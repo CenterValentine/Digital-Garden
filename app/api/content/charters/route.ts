@@ -1,17 +1,17 @@
 /**
  * Playbook registry API (AI v3.2 T3).
  *
- * GET /api/content/playbooks — list the current user's playbook notes for the
+ * GET /api/content/charters — list the current user's playbook notes for the
  * /playbook picker (id, title, description, phaseCount). See
- * lib/domain/ai/playbooks/registry.
+ * lib/domain/ai/charters/registry.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/infrastructure/auth";
-import { listPlaybooks } from "@/lib/domain/ai/playbooks/registry";
+import { listCharters } from "@/lib/domain/ai/charters/registry";
 import { logger, withRouteTrace, withSpan } from "@/lib/core/logger";
 
-const ROUTE_PATH = "/api/content/playbooks";
+const ROUTE_PATH = "/api/content/charters";
 
 export async function GET(request: NextRequest) {
   return withRouteTrace(request, { route: ROUTE_PATH }, async () => {
@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
         { summary: "session lookup" },
         async () => requireAuth(),
       );
-      const playbooks = await listPlaybooks(session.user.id);
+      const playbooks = await listCharters(session.user.id);
       return NextResponse.json({ success: true, data: { playbooks } });
     } catch (error) {
       if (error instanceof Error && error.message === "Authentication required") {

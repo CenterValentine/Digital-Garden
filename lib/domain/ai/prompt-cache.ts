@@ -33,9 +33,9 @@ export interface PromptCachePolicyInput {
   /** Final attached tool names; order must not affect cache identity. */
   toolNames: readonly string[];
   /** Present only when an attached/rooted playbook was validated. */
-  playbookId?: string | null;
+  charterId?: string | null;
   /** Standing rules + active phase (or the rooted playbook body). */
-  playbookContext?: string;
+  charterContext?: string;
 }
 
 export interface PromptCachePolicy {
@@ -99,7 +99,7 @@ export function buildPromptCachePolicy(
   input: PromptCachePolicyInput,
 ): PromptCachePolicy {
   const scope =
-    input.playbookId && input.playbookContext ? "playbook" : "general";
+    input.charterId && input.charterContext ? "playbook" : "general";
   const base: PromptCachePolicy = {
     enabled: false,
     policyVersion: PROMPT_CACHE_POLICY_VERSION,
@@ -116,7 +116,7 @@ export function buildPromptCachePolicy(
   const toolset = [...input.toolNames].sort().join("\n");
   const playbookFingerprint =
     scope === "playbook"
-      ? digest(`${input.playbookId}\0${input.playbookContext}`, 24)
+      ? digest(`${input.charterId}\0${input.charterContext}`, 24)
       : "general";
   const cacheIdentity = JSON.stringify({
     policy: PROMPT_CACHE_POLICY_VERSION,

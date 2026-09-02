@@ -68,7 +68,7 @@ jobs:
         run: pnpm typecheck
 
       - name: Playbook parser checks
-        run: pnpm playbooks:check
+        run: pnpm charters:check
 
       - name: Output-target checks
         run: pnpm output-targets:check

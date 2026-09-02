@@ -100,6 +100,11 @@ export interface TreeNode {
     characterCount?: number;
     readingTime?: number;
     /** Marked as a playbook (metadata.playbook). */
+    /** Charter flag — new stamp (P0a). */
+    charter?: boolean;
+    /** Charter description — new stamp (P0a). */
+    charterDescription?: string;
+    /** Legacy pre-rename charter flag; read-only compatibility. */
     playbook?: boolean;
     /** One-line description shown in the /playbook picker. */
     playbookDescription?: string;

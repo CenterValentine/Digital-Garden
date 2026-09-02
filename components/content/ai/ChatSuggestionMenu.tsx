@@ -80,7 +80,12 @@ export function ChatSuggestionMenu({
       ref={menuRef}
       className={cn(
         "absolute bottom-full left-0 right-0 mb-1 z-50",
-        "max-h-48 overflow-y-auto rounded-lg",
+        // Locked height (owner, 2026-09-02): mention search returns up to 16
+        // rows — the container holds a FIXED height once results are
+        // plentiful (no per-keystroke jitter while narrowing) and scrolls
+        // within it; sparse result sets keep the natural max-h cap.
+        mode === "mention" && items.length > 5 ? "h-48" : "max-h-48",
+        "overflow-y-auto rounded-lg",
         "border border-black/10 dark:border-white/10 bg-white dark:bg-[#1a1a1a] shadow-xl",
         "backdrop-blur-sm"
       )}

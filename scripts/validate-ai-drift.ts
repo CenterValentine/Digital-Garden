@@ -457,14 +457,14 @@ const basePromptCtx = {
 const promptText =
   buildSystemPrompt({
     ...basePromptCtx,
-    playbookContext: "playbook context",
-    hasAttachedPlaybook: true,
+    charterContext: "playbook context",
+    hasAttachedCharter: true,
   }) +
   "\n" +
   buildSystemPrompt({
     ...basePromptCtx,
-    playbookAwareness: "playbook awareness",
-    hasAttachedPlaybook: false,
+    charterAwareness: "playbook awareness",
+    hasAttachedCharter: false,
   });
 
 const descriptionText = [

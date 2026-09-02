@@ -4,7 +4,7 @@
  * TipTap JSON → markdown for MODEL CONTEXT (the text a playbook's phases/standing
  * rules become inside the chat system prompt). Two renderers with different jobs:
  *
- *   renderPlaybookSection(nodes, extensions)  — the LOSSLESS path (v3.6). Runs the
+ *   renderCharterSection(nodes, extensions)  — the LOSSLESS path (v3.6). Runs the
  *     section through the T2 self-verifying serializer (markdown-serialize.ts), so
  *     tables, callouts (`> [!note]`), links, and nested marks reach the model
  *     intact instead of being flattened or dropped. `[[wiki-links]]` are preserved
@@ -13,7 +13,7 @@
  *     module stays free of `extensions-server` so it's tsx-safe, exactly like the
  *     serializer it wraps.
  *
- *   renderPlaybookSectionPlain(nodes)  — the dependency-free path. A hand-rolled
+ *   renderCharterSectionPlain(nodes)  — the dependency-free path. A hand-rolled
  *     plain-text walk that preserves `[[wiki-links]]` and basic block structure.
  *     Used where rich fidelity is irrelevant and injecting extensions is undesirable
  *     (output-directive SCANNING, which only regexes for "output under chat" prose;
@@ -74,7 +74,7 @@ function restoreWikiLinks(markdown: string): string {
  *   serializer's env-split default is correct in the Next server); tsx callers
  *   inject a `@tiptap/html/server` bridge.
  */
-export function renderPlaybookSection(
+export function renderCharterSection(
   nodes: JSONContent[],
   extensions: Extensions,
   bridge?: HtmlBridge,
@@ -85,7 +85,7 @@ export function renderPlaybookSection(
     return restoreWikiLinks(tiptapToMarkdownRich(doc, extensions, bridge)).trim();
   } catch {
     // Never let a serializer edge case blank out a phase — degrade to plain text.
-    return renderPlaybookSectionPlain(nodes);
+    return renderCharterSectionPlain(nodes);
   }
 }
 
@@ -157,10 +157,10 @@ function renderBlock(node: JSONContent, listDepth = 0): string {
 /**
  * Render a section's top-level nodes to readable PLAIN TEXT, preserving
  * `[[wiki-links]]`. No editor extensions required — safe under tsx and cheap for
- * directive scanning. Lossy for tables/callouts/links (use `renderPlaybookSection`
+ * directive scanning. Lossy for tables/callouts/links (use `renderCharterSection`
  * when the model needs those).
  */
-export function renderPlaybookSectionPlain(nodes: JSONContent[]): string {
+export function renderCharterSectionPlain(nodes: JSONContent[]): string {
   return nodes
     .map((n) => renderBlock(n))
     .filter((s) => s.trim().length > 0)

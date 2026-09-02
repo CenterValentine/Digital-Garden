@@ -44,7 +44,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useImportSkillStore } from "@/state/import-skill-store";
-import { usePlaybookDialogStore } from "@/state/playbook-dialog-store";
+import { useCharterDialogStore } from "@/state/charter-dialog-store";
 import { useDataFlashcardsDialogStore } from "@/state/data-flashcards-dialog-store";
 import {
   findTableLink,
@@ -114,8 +114,8 @@ export interface FileTreeContext {
     nestedShortcutsHidden?: boolean;
     externalUrl?: string; // Phase 2: External link URL
     file?: { mimeType?: string } | null; // For supportsCustomIcon check
-    isPlaybook?: boolean; // v3.6: note/folder already marked as a playbook
-    playbookDescription?: string; // v3.6: seeds the edit-description dialog
+    isCharter?: boolean; // v3.6: note/folder already marked as a playbook
+    charterDescription?: string; // v3.6: seeds the edit-description dialog
   };
   /** Callbacks */
   onRename?: (id: string) => void; // Triggers inline edit mode
@@ -358,7 +358,7 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
   // --- Playbook (v3.6; consolidated off the editor context menu) ---
   // Import Skill turns a pasted SKILL.md into a marked playbook note.
   // Mark / Edit / Unmark act on a single note (or folder with a Notes payload);
-  // state-aware via clickedNode.isPlaybook so the menu shows the right verb.
+  // state-aware via clickedNode.isCharter so the menu shows the right verb.
   // Editing details opens a centered modal — a modal never grows the menu past
   // the viewport, unlike an inline input. The file's title is the playbook name
   // and its `##` sections are the phases.
@@ -373,17 +373,17 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
     ) {
       const playbookTitle = clickedNode.title;
       const contentId = clickedId;
-      if (clickedNode.isPlaybook) {
+      if (clickedNode.isCharter) {
         playbookActions.push(
           {
             id: "edit-playbook-details",
             label: "Edit Charter Details…",
             icon: <ScrollText className="h-4 w-4" />,
             onClick: () =>
-              usePlaybookDialogStore.getState().openDialog({
+              useCharterDialogStore.getState().openDialog({
                 contentId,
                 title: playbookTitle,
-                description: clickedNode.playbookDescription ?? "",
+                description: clickedNode.charterDescription ?? "",
                 editing: true,
               }),
           },
@@ -394,7 +394,7 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
             onClick: async () => {
               try {
                 const res = await fetch(
-                  `/api/content/playbooks/mark?contentId=${encodeURIComponent(contentId)}`,
+                  `/api/content/charters/mark?contentId=${encodeURIComponent(contentId)}`,
                   { method: "DELETE", credentials: "include" },
                 );
                 if (!res.ok) throw new Error("request failed");
@@ -412,7 +412,7 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
           label: "Mark as Charter…",
           icon: <ScrollText className="h-4 w-4" />,
           onClick: () =>
-            usePlaybookDialogStore.getState().openDialog({
+            useCharterDialogStore.getState().openDialog({
               contentId,
               title: playbookTitle,
               editing: false,

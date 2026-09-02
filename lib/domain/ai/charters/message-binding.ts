@@ -37,7 +37,7 @@ export function getLatestUserMessageText(
  * it as a playbook. Keep the cue narrow so ordinary questions asked while a
  * playbook-like note is open never enter execution mode.
  */
-export function requestsRootedPlaybookExecution(
+export function requestsRootedCharterExecution(
   messages: UserTextMessage[],
 ): boolean {
   const text = getLatestUserMessageText(messages);
@@ -52,37 +52,41 @@ export function requestsRootedPlaybookExecution(
 }
 
 /**
- * Durable UI representation of the playbook selected for a user turn.
+ * Durable UI representation of the charter selected for a user turn.
  *
- * This rides in a `data-playbook` UIMessage part: it is persisted and
+ * This rides in a `data-charter` UIMessage part: it is persisted and
  * rendered with the sent user message, while `convertToModelMessages`
- * ignores it. The server independently validates `playbookId` and adds the
+ * ignores it. The server independently validates `charterId` and adds the
  * authoritative message-level model context.
+ *
+ * Part-type compatibility (owner, 2026-09-02): messages sent before the
+ * rename persisted `data-playbook` parts — the parser accepts BOTH types
+ * forever; new parts are always emitted as `data-charter`.
  */
-export interface PlaybookMessageAttachment {
+export interface CharterMessageAttachment {
   id: string;
   title: string;
   phaseIndex: number;
   phaseCount: number;
 }
 
-export interface PlaybookMessageAttachmentPart {
-  type: "data-playbook";
-  data: PlaybookMessageAttachment;
+export interface CharterMessageAttachmentPart {
+  type: "data-charter" | "data-playbook";
+  data: CharterMessageAttachment;
 }
 
-export function createPlaybookMessageAttachmentPart(
-  attachment: PlaybookMessageAttachment,
-): PlaybookMessageAttachmentPart {
+export function createCharterMessageAttachmentPart(
+  attachment: CharterMessageAttachment,
+): CharterMessageAttachmentPart {
   return {
-    type: "data-playbook",
+    type: "data-charter",
     data: attachment,
   };
 }
 
-export function parsePlaybookMessageAttachment(
+export function parseCharterMessageAttachment(
   part: unknown,
-): PlaybookMessageAttachment | null {
+): CharterMessageAttachment | null {
   if (!part || typeof part !== "object") return null;
   const candidate = part as {
     type?: unknown;
@@ -94,7 +98,7 @@ export function parsePlaybookMessageAttachment(
     };
   };
   if (
-    candidate.type !== "data-playbook" ||
+    (candidate.type !== "data-charter" && candidate.type !== "data-playbook") ||
     typeof candidate.data?.id !== "string" ||
     typeof candidate.data.title !== "string"
   ) {
@@ -120,7 +124,7 @@ export function parsePlaybookMessageAttachment(
  * ignored a system-only Active Playbook section and followed rooted-content
  * context instead.
  */
-export function bindPlaybookToLatestUserMessage(
+export function bindCharterToLatestUserMessage(
   messages: ModelMessage[],
   title: string,
   source: "attached" | "rooted" = "attached",

@@ -11,12 +11,12 @@
  * See docs/notes-feature/work-tracking/AI-V3.2-T3-PLAYBOOKS-PLAN.md §2.
  *
  * Adapters are PURE (no Prisma, no server-only) so they run client-side for
- * preview and under tsx for tests. Note creation from an ImportedPlaybook is
+ * preview and under tsx for tests. Note creation from an ImportedCharter is
  * a separate server concern (the import route).
  */
 
 /** The internal shape every adapter produces from its source format. */
-export interface ImportedPlaybook {
+export interface ImportedCharter {
   /** → the playbook note's title. */
   name: string;
   /** → `metadata.playbookDescription` (the /playbook picker one-liner). */
@@ -34,5 +34,5 @@ export interface SkillImportAdapter {
   /** Cheap sniff: does this raw text look like this format? */
   detect(raw: string): boolean;
   /** Parse to the internal shape, or null if it isn't actually this format. */
-  parse(raw: string): ImportedPlaybook | null;
+  parse(raw: string): ImportedCharter | null;
 }

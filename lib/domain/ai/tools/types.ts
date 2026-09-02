@@ -6,8 +6,8 @@
  * plus editor tools (read_first_chunk, apply_diff, etc.) added in Sprint 39.
  */
 
-import type { PlaybookOutputDirective } from "../playbooks/output-directives";
-import type { PhaseCheckpointGate } from "../playbooks/checkpoint-gate";
+import type { CharterOutputDirective } from "../charters/output-directives";
+import type { PhaseCheckpointGate } from "../charters/checkpoint-gate";
 
 /** Context passed to tool execute functions from the API route */
 export interface ToolExecuteContext {
@@ -31,7 +31,7 @@ export interface ToolExecuteContext {
    * belt-and-braces habit (measured: 17k duplicate chars in one live run).
    * The pointer is absence-safe: the source is re-injected every request.
    */
-  activePlaybook?: { contentId: string; title: string };
+  activeCharter?: { contentId: string; title: string };
   /**
    * The bound Conversation entity id (sidebar multi-conv / full-page chat).
    * AI v3 core S3: lets tools associate created/read content with the
@@ -101,7 +101,7 @@ export interface ToolExecuteContext {
    * playbook. Write tools use these only when the model omits placement, and
    * only when the artifact title matches the directive's literal prefix.
    */
-  playbookOutputDirectives?: PlaybookOutputDirective[];
+  charterOutputDirectives?: CharterOutputDirective[];
   /**
    * Mutable request-scoped proof that externally verifiable current-phase
    * work actually ran before `phase_checkpoint` can request approval.

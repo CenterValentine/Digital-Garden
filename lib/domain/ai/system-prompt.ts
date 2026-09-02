@@ -174,16 +174,16 @@ export interface SystemPromptContext {
    * this string is stable turn-to-turn (only changes when the phase
    * advances), which keeps it prompt-cache-friendly.
    */
-  playbookContext?: string;
+  charterContext?: string;
   /**
    * Lightweight one-liner (AI v3.2 T3, Finding 2 fix) shown when the user is
    * chatting FROM a note/folder that is itself a playbook but hasn't attached
-   * it. Unlike `playbookContext`, this does NOT inject phase detail or flip
+   * it. Unlike `charterContext`, this does NOT inject phase detail or flip
    * the checkpoint cadence — it just makes the model aware it can run the
    * anchored playbook on request. Empty when not on a playbook or when one is
-   * explicitly attached (that path uses the full `playbookContext` instead).
+   * explicitly attached (that path uses the full `charterContext` instead).
    */
-  playbookAwareness?: string;
+  charterAwareness?: string;
   /**
    * What this chat is rooted in (title + type), so the model resolves "this
    * file / the current note / this playbook" to the chat's own subject
@@ -205,7 +205,7 @@ export interface SystemPromptContext {
    * next turn. Mention-based playbooks (whole note in context) keep the
    * continue-immediately cadence.
    */
-  hasAttachedPlaybook?: boolean;
+  hasAttachedCharter?: boolean;
   /**
    * Runtime-derived, provider-neutral proof requirements that must be
    * satisfied before the current phase can request checkpoint approval.
@@ -252,7 +252,7 @@ export function buildSystemPrompt(ctx: SystemPromptContext): string {
     // a phase it hasn't seen — it checkpoints and awaits the next turn.
     // Mention-based playbook = whole note in context, so continue-immediately
     // still holds.
-    const approvedCadence = ctx.hasAttachedPlaybook
+    const approvedCadence = ctx.hasAttachedCharter
       ? "This run uses an ATTACHED charter with progressive disclosure: ONLY the current phase's detail is in your context (the Phases list shows the run's shape, but not the other phases' text). So when a checkpoint is APPROVED, do NOT try to continue to the next phase in the same response — you have not been shown it. Instead, state in one line that the phase is approved and name what's next (from the Phases list), then STOP; the next phase's detail loads on the following turn. After the FINAL phase, give a short completion summary (artifacts + locations)."
       : "When a checkpoint is APPROVED (its result says so), continue IMMEDIATELY with the next phase in the same response — announce it in one line, then proceed; after the FINAL phase give a short completion summary (artifacts + locations) instead of stopping silently.";
     sections.push(
@@ -359,14 +359,14 @@ export function buildSystemPrompt(ctx: SystemPromptContext): string {
   // A validated Active Playbook is stable across separate runs of the same
   // unchanged phase. Keep it ahead of run-specific targeting/root context so
   // provider prefix caches can reuse the procedure while the subject changes.
-  if (ctx.playbookContext) sections.push(ctx.playbookContext);
+  if (ctx.charterContext) sections.push(ctx.charterContext);
   // What this chat is rooted in — stated before ambient playbook awareness so
   // "this file" resolves correctly. For an explicitly loaded playbook this
   // intentionally follows Active Playbook, preserving the reusable procedure
   // prefix across chats rooted in different content.
   if (ctx.rootedContentSection) sections.push(ctx.rootedContentSection);
   // Ambient-playbook awareness is a cheap hint, not executable phase context.
-  if (ctx.playbookAwareness) sections.push(ctx.playbookAwareness);
+  if (ctx.charterAwareness) sections.push(ctx.charterAwareness);
   // Date only (no time), after the cross-run playbook prefix. A date rollover
   // invalidates current-date/run context without invalidating the reusable
   // procedure prefix before it.

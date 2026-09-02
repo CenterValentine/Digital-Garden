@@ -29,7 +29,7 @@ import {
 import { upsertRunLedger } from "@/lib/domain/ai/run-ledger";
 import { computeTurnCost } from "@/lib/features/ai-connections/usage/pricing";
 import type { JSONContent } from "@tiptap/core";
-import { listPlaybooks, isPlaybookMetadata } from "@/lib/domain/ai/playbooks/registry";
+import { listCharters, isCharterMetadata } from "@/lib/domain/ai/charters/registry";
 import {
   generateUniqueSlug,
   extractSearchTextFromTipTap,
@@ -57,8 +57,8 @@ import {
   resolveToolOutputPlacement,
   type ToolOutputLocation,
 } from "./output-placement";
-import { resolvePlaybookOutputLocation } from "../playbooks/output-directives";
-import { getPhaseCheckpointGateStatus } from "../playbooks/checkpoint-gate";
+import { resolveCharterOutputLocation } from "../charters/output-directives";
+import { getPhaseCheckpointGateStatus } from "../charters/checkpoint-gate";
 import {
   writeNoteContent,
   isDestructiveRewrite,
@@ -1242,8 +1242,8 @@ export function createBaseTools(ctx: ToolExecuteContext) {
       }) => {
         const effectiveOutputLocation =
           (outputLocation as ToolOutputLocation | undefined) ??
-          resolvePlaybookOutputLocation(
-            ctx.playbookOutputDirectives,
+          resolveCharterOutputLocation(
+            ctx.charterOutputDirectives,
             title,
           );
         // Overwrite mode: replace an existing document's bytes at the same
@@ -1391,7 +1391,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           const excerpt = r.notePayload?.searchText?.slice(0, 150) || "";
           // Flag playbook notes inline so a generic search still surfaces
           // them unambiguously — no separate read needed to tell.
-          const tag = isPlaybookMetadata(r.notePayload?.metadata)
+          const tag = isCharterMetadata(r.notePayload?.metadata)
             ? " [CHARTER]"
             : "";
           return `${i + 1}. "${r.title}"${tag} (id: ${r.id})${excerpt ? `\n   ${excerpt}...` : ""}`;
@@ -1458,7 +1458,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           ),
       }),
       execute: async ({ query }) => {
-        const all = await listPlaybooks(ctx.userId);
+        const all = await listCharters(ctx.userId);
         const q = query?.trim().toLowerCase();
         const matches = q
           ? all.filter(
@@ -1491,8 +1491,8 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         // re-injected into the system prompt on EVERY request — answering a
         // re-read with a pointer saves the duplicate copy (17k chars in one
         // measured run) with zero information loss.
-        if (ctx.activePlaybook && contentId === ctx.activePlaybook.contentId) {
-          return `"${ctx.activePlaybook.title}" is ALREADY LOADED IN FULL in your system context as the Active Charter — no need to re-read it. Act on the charter content already provided above.`;
+        if (ctx.activeCharter && contentId === ctx.activeCharter.contentId) {
+          return `"${ctx.activeCharter.title}" is ALREADY LOADED IN FULL in your system context as the Active Charter — no need to re-read it. Act on the charter content already provided above.`;
         }
         const content = await prisma.contentNode.findFirst({
           where: {
@@ -1635,8 +1635,8 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           ctx,
           explicitParentId,
           (outputLocation as ToolOutputLocation | undefined) ??
-            resolvePlaybookOutputLocation(
-              ctx.playbookOutputDirectives,
+            resolveCharterOutputLocation(
+              ctx.charterOutputDirectives,
               title,
             ),
         );

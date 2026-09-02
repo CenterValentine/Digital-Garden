@@ -81,7 +81,7 @@ import {
   readPersistedCost,
 } from "@/lib/features/ai-connections/usage/pricing";
 import { ReasoningRouter } from "./reasoning/ReasoningRouter";
-import { parsePlaybookMessageAttachment } from "@/lib/domain/ai/playbooks/message-binding";
+import { parseCharterMessageAttachment } from "@/lib/domain/ai/charters/message-binding";
 import { parseFolderContextMentionPart } from "@/lib/domain/ai-context/mention-part";
 import {
   parseContentWriteReceipts,
@@ -804,8 +804,8 @@ export const ChatMessage = memo(function ChatMessage({
           // turn, rather than composer-only state. They render as a sent
           // attachment and are ignored by the SDK's model conversion; the
           // server adds independently validated model context.
-          if (part.type === "data-playbook") {
-            const playbook = parsePlaybookMessageAttachment(part);
+          if (part.type === "data-charter" || part.type === "data-playbook") {
+            const playbook = parseCharterMessageAttachment(part);
             if (!playbook) return null;
             const phaseLabel =
               playbook.phaseCount > 0

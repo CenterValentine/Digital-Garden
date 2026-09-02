@@ -18,8 +18,8 @@ const basePolicy = {
   modelId: "gpt-4o",
   userId: "user-123",
   toolNames: ["read_page", "search_web", "phase_checkpoint"],
-  playbookId: "playbook-123",
-  playbookContext: "Standing rules\nPhase A: Research the company",
+  charterId: "playbook-123",
+  charterContext: "Standing rules\nPhase A: Research the company",
 } as const;
 
 const firstRun = buildPromptCachePolicy(basePolicy);
@@ -40,7 +40,7 @@ assert.equal(
 
 const editedPlaybook = buildPromptCachePolicy({
   ...basePolicy,
-  playbookContext: "Standing rules\nPhase A: Research, verify, and cite",
+  charterContext: "Standing rules\nPhase A: Research, verify, and cite",
 });
 assert.notEqual(
   editedPlaybook.cacheKey,
@@ -50,7 +50,7 @@ assert.notEqual(
 
 const nextPhase = buildPromptCachePolicy({
   ...basePolicy,
-  playbookContext: "Standing rules\nPhase B: Draft the findings",
+  charterContext: "Standing rules\nPhase B: Draft the findings",
 });
 assert.notEqual(
   nextPhase.cacheKey,
@@ -149,8 +149,8 @@ const orderedPrompt = buildSystemPrompt({
   isChatContent: false,
   chatContentId: undefined,
   autoPronounceDefault: false,
-  playbookContext: "CACHEABLE_PLAYBOOK_PHASE",
-  playbookAwareness: "",
+  charterContext: "CACHEABLE_PLAYBOOK_PHASE",
+  charterAwareness: "",
   rootedContentSection: "RUN_SPECIFIC_ROOT",
   outputTargetSection: "RUN_SPECIFIC_OUTPUT_TARGET",
   userContextSection: "RUN_SPECIFIC_USER_CONTEXT",

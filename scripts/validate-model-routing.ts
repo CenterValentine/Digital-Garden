@@ -26,8 +26,8 @@ import {
   type RoutableModel,
   type ResolvedModelRoute,
 } from "../lib/domain/ai/model-directive";
-import { parsePlaybook } from "../lib/domain/ai/playbooks/parse";
-import { getPhaseModelDirective } from "../lib/domain/ai/playbooks/model-directives";
+import { parseCharter } from "../lib/domain/ai/charters/parse";
+import { getPhaseModelDirective } from "../lib/domain/ai/charters/model-directives";
 import { FEATURE_BY_ID, lookupFeature } from "../lib/domain/ai/features/registry";
 import { lookupTemplate } from "../lib/features/ai-connections/templates";
 
@@ -138,7 +138,7 @@ const doc = {
     { type: "paragraph", content: [{ type: "text", text: "Just write." }] },
   ],
 };
-const parsed = parsePlaybook(doc);
+const parsed = parseCharter(doc);
 assert.equal(parsed.phases.length, 3);
 assert.equal(parsed.phases[0].modelDirective, "writer");
 assert.equal(parsed.phases[1].modelDirective, "scout");
@@ -164,7 +164,7 @@ const docStanding = {
     { type: "paragraph", content: [{ type: "text", text: "Do the thing." }] },
   ],
 };
-const parsedStanding = parsePlaybook(docStanding);
+const parsedStanding = parseCharter(docStanding);
 assert.equal(parsedStanding.standingRules.modelDirective, "analyst");
 assert.deepEqual(getPhaseModelDirective(parsedStanding, 0), {
   directive: { kind: "role", role: "analyst" },
@@ -186,7 +186,7 @@ const mdDoc = {
     },
   ],
 };
-const mdParsed = parsePlaybook(mdDoc);
+const mdParsed = parseCharter(mdDoc);
 assert.equal(mdParsed.phases.length, 1);
 assert.equal(mdParsed.phases[0].modelDirective, "gpt-5 series");
 assert.deepEqual(getPhaseModelDirective(mdParsed, 0), {
@@ -202,7 +202,7 @@ const plainDoc = {
     { type: "paragraph", content: [{ type: "text", text: "No routing here." }] },
   ],
 };
-const plainParsed = parsePlaybook(plainDoc);
+const plainParsed = parseCharter(plainDoc);
 assert.equal(plainParsed.phases[0].modelDirective, undefined);
 assert.equal(getPhaseModelDirective(plainParsed, 0), null);
 
@@ -222,7 +222,7 @@ const codeBlockDoc = {
   ],
 };
 assert.equal(
-  parsePlaybook(codeBlockDoc).phases[0].modelDirective,
+  parseCharter(codeBlockDoc).phases[0].modelDirective,
   undefined,
   "a model: line inside a code block must not route",
 );
@@ -235,7 +235,7 @@ const midProseDoc = {
   ],
 };
 assert.equal(
-  parsePlaybook(midProseDoc).phases[0].modelDirective,
+  parseCharter(midProseDoc).phases[0].modelDirective,
   undefined,
   "a model: line that is not the phase's first line must not route",
 );

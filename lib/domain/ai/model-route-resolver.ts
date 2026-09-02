@@ -50,7 +50,7 @@ export interface AppliedModelRoute {
   modelId: string;
 }
 
-export async function resolvePlaybookModelRoute(
+export async function resolveCharterModelRoute(
   userId: string,
   directive: ModelDirective,
   userConns: ConnectionView[],

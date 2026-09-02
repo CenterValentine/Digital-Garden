@@ -10,7 +10,7 @@
  */
 
 import { skillMdAdapter } from "./skill-md";
-import type { ImportedPlaybook, SkillImportAdapter } from "./types";
+import type { ImportedCharter, SkillImportAdapter } from "./types";
 
 /** Registered import formats, in detection priority order. */
 export const IMPORT_ADAPTERS: SkillImportAdapter[] = [skillMdAdapter];
@@ -21,9 +21,9 @@ export function detectAdapter(raw: string): SkillImportAdapter | null {
 }
 
 /** Detect + parse in one step. Null when nothing recognizes/parses it. */
-export function importPlaybook(
+export function importCharter(
   raw: string,
-): { adapter: SkillImportAdapter; parsed: ImportedPlaybook } | null {
+): { adapter: SkillImportAdapter; parsed: ImportedCharter } | null {
   const adapter = detectAdapter(raw);
   if (!adapter) return null;
   const parsed = adapter.parse(raw);
@@ -32,4 +32,4 @@ export function importPlaybook(
 }
 
 export { skillMdAdapter } from "./skill-md";
-export type { ImportedPlaybook, SkillImportAdapter } from "./types";
+export type { ImportedCharter, SkillImportAdapter } from "./types";

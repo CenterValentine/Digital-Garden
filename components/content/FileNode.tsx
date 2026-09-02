@@ -334,8 +334,8 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
 
     // Charter (D6 "all distinct", P0a): a charter-marked note/folder gets a
     // full icon swap — ScrollText, indigo accent — an explicit customIcon
-    // above still wins. Storage flag remains `metadata.playbook` (legacy key).
-    if (data.note?.playbook) {
+    // above still wins. Dual-key: new stamp `charter`, legacy `playbook`.
+    if (data.note?.charter || data.note?.playbook) {
       return (
         <LucideIcons.ScrollText
           className={`${iconSize} text-indigo-500 dark:text-indigo-400`}
@@ -773,11 +773,15 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
           nestedShortcutsHidden,
           externalUrl: data.external?.url, // Phase 2: External link URL
           file: data.file || null, // For supportsCustomIcon check
-          isPlaybook: data.note?.playbook === true, // v3.6: state-aware Mark/Unmark
-          playbookDescription:
-            typeof data.note?.playbookDescription === "string"
-              ? data.note.playbookDescription
-              : "",
+          // Dual-key read (P0a): new stamp `charter`, legacy `playbook`.
+          isCharter:
+            data.note?.charter === true || data.note?.playbook === true,
+          charterDescription:
+            typeof data.note?.charterDescription === "string"
+              ? data.note.charterDescription
+              : typeof data.note?.playbookDescription === "string"
+                ? data.note.playbookDescription
+                : "",
         },
         // Pass callbacks to context menu
         onRename: () => {

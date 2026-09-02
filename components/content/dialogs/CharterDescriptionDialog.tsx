@@ -1,12 +1,12 @@
 /**
- * PlaybookDescriptionDialog
+ * CharterDescriptionDialog
  *
  * "Mark as Playbook" / "Edit Playbook Description" — a centered modal for the
  * one-line description shown in the /playbook picker. Opened from the file-tree
  * context menu (v3.6 moved this off the editor menu). A modal, not an inline
  * menu input: an inline input grows the context menu past the viewport and
  * forces a page scroll. The playbook NAME is always the file title (read-only
- * here); marking just flags NotePayload.metadata via POST /playbooks/mark
+ * here); marking just flags NotePayload.metadata via POST /charters/mark
  * (idempotent upsert, so the same route saves an edited description).
  *
  * Store-driven + <Body>-mounts-while-open, mirroring ImportSkillDialog so each
@@ -25,15 +25,15 @@ import {
 import { Button } from "@/components/ui/glass/button";
 import { Loader2, ScrollText } from "lucide-react";
 import { toast } from "sonner";
-import { usePlaybookDialogStore } from "@/state/playbook-dialog-store";
+import { useCharterDialogStore } from "@/state/charter-dialog-store";
 
-export function PlaybookDescriptionDialog() {
-  const open = usePlaybookDialogStore((s) => s.open);
-  const contentId = usePlaybookDialogStore((s) => s.contentId);
-  const title = usePlaybookDialogStore((s) => s.title);
-  const description = usePlaybookDialogStore((s) => s.description);
-  const editing = usePlaybookDialogStore((s) => s.editing);
-  const close = usePlaybookDialogStore((s) => s.close);
+export function CharterDescriptionDialog() {
+  const open = useCharterDialogStore((s) => s.open);
+  const contentId = useCharterDialogStore((s) => s.contentId);
+  const title = useCharterDialogStore((s) => s.title);
+  const description = useCharterDialogStore((s) => s.description);
+  const editing = useCharterDialogStore((s) => s.editing);
+  const close = useCharterDialogStore((s) => s.close);
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && close()}>
@@ -74,7 +74,7 @@ function Body({
     setBusy(true);
     setNotice(null);
     try {
-      const res = await fetch("/api/content/playbooks/mark", {
+      const res = await fetch("/api/content/charters/mark", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },

@@ -1,12 +1,12 @@
-import type { ParsedPlaybook, PlaybookSection } from "./parse";
-import { renderPlaybookSectionPlain } from "./render";
+import type { ParsedCharter, CharterSection } from "./parse";
+import { renderCharterSectionPlain } from "./render";
 
 export type RelativeOutputLocation =
   | "under_chat"
   | "under_content"
   | "beside_content";
 
-export interface PlaybookOutputDirective {
+export interface CharterOutputDirective {
   location: RelativeOutputLocation;
   /** Literal title prefix before a placeholder such as [COMPANY NAME]. */
   titlePrefix: string;
@@ -74,8 +74,8 @@ function titlePrefixFromDirective(text: string): string | null {
 export function extractOutputDirectivesFromText(
   text: string,
   phaseTitle?: string,
-): PlaybookOutputDirective[] {
-  const directives: PlaybookOutputDirective[] = [];
+): CharterOutputDirective[] {
+  const directives: CharterOutputDirective[] = [];
   for (const line of text.split(/\r?\n/)) {
     if (!/\boutput\b/i.test(line)) continue;
     const location = inferRelativeLocation(line);
@@ -90,19 +90,19 @@ export function extractOutputDirectivesFromText(
   return directives;
 }
 
-function extractFromSection(section: PlaybookSection): PlaybookOutputDirective[] {
+function extractFromSection(section: CharterSection): CharterOutputDirective[] {
   // Plain text is sufficient (and extension-free): directive scanning only
   // regexes for "output … under chat/content" prose, never table/callout detail.
   return extractOutputDirectivesFromText(
-    renderPlaybookSectionPlain(section.content),
+    renderCharterSectionPlain(section.content),
     section.title || undefined,
   );
 }
 
-export function extractPlaybookOutputDirectives(
-  playbook: ParsedPlaybook,
+export function extractCharterOutputDirectives(
+  playbook: ParsedCharter,
   phaseIndexes?: number[],
-): PlaybookOutputDirective[] {
+): CharterOutputDirective[] {
   const selectedPhases = phaseIndexes
     ? phaseIndexes.flatMap((index) => playbook.phases[index] ?? [])
     : playbook.phases;
@@ -112,8 +112,8 @@ export function extractPlaybookOutputDirectives(
   ];
 }
 
-export function resolvePlaybookOutputLocation(
-  directives: PlaybookOutputDirective[] | undefined,
+export function resolveCharterOutputLocation(
+  directives: CharterOutputDirective[] | undefined,
   artifactTitle: string,
 ): RelativeOutputLocation | undefined {
   if (!directives?.length) return undefined;

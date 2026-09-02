@@ -3,8 +3,8 @@
  *
  * "Import Skill as Playbook" — paste an Anthropic SKILL.md (or load a .md
  * file) and it becomes a marked playbook note (its `##` sections are phases).
- * Thin front-end over POST /api/content/playbooks/import; format detection +
- * parsing live in lib/domain/ai/playbooks/import (adapter-based, so fabric /
+ * Thin front-end over POST /api/content/charters/import; format detection +
+ * parsing live in lib/domain/ai/charters/import (adapter-based, so fabric /
  * MCP formats slot in later without touching this dialog).
  *
  * Store-driven + <Body>-mounts-while-open, mirroring FolderAssistantDialog so
@@ -74,7 +74,7 @@ function Body({
     setBusy(true);
     setNotice(null);
     try {
-      const res = await fetch("/api/content/playbooks/import", {
+      const res = await fetch("/api/content/charters/import", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },

@@ -36,7 +36,7 @@ import {
 import type { ChatStatus } from "ai";
 import type {
   ChatAttachment,
-  ActivePlaybook,
+  ActiveCharter,
 } from "@/lib/domain/ai/use-conversation-engine";
 import { useTreeDragStore } from "@/state/tree-drag-store";
 import { useImagePreviewStore } from "@/state/image-preview-store";
@@ -81,7 +81,7 @@ interface ChatInputProps {
   /** Static list of / command items (tool hints + playbook attach entries) */
   commandItems?: SuggestionItem[];
   /** Called when a `/` selection is a playbook (contentType "playbook") — attach instead of inserting text. */
-  onAttachPlaybook?: (item: SuggestionItem) => void;
+  onAttachCharter?: (item: SuggestionItem) => void;
   /**
    * Fires after a mention pill is inserted. Folder mentions use this to
    * start the pre-flight context gate (plan Phase 4 / sweep B5) while the
@@ -95,9 +95,9 @@ interface ChatInputProps {
    */
   onResolveMention?: (item: SuggestionItem) => Promise<SuggestionItem | null>;
   /** The playbook currently attached to this conversation, if any. */
-  activePlaybook?: ActivePlaybook | null;
+  activeCharter?: ActiveCharter | null;
   /** Detach the active playbook (dismiss the chip). */
-  onDetachPlaybook?: () => void;
+  onDetachCharter?: () => void;
   /**
    * Slot for controls on the left of the footer row — typically the
    * make/model picker.
@@ -122,11 +122,11 @@ export function ChatInput({
   onMentionSearch,
   mentionResults = [],
   commandItems = [],
-  onAttachPlaybook,
+  onAttachCharter,
   onMentionInserted,
   onResolveMention,
-  activePlaybook = null,
-  onDetachPlaybook,
+  activeCharter = null,
+  onDetachCharter,
   footerLeading,
   attachments = [],
   onAddFiles,
@@ -432,7 +432,7 @@ export function ChatInput({
       } else if (item.contentType === "charter") {
         // Attach, don't insert text — the trigger text was already deleted
         // above. The composer chip (below) shows what's attached.
-        onAttachPlaybook?.(item);
+        onAttachCharter?.(item);
       } else {
         const inserted = document.createTextNode(item.insertText ?? item.label);
         replaceRange.insertNode(inserted);
@@ -443,7 +443,7 @@ export function ChatInput({
       emit();
       root.focus();
     },
-    [closeSuggestions, emit, onAttachPlaybook, onMentionInserted, onResolveMention, suggestionMode],
+    [closeSuggestions, emit, onAttachCharter, onMentionInserted, onResolveMention, suggestionMode],
   );
 
   // ── submit / keyboard ──
@@ -697,20 +697,20 @@ export function ChatInput({
         )}
 
         {/* Active charter chip (AI v3.2 T3; charter vocabulary P0a) */}
-        {activePlaybook && (
+        {activeCharter && (
           <div className="flex flex-wrap gap-1.5 px-2.5 pt-2.5">
             <span className="inline-flex items-center gap-1.5 rounded-md border border-indigo-500/30 bg-indigo-500/10 px-2 py-1 text-[11px] text-indigo-700 dark:text-indigo-300">
               <ScrollText className="h-3 w-3 shrink-0" />
-              <span className="truncate max-w-[160px]">{activePlaybook.title}</span>
-              {activePlaybook.phaseCount > 0 && (
+              <span className="truncate max-w-[160px]">{activeCharter.title}</span>
+              {activeCharter.phaseCount > 0 && (
                 <span className="text-indigo-500/70 dark:text-indigo-400/70">
-                  · Phase {Math.min(activePlaybook.phaseIndex + 1, activePlaybook.phaseCount)}/
-                  {activePlaybook.phaseCount}
+                  · Phase {Math.min(activeCharter.phaseIndex + 1, activeCharter.phaseCount)}/
+                  {activeCharter.phaseCount}
                 </span>
               )}
               <button
                 type="button"
-                onClick={onDetachPlaybook}
+                onClick={onDetachCharter}
                 aria-label="Detach charter"
                 className="shrink-0 text-indigo-500/70 hover:text-red-400 transition-colors"
               >
