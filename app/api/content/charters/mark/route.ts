@@ -1,11 +1,11 @@
 /**
  * Mark-as-playbook action (AI v3.2 T3).
  *
- * POST /api/content/playbooks/mark — hand-authoring path (primary use
+ * POST /api/content/charters/mark — hand-authoring path (primary use
  * case): flag an existing note OR folder as a playbook via
  * NotePayload.metadata (folders can carry a notePayload too — the folder
  * "Notes" editor). The `##` sections are already phases (see
- * lib/domain/ai/playbooks/parse.ts); this just marks it discoverable in
+ * lib/domain/ai/charters/parse.ts); this just marks it discoverable in
  * the /playbook picker.
  */
 
@@ -14,13 +14,13 @@ import { requireAuth } from "@/lib/infrastructure/auth";
 import { prisma } from "@/lib/database/client";
 import type { Prisma } from "@/lib/database/generated/prisma";
 import {
-  isPlaybookMetadata,
-  stripPlaybookMetadata,
-  withPlaybookMetadata,
-} from "@/lib/domain/ai/playbooks/registry";
+  isCharterMetadata,
+  stripCharterMetadata,
+  withCharterMetadata,
+} from "@/lib/domain/ai/charters/registry";
 import { logger, withRouteTrace, withSpan } from "@/lib/core/logger";
 
-const ROUTE_PATH = "/api/content/playbooks/mark";
+const ROUTE_PATH = "/api/content/charters/mark";
 
 export async function POST(request: NextRequest) {
   return withRouteTrace(request, { route: ROUTE_PATH }, async () => {
@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const metadata = withPlaybookMetadata(
+      const metadata = withCharterMetadata(
         (node.notePayload?.metadata as Record<string, unknown> | null) ?? null,
         description,
       );
@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
 }
 
 /**
- * DELETE /api/content/playbooks/mark?contentId=… — the "unmark" path.
+ * DELETE /api/content/charters/mark?contentId=… — the "unmark" path.
  * Strips the playbook markers from NotePayload.metadata while preserving any
  * other metadata. Idempotent: unmarking something that isn't a playbook (or has
  * no payload row) succeeds with `wasPlaybook: false` rather than erroring.
@@ -141,14 +141,14 @@ export async function DELETE(request: NextRequest) {
       const metadata =
         (node.notePayload?.metadata as Record<string, unknown> | null) ?? null;
       // Nothing to strip — no payload row, or not actually marked. Idempotent success.
-      if (!node.notePayload || !isPlaybookMetadata(metadata)) {
+      if (!node.notePayload || !isCharterMetadata(metadata)) {
         return NextResponse.json({ success: true, wasPlaybook: false });
       }
 
       await prisma.notePayload.update({
         where: { contentId: node.id },
         data: {
-          metadata: stripPlaybookMetadata(metadata) as unknown as Prisma.InputJsonValue,
+          metadata: stripCharterMetadata(metadata) as unknown as Prisma.InputJsonValue,
         },
       });
 

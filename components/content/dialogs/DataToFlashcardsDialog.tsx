@@ -8,7 +8,7 @@
  * toast reports created/updated/unchanged rather than a bare count.
  *
  * Store-driven + <Body>-mounts-while-open, mirroring
- * PlaybookDescriptionDialog so each open starts fresh with no reset
+ * CharterDescriptionDialog so each open starts fresh with no reset
  * effect. Columns are fetched on open — the dialog can be launched from
  * the file tree, where no table state is loaded yet.
  */

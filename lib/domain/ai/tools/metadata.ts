@@ -37,7 +37,7 @@ export const BASE_TOOL_IDS = [
   "read_folder_context",
   "create_docx",
   "searchNotes",
-  "search_playbooks",
+  "search_charters",
   "getCurrentNote",
   "createNote",
   "updateNote",
@@ -80,12 +80,12 @@ export const BASE_TOOL_METADATA: Record<BaseToolId, BaseToolMeta> = {
   phase_checkpoint: {
     name: "Phase Checkpoint",
     description:
-      "Pause a multi-phase playbook for your verdict (approve / revise / tweak) and record the Run Ledger",
+      "Pause a multi-phase charter for your verdict (approve / revise / tweak) and record the Run Ledger",
   },
   create_folder: {
     name: "Create Folder",
     description:
-      "Find or create a folder (playbook destinations like job-search/{Company})",
+      "Find or create a folder (charter destinations like job-search/{Company})",
   },
   create_shortcut: {
     name: "Create Shortcut",
@@ -106,9 +106,9 @@ export const BASE_TOOL_METADATA: Record<BaseToolId, BaseToolMeta> = {
     name: "Search Notes",
     description: "Search through your notes by title or content",
   },
-  search_playbooks: {
-    name: "Search Playbooks",
-    description: "List/search playbooks by name or topic (scoped, not generic note search)",
+  search_charters: {
+    name: "Search Charters",
+    description: "List/search charters by name or topic (scoped, not generic note search)",
   },
   getCurrentNote: {
     name: "Read Note",
@@ -235,7 +235,7 @@ export const TOOL_GROUPS: ReadonlyArray<{
 }> = [
   {
     label: "Core",
-    description: "Web, notes, folders, playbooks, media, and notifications.",
+    description: "Web, notes, folders, charters, media, and notifications.",
     ids: BASE_TOOL_IDS,
   },
   {

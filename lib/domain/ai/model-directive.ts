@@ -174,7 +174,7 @@ export function resolveModelClass(
 // NOTE (review fix): an earlier revision shipped a `data-model-route`
 // user-message part here ("durable turn replay") that nothing produced or
 // consumed — deleted rather than left as dead API. Continuations today
-// re-resolve from turn-start inputs (playbookId + activePhaseIndex ride the
+// re-resolve from turn-start inputs (charterId + activePhaseIndex ride the
 // transport's turn snapshot); a true stamped-part replay rung is a
 // documented followup in AI-V3.4-MODEL-ROUTING-PLAN.md.
 
@@ -284,16 +284,16 @@ export function describeModelRouteSource(route: ResolvedModelRoute): string {
       return "by you";
     case "playbook-phase":
       return route.playbookTitle
-        ? `by playbook "${route.playbookTitle}"${
+        ? `by charter "${route.playbookTitle}"${
             typeof route.phaseIndex === "number"
               ? ` (Phase ${route.phaseIndex + 1})`
               : ""
           }`
-        : "by playbook";
+        : "by charter";
     case "playbook":
       return route.playbookTitle
-        ? `by playbook "${route.playbookTitle}"`
-        : "by playbook";
+        ? `by charter "${route.playbookTitle}"`
+        : "by charter";
     case "settings":
       return "by settings";
     case "default":

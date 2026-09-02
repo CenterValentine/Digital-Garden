@@ -4,7 +4,7 @@
  * Opened from the file-tree context menu ("Import Skill as Playbook…"). The
  * right-clicked folder, if any, seeds the destination so the imported
  * playbook lands where the user asked. See ImportSkillDialog +
- * lib/domain/ai/playbooks/import.
+ * lib/domain/ai/charters/import.
  */
 
 import { create } from "zustand";

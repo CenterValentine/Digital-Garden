@@ -8,7 +8,7 @@
  * sent user message (the durable trace), ignored by convertToModelMessages.
  * The SERVER re-runs the gate at send regardless (authoritative half).
  *
- * Pure types + helpers — client-safe, mirrors playbooks/message-binding.ts.
+ * Pure types + helpers — client-safe, mirrors charters/message-binding.ts.
  */
 
 export type FolderMentionStatus =

@@ -1,9 +1,9 @@
 /**
  * Playbook import API (AI v3.2 T3, P5-import).
  *
- * POST /api/content/playbooks/import — paste a SKILL.md (or any registered
+ * POST /api/content/charters/import — paste a SKILL.md (or any registered
  * format) and get a marked playbook note. Body: { raw, parentId? }.
- * Detection + parsing is adapter-based (lib/domain/ai/playbooks/import); this
+ * Detection + parsing is adapter-based (lib/domain/ai/charters/import); this
  * route only turns the parsed result into a note.
  */
 
@@ -16,11 +16,11 @@ import {
   markdownToTiptap,
   extractSearchTextFromTipTap,
 } from "@/lib/domain/content";
-import { withPlaybookMetadata } from "@/lib/domain/ai/playbooks/registry";
-import { importPlaybook } from "@/lib/domain/ai/playbooks/import";
+import { withCharterMetadata } from "@/lib/domain/ai/charters/registry";
+import { importCharter } from "@/lib/domain/ai/charters/import";
 import { logger, withRouteTrace, withSpan } from "@/lib/core/logger";
 
-const ROUTE_PATH = "/api/content/playbooks/import";
+const ROUTE_PATH = "/api/content/charters/import";
 
 export async function POST(request: NextRequest) {
   return withRouteTrace(request, { route: ROUTE_PATH }, async () => {
@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const result = importPlaybook(raw);
+      const result = importCharter(raw);
       if (!result) {
         return NextResponse.json(
           {
@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
             create: {
               tiptapJson: tiptapJson as unknown as Prisma.InputJsonValue,
               searchText,
-              metadata: withPlaybookMetadata(
+              metadata: withCharterMetadata(
                 null,
                 parsed.description,
               ) as unknown as Prisma.InputJsonValue,

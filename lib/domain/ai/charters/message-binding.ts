@@ -37,7 +37,7 @@ export function getLatestUserMessageText(
  * it as a playbook. Keep the cue narrow so ordinary questions asked while a
  * playbook-like note is open never enter execution mode.
  */
-export function requestsRootedPlaybookExecution(
+export function requestsRootedCharterExecution(
   messages: UserTextMessage[],
 ): boolean {
   const text = getLatestUserMessageText(messages);
@@ -52,37 +52,41 @@ export function requestsRootedPlaybookExecution(
 }
 
 /**
- * Durable UI representation of the playbook selected for a user turn.
+ * Durable UI representation of the charter selected for a user turn.
  *
- * This rides in a `data-playbook` UIMessage part: it is persisted and
+ * This rides in a `data-charter` UIMessage part: it is persisted and
  * rendered with the sent user message, while `convertToModelMessages`
- * ignores it. The server independently validates `playbookId` and adds the
+ * ignores it. The server independently validates `charterId` and adds the
  * authoritative message-level model context.
+ *
+ * Part-type compatibility (owner, 2026-09-02): messages sent before the
+ * rename persisted `data-playbook` parts — the parser accepts BOTH types
+ * forever; new parts are always emitted as `data-charter`.
  */
-export interface PlaybookMessageAttachment {
+export interface CharterMessageAttachment {
   id: string;
   title: string;
   phaseIndex: number;
   phaseCount: number;
 }
 
-export interface PlaybookMessageAttachmentPart {
-  type: "data-playbook";
-  data: PlaybookMessageAttachment;
+export interface CharterMessageAttachmentPart {
+  type: "data-charter" | "data-playbook";
+  data: CharterMessageAttachment;
 }
 
-export function createPlaybookMessageAttachmentPart(
-  attachment: PlaybookMessageAttachment,
-): PlaybookMessageAttachmentPart {
+export function createCharterMessageAttachmentPart(
+  attachment: CharterMessageAttachment,
+): CharterMessageAttachmentPart {
   return {
-    type: "data-playbook",
+    type: "data-charter",
     data: attachment,
   };
 }
 
-export function parsePlaybookMessageAttachment(
+export function parseCharterMessageAttachment(
   part: unknown,
-): PlaybookMessageAttachment | null {
+): CharterMessageAttachment | null {
   if (!part || typeof part !== "object") return null;
   const candidate = part as {
     type?: unknown;
@@ -94,7 +98,7 @@ export function parsePlaybookMessageAttachment(
     };
   };
   if (
-    candidate.type !== "data-playbook" ||
+    (candidate.type !== "data-charter" && candidate.type !== "data-playbook") ||
     typeof candidate.data?.id !== "string" ||
     typeof candidate.data.title !== "string"
   ) {
@@ -120,18 +124,18 @@ export function parsePlaybookMessageAttachment(
  * ignored a system-only Active Playbook section and followed rooted-content
  * context instead.
  */
-export function bindPlaybookToLatestUserMessage(
+export function bindCharterToLatestUserMessage(
   messages: ModelMessage[],
   title: string,
   source: "attached" | "rooted" = "attached",
 ): ModelMessage[] {
   const binding =
     source === "attached"
-      ? `[Attached playbook selected by the user: "${title}". ` +
-        "This is the procedure to execute for the request below. Its validated current-phase instructions are in the Active Playbook system section. " +
-        "Do not read rooted content to identify or discover the playbook; use rooted content only when the request or active phase actually requires it.]"
-      : `[The user explicitly asked to execute the rooted content "${title}" as a playbook. ` +
-        "Its validated instructions are in the Active Playbook system section. Follow that playbook directly; do not search for or substitute another one.]";
+      ? `[Attached charter selected by the user: "${title}". ` +
+        "This is the procedure to execute for the request below. Its validated current-phase instructions are in the Active Charter system section. " +
+        "Do not read rooted content to identify or discover the charter; use rooted content only when the request or active phase actually requires it.]"
+      : `[The user explicitly asked to execute the rooted content "${title}" as a charter. ` +
+        "Its validated instructions are in the Active Charter system section. Follow that charter directly; do not search for or substitute another one.]";
   const next = [...messages];
 
   for (let index = next.length - 1; index >= 0; index -= 1) {

@@ -3,8 +3,8 @@
  *
  * "Import Skill as Playbook" — paste an Anthropic SKILL.md (or load a .md
  * file) and it becomes a marked playbook note (its `##` sections are phases).
- * Thin front-end over POST /api/content/playbooks/import; format detection +
- * parsing live in lib/domain/ai/playbooks/import (adapter-based, so fabric /
+ * Thin front-end over POST /api/content/charters/import; format detection +
+ * parsing live in lib/domain/ai/charters/import (adapter-based, so fabric /
  * MCP formats slot in later without touching this dialog).
  *
  * Store-driven + <Body>-mounts-while-open, mirroring FolderAssistantDialog so
@@ -74,7 +74,7 @@ function Body({
     setBusy(true);
     setNotice(null);
     try {
-      const res = await fetch("/api/content/playbooks/import", {
+      const res = await fetch("/api/content/charters/import", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -96,7 +96,7 @@ function Body({
         contentType: "note",
         pin: true,
       });
-      toast.success(`Imported "${title}" as a playbook`);
+      toast.success(`Imported "${title}" as a charter`);
       onClose();
     } catch {
       setBusy(false);
@@ -109,7 +109,7 @@ function Body({
       <DialogHeader>
         <DialogTitle className="flex items-center gap-2">
           <BookUp className="h-4 w-4 text-indigo-400" />
-          Import Skill as Playbook
+          Import Skill as Charter
         </DialogTitle>
       </DialogHeader>
 
@@ -120,8 +120,8 @@ function Body({
           <code className="text-[11px]">name</code> +{" "}
           <code className="text-[11px]">description</code>, then a markdown
           body). Its <code className="text-[11px]">##</code> sections become the
-          playbook&apos;s phases, and it&apos;s marked so it shows in the{" "}
-          <code className="text-[11px]">/playbook</code> picker.
+          charter&apos;s phases, and it&apos;s marked so it shows in the{" "}
+          <code className="text-[11px]">/charter</code> picker.
         </p>
 
         <textarea

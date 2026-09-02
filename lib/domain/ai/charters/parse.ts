@@ -16,20 +16,20 @@
 
 import type { JSONContent } from "@tiptap/core";
 
-export interface PlaybookReference {
+export interface CharterReference {
   /** The linked note's title (wikiLink `targetTitle`). */
   targetTitle: string;
   /** Optional display alias (`[[Title|Alias]]`). */
   displayText?: string;
 }
 
-export interface PlaybookSection {
+export interface CharterSection {
   /** Heading text (phase title). Empty string for the standing-rules section. */
   title: string;
   /** Top-level TipTap nodes in this section (the phase heading is excluded). */
   content: JSONContent[];
   /** `[[wiki-link]]` references found anywhere in this section. */
-  references: PlaybookReference[];
+  references: CharterReference[];
   /**
    * Raw value of a `model:` directive line in this section, if any (AI 3.4).
    * Kept verbatim here (e.g. "scout", "gpt-5 series", "anthropic/claude-opus-4");
@@ -39,11 +39,11 @@ export interface PlaybookSection {
   modelDirective?: string;
 }
 
-export interface ParsedPlaybook {
+export interface ParsedCharter {
   /** Content before the first phase heading — always injected. */
-  standingRules: PlaybookSection;
+  standingRules: CharterSection;
   /** One section per phase heading, in document order. */
-  phases: PlaybookSection[];
+  phases: CharterSection[];
   /** The heading level that delimits phases (shallowest top-level heading), or null. */
   phaseLevel: number | null;
 }
@@ -59,8 +59,8 @@ function headingText(node: JSONContent): string {
 }
 
 /** Collect distinct `[[wiki-link]]` references anywhere within the given nodes. */
-export function collectReferences(nodes: JSONContent[]): PlaybookReference[] {
-  const refs: PlaybookReference[] = [];
+export function collectReferences(nodes: JSONContent[]): CharterReference[] {
+  const refs: CharterReference[] = [];
   const seen = new Set<string>();
   const addReference = (target: string, display?: string) => {
     const targetTitle = target.trim();
@@ -159,7 +159,7 @@ function extractModelDirective(content: JSONContent[]): string | undefined {
   return value || undefined;
 }
 
-function textSection(title: string, lines: string[]): PlaybookSection {
+function textSection(title: string, lines: string[]): CharterSection {
   const text = lines.join("\n").trim();
   const content: JSONContent[] = text
     ? [{ type: "paragraph", content: [{ type: "text", text }] }]
@@ -182,7 +182,7 @@ function textSection(title: string, lines: string[]): PlaybookSection {
  * lines rather than TipTap heading nodes. Treating that marked note as
  * "0 phases" made an explicit attachment disappear from model context.
  */
-function parseMarkdownLikePlaybook(nodes: JSONContent[]): ParsedPlaybook | null {
+function parseMarkdownLikePlaybook(nodes: JSONContent[]): ParsedCharter | null {
   const source = stripYamlFrontmatter(markdownLikeText(nodes));
   if (!source) return null;
 
@@ -222,7 +222,7 @@ function parseMarkdownLikePlaybook(nodes: JSONContent[]): ParsedPlaybook | null 
 }
 
 /** Split a playbook note's TipTap JSON into standing rules + phases. */
-export function parsePlaybook(doc: JSONContent): ParsedPlaybook {
+export function parseCharter(doc: JSONContent): ParsedCharter {
   const top = doc?.content ?? [];
 
   // Phases are delimited by the SHALLOWEST top-level heading level present, so
@@ -235,8 +235,8 @@ export function parsePlaybook(doc: JSONContent): ParsedPlaybook {
   }
 
   const standing: JSONContent[] = [];
-  const phases: PlaybookSection[] = [];
-  let current: PlaybookSection | null = null;
+  const phases: CharterSection[] = [];
+  let current: CharterSection | null = null;
 
   for (const node of top) {
     const isPhaseHeading =

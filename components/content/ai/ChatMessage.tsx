@@ -33,6 +33,7 @@ import {
   FolderPlus,
   GitBranch,
   Globe,
+  ScrollText,
   GripVertical,
   Image as ImageIcon,
   ImagePlus,
@@ -80,7 +81,7 @@ import {
   readPersistedCost,
 } from "@/lib/features/ai-connections/usage/pricing";
 import { ReasoningRouter } from "./reasoning/ReasoningRouter";
-import { parsePlaybookMessageAttachment } from "@/lib/domain/ai/playbooks/message-binding";
+import { parseCharterMessageAttachment } from "@/lib/domain/ai/charters/message-binding";
 import { parseFolderContextMentionPart } from "@/lib/domain/ai-context/mention-part";
 import {
   parseContentWriteReceipts,
@@ -803,8 +804,8 @@ export const ChatMessage = memo(function ChatMessage({
           // turn, rather than composer-only state. They render as a sent
           // attachment and are ignored by the SDK's model conversion; the
           // server adds independently validated model context.
-          if (part.type === "data-playbook") {
-            const playbook = parsePlaybookMessageAttachment(part);
+          if (part.type === "data-charter" || part.type === "data-playbook") {
+            const playbook = parseCharterMessageAttachment(part);
             if (!playbook) return null;
             const phaseLabel =
               playbook.phaseCount > 0
@@ -813,10 +814,10 @@ export const ChatMessage = memo(function ChatMessage({
             return (
               <div
                 key={i}
-                title="Playbook attached to this message"
+                title="Charter attached to this message"
                 className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-indigo-500/30 bg-indigo-500/[0.08] px-2.5 py-1.5 text-xs text-indigo-700 dark:text-indigo-300"
               >
-                <GitBranch className="h-3.5 w-3.5 shrink-0" />
+                <ScrollText className="h-3.5 w-3.5 shrink-0" />
                 <span className="truncate">{playbook.title}</span>
                 {phaseLabel && (
                   <span className="shrink-0 text-indigo-500/80 dark:text-indigo-300/70">
@@ -2314,7 +2315,7 @@ function PhaseCheckpointCard({
   return (
     <div className="rounded-lg border border-indigo-400/40 bg-indigo-500/[0.06] text-xs overflow-hidden">
       <div className="flex items-center gap-2 px-3 py-1.5">
-        <GitBranch className="h-3 w-3 shrink-0 text-indigo-400" />
+        <ScrollText className="h-3 w-3 shrink-0 text-indigo-400" />
         <span className="font-medium text-gray-700 dark:text-gray-300 truncate">
           {data.phase
             ? `Phase checkpoint: ${data.phase}`

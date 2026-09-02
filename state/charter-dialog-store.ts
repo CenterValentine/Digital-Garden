@@ -2,7 +2,7 @@
  * Playbook-description dialog state (transient — not persisted).
  *
  * Opened from the file-tree context menu ("Mark as Playbook…" / "Edit Playbook
- * Description…"). A centered modal (see PlaybookDescriptionDialog) rather than an
+ * Description…"). A centered modal (see CharterDescriptionDialog) rather than an
  * inline menu input — an inline input grows the context menu past the viewport
  * and forces a page scroll (v3.6 UX fix). The playbook's NAME is always the
  * file's title; only the one-line description is editable here.
@@ -29,7 +29,7 @@ interface PlaybookDialogState {
   close: () => void;
 }
 
-export const usePlaybookDialogStore = create<PlaybookDialogState>((set) => ({
+export const useCharterDialogStore = create<PlaybookDialogState>((set) => ({
   open: false,
   contentId: null,
   title: "",

@@ -99,7 +99,7 @@ import {
   writeStoredOutputTarget,
   type OutputTarget,
 } from "@/lib/domain/ai/output-target";
-import { createPlaybookMessageAttachmentPart } from "@/lib/domain/ai/playbooks/message-binding";
+import { createCharterMessageAttachmentPart } from "@/lib/domain/ai/charters/message-binding";
 import {
   createFolderContextMentionPart,
   type FolderContextMentionData,
@@ -540,13 +540,13 @@ export interface UseConversationEngineResult {
   /** Tool-hint commands + playbook attach entries for the `/` menu. */
   commandItems: SuggestionItem[];
 
-  // ── playbooks (AI v3.2 T3) ──
+  // ── charters (AI v3.2 T3) ──
   /** The playbook attached to this conversation, or null. */
-  activePlaybook: ActivePlaybook | null;
+  activeCharter: ActiveCharter | null;
   /** Attach a playbook — called when ChatInput's `/` selection is a playbook. */
-  attachPlaybook: (item: SuggestionItem) => void;
+  attachCharter: (item: SuggestionItem) => void;
   /** Detach the active playbook (dismiss the composer chip). */
-  detachPlaybook: () => void;
+  detachCharter: () => void;
 
   // ── output target (WS7) ──
   /** Where new content lands by default (persisted per conversation). */
@@ -632,8 +632,8 @@ export interface ChatAttachment {
   error?: string;
 }
 
-/** Playbook summary shape returned by GET /api/content/playbooks. */
-interface PlaybookCommandSource {
+/** Playbook summary shape returned by GET /api/content/charters. */
+interface CharterCommandSource {
   id: string;
   title: string;
   description: string;
@@ -641,7 +641,7 @@ interface PlaybookCommandSource {
 }
 
 /** The playbook currently attached to the composer (AI v3.2 T3). */
-export interface ActivePlaybook {
+export interface ActiveCharter {
   id: string;
   title: string;
   /** Phases completed so far — derived from resolved phase_checkpoint calls. */
@@ -1433,12 +1433,17 @@ export function useConversationEngine({
     if (mentionTimerRef.current) clearTimeout(mentionTimerRef.current);
     mentionTimerRef.current = setTimeout(async () => {
       try {
+        // Trim before searching: mention queries may now carry interior
+        // spaces ("Test 11"), and a TRAILING space mid-typing ("Test ")
+        // must not become part of the LIKE pattern — it would drop the
+        // exact-title match the user is about to pick.
+        const q = query.trim();
         // Un-promoted database rows ride beside the node search (plan
         // Phase 5) — best-effort, so a row-search failure cannot take the
         // node results with it.
-        const rowsPromise = query.trim()
+        const rowsPromise = q
           ? fetch(
-              `/api/content/data/suggest?q=${encodeURIComponent(query)}&limit=5`,
+              `/api/content/data/suggest?q=${encodeURIComponent(q)}&limit=5`,
               { credentials: "include" },
             )
               .then((r) => (r.ok ? r.json() : null))
@@ -1446,7 +1451,7 @@ export function useConversationEngine({
           : Promise.resolve(null);
 
         const res = await fetch(
-          `/api/content/content?search=${encodeURIComponent(query)}&limit=8`,
+          `/api/content/content?search=${encodeURIComponent(q)}&limit=16`,
           { credentials: "include" },
         );
         if (!res.ok) return;
@@ -1518,37 +1523,37 @@ export function useConversationEngine({
     [],
   );
 
-  // ── playbooks (AI v3.2 T3) ──
+  // ── charters (AI v3.2 T3) ──
   // Fetched once per mount for the /playbook command entry. A handful of
-  // playbooks per user is the expected scale — no search-as-you-type needed,
+  // charters per user is the expected scale — no search-as-you-type needed,
   // the existing "/" substring filter (below) already narrows the list.
-  const [playbooks, setPlaybooks] = useState<PlaybookCommandSource[]>([]);
+  const [charters, setCharters] = useState<CharterCommandSource[]>([]);
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/content/playbooks", { credentials: "include" })
+    fetch("/api/content/charters", { credentials: "include" })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (cancelled) return;
-        const items = data?.data?.playbooks;
-        if (Array.isArray(items)) setPlaybooks(items);
+        const items = data?.data?.charters;
+        if (Array.isArray(items)) setCharters(items);
       })
       .catch(() => {
-        /* best-effort — the picker just shows no playbooks */
+        /* best-effort — the picker just shows no charters */
       });
     return () => {
       cancelled = true;
     };
   }, []);
 
-  // ── / command items (tool hints + playbooks) ──
+  // ── / command items (tool hints + charters) ──
   const commandItems = useMemo<SuggestionItem[]>(() => {
-    const playbookItems: SuggestionItem[] = playbooks.map((p) => ({
+    const charterItems: SuggestionItem[] = charters.map((p) => ({
       id: p.id,
       label: p.title,
       description:
         p.description ||
-        `Playbook · ${p.phaseCount} phase${p.phaseCount === 1 ? "" : "s"}`,
-      contentType: "playbook",
+        `Charter · ${p.phaseCount} phase${p.phaseCount === 1 ? "" : "s"}`,
+      contentType: "charter",
     }));
     const toolItems: SuggestionItem[] = BASE_TOOL_IDS.map((id) => ({
       id,
@@ -1556,26 +1561,26 @@ export function useConversationEngine({
       description: BASE_TOOL_METADATA[id].description,
       insertText: COMMAND_HINTS[id] ?? BASE_TOOL_METADATA[id].name,
     }));
-    return [...playbookItems, ...toolItems];
-  }, [playbooks]);
+    return [...charterItems, ...toolItems];
+  }, [charters]);
 
   // ── active playbook state (AI v3.2 T3) ──
   // Attached via the /playbook command (ChatInput routes "contentType ===
   // playbook" selections here instead of inserting text). The derived
   // phase-index memo lives below, after `messages` is available from `chat`.
-  const [activePlaybookId, setActivePlaybookId] = useState<string | null>(null);
-  const [activePlaybookTitle, setActivePlaybookTitle] = useState<string | null>(
+  const [activeCharterId, setActiveCharterId] = useState<string | null>(null);
+  const [activeCharterTitle, setActiveCharterTitle] = useState<string | null>(
     null,
   );
 
-  const attachPlaybook = useCallback((item: SuggestionItem) => {
-    setActivePlaybookId(item.id);
-    setActivePlaybookTitle(item.label);
+  const attachCharter = useCallback((item: SuggestionItem) => {
+    setActiveCharterId(item.id);
+    setActiveCharterTitle(item.label);
   }, []);
 
-  const detachPlaybook = useCallback(() => {
-    setActivePlaybookId(null);
-    setActivePlaybookTitle(null);
+  const detachCharter = useCallback(() => {
+    setActiveCharterId(null);
+    setActiveCharterTitle(null);
   }, []);
 
   // ── output target (WS7) ──
@@ -2566,17 +2571,17 @@ export function useConversationEngine({
     return count;
   }, [messages]);
 
-  const activePlaybook = useMemo<ActivePlaybook | null>(() => {
-    if (!activePlaybookId) return null;
+  const activeCharter = useMemo<ActiveCharter | null>(() => {
+    if (!activeCharterId) return null;
     const phaseCount =
-      playbooks.find((p) => p.id === activePlaybookId)?.phaseCount ?? 0;
+      charters.find((p) => p.id === activeCharterId)?.phaseCount ?? 0;
     return {
-      id: activePlaybookId,
-      title: activePlaybookTitle ?? "",
+      id: activeCharterId,
+      title: activeCharterTitle ?? "",
       phaseIndex: resolvedPhaseIndex,
       phaseCount,
     };
-  }, [activePlaybookId, activePlaybookTitle, playbooks, resolvedPhaseIndex]);
+  }, [activeCharterId, activeCharterTitle, charters, resolvedPhaseIndex]);
 
   // Stream-time freshness (v3.1 R2): dispatch artifact refresh as tool
   // outputs ARRIVE in the stream, not just at turn end — a playbook turn
@@ -2620,7 +2625,7 @@ export function useConversationEngine({
       // Attached playbook (AI v3.2 T3) — read at request time so approval
       // resumes / internal sends carry the same binding as the turn that
       // started them.
-      playbookId: activePlaybookId,
+      charterId: activeCharterId,
       activePhaseIndex: resolvedPhaseIndex,
       // Output-target chip (WS7): where new content lands by default.
       outputTarget,
@@ -2644,7 +2649,7 @@ export function useConversationEngine({
     activeContextId,
     providerId,
     modelId,
-    activePlaybookId,
+    activeCharterId,
     resolvedPhaseIndex,
     outputTarget,
     modelPinned,
@@ -2994,17 +2999,17 @@ export function useConversationEngine({
     const parts: UIMessage["parts"] = [
       createOutputTargetMessagePart(outputTarget),
     ];
-    if (activePlaybookId) {
+    if (activeCharterId) {
       // Unlike the composer-only chip, this data part belongs to the sent
       // user turn, survives persistence/reload, and renders alongside that
       // message. The server validates the id independently before adding
       // authoritative model context.
       parts.push(
-        createPlaybookMessageAttachmentPart({
-          id: activePlaybookId,
-          title: activePlaybookTitle ?? "Attached playbook",
+        createCharterMessageAttachmentPart({
+          id: activeCharterId,
+          title: activeCharterTitle ?? "Attached charter",
           phaseIndex: resolvedPhaseIndex,
-          phaseCount: activePlaybook?.phaseCount ?? 0,
+          phaseCount: activeCharter?.phaseCount ?? 0,
         }),
       );
     }
@@ -3071,7 +3076,7 @@ export function useConversationEngine({
           // of currentPage). Null in the embed panel / when nothing readable.
           viewedContent: getActiveViewedContentHint(),
           // Attached playbook (AI v3.2 T3).
-          playbookId: activePlaybookId,
+          charterId: activeCharterId,
           activePhaseIndex: resolvedPhaseIndex,
           // Output-target chip (WS7).
           outputTarget,
@@ -3101,9 +3106,9 @@ export function useConversationEngine({
     activeContextId,
     providerId,
     modelId,
-    activePlaybookId,
-    activePlaybookTitle,
-    activePlaybook,
+    activeCharterId,
+    activeCharterTitle,
+    activeCharter,
     resolvedPhaseIndex,
     outputTarget,
     modelPinned,
@@ -3127,7 +3132,7 @@ export function useConversationEngine({
       // currentPage). Null in the embed panel and when nothing readable is focused.
       viewedContent: getActiveViewedContentHint(),
       // Attached playbook (AI v3.2 T3) rides re-runs too, for continuity.
-      playbookId: activePlaybookId,
+      charterId: activeCharterId,
       activePhaseIndex: resolvedPhaseIndex,
       // Output-target chip (WS7).
       outputTarget,
@@ -3140,7 +3145,7 @@ export function useConversationEngine({
       conversationId,
       providerId,
       modelId,
-      activePlaybookId,
+      activeCharterId,
       resolvedPhaseIndex,
       outputTarget,
       modelPinned,
@@ -3165,13 +3170,13 @@ export function useConversationEngine({
       const editedParts: UIMessage["parts"] = [
         createOutputTargetMessagePart(outputTarget),
       ];
-      if (activePlaybookId) {
+      if (activeCharterId) {
         editedParts.push(
-          createPlaybookMessageAttachmentPart({
-            id: activePlaybookId,
-            title: activePlaybookTitle ?? "Attached playbook",
+          createCharterMessageAttachmentPart({
+            id: activeCharterId,
+            title: activeCharterTitle ?? "Attached charter",
             phaseIndex: resolvedPhaseIndex,
-            phaseCount: activePlaybook?.phaseCount ?? 0,
+            phaseCount: activeCharter?.phaseCount ?? 0,
           }),
         );
       }
@@ -3189,9 +3194,9 @@ export function useConversationEngine({
       providerId,
       modelId,
       truncateRef,
-      activePlaybookId,
-      activePlaybookTitle,
-      activePlaybook,
+      activeCharterId,
+      activeCharterTitle,
+      activeCharter,
       resolvedPhaseIndex,
       outputTarget,
     ],
@@ -3265,9 +3270,9 @@ export function useConversationEngine({
     notifyMentionInserted,
     folderGates,
     commandItems,
-    activePlaybook,
-    attachPlaybook,
-    detachPlaybook,
+    activeCharter,
+    attachCharter,
+    detachCharter,
     outputTarget,
     setOutputTarget,
     promoteOutputTarget,

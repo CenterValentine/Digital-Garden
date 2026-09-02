@@ -18,14 +18,40 @@
 
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, type ComponentType } from "react";
+import * as LucideIcons from "lucide-react";
 import { useSearchStore } from "@/state/search-store";
 import { useContentStore } from "@/state/content-store";
 import { useTreeStateStore } from "@/state/tree-state-store";
 import { parseSearchResults } from "@/lib/domain/search/filters";
 import type { SearchResult } from "@/lib/domain/search/filters";
-import type { ContentType } from "@/lib/domain/content/types";
+import { getContentTypeIcon, type ContentType } from "@/lib/domain/content/types";
 import { clientLogger } from "@/lib/core/logger/client";
+
+/**
+ * Leading icon for a result row — the same vocabulary as the file tree:
+ * contentType via getContentTypeIcon, charters full-swapped to ScrollText
+ * (D6 "all distinct"), folders keeping their gold accent.
+ */
+function ResultIcon({ result }: { result: SearchResult }) {
+  if (result.charter) {
+    return (
+      <LucideIcons.ScrollText className="h-4 w-4 shrink-0 text-indigo-500 dark:text-indigo-400" />
+    );
+  }
+  const Icon =
+    (
+      LucideIcons as unknown as Record<
+        string,
+        ComponentType<{ className?: string }> | undefined
+      >
+    )[getContentTypeIcon(result.type)] ?? LucideIcons.File;
+  const color =
+    result.type === "folder"
+      ? "text-gold-primary"
+      : "text-gray-500 dark:text-gray-400";
+  return <Icon className={`h-4 w-4 shrink-0 ${color}`} />;
+}
 
 export function SearchPanel() {
   const {
@@ -534,10 +560,10 @@ export function SearchPanel() {
       </div>
 
       {/* Results Area */}
-      <div className="flex-1 overflow-y-auto" ref={resultsRef}>
-        {/* Results count */}
+      <div className="flex-1 overflow-y-auto">
+        {/* Results count — styled like a tree section header */}
         {results.length > 0 && !isLoading && (
-          <div className="px-3 py-2 text-xs font-medium text-gray-600 border-b border-white/10">
+          <div className="border-b border-white/10 px-3 py-1.5 text-[11px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
             {results.length} {results.length === 1 ? "result" : "results"}
           </div>
         )}
@@ -589,49 +615,60 @@ export function SearchPanel() {
 
         {/* Results List */}
         {!isLoading && results.length > 0 && (
-          <div className="space-y-1.5 p-2">
+          <div className="p-1.5" ref={resultsRef}>
             {results.map((result, index) => (
               <button
                 key={result.id}
                 onClick={() => handleResultClick(result)}
-                className={`w-full rounded-lg border p-2.5 text-left transition-all ${
+                className={`mb-0.5 flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-left transition-colors ${
                   index === selectedIndex
-                    ? "border-white/30 bg-white/15 shadow-md"
-                    : "border-white/10 bg-white/5 hover:border-white/20 hover:bg-white/10 hover:shadow-sm"
+                    ? "bg-white/15"
+                    : "hover:bg-white/10"
                 }`}
               >
-                {/* Title */}
-                <div className="mb-1.5 flex items-start justify-between gap-2">
-                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{result.title}</h3>
-                  {/* Type badge */}
-                  <span className="shrink-0 rounded-md border border-white/20 bg-white/10 px-2 py-0.5 text-xs font-medium text-gray-900 dark:text-white">
-                    {result.type}
+                {/* Tree-vocabulary icon (charter → ScrollText) */}
+                <span
+                  className="mt-0.5"
+                  title={result.charter ? "charter" : result.type}
+                >
+                  <ResultIcon result={result} />
+                </span>
+
+                <span className="min-w-0 flex-1">
+                  {/* Title + date on one line, tree-row density */}
+                  <span className="flex items-baseline justify-between gap-2">
+                    <span className="truncate text-sm font-medium text-gray-900 dark:text-gray-100">
+                      {result.title}
+                    </span>
+                    <span className="shrink-0 text-[10px] tabular-nums text-gray-500 dark:text-gray-400">
+                      {new Date(result.updatedAt).toLocaleDateString()}
+                    </span>
                   </span>
-                </div>
 
-                {/* Excerpt */}
-                {result.excerpt && (
-                  <p
-                    className={`mb-1.5 text-xs leading-relaxed text-gray-700 dark:text-gray-200 ${
-                      filter.showMoreContext ? "line-clamp-4" : "line-clamp-2"
-                    }`}
-                    dangerouslySetInnerHTML={{ __html: result.excerpt }}
-                  />
-                )}
+                  {/* Excerpt */}
+                  {result.excerpt && (
+                    <span
+                      className={`mt-0.5 block text-xs leading-snug text-gray-600 dark:text-gray-300 ${
+                        filter.showMoreContext ? "line-clamp-4" : "line-clamp-2"
+                      }`}
+                      dangerouslySetInnerHTML={{ __html: result.excerpt }}
+                    />
+                  )}
 
-                {/* Path + Metadata row */}
-                <div className="flex items-center gap-3 text-xs text-gray-600 dark:text-gray-400">
-                  {result.path && (
-                    <span className="flex items-center gap-1 truncate" title={result.path}>
-                      <svg className="h-3 w-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-                      </svg>
-                      <span className="truncate">{result.path}</span>
+                  {/* Breadcrumb + match count */}
+                  {(result.path || (result.matchCount ?? 0) > 1) && (
+                    <span className="mt-0.5 flex items-center gap-2 text-[10px] text-gray-500 dark:text-gray-400">
+                      {result.path && (
+                        <span className="truncate" title={result.path}>
+                          {result.path}
+                        </span>
+                      )}
+                      {(result.matchCount ?? 0) > 1 && (
+                        <span className="shrink-0">{result.matchCount} matches</span>
+                      )}
                     </span>
                   )}
-                  <span className="shrink-0">{new Date(result.updatedAt).toLocaleDateString()}</span>
-                  {result.matchCount && result.matchCount > 1 && <span className="shrink-0">{result.matchCount} matches</span>}
-                </div>
+                </span>
               </button>
             ))}
           </div>

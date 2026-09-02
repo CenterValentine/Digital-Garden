@@ -254,9 +254,9 @@ function ChatViewerInner({
     notifyMentionInserted,
     folderGates,
     commandItems,
-    activePlaybook,
-    attachPlaybook,
-    detachPlaybook,
+    activeCharter,
+    attachCharter,
+    detachCharter,
     outputTarget,
     setOutputTarget,
     followUps,
@@ -933,9 +933,9 @@ function ChatViewerInner({
         onMentionInserted={notifyMentionInserted}
         mentionResults={mentionResults}
         commandItems={commandItems}
-        onAttachPlaybook={attachPlaybook}
-        activePlaybook={activePlaybook}
-        onDetachPlaybook={detachPlaybook}
+        onAttachCharter={attachCharter}
+        activeCharter={activeCharter}
+        onDetachCharter={detachCharter}
         attachments={attachments}
         onAddFiles={addAttachmentFiles}
         onRemoveAttachment={removeAttachment}

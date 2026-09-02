@@ -9,7 +9,7 @@
  * its source for the precedence ladder.
  */
 
-import type { ParsedPlaybook } from "./parse";
+import type { ParsedCharter } from "./parse";
 import { parseModelDirective, type ModelDirective } from "../model-directive";
 
 export interface PhaseModelResolution {
@@ -19,7 +19,7 @@ export interface PhaseModelResolution {
 }
 
 export function getPhaseModelDirective(
-  playbook: ParsedPlaybook,
+  playbook: ParsedCharter,
   phaseIndex: number,
 ): PhaseModelResolution | null {
   const phaseRaw = playbook.phases[phaseIndex]?.modelDirective;

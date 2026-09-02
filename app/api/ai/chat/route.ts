@@ -213,39 +213,39 @@ import { ensureFolderContextFresh } from "@/lib/domain/ai-context/gate";
 import { assembleFolderCapsule } from "@/lib/domain/ai-context/capsule";
 import { collectWikiLinkRefs } from "@/lib/domain/editor/wiki-link-refs";
 import {
-  parsePlaybook,
-  type PlaybookReference,
-} from "@/lib/domain/ai/playbooks/parse";
+  parseCharter,
+  type CharterReference,
+} from "@/lib/domain/ai/charters/parse";
 import {
   getPhaseModelDirective,
   type PhaseModelResolution,
-} from "@/lib/domain/ai/playbooks/model-directives";
+} from "@/lib/domain/ai/charters/model-directives";
 import {
-  resolvePlaybookModelRoute,
+  resolveCharterModelRoute,
   describeUnresolvedDirective,
 } from "@/lib/domain/ai/model-route-resolver";
 import type {
   ModelRouteSource,
   ResolvedModelRoute,
 } from "@/lib/domain/ai/model-directive";
-import { renderPlaybookSection } from "@/lib/domain/ai/playbooks/render";
+import { renderCharterSection } from "@/lib/domain/ai/charters/render";
 import { getServerExtensions } from "@/lib/domain/editor/extensions-server";
-import { isPlaybookMetadata } from "@/lib/domain/ai/playbooks/registry";
+import { isCharterMetadata } from "@/lib/domain/ai/charters/registry";
 import {
   configurePhaseCheckpointGate,
   createPhaseCheckpointGate,
   recordCompletedPhaseTools,
   recordCompletedPhaseToolsFromMessages,
   renderPhaseCheckpointGateInstruction,
-} from "@/lib/domain/ai/playbooks/checkpoint-gate";
+} from "@/lib/domain/ai/charters/checkpoint-gate";
 import {
-  bindPlaybookToLatestUserMessage,
-  requestsRootedPlaybookExecution,
-} from "@/lib/domain/ai/playbooks/message-binding";
+  bindCharterToLatestUserMessage,
+  requestsRootedCharterExecution,
+} from "@/lib/domain/ai/charters/message-binding";
 import {
-  extractPlaybookOutputDirectives,
-  type PlaybookOutputDirective,
-} from "@/lib/domain/ai/playbooks/output-directives";
+  extractCharterOutputDirectives,
+  type CharterOutputDirective,
+} from "@/lib/domain/ai/charters/output-directives";
 
 const ROUTE_PATH = "/api/ai/chat";
 
@@ -305,10 +305,10 @@ async function buildFolderMentionSection(
   }
 }
 
-async function resolvePlaybookReferenceContext(
+async function resolveCharterReferenceContext(
   userId: string,
-  references: PlaybookReference[],
-  activePhaseReferences: PlaybookReference[],
+  references: CharterReference[],
+  activePhaseReferences: CharterReference[],
 ): Promise<{
   manifest: string;
   activeReferenceContentIds: string[];
@@ -361,9 +361,9 @@ async function resolvePlaybookReferenceContext(
         ? `- [[${title}]] — FOLDER (context capsule injected below)`
         : `- [[${title}]] — FOLDER (call read_folder_context with folderId: ${found.id} when the current phase needs it)`;
     }
-    const isSubPlaybook = isPlaybookMetadata(found.notePayload?.metadata);
-    return isSubPlaybook
-      ? `- [[${title}]] (getCurrentNote contentId: ${found.id}) — SUB-PLAYBOOK: has its own standing rules/phases; follow its directives once read`
+    const isSubCharter = isCharterMetadata(found.notePayload?.metadata);
+    return isSubCharter
+      ? `- [[${title}]] (getCurrentNote contentId: ${found.id}) — SUB-CHARTER: has its own standing rules/phases; follow its directives once read`
       : `- [[${title}]] (getCurrentNote contentId: ${found.id})`;
   });
 
@@ -451,16 +451,16 @@ export async function POST(request: Request) {
       // machinery provably behavior-identical. The small cost is a second
       // fetch+parse of the playbook note on attached-playbook turns.
       // Attach-mode + phase-index derivation MUST mirror the downstream block:
-      //   - explicit `body.playbookId` → progressive disclosure, clamped index
+      //   - explicit `body.charterId` → progressive disclosure, clamped index
       //   - rooted execution cue → all phases visible, active phase is phase 0
       //   - ambient (viewing a playbook without attaching) does NOT route
       // S2a wires the OUTPUT into nothing — the ladder consumes it in S2b.
-      const routingExplicitPlaybookId =
-        typeof body.playbookId === "string" ? body.playbookId : null;
-      const routingRootedPlaybookId =
-        !routingExplicitPlaybookId &&
+      const routingExplicitCharterId =
+        typeof body.charterId === "string" ? body.charterId : null;
+      const routingRootedCharterId =
+        !routingExplicitCharterId &&
         contentId &&
-        requestsRootedPlaybookExecution(messages)
+        requestsRootedCharterExecution(messages)
           ? contentId
           : null;
       let phaseModelResolution: PhaseModelResolution | null = null;
@@ -560,14 +560,14 @@ export async function POST(request: Request) {
         }
         return budget;
       })();
-      const routingPlaybookId = modelPinned
+      const routingCharterId = modelPinned
         ? null
-        : (routingExplicitPlaybookId ?? routingRootedPlaybookId);
-      if (routingPlaybookId) {
+        : (routingExplicitCharterId ?? routingRootedCharterId);
+      if (routingCharterId) {
         try {
           const routingNode = await prisma.contentNode.findFirst({
             where: {
-              id: routingPlaybookId,
+              id: routingCharterId,
               ownerId: session.user.id,
               contentType: { in: ["note", "folder"] },
               deletedAt: null,
@@ -585,10 +585,10 @@ export async function POST(request: Request) {
           // directives silently never routed.
           if (
             routingNode?.notePayload &&
-            (routingRootedPlaybookId != null ||
-              isPlaybookMetadata(routingNode.notePayload.metadata))
+            (routingRootedCharterId != null ||
+              isCharterMetadata(routingNode.notePayload.metadata))
           ) {
-            const routingParsed = parsePlaybook(
+            const routingParsed = parseCharter(
               routingNode.notePayload.tiptapJson as JSONContent,
             );
             if (routingParsed.phases.length > 0) {
@@ -704,7 +704,7 @@ export async function POST(request: Request) {
       let playbookRouteApplied = false;
       const modelRouteNotices: string[] = [];
       if (!modelPinned && phaseModelResolution) {
-        const applied = await resolvePlaybookModelRoute(
+        const applied = await resolveCharterModelRoute(
           session.user.id,
           phaseModelResolution.directive,
           userConns,
@@ -858,7 +858,7 @@ export async function POST(request: Request) {
       // The turn's resolved route — emitted to the client via
       // messageMetadata below and persisted with the message. NOTE: this is
       // a per-turn record of what ran, not a replay contract — continuations
-      // re-resolve from turn-start inputs (playbookId + activePhaseIndex via
+      // re-resolve from turn-start inputs (charterId + activePhaseIndex via
       // the transport's turn snapshot); a stamped-part replay rung is a
       // documented followup in the plan doc.
       const resolvedModelRoute: ResolvedModelRoute = {
@@ -1180,7 +1180,7 @@ export async function POST(request: Request) {
       // Playbook validation happens below, after the tool registry is built.
       // Tool closures retain this array reference, so trusted directives
       // pushed before streamText begins are available at execution time.
-      const playbookOutputDirectives: PlaybookOutputDirective[] = [];
+      const charterOutputDirectives: CharterOutputDirective[] = [];
       // Provider-neutral checkpoint proof is configured after the selected
       // playbook is parsed below. Tool closures retain this request-scoped
       // object and consult its live state before surfacing approval.
@@ -1190,7 +1190,7 @@ export async function POST(request: Request) {
         runTokens: runTokenCounter,
         // Filled in AFTER playbook resolution below (tools close over this
         // object, so a later property assignment is visible at execute time).
-        activePlaybook: undefined as { contentId: string; title: string } | undefined,
+        activeCharter: undefined as { contentId: string; title: string } | undefined,
         // Executed model identity (cost metering): lets ledger stamps
         // price the run's tokens. Bare id + vendor, post-resolution.
         executedModel: {
@@ -1221,7 +1221,7 @@ export async function POST(request: Request) {
         outputContentParentId: originContentId
           ? openContentLocationId ?? null
           : undefined,
-        playbookOutputDirectives,
+        charterOutputDirectives,
         phaseCheckpointGate,
         attachedMedia,
         // Agentic Browsing Phase 1: raises the server-read acquisition budget
@@ -1720,20 +1720,20 @@ export async function POST(request: Request) {
       // demand via getCurrentNote; sub-playbooks (a linked note OR folder that is
       // itself marked as a playbook) are called out so the model follows
       // their own directives rather than treating them as passive reading.
-      let playbookContext = "";
-      let playbookAwareness = "";
-      let attachedPlaybookResolved = false;
-      let rootedPlaybookResolved = false;
+      let charterContext = "";
+      let charterAwareness = "";
+      let attachedCharterResolved = false;
+      let rootedCharterResolved = false;
       let attachedPlaybookTitle = "";
       // An EXPLICIT attach (/playbook picker) gets the full progressive
       // disclosure below — standing rules + the active phase + reference
       // manifest, and flips the checkpoint cadence.
       const explicitPlaybookId =
-        typeof body.playbookId === "string" ? body.playbookId : null;
+        typeof body.charterId === "string" ? body.charterId : null;
       const rootedPlaybookId =
         !explicitPlaybookId &&
         contentId &&
-        requestsRootedPlaybookExecution(messages)
+        requestsRootedCharterExecution(messages)
           ? contentId
           : null;
       // AMBIENT: the user is chatting FROM a note/folder that is itself a
@@ -1744,7 +1744,7 @@ export async function POST(request: Request) {
       // the model can run it WHEN ASKED and knows the content's id — which
       // is what fixes "it couldn't look at what I'm actively viewing" without
       // hijacking the whole conversation.
-      const ambientPlaybookId =
+      const ambientCharterId =
         !explicitPlaybookId && !rootedPlaybookId && contentId
           ? contentId
           : null;
@@ -1753,7 +1753,7 @@ export async function POST(request: Request) {
           // Editor extensions for LOSSLESS playbook rendering (v3.6) — built
           // once per request, only on the playbook path.
           const serverExtensions = getServerExtensions();
-          const playbookNode = await prisma.contentNode.findFirst({
+          const charterNode = await prisma.contentNode.findFirst({
             where: {
               id: explicitPlaybookId,
               ownerId: session.user.id,
@@ -1769,19 +1769,19 @@ export async function POST(request: Request) {
             },
           });
           if (
-            playbookNode?.notePayload &&
-            isPlaybookMetadata(playbookNode.notePayload.metadata)
+            charterNode?.notePayload &&
+            isCharterMetadata(charterNode.notePayload.metadata)
           ) {
-            attachedPlaybookResolved = true;
-            attachedPlaybookTitle = playbookNode.title;
+            attachedCharterResolved = true;
+            attachedPlaybookTitle = charterNode.title;
             // Context diet (S7-C2): getCurrentNote answers this id with a
             // pointer — the body is already injected below.
-            toolCtx.activePlaybook = {
+            toolCtx.activeCharter = {
               contentId: explicitPlaybookId,
-              title: playbookNode.title,
+              title: charterNode.title,
             };
-            const parsed = parsePlaybook(
-              playbookNode.notePayload.tiptapJson as JSONContent,
+            const parsed = parseCharter(
+              charterNode.notePayload.tiptapJson as JSONContent,
             );
             if (parsed.phases.length > 0) {
               const rawIndex =
@@ -1791,8 +1791,8 @@ export async function POST(request: Request) {
                 parsed.phases.length - 1,
               );
               const phase = parsed.phases[phaseIndex];
-              playbookOutputDirectives.push(
-                ...extractPlaybookOutputDirectives(parsed, [phaseIndex]),
+              charterOutputDirectives.push(
+                ...extractCharterOutputDirectives(parsed, [phaseIndex]),
               );
 
               // Reference manifest: title-resolve every [[link]] in the
@@ -1802,11 +1802,11 @@ export async function POST(request: Request) {
                 ...parsed.standingRules.references,
                 ...phase.references,
               ];
-              const phaseText = renderPlaybookSection(
+              const phaseText = renderCharterSection(
                 phase.content,
                 serverExtensions,
               );
-              const referenceContext = await resolvePlaybookReferenceContext(
+              const referenceContext = await resolveCharterReferenceContext(
                 session.user.id,
                 allRefs,
                 phase.references,
@@ -1836,13 +1836,13 @@ export async function POST(request: Request) {
                 )
                 .join("\n");
 
-              const standingText = renderPlaybookSection(
+              const standingText = renderCharterSection(
                 parsed.standingRules.content,
                 serverExtensions,
               );
-              playbookContext =
-                `\n\n## Active Playbook: "${playbookNode.title}"\n` +
-                `This playbook is ALREADY ATTACHED and loaded below — when the user asks to run "this playbook" (or a bare "run it"/"go"), THIS is it. Do not search notes or read anything else to find it; act on the content already provided here.\n` +
+              charterContext =
+                `\n\n## Active Charter: "${charterNode.title}"\n` +
+                `This charter is ALREADY ATTACHED and loaded below — when the user asks to run "this charter" (or a bare "run it"/"go"), THIS is it. Do not search notes or read anything else to find it; act on the content already provided here.\n` +
                 `Phase ${phaseIndex + 1} of ${parsed.phases.length}: "${phase.title}"\n\n` +
                 `**Phases:**\n${phaseToc}\n\n` +
                 (standingText
@@ -1854,9 +1854,9 @@ export async function POST(request: Request) {
               // identity in context instead of silently falling through to
               // discovery/rooted-note behavior; the assistant should report
               // the missing instructions, never search for a replacement.
-              playbookContext =
-                `\n\n## Active Playbook: "${playbookNode.title}"\n` +
-                "This playbook is explicitly attached, but it contains no instructions. Do not search for another playbook. Tell the user this attached playbook is empty and needs content before it can run.";
+              charterContext =
+                `\n\n## Active Charter: "${charterNode.title}"\n` +
+                "This charter is explicitly attached, but it contains no instructions. Do not search for another charter. Tell the user this attached charter is empty and needs content before it can run.";
             }
           }
         } catch (playbookError) {
@@ -1884,21 +1884,21 @@ export async function POST(request: Request) {
             },
           });
           if (rootedNode?.notePayload) {
-            const parsed = parsePlaybook(
+            const parsed = parseCharter(
               rootedNode.notePayload.tiptapJson as JSONContent,
             );
-            rootedPlaybookResolved = true;
+            rootedCharterResolved = true;
             attachedPlaybookTitle = rootedNode.title;
             // Context diet (S7-C2): same pointer rule for rooted execution.
-            toolCtx.activePlaybook = {
+            toolCtx.activeCharter = {
               contentId: rootedPlaybookId,
               title: rootedNode.title,
             };
-            playbookOutputDirectives.push(
-              ...extractPlaybookOutputDirectives(parsed),
+            charterOutputDirectives.push(
+              ...extractCharterOutputDirectives(parsed),
             );
 
-            const standingText = renderPlaybookSection(
+            const standingText = renderCharterSection(
               parsed.standingRules.content,
               serverExtensions,
             );
@@ -1907,7 +1907,7 @@ export async function POST(request: Request) {
               ...parsed.standingRules.references,
               ...parsed.phases.flatMap((phase) => phase.references),
             ];
-            const referenceContext = await resolvePlaybookReferenceContext(
+            const referenceContext = await resolveCharterReferenceContext(
               session.user.id,
               allReferences,
               activePhase?.references ?? [],
@@ -1915,7 +1915,7 @@ export async function POST(request: Request) {
             if (activePhase) {
               configurePhaseCheckpointGate(phaseCheckpointGate, {
                 phaseTitle: activePhase.title,
-                phaseText: renderPlaybookSection(
+                phaseText: renderCharterSection(
                   activePhase.content,
                   serverExtensions,
                 ),
@@ -1933,17 +1933,17 @@ export async function POST(request: Request) {
             const phaseText = parsed.phases
               .map(
                 (phase, index) =>
-                  `### Phase ${index + 1}: ${phase.title}\n${renderPlaybookSection(phase.content, serverExtensions)}`,
+                  `### Phase ${index + 1}: ${phase.title}\n${renderCharterSection(phase.content, serverExtensions)}`,
               )
               .join("\n\n");
-            playbookContext =
-              `\n\n## Active Playbook: "${rootedNode.title}"\n` +
-              "The user explicitly asked to execute the rooted file as a playbook. Its validated contents are loaded below. Follow it directly; do not search for or substitute another playbook. All phases are visible, so continue through approved checkpoints as instructed.\n\n" +
+            charterContext =
+              `\n\n## Active Charter: "${rootedNode.title}"\n` +
+              "The user explicitly asked to execute the rooted file as a charter. Its validated contents are loaded below. Follow it directly; do not search for or substitute another charter. All phases are visible, so continue through approved checkpoints as instructed.\n\n" +
               (standingText
                 ? `**Standing rules (always apply):**\n${standingText}\n\n`
                 : "") +
               (phaseText ||
-                "This rooted playbook contains no executable instructions. Tell the user it needs content before it can run.") +
+                "This rooted charter contains no executable instructions. Tell the user it needs content before it can run.") +
               referenceContext.manifest;
           }
         } catch (rootedPlaybookError) {
@@ -1955,11 +1955,11 @@ export async function POST(request: Request) {
             error: rootedPlaybookError,
           });
         }
-      } else if (ambientPlaybookId) {
+      } else if (ambientCharterId) {
         try {
           const node = await prisma.contentNode.findFirst({
             where: {
-              id: ambientPlaybookId,
+              id: ambientCharterId,
               ownerId: session.user.id,
               contentType: { in: ["note", "folder"] },
               deletedAt: null,
@@ -1971,17 +1971,17 @@ export async function POST(request: Request) {
           });
           if (
             node?.notePayload &&
-            isPlaybookMetadata(node.notePayload.metadata)
+            isCharterMetadata(node.notePayload.metadata)
           ) {
-            const parsed = parsePlaybook(
+            const parsed = parseCharter(
               node.notePayload.tiptapJson as JSONContent,
             );
-            playbookAwareness =
-              `\n\nThe content you're working in — "${node.title}" — is itself a PLAYBOOK` +
+            charterAwareness =
+              `\n\nThe content you're working in — "${node.title}" — is itself a CHARTER` +
               (parsed.phases.length > 0
                 ? ` (${parsed.phases.length} phases)`
                 : "") +
-              `. Do NOT start running it on your own initiative. Only if the user asks you to run, start, or follow it: read its full content with getCurrentNote (contentId: ${ambientPlaybookId}), then follow its standing rules and phases in order, calling phase_checkpoint at each phase boundary.`;
+              `. Do NOT start running it on your own initiative. Only if the user asks you to run, start, or follow it: read its full content with getCurrentNote (contentId: ${ambientCharterId}), then follow its standing rules and phases in order, calling phase_checkpoint at each phase boundary.`;
           }
         } catch (awarenessError) {
           logger.warn({
@@ -1997,16 +1997,16 @@ export async function POST(request: Request) {
       // ownership-scoped attachment resolves, remove the discovery tool for
       // this turn so weaker models cannot search for the playbook that is
       // already loaded. Generic note search remains available for phase work.
-      if (attachedPlaybookResolved || rootedPlaybookResolved) {
-        delete tools.search_playbooks;
+      if (attachedCharterResolved || rootedCharterResolved) {
+        delete tools.search_charters;
         // System context alone proved insufficient for weaker models: the
         // owner smoke trace showed a correctly injected Active Playbook, yet
         // DeepSeek still opened the rooted note first. Put the validated
         // selection directly on the latest user request as well.
-        modelMessages = bindPlaybookToLatestUserMessage(
+        modelMessages = bindCharterToLatestUserMessage(
           modelMessages,
           attachedPlaybookTitle,
-          rootedPlaybookResolved ? "rooted" : "attached",
+          rootedCharterResolved ? "rooted" : "attached",
         );
       }
 
@@ -2019,14 +2019,14 @@ export async function POST(request: Request) {
       if (contentId && !isChatContent && !openWorkflowTitle && rootedContentTitle) {
         const readable =
           rootedContentType === "note" || rootedContentType === "folder";
-        rootedContentSection = attachedPlaybookResolved
-          ? `\n\nThis chat was opened from **"${rootedContentTitle}"** (a ${rootedContentType ?? "content"}). It is optional working context, NOT the selected playbook. The playbook attached to the current user message and loaded in "Active Playbook" is the procedure to execute. Do not read "${rootedContentTitle}" merely to identify, discover, or understand the playbook.` +
+        rootedContentSection = attachedCharterResolved
+          ? `\n\nThis chat was opened from **"${rootedContentTitle}"** (a ${rootedContentType ?? "content"}). It is optional working context, NOT the selected charter. The charter attached to the current user message and loaded in "Active Charter" is the procedure to execute. Do not read "${rootedContentTitle}" merely to identify, discover, or understand the charter.` +
             (readable
-              ? ` Read the rooted content with getCurrentNote (contentId: ${contentId}) only when the user's request or the active playbook phase actually requires its contents.`
+              ? ` Read the rooted content with getCurrentNote (contentId: ${contentId}) only when the user's request or the active charter phase actually requires its contents.`
               : "")
-          : rootedPlaybookResolved
-            ? `\n\nThis chat is rooted in **"${rootedContentTitle}"** (a ${rootedContentType ?? "content"}), and the user explicitly asked to execute it as the Active Playbook. Its validated instructions are already loaded; do not read or search for another playbook.`
-            : `\n\nThis chat is rooted in **"${rootedContentTitle}"** (a ${rootedContentType ?? "content"}) — that is what this conversation is about. When the user refers to "this file", "this note", "the current one", "this playbook", etc. without naming it, they mean "${rootedContentTitle}".` +
+          : rootedCharterResolved
+            ? `\n\nThis chat is rooted in **"${rootedContentTitle}"** (a ${rootedContentType ?? "content"}), and the user explicitly asked to execute it as the Active Charter. Its validated instructions are already loaded; do not read or search for another charter.`
+            : `\n\nThis chat is rooted in **"${rootedContentTitle}"** (a ${rootedContentType ?? "content"}) — that is what this conversation is about. When the user refers to "this file", "this note", "the current one", "this charter", etc. without naming it, they mean "${rootedContentTitle}".` +
               (readable
                 ? ` Read its content with getCurrentNote (contentId: ${contentId}) when you need it.`
                 : "");
@@ -2112,9 +2112,9 @@ export async function POST(request: Request) {
           : null;
 
       const toolsActive = Object.keys(tools).length > 0;
-      const validatedPlaybookId = attachedPlaybookResolved
+      const validatedPlaybookId = attachedCharterResolved
         ? explicitPlaybookId
-        : rootedPlaybookResolved
+        : rootedCharterResolved
           ? rootedPlaybookId
           : null;
       const promptCachePolicy = buildPromptCachePolicy({
@@ -2122,8 +2122,8 @@ export async function POST(request: Request) {
         modelId: activeModelId,
         userId: session.user.id,
         toolNames: Object.keys(tools),
-        playbookId: validatedPlaybookId,
-        playbookContext,
+        charterId: validatedPlaybookId,
+        charterContext,
       });
 
       // Open the streaming span manually — it outlives this function via
@@ -2156,10 +2156,10 @@ export async function POST(request: Request) {
       await spanPayload(streamSpan, "chat_input", {
         messages: modelMessages,
         mentionedContext,
-        playbookContext,
-        attachedPlaybookResolved,
-        rootedPlaybookResolved,
-        playbookOutputDirectives,
+        charterContext,
+        attachedCharterResolved,
+        rootedCharterResolved,
+        charterOutputDirectives,
         outputTarget,
         outputOwnerId,
         outputParentOverride,
@@ -2299,11 +2299,11 @@ export async function POST(request: Request) {
           autoPronounceDefault,
           userContextSection,
           mentionedContext,
-          playbookContext,
-          playbookAwareness,
+          charterContext,
+          charterAwareness,
           rootedContentSection,
           outputTargetSection: renderOutputTargetInstruction(outputTarget),
-          hasAttachedPlaybook: attachedPlaybookResolved,
+          hasAttachedCharter: attachedCharterResolved,
           checkpointIntegritySection:
             renderPhaseCheckpointGateInstruction(phaseCheckpointGate),
           pageContextSection,

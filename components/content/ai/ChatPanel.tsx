@@ -220,9 +220,9 @@ export function ChatPanel({
     notifyMentionInserted,
     folderGates,
     commandItems,
-    activePlaybook,
-    attachPlaybook,
-    detachPlaybook,
+    activeCharter,
+    attachCharter,
+    detachCharter,
     outputTarget,
     setOutputTarget,
     promoteOutputTarget,
@@ -1143,9 +1143,9 @@ export function ChatPanel({
         onMentionInserted={notifyMentionInserted}
         mentionResults={mentionResults}
         commandItems={commandItems}
-        onAttachPlaybook={attachPlaybook}
-        activePlaybook={activePlaybook}
-        onDetachPlaybook={detachPlaybook}
+        onAttachCharter={attachCharter}
+        activeCharter={activeCharter}
+        onDetachCharter={detachCharter}
         attachments={attachments}
         onAddFiles={addAttachmentFiles}
         onRemoveAttachment={removeAttachment}

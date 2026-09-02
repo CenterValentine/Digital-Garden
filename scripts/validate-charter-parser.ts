@@ -1,18 +1,18 @@
 import assert from "node:assert/strict";
 import type { JSONContent } from "@tiptap/core";
 
-import { parsePlaybook } from "@/lib/domain/ai/playbooks/parse";
-import { renderPlaybookSectionPlain } from "@/lib/domain/ai/playbooks/render";
+import { parseCharter } from "@/lib/domain/ai/charters/parse";
+import { renderCharterSectionPlain } from "@/lib/domain/ai/charters/render";
 import {
-  bindPlaybookToLatestUserMessage,
-  createPlaybookMessageAttachmentPart,
-  parsePlaybookMessageAttachment,
-  requestsRootedPlaybookExecution,
-} from "@/lib/domain/ai/playbooks/message-binding";
+  bindCharterToLatestUserMessage,
+  createCharterMessageAttachmentPart,
+  parseCharterMessageAttachment,
+  requestsRootedCharterExecution,
+} from "@/lib/domain/ai/charters/message-binding";
 import {
-  extractPlaybookOutputDirectives,
-  resolvePlaybookOutputLocation,
-} from "@/lib/domain/ai/playbooks/output-directives";
+  extractCharterOutputDirectives,
+  resolveCharterOutputLocation,
+} from "@/lib/domain/ai/charters/output-directives";
 import { resolveToolOutputPlacement } from "@/lib/domain/ai/tools/output-placement";
 import { buildRunLedgerTitle } from "@/lib/domain/ai/run-ledger-title";
 import { normalizePersistedToolParts } from "@/lib/domain/ai/tool-state-persistence";
@@ -23,7 +23,7 @@ import {
   recordCompletedPhaseTools,
   recordCompletedPhaseToolsFromMessages,
   renderPhaseCheckpointGateInstruction,
-} from "@/lib/domain/ai/playbooks/checkpoint-gate";
+} from "@/lib/domain/ai/charters/checkpoint-gate";
 
 function paragraph(text: string): JSONContent {
   return {
@@ -40,7 +40,7 @@ function heading(level: number, text: string): JSONContent {
   };
 }
 
-const structured = parsePlaybook({
+const structured = parseCharter({
   type: "doc",
   content: [
     paragraph("Use current sources."),
@@ -56,7 +56,7 @@ assert.deepEqual(
   ["Surface facts", "Read between the lines"],
 );
 assert.equal(
-  renderPlaybookSectionPlain(structured.standingRules.content),
+  renderCharterSectionPlain(structured.standingRules.content),
   "Use current sources.",
 );
 assert.deepEqual(structured.phases[1].references, [
@@ -66,7 +66,7 @@ assert.deepEqual(structured.phases[1].references, [
 // Regression: a pasted SKILL.md can be stored as literal markdown in ordinary
 // TipTap paragraphs. Marking it as a playbook must not produce "0 phases" and
 // silently remove the explicit attachment from model context.
-const pastedSkill = parsePlaybook({
+const pastedSkill = parseCharter({
   type: "doc",
   content: [
     paragraph(`---
@@ -85,16 +85,16 @@ assert.deepEqual(
   pastedSkill.phases.map((phase) => phase.title),
   ["Phase A: Surface facts", "Phase B: Read between the lines"],
 );
-assert.equal(renderPlaybookSectionPlain(pastedSkill.standingRules.content), "");
+assert.equal(renderCharterSectionPlain(pastedSkill.standingRules.content), "");
 assert.equal(
-  renderPlaybookSectionPlain(pastedSkill.phases[0].content),
+  renderCharterSectionPlain(pastedSkill.phases[0].content),
   "Find the product and funding.\nDone when: both are answered.",
 );
 assert.deepEqual(pastedSkill.phases[1].references, [
   { targetTitle: "Hiring Guide" },
 ]);
 
-const unsectioned = parsePlaybook({
+const unsectioned = parseCharter({
   type: "doc",
   content: [paragraph("Research the subject, then summarize the evidence.")],
 });
@@ -102,7 +102,7 @@ assert.equal(unsectioned.phaseLevel, null);
 assert.equal(unsectioned.phases.length, 1);
 assert.equal(unsectioned.phases[0].title, "Instructions");
 assert.equal(
-  renderPlaybookSectionPlain(unsectioned.phases[0].content),
+  renderCharterSectionPlain(unsectioned.phases[0].content),
   "Research the subject, then summarize the evidence.",
 );
 
@@ -234,7 +234,7 @@ assert.deepEqual(
   "disabled tools must not create an impossible checkpoint gate",
 );
 
-const routedOutputPlaybook = parsePlaybook({
+const routedOutputPlaybook = parseCharter({
   type: "doc",
   content: [
     paragraph(`name: Company Research Directive
@@ -244,7 +244,7 @@ Phase B: Read between the lines
 Output findings in a document with the title "Between the Lines - Company Research - [COMPANY NAME]*  under the chat.`),
   ],
 });
-const routedOutputDirectives = extractPlaybookOutputDirectives(
+const routedOutputDirectives = extractCharterOutputDirectives(
   routedOutputPlaybook,
 );
 assert.deepEqual(routedOutputDirectives, [
@@ -255,7 +255,7 @@ assert.deepEqual(routedOutputDirectives, [
   },
 ]);
 assert.equal(
-  resolvePlaybookOutputLocation(
+  resolveCharterOutputLocation(
     routedOutputDirectives,
     "Between the Lines - Company Research - LTK",
   ),
@@ -263,7 +263,7 @@ assert.equal(
   "the exact owner-smoke wording must bind the matching artifact under the chat",
 );
 assert.equal(
-  resolvePlaybookOutputLocation(
+  resolveCharterOutputLocation(
     routedOutputDirectives,
     "Surface Facts - LTK",
   ),
@@ -280,7 +280,7 @@ assert.deepEqual(
       outputContentParentId: "research-folder",
     },
     undefined,
-    resolvePlaybookOutputLocation(
+    resolveCharterOutputLocation(
       routedOutputDirectives,
       "Between the Lines - Company Research - LTK",
     ),
@@ -293,23 +293,23 @@ assert.deepEqual(
   "a matched playbook directive must override the under-content preset at runtime",
 );
 
-const empty = parsePlaybook({ type: "doc", content: [] });
+const empty = parseCharter({ type: "doc", content: [] });
 assert.equal(empty.phases.length, 0);
 
-const attachmentPart = createPlaybookMessageAttachmentPart({
+const attachmentPart = createCharterMessageAttachmentPart({
   id: "playbook-id",
   title: "Test",
   phaseIndex: 0,
   phaseCount: 2,
 });
-assert.deepEqual(parsePlaybookMessageAttachment(attachmentPart), {
+assert.deepEqual(parseCharterMessageAttachment(attachmentPart), {
   id: "playbook-id",
   title: "Test",
   phaseIndex: 0,
   phaseCount: 2,
 });
 
-const boundMessages = bindPlaybookToLatestUserMessage(
+const boundMessages = bindCharterToLatestUserMessage(
   [
     { role: "user", content: "Earlier request" },
     { role: "assistant", content: "Earlier reply" },
@@ -322,20 +322,20 @@ assert.deepEqual(boundMessages[2]?.content, [
   {
     type: "text",
     text:
-      '[Attached playbook selected by the user: "Test". ' +
-      "This is the procedure to execute for the request below. Its validated current-phase instructions are in the Active Playbook system section. " +
-      "Do not read rooted content to identify or discover the playbook; use rooted content only when the request or active phase actually requires it.]",
+      '[Attached charter selected by the user: "Test". ' +
+      "This is the procedure to execute for the request below. Its validated current-phase instructions are in the Active Charter system section. " +
+      "Do not read rooted content to identify or discover the charter; use rooted content only when the request or active phase actually requires it.]",
   },
   { type: "text", text: "Run this playbook." },
 ]);
 assert.equal(
-  requestsRootedPlaybookExecution([
+  requestsRootedCharterExecution([
     {
       role: "user",
       parts: [
         {
           type: "text",
-          text: "Execute this file as a playbook. Research LTK.",
+          text: "Execute this file as a charter. Research LTK.",
         },
       ],
     },
@@ -343,7 +343,7 @@ assert.equal(
   true,
 );
 assert.equal(
-  requestsRootedPlaybookExecution([
+  requestsRootedCharterExecution([
     {
       role: "user",
       parts: [{ type: "text", text: "What does this file say?" }],
@@ -352,15 +352,15 @@ assert.equal(
   false,
   "ordinary rooted-note questions must not activate playbook execution",
 );
-const rootedBoundMessages = bindPlaybookToLatestUserMessage(
+const rootedBoundMessages = bindCharterToLatestUserMessage(
   [{ role: "user", content: "Execute this file as a playbook." }],
   "Test 14",
   "rooted",
 );
 assert.equal(
   rootedBoundMessages[0]?.content,
-  '[The user explicitly asked to execute the rooted content "Test 14" as a playbook. ' +
-    "Its validated instructions are in the Active Playbook system section. Follow that playbook directly; do not search for or substitute another one.]\n\n" +
+  '[The user explicitly asked to execute the rooted content "Test 14" as a charter. ' +
+    "Its validated instructions are in the Active Charter system section. Follow that charter directly; do not search for or substitute another one.]\n\n" +
     "Execute this file as a playbook.",
 );
 
@@ -456,4 +456,4 @@ assert.match(
   "checkpoint-summary fallback should remain human-searchable",
 );
 
-console.log("Playbook parser checks passed.");
+console.log("Charter parser checks passed.");
