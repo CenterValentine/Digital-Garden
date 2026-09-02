@@ -102,6 +102,10 @@ export async function upsertRunLedger(
   const scope = ownerContentId
     ? { ownedByNoteId: ownerContentId }
     : { parentId: targetFolderId };
+  // Quest logs ("quest:" keys) are cross-chat durable: any sitting, from any
+  // conversation, must adopt the same note. The key alone is the identity —
+  // scoping by the calling chat would mint a new note per conversation.
+  const questScoped = runKey.startsWith("quest:");
 
   // New ledgers are keyed in metadata because their visible titles are now
   // descriptive. Fall back once to the legacy exact title so an existing
@@ -109,7 +113,7 @@ export async function upsertRunLedger(
   const keyedLedger = await prisma.contentNode.findFirst({
     where: {
       ownerId: userId,
-      ...scope,
+      ...(questScoped ? {} : scope),
       contentType: "note",
       deletedAt: null,
       notePayload: {
@@ -232,10 +236,13 @@ export async function readRunLedgerCaptureConfig(
   const scope = options.ownerContentId
     ? { ownedByNoteId: options.ownerContentId }
     : { parentId: targetFolderId };
+  // Mirror of upsertRunLedger: quest keys are globally unique per user, so
+  // a resumed sitting in a fresh chat still finds the quest log's config.
+  const questScoped = options.runKey.startsWith("quest:");
   const node = await prisma.contentNode.findFirst({
     where: {
       ownerId: userId,
-      ...scope,
+      ...(questScoped ? {} : scope),
       contentType: "note",
       deletedAt: null,
       notePayload: {

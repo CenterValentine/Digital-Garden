@@ -258,7 +258,13 @@ async function createSystemTable(input: {
 export async function ensureMasterLedger(
   userId: string,
   charter: { contentId: string; title: string },
-): Promise<{ masterId: string; masterCols: Record<string, string> } | null> {
+): Promise<{
+  masterId: string;
+  masterCols: Record<string, string>;
+  /** The charter's folder — quest artifacts nest here so the charter
+   *  neighborhood is their one findable home (owner: no root scatter). */
+  charterParentId: string | null;
+} | null> {
   const note = await prisma.contentNode.findFirst({
     where: { id: charter.contentId, ownerId: userId, deletedAt: null },
     select: { id: true, parentId: true, notePayload: { select: { metadata: true } } },
@@ -276,7 +282,11 @@ export async function ensureMasterLedger(
       select: { id: true },
     });
     if (alive) {
-      return { masterId: alive.id, masterCols: await columnKeysByName(alive.id) };
+      return {
+        masterId: alive.id,
+        masterCols: await columnKeysByName(alive.id),
+        charterParentId: note.parentId,
+      };
     }
     // Stamp points at a deleted node — self-heal by re-creating below.
   }
@@ -304,7 +314,11 @@ export async function ensureMasterLedger(
     summary: `master ledger created for charter ${charter.title}`,
     attrs: { masterId, charterId: charter.contentId },
   });
-  return { masterId, masterCols: await columnKeysByName(masterId) };
+  return {
+    masterId,
+    masterCols: await columnKeysByName(masterId),
+    charterParentId: note.parentId,
+  };
 }
 
 // ── Continue-or-create a quest (D9) ───────────────────────────────────────
