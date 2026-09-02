@@ -82,6 +82,12 @@ export async function upsertRunLedger(
     ownerContentId?: string;
     /** Stable conversation/run identity used to find later phase writes. */
     runKey?: string;
+    /**
+     * Durable capture configuration (EXTRACTION-TO-DATABASE-PLAN P1):
+     * stamped at proposal approval, carried forward on every later write —
+     * `record_item_result` re-derives it from here, never from model memory.
+     */
+    captureConfig?: unknown;
   } = {},
 ): Promise<{ contentNodeId: string; created: boolean }> {
   const { ownerContentId } = options;
@@ -130,12 +136,16 @@ export async function upsertRunLedger(
     ? existing.title
     : buildRunLedgerTitle(entry, runKey);
 
-  const prior =
+  const priorMeta =
     existing?.notePayload?.metadata &&
     typeof existing.notePayload.metadata === "object"
-      ? ((existing.notePayload.metadata as Record<string, unknown>)
-          .ledgerMarkdown as string | undefined)
+      ? (existing.notePayload.metadata as Record<string, unknown>)
       : undefined;
+  const prior = priorMeta?.ledgerMarkdown as string | undefined;
+  // Capture config survives every subsequent checkpoint write — the whole
+  // metadata object is rewritten per upsert, so an un-carried key would
+  // silently vanish at the first item record.
+  const captureConfig = options.captureConfig ?? priorMeta?.captureConfig;
 
   const markdown = prior
     ? `${prior}\n\n${renderEntry(entry)}`
@@ -151,6 +161,7 @@ export async function upsertRunLedger(
       [LEDGER_RUN_KEY]: runKey,
       ledgerTitle,
       wordCount: searchText.split(/\s+/).length,
+      ...(captureConfig !== undefined ? { captureConfig } : {}),
     } as unknown as Prisma.InputJsonValue,
   };
 
@@ -193,4 +204,38 @@ export async function upsertRunLedger(
     attrs: { contentNodeId: node.id, targetFolderId },
   });
   return { contentNodeId: node.id, created: true };
+}
+
+/**
+ * Read a run ledger's stored capture config by its runKey (P2's config
+ * source — the ledger is the run's reload-surviving state). Keyed lookup
+ * only: capture configs are stamped by the proposal, which always writes
+ * the key.
+ */
+export async function readRunLedgerCaptureConfig(
+  userId: string,
+  targetFolderId: string | null,
+  options: { ownerContentId?: string; runKey: string },
+): Promise<{ contentNodeId: string; captureConfig: unknown } | null> {
+  const scope = options.ownerContentId
+    ? { ownedByNoteId: options.ownerContentId }
+    : { parentId: targetFolderId };
+  const node = await prisma.contentNode.findFirst({
+    where: {
+      ownerId: userId,
+      ...scope,
+      contentType: "note",
+      deletedAt: null,
+      notePayload: {
+        metadata: { path: [LEDGER_RUN_KEY], equals: options.runKey },
+      },
+    },
+    select: { id: true, notePayload: { select: { metadata: true } } },
+  });
+  if (!node) return null;
+  const meta =
+    node.notePayload?.metadata && typeof node.notePayload.metadata === "object"
+      ? (node.notePayload.metadata as Record<string, unknown>)
+      : undefined;
+  return { contentNodeId: node.id, captureConfig: meta?.captureConfig };
 }

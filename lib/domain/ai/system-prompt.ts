@@ -333,6 +333,7 @@ export function buildSystemPrompt(ctx: SystemPromptContext): string {
   if (ctx.hasItemIteration) {
     sections.push(
       "Per-item iteration: when the user asks you to apply an analysis (usually an attached charter) to EACH of several items — the jobs on a board, their open tabs, a set of URLs — the LEDGER, not your memory, is the loop's source of truth. " +
+      "When the user wants results captured in a DATABASE, declare captureTo on propose_item_iteration (target database, admission rule, column names) — the approval card is their consent to write. With capture approved, every item meeting the admission rule must include capture.cells on its record_item_result (use the exact option labels the approval returned); a rejected capture writes NO row — fix the named cells and re-record that same item. Never pass cells for items that fail the admission rule. " +
         "ENUMERATE FIRST (co-browse `collect` for a list page" +
         (ctx.hasListTabs
           ? ", `list_tabs` for their open tabs (ONLY when they explicitly ask about their tabs)"

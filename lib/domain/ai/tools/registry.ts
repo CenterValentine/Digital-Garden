@@ -26,7 +26,15 @@ import {
   findOrCreateFolder,
   findOrCreateShortcut,
 } from "@/lib/domain/ai/documents";
-import { upsertRunLedger } from "@/lib/domain/ai/run-ledger";
+import {
+  readRunLedgerCaptureConfig,
+  upsertRunLedger,
+} from "@/lib/domain/ai/run-ledger";
+import {
+  captureUpsertRow,
+  parseCaptureConfig,
+  preflightCapture,
+} from "@/lib/domain/data/server/capture";
 import { computeTurnCost } from "@/lib/features/ai-connections/usage/pricing";
 import type { JSONContent } from "@tiptap/core";
 import { listCharters, isCharterMetadata } from "@/lib/domain/ai/charters/registry";
@@ -535,8 +543,44 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           .max(120)
           .optional()
           .describe("Short label for the run's ledger; omit to derive from the objective."),
+        captureTo: z
+          .object({
+            database: z
+              .string()
+              .min(1)
+              .max(200)
+              .describe(
+                "Target database — its id (from the mention capsule) or exact name.",
+              ),
+            admission: z
+              .enum(["all", "qualified", "custom"])
+              .describe(
+                "Which recorded items get rows: all done items, only qualified ones, or custom (the user's stated rule — pass cells only for items meeting it).",
+              ),
+            admissionNote: z
+              .string()
+              .max(300)
+              .optional()
+              .describe("One line stating a custom admission rule (shown on the card and in the ledger)."),
+            columns: z
+              .array(z.string().min(1).max(120))
+              .min(1)
+              .max(20)
+              .describe("Column NAMES this run will write per admitted item."),
+            dedupeColumn: z
+              .string()
+              .max(120)
+              .optional()
+              .describe(
+                "Column holding each item's stable identity; defaults to the table's first url column.",
+              ),
+          })
+          .optional()
+          .describe(
+            "Capture admitted items as DATABASE ROWS in addition to the ledger. Declare it when the user asked for results in a database — approving this card is the user's consent to write there, and each admitted item's record_item_result must then include capture.cells.",
+          ),
       }),
-      execute: async ({ objective, source, items, itemCap, batchSize, ledgerLabel }) => {
+      execute: async ({ objective, source, items, itemCap, batchSize, ledgerLabel, captureTo }) => {
         const label = (ledgerLabel ?? objective).trim();
         const ledgerRunKey =
           "iterate:" +
@@ -572,6 +616,60 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         // client's batch-boundary gate never arms.
         const effectiveBatchSize =
           batchSize != null && batchSize < itemBudget ? batchSize : null;
+
+        // ── Capture preflight (EXTRACTION-TO-DATABASE-PLAN P1) ──────────
+        // Code-not-model schema check BEFORE any ledger write: a gap fails
+        // the whole proposal with the exact fix. On success, approval IS
+        // the consent moment — grant the conversation association so
+        // query/describe reach the table for the rest of this run, and
+        // stamp the config into the ledger (the run's durable state).
+        let capture: Awaited<ReturnType<typeof preflightCapture>> | null = null;
+        const alreadyCapturedKeys: string[] = [];
+        if (captureTo) {
+          capture = await preflightCapture({
+            ctx: {
+              userId: ctx.userId,
+              contentId: ctx.contentId,
+              boundContentId: ctx.boundContentId,
+              conversationId: ctx.conversationId,
+            },
+            database: captureTo.database,
+            admission: captureTo.admission,
+            admissionNote: captureTo.admissionNote,
+            columnNames: captureTo.columns,
+            dedupeColumnName: captureTo.dedupeColumn,
+          });
+          if (!capture.ok) {
+            return {
+              ok: false,
+              refusal: capture.refusal,
+              nextAction:
+                "The capture target has a schema gap — fix what the refusal names (or drop captureTo) and re-propose. Do NOT start processing items.",
+            };
+          }
+          // Plan-time dedup: mark items whose identity already holds a row.
+          for (const n of normalized) {
+            const identity = (n.url ?? (n.keyTier === "url" ? n.key : "")).trim().toLowerCase();
+            if (identity && capture.dedupeValues.has(identity)) {
+              alreadyCapturedKeys.push(n.key);
+            }
+          }
+          if (ctx.conversationId && capture.config) {
+            await addAutoAssociation(
+              ctx.userId,
+              ctx.conversationId,
+              capture.config.tableId,
+              "tool-call",
+            ).catch(() => null);
+          }
+        }
+        const alreadyCaptured = new Set(alreadyCapturedKeys);
+        // Flat-result locals (non-strict tsconfig — unions don't narrow):
+        // config presence IS the "preflight passed" signal below.
+        const captureCfg = capture?.config ?? null;
+        const captureVocab = capture?.optionVocab ?? {};
+        const captureDescMissing = capture?.descriptionsMissing ?? [];
+
         let ledgerNodeId: string | null = null;
         const placement = resolveToolOutputPlacement(ctx);
         if (placement.parentId || placement.ownedByNoteId) {
@@ -587,17 +685,31 @@ export function createBaseTools(ctx: ToolExecuteContext) {
                   (effectiveBatchSize
                     ? ` · **Batches:** checkpoint every ${effectiveBatchSize} items`
                     : "") +
+                  (captureCfg
+                    ? `\n\n**Capture:** → "${captureCfg.tableTitle}" · admission ${captureCfg.admission}` +
+                      (captureCfg.admissionNote
+                        ? ` (${captureCfg.admissionNote})`
+                        : "") +
+                      ` · columns: ${captureCfg.columns.map((c) => c.name).join(", ")}` +
+                      (captureCfg.dedupeColumnName
+                        ? ` · identity: ${captureCfg.dedupeColumnName}`
+                        : "")
+                    : "") +
                   `\n\n` +
                   `**Checklist:**\n${normalized
                     .map(
                       (n) =>
-                        `- [ ] ${n.url ? `[${n.label}](${n.url})` : n.label}${n.keyTier === "label" ? " *(weak key)*" : ""}`,
+                        `- [ ] ${n.url ? `[${n.label}](${n.url})` : n.label}${n.keyTier === "label" ? " *(weak key)*" : ""}${alreadyCaptured.has(n.key) ? " *(already captured)*" : ""}`,
                     )
                     .join("\n")}`,
                 runTitle: label,
                 next: "Process items in order; record every item; reconcile at the end.",
               },
-              { runKey: ledgerRunKey, ownerContentId: placement.ownedByNoteId },
+              {
+                runKey: ledgerRunKey,
+                ownerContentId: placement.ownedByNoteId,
+                ...(captureCfg ? { captureConfig: captureCfg } : {}),
+              },
             );
             ledgerNodeId = ledger.contentNodeId;
             if (ctx.conversationId) {
@@ -621,8 +733,37 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           itemBudget,
           batchSize: effectiveBatchSize,
           items: normalized,
+          ...(captureCfg
+            ? {
+                capture: {
+                  database: captureCfg.tableTitle,
+                  admission: captureCfg.admission,
+                  ...(captureCfg.admissionNote
+                    ? { admissionNote: captureCfg.admissionNote }
+                    : {}),
+                  columns: captureCfg.columns.map((c) => c.name),
+                  ...(captureCfg.dedupeColumnName
+                    ? { identityColumn: captureCfg.dedupeColumnName }
+                    : {}),
+                  // Exact labels once, up front — never guess options per item.
+                  optionVocab: captureVocab,
+                  ...(captureDescMissing.length > 0
+                    ? {
+                        descriptionsMissing: captureDescMissing,
+                        descriptionsWarning:
+                          "These capture columns have no description — map scraped values by column NAME alone, conservatively.",
+                      }
+                    : {}),
+                  alreadyCapturedKeys,
+                },
+              }
+            : {}),
           nextAction:
             `APPROVED. Process the items IN ORDER, ONE at a time — the FULL analysis/charter applies to each item (all its phases; the user's framing and mentions apply across every item). ` +
+            (captureCfg
+              ? `CAPTURE IS ON: for every item that meets the admission rule (${captureCfg.admission}${captureCfg.admissionNote ? ` — ${captureCfg.admissionNote}` : ""}), include capture.cells in its record_item_result — column names ${captureCfg.columns.map((c) => c.name).join(", ")}; use the exact option labels provided. Items marked "already captured" in the checklist hold a row from an earlier sitting — you may skip re-reading them unless the user asked for a refresh. ` +
+                `If a capture is rejected, fix the named cells and re-record the SAME item before moving on. `
+              : "") +
             `After EACH item, call record_item_result with ledgerRunKey "${ledgerRunKey}" and that item's key — status done (with the verdict), or unreadable/blocked if it could not be read (NEVER silently skip an item). ` +
             (effectiveBatchSize
               ? `This run is BATCHED: after every ${effectiveBatchSize} recorded items, pause acquisition and call record_batch_checkpoint (dedupe the batch, note anomalies) BEFORE starting the next item — the harness holds new reads until the checkpoint is recorded. `
@@ -654,8 +795,20 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         fitPercent: z.number().min(0).max(100).optional().describe("Numeric score when the objective scores items."),
         verdict: z.string().max(1000).optional().describe("One-to-three sentence rationale for this item."),
         artifactTitle: z.string().max(200).optional().describe("Title of any per-item note you created."),
+        capture: z
+          .object({
+            cells: z
+              .record(z.string(), z.unknown())
+              .describe(
+                "Column NAME → value for THIS item's database row. Select/status accept option labels; dates ISO; numbers plain.",
+              ),
+          })
+          .optional()
+          .describe(
+            "Land this item as a database row — ONLY when the approved run declared captureTo AND this item meets its admission rule. The row upserts by the item's identity: a re-run updates, never duplicates.",
+          ),
       }),
-      execute: async ({ ledgerRunKey, itemKey, itemLabel, url, status, qualified, fitPercent, verdict, artifactTitle }) => {
+      execute: async ({ ledgerRunKey, itemKey, itemLabel, url, status, qualified, fitPercent, verdict, artifactTitle, capture }) => {
         const placement = resolveToolOutputPlacement(ctx);
         if (!placement.parentId && !placement.ownedByNoteId) {
           return { ok: false, note: "No target folder set, so no ledger was written. Continue the run; reconcile in the roll-up." };
@@ -666,10 +819,55 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         const linkUrl = url?.trim() || (/^https?:\/\//.test(itemKey) ? itemKey : "");
         const label = itemLabel ?? itemKey;
         const heading = linkUrl ? `[${label}](${linkUrl})` : `**${label}**`;
+
+        // ── Capture (EXTRACTION-TO-DATABASE-PLAN P2) ────────────────────
+        // Decide+do as ONE call: the same record that logs the verdict
+        // lands the row. Config comes from the ledger (durable, survives
+        // reloads); admission is enforced where checkable; a cell failure
+        // rejects the WHOLE row — zero partial rows, ever.
+        let captureNote = "";
+        let capturedRowId: string | undefined;
+        let capturedRowStatus: "created" | "updated" | undefined;
+        let captureErrors: string[] | undefined;
+        if (capture) {
+          const state = await readRunLedgerCaptureConfig(
+            ctx.userId,
+            placement.parentId,
+            { runKey: ledgerRunKey, ownerContentId: placement.ownedByNoteId },
+          );
+          const config = parseCaptureConfig(state?.captureConfig);
+          if (!config) {
+            captureNote =
+              "capture ignored — this run has no approved captureTo config";
+          } else if (config.admission === "qualified" && qualified !== true) {
+            captureNote =
+              "capture refused — admission is qualified-only and this item is not marked qualified";
+          } else {
+            const dedupeValue =
+              url?.trim() ||
+              (/^https?:\/\//.test(itemKey) ? itemKey : undefined);
+            const res = await captureUpsertRow({
+              userId: ctx.userId,
+              config,
+              cells: capture.cells,
+              dedupeValue,
+            });
+            if (res.status === "rejected") {
+              captureErrors = res.errors;
+              captureNote = `capture FAILED — no row written: ${(res.errors ?? []).join("; ")}`;
+            } else {
+              capturedRowId = res.rowId;
+              capturedRowStatus = res.status;
+              captureNote = `row ${res.status} in "${config.tableTitle}"`;
+            }
+          }
+        }
+
         const line =
           `${heading} — ${status}` +
           (typeof fitPercent === "number" ? ` · fit ${Math.round(fitPercent)}%` : "") +
           (qualified === true ? " · **qualified**" : qualified === false ? " · not qualified" : "") +
+          (captureNote ? ` · ${captureNote}` : "") +
           (verdict ? `\n\n${verdict}` : "");
         try {
           const ledger = await upsertRunLedger(
@@ -688,11 +886,20 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             recorded: itemKey,
             status,
             ledgerNodeId: ledger.contentNodeId,
+            ...(capturedRowId
+              ? { rowId: capturedRowId, rowStatus: capturedRowStatus }
+              : {}),
+            ...(captureErrors ? { captureErrors } : {}),
+            ...(captureNote && !capturedRowId && !captureErrors
+              ? { captureNote }
+              : {}),
             // Continuation directive after EVERY item — the run must not stall
             // here (observed live: model recorded 1 item then asked "shall I
             // continue?"). This is a server tool so the model keeps going in the
             // same turn; push it to the next item, not to the user.
-            next: "Recorded. Do NOT stop or ask the user whether to continue — immediately move to the NEXT item now (open/read it, then record it). Only once EVERY item is recorded do you write the roll-up (createNote) and call record_iteration_findings.",
+            next: captureErrors
+              ? "The ledger line is recorded but the row was REJECTED whole (no partial rows). Fix exactly the cells named in captureErrors and call record_item_result AGAIN for this SAME itemKey with corrected capture.cells — then continue to the next item."
+              : "Recorded. Do NOT stop or ask the user whether to continue — immediately move to the NEXT item now (open/read it, then record it). Only once EVERY item is recorded do you write the roll-up (createNote) and call record_iteration_findings.",
           };
         } catch (error) {
           return { ok: false, note: `Ledger write failed (${error instanceof Error ? error.message : "unknown"}). Continue to the next item; reconcile in the roll-up.` };
@@ -775,8 +982,11 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         qualifiedCount: z.number().int().min(0).optional().describe("Items that met the bar."),
         unreadableItems: z.array(z.string()).max(60).optional().describe("Keys/labels of items that could not be read or were blocked."),
         rollupTitle: z.string().max(200).optional().describe("Title of the roll-up note, recorded as the run's artifact."),
+        rowsWritten: z.number().int().min(0).optional().describe("Capture runs: rows CREATED in the target database this run."),
+        rowsUpdated: z.number().int().min(0).optional().describe("Capture runs: existing rows UPDATED (re-encountered identities)."),
+        rowsFailed: z.number().int().min(0).optional().describe("Capture runs: items whose row was rejected and never landed."),
       }),
-      execute: async ({ ledgerRunKey, resultSummary, processedCount, qualifiedCount, unreadableItems, rollupTitle }) => {
+      execute: async ({ ledgerRunKey, resultSummary, processedCount, qualifiedCount, unreadableItems, rollupTitle, rowsWritten, rowsUpdated, rowsFailed }) => {
         const placement = resolveToolOutputPlacement(ctx);
         if (!placement.parentId && !placement.ownedByNoteId) {
           return { ok: false, note: "No target folder set, so no ledger was written. The roll-up note still landed." };
@@ -785,6 +995,11 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           resultSummary.trim() +
           `\n\n**Processed:** ${processedCount}` +
           (typeof qualifiedCount === "number" ? ` · **Qualified:** ${qualifiedCount}` : "") +
+          (typeof rowsWritten === "number" ||
+          typeof rowsUpdated === "number" ||
+          typeof rowsFailed === "number"
+            ? `\n\n**Rows:** ${rowsWritten ?? 0} written · ${rowsUpdated ?? 0} updated · ${rowsFailed ?? 0} failed`
+            : "") +
           (unreadableItems?.length
             ? `\n\n**Unreadable/blocked (${unreadableItems.length}):**\n${unreadableItems.map((u) => `- ${u}`).join("\n")}`
             : "");

@@ -21,7 +21,7 @@ import {
   resolveDataTableAccess,
 } from "@/lib/domain/data/server/access";
 import { loadTable } from "@/lib/domain/data/server/queries";
-import type { DataColumn, DataTable } from "@/lib/domain/data";
+import type { DataTable } from "@/lib/domain/data";
 
 /** The context ids database resolution needs — a structural subset of ToolExecuteContext. */
 export interface DataToolContext {
@@ -153,83 +153,14 @@ export async function resolveDatabaseRef(
   };
 }
 
-/** Column lookup by name (case-insensitive), key, or id. */
-export function findColumn(
-  columns: DataColumn[],
-  ref: string
-): DataColumn | undefined {
-  const lower = ref.trim().toLowerCase();
-  return (
-    columns.find((c) => c.id === ref || c.key === ref) ??
-    columns.find((c) => c.name.toLowerCase() === lower)
-  );
-}
-
-/**
- * Model ergonomics: select/status cells store option IDS (plan D3), but a
- * model naturally speaks in labels. Accept either; translate labels to ids
- * before the strict encoder sees them.
- */
-export function translateOptionValue(
-  column: DataColumn,
-  value: unknown
-): unknown {
-  const options = column.config.options ?? [];
-  const toId = (v: unknown): unknown => {
-    if (typeof v !== "string") return v;
-    if (options.some((o) => o.id === v)) return v;
-    const byLabel = options.find(
-      (o) => o.label.toLowerCase() === v.trim().toLowerCase()
-    );
-    return byLabel ? byLabel.id : v;
-  };
-  if (column.type === "select" || column.type === "status") return toId(value);
-  if (column.type === "multiSelect" && Array.isArray(value)) {
-    return value.map(toId);
-  }
-  return value;
-}
-
-/**
- * Normalization safety (owner-requested, 2026-08-28): the strict encoder
- * REJECTS type violations by design (plan B8c — never coerce), but a model
- * legitimately produces unambiguous near-misses. Normalize exactly those,
- * nothing else, BEFORE the encoder:
- *  - strings trimmed;
- *  - number columns: a purely numeric string becomes a number;
- *  - checkbox columns: "true"/"yes"/"false"/"no" strings become booleans;
- *  - date columns: M/D/YYYY becomes ISO YYYY-MM-DD (ISO passes through).
- * Anything still ambiguous falls to the encoder and fails loudly — a
- * normalization that guesses is worse than a rejection that teaches.
- */
-export function normalizeCellInput(column: DataColumn, raw: unknown): unknown {
-  let value = raw;
-  if (typeof value === "string") value = value.trim();
-  if (column.type === "number" && typeof value === "string" && value !== "") {
-    const n = Number(value);
-    if (Number.isFinite(n)) value = n;
-  }
-  if (column.type === "checkbox" && typeof value === "string") {
-    const v = value.toLowerCase();
-    if (v === "true" || v === "yes") value = true;
-    else if (v === "false" || v === "no") value = false;
-  }
-  if (column.type === "date" && typeof value === "string") {
-    const us = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-    if (us) {
-      value = `${us[3]}-${us[1].padStart(2, "0")}-${us[2].padStart(2, "0")}`;
-    }
-  }
-  return translateOptionValue(column, value);
-}
-
-/** Cells no write tool may target, with the reason the model needs. */
-export function writeBlockReason(column: DataColumn): string | null {
-  if (column.type === "relation") {
-    return `${column.name} is a relation — links change through the table UI, not cell writes (not supported by this tool yet).`;
-  }
-  if (column.type === "lookup" || column.type === "rollup") {
-    return `${column.name} is computed from a relation — it has no stored value to write.`;
-  }
-  return null;
-}
+// The pure column helpers (findColumn / translateOptionValue /
+// normalizeCellInput / writeBlockReason) moved VERBATIM to
+// lib/domain/data/capture-core.ts in the P1/P2 build so the capture
+// validation is unit-testable without Prisma. Re-exported here so this
+// module's import surface is unchanged for existing consumers.
+export {
+  findColumn,
+  normalizeCellInput,
+  translateOptionValue,
+  writeBlockReason,
+} from "../capture-core";
