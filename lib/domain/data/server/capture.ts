@@ -77,6 +77,8 @@ export interface CapturePreflightResult {
   optionVocab: Record<string, string[]>;
   /** Capture columns missing an AI-facing description (capture-quality warning). */
   descriptionsMissing: string[];
+  /** Select-like capture columns with ZERO options — every value will reject until a vocabulary exists. */
+  emptyVocabColumns: string[];
   /**
    * Lower-cased existing values of the dedupe column — plan-time dedup:
    * the proposer marks already-captured items in the checklist. Internal
@@ -99,6 +101,7 @@ export async function preflightCapture(
     refusal,
     optionVocab: {},
     descriptionsMissing: [],
+    emptyVocabColumns: [],
     dedupeValues: new Set(),
   });
 
@@ -123,6 +126,7 @@ export async function preflightCapture(
   const resolved: CaptureConfig["columns"] = [];
   const optionVocab: Record<string, string[]> = {};
   const descriptionsMissing: string[] = [];
+  const emptyVocabColumns: string[] = [];
 
   for (const name of input.columnNames) {
     const column = findColumn(live, name);
@@ -148,6 +152,12 @@ export async function preflightCapture(
       optionVocab[column.name] = (column.config.options ?? []).map(
         (o) => o.label,
       );
+      // Owner smoke 2026-09-02: a select column with ZERO options stalled a
+      // run mid-item — every value is "Unknown option" until someone Applies
+      // a vocabulary. That's knowable HERE, so say it here.
+      if (optionVocab[column.name].length === 0) {
+        emptyVocabColumns.push(column.name);
+      }
     }
     if (!column.description) descriptionsMissing.push(column.name);
   }
@@ -194,6 +204,7 @@ export async function preflightCapture(
     },
     optionVocab,
     descriptionsMissing,
+    emptyVocabColumns,
     dedupeValues,
   };
 }

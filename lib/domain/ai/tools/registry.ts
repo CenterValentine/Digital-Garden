@@ -669,6 +669,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         const captureCfg = capture?.config ?? null;
         const captureVocab = capture?.optionVocab ?? {};
         const captureDescMissing = capture?.descriptionsMissing ?? [];
+        const captureEmptyVocab = capture?.emptyVocabColumns ?? [];
 
         let ledgerNodeId: string | null = null;
         const placement = resolveToolOutputPlacement(ctx);
@@ -754,6 +755,13 @@ export function createBaseTools(ctx: ToolExecuteContext) {
                           "These capture columns have no description — map scraped values by column NAME alone, conservatively.",
                       }
                     : {}),
+                  ...(captureEmptyVocab.length > 0
+                    ? {
+                        emptyVocabColumns: captureEmptyVocab,
+                        emptyVocabWarning:
+                          "These select columns have ZERO options — EVERY value will be rejected until a vocabulary exists. Call propose_column_options for them and wait for the user's Apply BEFORE recording any item with capture.cells.",
+                      }
+                    : {}),
                   alreadyCapturedKeys,
                 },
               }
@@ -762,6 +770,9 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             `APPROVED. Process the items IN ORDER, ONE at a time — the FULL analysis/charter applies to each item (all its phases; the user's framing and mentions apply across every item). ` +
             (captureCfg
               ? `CAPTURE IS ON: for every item that meets the admission rule (${captureCfg.admission}${captureCfg.admissionNote ? ` — ${captureCfg.admissionNote}` : ""}), include capture.cells in its record_item_result — column names ${captureCfg.columns.map((c) => c.name).join(", ")}; use the exact option labels provided. Items marked "already captured" in the checklist hold a row from an earlier sitting — you may skip re-reading them unless the user asked for a refresh. ` +
+                (captureEmptyVocab.length > 0
+                  ? `FIRST: ${captureEmptyVocab.join(", ")} ${captureEmptyVocab.length === 1 ? "has" : "have"} NO options yet — propose_column_options and wait for the user's Apply before any capture.cells, or every row will reject. `
+                  : "") +
                 `If a capture is rejected, fix the named cells and re-record the SAME item before moving on. `
               : "") +
             `After EACH item, call record_item_result with ledgerRunKey "${ledgerRunKey}" and that item's key — status done (with the verdict), or unreadable/blocked if it could not be read (NEVER silently skip an item). ` +
