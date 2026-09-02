@@ -96,7 +96,7 @@ function Body({
         contentType: "note",
         pin: true,
       });
-      toast.success(`Imported "${title}" as a playbook`);
+      toast.success(`Imported "${title}" as a charter`);
       onClose();
     } catch {
       setBusy(false);
@@ -109,7 +109,7 @@ function Body({
       <DialogHeader>
         <DialogTitle className="flex items-center gap-2">
           <BookUp className="h-4 w-4 text-indigo-400" />
-          Import Skill as Playbook
+          Import Skill as Charter
         </DialogTitle>
       </DialogHeader>
 
@@ -120,8 +120,8 @@ function Body({
           <code className="text-[11px]">name</code> +{" "}
           <code className="text-[11px]">description</code>, then a markdown
           body). Its <code className="text-[11px]">##</code> sections become the
-          playbook&apos;s phases, and it&apos;s marked so it shows in the{" "}
-          <code className="text-[11px]">/playbook</code> picker.
+          charter&apos;s phases, and it&apos;s marked so it shows in the{" "}
+          <code className="text-[11px]">/charter</code> picker.
         </p>
 
         <textarea

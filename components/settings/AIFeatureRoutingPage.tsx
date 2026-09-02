@@ -424,10 +424,10 @@ function PlaybookRolesGroup({
       >
         <div className="min-w-0">
           <h3 className="text-sm font-medium text-gray-900 dark:text-white">
-            Playbook model roles
+            Charter model roles
           </h3>
           <p className="mt-1 text-xs text-gray-500">
-            Per-phase model routing for playbooks (scout, analyst, writer,
+            Per-phase model routing for charters (scout, analyst, writer,
             coder, reviewer, archivist). {configured}/{features.length}{" "}
             configured.
           </p>

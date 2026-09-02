@@ -1547,8 +1547,8 @@ export function useConversationEngine({
       label: p.title,
       description:
         p.description ||
-        `Playbook · ${p.phaseCount} phase${p.phaseCount === 1 ? "" : "s"}`,
-      contentType: "playbook",
+        `Charter · ${p.phaseCount} phase${p.phaseCount === 1 ? "" : "s"}`,
+      contentType: "charter",
     }));
     const toolItems: SuggestionItem[] = BASE_TOOL_IDS.map((id) => ({
       id,

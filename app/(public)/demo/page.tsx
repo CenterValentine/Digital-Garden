@@ -4,7 +4,7 @@ import { DemoPage } from "@/components/personal/DemoPage";
 export const metadata: Metadata = {
   title: "Product demo — David Valentine",
   description:
-    "A guided video tour of the Digital Garden: AI chat with tool calls, agent playbooks, durable workflows, live collaboration, and publishing. Request a custom demo.",
+    "A guided video tour of the Digital Garden: AI chat with tool calls, agent charters, durable workflows, live collaboration, and publishing. Request a custom demo.",
 };
 
 /**

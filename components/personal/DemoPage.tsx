@@ -54,7 +54,7 @@ export function DemoPage() {
         </div>
 
         <p className="gc-line">
-          A guided video tour of the Digital Garden — the AI chat and its tool calls, playbooks,
+          A guided video tour of the Digital Garden — the AI chat and its tool calls, charters,
           workflows, live collaboration, and publishing — is being filmed. The product ships
           faster than the film crew.
         </p>

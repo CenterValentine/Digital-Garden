@@ -26,8 +26,8 @@ export function ModelPinToggle({
       aria-pressed={pinned}
       title={
         pinned
-          ? "Model pinned — this model overrides playbook per-phase routing. Click to unpin."
-          : "Pin this model so it overrides any playbook per-phase model routing."
+          ? "Model pinned — this model overrides charter per-phase routing. Click to unpin."
+          : "Pin this model so it overrides any charter per-phase model routing."
       }
       className={
         pinned

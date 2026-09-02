@@ -363,7 +363,7 @@ async function resolvePlaybookReferenceContext(
     }
     const isSubPlaybook = isPlaybookMetadata(found.notePayload?.metadata);
     return isSubPlaybook
-      ? `- [[${title}]] (getCurrentNote contentId: ${found.id}) — SUB-PLAYBOOK: has its own standing rules/phases; follow its directives once read`
+      ? `- [[${title}]] (getCurrentNote contentId: ${found.id}) — SUB-CHARTER: has its own standing rules/phases; follow its directives once read`
       : `- [[${title}]] (getCurrentNote contentId: ${found.id})`;
   });
 
@@ -1841,8 +1841,8 @@ export async function POST(request: Request) {
                 serverExtensions,
               );
               playbookContext =
-                `\n\n## Active Playbook: "${playbookNode.title}"\n` +
-                `This playbook is ALREADY ATTACHED and loaded below — when the user asks to run "this playbook" (or a bare "run it"/"go"), THIS is it. Do not search notes or read anything else to find it; act on the content already provided here.\n` +
+                `\n\n## Active Charter: "${playbookNode.title}"\n` +
+                `This charter is ALREADY ATTACHED and loaded below — when the user asks to run "this charter" (or a bare "run it"/"go"), THIS is it. Do not search notes or read anything else to find it; act on the content already provided here.\n` +
                 `Phase ${phaseIndex + 1} of ${parsed.phases.length}: "${phase.title}"\n\n` +
                 `**Phases:**\n${phaseToc}\n\n` +
                 (standingText
@@ -1855,8 +1855,8 @@ export async function POST(request: Request) {
               // discovery/rooted-note behavior; the assistant should report
               // the missing instructions, never search for a replacement.
               playbookContext =
-                `\n\n## Active Playbook: "${playbookNode.title}"\n` +
-                "This playbook is explicitly attached, but it contains no instructions. Do not search for another playbook. Tell the user this attached playbook is empty and needs content before it can run.";
+                `\n\n## Active Charter: "${playbookNode.title}"\n` +
+                "This charter is explicitly attached, but it contains no instructions. Do not search for another charter. Tell the user this attached charter is empty and needs content before it can run.";
             }
           }
         } catch (playbookError) {
@@ -1937,13 +1937,13 @@ export async function POST(request: Request) {
               )
               .join("\n\n");
             playbookContext =
-              `\n\n## Active Playbook: "${rootedNode.title}"\n` +
-              "The user explicitly asked to execute the rooted file as a playbook. Its validated contents are loaded below. Follow it directly; do not search for or substitute another playbook. All phases are visible, so continue through approved checkpoints as instructed.\n\n" +
+              `\n\n## Active Charter: "${rootedNode.title}"\n` +
+              "The user explicitly asked to execute the rooted file as a charter. Its validated contents are loaded below. Follow it directly; do not search for or substitute another charter. All phases are visible, so continue through approved checkpoints as instructed.\n\n" +
               (standingText
                 ? `**Standing rules (always apply):**\n${standingText}\n\n`
                 : "") +
               (phaseText ||
-                "This rooted playbook contains no executable instructions. Tell the user it needs content before it can run.") +
+                "This rooted charter contains no executable instructions. Tell the user it needs content before it can run.") +
               referenceContext.manifest;
           }
         } catch (rootedPlaybookError) {
@@ -1977,7 +1977,7 @@ export async function POST(request: Request) {
               node.notePayload.tiptapJson as JSONContent,
             );
             playbookAwareness =
-              `\n\nThe content you're working in — "${node.title}" — is itself a PLAYBOOK` +
+              `\n\nThe content you're working in — "${node.title}" — is itself a CHARTER` +
               (parsed.phases.length > 0
                 ? ` (${parsed.phases.length} phases)`
                 : "") +
@@ -1998,7 +1998,7 @@ export async function POST(request: Request) {
       // this turn so weaker models cannot search for the playbook that is
       // already loaded. Generic note search remains available for phase work.
       if (attachedPlaybookResolved || rootedPlaybookResolved) {
-        delete tools.search_playbooks;
+        delete tools.search_charters;
         // System context alone proved insufficient for weaker models: the
         // owner smoke trace showed a correctly injected Active Playbook, yet
         // DeepSeek still opened the rooted note first. Put the validated
@@ -2020,13 +2020,13 @@ export async function POST(request: Request) {
         const readable =
           rootedContentType === "note" || rootedContentType === "folder";
         rootedContentSection = attachedPlaybookResolved
-          ? `\n\nThis chat was opened from **"${rootedContentTitle}"** (a ${rootedContentType ?? "content"}). It is optional working context, NOT the selected playbook. The playbook attached to the current user message and loaded in "Active Playbook" is the procedure to execute. Do not read "${rootedContentTitle}" merely to identify, discover, or understand the playbook.` +
+          ? `\n\nThis chat was opened from **"${rootedContentTitle}"** (a ${rootedContentType ?? "content"}). It is optional working context, NOT the selected charter. The charter attached to the current user message and loaded in "Active Charter" is the procedure to execute. Do not read "${rootedContentTitle}" merely to identify, discover, or understand the charter.` +
             (readable
-              ? ` Read the rooted content with getCurrentNote (contentId: ${contentId}) only when the user's request or the active playbook phase actually requires its contents.`
+              ? ` Read the rooted content with getCurrentNote (contentId: ${contentId}) only when the user's request or the active charter phase actually requires its contents.`
               : "")
           : rootedPlaybookResolved
-            ? `\n\nThis chat is rooted in **"${rootedContentTitle}"** (a ${rootedContentType ?? "content"}), and the user explicitly asked to execute it as the Active Playbook. Its validated instructions are already loaded; do not read or search for another playbook.`
-            : `\n\nThis chat is rooted in **"${rootedContentTitle}"** (a ${rootedContentType ?? "content"}) — that is what this conversation is about. When the user refers to "this file", "this note", "the current one", "this playbook", etc. without naming it, they mean "${rootedContentTitle}".` +
+            ? `\n\nThis chat is rooted in **"${rootedContentTitle}"** (a ${rootedContentType ?? "content"}), and the user explicitly asked to execute it as the Active Charter. Its validated instructions are already loaded; do not read or search for another charter.`
+            : `\n\nThis chat is rooted in **"${rootedContentTitle}"** (a ${rootedContentType ?? "content"}) — that is what this conversation is about. When the user refers to "this file", "this note", "the current one", "this charter", etc. without naming it, they mean "${rootedContentTitle}".` +
               (readable
                 ? ` Read its content with getCurrentNote (contentId: ${contentId}) when you need it.`
                 : "");

@@ -38,7 +38,7 @@ import {
   Captions,
   LampDesk,
   BookUp,
-  BookMarked,
+  ScrollText,
   BookMinus,
   Layers,
 } from "lucide-react";
@@ -377,8 +377,8 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
         playbookActions.push(
           {
             id: "edit-playbook-details",
-            label: "Edit Playbook Details…",
-            icon: <BookMarked className="h-4 w-4" />,
+            label: "Edit Charter Details…",
+            icon: <ScrollText className="h-4 w-4" />,
             onClick: () =>
               usePlaybookDialogStore.getState().openDialog({
                 contentId,
@@ -389,7 +389,7 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
           },
           {
             id: "unmark-playbook",
-            label: "Unmark Playbook",
+            label: "Unmark Charter",
             icon: <BookMinus className="h-4 w-4" />,
             onClick: async () => {
               try {
@@ -399,9 +399,9 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
                 );
                 if (!res.ok) throw new Error("request failed");
                 window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
-                toast.success("Unmarked — removed from the /playbook picker");
+                toast.success("Unmarked — removed from the /charter picker");
               } catch {
-                toast.error("Failed to unmark playbook");
+                toast.error("Failed to unmark charter");
               }
             },
           },
@@ -409,8 +409,8 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
       } else {
         playbookActions.push({
           id: "mark-as-playbook",
-          label: "Mark as Playbook…",
-          icon: <BookMarked className="h-4 w-4" />,
+          label: "Mark as Charter…",
+          icon: <ScrollText className="h-4 w-4" />,
           onClick: () =>
             usePlaybookDialogStore.getState().openDialog({
               contentId,
@@ -432,14 +432,14 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
           : clickedNode?.parentId ?? null;
       playbookActions.push({
         id: "import-skill-playbook",
-        label: "Import Skill as Playbook…",
+        label: "Import Skill as Charter…",
         icon: <BookUp className="h-4 w-4" />,
         onClick: () => useImportSkillStore.getState().openDialog(importTarget),
       });
     }
 
     if (playbookActions.length > 0) {
-      sections.push({ title: "Playbook", actions: playbookActions });
+      sections.push({ title: "Charter", actions: playbookActions });
     }
   }
 

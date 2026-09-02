@@ -284,16 +284,16 @@ export function describeModelRouteSource(route: ResolvedModelRoute): string {
       return "by you";
     case "playbook-phase":
       return route.playbookTitle
-        ? `by playbook "${route.playbookTitle}"${
+        ? `by charter "${route.playbookTitle}"${
             typeof route.phaseIndex === "number"
               ? ` (Phase ${route.phaseIndex + 1})`
               : ""
           }`
-        : "by playbook";
+        : "by charter";
     case "playbook":
       return route.playbookTitle
-        ? `by playbook "${route.playbookTitle}"`
-        : "by playbook";
+        ? `by charter "${route.playbookTitle}"`
+        : "by charter";
     case "settings":
       return "by settings";
     case "default":

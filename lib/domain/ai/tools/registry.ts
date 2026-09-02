@@ -488,7 +488,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
     // engine enforces the item budget the same way it enforces page budget.
     propose_item_iteration: tool({
       description:
-        "Propose a BOUNDED per-item iteration for the user to approve BEFORE processing: apply an analysis (usually an attached playbook) to EACH item in an enumerated set — jobs on a board (from collect), the user's open tabs (from list_tabs), or given URLs. " +
+        "Propose a BOUNDED per-item iteration for the user to approve BEFORE processing: apply an analysis (usually an attached charter) to EACH item in an enumerated set — jobs on a board (from collect), the user's open tabs (from list_tabs), or given URLs. " +
         "Enumerate FIRST, then propose with the item list. On approval you receive an item budget, a ledger checklist (one row per item), and stable item keys. Process items IN ORDER, one at a time, recording EVERY item with record_item_result; finish with a roll-up (createNote) + record_iteration_findings. " +
         "Skip this tool for a single item — just run the analysis directly.",
       needsApproval: true,
@@ -497,7 +497,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           .string()
           .min(1)
           .max(400)
-          .describe("What each item gets, in one sentence (e.g. \"score fit with the Job Fit playbook; document >75% matches\")."),
+          .describe("What each item gets, in one sentence (e.g. \"score fit with the Job Fit charter; document >75% matches\")."),
         source: z
           .enum(["list-page", "open-tabs", "urls"])
           .describe("Where the items were enumerated from."),
@@ -622,7 +622,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           batchSize: effectiveBatchSize,
           items: normalized,
           nextAction:
-            `APPROVED. Process the items IN ORDER, ONE at a time — the FULL analysis/playbook applies to each item (all its phases; the user's framing and mentions apply across every item). ` +
+            `APPROVED. Process the items IN ORDER, ONE at a time — the FULL analysis/charter applies to each item (all its phases; the user's framing and mentions apply across every item). ` +
             `After EACH item, call record_item_result with ledgerRunKey "${ledgerRunKey}" and that item's key — status done (with the verdict), or unreadable/blocked if it could not be read (NEVER silently skip an item). ` +
             (effectiveBatchSize
               ? `This run is BATCHED: after every ${effectiveBatchSize} recorded items, pause acquisition and call record_batch_checkpoint (dedupe the batch, note anomalies) BEFORE starting the next item — the harness holds new reads until the checkpoint is recorded. `
@@ -957,7 +957,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
       needsApproval: () =>
         getPhaseCheckpointGateStatus(ctx.phaseCheckpointGate).ready,
       description:
-        "Call at EVERY phase boundary of a multi-phase procedure/playbook. Pauses for the user's verdict (approve / revise / approve-with-tweaks) and records the phase in the Run Ledger note. " +
+        "Call at EVERY phase boundary of a multi-phase procedure/charter. Pauses for the user's verdict (approve / revise / approve-with-tweaks) and records the phase in the Run Ledger note. " +
         "This is a completion signal, never a planning shortcut: do not call it until the phase's required research, linked-note reads, analysis, and outputs have actually been completed. The runtime rejects checkpoints that lack verifiable required tool activity. " +
         "Do NOT continue to the next phase without calling this. If the verdict includes revision feedback, redo the current phase incorporating it before checkpointing again. " +
         "Summarize concretely: what was produced, key decisions, where artifacts were saved. On the first checkpoint, provide runTitle as a stable short title for the WHOLE run (subject + anticipated deliverables), not merely this phase.",
@@ -1088,7 +1088,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
     }),
     create_folder: tool({
       description:
-        "Find or create a folder by name. Use for playbook standing rules like 'place outputs in a folder named after the company under job-search/'. " +
+        "Find or create a folder by name. Use for charter standing rules like 'place outputs in a folder named after the company under job-search/'. " +
         "Pass parentId to nest; omit it to use this conversation's target folder. Returns the folder id for use as parentId in createNote/create_docx. " +
         "Find-or-create: an existing folder with the same name under the same parent is reused, never duplicated.",
       inputSchema: z.object({
@@ -1200,7 +1200,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
       description:
         "Create a Word (.docx) document from markdown content and file it in the user's garden. " +
         "Use when the user asks for a Word/docx deliverable (e.g. a resume). Headings, lists, bold/italic and links from the markdown are preserved. Do NOT create output on your own initiative — only when the user asks for it. " +
-        "Targeting: omit placement fields to use the configured output-target preset. If the user or active playbook gives THIS document a different relative destination, pass outputLocation (`under_chat`, `under_content`, or `beside_content`). Pass parentId only for a specifically resolved folder UUID. A per-document instruction always overrides the preset.",
+        "Targeting: omit placement fields to use the configured output-target preset. If the user or active charter gives THIS document a different relative destination, pass outputLocation (`under_chat`, `under_content`, or `beside_content`). Pass parentId only for a specifically resolved folder UUID. A per-document instruction always overrides the preset.",
       inputSchema: z.object({
         title: z.string().min(1).max(200).describe("Document title (also the file name)"),
         markdown: z
@@ -1217,7 +1217,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           .enum(["under_chat", "under_content", "beside_content"])
           .optional()
           .describe(
-            "Per-document relative destination. Pass when the user or active playbook explicitly routes this document differently from the configured preset; otherwise omit.",
+            "Per-document relative destination. Pass when the user or active charter explicitly routes this document differently from the configured preset; otherwise omit.",
           ),
         alsoShortcutTo: z
           .string()
@@ -1392,7 +1392,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           // Flag playbook notes inline so a generic search still surfaces
           // them unambiguously — no separate read needed to tell.
           const tag = isPlaybookMetadata(r.notePayload?.metadata)
-            ? " [PLAYBOOK]"
+            ? " [CHARTER]"
             : "";
           return `${i + 1}. "${r.title}"${tag} (id: ${r.id})${excerpt ? `\n   ${excerpt}...` : ""}`;
         });
@@ -1446,15 +1446,15 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         }
       },
     }),
-    search_playbooks: tool({
+    search_charters: tool({
       description:
-        "List the user's playbooks (notes/folders marked as multi-phase procedures) with their descriptions. Use this — not searchNotes — when the user asks to run/find a playbook by name or topic; it searches ONLY playbooks, so it won't return unrelated notes. If a playbook is already attached to this chat (see the Active Playbook section, if present), you don't need this — that one is already the answer.",
+        "List the user's charters (notes/folders marked as multi-phase procedures) with their descriptions. Use this — not searchNotes — when the user asks to run/find a charter by name or topic; it searches ONLY charters, so it won't return unrelated notes. If a charter is already attached to this chat (see the Active Charter section, if present), you don't need this — that one is already the answer.",
       inputSchema: z.object({
         query: z
           .string()
           .optional()
           .describe(
-            "Optional filter — matches playbook title or description (case-insensitive substring). Omit to list all.",
+            "Optional filter — matches charter title or description (case-insensitive substring). Omit to list all.",
           ),
       }),
       execute: async ({ query }) => {
@@ -1469,14 +1469,14 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           : all;
         if (matches.length === 0) {
           return q
-            ? `No playbooks match "${query}".`
-            : "No playbooks found — none of the user's notes/folders are marked as playbooks yet.";
+            ? `No charters match "${query}".`
+            : "No charters found — none of the user's notes/folders are marked as charters yet.";
         }
         const lines = matches.map(
           (p, i) =>
             `${i + 1}. "${p.title}" (id: ${p.id}, ${p.phaseCount} phase${p.phaseCount === 1 ? "" : "s"})${p.description ? `\n   ${p.description}` : ""}`,
         );
-        return `Found ${matches.length} playbook${matches.length !== 1 ? "s" : ""}:\n\n${lines.join("\n\n")}\n\nRead the right one with getCurrentNote using its contentId.`;
+        return `Found ${matches.length} charter${matches.length !== 1 ? "s" : ""}:\n\n${lines.join("\n\n")}\n\nRead the right one with getCurrentNote using its contentId.`;
       },
     }),
 
@@ -1492,7 +1492,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         // re-read with a pointer saves the duplicate copy (17k chars in one
         // measured run) with zero information loss.
         if (ctx.activePlaybook && contentId === ctx.activePlaybook.contentId) {
-          return `"${ctx.activePlaybook.title}" is ALREADY LOADED IN FULL in your system context as the Active Playbook — no need to re-read it. Act on the playbook content already provided above.`;
+          return `"${ctx.activePlaybook.title}" is ALREADY LOADED IN FULL in your system context as the Active Charter — no need to re-read it. Act on the charter content already provided above.`;
         }
         const content = await prisma.contentNode.findFirst({
           where: {
@@ -1557,8 +1557,8 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         "Ambiguous phrasings to watch for: 'update the note in this chat', 'add to this conversation's notes', 'put X in the note' — these do NOT mean 'create a new note'. They typically refer to an existing note. When the phrasing is ambiguous, ASK the user whether to create a new note or update an existing one before calling this tool. " +
         "If they confirm a new note, this is the right tool. If they name an existing note, use `searchNotes` to find its id then use `updateNote`. " +
         "Do NOT create output on your own initiative — only when the user asks for it. " +
-        "Targeting: omit placement fields to use the configured output-target preset. If the user or active playbook gives THIS note a different relative destination, pass `outputLocation` (`under_chat`, `under_content`, or `beside_content`). Pass `parentId` only for a specifically resolved folder UUID. A per-note instruction always overrides the preset. " +
-        "HYPERLINKING: to link other garden content inline (notes OR folders), write wiki-links in the markdown — [[Exact Title]] or [[Exact Title|Shown Text]]. They become real clickable links, resolve by title, and a linked FOLDER also feeds its context to the AI when the note is used in chat or as a playbook. Use the content's exact title; do not invent URL-style links for internal content.",
+        "Targeting: omit placement fields to use the configured output-target preset. If the user or active charter gives THIS note a different relative destination, pass `outputLocation` (`under_chat`, `under_content`, or `beside_content`). Pass `parentId` only for a specifically resolved folder UUID. A per-note instruction always overrides the preset. " +
+        "HYPERLINKING: to link other garden content inline (notes OR folders), write wiki-links in the markdown — [[Exact Title]] or [[Exact Title|Shown Text]]. They become real clickable links, resolve by title, and a linked FOLDER also feeds its context to the AI when the note is used in chat or as a charter. Use the content's exact title; do not invent URL-style links for internal content.",
       inputSchema: z.object({
         title: z
           .string()
@@ -1595,7 +1595,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           .enum(["under_chat", "under_content", "beside_content"])
           .optional()
           .describe(
-            "Per-note relative destination. Pass when the user or active playbook explicitly routes this note differently from the configured preset; otherwise omit.",
+            "Per-note relative destination. Pass when the user or active charter explicitly routes this note differently from the configured preset; otherwise omit.",
           ),
         alsoShortcutTo: z
           .string()
@@ -1754,7 +1754,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         "Do NOT use this to create new top-level notes — use `createNote` for that. " +
         "Do NOT call this on your own initiative — only when the user asks you to write to a note. There is no default between writing-to-a-note and creating new output (createNote/create_docx); pick whichever the user's request actually asks for, and do neither unless they ask. " +
         "This updates CONTENT ONLY — it never changes the title. Renaming is a separate, explicit action: if the user asks to rename/retitle, use `renameNote`. Do not rename as a side effect of a content update. " +
-        "HYPERLINKING: to link other garden content inline (notes OR folders), write wiki-links in the markdown — [[Exact Title]] or [[Exact Title|Shown Text]]. They become real clickable links, resolve by title, and a linked FOLDER also feeds its context to the AI when the note is used in chat or as a playbook. Use the content's exact title; do not invent URL-style links for internal content.",
+        "HYPERLINKING: to link other garden content inline (notes OR folders), write wiki-links in the markdown — [[Exact Title]] or [[Exact Title|Shown Text]]. They become real clickable links, resolve by title, and a linked FOLDER also feeds its context to the AI when the note is used in chat or as a charter. Use the content's exact title; do not invent URL-style links for internal content.",
       inputSchema: z.object({
         contentId: z
           .string()

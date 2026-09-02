@@ -127,11 +127,11 @@ export function bindPlaybookToLatestUserMessage(
 ): ModelMessage[] {
   const binding =
     source === "attached"
-      ? `[Attached playbook selected by the user: "${title}". ` +
-        "This is the procedure to execute for the request below. Its validated current-phase instructions are in the Active Playbook system section. " +
-        "Do not read rooted content to identify or discover the playbook; use rooted content only when the request or active phase actually requires it.]"
-      : `[The user explicitly asked to execute the rooted content "${title}" as a playbook. ` +
-        "Its validated instructions are in the Active Playbook system section. Follow that playbook directly; do not search for or substitute another one.]";
+      ? `[Attached charter selected by the user: "${title}". ` +
+        "This is the procedure to execute for the request below. Its validated current-phase instructions are in the Active Charter system section. " +
+        "Do not read rooted content to identify or discover the charter; use rooted content only when the request or active phase actually requires it.]"
+      : `[The user explicitly asked to execute the rooted content "${title}" as a charter. ` +
+        "Its validated instructions are in the Active Charter system section. Follow that charter directly; do not search for or substitute another one.]";
   const next = [...messages];
 
   for (let index = next.length - 1; index >= 0; index -= 1) {

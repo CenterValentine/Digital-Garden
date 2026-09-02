@@ -23,7 +23,7 @@ import {
   DialogTitle,
 } from "@/components/ui/glass/dialog";
 import { Button } from "@/components/ui/glass/button";
-import { BookMarked, Loader2 } from "lucide-react";
+import { Loader2, ScrollText } from "lucide-react";
 import { toast } from "sonner";
 import { usePlaybookDialogStore } from "@/state/playbook-dialog-store";
 
@@ -88,8 +88,8 @@ function Body({
       window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
       toast.success(
         editing
-          ? "Playbook details updated"
-          : "Marked as playbook — attach it from any chat with /playbook",
+          ? "Charter details updated"
+          : "Marked as charter — attach it from any chat with /charter",
       );
       onClose();
     } catch {
@@ -102,21 +102,21 @@ function Body({
     <>
       <DialogHeader>
         <DialogTitle className="flex items-center gap-2">
-          <BookMarked className="h-4 w-4 text-indigo-400" />
-          {editing ? "Edit Playbook Details" : "Mark as Playbook"}
+          <ScrollText className="h-4 w-4 text-indigo-400" />
+          {editing ? "Edit Charter Details" : "Mark as Charter"}
         </DialogTitle>
       </DialogHeader>
 
       <div className="min-w-0 space-y-3">
         <div className="space-y-1">
           <span className="text-[11px] uppercase tracking-wide text-gray-400">
-            Playbook
+            Charter
           </span>
           <p className="truncate text-sm font-medium text-gray-900 dark:text-gray-100">
             {title || "Untitled"}
           </p>
           <p className="text-xs text-gray-400">
-            The playbook name is the file name. Its{" "}
+            The charter name is the file name. Its{" "}
             <code className="text-[11px]">##</code> sections are its phases.
           </p>
         </div>
@@ -142,7 +142,7 @@ function Body({
                 void handleSave();
               }
             }}
-            placeholder="One-line summary shown in the /playbook picker…"
+            placeholder="One-line summary shown in the /charter picker…"
             spellCheck
             rows={3}
             className="w-full resize-y rounded-md border border-black/10 bg-black/[0.03] px-3 py-2 text-sm leading-relaxed text-gray-900 outline-none focus:border-indigo-400/50 dark:border-white/10 dark:bg-white/[0.04] dark:text-gray-100"
@@ -178,7 +178,7 @@ function Body({
             ) : editing ? (
               "Save"
             ) : (
-              "Mark as Playbook"
+              "Mark as Charter"
             )}
           </Button>
         </div>

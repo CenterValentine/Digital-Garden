@@ -26,7 +26,7 @@ import {
   type KeyboardEvent,
   type FormEvent,
 } from "react";
-import { ArrowUp, Square, Mic, Paperclip, X, FileText, Loader2, GitBranch } from "lucide-react";
+import { ArrowUp, Square, Mic, Paperclip, X, FileText, Loader2, ScrollText } from "lucide-react";
 import { useDrop } from "react-dnd";
 import { cn } from "@/lib/core/utils";
 import {
@@ -293,11 +293,11 @@ export function ChatInput({
           (c) =>
             c.label.toLowerCase().includes(q) ||
             c.description?.toLowerCase().includes(q) ||
-            // Playbooks are labeled by their own title, but the user was told
-            // the command is "/playbook" — so make every playbook item match
-            // the keyword "playbook" (covers /p, /play, /playbook). `"playbook"
+            // Charters are labeled by their own title, but the user was told
+            // the command is "/charter" — so make every charter item match
+            // the keyword "charter" (covers /c, /char, /charter). `"charter"
             // .includes("")` is true, so a bare "/" still lists them too.
-            (c.contentType === "playbook" && "playbook".includes(q)),
+            (c.contentType === "charter" && "charter".includes(q)),
         ),
       );
     }
@@ -384,7 +384,7 @@ export function ChatInput({
         }
 
         finishMention(item);
-      } else if (item.contentType === "playbook") {
+      } else if (item.contentType === "charter") {
         // Attach, don't insert text — the trigger text was already deleted
         // above. The composer chip (below) shows what's attached.
         onAttachPlaybook?.(item);
@@ -645,11 +645,11 @@ export function ChatInput({
           />
         )}
 
-        {/* Active playbook chip (AI v3.2 T3) */}
+        {/* Active charter chip (AI v3.2 T3; charter vocabulary P0a) */}
         {activePlaybook && (
           <div className="flex flex-wrap gap-1.5 px-2.5 pt-2.5">
             <span className="inline-flex items-center gap-1.5 rounded-md border border-indigo-500/30 bg-indigo-500/10 px-2 py-1 text-[11px] text-indigo-700 dark:text-indigo-300">
-              <GitBranch className="h-3 w-3 shrink-0" />
+              <ScrollText className="h-3 w-3 shrink-0" />
               <span className="truncate max-w-[160px]">{activePlaybook.title}</span>
               {activePlaybook.phaseCount > 0 && (
                 <span className="text-indigo-500/70 dark:text-indigo-400/70">
@@ -660,7 +660,7 @@ export function ChatInput({
               <button
                 type="button"
                 onClick={onDetachPlaybook}
-                aria-label="Detach playbook"
+                aria-label="Detach charter"
                 className="shrink-0 text-indigo-500/70 hover:text-red-400 transition-colors"
               >
                 <X className="h-3 w-3" />

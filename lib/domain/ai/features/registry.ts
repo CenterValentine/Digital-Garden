@@ -240,18 +240,18 @@ export const FEATURE_REGISTRY: FeatureSpec[] = [
   // reasoning inference lands. Pinned by `model-routing:check`.
   {
     id: "role-scout",
-    label: "Playbook role · Scout",
+    label: "Charter role · Scout",
     description:
-      "Playbook phases tagged `model: scout` — fast, low-cost research/gather/search work.",
+      "Charter phases tagged `model: scout` — fast, low-cost research/gather/search work.",
     requiredCapabilities: ["text", "tools"],
     preferredCapabilities: ["low-cost"],
     defaultSuggestion: { presetId: "anthropic", modelId: "claude-haiku-4-5" },
   },
   {
     id: "role-analyst",
-    label: "Playbook role · Analyst",
+    label: "Charter role · Analyst",
     description:
-      "Playbook phases tagged `model: analyst` — weighing tradeoffs, deciding, planning.",
+      "Charter phases tagged `model: analyst` — weighing tradeoffs, deciding, planning.",
     requiredCapabilities: ["text", "tools"],
     preferredCapabilities: ["reasoning"],
     // Suggestion ids MUST exist in the preset template's defaultModels
@@ -262,34 +262,34 @@ export const FEATURE_REGISTRY: FeatureSpec[] = [
   },
   {
     id: "role-writer",
-    label: "Playbook role · Writer",
+    label: "Charter role · Writer",
     description:
-      "Playbook phases tagged `model: writer` — drafting and composing prose.",
+      "Charter phases tagged `model: writer` — drafting and composing prose.",
     requiredCapabilities: ["text", "streaming"],
     defaultSuggestion: { presetId: "anthropic", modelId: "claude-sonnet-4" },
   },
   {
     id: "role-coder",
-    label: "Playbook role · Coder",
+    label: "Charter role · Coder",
     description:
-      "Playbook phases tagged `model: coder` — implementing and scripting.",
+      "Charter phases tagged `model: coder` — implementing and scripting.",
     requiredCapabilities: ["text", "tools"],
     defaultSuggestion: { presetId: "mistral", modelId: "codestral-latest" },
   },
   {
     id: "role-reviewer",
-    label: "Playbook role · Reviewer",
+    label: "Charter role · Reviewer",
     description:
-      "Playbook phases tagged `model: reviewer` — adversarial critique and verification.",
+      "Charter phases tagged `model: reviewer` — adversarial critique and verification.",
     requiredCapabilities: ["text"],
     preferredCapabilities: ["reasoning"],
     defaultSuggestion: { presetId: "anthropic", modelId: "claude-opus-4" },
   },
   {
     id: "role-archivist",
-    label: "Playbook role · Archivist",
+    label: "Charter role · Archivist",
     description:
-      "Playbook phases tagged `model: archivist` — digesting a large corpus (long context).",
+      "Charter phases tagged `model: archivist` — digesting a large corpus (long context).",
     requiredCapabilities: ["text"],
     preferredCapabilities: ["low-cost"],
     minContextWindow: 200_000,

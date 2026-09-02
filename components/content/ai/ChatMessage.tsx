@@ -33,6 +33,7 @@ import {
   FolderPlus,
   GitBranch,
   Globe,
+  ScrollText,
   GripVertical,
   Image as ImageIcon,
   ImagePlus,
@@ -813,10 +814,10 @@ export const ChatMessage = memo(function ChatMessage({
             return (
               <div
                 key={i}
-                title="Playbook attached to this message"
+                title="Charter attached to this message"
                 className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-indigo-500/30 bg-indigo-500/[0.08] px-2.5 py-1.5 text-xs text-indigo-700 dark:text-indigo-300"
               >
-                <GitBranch className="h-3.5 w-3.5 shrink-0" />
+                <ScrollText className="h-3.5 w-3.5 shrink-0" />
                 <span className="truncate">{playbook.title}</span>
                 {phaseLabel && (
                   <span className="shrink-0 text-indigo-500/80 dark:text-indigo-300/70">
@@ -2314,7 +2315,7 @@ function PhaseCheckpointCard({
   return (
     <div className="rounded-lg border border-indigo-400/40 bg-indigo-500/[0.06] text-xs overflow-hidden">
       <div className="flex items-center gap-2 px-3 py-1.5">
-        <GitBranch className="h-3 w-3 shrink-0 text-indigo-400" />
+        <ScrollText className="h-3 w-3 shrink-0 text-indigo-400" />
         <span className="font-medium text-gray-700 dark:text-gray-300 truncate">
           {data.phase
             ? `Phase checkpoint: ${data.phase}`

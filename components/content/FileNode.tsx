@@ -46,7 +46,6 @@ import {
   MessageCircle,
   User,
   Users,
-  BookMarked,
 } from "lucide-react";
 import { format } from "date-fns";
 import { useLongPress } from "@/components/common/useLongPress";
@@ -331,6 +330,17 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
           return <LucideIcon className={`${iconSize} ${iconColor}`} />;
         }
       }
+    }
+
+    // Charter (D6 "all distinct", P0a): a charter-marked note/folder gets a
+    // full icon swap — ScrollText, indigo accent — an explicit customIcon
+    // above still wins. Storage flag remains `metadata.playbook` (legacy key).
+    if (data.note?.playbook) {
+      return (
+        <LucideIcons.ScrollText
+          className={`${iconSize} text-indigo-500 dark:text-indigo-400`}
+        />
+      );
     }
 
     if (isFolder) {
@@ -1087,17 +1097,6 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
               }`}
             >
               <LucideIcons.ArrowUpRight className="h-2 w-2" />
-            </span>
-          </span>
-        ) : data.note?.playbook ? (
-          <span data-file-icon className="relative inline-flex">
-            {getIcon()}
-            <span
-              aria-hidden
-              title="Playbook"
-              className="absolute -bottom-0.5 -right-1 flex h-3 w-3 items-center justify-center rounded-full bg-white text-indigo-500 shadow-sm ring-1 ring-black/10 dark:bg-gray-800 dark:text-indigo-400 dark:ring-white/15"
-            >
-              <BookMarked className="h-2 w-2" />
             </span>
           </span>
         ) : data.role === "referenced" ? (
