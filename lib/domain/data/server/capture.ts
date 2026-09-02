@@ -244,6 +244,18 @@ export async function captureUpsertRow(input: {
   if (!prepared.ok) {
     return { status: "rejected", errors: prepared.errors ?? [] };
   }
+  if (prepared.writes.length === 0) {
+    // All cells normalized to empty — creating a `{}` row would be exactly
+    // the silent-blank artifact this path exists to prevent (owner smoke
+    // found three grid-seeded empty rows; the capture path must never add
+    // a fourth).
+    return {
+      status: "rejected",
+      errors: [
+        "Every cell was empty after normalization — a captured row needs at least one real value. Include the item's actual data in capture.cells.",
+      ],
+    };
+  }
 
   // Dedupe lookup: exact JSON match on the stored (trimmed) value.
   let existingRowId: string | undefined;
