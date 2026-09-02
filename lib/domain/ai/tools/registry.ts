@@ -661,7 +661,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           return { ok: false, note: "No target folder set, so no ledger was written. Continue the run; reconcile in the roll-up." };
         }
         // Prefer an explicit url; fall back to itemKey when it IS a url (url-tier
-        // stable key). A linked heading makes the runbook click-through-able and
+        // stable key). A linked heading makes the ledger click-through-able and
         // lets a round-2 run re-read the source pages.
         const linkUrl = url?.trim() || (/^https?:\/\//.test(itemKey) ? itemKey : "");
         const label = itemLabel ?? itemKey;
