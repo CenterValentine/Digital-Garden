@@ -13,6 +13,7 @@ import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import type { ContentType } from "@/lib/domain/content/types";
 import type { Prisma } from "@/lib/database/generated/prisma";
 import { logger, spanPayload, withRouteTrace, withSpan } from "@/lib/core/logger";
+import { isPlaybookMetadata } from "@/lib/domain/ai/playbooks/registry";
 
 const ROUTE_PATH = "/api/content/search";
 
@@ -210,7 +211,7 @@ export async function GET(request: NextRequest) {
                   },
                 },
               },
-              notePayload: { select: { searchText: true } },
+              notePayload: { select: { searchText: true, metadata: true } },
               htmlPayload: { select: { searchText: true } },
               codePayload: { select: { searchText: true } },
               filePayload: { select: { fileName: true, mimeType: true } },
@@ -240,6 +241,9 @@ export async function GET(request: NextRequest) {
           contentType: item.contentType,
           updatedAt: item.updatedAt.toISOString(),
           path,
+          // Charter flag (P0a): lets result rows render the ScrollText icon
+          // the tree uses. Storage key is the legacy `metadata.playbook`.
+          charter: isPlaybookMetadata(item.notePayload?.metadata),
           note: item.notePayload
             ? { searchText: item.notePayload.searchText }
             : undefined,

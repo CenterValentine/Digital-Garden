@@ -62,6 +62,8 @@ export interface SearchResult {
   id: string;
   title: string;
   type: ContentType;
+  /** Charter-marked note/folder — renders the tree's ScrollText icon. */
+  charter?: boolean;
   excerpt?: string; // Snippet with highlighted matches
   path?: string; // Breadcrumb path (e.g., "Folder > Subfolder > Note")
   updatedAt: Date;
@@ -267,6 +269,7 @@ export function parseSearchResults(
       id: item.id,
       title: item.title || "Untitled",
       type: item.contentType,
+      charter: item.charter === true,
       excerpt: highlightedExcerpt,
       path: item.path || undefined,
       updatedAt: new Date(item.updatedAt),
