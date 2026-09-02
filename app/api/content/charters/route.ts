@@ -1,8 +1,8 @@
 /**
- * Playbook registry API (AI v3.2 T3).
+ * Charter registry API (AI v3.2 T3).
  *
- * GET /api/content/charters — list the current user's playbook notes for the
- * /playbook picker (id, title, description, phaseCount). See
+ * GET /api/content/charters — list the current user's charter notes for the
+ * /charter picker (id, title, description, phaseCount). See
  * lib/domain/ai/charters/registry.
  */
 
@@ -21,8 +21,8 @@ export async function GET(request: NextRequest) {
         { summary: "session lookup" },
         async () => requireAuth(),
       );
-      const playbooks = await listCharters(session.user.id);
-      return NextResponse.json({ success: true, data: { playbooks } });
+      const charters = await listCharters(session.user.id);
+      return NextResponse.json({ success: true, data: { charters } });
     } catch (error) {
       if (error instanceof Error && error.message === "Authentication required") {
         return NextResponse.json(
@@ -32,12 +32,12 @@ export async function GET(request: NextRequest) {
       }
       logger.error({
         layer: "ai",
-        event: "playbooks_list:caught",
-        summary: "failed to list playbooks",
+        event: "charters_list:caught",
+        summary: "failed to list charters",
         error,
       });
       return NextResponse.json(
-        { success: false, error: { message: "Failed to list playbooks" } },
+        { success: false, error: { message: "Failed to list charters" } },
         { status: 500 },
       );
     }
