@@ -297,6 +297,26 @@ Never folded: charter standing rules + active phase, the approved proposal/captu
 - Unit: validate-all rejection creates zero rows; admission=qualified refuses cells on unqualified items; upsert converges on url-tier key; preflight names the exact missing column/option.
 - Smoke (PR checklist lines): (1) side-panel co-browse run with `captureTo` against a pre-created Job Leads table → approve card → rows appear with correct cells, re-run marks existing items and updates instead of duplicating; (2) propose against a table missing "Fit %" → actionable refusal, no writes; (3) `source: "database-rows"` refinement run updates rows in place; (4) [P4] kill and resume a run in a fresh conversation → resumes from pending ledger rows, no re-processing of done items; (5) [P5] run a charter with no output table → generation card → approved schema has descriptions on every column; the run registers in the master ledger (new quest row, or the continued quest's row updated); (6) [P4/D9] mention a past matter → the proposal card names the continued quest; a later sitting updates the same item rows, not duplicates.
 
+### 9.1 Cost-mechanism verification (owner directive, 2026-09-02 — runs when the build completes)
+
+When P4c lands, a dedicated verification pass confirms the cost machinery works *as measured*, not as designed. Using a real multi-sitting quest (the P2 smoke's Job Leads table is the natural fixture):
+
+- [ ] **Dedup actually skips**: a revisited board's plan marks seen items (rejects included via the quest ledger) and the run's page-read count reflects the skips — compare ledger cost stamps between sitting 1 and sitting 2 on the same board.
+- [ ] **Folding actually shrinks resends**: per-step `inputTokens` after a batch checkpoint drops to ~(summary + current item), verified from the turn diagnostics payloads — not just "the card collapsed."
+- [ ] **Cache behavior**: cache-read ratio stays high across a folded run (folding at batch boundaries must not thrash the prompt cache — the §6.1 economics claim, checked against `cachedInputTokens`).
+- [ ] **Roll-up slimming**: capture runs' roll-ups reference the view, not a re-emitted table (token delta visible in the ledger's final cost stamp).
+- [ ] **Acquisition conservatism**: research runs LOCATE-then-read (search first, stop on acquire — prompt guidance shipped 2026-09-02 after the Greenhouse crawl observation); spot-check a run's pages-read list for speculative crawling.
+- [ ] **Model-role routing engaged**: iteration phases run on scout-tier, judgment phases on the routed tier — verify via the model-switch dividers + per-phase ledger cost stamps.
+
+### 9.2 Graceful budgets — T4 design constraints (owner doctrine, 2026-09-02)
+
+Resource governance has burned this product before: a mid-run hard cap wastes everything in flight and kills the conversation. When T4 (enforced budgets) is built, it must obey:
+
+- **Never choke mid-item.** Caps land only at safe boundaries — after a `record_item_result`, at a batch checkpoint — where the ledger and rows already hold everything. (The existing item-budget soft-stop-at-read-tools is the precedent.)
+- **Warn → checkpoint → ask, never abort.** At threshold: force a batch checkpoint, surface a "budget reached — continue / stop here" card. The user extends or accepts the stop; the harness never unilaterally discards work.
+- **Budgets are consented up front** on the proposal card (pages, items, and — with routing — an approximate cost envelope), so a stop is the *agreed* outcome, not a surprise.
+- **Durable state makes stopping cheap** — this is why governance becomes safe to build *after* P4: with quest rows + ledger as truth, a stopped run resumes from a bounded query. Pre-P4, a kill wasted the transcript's working state; post-P4, a stop costs one resume query. Sequencing matters: T4 lands after the ledger spine, never before.
+
 ## 10. Open items — tracked so they don't get lost (owner, 2026-09-01)
 
 - **Ledger special properties are undefined**: what file-tree mobility means for ledger and index nodes (moving one must not break the index's links — contentLink tracking is by reference, which should make this safe, but verify), and *which outputs nested beneath a ledger/playbook may be moved* — flagged explicitly by the owner as currently undefined; define before or during P4, not after.
