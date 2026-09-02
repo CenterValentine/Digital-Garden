@@ -156,25 +156,31 @@ export async function GET(request: NextRequest) {
       whereClause.contentType = type as ContentType;
     }
 
-    // Search filtering
+    // Search filtering. Body-text conditions are hoisted so the two-phase
+    // relevance fetch below can reuse them without the title arm.
+    const bodySearchOr: NonNullable<ContentWhereInput["OR"]> = search
+      ? [
+          {
+            notePayload: {
+              searchText: { contains: search, mode: "insensitive" },
+            },
+          },
+          {
+            htmlPayload: {
+              searchText: { contains: search, mode: "insensitive" },
+            },
+          },
+          {
+            codePayload: {
+              searchText: { contains: search, mode: "insensitive" },
+            },
+          },
+        ]
+      : [];
     if (search) {
       whereClause.OR = [
         { title: { contains: search, mode: "insensitive" } },
-        {
-          notePayload: {
-            searchText: { contains: search, mode: "insensitive" },
-          },
-        },
-        {
-          htmlPayload: {
-            searchText: { contains: search, mode: "insensitive" },
-          },
-        },
-        {
-          codePayload: {
-            searchText: { contains: search, mode: "insensitive" },
-          },
-        },
+        ...bodySearchOr,
       ];
     }
 
@@ -194,65 +200,117 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Query content
-    const [items, total] = await Promise.all([
-      prisma.contentNode.findMany({
-        where: whereClause,
-        include: {
-          folderPayload: {
-            select: {
-              viewMode: true,
-              sortMode: true,
-              includeReferencedContent: true,
-            },
-          },
-          notePayload: {
-            select: {
-              metadata: true,
-              searchText: true, // Include for search excerpts
-            },
-          },
-          filePayload: {
-            select: {
-              fileName: true,
-              mimeType: true,
-              fileSize: true,
-              uploadStatus: true,
-              storageUrl: true,
-              thumbnailUrl: true,
-              width: true,
-              height: true,
-            },
-          },
-          htmlPayload: {
-            select: {
-              isTemplate: true,
-              searchText: true, // Include for search excerpts
-            },
-          },
-          codePayload: {
-            select: {
-              language: true,
-              searchText: true, // Include for search excerpts
-            },
-          },
-          chatPayload: {
-            select: {
-              messages: true,
-            },
-          },
-          _count: {
-            select: {
-              children: true,
-            },
-          },
+    // Shared include for both fetch phases.
+    const listInclude = {
+      folderPayload: {
+        select: {
+          viewMode: true,
+          sortMode: true,
+          includeReferencedContent: true,
         },
+      },
+      notePayload: {
+        select: {
+          metadata: true,
+          searchText: true, // Include for search excerpts
+        },
+      },
+      filePayload: {
+        select: {
+          fileName: true,
+          mimeType: true,
+          fileSize: true,
+          uploadStatus: true,
+          storageUrl: true,
+          thumbnailUrl: true,
+          width: true,
+          height: true,
+        },
+      },
+      htmlPayload: {
+        select: {
+          isTemplate: true,
+          searchText: true, // Include for search excerpts
+        },
+      },
+      codePayload: {
+        select: {
+          language: true,
+          searchText: true, // Include for search excerpts
+        },
+      },
+      chatPayload: {
+        select: {
+          messages: true,
+        },
+      },
+      _count: {
+        select: {
+          children: true,
+        },
+      },
+    };
+
+    const fetchPage = (where: ContentWhereInput, take: number, skip = 0) =>
+      prisma.contentNode.findMany({
+        where,
+        include: listInclude,
         orderBy: { [sortBy]: sortOrder },
-        take: limit,
-        skip: offset,
-      }),
-      prisma.contentNode.count({ where: whereClause }),
-    ]);
+        take,
+        skip,
+      });
+
+    // Query content.
+    //
+    // Relevance-ranked search (owner report 2026-09-02): the search OR-clause
+    // matches body text too, but ordering stayed alphabetical — so a short
+    // query like "Test" let date-titled notes whose CONTENT merely contains
+    // the word fill the whole page before the note literally NAMED "Test"
+    // appeared (digits sort before letters). Every name-picker on this route
+    // (@mention, Move) truncated exact matches away. With `search`, title
+    // matches come first (exact > prefix > contains, stable within the
+    // requested sort), body-only matches fill the remainder. Offset
+    // pagination keeps the legacy single-query path (pickers don't paginate).
+    let items: Awaited<ReturnType<typeof fetchPage>>;
+    let total: number;
+    if (search && offset === 0) {
+      const { OR: _searchOr, ...baseWhere } = whereClause;
+      const titleItems = await fetchPage(
+        {
+          ...baseWhere,
+          title: { contains: search, mode: "insensitive" },
+        },
+        limit,
+      );
+      const q = search.toLowerCase();
+      const tierOf = (title: string) => {
+        const t = title.toLowerCase();
+        return t === q ? 0 : t.startsWith(q) ? 1 : 2;
+      };
+      // Array.prototype.sort is stable — the requested sort survives within
+      // each tier.
+      titleItems.sort((a, b) => tierOf(a.title) - tierOf(b.title));
+
+      const remaining = limit - titleItems.length;
+      const bodyItems =
+        remaining > 0
+          ? await fetchPage(
+              {
+                ...baseWhere,
+                id: { notIn: titleItems.map((i) => i.id) },
+                OR: bodySearchOr,
+              },
+              remaining,
+            )
+          : [];
+      items = [...titleItems, ...bodyItems];
+      total = await prisma.contentNode.count({ where: whereClause });
+    } else {
+      [items, total] = await Promise.all([
+        fetchPage(whereClause, limit, offset),
+        prisma.contentNode.count({ where: whereClause }),
+      ]);
+    }
 
     // Format response
     const formattedItems: ContentListItem[] = items.map((item) => {
