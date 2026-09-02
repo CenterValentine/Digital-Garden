@@ -1211,7 +1211,20 @@ export function createBaseTools(ctx: ToolExecuteContext) {
               "tool-call",
             ).catch(() => null);
           }
-          return { ok: true, ledgerNodeId: ledger.contentNodeId };
+          return {
+            ok: true,
+            ledgerNodeId: ledger.contentNodeId,
+            ...(questState
+              ? {
+                  questLedgerNodeId: questState.questLedgerId,
+                  // Owner smoke 2026-09-02: the closing message advertised
+                  // the roll-up note and never mentioned where the ROWS
+                  // live — users went looking for "the database" and found
+                  // only notes. Name the ledger.
+                  next: `In your closing summary, tell the user the item rows live in the "${questState.questLabel} — Quest Ledger" database (every item, one row each) — the roll-up note is just the narrative.`,
+                }
+              : {}),
+          };
         } catch (error) {
           return { ok: false, note: `Ledger write failed (${error instanceof Error ? error.message : "unknown"}).` };
         }
