@@ -271,6 +271,15 @@ Cost observability rides existing rails: batch checkpoints and reconciliation al
 
 ### 6.1 Per-item context economy (owner question, 2026-09-01)
 
+> **Build note (2026-09-02):** the server-side fold specced below turned out
+> to ALREADY EXIST — `supersedeIterationHistory` in
+> `lib/domain/ai/context-diet.ts` stubs perception outputs behind the latest
+> batch checkpoint (with a min-chars guard this spec lacked). P4c therefore
+> delivered the missing HALF: the boundary/predicate are now exported
+> (`findIterationFoldBoundary`, `shouldSupersedePart`) and the chat UI
+> collapses **exactly** the parts the model no longer sees — one rule, two
+> consumers, the owner's no-divergence guarantee by construction.
+
 **The leak**: within a sitting, each job's page read stays in the conversation and is re-sent on every later step — by item 20, items 1–19's JD text still rides (prompt caching discounts it to ~10% list price but the carried context grows without bound, and each job is scored with all prior jobs in view — rubric drift, not just cost). **The enabler the db scope provides**: today the transcript cannot be trimmed because enforcement state is derived by scanning message history; P4's ledger-as-truth severs that dependency — once an item's row is written, its page text and tool chatter are disposable.
 
 **Mechanism — batch-boundary context folding (rides P4):** after each `record_batch_checkpoint`, the *model-facing message assembly* replaces that batch's per-item tool bulk (page reads, snapshots, intermediate chatter) with the checkpoint summary + ledger row references; optionally the raw page read is stubbed immediately after its item records (read → extract → drop). Two rules:

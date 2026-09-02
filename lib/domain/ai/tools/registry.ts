@@ -35,6 +35,17 @@ import {
   parseCaptureConfig,
   preflightCapture,
 } from "@/lib/domain/data/server/capture";
+import {
+  closeSitting,
+  ensureMasterLedger,
+  ensureQuest,
+  parseQuestInfo,
+  questSeenKeys,
+  recordQuestItem,
+  setQuestLog,
+  tableColumnKeys,
+  type QuestInfo,
+} from "@/lib/domain/ai/quests";
 import { computeTurnCost } from "@/lib/features/ai-connections/usage/pricing";
 import type { JSONContent } from "@tiptap/core";
 import { listCharters, isCharterMetadata } from "@/lib/domain/ai/charters/registry";
@@ -579,8 +590,16 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           .describe(
             "Capture admitted items as DATABASE ROWS in addition to the ledger. Declare it when the user asked for results in a database — approving this card is the user's consent to write there, and each admitted item's record_item_result must then include capture.cells.",
           ),
+        quest: z
+          .string()
+          .min(1)
+          .max(120)
+          .optional()
+          .describe(
+            "The ongoing MATTER this run belongs to (continue-or-create): pass the quest's name when the user mentions a past matter to continue (\"my job hunt\") — the same quest across sittings shares one ledger and skips already-scored items. Omit for a brand-new matter (a quest is then created from the run's label).",
+          ),
       }),
-      execute: async ({ objective, source, items, itemCap, batchSize, ledgerLabel, captureTo }) => {
+      execute: async ({ objective, source, items, itemCap, batchSize, ledgerLabel, captureTo, quest: questArg }) => {
         const label = (ledgerLabel ?? objective).trim();
         const ledgerRunKey =
           "iterate:" +
@@ -671,6 +690,73 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         const captureDescMissing = capture?.descriptionsMissing ?? [];
         const captureEmptyVocab = capture?.emptyVocabColumns ?? [];
 
+        // ── Quest binding (P4a, D5/D9/D10) — charter-scoped ─────────────
+        // With a charter active, this run belongs to an ongoing MATTER:
+        // find-or-create the charter's master ledger (D10 lazy transition),
+        // continue-or-create the quest by label, and stamp the sitting's
+        // questInfo (ids + column maps) into the run note's metadata so
+        // per-item dual-writes and the P4b budget fallback never reload
+        // schemas. Charter-less runs keep the legacy markdown-only path.
+        let questInfo: QuestInfo | null = null;
+        let questContinued = false;
+        const alreadyScored = new Set<string>();
+        if (ctx.activeCharter) {
+          try {
+            const master = await ensureMasterLedger(ctx.userId, ctx.activeCharter);
+            if (master) {
+              const questLabel = (questArg ?? label).trim().slice(0, 120);
+              const ensured = await ensureQuest({
+                userId: ctx.userId,
+                charterTitle: ctx.activeCharter.title,
+                masterId: master.masterId,
+                masterCols: master.masterCols,
+                questLabel,
+                objective,
+                targetFolderId: ctx.targetFolderId ?? null,
+                outputTableId: captureCfg?.tableId,
+              });
+              if (ensured) {
+                questContinued = ensured.continued;
+                questInfo = {
+                  sittingId: crypto.randomUUID(),
+                  masterId: master.masterId,
+                  questRowId: ensured.questRowId,
+                  questLedgerId: ensured.questLedgerId,
+                  questLabel,
+                  itemBudget: Math.min(itemCap, normalized.length),
+                  batchSize:
+                    batchSize != null && batchSize < Math.min(itemCap, normalized.length)
+                      ? batchSize
+                      : null,
+                  masterCols: master.masterCols,
+                  ledgerCols: await tableColumnKeys(ensured.questLedgerId),
+                };
+                // Quest memory (rejects INCLUDED): items this quest already
+                // scored in ANY earlier sitting — the recurring token saver
+                // the output table alone cannot provide.
+                if (ensured.continued) {
+                  const seen = await questSeenKeys(ctx.userId, questInfo);
+                  for (const n of normalized) {
+                    const identity = (n.url ?? (n.keyTier === "url" ? n.key : ""))
+                      .trim()
+                      .toLowerCase();
+                    if (identity && seen.has(identity)) alreadyScored.add(n.key);
+                  }
+                }
+              }
+            }
+          } catch (error) {
+            // Quest infra is additive in P4a — its failure must never block
+            // the run (markdown ledger remains authoritative until P4b).
+            logger.warn({
+              layer: "ai",
+              event: "quests:ensure_caught",
+              summary: "quest binding failed — run continues without rows",
+              error,
+            });
+          }
+        }
+
         let ledgerNodeId: string | null = null;
         const placement = resolveToolOutputPlacement(ctx);
         if (placement.parentId || placement.ownedByNoteId) {
@@ -686,6 +772,9 @@ export function createBaseTools(ctx: ToolExecuteContext) {
                   (effectiveBatchSize
                     ? ` · **Batches:** checkpoint every ${effectiveBatchSize} items`
                     : "") +
+                  (questInfo
+                    ? `\n\n**Quest:** ${questInfo.questLabel} (${questContinued ? "continued" : "new"} · sitting stamped)`
+                    : "") +
                   (captureCfg
                     ? `\n\n**Capture:** → "${captureCfg.tableTitle}" · admission ${captureCfg.admission}` +
                       (captureCfg.admissionNote
@@ -700,7 +789,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
                   `**Checklist:**\n${normalized
                     .map(
                       (n) =>
-                        `- [ ] ${n.url ? `[${n.label}](${n.url})` : n.label}${n.keyTier === "label" ? " *(weak key)*" : ""}${alreadyCaptured.has(n.key) ? " *(already captured)*" : ""}`,
+                        `- [ ] ${n.url ? `[${n.label}](${n.url})` : n.label}${n.keyTier === "label" ? " *(weak key)*" : ""}${alreadyCaptured.has(n.key) ? " *(already captured)*" : alreadyScored.has(n.key) ? " *(already scored)*" : ""}`,
                     )
                     .join("\n")}`,
                 runTitle: label,
@@ -710,9 +799,20 @@ export function createBaseTools(ctx: ToolExecuteContext) {
                 runKey: ledgerRunKey,
                 ownerContentId: placement.ownedByNoteId,
                 ...(captureCfg ? { captureConfig: captureCfg } : {}),
+                ...(questInfo ? { questInfo } : {}),
               },
             );
             ledgerNodeId = ledger.contentNodeId;
+            if (questInfo) {
+              // The quest log (this note) exists only now — complete the
+              // master row's mandatory link set.
+              void setQuestLog({
+                masterId: questInfo.masterId,
+                questRowId: questInfo.questRowId,
+                masterCols: questInfo.masterCols,
+                questLogId: ledgerNodeId,
+              }).catch(() => null);
+            }
             if (ctx.conversationId) {
               void addAutoAssociation(
                 ctx.userId,
@@ -734,6 +834,15 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           itemBudget,
           batchSize: effectiveBatchSize,
           items: normalized,
+          ...(questInfo
+            ? {
+                quest: {
+                  label: questInfo.questLabel,
+                  continued: questContinued,
+                  alreadyScoredKeys: [...alreadyScored],
+                },
+              }
+            : {}),
           ...(captureCfg
             ? {
                 capture: {
@@ -768,6 +877,10 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             : {}),
           nextAction:
             `APPROVED. Process the items IN ORDER, ONE at a time — the FULL analysis/charter applies to each item (all its phases; the user's framing and mentions apply across every item). ` +
+            (alreadyScored.size > 0
+              ? `${alreadyScored.size} item(s) are marked "already scored" — this quest judged them in an earlier sitting (including rejects); SKIP re-reading them unless the user asked for a refresh, and record them as done with a one-line "previously scored" verdict. ` +
+                ``
+              : "") +
             (captureCfg
               ? `CAPTURE IS ON: for every item that meets the admission rule (${captureCfg.admission}${captureCfg.admissionNote ? ` — ${captureCfg.admissionNote}` : ""}), include capture.cells in its record_item_result — column names ${captureCfg.columns.map((c) => c.name).join(", ")}; use the exact option labels provided. Items marked "already captured" in the checklist hold a row from an earlier sitting — you may skip re-reading them unless the user asked for a refresh. ` +
                 (captureEmptyVocab.length > 0
@@ -836,17 +949,19 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         // lands the row. Config comes from the ledger (durable, survives
         // reloads); admission is enforced where checkable; a cell failure
         // rejects the WHOLE row — zero partial rows, ever.
+        // One read serves both capture (P2) and the quest dual-write (P4a).
+        const runState = await readRunLedgerCaptureConfig(
+          ctx.userId,
+          placement.parentId,
+          { runKey: ledgerRunKey, ownerContentId: placement.ownedByNoteId },
+        );
+
         let captureNote = "";
         let capturedRowId: string | undefined;
         let capturedRowStatus: "created" | "updated" | undefined;
         let captureErrors: string[] | undefined;
         if (capture) {
-          const state = await readRunLedgerCaptureConfig(
-            ctx.userId,
-            placement.parentId,
-            { runKey: ledgerRunKey, ownerContentId: placement.ownedByNoteId },
-          );
-          const config = parseCaptureConfig(state?.captureConfig);
+          const config = parseCaptureConfig(runState?.captureConfig);
           if (!config) {
             captureNote =
               "capture ignored — this run has no approved captureTo config";
@@ -871,6 +986,39 @@ export function createBaseTools(ctx: ToolExecuteContext) {
               capturedRowStatus = res.status;
               captureNote = `row ${res.status} in "${config.tableTitle}"`;
             }
+          }
+        }
+
+        // Quest dual-write (P4a): the same record lands as a quest-ledger
+        // row, upserted by item key — continuous across sittings, rejects
+        // included. Additive beside the markdown line; failure never blocks
+        // the run (markdown stays authoritative until P4b's cutover).
+        const questState = parseQuestInfo(runState?.questInfo);
+        if (questState && !questState.sittingClosed) {
+          try {
+            const isUrlKey = /^https?:\/\//.test(itemKey);
+            await recordQuestItem({
+              userId: ctx.userId,
+              quest: questState,
+              item: {
+                key: itemKey,
+                label: itemLabel,
+                url: url?.trim() || (isUrlKey ? itemKey : undefined),
+                keyTier: isUrlKey ? "url" : "label",
+                status: captureErrors ? "capture-failed" : status,
+                fit: fitPercent,
+                qualified,
+                verdict,
+                outputRowId: capturedRowId,
+              },
+            });
+          } catch (error) {
+            logger.warn({
+              layer: "ai",
+              event: "quests:record_item_caught",
+              summary: "quest-ledger dual-write failed",
+              error,
+            });
           }
         }
 
@@ -1002,6 +1150,15 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         if (!placement.parentId && !placement.ownedByNoteId) {
           return { ok: false, note: "No target folder set, so no ledger was written. The roll-up note still landed." };
         }
+        // Quest close (P4a): fold this sitting's totals into the master row
+        // and mark the sitting closed in the stamped questInfo (the P4b
+        // budget fallback reads that flag).
+        const runState = await readRunLedgerCaptureConfig(
+          ctx.userId,
+          placement.parentId,
+          { runKey: ledgerRunKey, ownerContentId: placement.ownedByNoteId },
+        );
+        const questState = parseQuestInfo(runState?.questInfo);
         const summary =
           resultSummary.trim() +
           `\n\n**Processed:** ${processedCount}` +
@@ -1026,8 +1183,26 @@ export function createBaseTools(ctx: ToolExecuteContext) {
               tokensSoFar: ctx.runTokens?.total,
               estimatedCostUsd: estimateRunCostUsd(ctx),
             },
-            { runKey: ledgerRunKey, ownerContentId: placement.ownedByNoteId },
+            {
+              runKey: ledgerRunKey,
+              ownerContentId: placement.ownedByNoteId,
+              ...(questState
+                ? { questInfo: { ...questState, sittingClosed: true } }
+                : {}),
+            },
           );
+          if (questState && !questState.sittingClosed) {
+            void closeSitting({
+              userId: ctx.userId,
+              quest: questState,
+              totals: {
+                items: processedCount,
+                qualified: qualifiedCount,
+                tokens: ctx.runTokens?.total,
+                costUsd: estimateRunCostUsd(ctx),
+              },
+            }).catch(() => null);
+          }
           if (ctx.conversationId) {
             void addAutoAssociation(
               ctx.userId,

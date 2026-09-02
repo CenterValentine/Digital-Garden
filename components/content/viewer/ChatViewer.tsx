@@ -18,6 +18,7 @@ import {
   ModelRouteNotices,
 } from "../ai/ModelSwitchDivider";
 import { computeModelRouteDecorations } from "@/lib/domain/ai/model-directive";
+import { findIterationFoldBoundary } from "@/lib/domain/ai/context-diet";
 import { ModelPinToggle } from "../ai/ModelPinToggle";
 
 /** Compact token formatting for the header meter (v3.1 R5). */
@@ -583,6 +584,12 @@ function ChatViewerInner({
     () => computeModelRouteDecorations(messages),
     [messages],
   );
+  // P4c: the active iteration run's fold boundary — parts before it render
+  // collapsed, mirroring exactly what the model-facing assembly stubs.
+  const iterationFoldBoundary = useMemo(
+    () => findIterationFoldBoundary(messages),
+    [messages],
+  );
 
   // Mid-run review (v3.1 R1): the run counts as "active" while streaming
   // AND while parked on an unanswered approval (the stream has ended but
@@ -865,6 +872,8 @@ function ChatViewerInner({
                   ) : null}
                   <ChatMessage
                     message={message}
+                    messageIndex={i}
+                    foldBoundary={iterationFoldBoundary}
                     providerId={stamp.providerId}
                     modelId={stamp.modelId}
                     isStreaming={

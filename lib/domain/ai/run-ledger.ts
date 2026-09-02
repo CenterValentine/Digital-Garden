@@ -88,6 +88,12 @@ export async function upsertRunLedger(
      * `record_item_result` re-derives it from here, never from model memory.
      */
     captureConfig?: unknown;
+    /**
+     * Quest binding (P4a): sittingId + master/ledger ids + column maps —
+     * stamped at proposal, carried forward, read back per item and by the
+     * chat route's compaction-resilient budget fallback (P4b).
+     */
+    questInfo?: unknown;
   } = {},
 ): Promise<{ contentNodeId: string; created: boolean }> {
   const { ownerContentId } = options;
@@ -146,6 +152,7 @@ export async function upsertRunLedger(
   // metadata object is rewritten per upsert, so an un-carried key would
   // silently vanish at the first item record.
   const captureConfig = options.captureConfig ?? priorMeta?.captureConfig;
+  const questInfo = options.questInfo ?? priorMeta?.questInfo;
 
   const markdown = prior
     ? `${prior}\n\n${renderEntry(entry)}`
@@ -162,6 +169,7 @@ export async function upsertRunLedger(
       ledgerTitle,
       wordCount: searchText.split(/\s+/).length,
       ...(captureConfig !== undefined ? { captureConfig } : {}),
+      ...(questInfo !== undefined ? { questInfo } : {}),
     } as unknown as Prisma.InputJsonValue,
   };
 
@@ -216,7 +224,11 @@ export async function readRunLedgerCaptureConfig(
   userId: string,
   targetFolderId: string | null,
   options: { ownerContentId?: string; runKey: string },
-): Promise<{ contentNodeId: string; captureConfig: unknown } | null> {
+): Promise<{
+  contentNodeId: string;
+  captureConfig: unknown;
+  questInfo: unknown;
+} | null> {
   const scope = options.ownerContentId
     ? { ownedByNoteId: options.ownerContentId }
     : { parentId: targetFolderId };
@@ -237,5 +249,9 @@ export async function readRunLedgerCaptureConfig(
     node.notePayload?.metadata && typeof node.notePayload.metadata === "object"
       ? (node.notePayload.metadata as Record<string, unknown>)
       : undefined;
-  return { contentNodeId: node.id, captureConfig: meta?.captureConfig };
+  return {
+    contentNodeId: node.id,
+    captureConfig: meta?.captureConfig,
+    questInfo: meta?.questInfo,
+  };
 }

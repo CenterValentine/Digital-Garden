@@ -34,6 +34,7 @@ import {
 } from "./ModelSwitchDivider";
 import { ModelPinToggle } from "./ModelPinToggle";
 import { computeModelRouteDecorations } from "@/lib/domain/ai/model-directive";
+import { findIterationFoldBoundary } from "@/lib/domain/ai/context-diet";
 import { REVERT_SNAPSHOT_KEY } from "@/lib/domain/ai/compact-tool-outputs";
 import { TargetFolderChip } from "./TargetFolderChip";
 import { OutputTargetChip } from "./OutputTargetChip";
@@ -955,6 +956,12 @@ export function ChatPanel({
     () => computeModelRouteDecorations(messages),
     [messages],
   );
+  // P4c: the active iteration run's fold boundary — parts before it render
+  // collapsed, mirroring exactly what the model-facing assembly stubs.
+  const iterationFoldBoundary = useMemo(
+    () => findIterationFoldBoundary(messages),
+    [messages],
+  );
 
   // Surface follows the *active* provider — selecting OpenAI tints
   // immediately even if previous messages were from Claude. Per-message
@@ -1074,6 +1081,8 @@ export function ChatPanel({
                   ) : null}
                 <ChatMessage
                   message={message}
+                  messageIndex={i}
+                  foldBoundary={iterationFoldBoundary}
                   providerId={stamp.providerId}
                   modelId={stamp.modelId}
                   isStreaming={

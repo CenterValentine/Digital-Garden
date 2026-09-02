@@ -73,8 +73,16 @@ const SUPERSEDED_STUB =
  * the trade is deliberate; the reclaimed 128k-window space is what lets a
  * 25-item run finish at all.
  */
-export function supersedeIterationHistory(messages: UIMessage[]): UIMessage[] {
-  // Single pass: track the ACTIVE run and its latest checkpoint position.
+/**
+ * The fold boundary of the ACTIVE batched iteration run: the position of the
+ * latest record_batch_checkpoint, or null when no run is active / no
+ * checkpoint exists. EXPORTED so the chat UI collapses exactly the parts the
+ * model no longer sees (P4c, owner rule: no divergence between front and
+ * back — one boundary implementation, two consumers).
+ */
+export function findIterationFoldBoundary(
+  messages: UIMessage[],
+): { messageIdx: number; partIdx: number } | null {
   let runActive = false;
   let lastCheckpoint: { messageIdx: number; partIdx: number } | null = null;
   messages.forEach((m, messageIdx) => {
@@ -105,8 +113,24 @@ export function supersedeIterationHistory(messages: UIMessage[]): UIMessage[] {
       }
     });
   });
-  if (!runActive || !lastCheckpoint) return messages;
-  const boundary: { messageIdx: number; partIdx: number } = lastCheckpoint;
+  return runActive ? lastCheckpoint : null;
+}
+
+/**
+ * Would the model-facing assembly stub this part behind the fold boundary?
+ * Shared by supersedeIterationHistory and the UI collapse (same rule, same
+ * min-chars guard).
+ */
+export function shouldSupersedePart(part: unknown): boolean {
+  const p = part as { type?: string; state?: string; output?: unknown };
+  if (!p.type || !PERCEPTION_TOOL_PARTS.has(p.type)) return false;
+  if (p.state !== "output-available") return false;
+  return JSON.stringify(p.output ?? "").length >= SUPERSEDE_MIN_CHARS;
+}
+
+export function supersedeIterationHistory(messages: UIMessage[]): UIMessage[] {
+  const boundary = findIterationFoldBoundary(messages);
+  if (!boundary) return messages;
 
   return messages.map((m, messageIdx) => {
     if (m.role !== "assistant" || messageIdx > boundary.messageIdx) return m;
@@ -118,17 +142,7 @@ export function supersedeIterationHistory(messages: UIMessage[]): UIMessage[] {
       ) {
         return part;
       }
-      const p = part as { type?: string; state?: string; output?: unknown };
-      if (
-        !p.type ||
-        !PERCEPTION_TOOL_PARTS.has(p.type) ||
-        p.state !== "output-available"
-      ) {
-        return part;
-      }
-      if (JSON.stringify(p.output ?? "").length < SUPERSEDE_MIN_CHARS) {
-        return part;
-      }
+      if (!shouldSupersedePart(part)) return part;
       changed = true;
       return {
         ...(part as Record<string, unknown>),
