@@ -150,6 +150,15 @@ export function ChatInput({
   // end = current caret). Stable across renders because we don't rewrite
   // the DOM during typing.
   const triggerRangeRef = useRef<Range | null>(null);
+  /** Last mention query sent to search — pairs async empty results with their query. */
+  const lastMentionQueryRef = useRef<string>("");
+  /**
+   * A mention prefix declared dead (spaced query → zero results, or Escape):
+   * while the current query still starts with it, the menu stays closed and
+   * no fetches fire. Cleared when the user edits back past it, starts a new
+   * mention, or completes a chip.
+   */
+  const deadMentionPrefixRef = useRef<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isEmpty, setIsEmpty] = useState(value.length === 0);
 
@@ -245,14 +254,22 @@ export function ChatInput({
     const offset = range.startOffset;
     const before = textNode.data.slice(0, offset);
 
-    // Mention: `@query` with whitespace / start-of-node before the @.
-    const mentionMatch = /(^|\s)@([^\s@]*)$/.exec(before);
+    // Mention: `@query` with whitespace / start-of-node before the @. The
+    // query may contain SPACES (owner request 2026-09-02 — multi-word titles
+    // like "Test 11" were only reachable via the accidental SQL LIKE `_`
+    // wildcard): it runs from a non-space char after the @ to the caret,
+    // capped at 64 chars, no second @, no newline. The session's exit ramps
+    // are below — a spaced query with zero results, Escape, or a completed
+    // chip arms `deadMentionPrefixRef` so prose after a dead mention doesn't
+    // reopen the menu on every keystroke.
+    const mentionMatch = /(^|\s)@([^\s@][^@\n]{0,63})?$/.exec(before);
     if (mentionMatch && onMentionSearch) {
-      const triggerOffset = offset - mentionMatch[2].length - 1;
+      const query = mentionMatch[2] ?? "";
+      const triggerOffset = offset - query.length - 1;
       const triggerRange = document.createRange();
       triggerRange.setStart(textNode, triggerOffset);
       triggerRange.setEnd(textNode, offset);
-      return { kind: "mention", query: mentionMatch[2], range: triggerRange };
+      return { kind: "mention", query, range: triggerRange };
     }
 
     // Command: `/query` only when the `/` is at the very start of the
@@ -281,6 +298,16 @@ export function ChatInput({
     }
     triggerRangeRef.current = trig.range;
     if (trig.kind === "mention") {
+      // A dead mention (spaced query that returned nothing, or Escaped)
+      // stays closed while the user keeps extending the same text; editing
+      // back before the dead prefix revives it.
+      const dead = deadMentionPrefixRef.current;
+      if (dead !== null && trig.query.startsWith(dead)) {
+        if (suggestionMode) closeSuggestions();
+        return;
+      }
+      deadMentionPrefixRef.current = null;
+      lastMentionQueryRef.current = trig.query;
       setSuggestionMode("mention");
       setSelectedIndex(0);
       onMentionSearch?.(trig.query);
@@ -320,6 +347,21 @@ export function ChatInput({
     setSelectedIndex(0);
   }, [mentionResults, filteredCommands]);
 
+  // "Search until results are null" (owner contract for spaced mentions):
+  // when a spaced query comes back empty, the mention session ends — the
+  // prefix is marked dead so continued prose doesn't reopen it. Single-word
+  // queries keep the legacy behavior (menu hides, session continues) since
+  // the next character routinely un-empties them.
+  useEffect(() => {
+    if (suggestionMode !== "mention") return;
+    if (mentionResults.length > 0) return;
+    const q = lastMentionQueryRef.current;
+    if (q.includes(" ")) {
+      deadMentionPrefixRef.current = q;
+      closeSuggestions();
+    }
+  }, [mentionResults, suggestionMode, closeSuggestions]);
+
   const handleSelect = useCallback(
     (item: SuggestionItem) => {
       const root = editorRef.current;
@@ -328,6 +370,9 @@ export function ChatInput({
 
       // Range = trigger char → current caret. Delete it; insert the
       // mention pill (or command insertText) in its place.
+      // Chip completes — any dead-prefix state is history.
+      deadMentionPrefixRef.current = null;
+
       const sel = window.getSelection();
       const caretRange = sel && sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
       const replaceRange = document.createRange();
@@ -440,6 +485,11 @@ export function ChatInput({
         }
         if (e.key === "Escape") {
           e.preventDefault();
+          // Escaping a mention kills the session for this prefix — without
+          // this, the very next keystroke re-triggers the menu.
+          if (suggestionMode === "mention" && lastMentionQueryRef.current) {
+            deadMentionPrefixRef.current = lastMentionQueryRef.current;
+          }
           closeSuggestions();
           return;
         }
@@ -461,6 +511,7 @@ export function ChatInput({
     },
     [
       showMenu,
+      suggestionMode,
       suggestionItems,
       selectedIndex,
       handleSelect,

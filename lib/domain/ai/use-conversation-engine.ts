@@ -1433,12 +1433,17 @@ export function useConversationEngine({
     if (mentionTimerRef.current) clearTimeout(mentionTimerRef.current);
     mentionTimerRef.current = setTimeout(async () => {
       try {
+        // Trim before searching: mention queries may now carry interior
+        // spaces ("Test 11"), and a TRAILING space mid-typing ("Test ")
+        // must not become part of the LIKE pattern — it would drop the
+        // exact-title match the user is about to pick.
+        const q = query.trim();
         // Un-promoted database rows ride beside the node search (plan
         // Phase 5) — best-effort, so a row-search failure cannot take the
         // node results with it.
-        const rowsPromise = query.trim()
+        const rowsPromise = q
           ? fetch(
-              `/api/content/data/suggest?q=${encodeURIComponent(query)}&limit=5`,
+              `/api/content/data/suggest?q=${encodeURIComponent(q)}&limit=5`,
               { credentials: "include" },
             )
               .then((r) => (r.ok ? r.json() : null))
@@ -1446,7 +1451,7 @@ export function useConversationEngine({
           : Promise.resolve(null);
 
         const res = await fetch(
-          `/api/content/content?search=${encodeURIComponent(query)}&limit=8`,
+          `/api/content/content?search=${encodeURIComponent(q)}&limit=8`,
           { credentials: "include" },
         );
         if (!res.ok) return;

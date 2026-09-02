@@ -274,36 +274,59 @@ export async function GET(request: NextRequest) {
     let items: Awaited<ReturnType<typeof fetchPage>>;
     let total: number;
     if (search && offset === 0) {
+      // Each tier is its OWN query — an in-memory re-sort of one truncated
+      // alphabetical page re-creates the bug (owner caught it live: with >8
+      // title-contains matches, "Test" fell outside the fetched page before
+      // the sort ever saw it).
       const { OR: _searchOr, ...baseWhere } = whereClause;
-      const titleItems = await fetchPage(
-        {
-          ...baseWhere,
-          title: { contains: search, mode: "insensitive" },
-        },
-        limit,
-      );
-      const q = search.toLowerCase();
-      const tierOf = (title: string) => {
-        const t = title.toLowerCase();
-        return t === q ? 0 : t.startsWith(q) ? 1 : 2;
-      };
-      // Array.prototype.sort is stable — the requested sort survives within
-      // each tier.
-      titleItems.sort((a, b) => tierOf(a.title) - tierOf(b.title));
+      const insensitive = "insensitive" as const;
+      const collected: Awaited<ReturnType<typeof fetchPage>> = [];
+      const notSeen = () => ({ notIn: collected.map((i) => i.id) });
 
-      const remaining = limit - titleItems.length;
-      const bodyItems =
-        remaining > 0
-          ? await fetchPage(
-              {
-                ...baseWhere,
-                id: { notIn: titleItems.map((i) => i.id) },
-                OR: bodySearchOr,
-              },
-              remaining,
-            )
-          : [];
-      items = [...titleItems, ...bodyItems];
+      // Tier 1: exact title match.
+      collected.push(
+        ...(await fetchPage(
+          { ...baseWhere, title: { equals: search, mode: insensitive } },
+          limit,
+        )),
+      );
+      // Tier 2: title prefix.
+      if (collected.length < limit) {
+        collected.push(
+          ...(await fetchPage(
+            {
+              ...baseWhere,
+              id: notSeen(),
+              title: { startsWith: search, mode: insensitive },
+            },
+            limit - collected.length,
+          )),
+        );
+      }
+      // Tier 3: title contains.
+      if (collected.length < limit) {
+        collected.push(
+          ...(await fetchPage(
+            {
+              ...baseWhere,
+              id: notSeen(),
+              title: { contains: search, mode: insensitive },
+            },
+            limit - collected.length,
+          )),
+        );
+      }
+      // Tier 4: body-only matches fill the remainder.
+      if (collected.length < limit) {
+        collected.push(
+          ...(await fetchPage(
+            { ...baseWhere, id: notSeen(), OR: bodySearchOr },
+            limit - collected.length,
+          )),
+        );
+      }
+
+      items = collected;
       total = await prisma.contentNode.count({ where: whereClause });
     } else {
       [items, total] = await Promise.all([
