@@ -223,17 +223,25 @@ P1–P3 do not depend on P4x/P5 (capture works against a hand-made table with th
 
 Prompt methodology sections keyed on `hasItemIteration` change in P1/P2/P4a — `validate-prompt-cache` must be updated in the same PR (the per-item iteration work established this gate).
 
-### 4.1 PR packaging — the release train (owner preference: fewer, packed PRs; agreed 2026-09-02)
+### 4.1 PR packaging — the release train (as built + compressed; owner directive 2026-09-02: consolidate smoke/gate cycles where justified)
 
-| PR | Release | Contains | What the user gets at merge |
+**Shipped:**
+
+| PR | Release | Contained | Status |
 |---|---|---|---|
-| **1** | **"Charters & Capture"** | P0a + P0 + P1 + P2 (plan doc + STATUS/BACKLOG ride along) | The rename is visible everywhere (charter command, icons, copy) **and** qualified jobs land as database rows — the core use case works end to end against a hand-made table. Smoke: §9 #1–2. |
-| **2** | **"Quests"** | P4a + P4b (parity gate enforced inside the PR) | Durable cross-sitting memory: continue-or-create, reject-skip dedup, bounded resume in a fresh chat, master ledger as the hub. Smoke: §9 #4, #6. |
-| **3** | **"Lean Context"** | P4c | Batch folding + the carousel card, front and back matched. Smoke: folded-context. Sequenced after real-world use of PR 2 proves rows trustworthy. |
-| **4** | **"Stage 2 & Generation"** | P3 + P5 | Row-driven refinement runs, the materials lifecycle (File cell + overwrite-in-place + shortcuts), and AI-structured output databases with written descriptions. Smoke: §9 #3, #5. |
-| **R** | Mechanical rename | `metadata.playbook`, `search_playbooks`, `lib/domain/ai/playbooks/` → charter identifiers | Zero behavior; lands any time after PR 1; never shares a diff with feature work. |
+| **#202** | "Charters & Capture (prep)" | P0a + P0 + the mechanical rename (originally planned as a separate PR R — the hard-swap directive folded it in) + search/mention fixes | MERGED 2026-09-02 |
+| **#203** | "Charter capture" | P1 + P2 + smoke-driven hardenings (empty-row guard, empty-vocab preflight, LOCATE-before-read) | Smoked live; owner checklist ticking |
 
-Compression option, considered and not recommended: merging PR 3 into PR 2 saves one PR but couples a UI feature to the enforcement cutover and forfeits the chance to validate rows in real use before folding starts *depending* on them. Four releases is the lean floor that keeps each merge independently verifiable.
+**Remaining — compressed from four gate cycles to two** (owner call: automated gates stay per-PR and per-commit; what consolidates is *owner smoke sessions and review rounds*, one per PR):
+
+| PR | Release | Contains | Why the combine is safe | The ONE smoke session |
+|---|---|---|---|---|
+| **3** | **"Quests & Lean Context"** | P4a + P4b + P4c | The parity assertion (row-derived == history-derived enforcement) runs INSIDE the PR — it is exactly the rows-are-trustworthy proof P4c was previously waiting a release cycle for. Folding activates only on batched runs (a natural scope limiter), and the carousel is rendering over persisted parts. Themed commits keep it reviewable. | One batched, captured, multi-sitting run: propose (quest named on card) → batch 1 completes → checkpoint folds + carousel collapses → kill the chat → resume from pending rows in a fresh chat → finish → next sitting dedups rejects via the quest ledger. Covers §9 #4, #6, folded-context, and the master-registry hub in a single session. |
+| **4** | **"Stage 2 & Generation"** | P3 + P5 (incl. the P3 owner asks: session-cumulative token popover, first-class captureTo on the card) | Both are capability additions atop a stable capture core; they share the proposal-card surface (captureTo rendering + the generation card are the same component neighborhood). No cutover risk anywhere in the PR. | One session: generation card creates an output DB with AI-written descriptions (§9 #5) → `database-rows` refinement run updates rows in place (§9 #3) → materials File-cell + overwrite → popover shows session totals. |
+
+**P6** (deferred batch) unchanged; **§9.1 cost verification** runs once, at the end of PR 4's smoke — it was always end-of-build. **T4** sequences after P4 per §9.2.
+
+What deliberately does NOT compress: the per-PR automated gate suite (typecheck/lint/build/capture:check/drift/prompt-cache/inspector — near-zero owner cost), the parity assertion, and the §9 smoke lines themselves — every contract still gets verified, just batched into fewer sittings.
 
 ## 5. Chips & traceability
 
