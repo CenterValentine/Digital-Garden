@@ -36,6 +36,7 @@ import {
   parseCaptureConfig,
   preflightCapture,
 } from "@/lib/domain/data/server/capture";
+import { createColumn } from "@/lib/domain/data/server/mutations";
 import {
   closeSitting,
   ensureMasterLedger,
@@ -609,8 +610,25 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           .describe(
             "The ongoing MATTER this run belongs to (continue-or-create): pass the quest's name when the user mentions a past matter to continue (\"my job hunt\") — the same quest across sittings shares one ledger and skips already-scored items. Omit for a brand-new matter (a quest is then created from the run's label).",
           ),
+        questColumns: z
+          .array(
+            z.object({
+              name: z.string().min(1).max(60),
+              type: z.enum(["text", "longText", "number", "url", "date", "checkbox"]),
+              description: z
+                .string()
+                .min(8)
+                .max(300)
+                .describe("What goes in it — same load-bearing context as every capture column."),
+            }),
+          )
+          .max(8)
+          .optional()
+          .describe(
+            "NEW quests only: extra ledger columns sculpted to this matter (a scoring task adds its criteria columns; a collection task adds none). The machinery core (Item/Status/Pass/Fit/Qualified/Verdict/…) always exists — never re-declare it. Write their values via questCells on record_item_result. Ignored when continuing an existing quest.",
+          ),
       }),
-      execute: async ({ objective, source, items, rowIds, itemCap, batchSize, ledgerLabel, captureTo, quest: questArg }) => {
+      execute: async ({ objective, source, items, rowIds, itemCap, batchSize, ledgerLabel, captureTo, quest: questArg, questColumns }) => {
         const label = (ledgerLabel ?? objective).trim();
         let ledgerRunKey =
           "iterate:" +
@@ -798,6 +816,9 @@ export function createBaseTools(ctx: ToolExecuteContext) {
                 objective,
                 targetFolderId: master.charterParentId,
                 outputTableId: captureCfg?.tableId,
+                ...(questColumns && questColumns.length > 0
+                  ? { extraColumns: questColumns }
+                  : {}),
               });
               if (ensured) {
                 questContinued = ensured.continued;
@@ -1043,8 +1064,14 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           .describe(
             "Land this item as a database row — ONLY when the approved run declared captureTo AND this item meets its admission rule. The row upserts by the item's identity: a re-run updates, never duplicates.",
           ),
+        questCells: z
+          .record(z.string(), z.unknown())
+          .optional()
+          .describe(
+            "Quest runs with SCULPTED ledger columns: their values for this item (column name → value). Machinery fields (status/fit/qualified/verdict) are recorded automatically — never repeat them here.",
+          ),
       }),
-      execute: async ({ ledgerRunKey, itemKey, itemLabel, url, status, qualified, fitPercent, verdict, artifactTitle, capture }) => {
+      execute: async ({ ledgerRunKey, itemKey, itemLabel, url, status, qualified, fitPercent, verdict, artifactTitle, capture, questCells }) => {
         const placement = resolveToolOutputPlacement(ctx);
         if (!placement.parentId && !placement.ownedByNoteId) {
           return { ok: false, note: "No target folder set, so no ledger was written. Continue the run; reconcile in the roll-up." };
@@ -1129,6 +1156,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
                 qualified,
                 verdict,
                 outputRowId: capturedRowId,
+                ...(questCells ? { extraCells: questCells } : {}),
               },
             });
           } catch (error) {
@@ -1256,6 +1284,85 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             note: `Ledger write failed (${error instanceof Error ? error.message : "unknown"}). Checkpoint counted — continue the run.`,
             next: "Continue IMMEDIATELY with the next item.",
           };
+        }
+      },
+    }),
+    // D8 mid-flight single-column grace (EXTRACTION-TO-DATABASE-PLAN §3.6):
+    // the quest ledger is AI-sculpted, and its evolution mechanism is ONE
+    // column at a time, mid-run, ledger databases only — no card, but
+    // logged in the quest log so the change is always visible. Output
+    // tables are out of scope by design (they go through proposal cards).
+    add_quest_ledger_column: tool({
+      description:
+        "Mid-run schema grace (quest LEDGER only): add ONE column to the active quest's ledger when the matter turns out to need a field it lacks (a criterion that emerged from the pages). Never for output/capture tables — those change via propose_column_options or the user. One column per call; the addition is logged in the quest log. After adding, write its value for later items via questCells on record_item_result.",
+      inputSchema: z.object({
+        ledgerRunKey: z.string().min(1).describe("The ledgerRunKey of the ACTIVE quest run."),
+        name: z.string().min(1).max(60).describe("The new column's name."),
+        type: z.enum(["text", "longText", "number", "url", "date", "checkbox"]),
+        description: z
+          .string()
+          .min(8)
+          .max(300)
+          .describe("What goes in it — same load-bearing context as every capture column."),
+        reason: z.string().min(1).max(200).describe("One line: why this emerged mid-run (logged in the quest log)."),
+      }),
+      execute: async ({ ledgerRunKey, name, type, description, reason }) => {
+        const placement = resolveToolOutputPlacement(ctx);
+        const runState = await readRunLedgerCaptureConfig(
+          ctx.userId,
+          placement.parentId,
+          { runKey: ledgerRunKey, ownerContentId: placement.ownedByNoteId },
+        );
+        const questState = parseQuestInfo(runState?.questInfo);
+        if (!runState || !questState) {
+          return { ok: false, note: "No active quest on that run — mid-run column grace applies to quest ledgers only. For an output table, use propose_column_options or ask the user." };
+        }
+        if (questState.sittingClosed) {
+          return { ok: false, note: "This sitting is closed — propose a new run first." };
+        }
+        const trimmed = name.trim();
+        const cols = await tableColumnKeys(questState.questLedgerId);
+        if (Object.keys(cols).some((n) => n.toLowerCase() === trimmed.toLowerCase())) {
+          return { ok: false, note: `The ledger already has a "${trimmed}" column — write it via questCells on record_item_result instead.` };
+        }
+        try {
+          await createColumn(questState.questLedgerId, {
+            name: trimmed,
+            type,
+            description: description.trim(),
+          });
+          // Re-stamp questInfo with the refreshed column map — the per-item
+          // dual-write reads its map from the note's metadata, and a stale
+          // map would silently drop the new column's values.
+          const refreshed = await tableColumnKeys(questState.questLedgerId);
+          const newQuestInfo = { ...questState, ledgerCols: refreshed };
+          await upsertRunLedger(
+            ctx.userId,
+            placement.parentId,
+            {
+              phase: `Ledger column added: ${trimmed}`,
+              summary: `**Mid-run schema grace (D8):** added \`${trimmed}\` (${type}) to the quest ledger — ${reason.trim()}`,
+            },
+            {
+              runKey: ledgerRunKey,
+              ownerContentId: placement.ownedByNoteId,
+              questInfo: newQuestInfo,
+            },
+          );
+          return {
+            ok: true,
+            column: trimmed,
+            note: "Column added to the quest ledger and logged in the quest log.",
+            next: `Include "${trimmed}" in questCells on record_item_result from now on (earlier items keep blank cells unless the user asks for a backfill). Continue with the current item.`,
+          };
+        } catch (error) {
+          logger.warn({
+            layer: "ai",
+            event: "quests:add_column_caught",
+            summary: "D8 ledger column add failed",
+            error,
+          });
+          return { ok: false, note: "Adding the column failed — continue the run without it; the machinery core still records every item." };
         }
       },
     }),

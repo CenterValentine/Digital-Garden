@@ -199,6 +199,9 @@ export const HARNESS_INTERNAL_TOOL_IDS: readonly string[] = [
   "record_item_result",
   "record_batch_checkpoint",
   "record_iteration_findings",
+  // D8 mid-run ledger grace: only meaningful inside an active quest run —
+  // a settings toggle would just strand the sculpting path mid-loop.
+  "add_quest_ledger_column",
   // Browser/co-browse client tools: availability-gated by the extension and
   // its own trust settings (side panel, "open a tab to read blocked pages"),
   // not by the tool-config toggles — a second, independent off-switch here
