@@ -60,6 +60,11 @@ import {
   OutputDatabaseProposalCard,
   type OutputDatabaseProposalPayload,
 } from "./OutputDatabaseProposalCard";
+import {
+  BatchGalleryCard,
+  type BatchGalleryGroup,
+  type BatchGalleryItem,
+} from "./BatchGalleryCard";
 import { FlashcardCardProposalList } from "./FlashcardCardProposalList";
 import { cn } from "@/lib/core/utils";
 import { calculateMenuPosition, type CalculatedPosition } from "@/lib/core/menu-positioning";
@@ -676,6 +681,114 @@ export const ChatMessage = memo(function ChatMessage({
     };
   }, [message.parts]);
 
+  // §5 batch gallery (owner shape 2026-09-03): within the folded region,
+  // group the parts between checkpoint anchors into ONE card per batch —
+  // an item gallery with per-item raw expansion. Member parts render
+  // nothing; the checkpoint's index renders the card; folded parts outside
+  // any complete group fall back to the per-part pills.
+  const batchGroups = useMemo(() => {
+    if (foldBoundary == null || typeof messageIndex !== "number") return null;
+    if (messageIndex > foldBoundary.messageIdx) return null;
+    const parts = (message.parts ?? []) as Array<Record<string, unknown>>;
+    const foldLimit =
+      messageIndex < foldBoundary.messageIdx
+        ? parts.length
+        : foldBoundary.partIdx;
+    const roles = new Map<
+      number,
+      { kind: "member" } | { kind: "card"; group: BatchGalleryGroup }
+    >();
+    let pending: number[] = [];
+    let items: BatchGalleryItem[] = [];
+    let memberIdxs: number[] = [];
+    for (let idx = 0; idx < foldLimit; idx++) {
+      const p = parts[idx] ?? {};
+      const type = typeof p.type === "string" ? p.type : "";
+      const state = (p as { state?: string }).state;
+      if (type === "tool-record_item_result" && state === "output-available") {
+        const input = (p.input ?? {}) as Record<string, unknown>;
+        const output = (p.output ?? {}) as Record<string, unknown>;
+        items.push({
+          label:
+            typeof input.itemLabel === "string" && input.itemLabel
+              ? input.itemLabel
+              : String(input.itemKey ?? "item"),
+          ...(typeof input.url === "string" && input.url
+            ? { url: input.url }
+            : {}),
+          ...(typeof input.status === "string"
+            ? { status: input.status }
+            : {}),
+          ...(typeof input.fitPercent === "number"
+            ? { fitPercent: input.fitPercent }
+            : {}),
+          ...(typeof input.qualified === "boolean"
+            ? { qualified: input.qualified }
+            : {}),
+          ...(typeof input.verdict === "string" && input.verdict
+            ? { verdict: input.verdict }
+            : {}),
+          ...(output.rowStatus === "created" || output.rowStatus === "updated"
+            ? { rowStatus: output.rowStatus as "created" | "updated" }
+            : {}),
+          ...(Array.isArray(output.captureErrors) &&
+          output.captureErrors.length > 0
+            ? { captureFailed: true }
+            : {}),
+          rawParts: [...pending.map((j) => parts[j]), p],
+        });
+        memberIdxs.push(...pending, idx);
+        pending = [];
+        continue;
+      }
+      if (
+        type === "tool-record_batch_checkpoint" &&
+        state === "output-available"
+      ) {
+        if (items.length > 0) {
+          const input = (p.input ?? {}) as Record<string, unknown>;
+          for (const m of memberIdxs) roles.set(m, { kind: "member" });
+          for (const j of pending) roles.set(j, { kind: "member" });
+          roles.set(idx, {
+            kind: "card",
+            group: {
+              batchNumber:
+                typeof input.batchNumber === "number"
+                  ? input.batchNumber
+                  : null,
+              itemsRecordedSoFar:
+                typeof input.itemsRecordedSoFar === "number"
+                  ? input.itemsRecordedSoFar
+                  : null,
+              batchSummary:
+                typeof input.batchSummary === "string"
+                  ? input.batchSummary
+                  : null,
+              items,
+            },
+          });
+        }
+        pending = [];
+        items = [];
+        memberIdxs = [];
+        continue;
+      }
+      // Only batch traffic is groupable: narration, reasoning, step marks
+      // and perception outputs between records belong to the NEXT item.
+      // Anything else (the proposal card, unrelated tool calls) renders
+      // normally and never disappears into a card.
+      if (
+        type === "text" ||
+        type === "reasoning" ||
+        type === "step-start" ||
+        shouldSupersedePart(p)
+      ) {
+        pending.push(idx);
+      }
+    }
+    return roles.size > 0 ? roles : null;
+  }, [message.parts, foldBoundary, messageIndex]);
+
   // Whether to show a persistent "still working" cue at the END of a streaming
   // assistant turn. True while streaming, no tool is running, AND the tail of the
   // message isn't ACTIVELY producing visible output (growing text / non-empty
@@ -857,6 +970,13 @@ export const ChatMessage = memo(function ChatMessage({
         <>
         {/* Render message parts (text runs pre-coalesced — see renderParts) */}
         {renderParts.map(({ key: i, part }) => {
+          // §5 batch gallery: parts grouped into a batch render as ONE
+          // card at the checkpoint's index; member parts render nothing.
+          const groupRole = batchGroups?.get(i);
+          if (groupRole?.kind === "member") return null;
+          if (groupRole?.kind === "card") {
+            return <BatchGalleryCard key={i} group={groupRole.group} />;
+          }
           // P4c: perception parts the model no longer sees (folded behind
           // the latest batch checkpoint) render collapsed — the default
           // view equals the retained context. Same rule as the server fold
