@@ -243,6 +243,8 @@ Prompt methodology sections keyed on `hasItemIteration` change in P1/P2/P4a — 
 
 **P6** (deferred batch) unchanged; **§9.1 cost verification** runs once, at the end of PR 4's smoke — it was always end-of-build. **T4** sequences after P4 per §9.2.
 
+*As built (2026-09-03):* PR 3 = **#204**, smoke-complete, merged into `feat/charter-capture` — so **#203 is the combined Release 2+3** (merge it to ship both). PR 4 = **#206** (`feat/stage2-generation`, stacked; retarget to main after #203): P3 database-rows + owner asks (captureTo card, session popover) + P5 generation card (`propose_output_database` + `POST /api/content/data` + card) + §5 batch gallery card + the deferred P4a pair (sculpted `questColumns`/`questCells`, D8 `add_quest_ledger_column`) + the stage-2 recipe doc (`guides/ai/STAGE2-CHARTER-RECIPE.md`). Full build + all gates green at open; owner smoke lines on the PR. Open decision on #206: rows-derived `qualifiedCount` at closeSitting.
+
 What deliberately does NOT compress: the per-PR automated gate suite (typecheck/lint/build/capture:check/drift/prompt-cache/inspector — near-zero owner cost), the parity assertion, and the §9 smoke lines themselves — every contract still gets verified, just batched into fewer sittings.
 
 ## 5. Chips & traceability
