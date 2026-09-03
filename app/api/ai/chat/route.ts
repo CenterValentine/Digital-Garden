@@ -58,6 +58,7 @@ import {
   getModelMeta,
 } from "@/lib/domain/ai/providers/catalog";
 import {
+  stripOpenAIItemReferences,
   stripReasoningForResend,
   supersedeIterationHistory,
 } from "@/lib/domain/ai/context-diet";
@@ -1457,10 +1458,16 @@ export async function POST(request: Request) {
       //     no resend value for non-Anthropic providers, yet
       //     convertToModelMessages forwards them as input verbatim (~100k
       //     chars replayed per request in the measured DeepSeek run).
+      //   - stripOpenAIItemReferences: dead `openai.itemId` pointers replay as
+      //     item_reference against an expired server-side store, 400ing every
+      //     send in the conversation (#193). Heals transcripts poisoned before
+      //     the `store: false` option below existed.
       const resolvedMessages = resolveAttachmentsForModel(
-        stripReasoningForResend(
-          supersedeIterationHistory(repairedMessages),
-          executedVendorId,
+        stripOpenAIItemReferences(
+          stripReasoningForResend(
+            supersedeIterationHistory(repairedMessages),
+            executedVendorId,
+          ),
         ),
         executedVendorId,
         audioCapable,
@@ -2253,8 +2260,21 @@ export async function POST(request: Request) {
         executedBareModelId,
         { mechanicalRun: itemIterationBudget != null },
       );
+      // OpenAI Responses stores every item server-side while `store` keeps its
+      // default of true, and @ai-sdk/openai then replays those items as
+      // { type: "item_reference" } instead of the text we hold verbatim in
+      // ConversationMessage.parts. Items expire after ~30 days (a key rotation
+      // re-scopes the store sooner), after which the reference resolves to
+      // nothing and the conversation is permanently unsendable (#193). Keep the
+      // request self-contained. Deliberately NOT a buildProviderOptions branch:
+      // that function's return doubles as the "this turn had a reasoning
+      // config" signal for describeReasoningConfig below, and a storage knob is
+      // not a reasoning config.
+      const storageProviderOptions: AIProviderOptions | undefined =
+        executedVendorId === "openai" ? { openai: { store: false } } : undefined;
       const providerOptions = mergeAIProviderOptions(
         reasoningProviderOptions,
+        storageProviderOptions,
         promptCachePolicy.providerOptions,
       );
 
