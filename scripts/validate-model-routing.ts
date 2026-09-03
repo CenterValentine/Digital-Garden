@@ -292,10 +292,12 @@ assert.equal(deco["a3"]?.kind, "divider");
 assert.deepEqual(deco["a3"]?.notices, ["fell through"]);
 assert.equal(deco["a4"], undefined);
 
-// Switch-line copy names who switched.
+// Switch-line copy names who switched. (P0a vocabulary: the persisted
+// source values stay "playbook"/"playbook-phase", but every DISPLAY
+// surface says charter.)
 assert.equal(
   describeModelRouteSource(route),
-  'by playbook "Job Hunt" (Phase 3)',
+  'by charter "Job Hunt" (Phase 3)',
 );
 assert.equal(
   describeModelRouteSource({ providerId: "a", modelId: "b", source: "user" }),
