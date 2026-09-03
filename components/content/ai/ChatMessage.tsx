@@ -79,6 +79,7 @@ import {
   computeTurnCost,
   formatUsdEstimate,
   readPersistedCost,
+  type SessionUsage,
 } from "@/lib/features/ai-connections/usage/pricing";
 import { ReasoningRouter } from "./reasoning/ReasoningRouter";
 import { parseCharterMessageAttachment } from "@/lib/domain/ai/charters/message-binding";
@@ -260,6 +261,12 @@ interface ChatMessageProps {
   messageIndex?: number;
   foldBoundary?: { messageIdx: number; partIdx: number } | null;
   /**
+   * Cumulative session usage (all assistant turns so far, aggregated by the
+   * surface) — the avatar popover shows it beside the turn's own numbers so
+   * a large turn total reads in context (P3 owner ask, 2026-09-02).
+   */
+  sessionUsage?: SessionUsage | null;
+  /**
    * True when this streaming message is a resumed stream (reload / second
    * tab), so the buffered flood settles in full instead of re-typing
    * already-generated content (AI 3.3). Inert unless `isStreaming`.
@@ -379,6 +386,7 @@ export const ChatMessage = memo(function ChatMessage({
   isStreaming = false,
   messageIndex,
   foldBoundary = null,
+  sessionUsage = null,
   resumedStream = false,
   providerId,
   modelId,
@@ -774,6 +782,7 @@ export const ChatMessage = memo(function ChatMessage({
           metadata={
             (message as { metadata?: Record<string, unknown> }).metadata
           }
+          sessionUsage={sessionUsage}
         />
       )}
 
@@ -1944,10 +1953,12 @@ function AssistantAvatar({
   providerId,
   modelId,
   metadata,
+  sessionUsage,
 }: {
   providerId?: string | null;
   modelId?: string | null;
   metadata?: Record<string, unknown>;
+  sessionUsage?: SessionUsage | null;
 }) {
   // The avatar's own rect, captured on hover. This is the MEASURE-phase
   // anchor: the tooltip first renders here hidden so it can be measured, then
@@ -2174,6 +2185,38 @@ function AssistantAvatar({
                 ) : (
                   <span className="text-gray-400 dark:text-gray-500">
                     cost n/a — no price entry for this model
+                  </span>
+                )}
+              </div>
+            )}
+            {/* Session cumulative (P3 owner ask): the turn's numbers in
+                context of the whole chat — a big turn total reads as part
+                of a priced whole, not one alarming figure. */}
+            {sessionUsage && sessionUsage.turns > 1 && (
+              <div className="mt-1 border-t border-black/10 dark:border-white/10 pt-1 text-gray-500">
+                <span className="text-gray-500">session</span>{" "}
+                <span className="tabular-nums text-gray-700 dark:text-gray-300">
+                  {sessionUsage.turns} turns ·{" "}
+                  {(
+                    sessionUsage.inputTokens + sessionUsage.outputTokens
+                  ).toLocaleString()}{" "}
+                  tokens
+                </span>
+                {sessionUsage.totalUsd > 0 && (
+                  <span>
+                    {" "}
+                    <span className="text-gray-500">· est.</span>{" "}
+                    <span className="tabular-nums text-gray-700 dark:text-gray-300">
+                      {sessionUsage.totalUsd < 0.001
+                        ? "<$0.001"
+                        : formatUsdEstimate(sessionUsage.totalUsd)}
+                    </span>
+                    {sessionUsage.unpricedTurns > 0 && (
+                      <span className="text-gray-400 dark:text-gray-500">
+                        {" "}
+                        (+{sessionUsage.unpricedTurns} unpriced)
+                      </span>
+                    )}
                   </span>
                 )}
               </div>
@@ -2688,6 +2731,97 @@ function ApprovalPreview({
                 </span>
                 <span className="text-[10px] text-gray-500 dark:text-gray-500">
                   {node.type}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+        <ApprovalRawJson args={args} />
+      </>
+    );
+  }
+
+  // Per-item iteration proposal (P3 owner ask): captureTo is the consent
+  // surface — approving this card IS the permission to write rows — so it
+  // renders first-class (database chip + admission rule), never buried in
+  // raw JSON while the generic fields show.
+  if (toolName === "propose_item_iteration") {
+    const items = Array.isArray(a.items)
+      ? (a.items as Array<{ label?: string; url?: string }>)
+      : [];
+    const capture = (
+      typeof a.captureTo === "object" && a.captureTo !== null
+        ? a.captureTo
+        : null
+    ) as {
+      database?: string;
+      admission?: string;
+      admissionNote?: string;
+      columns?: string[];
+      dedupeColumn?: string;
+    } | null;
+    const rowsPass = a.source === "database-rows";
+    const fields: Array<[string, string]> = [];
+    const objective = str("objective");
+    if (objective) fields.push(["Objective", objective]);
+    const quest = str("quest");
+    if (quest) fields.push(["Quest", quest]);
+    fields.push([
+      "Source",
+      rowsPass
+        ? "database rows — refinement pass, updates rows in place"
+        : String(a.source ?? "items"),
+    ]);
+    const cap = typeof a.itemCap === "number" ? a.itemCap : undefined;
+    const rowIdCount = Array.isArray(a.rowIds) ? a.rowIds.length : 0;
+    const count = rowsPass
+      ? rowIdCount > 0
+        ? String(rowIdCount)
+        : "all rows"
+      : String(items.length);
+    fields.push([
+      "Items",
+      `${count}${cap ? ` · cap ${cap}` : ""}${typeof a.batchSize === "number" ? ` · batches of ${a.batchSize}` : ""}`,
+    ]);
+    return (
+      <>
+        <ApprovalFieldRows fields={fields} />
+        {capture && (
+          <div className="mx-3 mb-1.5 rounded-md border border-sky-400/30 bg-sky-500/[0.07] px-3 py-2">
+            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-sky-700 dark:text-sky-300">
+              <Table2 className="h-3 w-3 shrink-0" />
+              <span className="truncate">
+                Writes rows to &ldquo;{capture.database ?? "?"}&rdquo;
+              </span>
+            </div>
+            <div className="mt-0.5 text-[11px] text-gray-600 dark:text-gray-400">
+              Admission: {capture.admission ?? "all"}
+              {capture.admissionNote ? ` — ${capture.admissionNote}` : ""}
+            </div>
+            {Array.isArray(capture.columns) && capture.columns.length > 0 && (
+              <div className="mt-0.5 text-[11px] text-gray-600 dark:text-gray-400">
+                Columns: {capture.columns.join(", ")}
+              </div>
+            )}
+            {capture.dedupeColumn && (
+              <div className="mt-0.5 text-[11px] text-gray-500 dark:text-gray-500">
+                Identity: {capture.dedupeColumn}
+              </div>
+            )}
+          </div>
+        )}
+        {items.length > 0 && (
+          <div className="mx-3 mb-1.5 rounded-md border border-black/10 dark:border-white/10 bg-white/70 dark:bg-black/25 px-3 py-1.5 max-h-40 overflow-auto">
+            {items.map((it, idx) => (
+              <div
+                key={idx}
+                className="flex items-baseline gap-1.5 text-[11px] leading-relaxed"
+              >
+                <span className="shrink-0 text-gray-400 dark:text-gray-600">
+                  {idx + 1}.
+                </span>
+                <span className="truncate text-gray-700 dark:text-gray-300">
+                  {it.label ?? it.url ?? "item"}
                 </span>
               </div>
             ))}

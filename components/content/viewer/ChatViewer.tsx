@@ -19,6 +19,7 @@ import {
 } from "../ai/ModelSwitchDivider";
 import { computeModelRouteDecorations } from "@/lib/domain/ai/model-directive";
 import { findIterationFoldBoundary } from "@/lib/domain/ai/context-diet";
+import { aggregateSessionUsage } from "@/lib/features/ai-connections/usage/pricing";
 import { ModelPinToggle } from "../ai/ModelPinToggle";
 
 /** Compact token formatting for the header meter (v3.1 R5). */
@@ -590,6 +591,11 @@ function ChatViewerInner({
     () => findIterationFoldBoundary(messages),
     [messages],
   );
+  // P3 owner ask: cumulative session usage for the avatar popover.
+  const sessionUsage = useMemo(
+    () => aggregateSessionUsage(messages),
+    [messages],
+  );
 
   // Mid-run review (v3.1 R1): the run counts as "active" while streaming
   // AND while parked on an unanswered approval (the stream has ended but
@@ -874,6 +880,7 @@ function ChatViewerInner({
                     message={message}
                     messageIndex={i}
                     foldBoundary={iterationFoldBoundary}
+                    sessionUsage={sessionUsage}
                     providerId={stamp.providerId}
                     modelId={stamp.modelId}
                     isStreaming={
