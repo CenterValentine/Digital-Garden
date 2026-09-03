@@ -126,22 +126,28 @@ export async function upsertRunLedger(
       notePayload: { select: { metadata: true } },
     },
   });
+  // Quest logs never adopt via the legacy exact-title fallback: a stale
+  // "Run Ledger" note sitting in the charter's folder is old debris, not
+  // this quest's log (owner smoke 2026-09-03: a July note got adopted and
+  // its history prepended to the quest log). Quest keys match by key only.
   const existing =
     keyedLedger ??
-    (await prisma.contentNode.findFirst({
-      where: {
-        ownerId: userId,
-        ...scope,
-        contentType: "note",
-        deletedAt: null,
-        title: LEDGER_TITLE,
-      },
-      select: {
-        id: true,
-        title: true,
-        notePayload: { select: { metadata: true } },
-      },
-    }));
+    (questScoped
+      ? null
+      : await prisma.contentNode.findFirst({
+          where: {
+            ownerId: userId,
+            ...scope,
+            contentType: "note",
+            deletedAt: null,
+            title: LEDGER_TITLE,
+          },
+          select: {
+            id: true,
+            title: true,
+            notePayload: { select: { metadata: true } },
+          },
+        }));
   const ledgerTitle = existing?.title.startsWith(`${LEDGER_TITLE} —`)
     ? existing.title
     : buildRunLedgerTitle(entry, runKey);

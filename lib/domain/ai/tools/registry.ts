@@ -864,6 +864,15 @@ export function createBaseTools(ctx: ToolExecuteContext) {
                 },
               }
             : {}),
+          // A quest arg without an engaged quest must be LOUD (owner smoke
+          // 2026-09-03: charter wasn't attached, the server silently ran a
+          // legacy run, and the model then NARRATED a quest run it wasn't
+          // having — fabricated "already scored" skips included).
+          ...(questArg && !questInfo
+            ? {
+                questIgnored: `quest "${questArg}" was NOT engaged — no charter is attached to this chat (or quest setup failed). This is a plain legacy run: NO quest ledger writes, NO cross-sitting dedup, NO master-ledger update. Never claim otherwise.`,
+              }
+            : {}),
           ...(captureCfg
             ? {
                 capture: {
@@ -897,9 +906,12 @@ export function createBaseTools(ctx: ToolExecuteContext) {
               }
             : {}),
           nextAction:
+            (questArg && !questInfo
+              ? `FIRST, tell the user plainly: the "${questArg}" quest was NOT engaged because no charter is attached to this chat — results will NOT land in the quest ledger; attaching the charter (/charter) and re-proposing would continue the quest properly. Then proceed with this legacy run honestly. `
+              : "") +
             `APPROVED. Process the items IN ORDER, ONE at a time — the FULL analysis/charter applies to each item (all its phases; the user's framing and mentions apply across every item). ` +
             (alreadyScored.size > 0
-              ? `${alreadyScored.size} item(s) are marked "already scored" — this quest judged them in an earlier sitting (including rejects); SKIP re-reading them unless the user asked for a refresh, and record them as done with a one-line "previously scored" verdict. ` +
+              ? `${alreadyScored.size} item(s) are marked "already scored" — this quest judged them in an earlier sitting (rejects included). Do NOT re-read and do NOT re-record them (a re-record inflates the quest's counters with zero new information) unless the user explicitly asked for a refresh; their verdicts already live in the quest ledger. Process ONLY the unscored items.${alreadyScored.size >= normalized.length ? ` Here that is NONE — every item is already scored: call record_iteration_findings NOW (processedCount 0, note that all ${normalized.length} items were previously scored) and close by linking the quest ledger.` : ""} ` +
                 ``
               : "") +
             (captureCfg
