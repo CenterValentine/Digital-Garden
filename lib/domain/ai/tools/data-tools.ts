@@ -735,5 +735,164 @@ export function createDataTools(ctx: ToolExecuteContext) {
         }
       },
     }),
+    // ─── propose_output_database ────────────────────────────
+    // P5 (EXTRACTION-TO-DATABASE-PLAN §3.7, D1 reversed): the AI structures
+    // the output database — schema derived from the charter's objective,
+    // with an AI-written description on EVERY column (the load-bearing
+    // capture context of §3.1) and initial vocabularies inline. Proposal,
+    // not a write: the sentinel renders as OutputDatabaseProposalCard and
+    // the USER's Apply click creates the table (POST /api/content/data).
+    propose_output_database: tool({
+      description:
+        "Propose a NEW database for capturing results when no suitable table exists (or the user asks for one). Renders a review card — NOTHING is created until the user clicks Apply, so never claim the database exists. Derive the schema from the run's objective and write a real description on EVERY column (what goes in it, where values come from) — descriptions are the capture mapping context. Type rule: select/status ONLY for vocabularies the user controls (pipeline stages, your own categories) and ALWAYS with initial options; text for anything the web invents (titles, companies, locations). Include a url column when items have pages — it becomes the dedupe identity. Prefer binding to an EXISTING table when one fits; propose creation only when none does. After the user applies, bind the new table via captureTo in propose_item_iteration.",
+      inputSchema: z.object({
+        title: z
+          .string()
+          .min(1)
+          .max(120)
+          .describe("The database's name (e.g. \"Job Leads\")."),
+        purpose: z
+          .string()
+          .max(300)
+          .optional()
+          .describe("One sentence on what this table captures — shown on the card."),
+        columns: z
+          .array(
+            z.object({
+              name: z.string().min(1).max(120),
+              type: z
+                .enum([
+                  "text",
+                  "longText",
+                  "number",
+                  "url",
+                  "date",
+                  "checkbox",
+                  "select",
+                  "multiSelect",
+                  "status",
+                  "file",
+                  "email",
+                  "phone",
+                ])
+                .describe("Column type — see the type rule in the tool description."),
+              description: z
+                .string()
+                .min(8)
+                .max(500)
+                .describe(
+                  "REQUIRED on every column: what goes in it and where values come from — this is the model-facing capture context, not decoration.",
+                ),
+              options: z
+                .array(
+                  z.object({
+                    label: z.string().min(1).max(120),
+                    color: z.string().optional(),
+                    group: z.enum(["todo", "active", "done"]).optional(),
+                  }),
+                )
+                .max(50)
+                .optional()
+                .describe("select/multiSelect/status: the initial vocabulary (REQUIRED for those types — an option-less select rejects every value)."),
+              primary: z
+                .boolean()
+                .optional()
+                .describe("Mark exactly ONE column as the primary (the row's title — usually the item's name/title column)."),
+            }),
+          )
+          .min(1)
+          .max(20)
+          .describe("The schema, in display order."),
+        dedupeColumn: z
+          .string()
+          .max(120)
+          .optional()
+          .describe("Which column holds each item's stable identity (defaults to the first url column)."),
+      }),
+      execute: async (input) => {
+        try {
+          const seen = new Set<string>();
+          const columns = [];
+          for (const raw of input.columns) {
+            const name = raw.name.trim();
+            if (!name) continue;
+            const lower = name.toLowerCase();
+            if (seen.has(lower)) {
+              return `Duplicate column name "${name}" — every column needs a distinct name.`;
+            }
+            seen.add(lower);
+            const selectLike =
+              raw.type === "select" ||
+              raw.type === "multiSelect" ||
+              raw.type === "status";
+            if (selectLike && (!raw.options || raw.options.length === 0)) {
+              return `"${name}" is a ${raw.type} column with NO initial options — an option-less ${raw.type} rejects every captured value (owner smoke, 2026-09-02). Provide the initial vocabulary, or make it a text column if the web controls the values.`;
+            }
+            if (!selectLike && raw.options && raw.options.length > 0) {
+              return `"${name}" is a ${raw.type} column — options belong only to select/multiSelect/status.`;
+            }
+            columns.push({
+              name: name.slice(0, 120),
+              type: raw.type,
+              description: raw.description.trim(),
+              ...(raw.options
+                ? {
+                    options: raw.options
+                      .map((o) => ({
+                        label: o.label.trim().slice(0, 120),
+                        ...(o.color && /^[a-z][a-z0-9-]{0,23}$/.test(o.color)
+                          ? { color: o.color }
+                          : {}),
+                        ...(raw.type === "status"
+                          ? { group: o.group ?? ("todo" as const) }
+                          : {}),
+                      }))
+                      .filter((o) => o.label.length > 0),
+                  }
+                : {}),
+              ...(raw.primary ? { primary: true } : {}),
+            });
+          }
+          if (columns.length === 0) {
+            return "No usable columns after cleaning — propose real column names.";
+          }
+          const primaries = columns.filter((c) => c.primary);
+          if (primaries.length > 1) {
+            return `Only one column can be primary (got: ${primaries.map((c) => c.name).join(", ")}).`;
+          }
+          if (primaries.length === 0) {
+            // Default: first text column, else the first column.
+            const firstText = columns.find((c) => c.type === "text");
+            (firstText ?? columns[0]).primary = true;
+          }
+          if (input.dedupeColumn) {
+            const match = columns.find(
+              (c) => c.name.toLowerCase() === input.dedupeColumn!.trim().toLowerCase(),
+            );
+            if (!match) {
+              return `dedupeColumn "${input.dedupeColumn}" is not one of the proposed columns.`;
+            }
+          }
+          return JSON.stringify({
+            __outputDatabaseProposal: true,
+            title: input.title.trim().slice(0, 120),
+            purpose: input.purpose?.trim() || null,
+            columns,
+            dedupeColumn:
+              input.dedupeColumn?.trim() ||
+              columns.find((c) => c.type === "url")?.name ||
+              null,
+          });
+        } catch (error) {
+          logger.warn({
+            layer: "ai",
+            event: "data_tools:propose_output_db_caught",
+            summary: "propose_output_database failed",
+            error,
+          });
+          return "Proposing the database failed with an internal error — nothing was created; tell the user.";
+        }
+      },
+    }),
   };
 }

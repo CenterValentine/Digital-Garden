@@ -56,6 +56,10 @@ import {
   ColumnOptionsProposalCard,
   type ColumnOptionsProposalPayload,
 } from "./ColumnOptionsProposalCard";
+import {
+  OutputDatabaseProposalCard,
+  type OutputDatabaseProposalPayload,
+} from "./OutputDatabaseProposalCard";
 import { FlashcardCardProposalList } from "./FlashcardCardProposalList";
 import { cn } from "@/lib/core/utils";
 import { calculateMenuPosition, type CalculatedPosition } from "@/lib/core/menu-positioning";
@@ -583,6 +587,7 @@ export const ChatMessage = memo(function ChatMessage({
     deckProposals,
     deckWithCardsProposals,
     columnOptionsProposals,
+    outputDatabaseProposals,
     hasRunningTools,
   } = useMemo(() => {
     const images: ImagePayload[] = [];
@@ -595,6 +600,7 @@ export const ChatMessage = memo(function ChatMessage({
     const deckProps: DeckProposalPayload[] = [];
     const deckWithCardsProps: DeckWithCardsProposalPayload[] = [];
     const columnOptionsProps: ColumnOptionsProposalPayload[] = [];
+    const outputDbProps: OutputDatabaseProposalPayload[] = [];
     let running = false;
     const seenImageIds = new Set<string>();
     const seenAudioIds = new Set<string>();
@@ -648,6 +654,11 @@ export const ChatMessage = memo(function ChatMessage({
         const columnOptions = parseColumnOptionsProposal(tp.output);
         if (columnOptions) {
           columnOptionsProps.push(columnOptions);
+          continue;
+        }
+        const outputDb = parseOutputDatabaseProposal(tp.output);
+        if (outputDb) {
+          outputDbProps.push(outputDb);
         }
       }
     }
@@ -660,6 +671,7 @@ export const ChatMessage = memo(function ChatMessage({
       deckProposals: deckProps,
       deckWithCardsProposals: deckWithCardsProps,
       columnOptionsProposals: columnOptionsProps,
+      outputDatabaseProposals: outputDbProps,
       hasRunningTools: running,
     };
   }, [message.parts]);
@@ -1110,6 +1122,7 @@ export const ChatMessage = memo(function ChatMessage({
               if (parseDeckProposal(toolPart.output) !== null) return null;
               if (parseDeckWithCardsProposal(toolPart.output) !== null) return null;
               if (parseColumnOptionsProposal(toolPart.output) !== null) return null;
+              if (parseOutputDatabaseProposal(toolPart.output) !== null) return null;
             }
 
             return (
@@ -1202,6 +1215,15 @@ export const ChatMessage = memo(function ChatMessage({
         {columnOptionsProposals.map((payload, i) => (
           <ColumnOptionsProposalCard
             key={`column-options-${i}`}
+            payload={payload}
+          />
+        ))}
+
+        {/* Output-database proposals (P5) — Apply creates the table via
+            POST /api/content/data; applied flag is content-keyed. */}
+        {outputDatabaseProposals.map((payload, i) => (
+          <OutputDatabaseProposalCard
+            key={`output-db-${i}`}
             payload={payload}
           />
         ))}
@@ -2286,6 +2308,23 @@ function parseNotePayload(result: unknown): NotePayload | null {
 }
 
 /** Parse a column-options proposal from a propose_column_options result. */
+function parseOutputDatabaseProposal(
+  result: unknown
+): OutputDatabaseProposalPayload | null {
+  if (result === undefined) return null;
+  const str = typeof result === "string" ? result : JSON.stringify(result);
+  if (!str.includes('"__outputDatabaseProposal"')) return null;
+  try {
+    const parsed = JSON.parse(str);
+    if (parsed.__outputDatabaseProposal) {
+      return parsed as OutputDatabaseProposalPayload;
+    }
+  } catch {
+    /* not valid JSON */
+  }
+  return null;
+}
+
 function parseColumnOptionsProposal(
   result: unknown
 ): ColumnOptionsProposalPayload | null {
