@@ -82,6 +82,7 @@ import {
 } from "@/lib/features/ai-connections/usage/pricing";
 import { ReasoningRouter } from "./reasoning/ReasoningRouter";
 import { parseCharterMessageAttachment } from "@/lib/domain/ai/charters/message-binding";
+import { shouldSupersedePart } from "@/lib/domain/ai/context-diet";
 import { parseFolderContextMentionPart } from "@/lib/domain/ai-context/mention-part";
 import {
   parseContentWriteReceipts,
@@ -250,6 +251,15 @@ interface ChatMessageProps {
   message: UIMessage;
   isStreaming?: boolean;
   /**
+   * P4c lean context: this message's index in the conversation plus the
+   * active iteration run's fold boundary (from findIterationFoldBoundary).
+   * Perception parts BEFORE the boundary render collapsed — the default
+   * view IS the model's retained view (owner rule: no divergence between
+   * front and back). Expanding is user-only and free.
+   */
+  messageIndex?: number;
+  foldBoundary?: { messageIdx: number; partIdx: number } | null;
+  /**
    * True when this streaming message is a resumed stream (reload / second
    * tab), so the buffered flood settles in full instead of re-typing
    * already-generated content (AI 3.3). Inert unless `isStreaming`.
@@ -322,9 +332,53 @@ interface ChatMessageProps {
   contentId?: string | null;
 }
 
+/**
+ * P4c collapsed rendering for a perception part the model has let go
+ * (folded behind the latest batch checkpoint). Collapsed = one quiet line;
+ * expanding shows the raw superseded output — user-only, costs no tokens,
+ * and visually marks what the model no longer carries.
+ */
+function FoldedPerceptionPart({ part }: { part: unknown }) {
+  const [expanded, setExpanded] = useState(false);
+  const p = part as { type?: string; output?: unknown };
+  const toolName = (p.type ?? "tool-").replace(/^tool-/, "");
+  const raw = (() => {
+    const out = p.output as { value?: unknown } | unknown;
+    const v =
+      out && typeof out === "object" && "value" in (out as object)
+        ? (out as { value: unknown }).value
+        : out;
+    return typeof v === "string" ? v : JSON.stringify(v, null, 2);
+  })();
+  return (
+    <div className="my-1">
+      <button
+        type="button"
+        onClick={() => setExpanded((e) => !e)}
+        className="inline-flex items-center gap-1.5 rounded-md border border-black/5 bg-black/[0.02] px-2 py-1 text-[11px] text-gray-500 transition-colors hover:bg-black/[0.05] dark:border-white/5 dark:bg-white/[0.03] dark:text-gray-400 dark:hover:bg-white/[0.06]"
+        title="Folded at batch checkpoint — the model no longer carries this; expanding is free"
+      >
+        <ChevronRight
+          className={`h-3 w-3 shrink-0 transition-transform ${expanded ? "rotate-90" : ""}`}
+        />
+        <span>
+          {toolName} · folded at checkpoint — digested into the run records
+        </span>
+      </button>
+      {expanded && (
+        <pre className="mt-1 max-h-64 overflow-auto rounded-md border border-black/5 bg-black/[0.02] p-2 text-[10px] leading-snug text-gray-600 dark:border-white/5 dark:bg-white/[0.03] dark:text-gray-300">
+          {raw}
+        </pre>
+      )}
+    </div>
+  );
+}
+
 export const ChatMessage = memo(function ChatMessage({
   message,
   isStreaming = false,
+  messageIndex,
+  foldBoundary = null,
   resumedStream = false,
   providerId,
   modelId,
@@ -782,6 +836,20 @@ export const ChatMessage = memo(function ChatMessage({
         <>
         {/* Render message parts (text runs pre-coalesced — see renderParts) */}
         {renderParts.map(({ key: i, part }) => {
+          // P4c: perception parts the model no longer sees (folded behind
+          // the latest batch checkpoint) render collapsed — the default
+          // view equals the retained context. Same rule as the server fold
+          // (shouldSupersedePart), same boundary, one implementation.
+          if (
+            foldBoundary != null &&
+            typeof messageIndex === "number" &&
+            (messageIndex < foldBoundary.messageIdx ||
+              (messageIndex === foldBoundary.messageIdx &&
+                i < foldBoundary.partIdx)) &&
+            shouldSupersedePart(part)
+          ) {
+            return <FoldedPerceptionPart key={i} part={part} />;
+          }
           // Reasoning / "thinking" parts (Session 6). Routed to a
           // provider-themed renderer keyed on this message's stamped
           // providerId — not the panel's active provider — so branched
