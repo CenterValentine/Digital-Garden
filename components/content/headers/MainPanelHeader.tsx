@@ -8,6 +8,7 @@ import { requestOverlayOpen } from "@/lib/domain/browser-extension/panel-bridge"
 import { X } from "lucide-react";
 import { toast } from "sonner";
 import { getSurfaceStyles } from "@/lib/design/system";
+import { calculateMenuPosition } from "@/lib/core/menu-positioning";
 import {
   getPaneLabel,
   useContentStore,
@@ -302,6 +303,15 @@ export function MainPanelHeader({
     x: number;
     y: number;
   } | null>(null);
+  // Boundary-checked placement for the tab menu, filled in after the hidden
+  // measure pass below. Null means "not measured yet" — render hidden at the
+  // raw pointer position.
+  const [tabMenuPosition, setTabMenuPosition] = useState<{
+    x: number;
+    y: number;
+    maxHeight: number;
+  } | null>(null);
+  const tabMenuRef = useRef<HTMLDivElement>(null);
   const [presenceByContentId, setPresenceByContentId] = useState<
     Record<string, TabPresenceSession[]>
   >({});
@@ -594,6 +604,28 @@ export function MainPanelHeader({
     };
   }, [tabMenu]);
 
+  // Two-phase placement (same recipe as ContextMenu): the menu renders hidden
+  // at the raw pointer position, gets measured, then moves to a spot that
+  // clears the viewport edges. Anchoring a 224px-wide menu at the pointer put
+  // it off-screen for the rightmost tab, which is by definition within its own
+  // width of the right edge.
+  useEffect(() => {
+    if (!tabMenu) return;
+
+    const timeoutId = setTimeout(() => {
+      const menuRect = tabMenuRef.current?.getBoundingClientRect();
+      if (!menuRect) return;
+      setTabMenuPosition(
+        calculateMenuPosition({
+          triggerPosition: { x: tabMenu.x, y: tabMenu.y },
+          menuDimensions: { width: menuRect.width, height: menuRect.height },
+        })
+      );
+    }, 0);
+
+    return () => clearTimeout(timeoutId);
+  }, [tabMenu]);
+
   // Close the active tab. Cmd+W and Cmd+Shift+W never reach the page — browsers
   // reserve them for Close Tab / Close Window — so we bind the two W chords that
   // do survive:
@@ -743,6 +775,9 @@ export function MainPanelHeader({
                 onContextMenu={(event) => {
                   if (shellTabMenuSections.length === 0 && !isPanelEmbed) return;
                   event.preventDefault();
+                  // Clear the previous placement so the new menu measures from
+                  // scratch instead of flashing at the last tab's position.
+                  setTabMenuPosition(null);
                   setTabMenu({ tabId: tab.id, x: event.clientX, y: event.clientY });
                 }}
                 onDragStart={(event) => {
@@ -836,40 +871,55 @@ export function MainPanelHeader({
           ) : null}
         </div>
       </div>
-      {tabMenu && tabMenuTab ? (
-        <div
-          className="fixed z-50 min-w-56 rounded-md border border-white/10 bg-white/95 p-1 text-sm text-gray-900 shadow-lg backdrop-blur-sm dark:bg-gray-900/95 dark:text-gray-100"
-          style={{ left: tabMenu.x, top: tabMenu.y }}
-          onClick={(event) => event.stopPropagation()}
-        >
-          {/* Side panel only: project this tab onto the page. Drag-to-corner
-              gives precise placement; this is the one-click default. */}
-          {isPanelEmbed && tabMenuTab.contentId ? (
-            <>
-              <div className="px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                Page
-              </div>
-              <button
-                type="button"
-                className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/10"
-                onClick={() => {
-                  requestOverlayOpen(tabMenuTab.contentId as string);
-                  setTabMenu(null);
-                }}
-              >
-                Open as overlay
-              </button>
-            </>
-          ) : null}
-          {shellTabMenuSections.map((Section) =>
-            createElement(Section, {
-              key: Section.displayName ?? Section.name,
-              tab: tabMenuTab,
-              closeMenu: () => setTabMenu(null),
-            })
-          )}
-        </div>
-      ) : null}
+      {/* Portalled to the body so the menu escapes the header's stacking
+          context — as a header child its z-50 could not paint above an
+          expanded right sidebar. */}
+      {tabMenu && tabMenuTab && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              ref={tabMenuRef}
+              className="fixed z-[120] min-w-56 overflow-y-auto rounded-md border border-white/10 bg-white/95 p-1 text-sm text-gray-900 shadow-lg backdrop-blur-sm dark:bg-gray-900/95 dark:text-gray-100"
+              style={
+                tabMenuPosition
+                  ? {
+                      left: tabMenuPosition.x,
+                      top: tabMenuPosition.y,
+                      maxHeight: tabMenuPosition.maxHeight,
+                    }
+                  : { left: tabMenu.x, top: tabMenu.y, visibility: "hidden" }
+              }
+              onClick={(event) => event.stopPropagation()}
+            >
+              {/* Side panel only: project this tab onto the page. Drag-to-corner
+                  gives precise placement; this is the one-click default. */}
+              {isPanelEmbed && tabMenuTab.contentId ? (
+                <>
+                  <div className="px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                    Page
+                  </div>
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/10"
+                    onClick={() => {
+                      requestOverlayOpen(tabMenuTab.contentId as string);
+                      setTabMenu(null);
+                    }}
+                  >
+                    Open as overlay
+                  </button>
+                </>
+              ) : null}
+              {shellTabMenuSections.map((Section) =>
+                createElement(Section, {
+                  key: Section.displayName ?? Section.name,
+                  tab: tabMenuTab,
+                  closeMenu: () => setTabMenu(null),
+                })
+              )}
+            </div>,
+            document.body
+          )
+        : null}
     </>
   );
 }
