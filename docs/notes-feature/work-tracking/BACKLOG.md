@@ -16,6 +16,8 @@ last_updated: 2026-08-29
 
 ## Workspace layout: multi-tab last-writer-wins reverts D+D (2026-09-04; owner repro; lands with layout-intent "P4 live fan-in")
 
+**PARTIAL FIX SHIPPED (PR #210, merged 2026-09-04):** the null-base write path now returns `conflict` instead of blind-overwriting (a writer with no compare base never loaded what it overwrites) — the adopt-and-retry loop converges in one round. The remaining items below (writer recency for PRIMED-but-stale writers, URL-re-projection question) still ride the fan-in phase.
+
 Owner report during the Release-4 smoke: split-pane tab D+D "repeatedly regressed/ignored" on dev; prod unaffected; hard refresh helps. Diagnosed, not fixed (the fix IS the planned live fan-in phase, not a drive-by):
 
 - [ ] **Null-base saves are unconditional overwrites** (`saveWorkspaceState` — no `expectedUpdatedAt` → plain update). Legitimate for first-save/layout-authority, but it lets any client whose `lastAppliedUpdatedAt` map is unprimed clobber newer state. Revisit the semantics with fan-in (e.g., server distinguishes "create/first write" from "stale blind write").
