@@ -127,13 +127,15 @@ export function ChatControlPanel({
       if (event.key === "Escape") setOpen(false);
     };
     // Click-away dismissal (owner, 2026-09-04) with the nested-portal trap
-    // handled: the hosted affordances (target pickers, context picker) open
-    // their OWN menus portaled to <body> as position:fixed layers — a click
-    // there is an interaction, not a dismissal. Clicks inside the panel or
-    // trigger keep it open; clicks inside ANY other fixed layer (a hosted
-    // menu, a toast) are ignored; true page clicks close.
+    // handled by DOM ORDER, not position (a fixed-position test false-
+    // positived on the app shell's own fixed ancestors and nothing ever
+    // dismissed): the hosted affordances portal their menus to <body>
+    // AFTER this panel, so a click whose top-level ancestor FOLLOWS the
+    // panel is an interaction with a layer opened on top of us — ignore
+    // it. Everything else (the app content root precedes the panel)
+    // closes.
     const onPointerDown = (event: PointerEvent) => {
-      const target = event.target as HTMLElement | null;
+      const target = event.target as Node | null;
       if (!target) return;
       if (
         panelRef.current?.contains(target) ||
@@ -141,12 +143,19 @@ export function ChatControlPanel({
       ) {
         return;
       }
-      for (
-        let el: HTMLElement | null = target;
-        el && el !== document.body;
-        el = el.parentElement
-      ) {
-        if (getComputedStyle(el).position === "fixed") return;
+      const panel = panelRef.current;
+      if (panel && target instanceof Element) {
+        let top: Element = target;
+        while (top.parentElement && top.parentElement !== document.body) {
+          top = top.parentElement;
+        }
+        if (
+          top.parentElement === document.body &&
+          panel.compareDocumentPosition(top) &
+            Node.DOCUMENT_POSITION_FOLLOWING
+        ) {
+          return;
+        }
       }
       setOpen(false);
     };
