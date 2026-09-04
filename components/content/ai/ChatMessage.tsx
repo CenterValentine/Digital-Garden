@@ -1290,10 +1290,28 @@ export const ChatMessage = memo(function ChatMessage({
                 key={i}
                 toolName={toolPart.toolName}
                 toolCallId={toolPart.toolCallId}
-                state={toolPart.state}
+                // A "running" part on a message that is no longer streaming
+                // is a contradiction — the turn ended, so the tool can never
+                // return (owner report, 2026-09-04: interrupts that bypass
+                // the engine's stop() left eternal spinners in the persisted
+                // transcript). Render it settled as an honest interruption;
+                // live streams are untouched.
+                state={
+                  !isStreaming &&
+                  (toolPart.state === "input-streaming" ||
+                    toolPart.state === "input-available")
+                    ? "output-error"
+                    : toolPart.state
+                }
                 args={toolPart.input}
                 result={toolPart.output}
-                errorText={toolPart.errorText}
+                errorText={
+                  !isStreaming &&
+                  (toolPart.state === "input-streaming" ||
+                    toolPart.state === "input-available")
+                    ? "Stopped by the user — the turn was interrupted before this tool returned."
+                    : toolPart.errorText
+                }
                 isRevertable={revertableToolIds?.has(toolPart.toolCallId) ?? false}
                 onRevertEdit={onRevertEdit}
               />
