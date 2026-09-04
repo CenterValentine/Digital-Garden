@@ -61,14 +61,17 @@ function PanelRow({
   hint: string;
   children: React.ReactNode;
 }) {
-  // Compact step (owner, 2026-09-04): the explanatory line lives behind a
-  // native tooltip on the row instead of visible text.
+  // Settings-row layout (owner, 2026-09-04, second pass): label left,
+  // control right, one line per row — the macOS-settings shape. The
+  // explanatory line stays behind a native tooltip on the row.
   return (
-    <div className="px-3 py-2" title={hint}>
-      <div className="text-[11px] font-medium text-gray-700 dark:text-gray-200">
+    <div className="flex items-center gap-3 px-3 py-2" title={hint}>
+      <div className="w-24 shrink-0 text-[11px] font-medium text-gray-700 dark:text-gray-200">
         {label}
       </div>
-      <div className="mt-1.5 flex min-w-0 items-center">{children}</div>
+      <div className="flex min-w-0 flex-1 items-center justify-end">
+        {children}
+      </div>
     </div>
   );
 }
@@ -227,12 +230,16 @@ export function ChatControlPanel({
               </PanelRow>
               <PanelRow
                 label="Model pin"
-                hint="Pinned: the selected model overrides charter per-phase routing."
+                hint={
+                  modelPinned
+                    ? "Pinned — the selected model overrides charter per-phase routing."
+                    : "Unpinned — charter per-phase routing applies. Pin to override."
+                }
               >
-                <ModelPinToggle pinned={modelPinned} onToggle={onModelPinnedChange} />
-                <span className="ml-1.5 text-[11px] text-gray-600 dark:text-gray-300">
-                  {modelPinned ? "Pinned — routing overridden" : "Unpinned — charter routing applies"}
+                <span className="mr-0.5 text-[11px] text-gray-500 dark:text-gray-400">
+                  {modelPinned ? "Pinned" : "Unpinned"}
                 </span>
+                <ModelPinToggle pinned={modelPinned} onToggle={onModelPinnedChange} />
               </PanelRow>
               <PanelRow
                 label={
