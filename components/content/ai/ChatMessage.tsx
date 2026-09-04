@@ -4133,8 +4133,11 @@ function WorkingIndicator() {
   // pointless "0:01"; once it's clearly a wait, the counter reassures.
   const showTime = elapsed >= 3;
   return (
+    // Borderless (owner, 2026-09-04, with the reasoning de-boxing): status
+    // is text, boxes are content — the claude.ai/ChatGPT idiom for
+    // transient signals.
     <div
-      className="inline-flex items-center gap-2 rounded-xl bg-black/[0.03] dark:bg-white/5 border border-black/10 dark:border-white/10 px-3.5 py-2 text-xs text-gray-500"
+      className="inline-flex items-center gap-2 px-1 py-0.5 text-xs text-gray-500 dark:text-gray-400"
       aria-live="polite"
       aria-label={`Working${showTime ? `, ${elapsed} seconds elapsed` : ""}`}
     >
@@ -4157,7 +4160,7 @@ function WorkingIndicator() {
 /** Thinking indicator — shown while tools are executing */
 function ThinkingIndicator() {
   return (
-    <div className="inline-flex items-center gap-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20 px-3.5 py-2 text-xs text-indigo-300">
+    <div className="inline-flex items-center gap-2 px-1 py-0.5 text-xs text-indigo-500 dark:text-indigo-300">
       <BrainCircuit className="h-3.5 w-3.5 animate-pulse" />
       <span>Thinking</span>
       <span className="inline-flex gap-0.5">
