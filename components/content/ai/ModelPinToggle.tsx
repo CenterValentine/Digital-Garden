@@ -30,8 +30,8 @@ export function ModelPinToggle({
       aria-pressed={pinned}
       title={
         pinned
-          ? "Model locked — the selected model overrides charter per-phase routing. Click to unlock."
-          : "Lock the selected model so it overrides any charter per-phase model routing."
+          ? "Model locked — the selected model overrides charter-designated per-phase routing. Click to unlock."
+          : "Lock the selected model so it overrides any charter-designated per-phase model routing."
       }
       className={
         pinned

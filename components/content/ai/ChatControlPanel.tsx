@@ -12,9 +12,9 @@
  * - The hosted affordances (TargetFolderChip, OutputTargetChip,
  *   ChatContextPicker) open their OWN portaled menus at <body> level, so a
  *   naive outside-click handler would close the panel mid-interaction.
- *   Click-away dismissal (owner ask) therefore exempts any position:fixed
- *   layer: hosted menus and toasts count as "inside"; true page clicks,
- *   ✕, Escape, and the trigger all dismiss.
+ *   Click-away dismissal therefore exempts by DOM ORDER: layers portaled
+ *   to <body> AFTER the panel (the hosted menus) count as "inside"; true
+ *   page clicks, ✕, Escape, and the trigger all dismiss.
  * - Portaled + position:fixed, opening above the trigger (the composer
  *   sits at the viewport bottom; overflow-x-auto rails clip upward
  *   dropdowns — the recorded portal rule).
@@ -241,8 +241,8 @@ export function ChatControlPanel({
                 label="Lock selected model"
                 hint={
                   modelPinned
-                    ? "Locked — the selected model overrides charter per-phase routing."
-                    : "Unlocked — charter per-phase routing applies. Lock to override."
+                    ? "Locked — the selected model overrides charter-designated per-phase routing."
+                    : "Unlocked — charter-designated per-phase routing applies. Lock to override."
                 }
               >
                 <ModelPinToggle pinned={modelPinned} onToggle={onModelPinnedChange} />
