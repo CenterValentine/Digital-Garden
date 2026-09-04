@@ -21,6 +21,7 @@ import { RootNodeHeader, type RootScopeOption } from "../file-tree/RootNodeHeade
 import { useContentStore } from "@/state/content-store";
 import { useSearchStore } from "@/state/search-store";
 import { useTreeStateStore } from "@/state/tree-state-store";
+import { useCharterIdsStore } from "@/state/charter-ids-store";
 import { useWorkspaceStore } from "@/extensions/workplaces/state/workspace-store";
 import { useContextMenuStore } from "@/state/context-menu-store";
 import { usePageTemplateStore } from "@/state/page-template-store";
@@ -455,6 +456,9 @@ export function LeftSidebarContent({
       }
 
       setTreeData(result.data.tree);
+      // Feed the charter-id cache so metadata-less surfaces (workspace
+      // tabs) can render the ScrollText identity consistently.
+      useCharterIdsStore.getState().setFromTree(result.data.tree);
     } catch (err) {
       clientLogger.error({
         layer: "ui",

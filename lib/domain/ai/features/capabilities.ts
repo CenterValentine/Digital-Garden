@@ -8,6 +8,8 @@
  * AIFeatureRoutingPage compatibility filter.
  */
 
+import { PROVIDER_CATALOG } from "@/lib/domain/ai/providers/catalog";
+
 /**
  * Infer capability flags from a model's id when the saved
  * `capabilities` array is missing or incomplete.
@@ -123,12 +125,41 @@ export function normalizeCapability(cap: string): string {
 }
 
 /**
+ * The PROVIDER_CATALOG's capability flags by bare model id (union across
+ * providers when the same id appears via a gateway and directly). The
+ * catalog is load-bearing: a fetched Connection row persists with the
+ * generic `["text","streaming"]` default (the /models endpoints report no
+ * capabilities), which silently disqualified catalog-known models from
+ * every `tools`-requiring role slot — owner report 2026-09-04: DeepSeek
+ * missing from Scout/Analyst/Coder dropdowns while its catalog entry says
+ * `["text","tools","streaming"]`. Merging at READ time heals every
+ * already-saved row with no migration.
+ */
+let catalogCapsById: Map<string, Set<string>> | null = null;
+function catalogCapabilities(bareId: string): Set<string> | undefined {
+  if (!catalogCapsById) {
+    catalogCapsById = new Map();
+    for (const provider of PROVIDER_CATALOG) {
+      for (const m of provider.models) {
+        const key = m.id.toLowerCase();
+        const set = catalogCapsById.get(key) ?? new Set<string>();
+        for (const c of m.capabilities ?? []) set.add(normalizeCapability(c));
+        catalogCapsById.set(key, set);
+      }
+    }
+  }
+  return catalogCapsById.get(bareId.toLowerCase());
+}
+
+/**
  * Effective capability set for a saved model: union of the explicit
- * `capabilities` array (catalog/fetcher-derived) and any flags
- * inferred from the model id, each normalized to its canonical token.
- * Use this anywhere a feature-routing filter wants to know what a
- * model can do. Because tokens are normalized, an id-inferred image
- * model (`"image-generation"`) satisfies a feature requiring `"image"`.
+ * `capabilities` array (catalog/fetcher-derived), any flags inferred
+ * from the model id, and the PROVIDER_CATALOG entry for the bare id —
+ * each normalized to its canonical token. Use this anywhere a
+ * feature-routing filter wants to know what a model can do. Because
+ * tokens are normalized, an id-inferred image model
+ * (`"image-generation"`) satisfies a feature requiring `"image"`.
+ * Additive only: a saved row's explicit flags are never removed.
  */
 export function effectiveCapabilities(
   model: { id: string; capabilities?: string[] },
@@ -138,5 +169,8 @@ export function effectiveCapabilities(
   for (const inferred of inferCapabilities(model.id)) {
     have.add(normalizeCapability(inferred));
   }
+  const slash = model.id.indexOf("/");
+  const bare = slash >= 0 ? model.id.slice(slash + 1) : model.id;
+  for (const c of catalogCapabilities(bare) ?? []) have.add(c);
   return have;
 }

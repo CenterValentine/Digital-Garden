@@ -24,6 +24,8 @@ Prefer binding to a table you already keep (existing-structure principle). When 
 | Notes | longText | from `verdict` |
 | Materials | file | tailored artifacts, attached in place (§3 below) |
 
+**The charter must CONTAIN everything its rubric references.** A scoring rubric that says "against my profile" needs the profile IN the charter (a `## Profile` block: target role, stack, seniority, location, dealbreakers) — the charter is the commissioning document, and its content rides into every sitting automatically. A rubric pointing at missing context stalls an honest model ("I'd rather not fabricate Fit % values" — first production run, 2026-09-04) and silently corrupts a dishonest one. Rubric grounding is verdict quality, the same way description quality is capture quality.
+
 **Write a description on every column.** Descriptions are the model's mapping context for scraped content ("Fit %" → *"0–100 score from this charter's rubric"*). A description-less column forces a guess, and guesses are where inconsistent capture comes from. The preflight flags blanks; the generation card requires them.
 
 **Select/status only for vocabularies you control; text for vocabularies the web controls.** An option-less select rejects every captured value — the generation card refuses to propose one, and the run preflight warns when it finds one.

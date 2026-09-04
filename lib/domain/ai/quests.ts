@@ -70,7 +70,7 @@ const MASTER_COLUMNS: Array<{
   { name: "Last sitting", type: "date", description: "Most recent sitting's date." },
   { name: "Sittings", type: "number", description: "How many sittings this quest has had." },
   { name: "Items", type: "number", description: "Cumulative items processed across sittings." },
-  { name: "Qualified", type: "number", description: "Cumulative items that met the bar." },
+  { name: "Qualified", type: "number", description: "Unique items currently qualified — derived from the quest ledger's rows at each sitting close, never model-asserted." },
   { name: "Tokens", type: "number", description: "Cumulative model tokens across sittings (approximate)." },
   { name: "Est. cost", type: "number", description: "Cumulative estimated USD across sittings." },
   { name: "Quest ledger", type: "contentLink", description: "MANDATORY link — the quest's item-state database." },
@@ -579,11 +579,28 @@ export async function closeSitting(input: {
   const d = (row.data ?? {}) as Record<string, unknown>;
   const cols = quest.masterCols;
   const num = (key: string) => (typeof d[key] === "number" ? (d[key] as number) : 0);
+  // Qualified is DERIVED from ledger rows, never model-asserted arithmetic
+  // (checkable-reconciliation doctrine, §3.6): the count of unique items
+  // currently marked qualified in the quest ledger. A model-passed total
+  // was both trust-the-narrator and double-counting under refresh sittings
+  // (owner smoke: 10 "qualified" for 4 unique items).
+  const qualifiedKey = quest.ledgerCols["Qualified"];
+  const derivedQualified = qualifiedKey
+    ? await prisma.dataRow.count({
+        where: {
+          tableId: quest.questLedgerId,
+          deletedAt: null,
+          data: { path: [qualifiedKey], equals: true },
+        },
+      })
+    : null;
   const writes: CellWrite[] = [
     { rowId: row.id, columnKey: cols["Items"], value: num(cols["Items"]) + totals.items },
-    ...(typeof totals.qualified === "number"
-      ? [{ rowId: row.id, columnKey: cols["Qualified"], value: num(cols["Qualified"]) + totals.qualified }]
-      : []),
+    ...(derivedQualified !== null
+      ? [{ rowId: row.id, columnKey: cols["Qualified"], value: derivedQualified }]
+      : typeof totals.qualified === "number"
+        ? [{ rowId: row.id, columnKey: cols["Qualified"], value: num(cols["Qualified"]) + totals.qualified }]
+        : []),
     ...(typeof totals.tokens === "number"
       ? [{ rowId: row.id, columnKey: cols["Tokens"], value: num(cols["Tokens"]) + totals.tokens }]
       : []),

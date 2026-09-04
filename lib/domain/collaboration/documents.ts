@@ -261,12 +261,26 @@ export async function storeCollaborationYDocState(
       },
     });
 
+    // MERGE over the existing metadata, never replace it (owner bug
+    // 2026-09-04: an editor save wiped a charter's `charter` mark and
+    // would equally destroy `masterLedgerId` (D10), a quest log's
+    // `runLedgerKey`/`ledgerMarkdown`/`captureConfig`/`questInfo`, or any
+    // other durable key — this hook only OWNS the derived-stats keys).
+    const existingPayload = await tx.notePayload.findUnique({
+      where: { contentId },
+      select: { metadata: true },
+    });
+    const priorMeta =
+      existingPayload?.metadata && typeof existingPayload.metadata === "object"
+        ? (existingPayload.metadata as Record<string, unknown>)
+        : {};
     await tx.notePayload.update({
       where: { contentId },
       data: {
         tiptapJson: snapshot,
         searchText,
         metadata: {
+          ...priorMeta,
           wordCount,
           characterCount: searchText.length,
           readingTime: Math.ceil(wordCount / 200),

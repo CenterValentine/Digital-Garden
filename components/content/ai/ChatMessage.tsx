@@ -2782,7 +2782,7 @@ function ApprovalRawJson({ args }: { args: unknown }) {
   if (!json) return null;
   return (
     <details className="mx-3 mb-2">
-      <summary className="cursor-pointer text-[10.5px] text-gray-500 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 select-none">
+      <summary className="cursor-pointer text-[10.5px] text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 select-none">
         Raw JSON
       </summary>
       <pre className="mt-1 max-h-40 overflow-auto rounded-md bg-black/[0.04] dark:bg-white/[0.05] px-2 py-1.5 text-[11px] leading-snug whitespace-pre-wrap break-words text-gray-600 dark:text-gray-400">
@@ -2821,10 +2821,10 @@ function ApprovalFieldRows({ fields }: { fields: Array<[string, string]> }) {
     <div className="mx-3 mb-1.5 space-y-0.5">
       {fields.map(([label, value]) => (
         <div key={label} className="flex gap-2 text-[11px]">
-          <span className="shrink-0 w-28 text-gray-500 dark:text-gray-500">
+          <span className="shrink-0 w-28 text-gray-500 dark:text-gray-400">
             {label}
           </span>
-          <span className="min-w-0 break-words text-gray-700 dark:text-gray-300">
+          <span className="min-w-0 break-words text-gray-700 dark:text-gray-200">
             {value}
           </span>
         </div>
@@ -3003,7 +3003,7 @@ function ApprovalPreview({
               </div>
             )}
             {capture.dedupeColumn && (
-              <div className="mt-0.5 text-[11px] text-gray-500 dark:text-gray-500">
+              <div className="mt-0.5 text-[11px] text-gray-500 dark:text-gray-400">
                 Identity: {capture.dedupeColumn}
               </div>
             )}
@@ -3016,10 +3016,10 @@ function ApprovalPreview({
                 key={idx}
                 className="flex items-baseline gap-1.5 text-[11px] leading-relaxed"
               >
-                <span className="shrink-0 text-gray-400 dark:text-gray-600">
+                <span className="shrink-0 text-gray-400 dark:text-gray-500">
                   {idx + 1}.
                 </span>
-                <span className="truncate text-gray-700 dark:text-gray-300">
+                <span className="truncate text-gray-700 dark:text-gray-200">
                   {it.label ?? it.url ?? "item"}
                 </span>
               </div>

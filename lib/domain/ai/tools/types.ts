@@ -60,6 +60,19 @@ export interface ToolExecuteContext {
     cachedInput?: number;
   };
   /**
+   * Usage from the turn's EARLIER segments (approval continuations start a
+   * fresh request whose `runTokens` begins at zero; the prior segments ride
+   * the trailing assistant message's metadata). Stamps that mean "this
+   * turn" must add this to `runTokens` or they report only the final
+   * segment (~27x under on the first production sitting).
+   */
+  priorTurnUsage?: {
+    total: number;
+    input?: number;
+    output?: number;
+    cachedInput?: number;
+  };
+  /**
    * The resolved model actually serving this request (bare id + vendor).
    * Cost metering: ledger stamps price `runTokens` with this identity.
    */

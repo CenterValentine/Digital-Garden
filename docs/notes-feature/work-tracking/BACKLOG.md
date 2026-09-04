@@ -10,6 +10,10 @@ last_updated: 2026-08-29
 
 ---
 
+## Quest master ledger under-counts sitting tokens (2026-09-04, first production quest)
+
+- [x] **FIXED same day (`chore/release-tail`)**: the route now sums the turn's earlier segments (riding the trailing assistant message's `metadata.segments`) into `ctx.priorTurnUsage`; `turnTokensSoFar()` + `estimateRunCostUsd()` stamp turn-cumulative numbers at every checkpoint and at `closeSitting`. Residual caveat: prior segments are priced at the current executed model, so mixed-model turns carry an estimate — which is all the stamp ever claimed.
+
 ## Workspace layout: multi-tab last-writer-wins reverts D+D (2026-09-04; owner repro; lands with layout-intent "P4 live fan-in")
 
 Owner report during the Release-4 smoke: split-pane tab D+D "repeatedly regressed/ignored" on dev; prod unaffected; hard refresh helps. Diagnosed, not fixed (the fix IS the planned live fan-in phase, not a drive-by):

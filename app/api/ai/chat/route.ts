@@ -1236,6 +1236,32 @@ export async function POST(request: Request) {
       // Run Ledger. Input/output split added by cost metering so ledger
       // stamps can carry a $ estimate (totals alone can't be priced).
       const runTokenCounter = { total: 0, input: 0, output: 0, cachedInput: 0 };
+      // Turn-cumulative usage (BACKLOG 2026-09-04): an approval continuation
+      // is a NEW request whose accumulator starts at zero, but the turn's
+      // earlier segments ride back in on the trailing assistant message's
+      // metadata. Summing them lets sitting/ledger stamps report the TURN —
+      // the first production sitting stamped 25.8k of an actual 698.9k
+      // (final segment only, ~27x under).
+      const priorTurnUsage = { total: 0, input: 0, output: 0, cachedInput: 0 };
+      {
+        const last = messages[messages.length - 1] as
+          | {
+              role?: string;
+              metadata?: { segments?: Array<{ usage?: Record<string, unknown> }> };
+            }
+          | undefined;
+        if (last?.role === "assistant") {
+          const num = (v: unknown) =>
+            typeof v === "number" && Number.isFinite(v) ? v : 0;
+          for (const seg of last.metadata?.segments ?? []) {
+            const u = (seg?.usage ?? {}) as Record<string, unknown>;
+            priorTurnUsage.total += num(u.totalTokens);
+            priorTurnUsage.input += num(u.inputTokens);
+            priorTurnUsage.output += num(u.outputTokens);
+            priorTurnUsage.cachedInput += num(u.cachedInputTokens);
+          }
+        }
+      }
       // Per-request step tracker (self-describing turns): onStepFinish counts
       // steps and records bounded summaries; messageMetadata stamps them into
       // the turn's segment record so the persisted row can say how close the
@@ -1256,6 +1282,7 @@ export async function POST(request: Request) {
       const toolCtx = {
         userId: session.user.id,
         runTokens: runTokenCounter,
+        priorTurnUsage,
         // Filled in AFTER playbook resolution below (tools close over this
         // object, so a later property assignment is visible at execute time).
         activeCharter: undefined as { contentId: string; title: string } | undefined,
