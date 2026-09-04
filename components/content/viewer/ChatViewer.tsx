@@ -20,7 +20,7 @@ import {
 import { computeModelRouteDecorations } from "@/lib/domain/ai/model-directive";
 import { findIterationFoldBoundary } from "@/lib/domain/ai/context-diet";
 import { aggregateSessionUsage } from "@/lib/features/ai-connections/usage/pricing";
-import { ModelPinToggle } from "../ai/ModelPinToggle";
+import { ChatControlPanel } from "../ai/ChatControlPanel";
 
 /** Compact token formatting for the header meter (v3.1 R5). */
 function formatTokenCount(n: number): string {
@@ -34,7 +34,6 @@ import { FolderContextChips } from "@/components/content/ai/FolderContextChips";
 import { FollowUpsStrip } from "../ai/FollowUpsStrip";
 import { ChatErrorBanner } from "../ai/ChatErrorBanner";
 import { MakeAndModelPicker } from "../ai/MakeAndModelPicker";
-import { ChatContextPicker } from "../ai/ChatContextPicker";
 import { AssociatedContentChips } from "../ai/AssociatedContentChips";
 import { useConversationEngine } from "@/lib/domain/ai/use-conversation-engine";
 import {
@@ -987,11 +986,21 @@ function ChatViewerInner({
               disabled={isActive}
               contributors={mixed.contributors as AIProviderId[]}
             />
-            <ModelPinToggle pinned={modelPinned} onToggle={setModelPinned} />
-            <ChatContextPicker
-              value={activeContextId}
-              onChange={handleContextChange}
-              disabled={isActive}
+            {/* AI 3.8: pin + context moved into the labeled control panel. */}
+            <ChatControlPanel
+              targetFolder={targetFolder}
+              targetInherited={targetInherited}
+              targetLocation={initialTargetLocation}
+              onTargetChange={handleTargetChange}
+              targetDisabled={!conversationId}
+              outputTarget={outputTarget}
+              onOutputTargetChange={setOutputTarget}
+              hasOrigin={false}
+              modelPinned={modelPinned}
+              onModelPinnedChange={setModelPinned}
+              activeContextId={activeContextId}
+              onContextChange={handleContextChange}
+              busy={isActive}
             />
           </div>
         }

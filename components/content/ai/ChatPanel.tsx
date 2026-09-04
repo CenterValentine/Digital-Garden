@@ -32,7 +32,7 @@ import {
   ModelSwitchDivider,
   ModelRouteNotices,
 } from "./ModelSwitchDivider";
-import { ModelPinToggle } from "./ModelPinToggle";
+import { ChatControlPanel } from "./ChatControlPanel";
 import { computeModelRouteDecorations } from "@/lib/domain/ai/model-directive";
 import { findIterationFoldBoundary } from "@/lib/domain/ai/context-diet";
 import { aggregateSessionUsage } from "@/lib/features/ai-connections/usage/pricing";
@@ -45,7 +45,6 @@ import { FolderContextChips } from "@/components/content/ai/FolderContextChips";
 import { FollowUpsStrip } from "./FollowUpsStrip";
 import { ChatErrorBanner } from "./ChatErrorBanner";
 import { MakeAndModelPicker } from "./MakeAndModelPicker";
-import { ChatContextPicker } from "./ChatContextPicker";
 import {
   useConversationEngine,
   type ClientEditOutcome,
@@ -1193,12 +1192,21 @@ export function ChatPanel({
               contributors={mixed.contributors as AIProviderId[]}
               compact
             />
-            <ModelPinToggle pinned={modelPinned} onToggle={setModelPinned} />
-            <ChatContextPicker
-              value={activeContextId}
-              onChange={handleContextChange}
-              disabled={isActive}
-              compact
+            {/* AI 3.8: pin + context moved into the labeled control panel —
+                the rail keeps only the model picker (condensed by design). */}
+            <ChatControlPanel
+              targetFolder={targetFolder}
+              targetInherited={targetInherited}
+              targetLocation={effectiveLocation}
+              onTargetChange={handleTargetChange}
+              outputTarget={outputTarget}
+              onOutputTargetChange={setOutputTarget}
+              hasOrigin={Boolean(contentId)}
+              modelPinned={modelPinned}
+              onModelPinnedChange={setModelPinned}
+              activeContextId={activeContextId}
+              onContextChange={handleContextChange}
+              busy={isActive}
             />
           </div>
         }
