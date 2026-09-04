@@ -39,6 +39,7 @@ import { aggregateSessionUsage } from "@/lib/features/ai-connections/usage/prici
 import { REVERT_SNAPSHOT_KEY } from "@/lib/domain/ai/compact-tool-outputs";
 import { TargetFolderChip } from "./TargetFolderChip";
 import { OutputTargetChip } from "./OutputTargetChip";
+import { deriveTargetSeed } from "@/lib/domain/ai/output-target";
 import { ChatInput } from "./ChatInput";
 import { FolderContextChips } from "@/components/content/ai/FolderContextChips";
 import { FollowUpsStrip } from "./FollowUpsStrip";
@@ -369,14 +370,14 @@ export function ChatPanel({
 
   const effectiveLocation = initialTargetLocation ?? locationFallback;
   useEffect(() => {
-    if (initialTargetFolder) {
-      setTargetFolder(initialTargetFolder);
-      setTargetInherited(initialTargetInherited);
-    } else if (effectiveLocation) {
-      // No explicit target: inherit the chat's location instead of
-      // rendering blank.
-      setTargetFolder(effectiveLocation);
-      setTargetInherited(true);
+    const seed = deriveTargetSeed({
+      explicit: initialTargetFolder,
+      explicitInherited: initialTargetInherited,
+      location: effectiveLocation,
+    });
+    if (seed.target) {
+      setTargetFolder(seed.target);
+      setTargetInherited(seed.inherited);
     } else if (isPanelEmbed) {
       // Browser panel: no conversation and nothing to inherit from, so fall
       // back to the last target the user picked here. Browser chats aren't

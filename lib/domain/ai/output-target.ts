@@ -194,3 +194,31 @@ export function renderOutputTargetInstruction(target: OutputTarget): string {
     "Use parentId only for a specifically resolved folder UUID. Otherwise omit both placement fields — do not substitute the active file's parent, the operating-context folder, or another inferred location."
   );
 }
+
+// ── Target-folder chip seed (AI 3.8 fix sprint) ───────────────────────────
+
+export interface TargetSeed {
+  target: { id: string; title: string | null } | null;
+  inherited: boolean;
+}
+
+/**
+ * Single-source seed for the target-folder chip: an explicit target wins;
+ * otherwise the chat's LOCATION is inherited. ChatPanel and the full-page
+ * ChatViewer both derive through this, so expand-to-full-view can never
+ * drop an inherited chip again (the viewer used to seed only from the
+ * persisted target and rendered blank where the panel showed inheritance).
+ */
+export function deriveTargetSeed(input: {
+  explicit: { id: string; title: string | null } | null;
+  explicitInherited: boolean;
+  location: { id: string; title: string | null } | null;
+}): TargetSeed {
+  if (input.explicit) {
+    return { target: input.explicit, inherited: input.explicitInherited };
+  }
+  if (input.location) {
+    return { target: input.location, inherited: true };
+  }
+  return { target: null, inherited: false };
+}

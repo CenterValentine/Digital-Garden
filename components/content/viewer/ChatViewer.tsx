@@ -28,6 +28,7 @@ function formatTokenCount(n: number): string {
 }
 import { TargetFolderChip } from "../ai/TargetFolderChip";
 import { OutputTargetChip } from "../ai/OutputTargetChip";
+import { deriveTargetSeed } from "@/lib/domain/ai/output-target";
 import { ChatInput } from "../ai/ChatInput";
 import { FolderContextChips } from "@/components/content/ai/FolderContextChips";
 import { FollowUpsStrip } from "../ai/FollowUpsStrip";
@@ -331,9 +332,17 @@ function ChatViewerInner({
   } | null>(null);
   const [targetInherited, setTargetInherited] = useState(false);
   useEffect(() => {
-    setTargetFolder(initialTargetFolder);
-    setTargetInherited(initialTargetInherited);
-  }, [initialTargetFolder, initialTargetInherited]);
+    // Single-source with ChatPanel (AI 3.8 fix): no explicit target
+    // inherits the chat's location, so expanding a panel chat to full
+    // view keeps the inherited chip instead of dropping it.
+    const seed = deriveTargetSeed({
+      explicit: initialTargetFolder,
+      explicitInherited: initialTargetInherited,
+      location: initialTargetLocation,
+    });
+    setTargetFolder(seed.target);
+    setTargetInherited(seed.inherited);
+  }, [initialTargetFolder, initialTargetInherited, initialTargetLocation]);
   const handleTargetChange = useCallback(
     (next: { id: string; title: string | null } | null) => {
       if (next) {
