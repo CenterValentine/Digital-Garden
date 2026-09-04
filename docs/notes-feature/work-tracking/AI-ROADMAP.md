@@ -25,7 +25,7 @@ authoritative category map is an enhancement, not a blocker.
 
 ## Planned (owner-ordered 2026-07-25)
 
-### 3.6 — Playbook completeness  ← BUILT (pre-PR, branch `feat/ai-v3.6-playbook-completeness`)
+### 3.6 — Playbook completeness  ← SHIPPED (verified on main 2026-09-04: `charters/render.ts` carries the v3.6 lossless upgrade, DELETE unmark route live; the pre-PR branch was folded in and no longer exists)
 Scope correction from the original T3-deferral list: the **SKILL.md import
 adapter already shipped with T3** (`playbooks/import/skill-md.ts` +
 `ImportSkillDialog`) and is **already lossless on the way in** — `markdownToTiptap`
@@ -56,7 +56,15 @@ was rewired to `markdownToTiptapRich` in T2. So 3.6 reduced to two real items:
   /api/content/playbooks/mark?contentId=…` + `stripPlaybookMetadata` (idempotent,
   preserves other metadata); mark/edit reuse the idempotent POST upsert.
 
-### 3.7 — Resource governance
+### 3.7 — Resource governance  ← LARGELY SUPERSEDED BY JUDGMENT (2026-09-04)
+**The enforcement centerpiece (token/step caps, decrement + stop) was
+deliberately NOT built** — owner + judgment recorded in
+EXTRACTION-TO-DATABASE-PLAN §9.2: the existing item caps / batch checkpoints /
+step caps ARE the graceful budgets, and §9.1's production measurements show
+them working. Remaining rows re-scoped: sub-agent isolation → rides the P6
+deferred-batch runner (structurally free there); loop guards + effort
+allocation → revisit only if real usage produces the failure mode. Build
+token caps only if a runaway appears that the existing caps miss.
 The **enforcement** half of agentic discipline (we shipped the observability —
 token meter, Run Ledger, `phase_checkpoint` — not the enforcement). From
 [AGENTIC-RESOURCE-DISCIPLINE.md](../guides/ai/AGENTIC-RESOURCE-DISCIPLINE.md)
@@ -67,7 +75,7 @@ governance" from the resource-discipline doc — NOT the v3.2 "T4" (resumable
 streams, shipped as 3.3). Its per-run compaction sub-item stays backlogged with
 R5b (same machinery).
 
-### ~3.8 — Chat control panel + chat-surface fixes  (right before T6)
+### ~3.8 — Chat control panel + chat-surface fixes  ← BUILT (2026-09-04, branch `feat/ai-v38-control-panel`: ChatControlPanel hosts file-target/output-target/model-pin/context with labels, Feather context icon, rail condensed to the model picker; deriveTargetSeed single-sources the inherited-target chip across ChatPanel/ChatViewer so expand is loss-less)
 Two sprints, one milestone:
 - **Control panel** — one panel hosting the file-target, output-target, and
   pin-model affordances **with real labels** (the footer rail has no room
