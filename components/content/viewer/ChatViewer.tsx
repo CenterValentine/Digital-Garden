@@ -596,6 +596,17 @@ function ChatViewerInner({
     () => aggregateSessionUsage(messages),
     [messages],
   );
+  const charterAttached = useMemo(
+    () =>
+      messages.some(
+        (m) =>
+          m.role === "user" &&
+          (m.parts ?? []).some(
+            (p) => (p as { type?: string }).type === "data-charter",
+          ),
+      ),
+    [messages],
+  );
 
   // Mid-run review (v3.1 R1): the run counts as "active" while streaming
   // AND while parked on an unanswered approval (the stream has ended but
@@ -881,6 +892,7 @@ function ChatViewerInner({
                     messageIndex={i}
                     foldBoundary={iterationFoldBoundary}
                     sessionUsage={sessionUsage}
+                    charterAttached={charterAttached}
                     providerId={stamp.providerId}
                     modelId={stamp.modelId}
                     isStreaming={

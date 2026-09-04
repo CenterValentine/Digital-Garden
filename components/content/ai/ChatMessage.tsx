@@ -276,6 +276,14 @@ interface ChatMessageProps {
    */
   sessionUsage?: SessionUsage | null;
   /**
+   * Whether ANY user message in this chat attached a charter — powers the
+   * pre-approval warning on quest-declaring proposal cards (owner hit the
+   * missing-charter foot-gun three runs straight; the card is the last
+   * cheap moment to catch it). undefined = surface doesn't know: no
+   * warning, no false positives.
+   */
+  charterAttached?: boolean;
+  /**
    * True when this streaming message is a resumed stream (reload / second
    * tab), so the buffered flood settles in full instead of re-typing
    * already-generated content (AI 3.3). Inert unless `isStreaming`.
@@ -396,6 +404,7 @@ export const ChatMessage = memo(function ChatMessage({
   messageIndex,
   foldBoundary = null,
   sessionUsage = null,
+  charterAttached,
   resumedStream = false,
   providerId,
   modelId,
@@ -1257,6 +1266,7 @@ export const ChatMessage = memo(function ChatMessage({
                   key={i}
                   toolName={toolPart.toolName}
                   args={toolPart.input}
+                  charterAttached={charterAttached}
                   approvalId={toolPart.approvalId}
                   onRespond={
                     approvalActionable ? onToolApprovalResponse : undefined
@@ -3055,6 +3065,7 @@ function ToolApprovalCard({
   approvalId,
   onRespond,
   expired = false,
+  charterAttached,
 }: {
   toolName: string;
   args: unknown;
@@ -3066,6 +3077,7 @@ function ToolApprovalCard({
   }) => void;
   /** Stale pause (message superseded) — render status, not buttons. */
   expired?: boolean;
+  charterAttached?: boolean;
 }) {
   const [responded, setResponded] = useState<"approved" | "rejected" | null>(
     null,
@@ -3087,6 +3099,23 @@ function ToolApprovalCard({
         </span>
       </div>
       <ApprovalPreview toolName={toolName} args={args} />
+      {/* Pre-approval charter guard (owner foot-gun, hit three runs
+          straight): a quest declared with NO charter attached runs as a
+          legacy pass — no quest ledger, no dedup — and the model can only
+          disclose that AFTER approval. Warn at the consent moment. */}
+      {toolName === "propose_item_iteration" &&
+        charterAttached === false &&
+        typeof (args as { quest?: unknown } | null)?.quest === "string" && (
+          <div className="mx-3 mb-1.5 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-[11px] leading-snug text-amber-800 dark:text-amber-300">
+            <span className="font-semibold">
+              No charter is attached to this chat
+            </span>{" "}
+            — the &ldquo;{String((args as { quest?: unknown }).quest)}&rdquo;
+            quest will NOT be engaged: no quest-ledger writes, no
+            cross-sitting dedup. Reject, attach the charter with /charter,
+            and re-send — or approve to run charter-less.
+          </div>
+        )}
       {expired ? (
         <div className="px-3 pb-2 text-[11px] text-gray-500 dark:text-gray-400">
           Expired — this action never ran. Ask again if it&apos;s still wanted.

@@ -969,6 +969,19 @@ export function ChatPanel({
     () => aggregateSessionUsage(messages),
     [messages],
   );
+  // Any user message carrying a charter attachment — powers the proposal
+  // card's pre-approval "no charter attached" warning.
+  const charterAttached = useMemo(
+    () =>
+      messages.some(
+        (m) =>
+          m.role === "user" &&
+          (m.parts ?? []).some(
+            (p) => (p as { type?: string }).type === "data-charter",
+          ),
+      ),
+    [messages],
+  );
 
   // Surface follows the *active* provider — selecting OpenAI tints
   // immediately even if previous messages were from Claude. Per-message
@@ -1091,6 +1104,7 @@ export function ChatPanel({
                   messageIndex={i}
                   foldBoundary={iterationFoldBoundary}
                   sessionUsage={sessionUsage}
+                  charterAttached={charterAttached}
                   providerId={stamp.providerId}
                   modelId={stamp.modelId}
                   isStreaming={
