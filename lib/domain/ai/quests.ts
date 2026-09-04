@@ -333,6 +333,13 @@ export async function ensureQuest(input: {
   targetFolderId: string | null;
   outputTableId?: string;
   questLogId?: string;
+  /**
+   * AI-sculpted ledger columns (§3.6): shaped per matter at CREATION only —
+   * a scoring task adds its criteria, a collection task adds none. Merged
+   * after the machinery core; names colliding with core columns are
+   * dropped. Ignored when continuing an existing quest.
+   */
+  extraColumns?: Array<{ name: string; type: string; description: string }>;
 }): Promise<{
   questRowId: string;
   questLedgerId: string;
@@ -381,13 +388,25 @@ export async function ensureQuest(input: {
     return { questRowId: existing.id, questLedgerId: ledgerId, continued: true };
   }
 
-  // Create: quest ledger (machinery core, D6 Map icon) + master row.
+  // Create: quest ledger (machinery core + sculpted columns, D6 Map icon)
+  // + master row.
+  const coreNames = new Set(
+    QUEST_LEDGER_COLUMNS.map((c) => c.name.toLowerCase()),
+  );
+  const sculpted = (input.extraColumns ?? [])
+    .filter((c) => c.name.trim() && !coreNames.has(c.name.trim().toLowerCase()))
+    .slice(0, 8)
+    .map((c) => ({
+      name: c.name.trim().slice(0, 60),
+      type: c.type,
+      description: c.description.trim().slice(0, 300),
+    }));
   const questLedgerId = await createSystemTable({
     userId,
     title: `${label} — Quest Ledger`,
     parentId: input.targetFolderId,
     icon: "lucide:Map",
-    columns: QUEST_LEDGER_COLUMNS,
+    columns: [...QUEST_LEDGER_COLUMNS, ...sculpted],
   });
   const today = new Date().toISOString().slice(0, 10);
   const [questRowId] = await createRows(masterId, await liveColumns(masterId), 1, userId);
@@ -431,6 +450,12 @@ export async function recordQuestItem(input: {
     qualified?: boolean;
     verdict?: string;
     outputRowId?: string;
+    /**
+     * Values for SCULPTED ledger columns (name → value) — resolved through
+     * the quest's column map; unknown names are skipped, and the cell
+     * encoder inside writeCells still validates every value.
+     */
+    extraCells?: Record<string, unknown>;
   };
 }): Promise<{ rowId: string; updated: boolean } | null> {
   const { quest, item } = input;
@@ -467,6 +492,12 @@ export async function recordQuestItem(input: {
     ...(item.verdict ? [{ rowId, columnKey: cols["Verdict"], value: item.verdict.slice(0, 2000) }] : []),
     ...(item.outputRowId ? [{ rowId, columnKey: cols["Output row"], value: item.outputRowId }] : []),
     { rowId, columnKey: cols["Sitting"], value: quest.sittingId },
+    ...(item.extraCells
+      ? Object.entries(item.extraCells).flatMap(([name, value]) => {
+          const key = cols[name];
+          return key ? [{ rowId, columnKey: key, value }] : [];
+        })
+      : []),
   ] as CellWrite[];
   const result = await writeCells(
     quest.questLedgerId,

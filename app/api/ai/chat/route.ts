@@ -32,6 +32,7 @@ import { isResumableConfigured } from "@/lib/domain/ai/resumable/redis";
 import { getStreamContext } from "@/lib/domain/ai/resumable/context";
 import {
   associateStream,
+  clearActiveStream,
   getActiveStreamId,
 } from "@/lib/domain/ai/resumable/association";
 import type { JSONContent } from "@tiptap/core";
@@ -2574,6 +2575,18 @@ export async function POST(request: Request) {
         originalMessages: repairedMessages,
         sendReasoning: true,
         onFinish: async ({ responseMessage, isAborted }) => {
+          // Phantom-resume guard (owner smoke 2026-09-04): the turn is over
+          // on EVERY path through here — clear the resumable association so
+          // later visits never re-attach to a stream with no live writer
+          // (a Stopped turn's buffer has no completion marker; attaching to
+          // it hangs the client in "thinking" until the key's 1h TTL).
+          if (resumableStreamId && conversationIdForAssoc) {
+            void clearActiveStream(
+              session.user.id,
+              conversationIdForAssoc,
+              resumableStreamId,
+            );
+          }
           // Server-side turn persistence + approval notification (S1). Only
           // turns bound to a Conversation entity persist here; ephemeral
           // surfaces keep their existing client-side persist path.

@@ -32,9 +32,11 @@ import {
 } from "@/lib/domain/ai/run-ledger";
 import {
   captureUpsertRow,
+  enumerateCaptureRows,
   parseCaptureConfig,
   preflightCapture,
 } from "@/lib/domain/data/server/capture";
+import { createColumn } from "@/lib/domain/data/server/mutations";
 import {
   closeSitting,
   ensureMasterLedger,
@@ -507,7 +509,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
     // engine enforces the item budget the same way it enforces page budget.
     propose_item_iteration: tool({
       description:
-        "Propose a BOUNDED per-item iteration for the user to approve BEFORE processing: apply an analysis (usually an attached charter) to EACH item in an enumerated set — jobs on a board (from collect), the user's open tabs (from list_tabs), or given URLs. " +
+        "Propose a BOUNDED per-item iteration for the user to approve BEFORE processing: apply an analysis (usually an attached charter) to EACH item in an enumerated set — jobs on a board (from collect), the user's open tabs (from list_tabs), given URLs, or EXISTING DATABASE ROWS (source \"database-rows\": a refinement/investigation pass over captured leads — the server enumerates the rows of captureTo.database as the items, and capture.cells stamp back to each row in place). " +
         "Enumerate FIRST, then propose with the item list. On approval you receive an item budget, a ledger checklist (one row per item), and stable item keys. Process items IN ORDER, one at a time, recording EVERY item with record_item_result; finish with record_iteration_findings (quest-less runs also write a roll-up note first — quest runs never do). " +
         "Skip this tool for a single item — just run the analysis directly.",
       needsApproval: true,
@@ -518,8 +520,10 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           .max(400)
           .describe("What each item gets, in one sentence (e.g. \"score fit with the Job Fit charter; document >75% matches\")."),
         source: z
-          .enum(["list-page", "open-tabs", "urls"])
-          .describe("Where the items were enumerated from."),
+          .enum(["list-page", "open-tabs", "urls", "database-rows"])
+          .describe(
+            "Where the items were enumerated from. \"database-rows\" = a stage-2 pass over an existing table: requires captureTo (the table is both source and stamp-back target); omit items — the server enumerates rows itself (optionally narrowed by rowIds).",
+          ),
         items: z
           .array(
             z.object({
@@ -529,7 +533,15 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           )
           .min(1)
           .max(250)
-          .describe("The enumerated items, in processing order."),
+          .optional()
+          .describe("The enumerated items, in processing order. REQUIRED for every source except \"database-rows\" (where the server enumerates)."),
+        rowIds: z
+          .array(z.string().min(1).max(80))
+          .max(200)
+          .optional()
+          .describe(
+            "database-rows only: iterate exactly these rows, in this order (row ids from query_database). Omit to iterate the whole table in grid order (capped by itemCap).",
+          ),
         itemCap: z
           .number()
           .int()
@@ -598,8 +610,25 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           .describe(
             "The ongoing MATTER this run belongs to (continue-or-create): pass the quest's name when the user mentions a past matter to continue (\"my job hunt\") — the same quest across sittings shares one ledger and skips already-scored items. Omit for a brand-new matter (a quest is then created from the run's label).",
           ),
+        questColumns: z
+          .array(
+            z.object({
+              name: z.string().min(1).max(60),
+              type: z.enum(["text", "longText", "number", "url", "date", "checkbox"]),
+              description: z
+                .string()
+                .min(8)
+                .max(300)
+                .describe("What goes in it — same load-bearing context as every capture column."),
+            }),
+          )
+          .max(8)
+          .optional()
+          .describe(
+            "NEW quests only: extra ledger columns sculpted to this matter (a scoring task adds its criteria columns; a collection task adds none). The machinery core (Item/Status/Pass/Fit/Qualified/Verdict/…) always exists — never re-declare it. Write their values via questCells on record_item_result. Ignored when continuing an existing quest.",
+          ),
       }),
-      execute: async ({ objective, source, items, itemCap, batchSize, ledgerLabel, captureTo, quest: questArg }) => {
+      execute: async ({ objective, source, items, rowIds, itemCap, batchSize, ledgerLabel, captureTo, quest: questArg, questColumns }) => {
         const label = (ledgerLabel ?? objective).trim();
         let ledgerRunKey =
           "iterate:" +
@@ -608,33 +637,25 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             .replace(/[^a-z0-9]+/g, "-")
             .replace(/^-+|-+$/g, "")
             .slice(0, 60) || "items");
-        // Tiered stable key (spec Q2): the item's own URL when present (tier
-        // "url" — survives list re-renders/reshuffles), else a label slug (tier
-        // "label" — weaker; the tier is recorded so weak keys stay visible).
-        const seen = new Set<string>();
-        const normalized = items.map((it) => {
-          const base = it.url?.trim()
-            ? it.url.trim()
-            : it.label
-                .toLowerCase()
-                .replace(/[^a-z0-9]+/g, "-")
-                .replace(/^-+|-+$/g, "")
-                .slice(0, 80) || "item";
-          let key = base;
-          for (let n = 2; seen.has(key); n++) key = `${base}~${n}`;
-          seen.add(key);
+        // Source-shape guards (P3): a rows pass needs the table (it is both
+        // source and stamp-back target); every other source needs items.
+        const rowSourced = source === "database-rows";
+        if (rowSourced && !captureTo) {
           return {
-            key,
-            keyTier: it.url?.trim() ? ("url" as const) : ("label" as const),
-            label: it.label,
-            ...(it.url?.trim() ? { url: it.url.trim() } : {}),
+            ok: false,
+            refusal:
+              "source \"database-rows\" needs captureTo — the table is both the item source and the stamp-back target. Name the database in captureTo and re-propose.",
+            nextAction: "Re-propose with captureTo set. Do NOT start processing items.",
           };
-        });
-        const itemBudget = Math.min(itemCap, normalized.length);
-        // A batch cadence >= the whole run is a single batch — drop it so the
-        // client's batch-boundary gate never arms.
-        const effectiveBatchSize =
-          batchSize != null && batchSize < itemBudget ? batchSize : null;
+        }
+        if (!rowSourced && (!items || items.length === 0)) {
+          return {
+            ok: false,
+            refusal:
+              "No items given. Enumerate the items first, then propose with the list (items is required for every source except database-rows).",
+            nextAction: "Enumerate, then re-propose with items.",
+          };
+        }
 
         // ── Capture preflight (EXTRACTION-TO-DATABASE-PLAN P1) ──────────
         // Code-not-model schema check BEFORE any ledger write: a gap fails
@@ -642,8 +663,9 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         // the consent moment — grant the conversation association so
         // query/describe reach the table for the rest of this run, and
         // stamp the config into the ledger (the run's durable state).
+        // Runs before item normalization because database-rows enumerates
+        // FROM the capture table.
         let capture: Awaited<ReturnType<typeof preflightCapture>> | null = null;
-        const alreadyCapturedKeys: string[] = [];
         if (captureTo) {
           capture = await preflightCapture({
             ctx: {
@@ -651,6 +673,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
               contentId: ctx.contentId,
               boundContentId: ctx.boundContentId,
               conversationId: ctx.conversationId,
+              activeCharter: ctx.activeCharter,
             },
             database: captureTo.database,
             admission: captureTo.admission,
@@ -666,13 +689,6 @@ export function createBaseTools(ctx: ToolExecuteContext) {
                 "The capture target has a schema gap — fix what the refusal names (or drop captureTo) and re-propose. Do NOT start processing items.",
             };
           }
-          // Plan-time dedup: mark items whose identity already holds a row.
-          for (const n of normalized) {
-            const identity = (n.url ?? (n.keyTier === "url" ? n.key : "")).trim().toLowerCase();
-            if (identity && capture.dedupeValues.has(identity)) {
-              alreadyCapturedKeys.push(n.key);
-            }
-          }
           if (ctx.conversationId && capture.config) {
             await addAutoAssociation(
               ctx.userId,
@@ -682,13 +698,95 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             ).catch(() => null);
           }
         }
-        const alreadyCaptured = new Set(alreadyCapturedKeys);
         // Flat-result locals (non-strict tsconfig — unions don't narrow):
-        // config presence IS the "preflight passed" signal below.
-        const captureCfg = capture?.config ?? null;
+        // config presence IS the "preflight passed" signal below. rowKeyed
+        // rides the stamped config so record_item_result knows item keys
+        // are row ids (P3 stamp-back).
+        const captureCfg = capture?.config
+          ? rowSourced
+            ? { ...capture.config, rowKeyed: true }
+            : capture.config
+          : null;
         const captureVocab = capture?.optionVocab ?? {};
         const captureDescMissing = capture?.descriptionsMissing ?? [];
         const captureEmptyVocab = capture?.emptyVocabColumns ?? [];
+
+        // ── Item normalization ───────────────────────────────────────────
+        // Tiered stable key (spec Q2): row id when iterating database rows
+        // (tier "row" — the strongest; survives everything short of row
+        // deletion), else the item's own URL (tier "url" — survives list
+        // re-renders/reshuffles), else a label slug (tier "label" — weaker;
+        // the tier is recorded so weak keys stay visible).
+        type NormalizedItem = {
+          key: string;
+          keyTier: "url" | "label" | "row";
+          label: string;
+          url?: string;
+        };
+        let normalized: NormalizedItem[];
+        if (rowSourced) {
+          if (!captureCfg) {
+            return { ok: false, refusal: "Capture preflight did not resolve the table.", nextAction: "Re-propose." };
+          }
+          const enumerated = await enumerateCaptureRows({
+            userId: ctx.userId,
+            config: captureCfg,
+            rowIds,
+            limit: itemCap,
+          });
+          if (!enumerated.items) {
+            return {
+              ok: false,
+              refusal: enumerated.refusal ?? "Row enumeration failed.",
+              nextAction:
+                "Check the table (query_database) and re-propose — rowIds must be live row ids of the captureTo database.",
+            };
+          }
+          normalized = enumerated.items.map((r) => ({
+            key: r.rowId,
+            keyTier: "row" as const,
+            label: r.label,
+            ...(r.url ? { url: r.url } : {}),
+          }));
+        } else {
+          const seen = new Set<string>();
+          normalized = (items ?? []).map((it) => {
+            const base = it.url?.trim()
+              ? it.url.trim()
+              : it.label
+                  .toLowerCase()
+                  .replace(/[^a-z0-9]+/g, "-")
+                  .replace(/^-+|-+$/g, "")
+                  .slice(0, 80) || "item";
+            let key = base;
+            for (let n = 2; seen.has(key); n++) key = `${base}~${n}`;
+            seen.add(key);
+            return {
+              key,
+              keyTier: it.url?.trim() ? ("url" as const) : ("label" as const),
+              label: it.label,
+              ...(it.url?.trim() ? { url: it.url.trim() } : {}),
+            };
+          });
+        }
+        const itemBudget = Math.min(itemCap, normalized.length);
+        // A batch cadence >= the whole run is a single batch — drop it so the
+        // client's batch-boundary gate never arms.
+        const effectiveBatchSize =
+          batchSize != null && batchSize < itemBudget ? batchSize : null;
+
+        // Plan-time dedup: mark items whose identity already holds a row.
+        // Meaningless for row-sourced runs — every item IS a row already.
+        const alreadyCapturedKeys: string[] = [];
+        if (capture?.dedupeValues && !rowSourced) {
+          for (const n of normalized) {
+            const identity = (n.url ?? (n.keyTier === "url" ? n.key : "")).trim().toLowerCase();
+            if (identity && capture.dedupeValues.has(identity)) {
+              alreadyCapturedKeys.push(n.key);
+            }
+          }
+        }
+        const alreadyCaptured = new Set(alreadyCapturedKeys);
 
         // ── Quest binding (P4a, D5/D9/D10) — charter-scoped ─────────────
         // With a charter active, this run belongs to an ongoing MATTER:
@@ -719,6 +817,9 @@ export function createBaseTools(ctx: ToolExecuteContext) {
                 objective,
                 targetFolderId: master.charterParentId,
                 outputTableId: captureCfg?.tableId,
+                ...(questColumns && questColumns.length > 0
+                  ? { extraColumns: questColumns }
+                  : {}),
               });
               if (ensured) {
                 questContinued = ensured.continued;
@@ -915,7 +1016,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
                 ``
               : "") +
             (captureCfg
-              ? `CAPTURE IS ON: for every item that meets the admission rule (${captureCfg.admission}${captureCfg.admissionNote ? ` — ${captureCfg.admissionNote}` : ""}), include capture.cells in its record_item_result — column names ${captureCfg.columns.map((c) => c.name).join(", ")}; use the exact option labels provided. Items marked "already captured" in the checklist hold a row from an earlier sitting — you may skip re-reading them unless the user asked for a refresh. ` +
+              ? `CAPTURE IS ON: for every item that meets the admission rule (${captureCfg.admission}${captureCfg.admissionNote ? ` — ${captureCfg.admissionNote}` : ""}), include capture.cells in its record_item_result — column names ${captureCfg.columns.map((c) => c.name).join(", ")}; use the exact option labels provided. ${captureCfg.rowKeyed ? "This is a ROWS pass: each item's key IS its row id, and capture.cells UPDATE that row in place — no new rows are ever created (a vanished row rejects; record it without cells and move on). " : 'Items marked "already captured" in the checklist hold a row from an earlier sitting — you may skip re-reading them unless the user asked for a refresh. '}` +
                 (captureEmptyVocab.length > 0
                   ? `FIRST: ${captureEmptyVocab.join(", ")} ${captureEmptyVocab.length === 1 ? "has" : "have"} NO options yet — propose_column_options and wait for the user's Apply before any capture.cells, or every row will reject. `
                   : "") +
@@ -964,8 +1065,14 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           .describe(
             "Land this item as a database row — ONLY when the approved run declared captureTo AND this item meets its admission rule. The row upserts by the item's identity: a re-run updates, never duplicates.",
           ),
+        questCells: z
+          .record(z.string(), z.unknown())
+          .optional()
+          .describe(
+            "Quest runs with SCULPTED ledger columns: their values for this item (column name → value). Machinery fields (status/fit/qualified/verdict) are recorded automatically — never repeat them here.",
+          ),
       }),
-      execute: async ({ ledgerRunKey, itemKey, itemLabel, url, status, qualified, fitPercent, verdict, artifactTitle, capture }) => {
+      execute: async ({ ledgerRunKey, itemKey, itemLabel, url, status, qualified, fitPercent, verdict, artifactTitle, capture, questCells }) => {
         const placement = resolveToolOutputPlacement(ctx);
         if (!placement.parentId && !placement.ownedByNoteId) {
           return { ok: false, note: "No target folder set, so no ledger was written. Continue the run; reconcile in the roll-up." };
@@ -989,12 +1096,18 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           { runKey: ledgerRunKey, ownerContentId: placement.ownedByNoteId },
         );
 
+        // Row-keyed runs (P3 database-rows) stamp back to the row the item
+        // key names — read once here, used by both capture and the quest
+        // dual-write's key tier.
+        const runCaptureConfig = parseCaptureConfig(runState?.captureConfig);
+        const rowKeyedRun = runCaptureConfig?.rowKeyed === true;
+
         let captureNote = "";
         let capturedRowId: string | undefined;
         let capturedRowStatus: "created" | "updated" | undefined;
         let captureErrors: string[] | undefined;
         if (capture) {
-          const config = parseCaptureConfig(runState?.captureConfig);
+          const config = runCaptureConfig;
           if (!config) {
             captureNote =
               "capture ignored — this run has no approved captureTo config";
@@ -1009,7 +1122,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
               userId: ctx.userId,
               config,
               cells: capture.cells,
-              dedupeValue,
+              ...(rowKeyedRun ? { rowId: itemKey } : { dedupeValue }),
             });
             if (res.status === "rejected") {
               captureErrors = res.errors;
@@ -1031,19 +1144,32 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         if (questState && !sittingClosed) {
           try {
             const isUrlKey = /^https?:\/\//.test(itemKey);
+            // Ledger identity is the URL when available — CROSS-SOURCE
+            // continuity (owner smoke Run B, 2026-09-04): a rows pass keys
+            // items by row id, and using that as the ledger identity forked
+            // every item into a second row (8 rows for 4 items, Pass reset)
+            // instead of advancing the same trajectory. The tier records
+            // the identity actually used.
+            const ledgerItemKey = url?.trim() || itemKey;
             await recordQuestItem({
               userId: ctx.userId,
               quest: questState,
               item: {
-                key: itemKey,
+                key: ledgerItemKey,
                 label: itemLabel,
                 url: url?.trim() || (isUrlKey ? itemKey : undefined),
-                keyTier: isUrlKey ? "url" : "label",
+                keyTier:
+                  url?.trim() || isUrlKey
+                    ? "url"
+                    : rowKeyedRun
+                      ? "row"
+                      : "label",
                 status: captureErrors ? "capture-failed" : status,
                 fit: fitPercent,
                 qualified,
                 verdict,
                 outputRowId: capturedRowId,
+                ...(questCells ? { extraCells: questCells } : {}),
               },
             });
           } catch (error) {
@@ -1171,6 +1297,85 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             note: `Ledger write failed (${error instanceof Error ? error.message : "unknown"}). Checkpoint counted — continue the run.`,
             next: "Continue IMMEDIATELY with the next item.",
           };
+        }
+      },
+    }),
+    // D8 mid-flight single-column grace (EXTRACTION-TO-DATABASE-PLAN §3.6):
+    // the quest ledger is AI-sculpted, and its evolution mechanism is ONE
+    // column at a time, mid-run, ledger databases only — no card, but
+    // logged in the quest log so the change is always visible. Output
+    // tables are out of scope by design (they go through proposal cards).
+    add_quest_ledger_column: tool({
+      description:
+        "Mid-run schema grace (quest LEDGER only): add ONE column to the active quest's ledger when the matter turns out to need a field it lacks (a criterion that emerged from the pages). Never for output/capture tables — those change via propose_column_options or the user. One column per call; the addition is logged in the quest log. After adding, write its value for later items via questCells on record_item_result.",
+      inputSchema: z.object({
+        ledgerRunKey: z.string().min(1).describe("The ledgerRunKey of the ACTIVE quest run."),
+        name: z.string().min(1).max(60).describe("The new column's name."),
+        type: z.enum(["text", "longText", "number", "url", "date", "checkbox"]),
+        description: z
+          .string()
+          .min(8)
+          .max(300)
+          .describe("What goes in it — same load-bearing context as every capture column."),
+        reason: z.string().min(1).max(200).describe("One line: why this emerged mid-run (logged in the quest log)."),
+      }),
+      execute: async ({ ledgerRunKey, name, type, description, reason }) => {
+        const placement = resolveToolOutputPlacement(ctx);
+        const runState = await readRunLedgerCaptureConfig(
+          ctx.userId,
+          placement.parentId,
+          { runKey: ledgerRunKey, ownerContentId: placement.ownedByNoteId },
+        );
+        const questState = parseQuestInfo(runState?.questInfo);
+        if (!runState || !questState) {
+          return { ok: false, note: "No active quest on that run — mid-run column grace applies to quest ledgers only. For an output table, use propose_column_options or ask the user." };
+        }
+        if (questState.sittingClosed) {
+          return { ok: false, note: "This sitting is closed — propose a new run first." };
+        }
+        const trimmed = name.trim();
+        const cols = await tableColumnKeys(questState.questLedgerId);
+        if (Object.keys(cols).some((n) => n.toLowerCase() === trimmed.toLowerCase())) {
+          return { ok: false, note: `The ledger already has a "${trimmed}" column — write it via questCells on record_item_result instead.` };
+        }
+        try {
+          await createColumn(questState.questLedgerId, {
+            name: trimmed,
+            type,
+            description: description.trim(),
+          });
+          // Re-stamp questInfo with the refreshed column map — the per-item
+          // dual-write reads its map from the note's metadata, and a stale
+          // map would silently drop the new column's values.
+          const refreshed = await tableColumnKeys(questState.questLedgerId);
+          const newQuestInfo = { ...questState, ledgerCols: refreshed };
+          await upsertRunLedger(
+            ctx.userId,
+            placement.parentId,
+            {
+              phase: `Ledger column added: ${trimmed}`,
+              summary: `**Mid-run schema grace (D8):** added \`${trimmed}\` (${type}) to the quest ledger — ${reason.trim()}`,
+            },
+            {
+              runKey: ledgerRunKey,
+              ownerContentId: placement.ownedByNoteId,
+              questInfo: newQuestInfo,
+            },
+          );
+          return {
+            ok: true,
+            column: trimmed,
+            note: "Column added to the quest ledger and logged in the quest log.",
+            next: `Include "${trimmed}" in questCells on record_item_result from now on (earlier items keep blank cells unless the user asks for a backfill). Continue with the current item.`,
+          };
+        } catch (error) {
+          logger.warn({
+            layer: "ai",
+            event: "quests:add_column_caught",
+            summary: "D8 ledger column add failed",
+            error,
+          });
+          return { ok: false, note: "Adding the column failed — continue the run without it; the machinery core still records every item." };
         }
       },
     }),

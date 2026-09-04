@@ -35,6 +35,7 @@ import {
 import { ModelPinToggle } from "./ModelPinToggle";
 import { computeModelRouteDecorations } from "@/lib/domain/ai/model-directive";
 import { findIterationFoldBoundary } from "@/lib/domain/ai/context-diet";
+import { aggregateSessionUsage } from "@/lib/features/ai-connections/usage/pricing";
 import { REVERT_SNAPSHOT_KEY } from "@/lib/domain/ai/compact-tool-outputs";
 import { TargetFolderChip } from "./TargetFolderChip";
 import { OutputTargetChip } from "./OutputTargetChip";
@@ -962,6 +963,25 @@ export function ChatPanel({
     () => findIterationFoldBoundary(messages),
     [messages],
   );
+  // P3 owner ask: cumulative session usage for the avatar popover — each
+  // turn's numbers read in context of the whole chat.
+  const sessionUsage = useMemo(
+    () => aggregateSessionUsage(messages),
+    [messages],
+  );
+  // Any user message carrying a charter attachment — powers the proposal
+  // card's pre-approval "no charter attached" warning.
+  const charterAttached = useMemo(
+    () =>
+      messages.some(
+        (m) =>
+          m.role === "user" &&
+          (m.parts ?? []).some(
+            (p) => (p as { type?: string }).type === "data-charter",
+          ),
+      ),
+    [messages],
+  );
 
   // Surface follows the *active* provider — selecting OpenAI tints
   // immediately even if previous messages were from Claude. Per-message
@@ -1083,6 +1103,8 @@ export function ChatPanel({
                   message={message}
                   messageIndex={i}
                   foldBoundary={iterationFoldBoundary}
+                  sessionUsage={sessionUsage}
+                  charterAttached={charterAttached}
                   providerId={stamp.providerId}
                   modelId={stamp.modelId}
                   isStreaming={

@@ -40,7 +40,11 @@ import {
   writeBlockReason,
   type CaptureConfig,
 } from "@/lib/domain/data/capture-core";
-import type { DataColumn } from "@/lib/domain/data";
+import {
+  deriveRowTitle,
+  type DataColumn,
+  type RowData,
+} from "@/lib/domain/data";
 
 // Pure halves live in capture-core.ts (unit-tested by
 // scripts/validate-capture.ts without Prisma); re-exported so the AI layer
@@ -209,6 +213,78 @@ export async function preflightCapture(
   };
 }
 
+// ── Row enumeration (P3 — `source: "database-rows"`) ──────────────────────
+
+export interface CaptureRowItem {
+  rowId: string;
+  label: string;
+  url?: string;
+}
+
+/**
+ * Enumerate a capture table's rows as iteration items: key = row id (the
+ * strongest tier — survives everything short of deletion), label = the row's
+ * derived title, url = its url-column value when present. `rowIds` narrows
+ * AND orders the set (the model picks rows via query_database first);
+ * omitted = all live rows in grid order, capped by `limit`.
+ *
+ * Flat result (non-strict tsconfig — no union narrowing): `items` present
+ * on success, `refusal` on failure.
+ */
+export async function enumerateCaptureRows(input: {
+  userId: string;
+  config: CaptureConfig;
+  rowIds?: string[];
+  limit: number;
+}): Promise<{ items?: CaptureRowItem[]; refusal?: string }> {
+  const { userId, config } = input;
+  const table = await loadTable(config.tableId, userId);
+  if (!table) return { refusal: "Database not found." };
+  const live = table.columns.filter((c) => !c.deletedAt);
+  const urlColumn =
+    live.find((c) => c.key === config.dedupeColumnKey && c.type === "url") ??
+    live.find((c) => c.type === "url");
+
+  const rows = await prisma.dataRow.findMany({
+    where: {
+      tableId: config.tableId,
+      deletedAt: null,
+      ...(input.rowIds && input.rowIds.length > 0
+        ? { id: { in: input.rowIds } }
+        : {}),
+    },
+    orderBy: { sortKey: "asc" },
+    take: Math.max(1, Math.min(input.limit, 250)),
+    select: { id: true, data: true },
+  });
+  if (rows.length === 0) {
+    return {
+      refusal:
+        input.rowIds && input.rowIds.length > 0
+          ? "None of the given rowIds exist (live) in that database — re-check them with query_database and re-propose."
+          : `"${config.tableTitle}" has no rows to iterate.`,
+    };
+  }
+  // Preserve the model's explicit order when rowIds were given.
+  const ordered =
+    input.rowIds && input.rowIds.length > 0
+      ? input.rowIds
+          .map((id) => rows.find((r) => r.id === id))
+          .filter((r): r is (typeof rows)[number] => Boolean(r))
+      : rows;
+  return {
+    items: ordered.map((r) => {
+      const data = (r.data ?? {}) as Record<string, unknown>;
+      const url = urlColumn ? data[urlColumn.key] : undefined;
+      return {
+        rowId: r.id,
+        label: deriveRowTitle(live, data as RowData),
+        ...(typeof url === "string" && url ? { url } : {}),
+      };
+    }),
+  };
+}
+
 // ── Upsert (P2) ───────────────────────────────────────────────────────────
 
 export interface CaptureUpsertResult {
@@ -229,6 +305,12 @@ export async function captureUpsertRow(input: {
   cells: Record<string, unknown>;
   /** The item's stable identity (its url-tier key), for the dedupe column. */
   dedupeValue?: string;
+  /**
+   * Row-keyed stamp-back (P3 `database-rows`): the item's key IS this row —
+   * update it in place. Update-only: a vanished row rejects, never re-creates
+   * (creating would fork the identity the run enumerated from).
+   */
+  rowId?: string;
 }): Promise<CaptureUpsertResult> {
   const { userId, config } = input;
 
@@ -268,9 +350,24 @@ export async function captureUpsertRow(input: {
     };
   }
 
-  // Dedupe lookup: exact JSON match on the stored (trimmed) value.
   let existingRowId: string | undefined;
-  if (config.dedupeColumnKey && dedupeValue) {
+  if (input.rowId) {
+    // Row-keyed: verify the row is still live, then update in place.
+    const row = await prisma.dataRow.findFirst({
+      where: { id: input.rowId, tableId: config.tableId, deletedAt: null },
+      select: { id: true },
+    });
+    if (!row) {
+      return {
+        status: "rejected",
+        errors: [
+          `Row ${input.rowId} no longer exists in "${config.tableTitle}" — it may have been deleted since the run was proposed. Record the item without capture.cells and move on.`,
+        ],
+      };
+    }
+    existingRowId = row.id;
+  } else if (config.dedupeColumnKey && dedupeValue) {
+    // Dedupe lookup: exact JSON match on the stored (trimmed) value.
     const existing = await prisma.dataRow.findFirst({
       where: {
         tableId: config.tableId,

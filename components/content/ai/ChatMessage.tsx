@@ -56,6 +56,15 @@ import {
   ColumnOptionsProposalCard,
   type ColumnOptionsProposalPayload,
 } from "./ColumnOptionsProposalCard";
+import {
+  OutputDatabaseProposalCard,
+  type OutputDatabaseProposalPayload,
+} from "./OutputDatabaseProposalCard";
+import {
+  BatchGalleryCard,
+  type BatchGalleryGroup,
+  type BatchGalleryItem,
+} from "./BatchGalleryCard";
 import { FlashcardCardProposalList } from "./FlashcardCardProposalList";
 import { cn } from "@/lib/core/utils";
 import { calculateMenuPosition, type CalculatedPosition } from "@/lib/core/menu-positioning";
@@ -79,6 +88,7 @@ import {
   computeTurnCost,
   formatUsdEstimate,
   readPersistedCost,
+  type SessionUsage,
 } from "@/lib/features/ai-connections/usage/pricing";
 import { ReasoningRouter } from "./reasoning/ReasoningRouter";
 import { parseCharterMessageAttachment } from "@/lib/domain/ai/charters/message-binding";
@@ -260,6 +270,20 @@ interface ChatMessageProps {
   messageIndex?: number;
   foldBoundary?: { messageIdx: number; partIdx: number } | null;
   /**
+   * Cumulative session usage (all assistant turns so far, aggregated by the
+   * surface) — the avatar popover shows it beside the turn's own numbers so
+   * a large turn total reads in context (P3 owner ask, 2026-09-02).
+   */
+  sessionUsage?: SessionUsage | null;
+  /**
+   * Whether ANY user message in this chat attached a charter — powers the
+   * pre-approval warning on quest-declaring proposal cards (owner hit the
+   * missing-charter foot-gun three runs straight; the card is the last
+   * cheap moment to catch it). undefined = surface doesn't know: no
+   * warning, no false positives.
+   */
+  charterAttached?: boolean;
+  /**
    * True when this streaming message is a resumed stream (reload / second
    * tab), so the buffered flood settles in full instead of re-typing
    * already-generated content (AI 3.3). Inert unless `isStreaming`.
@@ -379,6 +403,8 @@ export const ChatMessage = memo(function ChatMessage({
   isStreaming = false,
   messageIndex,
   foldBoundary = null,
+  sessionUsage = null,
+  charterAttached,
   resumedStream = false,
   providerId,
   modelId,
@@ -575,6 +601,7 @@ export const ChatMessage = memo(function ChatMessage({
     deckProposals,
     deckWithCardsProposals,
     columnOptionsProposals,
+    outputDatabaseProposals,
     hasRunningTools,
   } = useMemo(() => {
     const images: ImagePayload[] = [];
@@ -587,6 +614,7 @@ export const ChatMessage = memo(function ChatMessage({
     const deckProps: DeckProposalPayload[] = [];
     const deckWithCardsProps: DeckWithCardsProposalPayload[] = [];
     const columnOptionsProps: ColumnOptionsProposalPayload[] = [];
+    const outputDbProps: OutputDatabaseProposalPayload[] = [];
     let running = false;
     const seenImageIds = new Set<string>();
     const seenAudioIds = new Set<string>();
@@ -640,6 +668,11 @@ export const ChatMessage = memo(function ChatMessage({
         const columnOptions = parseColumnOptionsProposal(tp.output);
         if (columnOptions) {
           columnOptionsProps.push(columnOptions);
+          continue;
+        }
+        const outputDb = parseOutputDatabaseProposal(tp.output);
+        if (outputDb) {
+          outputDbProps.push(outputDb);
         }
       }
     }
@@ -652,8 +685,147 @@ export const ChatMessage = memo(function ChatMessage({
       deckProposals: deckProps,
       deckWithCardsProposals: deckWithCardsProps,
       columnOptionsProposals: columnOptionsProps,
+      outputDatabaseProposals: outputDbProps,
       hasRunningTools: running,
     };
+  }, [message.parts]);
+
+  // §5 batch gallery (owner shape 2026-09-03): group each RECORDED batch
+  // into ONE card — an item gallery with per-item raw expansion. Anchors
+  // are durable, not the live fold boundary (owner smoke 2026-09-03: the
+  // boundary sits AT the checkpoint and vanishes when the run closes, so
+  // boundary-gated cards either never formed or un-collapsed at run end —
+  // condensation must be permanent). A batch docks at its checkpoint; the
+  // FINAL batch (which skips its checkpoint by design) docks at
+  // record_iteration_findings, anchored on its last recorded item. The
+  // in-flight batch stays live and loose until its anchor lands.
+  const batchGroups = useMemo(() => {
+    const parts = (message.parts ?? []) as Array<Record<string, unknown>>;
+    const roles = new Map<
+      number,
+      { kind: "member" } | { kind: "card"; group: BatchGalleryGroup }
+    >();
+    let pending: number[] = [];
+    let items: BatchGalleryItem[] = [];
+    let memberIdxs: number[] = [];
+    let lastRecordIdx: number | null = null;
+    for (let idx = 0; idx < parts.length; idx++) {
+      const p = parts[idx] ?? {};
+      const type = typeof p.type === "string" ? p.type : "";
+      const state = (p as { state?: string }).state;
+      if (type === "tool-record_item_result" && state === "output-available") {
+        const input = (p.input ?? {}) as Record<string, unknown>;
+        const output = (p.output ?? {}) as Record<string, unknown>;
+        items.push({
+          label:
+            typeof input.itemLabel === "string" && input.itemLabel
+              ? input.itemLabel
+              : String(input.itemKey ?? "item"),
+          ...(typeof input.url === "string" && input.url
+            ? { url: input.url }
+            : {}),
+          ...(typeof input.status === "string"
+            ? { status: input.status }
+            : {}),
+          ...(typeof input.fitPercent === "number"
+            ? { fitPercent: input.fitPercent }
+            : {}),
+          ...(typeof input.qualified === "boolean"
+            ? { qualified: input.qualified }
+            : {}),
+          ...(typeof input.verdict === "string" && input.verdict
+            ? { verdict: input.verdict }
+            : {}),
+          ...(output.rowStatus === "created" || output.rowStatus === "updated"
+            ? { rowStatus: output.rowStatus as "created" | "updated" }
+            : {}),
+          ...(Array.isArray(output.captureErrors) &&
+          output.captureErrors.length > 0
+            ? { captureFailed: true }
+            : {}),
+          rawParts: [...pending.map((j) => parts[j]), p],
+        });
+        memberIdxs.push(...pending, idx);
+        lastRecordIdx = idx;
+        pending = [];
+        continue;
+      }
+      if (
+        type === "tool-record_batch_checkpoint" &&
+        state === "output-available"
+      ) {
+        if (items.length > 0) {
+          const input = (p.input ?? {}) as Record<string, unknown>;
+          for (const m of memberIdxs) roles.set(m, { kind: "member" });
+          for (const j of pending) roles.set(j, { kind: "member" });
+          roles.set(idx, {
+            kind: "card",
+            group: {
+              batchNumber:
+                typeof input.batchNumber === "number"
+                  ? input.batchNumber
+                  : null,
+              itemsRecordedSoFar:
+                typeof input.itemsRecordedSoFar === "number"
+                  ? input.itemsRecordedSoFar
+                  : null,
+              batchSummary:
+                typeof input.batchSummary === "string"
+                  ? input.batchSummary
+                  : null,
+              items,
+            },
+          });
+        }
+        pending = [];
+        items = [];
+        memberIdxs = [];
+        lastRecordIdx = null;
+        continue;
+      }
+      // Run close: the FINAL batch skips its checkpoint by design, so the
+      // findings result is its dock anchor — the card lands on the last
+      // recorded item's index; the findings bubble itself stays visible.
+      if (
+        type === "tool-record_iteration_findings" &&
+        state === "output-available"
+      ) {
+        if (items.length > 0 && lastRecordIdx != null) {
+          const input = (p.input ?? {}) as Record<string, unknown>;
+          for (const m of memberIdxs) roles.set(m, { kind: "member" });
+          roles.set(lastRecordIdx, {
+            kind: "card",
+            group: {
+              batchNumber: null,
+              itemsRecordedSoFar: null,
+              batchSummary:
+                typeof input.resultSummary === "string"
+                  ? input.resultSummary
+                  : null,
+              items,
+            },
+          });
+        }
+        pending = [];
+        items = [];
+        memberIdxs = [];
+        lastRecordIdx = null;
+        continue;
+      }
+      // Only batch traffic is groupable: narration, reasoning, step marks
+      // and perception outputs between records belong to the NEXT item.
+      // Anything else (the proposal card, unrelated tool calls) renders
+      // normally and never disappears into a card.
+      if (
+        type === "text" ||
+        type === "reasoning" ||
+        type === "step-start" ||
+        shouldSupersedePart(p)
+      ) {
+        pending.push(idx);
+      }
+    }
+    return roles.size > 0 ? roles : null;
   }, [message.parts]);
 
   // Whether to show a persistent "still working" cue at the END of a streaming
@@ -774,6 +946,7 @@ export const ChatMessage = memo(function ChatMessage({
           metadata={
             (message as { metadata?: Record<string, unknown> }).metadata
           }
+          sessionUsage={sessionUsage}
         />
       )}
 
@@ -836,6 +1009,13 @@ export const ChatMessage = memo(function ChatMessage({
         <>
         {/* Render message parts (text runs pre-coalesced — see renderParts) */}
         {renderParts.map(({ key: i, part }) => {
+          // §5 batch gallery: parts grouped into a batch render as ONE
+          // card at the checkpoint's index; member parts render nothing.
+          const groupRole = batchGroups?.get(i);
+          if (groupRole?.kind === "member") return null;
+          if (groupRole?.kind === "card") {
+            return <BatchGalleryCard key={i} group={groupRole.group} />;
+          }
           // P4c: perception parts the model no longer sees (folded behind
           // the latest batch checkpoint) render collapsed — the default
           // view equals the retained context. Same rule as the server fold
@@ -1086,6 +1266,7 @@ export const ChatMessage = memo(function ChatMessage({
                   key={i}
                   toolName={toolPart.toolName}
                   args={toolPart.input}
+                  charterAttached={charterAttached}
                   approvalId={toolPart.approvalId}
                   onRespond={
                     approvalActionable ? onToolApprovalResponse : undefined
@@ -1101,6 +1282,7 @@ export const ChatMessage = memo(function ChatMessage({
               if (parseDeckProposal(toolPart.output) !== null) return null;
               if (parseDeckWithCardsProposal(toolPart.output) !== null) return null;
               if (parseColumnOptionsProposal(toolPart.output) !== null) return null;
+              if (parseOutputDatabaseProposal(toolPart.output) !== null) return null;
             }
 
             return (
@@ -1193,6 +1375,15 @@ export const ChatMessage = memo(function ChatMessage({
         {columnOptionsProposals.map((payload, i) => (
           <ColumnOptionsProposalCard
             key={`column-options-${i}`}
+            payload={payload}
+          />
+        ))}
+
+        {/* Output-database proposals (P5) — Apply creates the table via
+            POST /api/content/data; applied flag is content-keyed. */}
+        {outputDatabaseProposals.map((payload, i) => (
+          <OutputDatabaseProposalCard
+            key={`output-db-${i}`}
             payload={payload}
           />
         ))}
@@ -1944,10 +2135,12 @@ function AssistantAvatar({
   providerId,
   modelId,
   metadata,
+  sessionUsage,
 }: {
   providerId?: string | null;
   modelId?: string | null;
   metadata?: Record<string, unknown>;
+  sessionUsage?: SessionUsage | null;
 }) {
   // The avatar's own rect, captured on hover. This is the MEASURE-phase
   // anchor: the tooltip first renders here hidden so it can be measured, then
@@ -2178,6 +2371,38 @@ function AssistantAvatar({
                 )}
               </div>
             )}
+            {/* Session cumulative (P3 owner ask): the turn's numbers in
+                context of the whole chat — a big turn total reads as part
+                of a priced whole, not one alarming figure. */}
+            {sessionUsage && sessionUsage.turns > 1 && (
+              <div className="mt-1 border-t border-black/10 dark:border-white/10 pt-1 text-gray-500">
+                <span className="text-gray-500">session</span>{" "}
+                <span className="tabular-nums text-gray-700 dark:text-gray-300">
+                  {sessionUsage.turns} turns ·{" "}
+                  {(
+                    sessionUsage.inputTokens + sessionUsage.outputTokens
+                  ).toLocaleString()}{" "}
+                  tokens
+                </span>
+                {sessionUsage.totalUsd > 0 && (
+                  <span>
+                    {" "}
+                    <span className="text-gray-500">· est.</span>{" "}
+                    <span className="tabular-nums text-gray-700 dark:text-gray-300">
+                      {sessionUsage.totalUsd < 0.001
+                        ? "<$0.001"
+                        : formatUsdEstimate(sessionUsage.totalUsd)}
+                    </span>
+                    {sessionUsage.unpricedTurns > 0 && (
+                      <span className="text-gray-400 dark:text-gray-500">
+                        {" "}
+                        (+{sessionUsage.unpricedTurns} unpriced)
+                      </span>
+                    )}
+                  </span>
+                )}
+              </div>
+            )}
           </div>,
           document.body,
         )}
@@ -2243,6 +2468,23 @@ function parseNotePayload(result: unknown): NotePayload | null {
 }
 
 /** Parse a column-options proposal from a propose_column_options result. */
+function parseOutputDatabaseProposal(
+  result: unknown
+): OutputDatabaseProposalPayload | null {
+  if (result === undefined) return null;
+  const str = typeof result === "string" ? result : JSON.stringify(result);
+  if (!str.includes('"__outputDatabaseProposal"')) return null;
+  try {
+    const parsed = JSON.parse(str);
+    if (parsed.__outputDatabaseProposal) {
+      return parsed as OutputDatabaseProposalPayload;
+    }
+  } catch {
+    /* not valid JSON */
+  }
+  return null;
+}
+
 function parseColumnOptionsProposal(
   result: unknown
 ): ColumnOptionsProposalPayload | null {
@@ -2698,6 +2940,97 @@ function ApprovalPreview({
     );
   }
 
+  // Per-item iteration proposal (P3 owner ask): captureTo is the consent
+  // surface — approving this card IS the permission to write rows — so it
+  // renders first-class (database chip + admission rule), never buried in
+  // raw JSON while the generic fields show.
+  if (toolName === "propose_item_iteration") {
+    const items = Array.isArray(a.items)
+      ? (a.items as Array<{ label?: string; url?: string }>)
+      : [];
+    const capture = (
+      typeof a.captureTo === "object" && a.captureTo !== null
+        ? a.captureTo
+        : null
+    ) as {
+      database?: string;
+      admission?: string;
+      admissionNote?: string;
+      columns?: string[];
+      dedupeColumn?: string;
+    } | null;
+    const rowsPass = a.source === "database-rows";
+    const fields: Array<[string, string]> = [];
+    const objective = str("objective");
+    if (objective) fields.push(["Objective", objective]);
+    const quest = str("quest");
+    if (quest) fields.push(["Quest", quest]);
+    fields.push([
+      "Source",
+      rowsPass
+        ? "database rows — refinement pass, updates rows in place"
+        : String(a.source ?? "items"),
+    ]);
+    const cap = typeof a.itemCap === "number" ? a.itemCap : undefined;
+    const rowIdCount = Array.isArray(a.rowIds) ? a.rowIds.length : 0;
+    const count = rowsPass
+      ? rowIdCount > 0
+        ? String(rowIdCount)
+        : "all rows"
+      : String(items.length);
+    fields.push([
+      "Items",
+      `${count}${cap ? ` · cap ${cap}` : ""}${typeof a.batchSize === "number" ? ` · batches of ${a.batchSize}` : ""}`,
+    ]);
+    return (
+      <>
+        <ApprovalFieldRows fields={fields} />
+        {capture && (
+          <div className="mx-3 mb-1.5 rounded-md border border-sky-400/30 bg-sky-500/[0.07] px-3 py-2">
+            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-sky-700 dark:text-sky-300">
+              <Table2 className="h-3 w-3 shrink-0" />
+              <span className="truncate">
+                Writes rows to &ldquo;{capture.database ?? "?"}&rdquo;
+              </span>
+            </div>
+            <div className="mt-0.5 text-[11px] text-gray-600 dark:text-gray-400">
+              Admission: {capture.admission ?? "all"}
+              {capture.admissionNote ? ` — ${capture.admissionNote}` : ""}
+            </div>
+            {Array.isArray(capture.columns) && capture.columns.length > 0 && (
+              <div className="mt-0.5 text-[11px] text-gray-600 dark:text-gray-400">
+                Columns: {capture.columns.join(", ")}
+              </div>
+            )}
+            {capture.dedupeColumn && (
+              <div className="mt-0.5 text-[11px] text-gray-500 dark:text-gray-500">
+                Identity: {capture.dedupeColumn}
+              </div>
+            )}
+          </div>
+        )}
+        {items.length > 0 && (
+          <div className="mx-3 mb-1.5 rounded-md border border-black/10 dark:border-white/10 bg-white/70 dark:bg-black/25 px-3 py-1.5 max-h-40 overflow-auto">
+            {items.map((it, idx) => (
+              <div
+                key={idx}
+                className="flex items-baseline gap-1.5 text-[11px] leading-relaxed"
+              >
+                <span className="shrink-0 text-gray-400 dark:text-gray-600">
+                  {idx + 1}.
+                </span>
+                <span className="truncate text-gray-700 dark:text-gray-300">
+                  {it.label ?? it.url ?? "item"}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+        <ApprovalRawJson args={args} />
+      </>
+    );
+  }
+
   // Generic: labeled rows for primitive fields, raw JSON for the rest.
   const fields: Array<[string, string]> = [];
   for (const [key, value] of Object.entries(a)) {
@@ -2732,6 +3065,7 @@ function ToolApprovalCard({
   approvalId,
   onRespond,
   expired = false,
+  charterAttached,
 }: {
   toolName: string;
   args: unknown;
@@ -2743,6 +3077,7 @@ function ToolApprovalCard({
   }) => void;
   /** Stale pause (message superseded) — render status, not buttons. */
   expired?: boolean;
+  charterAttached?: boolean;
 }) {
   const [responded, setResponded] = useState<"approved" | "rejected" | null>(
     null,
@@ -2764,6 +3099,23 @@ function ToolApprovalCard({
         </span>
       </div>
       <ApprovalPreview toolName={toolName} args={args} />
+      {/* Pre-approval charter guard (owner foot-gun, hit three runs
+          straight): a quest declared with NO charter attached runs as a
+          legacy pass — no quest ledger, no dedup — and the model can only
+          disclose that AFTER approval. Warn at the consent moment. */}
+      {toolName === "propose_item_iteration" &&
+        charterAttached === false &&
+        typeof (args as { quest?: unknown } | null)?.quest === "string" && (
+          <div className="mx-3 mb-1.5 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-[11px] leading-snug text-amber-800 dark:text-amber-300">
+            <span className="font-semibold">
+              No charter is attached to this chat
+            </span>{" "}
+            — the &ldquo;{String((args as { quest?: unknown }).quest)}&rdquo;
+            quest will NOT be engaged: no quest-ledger writes, no
+            cross-sitting dedup. Reject, attach the charter with /charter,
+            and re-send — or approve to run charter-less.
+          </div>
+        )}
       {expired ? (
         <div className="px-3 pb-2 text-[11px] text-gray-500 dark:text-gray-400">
           Expired — this action never ran. Ask again if it&apos;s still wanted.

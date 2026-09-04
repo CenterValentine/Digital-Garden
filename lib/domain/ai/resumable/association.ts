@@ -69,3 +69,33 @@ export async function getActiveStreamId(
     return null;
   }
 }
+
+/**
+ * Clear the mapping when ITS stream's turn ends — any path: finish,
+ * abort, error (owner smoke 2026-09-04: a Stopped turn's association
+ * outlived its half-dead stream by up to the full TTL, so every revisit
+ * re-attached and hung "thinking" forever). Guarded compare-then-delete:
+ * a newer turn may already have overwritten the key, and deleting that
+ * would cost the NEW turn its resumability. The get→del race window is
+ * milliseconds and degrades to non-resumable, never to errors.
+ */
+export async function clearActiveStream(
+  userId: string,
+  conversationId: string,
+  streamId: string,
+): Promise<void> {
+  const redis = getRedisPublisher();
+  if (!redis) return;
+  try {
+    const key = associationKey(userId, conversationId);
+    const current = await redis.get(key);
+    if (current === streamId) await redis.del(key);
+  } catch (error) {
+    logger.warn({
+      layer: "ai",
+      event: "resumable:clear_failed",
+      summary: "stream association clear failed — orphan will TTL out",
+      error,
+    });
+  }
+}

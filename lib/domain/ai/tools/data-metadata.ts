@@ -12,6 +12,7 @@ export const DATA_TOOL_IDS = [
   "insert_rows",
   "update_row",
   "propose_column_options",
+  "propose_output_database",
 ] as const;
 
 export type DataToolId = (typeof DATA_TOOL_IDS)[number];
@@ -44,5 +45,10 @@ export const DATA_TOOL_METADATA: Record<
     name: "Propose Column Options",
     description:
       "Suggest category options for a select, multi-select, or status column as a review card — nothing is written until you click Apply on the card",
+  },
+  propose_output_database: {
+    name: "Propose Output Database",
+    description:
+      "Design a new capture database (schema, per-column descriptions, initial category options) as a review card — nothing is created until you click Apply on the card",
   },
 };

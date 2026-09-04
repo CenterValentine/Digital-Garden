@@ -401,3 +401,68 @@ export function formatUsdEstimate(usd: number): string {
   if (usd > 0) return "<$0.001";
   return "$0.00";
 }
+
+// ── Session aggregation (EXTRACTION-TO-DATABASE-PLAN P3 owner ask) ────────
+
+export interface SessionUsage {
+  /** Assistant turns that reported any usage. */
+  turns: number;
+  inputTokens: number;
+  outputTokens: number;
+  /** Sum of persisted per-turn cost estimates (priced turns only). */
+  totalUsd: number;
+  /** Turns whose model had no price row — totalUsd understates by these. */
+  unpricedTurns: number;
+}
+
+/**
+ * Sum a chat session's persisted per-turn usage for display: the popover
+ * shows the session line beside the turn line so a 100k turn total reads
+ * as "part of a priced whole", not one alarming number. Pure aggregation
+ * over message metadata — the turn accumulator already did the work.
+ */
+export function aggregateSessionUsage(
+  messages: Array<{ role?: string; metadata?: unknown }>,
+): SessionUsage | null {
+  const out: SessionUsage = {
+    turns: 0,
+    inputTokens: 0,
+    outputTokens: 0,
+    totalUsd: 0,
+    unpricedTurns: 0,
+  };
+  for (const m of messages) {
+    if (m.role !== "assistant") continue;
+    const meta =
+      m.metadata && typeof m.metadata === "object"
+        ? (m.metadata as { usage?: unknown; cost?: unknown })
+        : undefined;
+    const usage =
+      meta?.usage && typeof meta.usage === "object"
+        ? (meta.usage as { inputTokens?: unknown; outputTokens?: unknown })
+        : undefined;
+    const input =
+      typeof usage?.inputTokens === "number" && Number.isFinite(usage.inputTokens)
+        ? usage.inputTokens
+        : 0;
+    const output =
+      typeof usage?.outputTokens === "number" && Number.isFinite(usage.outputTokens)
+        ? usage.outputTokens
+        : 0;
+    if (input === 0 && output === 0) continue;
+    out.turns += 1;
+    out.inputTokens += input;
+    out.outputTokens += output;
+    const cost = readPersistedCost(meta?.cost);
+    if (cost) {
+      out.totalUsd += cost.usd;
+    } else if (
+      meta?.cost &&
+      typeof meta.cost === "object" &&
+      (meta.cost as { unpriced?: unknown }).unpriced === true
+    ) {
+      out.unpricedTurns += 1;
+    }
+  }
+  return out.turns > 0 ? out : null;
+}

@@ -114,6 +114,12 @@ export interface CaptureConfig {
   columns: Array<{ key: string; name: string; type: string }>;
   dedupeColumnKey?: string;
   dedupeColumnName?: string;
+  /**
+   * P3 `source: "database-rows"`: item keys ARE row ids of this table —
+   * capture writes stamp back to the row by id (update-only, never create)
+   * instead of upserting by the dedupe identity.
+   */
+  rowKeyed?: boolean;
 }
 
 export function parseCaptureConfig(value: unknown): CaptureConfig | null {
