@@ -181,16 +181,28 @@ export const listTabsTool = tool({
  * Undefined when the model has no price row: the ledger line then shows
  * tokens only, never $0.
  */
+/**
+ * Tokens so far THIS TURN — the turn's earlier segments (approval
+ * continuations restart the live accumulator) plus the live request.
+ */
+function turnTokensSoFar(ctx: ToolExecuteContext): number | undefined {
+  const sum = (ctx.priorTurnUsage?.total ?? 0) + (ctx.runTokens?.total ?? 0);
+  return sum > 0 ? sum : undefined;
+}
+
 function estimateRunCostUsd(ctx: ToolExecuteContext): number | undefined {
   const tokens = ctx.runTokens;
+  const prior = ctx.priorTurnUsage;
   const model = ctx.executedModel;
-  if (!tokens || !model || tokens.total <= 0) return undefined;
+  // Prior segments are priced at the CURRENT executed model — a mixed-model
+  // turn (mid-run route switch) makes this an estimate, which is all the
+  // ledger stamp ever claimed to be.
+  const inputTokens = (tokens?.input ?? 0) + (prior?.input ?? 0);
+  const outputTokens = (tokens?.output ?? 0) + (prior?.output ?? 0);
+  const cachedInputTokens = (tokens?.cachedInput ?? 0) + (prior?.cachedInput ?? 0);
+  if (!model || inputTokens + outputTokens <= 0) return undefined;
   const cost = computeTurnCost(
-    {
-      inputTokens: tokens.input,
-      outputTokens: tokens.output,
-      cachedInputTokens: tokens.cachedInput,
-    },
+    { inputTokens, outputTokens, cachedInputTokens },
     model.modelId,
     model.vendorId,
   );
@@ -470,7 +482,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
               artifacts: synthesisTitle ? [synthesisTitle] : undefined,
               openQuestions,
               next: "Run complete.",
-              tokensSoFar: ctx.runTokens?.total,
+              tokensSoFar: turnTokensSoFar(ctx),
               estimatedCostUsd: estimateRunCostUsd(ctx),
             },
             { runKey: ledgerRunKey, ownerContentId: placement.ownedByNoteId },
@@ -1281,7 +1293,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
               phase: `Batch ${batchNumber} checkpoint`,
               summary,
               next: "Continue with the next batch's first item.",
-              tokensSoFar: ctx.runTokens?.total,
+              tokensSoFar: turnTokensSoFar(ctx),
               estimatedCostUsd: estimateRunCostUsd(ctx),
             },
             { runKey: ledgerRunKey, ownerContentId: placement.ownedByNoteId },
@@ -1430,7 +1442,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
               summary,
               artifacts: rollupTitle ? [rollupTitle] : undefined,
               next: "Run complete.",
-              tokensSoFar: ctx.runTokens?.total,
+              tokensSoFar: turnTokensSoFar(ctx),
               estimatedCostUsd: estimateRunCostUsd(ctx),
             },
             {
@@ -1448,7 +1460,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
               totals: {
                 items: processedCount,
                 qualified: qualifiedCount,
-                tokens: ctx.runTokens?.total,
+                tokens: turnTokensSoFar(ctx),
                 costUsd: estimateRunCostUsd(ctx),
               },
             }).catch(() => null);
@@ -1702,7 +1714,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
               // through this step — the ledger becomes the per-run cost
               // record ("tokens so far" at each checkpoint = per-phase
               // deltas by subtraction).
-              tokensSoFar: ctx.runTokens?.total,
+              tokensSoFar: turnTokensSoFar(ctx),
               estimatedCostUsd: estimateRunCostUsd(ctx),
             },
             {

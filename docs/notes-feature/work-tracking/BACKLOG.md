@@ -12,7 +12,7 @@ last_updated: 2026-08-29
 
 ## Quest master ledger under-counts sitting tokens (2026-09-04, first production quest)
 
-- [ ] `closeSitting` stamps `totals.tokens` from `ctx.runTokens.total`, which is scoped to ONE streamText call — a multi-segment turn (approval continuations) stamps only the FINAL segment (~25.8k recorded vs 698.9k actual on the first real sitting, ~27× under). Fix: thread the turn-cumulative accumulator (the same sum the popover persists as `metadata.usage`) into tool context, or stamp at persist time from the turn totals. Until then the popover is the cost truth; the master's Tokens/Est. cost columns are floor values.
+- [x] **FIXED same day (`chore/release-tail`)**: the route now sums the turn's earlier segments (riding the trailing assistant message's `metadata.segments`) into `ctx.priorTurnUsage`; `turnTokensSoFar()` + `estimateRunCostUsd()` stamp turn-cumulative numbers at every checkpoint and at `closeSitting`. Residual caveat: prior segments are priced at the current executed model, so mixed-model turns carry an estimate — which is all the stamp ever claimed.
 
 ## Workspace layout: multi-tab last-writer-wins reverts D+D (2026-09-04; owner repro; lands with layout-intent "P4 live fan-in")
 
