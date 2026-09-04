@@ -535,6 +535,10 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
     if (e.metaKey || e.ctrlKey) {
       e.preventDefault();
       e.stopPropagation();
+      // Cmd/ctrl-click is a multi-select GESTURE, not navigation (owner,
+      // 2026-09-04) — same selection-only routing shift-click uses, so the
+      // tree's onSelect skips opening the content in the main panel.
+      onSelectionOnly?.();
       if (node.isSelected) {
         node.deselect();
       } else {

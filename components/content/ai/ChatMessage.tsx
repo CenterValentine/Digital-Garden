@@ -1290,10 +1290,28 @@ export const ChatMessage = memo(function ChatMessage({
                 key={i}
                 toolName={toolPart.toolName}
                 toolCallId={toolPart.toolCallId}
-                state={toolPart.state}
+                // A "running" part on a message that is no longer streaming
+                // is a contradiction — the turn ended, so the tool can never
+                // return (owner report, 2026-09-04: interrupts that bypass
+                // the engine's stop() left eternal spinners in the persisted
+                // transcript). Render it settled as an honest interruption;
+                // live streams are untouched.
+                state={
+                  !isStreaming &&
+                  (toolPart.state === "input-streaming" ||
+                    toolPart.state === "input-available")
+                    ? "output-error"
+                    : toolPart.state
+                }
                 args={toolPart.input}
                 result={toolPart.output}
-                errorText={toolPart.errorText}
+                errorText={
+                  !isStreaming &&
+                  (toolPart.state === "input-streaming" ||
+                    toolPart.state === "input-available")
+                    ? "Stopped by the user — the turn was interrupted before this tool returned."
+                    : toolPart.errorText
+                }
                 isRevertable={revertableToolIds?.has(toolPart.toolCallId) ?? false}
                 onRevertEdit={onRevertEdit}
               />
@@ -3186,6 +3204,41 @@ function ToolCallBubble({
       : JSON.stringify(result, null, 2);
   }, [hasError, hasResult, result, errorText]);
 
+  // Rough token costs of this tool call, surfaced on the delayed hover
+  // tooltip (owner ask, 2026-09-04). Two directions, both ESTIMATES and
+  // labeled as such (providers report usage per request, never per call):
+  // the RESULT is context weight for later requests; the ARGUMENTS are the
+  // model's generated output for this call — the only per-call "output
+  // tokens" that exist to attribute.
+  //
+  // Content-aware divisors (owner accuracy bar, 2026-09-04): BPE
+  // tokenizers average ~4 chars/token on prose but ~3.3 on compact JSON
+  // (punctuation/keys fragment) and ~3.7 on pretty-printed JSON (indent
+  // runs collapse). This puts mixed payloads at roughly ±15-20% vs the
+  // flat /4's ±30%-biased-low; anything tighter needs a bundled
+  // tokenizer, which a tooltip does not justify.
+  const approxResultTokens = useMemo(() => {
+    const s = resultString;
+    if (!s) return null;
+    const divisor = s.startsWith("{") || s.startsWith("[")
+      ? s.includes("\n  ")
+        ? 3.7 // pretty-printed JSON
+        : 3.3 // compact JSON
+      : 4.0; // prose-ish
+    return s.length > 0 ? Math.max(1, Math.round(s.length / divisor)) : null;
+  }, [resultString]);
+  const approxArgsTokens = useMemo(() => {
+    if (args === undefined || args === null) return null;
+    try {
+      const s = typeof args === "string" ? args : JSON.stringify(args);
+      if (!s || s.length <= 2) return null;
+      const divisor = s.startsWith("{") || s.startsWith("[") ? 3.3 : 4.0;
+      return Math.max(1, Math.round(s.length / divisor));
+    } catch {
+      return null;
+    }
+  }, [args]);
+
   // One-line summary used in the collapsed header. Tells the user what
   // came back without forcing them to expand — char counts for text,
   // item counts for arrays, "edit applied" for orchestrator payloads.
@@ -3392,7 +3445,11 @@ function ToolCallBubble({
           hasDetails && "hover:bg-black/[0.03] dark:hover:bg-white/[0.04] transition-colors cursor-pointer",
           !hasDetails && "cursor-default",
         )}
-        title={hasDetails ? (expanded ? "Hide details" : "Show details") : undefined}
+        title={
+          hasDetails
+            ? `${approxResultTokens ? `result ≈${approxResultTokens.toLocaleString()} tokens in context · ` : ""}${approxArgsTokens ? `call ≈${approxArgsTokens.toLocaleString()} tokens generated · ` : ""}(±20% est.) ${expanded ? "Hide details" : "Show details"}`
+            : undefined
+        }
       >
         {isRunning ? (
           <Loader2 className="h-3 w-3 shrink-0 animate-spin text-amber-400" />
@@ -4133,8 +4190,11 @@ function WorkingIndicator() {
   // pointless "0:01"; once it's clearly a wait, the counter reassures.
   const showTime = elapsed >= 3;
   return (
+    // Borderless (owner, 2026-09-04, with the reasoning de-boxing): status
+    // is text, boxes are content — the claude.ai/ChatGPT idiom for
+    // transient signals.
     <div
-      className="inline-flex items-center gap-2 rounded-xl bg-black/[0.03] dark:bg-white/5 border border-black/10 dark:border-white/10 px-3.5 py-2 text-xs text-gray-500"
+      className="inline-flex items-center gap-2 px-1 py-0.5 text-xs text-gray-500 dark:text-gray-400"
       aria-live="polite"
       aria-label={`Working${showTime ? `, ${elapsed} seconds elapsed` : ""}`}
     >
@@ -4157,7 +4217,7 @@ function WorkingIndicator() {
 /** Thinking indicator — shown while tools are executing */
 function ThinkingIndicator() {
   return (
-    <div className="inline-flex items-center gap-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20 px-3.5 py-2 text-xs text-indigo-300">
+    <div className="inline-flex items-center gap-2 px-1 py-0.5 text-xs text-indigo-500 dark:text-indigo-300">
       <BrainCircuit className="h-3.5 w-3.5 animate-pulse" />
       <span>Thinking</span>
       <span className="inline-flex gap-0.5">

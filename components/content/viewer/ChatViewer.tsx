@@ -20,20 +20,18 @@ import {
 import { computeModelRouteDecorations } from "@/lib/domain/ai/model-directive";
 import { findIterationFoldBoundary } from "@/lib/domain/ai/context-diet";
 import { aggregateSessionUsage } from "@/lib/features/ai-connections/usage/pricing";
-import { ModelPinToggle } from "../ai/ModelPinToggle";
+import { ChatControlPanel } from "../ai/ChatControlPanel";
 
 /** Compact token formatting for the header meter (v3.1 R5). */
 function formatTokenCount(n: number): string {
   return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
 }
-import { TargetFolderChip } from "../ai/TargetFolderChip";
-import { OutputTargetChip } from "../ai/OutputTargetChip";
+import { deriveTargetSeed } from "@/lib/domain/ai/output-target";
 import { ChatInput } from "../ai/ChatInput";
 import { FolderContextChips } from "@/components/content/ai/FolderContextChips";
 import { FollowUpsStrip } from "../ai/FollowUpsStrip";
 import { ChatErrorBanner } from "../ai/ChatErrorBanner";
 import { MakeAndModelPicker } from "../ai/MakeAndModelPicker";
-import { ChatContextPicker } from "../ai/ChatContextPicker";
 import { AssociatedContentChips } from "../ai/AssociatedContentChips";
 import { useConversationEngine } from "@/lib/domain/ai/use-conversation-engine";
 import {
@@ -41,6 +39,7 @@ import {
   type PersistFinishPayload,
 } from "@/lib/domain/ai/use-conversation-binding";
 import { useContentStore } from "@/state/content-store";
+import { useIsMobile } from "@/components/common/useIsMobile";
 import { toast } from "sonner";
 import {
   buildSurfaceBackground,
@@ -194,6 +193,9 @@ function ChatViewerInner({
 }: ChatViewerInnerProps) {
   const persistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isBound = Boolean(conversationId);
+  // Same gate that mounts MobileNotesLayout/bottom nav — the composer's
+  // provider strip collapses with it.
+  const isMobileNav = useIsMobile();
 
   // Initial messages: in bound mode the binding hook hydrates from the
   // Conversation, so we start empty; in legacy mode we seed from the
@@ -331,9 +333,17 @@ function ChatViewerInner({
   } | null>(null);
   const [targetInherited, setTargetInherited] = useState(false);
   useEffect(() => {
-    setTargetFolder(initialTargetFolder);
-    setTargetInherited(initialTargetInherited);
-  }, [initialTargetFolder, initialTargetInherited]);
+    // Single-source with ChatPanel (AI 3.8 fix): no explicit target
+    // inherits the chat's location, so expanding a panel chat to full
+    // view keeps the inherited chip instead of dropping it.
+    const seed = deriveTargetSeed({
+      explicit: initialTargetFolder,
+      explicitInherited: initialTargetInherited,
+      location: initialTargetLocation,
+    });
+    setTargetFolder(seed.target);
+    setTargetInherited(seed.inherited);
+  }, [initialTargetFolder, initialTargetInherited, initialTargetLocation]);
   const handleTargetChange = useCallback(
     (next: { id: string; title: string | null } | null) => {
       if (next) {
@@ -795,7 +805,10 @@ function ChatViewerInner({
                 {displayTitle}
               </h1>
             )}
-            <p className="relative text-xs text-gray-500">
+            {/* Subheader line — stats, with the pinned-content affordance
+                inline to the RIGHT of it (owner, 2026-09-04). */}
+            <div className="relative flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-500">
+              <span>
               {hasMessages ? (
                 <>
                   {messages.length} message{messages.length !== 1 ? "s" : ""}
@@ -835,30 +848,12 @@ function ChatViewerInner({
               ) : (
                 "New conversation"
               )}
-            </p>
+              </span>
+              {conversationId && (
+                <AssociatedContentChips conversationId={conversationId} />
+              )}
+            </div>
           </div>
-        </div>
-        {/* Reverse-view: which content this chat is pinned to. Renders
-            nothing unless the chat is Conversation-backed with at least
-            one association. */}
-        <div className="flex flex-wrap items-center gap-2">
-          <TargetFolderChip
-            target={targetFolder}
-            inherited={targetInherited}
-            location={initialTargetLocation}
-            disabled={!conversationId}
-            onChange={handleTargetChange}
-          />
-          {/* WS7: where generated content lands by default. A full-page chat
-              IS the content, so there's no distinct "next to this chat". */}
-          <OutputTargetChip
-            value={outputTarget}
-            onChange={setOutputTarget}
-            hasOrigin={false}
-          />
-          {conversationId && (
-            <AssociatedContentChips conversationId={conversationId} />
-          )}
         </div>
       </div>
 
@@ -977,12 +972,27 @@ function ChatViewerInner({
               onChange={handleModelChange}
               disabled={isActive}
               contributors={mixed.contributors as AIProviderId[]}
+              // Mobile nav engaged (same gate that mounts MobileNotesLayout):
+              // fold the provider quick-icons into the single ⋯ menu — the
+              // strip otherwise overflows the phone composer (owner,
+              // 2026-09-04).
+              compact={isMobileNav}
             />
-            <ModelPinToggle pinned={modelPinned} onToggle={setModelPinned} />
-            <ChatContextPicker
-              value={activeContextId}
-              onChange={handleContextChange}
-              disabled={isActive}
+            {/* AI 3.8: pin + context moved into the labeled control panel. */}
+            <ChatControlPanel
+              targetFolder={targetFolder}
+              targetInherited={targetInherited}
+              targetLocation={initialTargetLocation}
+              onTargetChange={handleTargetChange}
+              targetDisabled={!conversationId}
+              outputTarget={outputTarget}
+              onOutputTargetChange={setOutputTarget}
+              hasOrigin={false}
+              modelPinned={modelPinned}
+              onModelPinnedChange={setModelPinned}
+              activeContextId={activeContextId}
+              onContextChange={handleContextChange}
+              busy={isActive}
             />
           </div>
         }

@@ -20,6 +20,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { FolderOpen, X, Search, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/core/utils";
 
@@ -85,6 +86,17 @@ export function TargetFolderChip({
   const [folders, setFolders] = useState<FlatFolder[] | null>(null);
   const [filter, setFilter] = useState("");
   const rootRef = useRef<HTMLDivElement | null>(null);
+  // Menu is PORTALED to <body> (position:fixed) so clipping ancestors —
+  // the ChatControlPanel's rounded container was cutting it off — can't
+  // truncate it (the recorded portal rule; same pattern as
+  // OutputTargetChip/ChatContextPicker). menuRef counts as "inside" for
+  // the click-away check.
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const [menuPos, setMenuPos] = useState<{
+    left: number;
+    top: number;
+    maxHeight: number;
+  } | null>(null);
 
   // Lazy tree fetch — only when the picker opens, cached for the mount.
   useEffect(() => {
@@ -114,13 +126,13 @@ export function TargetFolderChip({
     };
   }, [open, folders]);
 
-  // Click-away close.
+  // Click-away close — the portaled menu counts as inside.
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
+      const t = e.target as Node;
+      if (rootRef.current?.contains(t) || menuRef.current?.contains(t)) return;
+      setOpen(false);
     };
     document.addEventListener("mousedown", onDown);
     return () => document.removeEventListener("mousedown", onDown);
@@ -147,7 +159,29 @@ export function TargetFolderChip({
       <button
         type="button"
         disabled={disabled}
-        onClick={() => setOpen((v) => !v)}
+        onClick={() =>
+          setOpen((v) => {
+            if (!v) {
+              const rect = rootRef.current?.getBoundingClientRect();
+              if (rect) {
+                const left = Math.max(
+                  8,
+                  Math.min(rect.left, window.innerWidth - 264),
+                );
+                const top = rect.bottom + 4;
+                setMenuPos({
+                  left,
+                  top,
+                  maxHeight: Math.max(
+                    160,
+                    Math.min(320, window.innerHeight - top - 8),
+                  ),
+                });
+              }
+            }
+            return !v;
+          })
+        }
         title={
           disabled
             ? "Save the chat to set an operating folder"
@@ -180,9 +214,21 @@ export function TargetFolderChip({
         </span>
       </button>
 
-      {open && (
-        <div className="absolute left-0 top-full z-50 mt-1 w-64 rounded-lg border border-black/10 dark:border-white/10 bg-white dark:bg-neutral-900 shadow-lg text-xs overflow-hidden">
-          <div className="flex items-center gap-1.5 border-b border-black/5 dark:border-white/10 px-2 py-1.5">
+      {open &&
+        menuPos &&
+        createPortal(
+        <div
+          ref={menuRef}
+          style={{
+            position: "fixed",
+            left: menuPos.left,
+            top: menuPos.top,
+            width: 256,
+            maxHeight: menuPos.maxHeight,
+          }}
+          className="z-[130] flex flex-col rounded-lg border border-black/10 dark:border-white/10 bg-white dark:bg-neutral-900 shadow-lg text-xs overflow-hidden"
+        >
+          <div className="flex shrink-0 items-center gap-1.5 border-b border-black/5 dark:border-white/10 px-2 py-1.5">
             <Search className="h-3 w-3 shrink-0 text-gray-400" />
             <input
               autoFocus
@@ -192,7 +238,7 @@ export function TargetFolderChip({
               className="w-full bg-transparent outline-none placeholder:text-gray-400"
             />
           </div>
-          <div className="max-h-56 overflow-y-auto py-1">
+          <div className="min-h-0 flex-1 overflow-y-auto py-1">
             {folders === null && (
               <div className="px-3 py-2 text-gray-400">Loading folders…</div>
             )}
@@ -238,7 +284,8 @@ export function TargetFolderChip({
               {inherited ? "Clear" : "Clear target"}
             </button>
           )}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

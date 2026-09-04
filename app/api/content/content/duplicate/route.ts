@@ -15,6 +15,33 @@ import { getSession } from "@/lib/infrastructure/auth/session";
 import { prisma } from "@/lib/database/client";
 import { logger, spanPayload, withRouteTrace, withSpan } from "@/lib/core/logger";
 import { regenerateAllBlockIds } from "@/lib/domain/blocks/block-id-walk";
+import { forkConversation } from "@/lib/features/conversations";
+
+/**
+ * Mac-style duplicate naming (owner, 2026-09-04): "T" → "T 2" → "T 3";
+ * duplicating "T 2" strips the trailing number and continues from the base —
+ * never "(Copy)" chains. Scoped to live siblings under the same parent.
+ */
+async function nextDuplicateTitle(
+  originalTitle: string,
+  parentId: string | null,
+  userId: string,
+): Promise<string> {
+  const base = originalTitle.replace(/ \d+$/, "");
+  const siblings = await prisma.contentNode.findMany({
+    where: {
+      ownerId: userId,
+      parentId,
+      deletedAt: null,
+      title: { startsWith: base },
+    },
+    select: { title: true },
+  });
+  const taken = new Set(siblings.map((s) => s.title));
+  let n = 2;
+  while (taken.has(`${base} ${n}`)) n += 1;
+  return `${base} ${n}`;
+}
 
 const ROUTE_PATH = "/api/content/content/duplicate";
 
@@ -63,6 +90,7 @@ export async function POST(request: NextRequest) {
                 codePayload: true,
                 externalPayload: true,
                 shortcutPayload: true,
+                chatPayload: true,
               },
             });
 
@@ -144,10 +172,20 @@ export async function POST(request: NextRequest) {
 async function duplicateNode(
   original: any,
   userId: string,
-  parentId: string | null = null
+  parentId: string | null = null,
+  /** Only the top-level node renames (mac semantics) — children inside a
+   *  duplicated folder keep their exact titles (their parent is new, so
+   *  there is nothing to collide with). */
+  rename = true,
 ): Promise<any> {
 /* eslint-enable @typescript-eslint/no-explicit-any */
-  const newTitle = `${original.title} (Copy)`;
+  const newTitle = rename
+    ? await nextDuplicateTitle(
+        original.title,
+        parentId ?? original.parentId,
+        userId,
+      )
+    : original.title;
 
   const duplicate = await prisma.contentNode.create({
     data: {
@@ -252,8 +290,47 @@ async function duplicateNode(
           },
         },
       }),
+
+      // Chats: copy the legacy payload verbatim; the LIVE transcript (the
+      // backing Conversation) is forked below.
+      ...(original.chatPayload && {
+        chatPayload: {
+          create: {
+            messages: original.chatPayload.messages || [],
+            metadata: original.chatPayload.metadata || {},
+          },
+        },
+      }),
     } as never,
   });
+
+  // Fork, don't blank (owner, 2026-09-04): a duplicated chat used to come
+  // out empty because the transcript lives in the backing Conversation,
+  // which this route never touched. Fork it (full message copy + mirrored
+  // associations) and point the fork at the NEW node. Best-effort: a fork
+  // failure still leaves the node copy (with the legacy payload above).
+  if (original.contentType === "chat") {
+    try {
+      const backing = await prisma.conversation.findFirst({
+        where: { archivedToContentNodeId: original.id },
+        select: { id: true },
+      });
+      if (backing) {
+        const forkedId = await forkConversation(userId, backing.id, undefined);
+        await prisma.conversation.update({
+          where: { id: forkedId },
+          data: { archivedToContentNodeId: duplicate.id, title: newTitle },
+        });
+      }
+    } catch (error) {
+      logger.warn({
+        layer: "content",
+        event: "duplicate:chat_fork_failed",
+        summary: "chat node copied but conversation fork failed",
+        error,
+      });
+    }
+  }
 
   if (original.contentType === "folder") {
     const children = await prisma.contentNode.findMany({
@@ -266,11 +343,12 @@ async function duplicateNode(
         codePayload: true,
         externalPayload: true,
         shortcutPayload: true,
+        chatPayload: true,
       },
     });
 
     for (const child of children) {
-      await duplicateNode(child, userId, duplicate.id);
+      await duplicateNode(child, userId, duplicate.id, false);
     }
   }
 

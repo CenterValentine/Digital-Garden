@@ -32,19 +32,17 @@ import {
   ModelSwitchDivider,
   ModelRouteNotices,
 } from "./ModelSwitchDivider";
-import { ModelPinToggle } from "./ModelPinToggle";
+import { ChatControlPanel } from "./ChatControlPanel";
 import { computeModelRouteDecorations } from "@/lib/domain/ai/model-directive";
 import { findIterationFoldBoundary } from "@/lib/domain/ai/context-diet";
 import { aggregateSessionUsage } from "@/lib/features/ai-connections/usage/pricing";
 import { REVERT_SNAPSHOT_KEY } from "@/lib/domain/ai/compact-tool-outputs";
-import { TargetFolderChip } from "./TargetFolderChip";
-import { OutputTargetChip } from "./OutputTargetChip";
+import { deriveTargetSeed } from "@/lib/domain/ai/output-target";
 import { ChatInput } from "./ChatInput";
 import { FolderContextChips } from "@/components/content/ai/FolderContextChips";
 import { FollowUpsStrip } from "./FollowUpsStrip";
 import { ChatErrorBanner } from "./ChatErrorBanner";
 import { MakeAndModelPicker } from "./MakeAndModelPicker";
-import { ChatContextPicker } from "./ChatContextPicker";
 import {
   useConversationEngine,
   type ClientEditOutcome,
@@ -369,14 +367,14 @@ export function ChatPanel({
 
   const effectiveLocation = initialTargetLocation ?? locationFallback;
   useEffect(() => {
-    if (initialTargetFolder) {
-      setTargetFolder(initialTargetFolder);
-      setTargetInherited(initialTargetInherited);
-    } else if (effectiveLocation) {
-      // No explicit target: inherit the chat's location instead of
-      // rendering blank.
-      setTargetFolder(effectiveLocation);
-      setTargetInherited(true);
+    const seed = deriveTargetSeed({
+      explicit: initialTargetFolder,
+      explicitInherited: initialTargetInherited,
+      location: effectiveLocation,
+    });
+    if (seed.target) {
+      setTargetFolder(seed.target);
+      setTargetInherited(seed.inherited);
     } else if (isPanelEmbed) {
       // Browser panel: no conversation and nothing to inherit from, so fall
       // back to the last target the user picked here. Browser chats aren't
@@ -1017,22 +1015,9 @@ export function ChatPanel({
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-y-1 border-b border-black/10 dark:border-white/10 px-3 py-2">
         <div className="flex min-w-0 flex-wrap items-center gap-2 gap-y-1">
           <HeaderTitle providerId={providerId} modelId={modelId} />
-          <TargetFolderChip
-            target={targetFolder}
-            inherited={targetInherited}
-            location={effectiveLocation}
-            // Selectable before the conversation exists: the pick is held in
-            // local state, carried into the POST that creates the conversation,
-            // and (in the browser panel) remembered for the next chat.
-            disabled={false}
-            onChange={handleTargetChange}
-          />
-          {/* WS7: where generated content lands by default. */}
-          <OutputTargetChip
-            value={outputTarget}
-            onChange={setOutputTarget}
-            hasOrigin={Boolean(contentId)}
-          />
+          {/* AI 3.8 (owner): the target chips moved into the ChatControlPanel
+              wholesale — duplicating them here as header affordances was
+              retired with the rail condensation. */}
         </div>
         <div className="ml-auto flex items-center gap-1">
           {conversationId && (
@@ -1192,12 +1177,21 @@ export function ChatPanel({
               contributors={mixed.contributors as AIProviderId[]}
               compact
             />
-            <ModelPinToggle pinned={modelPinned} onToggle={setModelPinned} />
-            <ChatContextPicker
-              value={activeContextId}
-              onChange={handleContextChange}
-              disabled={isActive}
-              compact
+            {/* AI 3.8: pin + context moved into the labeled control panel —
+                the rail keeps only the model picker (condensed by design). */}
+            <ChatControlPanel
+              targetFolder={targetFolder}
+              targetInherited={targetInherited}
+              targetLocation={effectiveLocation}
+              onTargetChange={handleTargetChange}
+              outputTarget={outputTarget}
+              onOutputTargetChange={setOutputTarget}
+              hasOrigin={Boolean(contentId)}
+              modelPinned={modelPinned}
+              onModelPinnedChange={setModelPinned}
+              activeContextId={activeContextId}
+              onContextChange={handleContextChange}
+              busy={isActive}
             />
           </div>
         }

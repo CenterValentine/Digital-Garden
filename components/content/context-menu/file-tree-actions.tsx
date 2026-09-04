@@ -761,17 +761,24 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
 
   // Section 5: Organization actions
   if (selectedIds.length > 0) {
-    const itemLabel = isMultiSelection ? `${selectedIds.length} items` : "item";
+    // Duplicate is SINGLE-select only (owner, 2026-09-04), and for chats it
+    // reads as "Fork chat" — the server deep-forks the backing conversation
+    // so the copy carries the full transcript, never a blank chat.
+    const isChat = clickedNode?.contentType === "chat";
     sections.push({
       title: "Organize",
       actions: [
-        {
-          id: "duplicate",
-          label: `Duplicate ${itemLabel}`,
-          shortcut: "⌘D",
-          onClick: async () => await onDuplicate?.(selectedIds),
-          disabled: (!onDuplicate) || isMirrorRow,
-        },
+        ...(isSingleSelection
+          ? [
+              {
+                id: "duplicate",
+                label: isChat ? "Fork chat" : "Duplicate item",
+                shortcut: "⌘D",
+                onClick: async () => await onDuplicate?.(selectedIds),
+                disabled: (!onDuplicate) || isMirrorRow,
+              },
+            ]
+          : []),
         {
           id: "star",
           label: `Toggle Star`,

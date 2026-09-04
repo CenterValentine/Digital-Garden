@@ -1033,13 +1033,15 @@ export async function saveWorkspaceState(
       : { status: "ok", workspace: await readFormatted() };
   }
 
-  const updatedWorkspace = await prisma.contentWorkspace.update({
-    where: { id: workspaceId },
-    data,
-    include: stateInclude,
-  });
-
-  return { status: "ok", workspace: formatWorkspace(updatedWorkspace) };
+  // No compare base = this writer never loaded the record it is about to
+  // overwrite. Every legitimate client primes its base at load / create /
+  // 409-adoption; the observed null-base writers were stale clients whose
+  // module-scope base map had been wiped (dev Fast Refresh) — and the old
+  // unconditional last-writer-wins update here let them clobber fresh
+  // arrangements (owner D+D revert report, 2026-09-04). Reconcile instead:
+  // hand back the current row as a conflict; the client adopts it and
+  // retries with a real base, converging in one round.
+  return { status: "conflict", workspace: await readFormatted() };
 
   async function readFormatted() {
     const current = await prisma.contentWorkspace.findFirstOrThrow({

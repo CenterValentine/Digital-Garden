@@ -1,16 +1,20 @@
 /**
- * ModelPinToggle (AI 3.4) — explicit pin control in the chat footer.
+ * ModelPinToggle (AI 3.4; re-skinned "Lock-in model" 2026-09-04) — the
+ * explicit lock-in control, hosted in the ChatControlPanel.
  *
- * Pinning the model makes the currently-selected model win over any playbook
- * phase directive for this conversation. It is an EXPLICIT toggle (not a side
- * effect of picking a model), always visible so it's discoverable in every
- * flow — including rooted "run this playbook" chats, where there is no
- * client-side attached-playbook state to gate on.
+ * Locking in the model makes the currently-selected model win over any
+ * charter phase directive for this conversation. It is an EXPLICIT toggle
+ * (not a side effect of picking a model) so it's discoverable in every
+ * flow — including rooted "run this charter" chats, where there is no
+ * client-side attached-charter state to gate on.
+ *
+ * Icon semantics (owner): locked-in = closed lock; off = open lock
+ * (lucide ships no slashed lock — the open lock is the off state).
  */
 
 "use client";
 
-import { Pin, PinOff } from "lucide-react";
+import { Lock, LockOpen } from "lucide-react";
 
 export function ModelPinToggle({
   pinned,
@@ -26,8 +30,8 @@ export function ModelPinToggle({
       aria-pressed={pinned}
       title={
         pinned
-          ? "Model pinned — this model overrides charter per-phase routing. Click to unpin."
-          : "Pin this model so it overrides any charter per-phase model routing."
+          ? "Model locked — the selected model overrides charter-designated per-phase routing. Click to unlock."
+          : "Lock the selected model so it overrides any charter-designated per-phase model routing."
       }
       className={
         pinned
@@ -36,9 +40,9 @@ export function ModelPinToggle({
       }
     >
       {pinned ? (
-        <Pin className="h-3.5 w-3.5 shrink-0 fill-current" />
+        <Lock className="h-3.5 w-3.5 shrink-0" />
       ) : (
-        <PinOff className="h-3.5 w-3.5 shrink-0" />
+        <LockOpen className="h-3.5 w-3.5 shrink-0" />
       )}
     </button>
   );

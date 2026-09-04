@@ -19,12 +19,12 @@ export function ReasoningBlockGeneric({ text, streaming }: ReasoningBlockProps) 
   const elapsedLabel = formatReasoningElapsed(elapsed, streaming);
 
   return (
-    <div className="my-2 rounded-lg border border-black/10 bg-black/[0.02] dark:border-white/10 dark:bg-white/[0.03]">
+    <div className="my-1.5">
       <button
         ref={headerRef}
         type="button"
         onClick={toggle}
-        className="flex w-full items-center gap-2 px-3 py-1.5 text-[11px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400 hover:bg-black/[0.03] dark:hover:bg-white/[0.04] transition-colors rounded-lg"
+        className="inline-flex items-center gap-1.5 rounded px-1 py-0.5 text-[12px] font-medium text-gray-500 dark:text-gray-400 hover:opacity-80 transition-opacity"
       >
         {open ? (
           <ChevronDown className="h-3 w-3 opacity-70" />
@@ -38,13 +38,13 @@ export function ReasoningBlockGeneric({ text, streaming }: ReasoningBlockProps) 
           {streaming ? "Thinking…" : "Reasoning"}
         </span>
         {elapsedLabel && (
-          <span className="ml-auto tabular-nums text-[10px] font-normal opacity-60">
+          <span className="tabular-nums text-[10px] font-normal opacity-60">
             {elapsedLabel}
           </span>
         )}
       </button>
       {open && (
-        <div className="px-3.5 pb-2.5 pt-1 text-xs leading-relaxed text-gray-600 dark:text-gray-400 whitespace-pre-wrap">
+        <div className="pl-6 pb-1 pt-0.5 text-xs leading-relaxed text-gray-600 dark:text-gray-400 whitespace-pre-wrap">
           {text}
           {streaming && <span className="ml-0.5 inline-block animate-pulse">▍</span>}
         </div>

@@ -85,6 +85,9 @@ const TOOL_REGISTRY: ToolDefinition[] = [
     contentTypes: ["chat"],
     order: 100,
     group: "export",
+    // Icon-only like its sibling export tool (owner, 2026-09-04) — the
+    // label survives as the hover tooltip.
+    iconOnly: true,
   },
 
   // ─── TOOLBELT: Text formatting (matches current BubbleMenu) ───
