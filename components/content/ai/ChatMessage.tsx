@@ -681,19 +681,17 @@ export const ChatMessage = memo(function ChatMessage({
     };
   }, [message.parts]);
 
-  // §5 batch gallery (owner shape 2026-09-03): within the folded region,
-  // group the parts between checkpoint anchors into ONE card per batch —
-  // an item gallery with per-item raw expansion. Member parts render
-  // nothing; the checkpoint's index renders the card; folded parts outside
-  // any complete group fall back to the per-part pills.
+  // §5 batch gallery (owner shape 2026-09-03): group each RECORDED batch
+  // into ONE card — an item gallery with per-item raw expansion. Anchors
+  // are durable, not the live fold boundary (owner smoke 2026-09-03: the
+  // boundary sits AT the checkpoint and vanishes when the run closes, so
+  // boundary-gated cards either never formed or un-collapsed at run end —
+  // condensation must be permanent). A batch docks at its checkpoint; the
+  // FINAL batch (which skips its checkpoint by design) docks at
+  // record_iteration_findings, anchored on its last recorded item. The
+  // in-flight batch stays live and loose until its anchor lands.
   const batchGroups = useMemo(() => {
-    if (foldBoundary == null || typeof messageIndex !== "number") return null;
-    if (messageIndex > foldBoundary.messageIdx) return null;
     const parts = (message.parts ?? []) as Array<Record<string, unknown>>;
-    const foldLimit =
-      messageIndex < foldBoundary.messageIdx
-        ? parts.length
-        : foldBoundary.partIdx;
     const roles = new Map<
       number,
       { kind: "member" } | { kind: "card"; group: BatchGalleryGroup }
@@ -701,7 +699,8 @@ export const ChatMessage = memo(function ChatMessage({
     let pending: number[] = [];
     let items: BatchGalleryItem[] = [];
     let memberIdxs: number[] = [];
-    for (let idx = 0; idx < foldLimit; idx++) {
+    let lastRecordIdx: number | null = null;
+    for (let idx = 0; idx < parts.length; idx++) {
       const p = parts[idx] ?? {};
       const type = typeof p.type === "string" ? p.type : "";
       const state = (p as { state?: string }).state;
@@ -738,6 +737,7 @@ export const ChatMessage = memo(function ChatMessage({
           rawParts: [...pending.map((j) => parts[j]), p],
         });
         memberIdxs.push(...pending, idx);
+        lastRecordIdx = idx;
         pending = [];
         continue;
       }
@@ -771,6 +771,36 @@ export const ChatMessage = memo(function ChatMessage({
         pending = [];
         items = [];
         memberIdxs = [];
+        lastRecordIdx = null;
+        continue;
+      }
+      // Run close: the FINAL batch skips its checkpoint by design, so the
+      // findings result is its dock anchor — the card lands on the last
+      // recorded item's index; the findings bubble itself stays visible.
+      if (
+        type === "tool-record_iteration_findings" &&
+        state === "output-available"
+      ) {
+        if (items.length > 0 && lastRecordIdx != null) {
+          const input = (p.input ?? {}) as Record<string, unknown>;
+          for (const m of memberIdxs) roles.set(m, { kind: "member" });
+          roles.set(lastRecordIdx, {
+            kind: "card",
+            group: {
+              batchNumber: null,
+              itemsRecordedSoFar: null,
+              batchSummary:
+                typeof input.resultSummary === "string"
+                  ? input.resultSummary
+                  : null,
+              items,
+            },
+          });
+        }
+        pending = [];
+        items = [];
+        memberIdxs = [];
+        lastRecordIdx = null;
         continue;
       }
       // Only batch traffic is groupable: narration, reasoning, step marks
@@ -787,7 +817,7 @@ export const ChatMessage = memo(function ChatMessage({
       }
     }
     return roles.size > 0 ? roles : null;
-  }, [message.parts, foldBoundary, messageIndex]);
+  }, [message.parts]);
 
   // Whether to show a persistent "still working" cue at the END of a streaming
   // assistant turn. True while streaming, no tool is running, AND the tail of the

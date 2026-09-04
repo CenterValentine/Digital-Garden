@@ -75,7 +75,9 @@ export function BatchGalleryCard({ group }: { group: BatchGalleryGroup }) {
       <div className="flex items-center gap-2 border-b border-black/[0.06] px-3 py-1.5 dark:border-white/[0.08]">
         <Layers className="h-3.5 w-3.5 shrink-0 text-gray-400" />
         <span className="text-[11px] font-medium text-gray-600 dark:text-gray-300">
-          {group.batchNumber != null ? `Batch ${group.batchNumber}` : "Batch"}
+          {group.batchNumber != null
+            ? `Batch ${group.batchNumber}`
+            : "Final batch"}
           {" · "}
           {items.length} item{items.length === 1 ? "" : "s"}
           {qualifiedCount > 0 && ` · ${qualifiedCount} qualified`}
