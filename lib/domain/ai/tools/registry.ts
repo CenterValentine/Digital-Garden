@@ -673,6 +673,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
               contentId: ctx.contentId,
               boundContentId: ctx.boundContentId,
               conversationId: ctx.conversationId,
+              activeCharter: ctx.activeCharter,
             },
             database: captureTo.database,
             admission: captureTo.admission,
