@@ -39,6 +39,7 @@ import {
   type PersistFinishPayload,
 } from "@/lib/domain/ai/use-conversation-binding";
 import { useContentStore } from "@/state/content-store";
+import { useIsMobile } from "@/components/common/useIsMobile";
 import { toast } from "sonner";
 import {
   buildSurfaceBackground,
@@ -192,6 +193,9 @@ function ChatViewerInner({
 }: ChatViewerInnerProps) {
   const persistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isBound = Boolean(conversationId);
+  // Same gate that mounts MobileNotesLayout/bottom nav — the composer's
+  // provider strip collapses with it.
+  const isMobileNav = useIsMobile();
 
   // Initial messages: in bound mode the binding hook hydrates from the
   // Conversation, so we start empty; in legacy mode we seed from the
@@ -968,6 +972,11 @@ function ChatViewerInner({
               onChange={handleModelChange}
               disabled={isActive}
               contributors={mixed.contributors as AIProviderId[]}
+              // Mobile nav engaged (same gate that mounts MobileNotesLayout):
+              // fold the provider quick-icons into the single ⋯ menu — the
+              // strip otherwise overflows the phone composer (owner,
+              // 2026-09-04).
+              compact={isMobileNav}
             />
             {/* AI 3.8: pin + context moved into the labeled control panel. */}
             <ChatControlPanel
