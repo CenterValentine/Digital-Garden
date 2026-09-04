@@ -1144,14 +1144,26 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         if (questState && !sittingClosed) {
           try {
             const isUrlKey = /^https?:\/\//.test(itemKey);
+            // Ledger identity is the URL when available — CROSS-SOURCE
+            // continuity (owner smoke Run B, 2026-09-04): a rows pass keys
+            // items by row id, and using that as the ledger identity forked
+            // every item into a second row (8 rows for 4 items, Pass reset)
+            // instead of advancing the same trajectory. The tier records
+            // the identity actually used.
+            const ledgerItemKey = url?.trim() || itemKey;
             await recordQuestItem({
               userId: ctx.userId,
               quest: questState,
               item: {
-                key: itemKey,
+                key: ledgerItemKey,
                 label: itemLabel,
                 url: url?.trim() || (isUrlKey ? itemKey : undefined),
-                keyTier: rowKeyedRun ? "row" : isUrlKey ? "url" : "label",
+                keyTier:
+                  url?.trim() || isUrlKey
+                    ? "url"
+                    : rowKeyedRun
+                      ? "row"
+                      : "label",
                 status: captureErrors ? "capture-failed" : status,
                 fit: fitPercent,
                 qualified,
