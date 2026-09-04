@@ -17,7 +17,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Crosshair, MessageSquare, CornerDownRight, FolderOpen, Check } from "lucide-react";
+import { MessageSquare, CornerDownRight, FolderOpen, Check } from "lucide-react";
 import { cn } from "@/lib/core/utils";
 import { calculateMenuPosition } from "@/lib/core/menu-positioning";
 import {
@@ -182,7 +182,8 @@ export function OutputTargetChip({
             : "hover:bg-black/[0.04] dark:hover:bg-white/[0.06] cursor-pointer",
         )}
       >
-        <Crosshair className="h-3 w-3 shrink-0" />
+        {/* Crosshair icon removed for now (owner, 2026-09-04) — may return
+            if label-icon affordances become a pattern. */}
         {!compact && (
           <span className="truncate">{getOutputTargetLabel(value)}</span>
         )}

@@ -801,7 +801,10 @@ function ChatViewerInner({
                 {displayTitle}
               </h1>
             )}
-            <p className="relative text-xs text-gray-500">
+            {/* Subheader line — stats, with the pinned-content affordance
+                inline to the RIGHT of it (owner, 2026-09-04). */}
+            <div className="relative flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-500">
+              <span>
               {hasMessages ? (
                 <>
                   {messages.length} message{messages.length !== 1 ? "s" : ""}
@@ -841,19 +844,12 @@ function ChatViewerInner({
               ) : (
                 "New conversation"
               )}
-            </p>
+              </span>
+              {conversationId && (
+                <AssociatedContentChips conversationId={conversationId} />
+              )}
+            </div>
           </div>
-        </div>
-        {/* Reverse-view: which content this chat is pinned to. Renders
-            nothing unless the chat is Conversation-backed with at least
-            one association. */}
-        <div className="flex flex-wrap items-center gap-2">
-          {/* AI 3.8 (owner): target chips live in the ChatControlPanel now —
-              the header keeps only the association chips, which the panel
-              does not host. */}
-          {conversationId && (
-            <AssociatedContentChips conversationId={conversationId} />
-          )}
         </div>
       </div>
 

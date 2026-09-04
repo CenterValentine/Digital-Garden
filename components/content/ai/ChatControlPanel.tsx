@@ -207,7 +207,7 @@ export function ChatControlPanel({
             </div>
             <div className="min-h-0 divide-y divide-black/[0.05] overflow-y-auto dark:divide-white/[0.06]">
               <PanelRow
-                label="File target"
+                label="Target folder"
                 hint="The folder this chat serves — run notes and ledgers file here."
               >
                 <TargetFolderChip
@@ -219,7 +219,7 @@ export function ChatControlPanel({
                 />
               </PanelRow>
               <PanelRow
-                label="Output target"
+                label="Target output"
                 hint="Where generated content (notes, documents) lands by default."
               >
                 <OutputTargetChip
@@ -236,9 +236,6 @@ export function ChatControlPanel({
                     : "Unpinned — charter per-phase routing applies. Pin to override."
                 }
               >
-                <span className="mr-0.5 text-[11px] text-gray-500 dark:text-gray-400">
-                  {modelPinned ? "Pinned" : "Unpinned"}
-                </span>
                 <ModelPinToggle pinned={modelPinned} onToggle={onModelPinnedChange} />
               </PanelRow>
               <PanelRow
