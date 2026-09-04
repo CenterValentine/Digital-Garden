@@ -37,8 +37,6 @@ import { computeModelRouteDecorations } from "@/lib/domain/ai/model-directive";
 import { findIterationFoldBoundary } from "@/lib/domain/ai/context-diet";
 import { aggregateSessionUsage } from "@/lib/features/ai-connections/usage/pricing";
 import { REVERT_SNAPSHOT_KEY } from "@/lib/domain/ai/compact-tool-outputs";
-import { TargetFolderChip } from "./TargetFolderChip";
-import { OutputTargetChip } from "./OutputTargetChip";
 import { deriveTargetSeed } from "@/lib/domain/ai/output-target";
 import { ChatInput } from "./ChatInput";
 import { FolderContextChips } from "@/components/content/ai/FolderContextChips";
@@ -1017,22 +1015,9 @@ export function ChatPanel({
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-y-1 border-b border-black/10 dark:border-white/10 px-3 py-2">
         <div className="flex min-w-0 flex-wrap items-center gap-2 gap-y-1">
           <HeaderTitle providerId={providerId} modelId={modelId} />
-          <TargetFolderChip
-            target={targetFolder}
-            inherited={targetInherited}
-            location={effectiveLocation}
-            // Selectable before the conversation exists: the pick is held in
-            // local state, carried into the POST that creates the conversation,
-            // and (in the browser panel) remembered for the next chat.
-            disabled={false}
-            onChange={handleTargetChange}
-          />
-          {/* WS7: where generated content lands by default. */}
-          <OutputTargetChip
-            value={outputTarget}
-            onChange={setOutputTarget}
-            hasOrigin={Boolean(contentId)}
-          />
+          {/* AI 3.8 (owner): the target chips moved into the ChatControlPanel
+              wholesale — duplicating them here as header affordances was
+              retired with the rail condensation. */}
         </div>
         <div className="ml-auto flex items-center gap-1">
           {conversationId && (

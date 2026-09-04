@@ -26,8 +26,6 @@ import { ChatControlPanel } from "../ai/ChatControlPanel";
 function formatTokenCount(n: number): string {
   return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
 }
-import { TargetFolderChip } from "../ai/TargetFolderChip";
-import { OutputTargetChip } from "../ai/OutputTargetChip";
 import { deriveTargetSeed } from "@/lib/domain/ai/output-target";
 import { ChatInput } from "../ai/ChatInput";
 import { FolderContextChips } from "@/components/content/ai/FolderContextChips";
@@ -850,20 +848,9 @@ function ChatViewerInner({
             nothing unless the chat is Conversation-backed with at least
             one association. */}
         <div className="flex flex-wrap items-center gap-2">
-          <TargetFolderChip
-            target={targetFolder}
-            inherited={targetInherited}
-            location={initialTargetLocation}
-            disabled={!conversationId}
-            onChange={handleTargetChange}
-          />
-          {/* WS7: where generated content lands by default. A full-page chat
-              IS the content, so there's no distinct "next to this chat". */}
-          <OutputTargetChip
-            value={outputTarget}
-            onChange={setOutputTarget}
-            hasOrigin={false}
-          />
+          {/* AI 3.8 (owner): target chips live in the ChatControlPanel now —
+              the header keeps only the association chips, which the panel
+              does not host. */}
           {conversationId && (
             <AssociatedContentChips conversationId={conversationId} />
           )}
