@@ -3186,14 +3186,26 @@ function ToolCallBubble({
       : JSON.stringify(result, null, 2);
   }, [hasError, hasResult, result, errorText]);
 
-  // Rough context cost of this tool's result, surfaced on the delayed
-  // hover tooltip (owner ask, 2026-09-04). chars/4 is an ESTIMATE and is
-  // labeled as one — providers report usage per request, never per call,
-  // so an exact figure does not exist to show.
+  // Rough token costs of this tool call, surfaced on the delayed hover
+  // tooltip (owner ask, 2026-09-04). Two directions, both chars/4
+  // ESTIMATES and labeled as such (providers report usage per request,
+  // never per call): the RESULT is context weight for later requests; the
+  // ARGUMENTS are the model's generated output for this call — the only
+  // per-call "output tokens" that exist to attribute.
   const approxResultTokens = useMemo(() => {
     const len = resultString?.length ?? 0;
     return len > 0 ? Math.max(1, Math.round(len / 4)) : null;
   }, [resultString]);
+  const approxArgsTokens = useMemo(() => {
+    if (args === undefined || args === null) return null;
+    try {
+      const s = typeof args === "string" ? args : JSON.stringify(args);
+      const len = s?.length ?? 0;
+      return len > 2 ? Math.max(1, Math.round(len / 4)) : null;
+    } catch {
+      return null;
+    }
+  }, [args]);
 
   // One-line summary used in the collapsed header. Tells the user what
   // came back without forcing them to expand — char counts for text,
@@ -3403,7 +3415,7 @@ function ToolCallBubble({
         )}
         title={
           hasDetails
-            ? `${approxResultTokens ? `≈${approxResultTokens.toLocaleString()} tokens in context (estimated) · ` : ""}${expanded ? "Hide details" : "Show details"}`
+            ? `${approxResultTokens ? `result ≈${approxResultTokens.toLocaleString()} tokens in context · ` : ""}${approxArgsTokens ? `call ≈${approxArgsTokens.toLocaleString()} tokens generated · ` : ""}(estimated) ${expanded ? "Hide details" : "Show details"}`
             : undefined
         }
       >
