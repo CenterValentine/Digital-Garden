@@ -322,12 +322,12 @@ Never folded: charter standing rules + active phase, the approved proposal/captu
 
 When P4c lands, a dedicated verification pass confirms the cost machinery works *as measured*, not as designed. Using a real multi-sitting quest (the P2 smoke's Job Leads table is the natural fixture):
 
-- [ ] **Dedup actually skips**: a revisited board's plan marks seen items (rejects included via the quest ledger) and the run's page-read count reflects the skips — compare ledger cost stamps between sitting 1 and sitting 2 on the same board.
-- [ ] **Folding actually shrinks resends**: per-step `inputTokens` after a batch checkpoint drops to ~(summary + current item), verified from the turn diagnostics payloads — not just "the card collapsed."
-- [ ] **Cache behavior**: cache-read ratio stays high across a folded run (folding at batch boundaries must not thrash the prompt cache — the §6.1 economics claim, checked against `cachedInputTokens`).
-- [ ] **Roll-up slimming**: capture runs' roll-ups reference the view, not a re-emitted table (token delta visible in the ledger's final cost stamp).
-- [ ] **Acquisition conservatism**: research runs LOCATE-then-read (search first, stop on acquire — prompt guidance shipped 2026-09-02 after the Greenhouse crawl observation); spot-check a run's pages-read list for speculative crawling.
-- [ ] **Model-role routing engaged**: iteration phases run on scout-tier, judgment phases on the routed tier — verify via the model-switch dividers + per-phase ledger cost stamps.
+- [x] **Dedup actually skips** *(measured 2026-09-04)*: an all-already-scored sitting short-circuited to ZERO page reads and ZERO re-records, closing straight through findings; master stamps show the skip sitting adding a small fraction of an acquisition sitting's tokens. Cross-sitting memory held across sources after the URL-identity fix (rows pass advanced the same ledger rows, Pass 1→2).
+- [x] **Folding actually shrinks resends** *(measured, Run B3 segments)*: per-request input stayed FLAT across the run (~26k → ~21k → ~22k avg per request) while four page reads accumulated in the transcript — without the fold each request would have grown monotonically by the read bulk. The fold holds resend size at ~(digest + current batch).
+- [x] **Cache behavior** *(measured, Run B3)*: cache-read ratio 61–93% per segment (72% turn-wide) across a folded batched run — the batch-boundary fold costs one bounded invalidation per batch, never a thrash; unfolded turns measured ~95% for comparison. Matches the §6.1 economics (fold per batch, never per item).
+- [x] **Roll-up slimming** *(exceeded — measured as zero)*: quest runs create NO roll-up note at all (reuse policy §3.6); the reconciliation lives in the quest log, rows in the ledger, and the closing message links both. Verified zero new notes across three sittings.
+- [ ] **Acquisition conservatism**: NOT exercisable in this smoke (all runs used given URLs — no search/locate phase). Prompt guidance shipped 2026-09-02; measure on the first real job-hunt quest (spot-check its pages-read list for speculative crawling).
+- [ ] **Model-role routing engaged**: NOT exercised in this smoke (the Test charter carries no model directives; everything ran on one model). The routing machinery itself is gate-verified (`model-routing:check`); measure per-phase cost stamps on the first charter with scout/analyst directives.
 
 ### 9.2 Graceful budgets — T4 design constraints (owner doctrine, 2026-09-02)
 
