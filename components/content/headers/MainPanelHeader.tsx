@@ -5,7 +5,8 @@ import { createPortal } from "react-dom";
 import { useDrop } from "react-dnd";
 import { usePathname } from "next/navigation";
 import { requestOverlayOpen } from "@/lib/domain/browser-extension/panel-bridge";
-import { X } from "lucide-react";
+import { ScrollText, X } from "lucide-react";
+import { useCharterIdsStore } from "@/state/charter-ids-store";
 import { toast } from "sonner";
 import { getSurfaceStyles } from "@/lib/design/system";
 import { calculateMenuPosition } from "@/lib/core/menu-positioning";
@@ -276,6 +277,11 @@ export function MainPanelHeader({
   onTabDrop,
 }: MainPanelHeaderProps) {
   const glass1 = getSurfaceStyles("glass-1");
+  // Charter identity for tabs (owner, 2026-09-04): tab data carries no note
+  // metadata, so charter-marked notes rendered the generic note icon here
+  // while the tree showed ScrollText. The id cache (fed by tree loads)
+  // restores the same full icon swap the tree does.
+  const charterIds = useCharterIdsStore((state) => state.ids);
   const layoutMode = useContentStore((state) => state.layoutMode);
   const activePaneId = useContentStore((state) => state.activePaneId);
   const pane = useContentStore((state) => state.panes[paneId]);
@@ -736,7 +742,10 @@ export function MainPanelHeader({
                 : `${tabs.length} ${tabs.length === 1 ? "tab" : "tabs"} hidden by filters`}
             </div>
           ) : visibleTabs.map((tab) => {
-            const Icon = getTabIcon(tab.contentType);
+            const isCharter =
+              charterIds.has(tab.contentId) &&
+              (tab.contentType === "note" || tab.contentType === null);
+            const Icon = isCharter ? ScrollText : getTabIcon(tab.contentType);
             const isActive = tab.id === pane?.activeTabId;
             const isDragging = draggedTabId === tab.id;
 
@@ -826,7 +835,10 @@ export function MainPanelHeader({
                     onClick={() => activateContentTab(tab.id)}
                     onDoubleClick={(e) => { e.preventDefault(); startRename(tab.id, tab.title); }}
                   >
-                    <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                    <Icon
+                      className={`h-3.5 w-3.5 shrink-0${isCharter ? " text-indigo-500 dark:text-indigo-400" : ""}`}
+                      aria-hidden="true"
+                    />
                     <span className="truncate">{tab.title}</span>
                   </button>
                 )}
