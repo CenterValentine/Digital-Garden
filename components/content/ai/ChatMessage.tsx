@@ -3186,6 +3186,15 @@ function ToolCallBubble({
       : JSON.stringify(result, null, 2);
   }, [hasError, hasResult, result, errorText]);
 
+  // Rough context cost of this tool's result, surfaced on the delayed
+  // hover tooltip (owner ask, 2026-09-04). chars/4 is an ESTIMATE and is
+  // labeled as one — providers report usage per request, never per call,
+  // so an exact figure does not exist to show.
+  const approxResultTokens = useMemo(() => {
+    const len = resultString?.length ?? 0;
+    return len > 0 ? Math.max(1, Math.round(len / 4)) : null;
+  }, [resultString]);
+
   // One-line summary used in the collapsed header. Tells the user what
   // came back without forcing them to expand — char counts for text,
   // item counts for arrays, "edit applied" for orchestrator payloads.
@@ -3392,7 +3401,11 @@ function ToolCallBubble({
           hasDetails && "hover:bg-black/[0.03] dark:hover:bg-white/[0.04] transition-colors cursor-pointer",
           !hasDetails && "cursor-default",
         )}
-        title={hasDetails ? (expanded ? "Hide details" : "Show details") : undefined}
+        title={
+          hasDetails
+            ? `${approxResultTokens ? `≈${approxResultTokens.toLocaleString()} tokens in context (estimated) · ` : ""}${expanded ? "Hide details" : "Show details"}`
+            : undefined
+        }
       >
         {isRunning ? (
           <Loader2 className="h-3 w-3 shrink-0 animate-spin text-amber-400" />
