@@ -238,11 +238,11 @@ export function ChatControlPanel({
                 />
               </PanelRow>
               <PanelRow
-                label="Lock-in model"
+                label="Lock selected model"
                 hint={
                   modelPinned
-                    ? "Locked in — the selected model overrides charter per-phase routing."
-                    : "Unlocked — charter per-phase routing applies. Lock in to override."
+                    ? "Locked — the selected model overrides charter per-phase routing."
+                    : "Unlocked — charter per-phase routing applies. Lock to override."
                 }
               >
                 <ModelPinToggle pinned={modelPinned} onToggle={onModelPinnedChange} />
