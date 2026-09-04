@@ -972,12 +972,26 @@ export async function PATCH(
             }
             // ────────────────────────────────────────────────────────────────
 
+            // MERGE over existing metadata — this path only owns the
+            // derived-stats keys; replacing wholesale wiped charter marks
+            // and other durable metadata (same bug family as the collab
+            // store hook, fixed 2026-09-04).
+            const existingNotePayload = await prisma.notePayload.findUnique({
+              where: { contentId: id },
+              select: { metadata: true },
+            });
+            const priorNoteMeta =
+              existingNotePayload?.metadata &&
+              typeof existingNotePayload.metadata === "object"
+                ? (existingNotePayload.metadata as Record<string, unknown>)
+                : {};
             await prisma.notePayload.upsert({
               where: { contentId: id },
               update: {
                 tiptapJson: json,
                 searchText,
                 metadata: {
+                  ...priorNoteMeta,
                   wordCount,
                   characterCount: searchText.length,
                   readingTime,
