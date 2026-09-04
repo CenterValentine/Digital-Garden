@@ -35,6 +35,9 @@ export interface OutputDatabaseProposalPayload {
     primary?: boolean;
   }>;
   dedupeColumn: string | null;
+  /** Resolved destination — charter folder, else the chat's target. */
+  parentId?: string | null;
+  parentTitle?: string | null;
 }
 
 type ApplyState =
@@ -92,6 +95,7 @@ export function OutputDatabaseProposalCard({
         body: JSON.stringify({
           title: payload.title,
           columns: payload.columns,
+          ...(payload.parentId ? { parentId: payload.parentId } : {}),
         }),
       });
       const json = await res.json().catch(() => null);
@@ -164,6 +168,11 @@ export function OutputDatabaseProposalCard({
           {payload.dedupeColumn && (
             <div className="text-[11px] text-gray-500 dark:text-gray-400">
               Identity column: {payload.dedupeColumn}
+            </div>
+          )}
+          {payload.parentTitle && (
+            <div className="text-[11px] text-gray-500 dark:text-gray-400">
+              Location: {payload.parentTitle}
             </div>
           )}
         </div>

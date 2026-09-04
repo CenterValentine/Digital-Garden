@@ -873,6 +873,33 @@ export function createDataTools(ctx: ToolExecuteContext) {
               return `dedupeColumn "${input.dedupeColumn}" is not one of the proposed columns.`;
             }
           }
+          // Placement (owner policy: no root scatter — a table minted at
+          // root among hundreds of files is invisible): home the new table
+          // beside the active charter, else in the chat's target folder.
+          let parentId: string | null = null;
+          let parentTitle: string | null = null;
+          if (ctx.activeCharter) {
+            const charterNode = await prisma.contentNode.findFirst({
+              where: {
+                id: ctx.activeCharter.contentId,
+                ownerId: ctx.userId,
+                deletedAt: null,
+              },
+              select: { parentId: true },
+            });
+            parentId = charterNode?.parentId ?? null;
+          }
+          if (!parentId && ctx.targetFolderId) {
+            parentId = ctx.targetFolderId;
+          }
+          if (parentId) {
+            const parent = await prisma.contentNode.findFirst({
+              where: { id: parentId, ownerId: ctx.userId, deletedAt: null },
+              select: { id: true, title: true },
+            });
+            parentId = parent?.id ?? null;
+            parentTitle = parent?.title ?? null;
+          }
           return JSON.stringify({
             __outputDatabaseProposal: true,
             title: input.title.trim().slice(0, 120),
@@ -882,6 +909,8 @@ export function createDataTools(ctx: ToolExecuteContext) {
               input.dedupeColumn?.trim() ||
               columns.find((c) => c.type === "url")?.name ||
               null,
+            parentId,
+            parentTitle,
           });
         } catch (error) {
           logger.warn({
