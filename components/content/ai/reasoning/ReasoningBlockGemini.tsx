@@ -64,18 +64,13 @@ export function ReasoningBlockGemini({ text, streaming }: ReasoningBlockProps) {
 
   return (
     <div
-      className="my-2 rounded-lg border bg-gradient-to-br"
-      style={{
-        borderColor: "rgba(66, 133, 244, 0.25)",
-        backgroundImage:
-          "linear-gradient(135deg, rgba(66,133,244,0.06), rgba(124,77,255,0.04))",
-      }}
+      className="my-1.5"
     >
       <button
         ref={headerRef}
         type="button"
         onClick={toggle}
-        className="flex w-full items-center gap-2 px-3 py-1.5 text-[11px] font-medium uppercase tracking-wide text-[#1967D2] dark:text-[#4285F4] hover:bg-black/[0.03] dark:hover:bg-white/[0.04] transition-colors rounded-lg"
+        className="inline-flex items-center gap-1.5 rounded px-1 py-0.5 text-[12px] font-medium text-[#1967D2] dark:text-[#4285F4] hover:opacity-80 transition-opacity"
       >
         {open ? (
           <ChevronDown className="h-3 w-3 opacity-70" />
@@ -89,13 +84,13 @@ export function ReasoningBlockGemini({ text, streaming }: ReasoningBlockProps) {
           {streaming ? "Thinking process…" : "Thinking process"}
         </span>
         {elapsedLabel && (
-          <span className="ml-auto tabular-nums text-[10px] font-normal opacity-60">
+          <span className="tabular-nums text-[10px] font-normal opacity-60">
             {elapsedLabel}
           </span>
         )}
       </button>
       {open && (
-        <div className="space-y-2.5 px-3.5 pb-3 pt-1 text-xs leading-relaxed text-gray-700 dark:text-gray-300">
+        <div className="space-y-2.5 pl-6 pb-1 pt-1 text-xs leading-relaxed text-gray-700 dark:text-gray-300">
           {sections.map((s, i) => (
             <div key={i}>
               {s.heading && (

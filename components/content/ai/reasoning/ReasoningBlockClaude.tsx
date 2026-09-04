@@ -25,14 +25,14 @@ export function ReasoningBlockClaude({ text, streaming }: ReasoningBlockProps) {
 
   return (
     <div
-      className="my-2 rounded-lg border border-[#D4A574]/25 bg-[#D4A574]/[0.06]"
+      className="my-1.5"
       style={{ color: "#D4A574" }}
     >
       <button
         ref={headerRef}
         type="button"
         onClick={toggle}
-        className="flex w-full items-center gap-2 px-3 py-1.5 text-[11px] font-medium uppercase tracking-wide hover:bg-[#D4A574]/[0.08] transition-colors rounded-lg"
+        className="inline-flex items-center gap-1.5 rounded px-1 py-0.5 text-[12px] font-medium hover:opacity-80 transition-opacity"
       >
         {open ? (
           <ChevronDown className="h-3 w-3 opacity-70" />
@@ -46,14 +46,14 @@ export function ReasoningBlockClaude({ text, streaming }: ReasoningBlockProps) {
           {streaming ? "Thinking…" : "Thought"}
         </span>
         {elapsedLabel && (
-          <span className="ml-auto tabular-nums text-[10px] font-normal opacity-60">
+          <span className="tabular-nums text-[10px] font-normal opacity-60">
             {elapsedLabel}
           </span>
         )}
       </button>
       {open && (
         <div
-          className="px-3.5 pb-2.5 pt-1 text-xs italic leading-relaxed whitespace-pre-wrap"
+          className="pl-6 pb-1 pt-0.5 text-xs italic leading-relaxed whitespace-pre-wrap"
           style={{ color: "rgba(212, 165, 116, 0.85)" }}
         >
           {text}

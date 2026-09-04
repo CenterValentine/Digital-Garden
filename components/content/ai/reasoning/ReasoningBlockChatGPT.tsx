@@ -29,12 +29,12 @@ export function ReasoningBlockChatGPT({ text, streaming }: ReasoningBlockProps) 
   }, [text]);
 
   return (
-    <div className="my-2 rounded-lg border border-[#10A37F]/25 bg-[#10A37F]/[0.04]">
+    <div className="my-1.5">
       <button
         ref={headerRef}
         type="button"
         onClick={toggle}
-        className="flex w-full items-center gap-2 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-[#0B7A5E] dark:text-[#10A37F] hover:bg-[#10A37F]/[0.08] transition-colors rounded-lg"
+        className="inline-flex items-center gap-1.5 rounded px-1 py-0.5 text-[12px] font-medium text-[#0B7A5E] dark:text-[#10A37F] hover:opacity-80 transition-opacity"
       >
         {open ? (
           <ChevronDown className="h-3 w-3 opacity-70" />
@@ -47,7 +47,7 @@ export function ReasoningBlockChatGPT({ text, streaming }: ReasoningBlockProps) 
         <span className={streaming ? "animate-pulse" : undefined}>
           {streaming ? "Reasoning…" : "Reasoning"}
         </span>
-        <span className="ml-auto inline-flex items-center gap-2 text-[10px] font-normal opacity-60">
+        <span className="inline-flex items-center gap-2 text-[10px] font-normal opacity-60">
           {!streaming && (
             <span>
               {steps.length} step{steps.length === 1 ? "" : "s"}
@@ -57,7 +57,7 @@ export function ReasoningBlockChatGPT({ text, streaming }: ReasoningBlockProps) 
         </span>
       </button>
       {open && (
-        <ol className="space-y-1.5 px-3 pb-3 pt-1">
+        <ol className="space-y-1.5 pl-6 pb-1 pt-1">
           {steps.map((step, i) => (
             <li
               key={i}
