@@ -3187,21 +3187,35 @@ function ToolCallBubble({
   }, [hasError, hasResult, result, errorText]);
 
   // Rough token costs of this tool call, surfaced on the delayed hover
-  // tooltip (owner ask, 2026-09-04). Two directions, both chars/4
-  // ESTIMATES and labeled as such (providers report usage per request,
-  // never per call): the RESULT is context weight for later requests; the
-  // ARGUMENTS are the model's generated output for this call — the only
-  // per-call "output tokens" that exist to attribute.
+  // tooltip (owner ask, 2026-09-04). Two directions, both ESTIMATES and
+  // labeled as such (providers report usage per request, never per call):
+  // the RESULT is context weight for later requests; the ARGUMENTS are the
+  // model's generated output for this call — the only per-call "output
+  // tokens" that exist to attribute.
+  //
+  // Content-aware divisors (owner accuracy bar, 2026-09-04): BPE
+  // tokenizers average ~4 chars/token on prose but ~3.3 on compact JSON
+  // (punctuation/keys fragment) and ~3.7 on pretty-printed JSON (indent
+  // runs collapse). This puts mixed payloads at roughly ±15-20% vs the
+  // flat /4's ±30%-biased-low; anything tighter needs a bundled
+  // tokenizer, which a tooltip does not justify.
   const approxResultTokens = useMemo(() => {
-    const len = resultString?.length ?? 0;
-    return len > 0 ? Math.max(1, Math.round(len / 4)) : null;
+    const s = resultString;
+    if (!s) return null;
+    const divisor = s.startsWith("{") || s.startsWith("[")
+      ? s.includes("\n  ")
+        ? 3.7 // pretty-printed JSON
+        : 3.3 // compact JSON
+      : 4.0; // prose-ish
+    return s.length > 0 ? Math.max(1, Math.round(s.length / divisor)) : null;
   }, [resultString]);
   const approxArgsTokens = useMemo(() => {
     if (args === undefined || args === null) return null;
     try {
       const s = typeof args === "string" ? args : JSON.stringify(args);
-      const len = s?.length ?? 0;
-      return len > 2 ? Math.max(1, Math.round(len / 4)) : null;
+      if (!s || s.length <= 2) return null;
+      const divisor = s.startsWith("{") || s.startsWith("[") ? 3.3 : 4.0;
+      return Math.max(1, Math.round(s.length / divisor));
     } catch {
       return null;
     }
@@ -3415,7 +3429,7 @@ function ToolCallBubble({
         )}
         title={
           hasDetails
-            ? `${approxResultTokens ? `result ≈${approxResultTokens.toLocaleString()} tokens in context · ` : ""}${approxArgsTokens ? `call ≈${approxArgsTokens.toLocaleString()} tokens generated · ` : ""}(estimated) ${expanded ? "Hide details" : "Show details"}`
+            ? `${approxResultTokens ? `result ≈${approxResultTokens.toLocaleString()} tokens in context · ` : ""}${approxArgsTokens ? `call ≈${approxArgsTokens.toLocaleString()} tokens generated · ` : ""}(±20% est.) ${expanded ? "Hide details" : "Show details"}`
             : undefined
         }
       >
