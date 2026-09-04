@@ -10,6 +10,13 @@ last_updated: 2026-08-29
 
 ---
 
+## Workspace layout: multi-tab last-writer-wins reverts D+D (2026-09-04; owner repro; lands with layout-intent "P4 live fan-in")
+
+Owner report during the Release-4 smoke: split-pane tab D+D "repeatedly regressed/ignored" on dev; prod unaffected; hard refresh helps. Diagnosed, not fixed (the fix IS the planned live fan-in phase, not a drive-by):
+
+- [ ] **Null-base saves are unconditional overwrites** (`saveWorkspaceState` — no `expectedUpdatedAt` → plain update). Legitimate for first-save/layout-authority, but it lets any client whose `lastAppliedUpdatedAt` map is unprimed clobber newer state. Revisit the semantics with fan-in (e.g., server distinguishes "create/first write" from "stale blind write").
+- [ ] **Stale background tabs are live writers.** Each open tab debounce-saves its own snapshot; a wake (visibility, dev Fast Refresh re-arming effects) pushes an older arrangement; the active tab's refresh path ("saved by another tab" → apply) then reverts the user's fresh drag. The 409-adopt path can also re-write per-tab view divergence (the R1-R8 echo territory). Dev amplifiers: many smoke tabs + constant HMR — which is why prod looks fine. Workaround: close stale tabs / hard refresh.
+
 ## Deferred batch execution for row-driven AI runs (2026-08-29; plan: EXTRACTION-TO-DATABASE-PLAN.md §3.3/§6, decision D4)
 
 Stage-2 lead investigation (research a captured lead, tailor resume/CL) is
