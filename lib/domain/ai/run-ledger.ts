@@ -82,6 +82,18 @@ export async function upsertRunLedger(
     ownerContentId?: string;
     /** Stable conversation/run identity used to find later phase writes. */
     runKey?: string;
+    /**
+     * Durable capture configuration (EXTRACTION-TO-DATABASE-PLAN P1):
+     * stamped at proposal approval, carried forward on every later write —
+     * `record_item_result` re-derives it from here, never from model memory.
+     */
+    captureConfig?: unknown;
+    /**
+     * Quest binding (P4a): sittingId + master/ledger ids + column maps —
+     * stamped at proposal, carried forward, read back per item and by the
+     * chat route's compaction-resilient budget fallback (P4b).
+     */
+    questInfo?: unknown;
   } = {},
 ): Promise<{ contentNodeId: string; created: boolean }> {
   const { ownerContentId } = options;
@@ -90,6 +102,10 @@ export async function upsertRunLedger(
   const scope = ownerContentId
     ? { ownedByNoteId: ownerContentId }
     : { parentId: targetFolderId };
+  // Quest logs ("quest:" keys) are cross-chat durable: any sitting, from any
+  // conversation, must adopt the same note. The key alone is the identity —
+  // scoping by the calling chat would mint a new note per conversation.
+  const questScoped = runKey.startsWith("quest:");
 
   // New ledgers are keyed in metadata because their visible titles are now
   // descriptive. Fall back once to the legacy exact title so an existing
@@ -97,7 +113,7 @@ export async function upsertRunLedger(
   const keyedLedger = await prisma.contentNode.findFirst({
     where: {
       ownerId: userId,
-      ...scope,
+      ...(questScoped ? {} : scope),
       contentType: "note",
       deletedAt: null,
       notePayload: {
@@ -110,32 +126,43 @@ export async function upsertRunLedger(
       notePayload: { select: { metadata: true } },
     },
   });
+  // Quest logs never adopt via the legacy exact-title fallback: a stale
+  // "Run Ledger" note sitting in the charter's folder is old debris, not
+  // this quest's log (owner smoke 2026-09-03: a July note got adopted and
+  // its history prepended to the quest log). Quest keys match by key only.
   const existing =
     keyedLedger ??
-    (await prisma.contentNode.findFirst({
-      where: {
-        ownerId: userId,
-        ...scope,
-        contentType: "note",
-        deletedAt: null,
-        title: LEDGER_TITLE,
-      },
-      select: {
-        id: true,
-        title: true,
-        notePayload: { select: { metadata: true } },
-      },
-    }));
+    (questScoped
+      ? null
+      : await prisma.contentNode.findFirst({
+          where: {
+            ownerId: userId,
+            ...scope,
+            contentType: "note",
+            deletedAt: null,
+            title: LEDGER_TITLE,
+          },
+          select: {
+            id: true,
+            title: true,
+            notePayload: { select: { metadata: true } },
+          },
+        }));
   const ledgerTitle = existing?.title.startsWith(`${LEDGER_TITLE} —`)
     ? existing.title
     : buildRunLedgerTitle(entry, runKey);
 
-  const prior =
+  const priorMeta =
     existing?.notePayload?.metadata &&
     typeof existing.notePayload.metadata === "object"
-      ? ((existing.notePayload.metadata as Record<string, unknown>)
-          .ledgerMarkdown as string | undefined)
+      ? (existing.notePayload.metadata as Record<string, unknown>)
       : undefined;
+  const prior = priorMeta?.ledgerMarkdown as string | undefined;
+  // Capture config survives every subsequent checkpoint write — the whole
+  // metadata object is rewritten per upsert, so an un-carried key would
+  // silently vanish at the first item record.
+  const captureConfig = options.captureConfig ?? priorMeta?.captureConfig;
+  const questInfo = options.questInfo ?? priorMeta?.questInfo;
 
   const markdown = prior
     ? `${prior}\n\n${renderEntry(entry)}`
@@ -151,6 +178,8 @@ export async function upsertRunLedger(
       [LEDGER_RUN_KEY]: runKey,
       ledgerTitle,
       wordCount: searchText.split(/\s+/).length,
+      ...(captureConfig !== undefined ? { captureConfig } : {}),
+      ...(questInfo !== undefined ? { questInfo } : {}),
     } as unknown as Prisma.InputJsonValue,
   };
 
@@ -193,4 +222,49 @@ export async function upsertRunLedger(
     attrs: { contentNodeId: node.id, targetFolderId },
   });
   return { contentNodeId: node.id, created: true };
+}
+
+/**
+ * Read a run ledger's stored capture config by its runKey (P2's config
+ * source — the ledger is the run's reload-surviving state). Keyed lookup
+ * only: capture configs are stamped by the proposal, which always writes
+ * the key.
+ */
+export async function readRunLedgerCaptureConfig(
+  userId: string,
+  targetFolderId: string | null,
+  options: { ownerContentId?: string; runKey: string },
+): Promise<{
+  contentNodeId: string;
+  captureConfig: unknown;
+  questInfo: unknown;
+} | null> {
+  const scope = options.ownerContentId
+    ? { ownedByNoteId: options.ownerContentId }
+    : { parentId: targetFolderId };
+  // Mirror of upsertRunLedger: quest keys are globally unique per user, so
+  // a resumed sitting in a fresh chat still finds the quest log's config.
+  const questScoped = options.runKey.startsWith("quest:");
+  const node = await prisma.contentNode.findFirst({
+    where: {
+      ownerId: userId,
+      ...(questScoped ? {} : scope),
+      contentType: "note",
+      deletedAt: null,
+      notePayload: {
+        metadata: { path: [LEDGER_RUN_KEY], equals: options.runKey },
+      },
+    },
+    select: { id: true, notePayload: { select: { metadata: true } } },
+  });
+  if (!node) return null;
+  const meta =
+    node.notePayload?.metadata && typeof node.notePayload.metadata === "object"
+      ? (node.notePayload.metadata as Record<string, unknown>)
+      : undefined;
+  return {
+    contentNodeId: node.id,
+    captureConfig: meta?.captureConfig,
+    questInfo: meta?.questInfo,
+  };
 }

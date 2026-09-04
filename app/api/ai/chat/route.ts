@@ -32,6 +32,7 @@ import { isResumableConfigured } from "@/lib/domain/ai/resumable/redis";
 import { getStreamContext } from "@/lib/domain/ai/resumable/context";
 import {
   associateStream,
+  clearActiveStream,
   getActiveStreamId,
 } from "@/lib/domain/ai/resumable/association";
 import type { JSONContent } from "@tiptap/core";
@@ -57,6 +58,7 @@ import {
   getModelMeta,
 } from "@/lib/domain/ai/providers/catalog";
 import {
+  stripOpenAIItemReferences,
   stripReasoningForResend,
   supersedeIterationHistory,
 } from "@/lib/domain/ai/context-diet";
@@ -206,6 +208,8 @@ import { effectiveCapabilities } from "@/lib/domain/ai/features/capabilities";
 import { prisma } from "@/lib/database/client";
 import type { Prisma } from "@/lib/database/generated/prisma";
 import { logger, spanPayload, startSpan, withRouteTrace, withSpan } from "@/lib/core/logger";
+import { readRunLedgerCaptureConfig } from "@/lib/domain/ai/run-ledger";
+import { parseQuestInfo } from "@/lib/domain/ai/quests";
 import { after } from "next/server";
 import { assembleFolderChatContext } from "@/extensions/studio/server/source-selection";
 import { refreshContextOnAccess } from "@/lib/domain/ai-context/context-refresh";
@@ -526,7 +530,7 @@ export async function POST(request: Request) {
       // record_iteration_findings) raises the step cap so the loop has room to
       // process ALL its items in the run. Without this the default 7/8-step cap
       // ends the turn after ~1 item, even though the client item budget allows N.
-      const itemIterationBudget = ((): number | null => {
+      let itemIterationBudget = ((): number | null => {
         const msgs = (body as { messages?: unknown }).messages;
         if (!Array.isArray(msgs)) return null;
         let budget: number | null = null;
@@ -1163,6 +1167,70 @@ export async function POST(request: Request) {
       }
       // mode "chat" → keep the chat-owner default.
 
+      // ── P4b: durable budget fallback + parity (quests) ────────────────
+      // The history-derived budget above dies with the transcript: after
+      // conversation compaction the proposal part is gone and the step cap
+      // collapses mid-run. The quest's questInfo (stamped in the run note's
+      // metadata at approval) survives anything the transcript can lose —
+      // derive from it when history yields nothing, and when BOTH exist,
+      // assert parity (mismatch = a derivation bug, logged loudly).
+      {
+        let latestRunKey: string | null = null;
+        const msgs = (body as { messages?: unknown }).messages;
+        if (Array.isArray(msgs)) {
+          for (const m of msgs) {
+            const parts = (m as { parts?: unknown }).parts;
+            if (!Array.isArray(parts)) continue;
+            for (const part of parts) {
+              const p = part as {
+                type?: string;
+                input?: { ledgerRunKey?: unknown };
+                output?: { ledgerRunKey?: unknown };
+              };
+              const key =
+                (typeof p.input?.ledgerRunKey === "string" && p.input.ledgerRunKey) ||
+                (typeof p.output?.ledgerRunKey === "string" && p.output.ledgerRunKey) ||
+                null;
+              if (key && p.type?.startsWith("tool-")) latestRunKey = key;
+            }
+          }
+        }
+        if (latestRunKey) {
+          try {
+            const runState = await readRunLedgerCaptureConfig(
+              session.user.id,
+              targetFolderId ?? null,
+              { ownerContentId: outputOwnerId, runKey: latestRunKey },
+            );
+            const quest = parseQuestInfo(runState?.questInfo);
+            if (quest && !quest.sittingClosed) {
+              if (itemIterationBudget == null) {
+                itemIterationBudget = Math.min(quest.itemBudget, 200);
+                logger.info({
+                  layer: "ai",
+                  event: "quests:budget_fallback",
+                  summary: "item budget restored from quest metadata (history lacked it)",
+                  attrs: { runKey: latestRunKey, budget: itemIterationBudget },
+                });
+              } else if (itemIterationBudget !== Math.min(quest.itemBudget, 200)) {
+                logger.warn({
+                  layer: "ai",
+                  event: "quests:parity_mismatch",
+                  summary: "history-derived and quest-derived item budgets disagree",
+                  attrs: {
+                    fromHistory: itemIterationBudget,
+                    fromQuest: quest.itemBudget,
+                    runKey: latestRunKey,
+                  },
+                });
+              }
+            }
+          } catch {
+            // Fallback is best-effort — history remains the primary source.
+          }
+        }
+      }
+
       // Per-request token accumulator (v3.1 R5): onStepFinish adds each
       // step's usage; phase_checkpoint stamps the running total into the
       // Run Ledger. Input/output split added by cost metering so ledger
@@ -1390,10 +1458,16 @@ export async function POST(request: Request) {
       //     no resend value for non-Anthropic providers, yet
       //     convertToModelMessages forwards them as input verbatim (~100k
       //     chars replayed per request in the measured DeepSeek run).
+      //   - stripOpenAIItemReferences: dead `openai.itemId` pointers replay as
+      //     item_reference against an expired server-side store, 400ing every
+      //     send in the conversation (#193). Heals transcripts poisoned before
+      //     the `store: false` option below existed.
       const resolvedMessages = resolveAttachmentsForModel(
-        stripReasoningForResend(
-          supersedeIterationHistory(repairedMessages),
-          executedVendorId,
+        stripOpenAIItemReferences(
+          stripReasoningForResend(
+            supersedeIterationHistory(repairedMessages),
+            executedVendorId,
+          ),
         ),
         executedVendorId,
         audioCapable,
@@ -2186,8 +2260,21 @@ export async function POST(request: Request) {
         executedBareModelId,
         { mechanicalRun: itemIterationBudget != null },
       );
+      // OpenAI Responses stores every item server-side while `store` keeps its
+      // default of true, and @ai-sdk/openai then replays those items as
+      // { type: "item_reference" } instead of the text we hold verbatim in
+      // ConversationMessage.parts. Items expire after ~30 days (a key rotation
+      // re-scopes the store sooner), after which the reference resolves to
+      // nothing and the conversation is permanently unsendable (#193). Keep the
+      // request self-contained. Deliberately NOT a buildProviderOptions branch:
+      // that function's return doubles as the "this turn had a reasoning
+      // config" signal for describeReasoningConfig below, and a storage knob is
+      // not a reasoning config.
+      const storageProviderOptions: AIProviderOptions | undefined =
+        executedVendorId === "openai" ? { openai: { store: false } } : undefined;
       const providerOptions = mergeAIProviderOptions(
         reasoningProviderOptions,
+        storageProviderOptions,
         promptCachePolicy.providerOptions,
       );
 
@@ -2508,6 +2595,18 @@ export async function POST(request: Request) {
         originalMessages: repairedMessages,
         sendReasoning: true,
         onFinish: async ({ responseMessage, isAborted }) => {
+          // Phantom-resume guard (owner smoke 2026-09-04): the turn is over
+          // on EVERY path through here — clear the resumable association so
+          // later visits never re-attach to a stream with no live writer
+          // (a Stopped turn's buffer has no completion marker; attaching to
+          // it hangs the client in "thinking" until the key's 1h TTL).
+          if (resumableStreamId && conversationIdForAssoc) {
+            void clearActiveStream(
+              session.user.id,
+              conversationIdForAssoc,
+              resumableStreamId,
+            );
+          }
           // Server-side turn persistence + approval notification (S1). Only
           // turns bound to a Conversation entity persist here; ephemeral
           // surfaces keep their existing client-side persist path.

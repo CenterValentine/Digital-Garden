@@ -10,6 +10,13 @@ last_updated: 2026-08-29
 
 ---
 
+## Workspace layout: multi-tab last-writer-wins reverts D+D (2026-09-04; owner repro; lands with layout-intent "P4 live fan-in")
+
+Owner report during the Release-4 smoke: split-pane tab D+D "repeatedly regressed/ignored" on dev; prod unaffected; hard refresh helps. Diagnosed, not fixed (the fix IS the planned live fan-in phase, not a drive-by):
+
+- [ ] **Null-base saves are unconditional overwrites** (`saveWorkspaceState` — no `expectedUpdatedAt` → plain update). Legitimate for first-save/layout-authority, but it lets any client whose `lastAppliedUpdatedAt` map is unprimed clobber newer state. Revisit the semantics with fan-in (e.g., server distinguishes "create/first write" from "stale blind write").
+- [ ] **Writer UNIDENTIFIED (2026-09-04; two theories eliminated).** Eliminated: multi-tab live writers — owner's only other 3015 tabs were weeks-unviewed across several browser restarts, i.e. lazy-loaded/discarded, running no JS. Surviving single-client hypotheses: (a) **restore-from-URL re-projection** — the URL query is a full layout snapshot (`tabs_top_left=…`) that predates the drag; any cold-load/refresh path honoring the URL tiebreaker re-applies the stale arrangement with NO server write (fits: hard refresh recovers, prod has no HMR-driven re-runs); (b) **active-tab Fast Refresh** re-arming the shell's debounced persist against a stale snapshot or wiping the module-scope `lastAppliedUpdatedAt`/`lastAppliedSnapshotJson` maps (null base → unconditional overwrite); (c) the browser-extension side-panel embed as an invisible second client (unconfirmed). **Settling diagnostic on next repro:** drag once, note the time, then diff `ContentWorkspace.updatedAt`/`paneState` — a revert WITHOUT a new server write convicts (a); with writes, attribute the writer. Fan-in work should also add a writer recency/liveness signal regardless.
+
 ## Deferred batch execution for row-driven AI runs (2026-08-29; plan: EXTRACTION-TO-DATABASE-PLAN.md §3.3/§6, decision D4)
 
 Stage-2 lead investigation (research a captured lead, tailor resume/CL) is

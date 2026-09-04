@@ -39,6 +39,84 @@ export function stripReasoningForResend(
   });
 }
 
+// ── OpenAI item references (#193) ───────────────────────────────────────────
+
+/** Provider-metadata namespace the OpenAI Responses API reads item ids from. */
+const OPENAI_METADATA_NAMESPACE = "openai";
+
+/**
+ * The metadata carriers convertToModelMessages forwards as `providerOptions`
+ * on assistant text/reasoning parts (`providerMetadata`), tool calls
+ * (`callProviderMetadata`) and tool results (`resultProviderMetadata`). All
+ * three can carry an `openai.itemId`, so all three have to be cleaned.
+ */
+const ITEM_ID_METADATA_FIELDS = [
+  "providerMetadata",
+  "callProviderMetadata",
+  "resultProviderMetadata",
+] as const;
+
+/** Returns a cleaned copy of `part`, or null when it carried no item id. */
+function withoutOpenAIItemId(
+  part: UIMessage["parts"][number],
+): UIMessage["parts"][number] | null {
+  let next: Record<string, unknown> | null = null;
+  for (const field of ITEM_ID_METADATA_FIELDS) {
+    const metadata = (part as Record<string, unknown>)[field];
+    if (!metadata || typeof metadata !== "object") continue;
+    const namespace = (metadata as Record<string, unknown>)[
+      OPENAI_METADATA_NAMESPACE
+    ];
+    if (!namespace || typeof namespace !== "object") continue;
+    if (!("itemId" in namespace)) continue;
+    const { itemId: _itemId, ...rest } = namespace as Record<string, unknown>;
+    next ??= { ...(part as Record<string, unknown>) };
+    next[field] = {
+      ...(metadata as Record<string, unknown>),
+      [OPENAI_METADATA_NAMESPACE]: rest,
+    };
+  }
+  return next as UIMessage["parts"][number] | null;
+}
+
+/**
+ * Drop `openai.itemId` from RESENT message parts so the transcript replays as
+ * the text we are holding rather than as a pointer to OpenAI's server-side
+ * item store.
+ *
+ * With the Responses API's `store` defaulting to true, @ai-sdk/openai emits
+ * `{ type: "item_reference", id }` for any part carrying an item id. Those
+ * items expire after ~30 days — and a key rotation or a ZDR policy kills them
+ * sooner — after which the reference resolves to nothing and every send in
+ * that conversation is rejected with `Item with id 'msg_…' not found` (#193).
+ *
+ * The chat route now also sends `store: false` for OpenAI, which stops NEW
+ * transcripts being poisoned; this heals the ones already carrying dead ids,
+ * which is every OpenAI conversation predating that change. Stripping is
+ * absence-safe in both directions: with `store: false` the id is never a
+ * usable reference, and no other vendor reads the `openai` namespace — so the
+ * transform is unconditional rather than gated on the executed vendor, and
+ * keeps healing a transcript whichever route later reaches it.
+ *
+ * Only `itemId` is removed; sibling keys in the namespace (`phase`, cache
+ * hints) are preserved.
+ *
+ * Model-path only, same contract as the transforms above: the persisted
+ * transcript and `originalMessages` keep every byte.
+ */
+export function stripOpenAIItemReferences(messages: UIMessage[]): UIMessage[] {
+  return messages.map((m) => {
+    let changed = false;
+    const parts = m.parts.map((part) => {
+      const stripped = withoutOpenAIItemId(part);
+      if (!stripped) return part;
+      changed = true;
+      return stripped;
+    });
+    return changed ? { ...m, parts } : m;
+  });
+}
+
 // ── Snapshot supersession (S8) ──────────────────────────────────────────────
 
 /** Raw-perception outputs eligible for supersession — bulky page data whose
@@ -73,8 +151,16 @@ const SUPERSEDED_STUB =
  * the trade is deliberate; the reclaimed 128k-window space is what lets a
  * 25-item run finish at all.
  */
-export function supersedeIterationHistory(messages: UIMessage[]): UIMessage[] {
-  // Single pass: track the ACTIVE run and its latest checkpoint position.
+/**
+ * The fold boundary of the ACTIVE batched iteration run: the position of the
+ * latest record_batch_checkpoint, or null when no run is active / no
+ * checkpoint exists. EXPORTED so the chat UI collapses exactly the parts the
+ * model no longer sees (P4c, owner rule: no divergence between front and
+ * back — one boundary implementation, two consumers).
+ */
+export function findIterationFoldBoundary(
+  messages: UIMessage[],
+): { messageIdx: number; partIdx: number } | null {
   let runActive = false;
   let lastCheckpoint: { messageIdx: number; partIdx: number } | null = null;
   messages.forEach((m, messageIdx) => {
@@ -105,8 +191,24 @@ export function supersedeIterationHistory(messages: UIMessage[]): UIMessage[] {
       }
     });
   });
-  if (!runActive || !lastCheckpoint) return messages;
-  const boundary: { messageIdx: number; partIdx: number } = lastCheckpoint;
+  return runActive ? lastCheckpoint : null;
+}
+
+/**
+ * Would the model-facing assembly stub this part behind the fold boundary?
+ * Shared by supersedeIterationHistory and the UI collapse (same rule, same
+ * min-chars guard).
+ */
+export function shouldSupersedePart(part: unknown): boolean {
+  const p = part as { type?: string; state?: string; output?: unknown };
+  if (!p.type || !PERCEPTION_TOOL_PARTS.has(p.type)) return false;
+  if (p.state !== "output-available") return false;
+  return JSON.stringify(p.output ?? "").length >= SUPERSEDE_MIN_CHARS;
+}
+
+export function supersedeIterationHistory(messages: UIMessage[]): UIMessage[] {
+  const boundary = findIterationFoldBoundary(messages);
+  if (!boundary) return messages;
 
   return messages.map((m, messageIdx) => {
     if (m.role !== "assistant" || messageIdx > boundary.messageIdx) return m;
@@ -118,17 +220,7 @@ export function supersedeIterationHistory(messages: UIMessage[]): UIMessage[] {
       ) {
         return part;
       }
-      const p = part as { type?: string; state?: string; output?: unknown };
-      if (
-        !p.type ||
-        !PERCEPTION_TOOL_PARTS.has(p.type) ||
-        p.state !== "output-available"
-      ) {
-        return part;
-      }
-      if (JSON.stringify(p.output ?? "").length < SUPERSEDE_MIN_CHARS) {
-        return part;
-      }
+      if (!shouldSupersedePart(part)) return part;
       changed = true;
       return {
         ...(part as Record<string, unknown>),

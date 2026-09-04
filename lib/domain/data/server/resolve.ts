@@ -21,7 +21,7 @@ import {
   resolveDataTableAccess,
 } from "@/lib/domain/data/server/access";
 import { loadTable } from "@/lib/domain/data/server/queries";
-import type { DataColumn, DataTable } from "@/lib/domain/data";
+import type { DataTable } from "@/lib/domain/data";
 
 /** The context ids database resolution needs — a structural subset of ToolExecuteContext. */
 export interface DataToolContext {
@@ -32,6 +32,13 @@ export interface DataToolContext {
   boundContentId?: string;
   /** The bound Conversation entity id, when the chat is saved. */
   conversationId?: string;
+  /**
+   * The chat's attached charter, when any (structurally supplied by the
+   * full ToolExecuteContext). Grants charter-registry jurisdiction: tables
+   * linked from the charter's master ledger are reachable without a fresh
+   * mention — the consent chain is user → charter attach → registry.
+   */
+  activeCharter?: { contentId: string; title: string };
 }
 
 /**
@@ -65,6 +72,48 @@ export async function boundTableIdFor(
 }
 
 /**
+ * Charter-registry jurisdiction (EXTRACTION-TO-DATABASE-PLAN P3 resume):
+ * with a charter attached, the charter's master ledger IS a consent
+ * surface — the master itself and every table its rows link (quest
+ * ledgers, output tables) are within jurisdiction, no fresh mention
+ * needed. Owner smoke 2026-09-04: "Continue the Reading Quest" in a new
+ * chat was refused access to the quest's own output table, defeating the
+ * registry's whole purpose ("every consumer navigates through the
+ * links"). Scope note: everything reachable this way is the SAME user's
+ * own data behind the usual access checks — jurisdiction here is a
+ * consent-visibility structure, not a cross-principal boundary.
+ */
+async function charterRegistryAuthorizes(
+  ctx: DataToolContext,
+  databaseId: string,
+): Promise<boolean> {
+  const charter = ctx.activeCharter;
+  if (!charter) return false;
+  const note = await prisma.contentNode.findFirst({
+    where: { id: charter.contentId, ownerId: ctx.userId, deletedAt: null },
+    select: { notePayload: { select: { metadata: true } } },
+  });
+  const meta =
+    note?.notePayload?.metadata && typeof note.notePayload.metadata === "object"
+      ? (note.notePayload.metadata as Record<string, unknown>)
+      : undefined;
+  const masterId = meta?.masterLedgerId;
+  if (typeof masterId !== "string") return false;
+  if (databaseId === masterId) return true;
+  // One row per quest — the scan is bounded by the charter's quest count.
+  const rows = await prisma.dataRow.findMany({
+    where: { tableId: masterId, deletedAt: null },
+    select: { data: true },
+  });
+  for (const r of rows) {
+    for (const v of Object.values((r.data ?? {}) as Record<string, unknown>)) {
+      if (Array.isArray(v) && v.some((x) => x === databaseId)) return true;
+    }
+  }
+  return false;
+}
+
+/**
  * Structural jurisdiction: the database must be associated with THIS
  * conversation, and the user must be able to read it. Returns the loaded
  * table or a model-facing refusal string.
@@ -94,7 +143,7 @@ export async function resolveJurisdiction(
       where: { conversationId: ctx.conversationId, contentNodeId: databaseId },
       select: { conversationId: true },
     });
-    if (!assoc) {
+    if (!assoc && !(await charterRegistryAuthorizes(ctx, databaseId))) {
       return {
         refusal:
           "That database is not associated with this conversation — tools reach only associated databases by design. Ask the user to @-mention it (or open the chat from the database) first.",
@@ -153,83 +202,14 @@ export async function resolveDatabaseRef(
   };
 }
 
-/** Column lookup by name (case-insensitive), key, or id. */
-export function findColumn(
-  columns: DataColumn[],
-  ref: string
-): DataColumn | undefined {
-  const lower = ref.trim().toLowerCase();
-  return (
-    columns.find((c) => c.id === ref || c.key === ref) ??
-    columns.find((c) => c.name.toLowerCase() === lower)
-  );
-}
-
-/**
- * Model ergonomics: select/status cells store option IDS (plan D3), but a
- * model naturally speaks in labels. Accept either; translate labels to ids
- * before the strict encoder sees them.
- */
-export function translateOptionValue(
-  column: DataColumn,
-  value: unknown
-): unknown {
-  const options = column.config.options ?? [];
-  const toId = (v: unknown): unknown => {
-    if (typeof v !== "string") return v;
-    if (options.some((o) => o.id === v)) return v;
-    const byLabel = options.find(
-      (o) => o.label.toLowerCase() === v.trim().toLowerCase()
-    );
-    return byLabel ? byLabel.id : v;
-  };
-  if (column.type === "select" || column.type === "status") return toId(value);
-  if (column.type === "multiSelect" && Array.isArray(value)) {
-    return value.map(toId);
-  }
-  return value;
-}
-
-/**
- * Normalization safety (owner-requested, 2026-08-28): the strict encoder
- * REJECTS type violations by design (plan B8c — never coerce), but a model
- * legitimately produces unambiguous near-misses. Normalize exactly those,
- * nothing else, BEFORE the encoder:
- *  - strings trimmed;
- *  - number columns: a purely numeric string becomes a number;
- *  - checkbox columns: "true"/"yes"/"false"/"no" strings become booleans;
- *  - date columns: M/D/YYYY becomes ISO YYYY-MM-DD (ISO passes through).
- * Anything still ambiguous falls to the encoder and fails loudly — a
- * normalization that guesses is worse than a rejection that teaches.
- */
-export function normalizeCellInput(column: DataColumn, raw: unknown): unknown {
-  let value = raw;
-  if (typeof value === "string") value = value.trim();
-  if (column.type === "number" && typeof value === "string" && value !== "") {
-    const n = Number(value);
-    if (Number.isFinite(n)) value = n;
-  }
-  if (column.type === "checkbox" && typeof value === "string") {
-    const v = value.toLowerCase();
-    if (v === "true" || v === "yes") value = true;
-    else if (v === "false" || v === "no") value = false;
-  }
-  if (column.type === "date" && typeof value === "string") {
-    const us = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-    if (us) {
-      value = `${us[3]}-${us[1].padStart(2, "0")}-${us[2].padStart(2, "0")}`;
-    }
-  }
-  return translateOptionValue(column, value);
-}
-
-/** Cells no write tool may target, with the reason the model needs. */
-export function writeBlockReason(column: DataColumn): string | null {
-  if (column.type === "relation") {
-    return `${column.name} is a relation — links change through the table UI, not cell writes (not supported by this tool yet).`;
-  }
-  if (column.type === "lookup" || column.type === "rollup") {
-    return `${column.name} is computed from a relation — it has no stored value to write.`;
-  }
-  return null;
-}
+// The pure column helpers (findColumn / translateOptionValue /
+// normalizeCellInput / writeBlockReason) moved VERBATIM to
+// lib/domain/data/capture-core.ts in the P1/P2 build so the capture
+// validation is unit-testable without Prisma. Re-exported here so this
+// module's import surface is unchanged for existing consumers.
+export {
+  findColumn,
+  normalizeCellInput,
+  translateOptionValue,
+  writeBlockReason,
+} from "../capture-core";
