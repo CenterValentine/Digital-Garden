@@ -10,11 +10,11 @@
  *
  * Composition notes:
  * - The hosted affordances (TargetFolderChip, OutputTargetChip,
- *   ChatContextPicker) open their OWN portaled menus. A click in those
- *   menus is outside this panel's DOM, so the panel deliberately does NOT
- *   close on outside clicks — explicit close only (✕, Escape, or the
- *   trigger toggling). Predictable for a settings surface, and immune to
- *   the nested-portal outside-click trap.
+ *   ChatContextPicker) open their OWN portaled menus at <body> level, so a
+ *   naive outside-click handler would close the panel mid-interaction.
+ *   Click-away dismissal (owner ask) therefore exempts any position:fixed
+ *   layer: hosted menus and toasts count as "inside"; true page clicks,
+ *   ✕, Escape, and the trigger all dismiss.
  * - Portaled + position:fixed, opening above the trigger (the composer
  *   sits at the viewport bottom; overflow-x-auto rails clip upward
  *   dropdowns — the recorded portal rule).
@@ -61,13 +61,12 @@ function PanelRow({
   hint: string;
   children: React.ReactNode;
 }) {
+  // Compact step (owner, 2026-09-04): the explanatory line lives behind a
+  // native tooltip on the row instead of visible text.
   return (
-    <div className="px-3 py-2">
+    <div className="px-3 py-2" title={hint}>
       <div className="text-[11px] font-medium text-gray-700 dark:text-gray-200">
         {label}
-      </div>
-      <div className="mt-0.5 text-[10.5px] leading-snug text-gray-500 dark:text-gray-400">
-        {hint}
       </div>
       <div className="mt-1.5 flex min-w-0 items-center">{children}</div>
     </div>
@@ -92,6 +91,7 @@ export function ChatControlPanel({
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState<CalculatedPosition | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const panelRef = useRef<HTMLDivElement | null>(null);
   const [portalReady, setPortalReady] = useState(false);
 
   useEffect(() => {
@@ -123,8 +123,36 @@ export function ChatControlPanel({
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") setOpen(false);
     };
+    // Click-away dismissal (owner, 2026-09-04) with the nested-portal trap
+    // handled: the hosted affordances (target pickers, context picker) open
+    // their OWN menus portaled to <body> as position:fixed layers — a click
+    // there is an interaction, not a dismissal. Clicks inside the panel or
+    // trigger keep it open; clicks inside ANY other fixed layer (a hosted
+    // menu, a toast) are ignored; true page clicks close.
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (!target) return;
+      if (
+        panelRef.current?.contains(target) ||
+        triggerRef.current?.contains(target)
+      ) {
+        return;
+      }
+      for (
+        let el: HTMLElement | null = target;
+        el && el !== document.body;
+        el = el.parentElement
+      ) {
+        if (getComputedStyle(el).position === "fixed") return;
+      }
+      setOpen(false);
+    };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("pointerdown", onPointerDown);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("pointerdown", onPointerDown);
+    };
   }, [open]);
 
   return (
@@ -148,6 +176,7 @@ export function ChatControlPanel({
         position &&
         createPortal(
           <div
+            ref={panelRef}
             role="dialog"
             aria-label="Chat controls"
             style={{
