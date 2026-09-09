@@ -33,6 +33,12 @@ const SOURCE_FILE_RE = /\.(ts|tsx)$/;
 type Policy =
   /** Network timer that correctly skips ticks while the tab is hidden. */
   | "pause-when-hidden"
+  /**
+   * Network timer permitted to keep running while hidden. Requires
+   * `estimatedMonthlyCostUsd` — the expensive case is the one that has to
+   * justify itself in writing. See D14 in POLLING-DISCIPLINE-PLAN.md.
+   */
+  | "background-allowed"
   /** Purely local timer (animation, clock, local state) — no network, exempt. */
   | "ui-only"
   /** Runs on the server (SSE heartbeats etc.) — visibility is meaningless. */
@@ -44,6 +50,14 @@ interface Declared {
   file: string;
   policy: Policy;
   note: string;
+  /**
+   * Required when policy is "background-allowed". State the dominant meter and
+   * why. Reference figures live in D14; the short version is that Neon
+   * autosuspends after 5 minutes, so ANY ungated sub-5-minute poll costs about
+   * the same (~$19/mo per always-open tab) regardless of its interval —
+   * continuity dominates frequency.
+   */
+  estimatedMonthlyCostUsd?: number;
 }
 
 /**
@@ -213,6 +227,21 @@ function main() {
         `NOT GATED     ${rel}\n` +
           `    Declared "pause-when-hidden" but contains no visibilityState check.\n` +
           `    ${declared.note}`
+      );
+    }
+
+    if (
+      declared.policy === "background-allowed" &&
+      typeof declared.estimatedMonthlyCostUsd !== "number"
+    ) {
+      errors.push(
+        `NO COST       ${rel}\n` +
+          `    Declared "background-allowed" — it runs while the tab is hidden — but carries no\n` +
+          `    estimatedMonthlyCostUsd. Anything that keeps running unattended must state what it\n` +
+          `    costs (D14 in docs/notes-feature/work-tracking/POLLING-DISCIPLINE-PLAN.md).\n` +
+          `    Reference: Neon autosuspends after 5 min, so ANY ungated sub-5-minute poll runs\n` +
+          `    ~$19/mo per always-open tab whatever its interval — continuity dominates frequency.\n` +
+          `    A held SSE stream adds ~$15/mo of Vercel provisioned memory on top.`
       );
     }
 

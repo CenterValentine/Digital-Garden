@@ -155,6 +155,73 @@ untouched by design. That is the payoff of keeping the distinction sharp.
 and classify them. Both are long-running surfaces a user plausibly watches without
 touching anything.
 
+### D2a — Could `MainPanelHeader` / `presence-poll` move to Hocuspocus after all?
+
+**Architecturally yes — but not for free, and the naive version is *more* expensive than what it replaces.**
+
+D2 said awareness cannot serve them because it is per-document and only the active document has a provider. That is true of the *current* wiring, but not a hard limit. The idiomatic Y.js answer is a **shared presence document**: one Y.Doc whose awareness map carries "which contentIds is each session currently in." One connection then answers for every open tab, read straight from Hocuspocus's in-memory awareness with **zero database access**. `presence-poll` maps onto it especially cleanly, since it is already a shared module-level singleton.
+
+**The trap is Cloud Run billing.** From `cloudbuild.hocuspocus.yaml`: `--cpu=1 --memory=512Mi --min-instances=0`. A held WebSocket keeps that instance alive, and an always-on instance costs roughly:
+
+| | |
+|---|---|
+| vCPU | 2,628,000 s/mo × ~$0.000024 ≈ **$63** |
+| Memory | 0.5 GiB × 2,628,000 s × ~$0.0000025 ≈ **$3** |
+| **Always-on total** | **≈ $66/month** |
+
+Cloud Run's free tier (~180,000 vCPU-seconds) covers about **7%** of a month. So keeping Hocuspocus awake around the clock would cost roughly **double** the ~$32/month of Vercel memory + Neon compute it would be replacing.
+
+**This is why `min-instances=0` and sleep mode (PR #101) are load-bearing rather than incidental.**
+
+**Conclusion:** the move is worth making, but only if the presence connection is itself governed by the same engagement core (D13) — closed when hidden, released when idle. Otherwise it is not a saving, it is a relocation of the bill to a more expensive meter.
+
+### D14 — POLICY: any new poller or heartbeat must carry a cost estimate
+
+Before adding a recurring timer, heartbeat, or held stream, state its estimated monthly cost in the PR description **and** in its `polling:check` registry entry.
+
+#### The cost model
+
+Three meters, and they are **not** equally important:
+
+| Meter | Rate | Usually |
+|---|---|---|
+| Vercel Function Invocations | $0.60 / million | negligible |
+| Vercel Provisioned Memory | $0.0106 / GB-hr (default 2 GB) | negligible for short polls, **dominant for held streams** |
+| Neon compute | $0.106 / CU-hour | **dominant for anything that runs continuously** |
+
+#### The counter-intuitive part: continuity beats frequency
+
+Neon autosuspends after **5 minutes of inactivity**. So a poll every 10 s and a poll every 4 minutes cost *almost the same* — both keep the database permanently awake. Even a 6-minute poll leaves it awake ~83% of the time (wake, serve, idle 5 min, suspend, wake again a minute later).
+
+**A database only sleeps given long contiguous quiet — hours, not minutes.** That is something no choice of interval can buy you and only gating can. It is the entire justification for this document.
+
+#### Reference figures — per always-open tab, ~730 hr/month
+
+Estimates. Assume 0.25 CU Neon and Vercel's default 2 GB function memory; "gated" assumes ~3 hours/day of genuine active use.
+
+| Shape | Neon | Vercel | **Total** |
+|---|---|---|---|
+| Poll < 5 min, **ungated** | ~$19.35 | ~$0.50 | **≈ $20/mo** |
+| Poll < 5 min, **gated** | ~$2.40 | ~$0.06 | **≈ $2.50/mo** |
+| Held SSE stream, **ungated** | ~$19.35 | ~$15.50 | **≈ $35/mo** |
+| Held SSE stream, **gated** | ~$2.40 | ~$1.90 | **≈ $4.30/mo** |
+| Held WebSocket → Cloud Run, **ungated** | — | ~$66 | **≈ $66/mo** |
+
+Multiply by the number of simultaneously open tabs unless the poller is leader-elected (D11).
+
+#### Disclosure template
+
+```
+Poller: <id>
+Interval: <N>s   Gating: hidden=<pause|run> idle=<pause|run>
+Estimated: ~$X/month per always-open tab
+Basis: <which meter dominates and why>
+```
+
+#### Enforcement
+
+`polling:check` **requires** an `estimatedMonthlyCostUsd` on any entry claiming background rights (`background-allowed`). Gated pollers inherit the reference figures above and need only a note. The expensive case is the one that must justify itself in writing.
+
 ### D8 — A unified scheduler is a **hardened requirement**, not a nice-to-have
 
 All client polling must go through one designated heartbeat. *Rationale:* the CI gate enforces a **convention**; the scheduler enforces a **structure**. It also delivers the two properties static analysis can never retrofit — idle gating and leader election.
