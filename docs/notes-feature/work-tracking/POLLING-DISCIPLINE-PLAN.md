@@ -77,6 +77,62 @@ presence read  60s   — pure display, no correctness constraint
 
 They remain **visibility**-gated. *Rationale:* someone who starts a job and watches the progress bar without touching the mouse is at their most attentive; a 60 s idle pause would freeze the display exactly then. Bounded anyway, since the effect only arms during an active run.
 
+### D7a — REFINEMENT: exempt by **predicate**, not by blanket flag
+
+D7's flat "runs are exempt from idle" is too coarse — it would poll through idle
+forever whenever the panel is open, including long after the job finished.
+
+Use a predicate instead:
+
+```ts
+registerPollingTask({
+  id: "studio-runs",
+  intervalMs: 5_000,
+  whenHidden: "pause",
+  whenIdle: "pause",
+  keepAliveWhile: () => anyRunning,   // overrides idle ONLY while true
+});
+```
+
+Polls through idle *only while work is genuinely in flight*, and goes quiet the
+moment it completes even if the user is still sitting there.
+
+**The principle: "no input" ≠ "not watching."** Hidden and idle are two different
+gates with two different rules:
+
+| Gate | Rule |
+|---|---|
+| **Hidden** | pause almost everything — the user demonstrably is not looking |
+| **Idle** | pause polls **unless the app knows work is in flight** — the user may well be looking |
+
+A 60 s idle pause while a job is running is precisely the moment it would annoy
+someone most.
+
+### D7b — Passive-watch inventory
+
+Surfaces where a user sits and watches with **zero input**, and whether idle
+gating endangers them:
+
+| Surface | Watching | Safe? | Why |
+|---|---|---|---|
+| AI chat streaming | tokens arriving | ✅ | Active HTTP response stream, not a poll |
+| ChatMessage typing effect | text revealing | ✅ | UI-only timer (`typingActive = typingEffect && isStreaming`) |
+| Speed reader (RSVP) | words flashing | ✅ | **0 fetches** — verified pure UI |
+| Live collaboration | co-editor typing | ✅ | Y.js push over WebSocket |
+| TTS read-aloud | listening | ✅ | audio element |
+| MediaLightbox slideshow | images advancing | ✅ | UI-only |
+| **RunsPanel / RunDetail** | job progress | ⚠️ | **network poll — needs D7a predicate** |
+| Co-browse / agentic browsing | agent driving the browser | ⚠️ | `CoBrowseIndicator` is UI-only, but run-status polling **not yet traced** |
+| Extraction / quest sittings | generation progress | ⚠️ | **not yet traced** |
+
+**Why most of these are structurally safe:** idle gating applies only to *network
+polls*. Push transports (SSE, WebSocket, streaming HTTP) and UI-only timers are
+untouched by design. That is the payoff of keeping the distinction sharp.
+
+**TODO before Phase 2 ships:** trace co-browse and extraction/quest status polling
+and classify them. Both are long-running surfaces a user plausibly watches without
+touching anything.
+
 ### D8 — A unified scheduler is a **hardened requirement**, not a nice-to-have
 
 All client polling must go through one designated heartbeat. *Rationale:* the CI gate enforces a **convention**; the scheduler enforces a **structure**. It also delivers the two properties static analysis can never retrofit — idle gating and leader election.
@@ -164,7 +220,8 @@ registerPollingTask({
   id: "auth-session",
   intervalMs: 60_000,
   whenHidden: "pause",
-  whenIdle: "pause",     // "run" for RunsPanel / RunDetail — D7
+  whenIdle: "pause",
+  keepAliveWhile: () => anyRunning,  // predicate overrides idle — D7a
   scope: "leader",       // or "per-tab"
   run: async () => { ... },
 });
