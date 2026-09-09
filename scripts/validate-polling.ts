@@ -20,7 +20,13 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 
 const REPO_ROOT = process.cwd();
-const SCAN_ROOTS = ["app", "components", "lib", "extensions"].map((d) => join(REPO_ROOT, d));
+// `state/` is included deliberately. It was omitted in the first version of
+// this gate, which is exactly how state/conversation-cache-store.ts — holding a
+// second, refcounted EventSource on the same endpoint — went unnoticed. Any
+// directory that can contain client code belongs here.
+const SCAN_ROOTS = ["app", "components", "lib", "extensions", "state"].map((d) =>
+  join(REPO_ROOT, d)
+);
 const SOURCE_FILE_RE = /\.(ts|tsx)$/;
 
 /** How a declared timer is permitted to behave. */
@@ -129,13 +135,18 @@ const REGISTRY: Declared[] = [
   },
   {
     file: "lib/domain/ai/use-conversation-binding.ts",
-    policy: "unreviewed",
+    policy: "pause-when-hidden",
     note:
-      "HIGHEST-COST ITEM. Ungated EventSource on /api/conversations/events — held open for the life of the tab, " +
-      "closing only on unmount. Vercel bills provisioned memory for an SSE request's entire lifetime, so one " +
-      "forgotten tab is ~1,460 GB-hrs/month (~97% of the observed Fluid Provisioned Memory line). Left unreviewed " +
-      "deliberately: gating it is a UX decision (close immediately on hidden / grace period / close-and-refetch-on-visible), " +
-      "not a mechanical one. See lib/domain/collaboration/runtime.ts `presenceStreamSuspended` for the pattern.",
+      "Per-viewer EventSource on /api/conversations/events. Closed while hidden, reopened on return (D12 = close-and-refetch). " +
+      "Vercel bills provisioned memory for an SSE request's entire lifetime, so a held-open stream is ~1,460 GB-hrs/month per tab.",
+  },
+  {
+    file: "state/conversation-cache-store.ts",
+    policy: "pause-when-hidden",
+    note:
+      "The SECOND EventSource on the same endpoint — refcounted and shared across surfaces. Closed while hidden; " +
+      "refetchAllCached reconciles on return via both `focus` and `visibilitychange`. This file was missed by the " +
+      "first version of this gate because `state/` was not in SCAN_ROOTS.",
   },
 ];
 

@@ -711,12 +711,26 @@ export function useConversationBinding({
   // not generic messages, so we must `addEventListener(EVENT_NAME)` —
   // `es.onmessage` would silently drop every event (and produced the
   // initial "title doesn't update in the header" report).
+  // The stream is CLOSED while the tab is hidden and reopened on return.
+  //
+  // This is the single most expensive line in the app's infrastructure bill.
+  // Vercel bills Fluid Provisioned Memory for a request's entire lifetime,
+  // including time spent idle in I/O — and an SSE response never completes, so
+  // one held-open stream at the default 2 GB is ~1,460 GB-hrs/month. That was
+  // ~97% of the observed memory charge, from a single forgotten tab.
+  //
+  // Closing on hidden is safe because state/conversation-cache-store.ts binds
+  // `refetchAllCached` to window focus, so anything missed while hidden is
+  // reconciled on return rather than lost. `visibilitychange` is bound here too
+  // because the two events cover different cases: `focus` fires when the whole
+  // browser window regains focus, `visibilitychange` when a tab is switched to
+  // inside an already-focused window.
   useEffect(() => {
     if (!conversationId) return;
     if (typeof EventSource === "undefined") return;
-    const es = new EventSource("/api/conversations/events", {
-      withCredentials: true,
-    });
+
+    let es: EventSource | null = null;
+
     const handler = (e: MessageEvent) => {
       try {
         const event = JSON.parse(e.data) as
@@ -733,10 +747,30 @@ export function useConversationBinding({
         /* malformed event — ignore */
       }
     };
-    es.addEventListener("conversation", handler as EventListener);
-    return () => {
+
+    const open = () => {
+      if (es) return;
+      es = new EventSource("/api/conversations/events", { withCredentials: true });
+      es.addEventListener("conversation", handler as EventListener);
+    };
+
+    const close = () => {
+      if (!es) return;
       es.removeEventListener("conversation", handler as EventListener);
       es.close();
+      es = null;
+    };
+
+    const syncToVisibility = () => {
+      if (document.visibilityState === "visible") open();
+      else close();
+    };
+
+    syncToVisibility();
+    document.addEventListener("visibilitychange", syncToVisibility);
+    return () => {
+      document.removeEventListener("visibilitychange", syncToVisibility);
+      close();
     };
   }, [conversationId]);
 

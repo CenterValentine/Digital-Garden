@@ -595,10 +595,17 @@ export function MainPanelHeader({
         void fetchPresence();
       }
     }, PRESENCE_POLL_INTERVAL_MS);
+    // Catch up immediately on return rather than making someone stare at stale
+    // tab chrome for up to a full interval.
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") void fetchPresence();
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
       isCancelled = true;
       window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [tabContentIds]);
 

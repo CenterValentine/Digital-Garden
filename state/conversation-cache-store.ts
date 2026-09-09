@@ -132,6 +132,32 @@ async function fetchAssociations(
 let eventSource: EventSource | null = null;
 let refCount = 0;
 let focusHandlerBound = false;
+/** Stable identity so removeEventListener actually detaches it. */
+let visibilityHandler: (() => void) | null = null;
+
+/**
+ * Attach the shared stream. Extracted so the visibility handler can reopen it
+ * without duplicating the listener wiring.
+ */
+function openStream(applyEvent: (event: ConversationEvent) => void) {
+  if (eventSource) return;
+  eventSource = new EventSource("/api/conversations/events", {
+    withCredentials: true,
+  });
+  eventSource.addEventListener("conversation", (e) => {
+    try {
+      applyEvent(JSON.parse((e as MessageEvent).data) as ConversationEvent);
+    } catch {
+      /* malformed frame — ignore */
+    }
+  });
+}
+
+function closeStream() {
+  if (!eventSource) return;
+  eventSource.close();
+  eventSource = null;
+}
 
 export const useConversationCacheStore = create<ConversationCacheState>(
   (set, get) => ({
@@ -274,23 +300,33 @@ export const useConversationCacheStore = create<ConversationCacheState>(
       refCount += 1;
       if (eventSource) return; // already connected — just bumped refcount
 
-      eventSource = new EventSource("/api/conversations/events", {
-        withCredentials: true,
-      });
-      eventSource.addEventListener("conversation", (e) => {
-        try {
-          const event = JSON.parse(
-            (e as MessageEvent).data,
-          ) as ConversationEvent;
-          get().applyEvent(event);
-        } catch {
-          /* malformed frame — ignore */
-        }
-      });
+      openStream((event) => get().applyEvent(event));
       // EventSource auto-reconnects on transport errors; no manual retry.
 
       if (!focusHandlerBound) {
         window.addEventListener("focus", get().refetchAllCached);
+
+        // The stream is CLOSED while the tab is hidden and reopened on return.
+        //
+        // Vercel bills Fluid Provisioned Memory for an SSE request's entire
+        // lifetime, including time idle in I/O — and an SSE response never
+        // completes. One held-open stream at the default 2 GB is roughly
+        // 1,460 GB-hrs/month whether or not anything is watching it.
+        //
+        // Closing is safe because refetchAllCached reconciles anything missed
+        // while hidden. `focus` alone would not be enough to trigger that:
+        // it fires when a whole browser window regains focus, while
+        // `visibilitychange` covers switching to a tab inside a window that
+        // already had it. Both paths are bound.
+        visibilityHandler = () => {
+          if (document.visibilityState === "visible") {
+            openStream((event) => get().applyEvent(event));
+            void get().refetchAllCached();
+          } else {
+            closeStream();
+          }
+        };
+        document.addEventListener("visibilitychange", visibilityHandler);
         focusHandlerBound = true;
       }
     },
@@ -298,12 +334,13 @@ export const useConversationCacheStore = create<ConversationCacheState>(
     disconnect: () => {
       refCount = Math.max(0, refCount - 1);
       if (refCount > 0) return; // other surfaces still using the stream
-      if (eventSource) {
-        eventSource.close();
-        eventSource = null;
-      }
+      closeStream();
       if (focusHandlerBound) {
         window.removeEventListener("focus", get().refetchAllCached);
+        if (visibilityHandler) {
+          document.removeEventListener("visibilitychange", visibilityHandler);
+          visibilityHandler = null;
+        }
         focusHandlerBound = false;
       }
     },

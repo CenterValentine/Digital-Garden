@@ -54,6 +54,28 @@ Consumer audit:
 
 *Rationale:* drives **proactive UI sign-out only**. Authorization happens server-side on every real API call, so a slower poll means a stale UI, never an unauthorized action. It mounts app-wide, so its interval multiplied by every open tab — the largest single source of idle DB load. Paired with an immediate re-check on tab-visible.
 
+#### D3a — What the poll does and does not detect
+
+The original D3 wording was imprecise. There are two different "signed out elsewhere", and only one of them involves this poll at all:
+
+| Scenario | Detection | Mechanism |
+|---|---|---|
+| Sign out in **another tab, same browser** | **Instant** | `publishSignedOut()` → BroadcastChannel (localStorage fallback) → every tab's `subscribeAuthSessionEvents` fires. **No polling involved.** |
+| Sign out on **another device**, or a server-side revocation | Up to **3 × interval** | The tab has no way to know until it asks. `CONSECUTIVE_FAILURES_REQUIRED = 3`, so at 60 s that is **up to ~3 minutes** (it was ~30 s at 10 s). |
+
+**The 3-minute figure is a stale-UI window, not a security window.** A revoked session cannot do anything — every real API call validates server-side and returns 401. The worst case is that a user clicks something, it fails, and the poll catches up shortly after. The immediate re-check on tab-visible also collapses this to near-zero whenever someone actually returns to the tab.
+
+The 3-failure threshold exists to survive transient Neon hiccups, not to harden security. If ~3 minutes ever feels too long, the lever is `CONSECUTIVE_FAILURES_REQUIRED`, or treating the first 401 after a visibility transition as authoritative — **not** shortening the interval back down.
+
+### D3b — What `MainPanelHeader` and `presence-poll` actually do
+
+Both answer "is someone else in this content?", for different surfaces:
+
+- **`MainPanelHeader`** — the **tab strip** at the top of the main panel. Shows, per open tab, whether another session is currently viewing or editing that content, so you can see a collaborator is in a document without opening it. Polls **all open tabs' contentIds in one batched request**.
+- **`presence-poll.ts`** — the **Note Window block's edit gate**. A Note Window embeds another note inside a note; before allowing edits it checks whether that content is actively open elsewhere, to avoid conflicting edits. Module-level and shared, so N embedded windows collapse to `ceil(N/16)` requests rather than N.
+
+Neither owns a collaboration runtime, which is why neither can be served by awareness (see D2).
+
 ### D4 — `SharedContentViewer`: split the write from the read
 
 Was one `tick` at 10 s doing both. Now:
@@ -163,7 +185,63 @@ Plus `visibilitychange` and window `focus` to resume instantly.
 
 **Caveat — do not copy `syncPresenceTransport`'s election rule directly.** It elects a leader and then suspends it. For auth that is a bug: a hidden leader pauses and nobody polls, leaving a *visible* tab running against a dead session. **Elect among visible, non-idle tabs only**; a leader that hides or goes idle must relinquish. If every tab is hidden or idle, nobody polls — which is the desired end state.
 
-### D12 — OPEN: `use-conversation-binding.ts` visibility policy
+### D13 — Idle and hidden share **one core**, with different policies
+
+They are two readings of the same question — *is this tab worth spending money on right now?* — so they must not be two independent implementations that drift.
+
+One module computes a single engagement state:
+
+```ts
+type Engagement = "active" | "idle" | "hidden";
+getEngagement(): Engagement
+subscribeEngagement(cb: (e: Engagement) => void): () => void
+```
+
+Per-task policy layers on top, because the *rules* genuinely differ (D7a):
+
+```ts
+{ whenHidden: "pause", whenIdle: "pause" | "run", keepAliveWhile?: () => boolean }
+```
+
+*Rationale:* shared observation, differentiated policy. `hidden` is authoritative — the user demonstrably is not looking. `idle` is a heuristic that a surface can legitimately override. Splitting the observation would mean two sets of listeners, two sources of truth, and inevitable divergence.
+
+### D13a — Surface activity as an engagement signal
+
+Passive-watch surfaces (D7b) can assert engagement for as long as they are genuinely doing something, rather than being blanket-exempted:
+
+| Surface | Asserts engagement while | Releases when |
+|---|---|---|
+| TTS read-aloud | audio is playing | playback ends |
+| Speed reader | RSVP is running | session ends or pauses |
+| Runs / quests | work is in flight | run reaches a terminal state |
+| Live collaboration | — | **5 min hard cap** of absolute zero input |
+
+Push form (`assertEngaged("tts-playback")` returning a release fn) and pull form (`keepAliveWhile: () => anyRunning`) are the same mechanism from either side; the scheduler should accept both.
+
+**`MediaLightbox` is excluded entirely** — a UI-only slideshow with no bearing on whether polling should run.
+
+### D13b — Engagement assertions matter for **visible+idle**, not hidden
+
+`hidden` overrides everything: a hidden tab pauses its polls regardless of what any surface asserts. So surface-activity signals only change behaviour in the **visible-but-idle** case — a PWA sitting open with TTS playing and nobody touching the mouse. That is exactly the case that motivated idle gating, so it is the right place for them.
+
+**Media keeps playing in hidden tabs regardless**, and needs no polling to do so: `<audio>`/`<video>` playback is browser-native. Chrome additionally throttles background timers (~1/min after a few minutes) but relaxes that for tabs playing audio — so the browser already does much of this work. The only thing that would need `keepAliveWhile` in a hidden tab is a job whose *completion* must be observed while hidden.
+
+### D12 — RESOLVED: `use-conversation-binding.ts` → option (c)
+
+**Decision: close on hidden, refetch on visible.** Verified implementable — `state/conversation-cache-store.ts:293` already binds `refetchAllCached` to window focus, so nothing missed while hidden is lost.
+
+**Both** streams are now gated. There were two, not one:
+
+| Stream | Scope |
+|---|---|
+| `lib/domain/ai/use-conversation-binding.ts` | per chat viewer |
+| `state/conversation-cache-store.ts` | **refcounted, shared across surfaces** |
+
+The second was missed by the first version of the gate because **`state/` was not in `SCAN_ROOTS`** — a genuine hole in the gate, now fixed. Any directory that can hold client code belongs in that list.
+
+Both now also bind `visibilitychange` alongside `focus`, because the two cover different transitions: `focus` fires when a browser *window* regains focus; `visibilitychange` covers switching to a tab inside a window that already had it.
+
+#### Superseded — the original open question
 
 **The single highest-cost item in the app.** An ungated `EventSource` on `/api/conversations/events`, held open for the life of the tab, closing only on unmount. At the default 2 GB function memory that is ~**1,460 GB-hrs/month**, roughly **97% of the observed Fluid Provisioned Memory line** — from one forgotten tab.
 
@@ -192,6 +270,28 @@ Seven pollers gated; `workspace-sync.ts` was already correct and is now cited as
 | `RunDetail.tsx` | 3s → **5s**, gated, named `RUN_POLL_MS` |
 
 **New gate:** `pnpm polling:check` (`scripts/validate-polling.ts`), wired into `build` after `extensions:check`. Every client timer must be declared with a policy — `pause-when-hidden` / `ui-only` / `server` / `unreviewed`. Undeclared timers are a hard failure; so are stale registry entries, so the registry cannot drift into fiction.
+
+### How pausing and resuming actually work
+
+Worth stating explicitly, because "pause" could mean several things:
+
+**The timer is never torn down.** Each interval keeps running; its callback returns early while hidden. So resumption needs no re-arming — the next tick simply does its work. Worst case on return is one interval of staleness, and that only where there is no catch-up.
+
+**Catch-up on return** — every gated poller except none now fires immediately on `visibilitychange`:
+
+| Poller | Catch-up |
+|---|---|
+| `AuthSessionSync` | ✓ |
+| `MainPanelHeader` | ✓ (added after audit — it was the one gap) |
+| `SharedContentViewer` | ✓ |
+| `notifications/transport` | ✓ (pre-existing `handleFocus`) |
+| `presence-poll` | ✓ (via guarded `onFocus`) |
+| `RunsPanel` / `RunDetail` | ✓ |
+| conversations SSE (both) | ✓ reopen **+ refetch** |
+
+**Streams are different from polls.** An SSE stream is closed and reopened, not paused — so it must be paired with a refetch, which is exactly why D12 chose option (c) rather than (a).
+
+**Idle resumption (Phase 2)** will follow the same shape: any of the D10 activity events stamps `lastActivityAt`, engagement flips back to `active`, and the next tick proceeds. Surfaces that need instant resumption rather than next-tick get an explicit catch-up, same as visibility.
 
 **Mutation-tested both directions:** an unregistered poller produced `UNREGISTERED`; stripping a visibility guard produced `NOT GATED`; restoring gave `✓ 20 timer files: 8 gated, 6 ui-only, 2 server, 4 awaiting audit`.
 
