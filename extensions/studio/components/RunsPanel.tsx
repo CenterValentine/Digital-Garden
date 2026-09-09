@@ -63,11 +63,25 @@ export function RunsPanel({
   const runs = result?.forFolderId === folderId ? result.runs : [];
   const anyRunning = runs.some((r) => r.status === "running");
 
-  // Poll only while a run is in flight.
+  // Poll only while a run is in flight AND someone is looking at the tab.
+  // 3 s is the shortest interval in the app and it is justified — the user is
+  // watching a job execute and latency is the point — but that justification
+  // evaporates the moment the tab is backgrounded.
   useEffect(() => {
     if (!anyRunning) return;
-    const timer = setInterval(() => fetchRuns(folderId), POLL_MS);
-    return () => clearInterval(timer);
+    const timer = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void fetchRuns(folderId);
+      }
+    }, POLL_MS);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") void fetchRuns(folderId);
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, [anyRunning, folderId, fetchRuns]);
 
   const openOutput = (run: RunDtoClient) => {

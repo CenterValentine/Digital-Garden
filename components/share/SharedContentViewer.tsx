@@ -319,8 +319,23 @@ export function SharedContentViewer({ content }: SharedContentViewerProps) {
     };
 
     void tick();
-    const interval = window.setInterval(tick, SHARE_PRESENCE_INTERVAL_MS);
-    return () => window.clearInterval(interval);
+    // Each tick is TWO database operations — a presence upsert and a presence
+    // read — so an ungated interval on a public share page is the most
+    // expensive poller in the app per open tab. Hidden tabs skip entirely; a
+    // returning viewer gets an immediate tick rather than waiting out the cycle.
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void tick();
+      }
+    }, SHARE_PRESENCE_INTERVAL_MS);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") void tick();
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, [content.id]);
 
   return (

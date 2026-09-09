@@ -127,10 +127,19 @@ export function createPollingTransport(): NotificationTransport {
     }
   }
 
+  // Hidden tabs do not poll. `handleFocus` already fires an immediate refresh
+  // when the tab becomes visible, so a backgrounded tab loses nothing by
+  // skipping ticks — it catches up the moment anyone looks at it.
+  function isVisible() {
+    return typeof document === "undefined" || document.visibilityState === "visible";
+  }
+
   function ensureBadgeTimer() {
     if (started && badgeRefCount > 0 && !badgeTimer) {
       void pollBadge();
-      badgeTimer = setInterval(() => void pollBadge(), BADGE_INTERVAL_MS);
+      badgeTimer = setInterval(() => {
+        if (isVisible()) void pollBadge();
+      }, BADGE_INTERVAL_MS);
     }
   }
 
@@ -138,10 +147,9 @@ export function createPollingTransport(): NotificationTransport {
     const scope = threadScopes.get(threadId);
     if (started && scope && !scope.timer) {
       void pollThread(threadId);
-      scope.timer = setInterval(
-        () => void pollThread(threadId),
-        THREAD_INTERVAL_MS,
-      );
+      scope.timer = setInterval(() => {
+        if (isVisible()) void pollThread(threadId);
+      }, THREAD_INTERVAL_MS);
     }
   }
 

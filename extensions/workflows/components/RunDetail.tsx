@@ -290,10 +290,22 @@ export function RunDetail({
     void load();
   }, [load]);
   const active = run ? !isTerminal(run.status) : true;
+  // Open + still moving + visible. 3 s is justified while a human is watching
+  // a run progress; it is not justified in a backgrounded tab, where the same
+  // interval is 20 database reads a minute nobody will see.
   useEffect(() => {
     if (!active) return;
-    const timer = setInterval(() => void load(), 3000);
-    return () => clearInterval(timer);
+    const timer = setInterval(() => {
+      if (document.visibilityState === "visible") void load();
+    }, 3000);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") void load();
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, [active, load]);
 
   const cancel = useCallback(async () => {

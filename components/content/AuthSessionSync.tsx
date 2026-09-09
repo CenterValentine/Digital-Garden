@@ -11,12 +11,28 @@ import {
 } from "@/lib/infrastructure/auth/client-session-events";
 import { clientLogger } from "@/lib/core/logger/client";
 
-const AUTH_STATUS_INTERVAL_MS = 10_000;
+// 60 s, and only while the tab is visible.
+//
+// This poll drives *proactive* UI sign-out only. Authorization itself happens
+// server-side on every real API call, so a revoked session can never actually
+// do anything — a slower poll just means a stale UI for longer, and only in a
+// tab nobody is looking at.
+//
+// The cost matters because this component mounts app-wide: its interval
+// multiplies by every open tab, and each call validates the session against
+// Postgres. At 10 s ungated it was the single largest source of idle database
+// load in the app, which on metered infrastructure is billed twice — once for
+// the function that serves it and once for the database that never gets to
+// sleep. See docs/notes-feature/infrastructure/PLATFORM-PORTABILITY.md.
+//
+// Paired with an immediate re-check on tab-visible, so someone returning to a
+// backgrounded tab never waits a full minute to learn they were signed out.
+const AUTH_STATUS_INTERVAL_MS = 60_000;
 const SIGNED_OUT_MESSAGE = "You were signed out. Sign in again to continue editing.";
 // Require this many consecutive 401s before triggering sign-out.
-// Three in a row (30 s apart) is authoritative: with NEGATIVE_TTL_MS = 10 s,
-// the third check always re-queries the DB fresh, so a Neon hiccup lasting
-// <20 s will clear before we reach this threshold.
+// Three in a row is authoritative: at a 60 s cadence every check is far past
+// NEGATIVE_TTL_MS (10 s), so each one re-queries the DB fresh and a transient
+// Neon hiccup clears long before the threshold is reached.
 const CONSECUTIVE_FAILURES_REQUIRED = 3;
 
 function getCurrentRedirectPath(pathname: string | null, searchParams: URLSearchParams) {
@@ -56,7 +72,8 @@ export function AuthSessionSync() {
     // a transient DB reconnection error look like two consecutive 401s.
     // Resetting here ensures the post-wake count always starts at 0.
     const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible" && consecutiveFailures > 0) {
+      if (document.visibilityState !== "visible") return;
+      if (consecutiveFailures > 0) {
         clientLogger.info({
           layer: "ui",
           event: "session_check:counter_reset_on_wake",
@@ -64,6 +81,10 @@ export function AuthSessionSync() {
         });
         consecutiveFailures = 0;
       }
+      // The interval does not run while hidden, so the session state may be up
+      // to AUTH_STATUS_INTERVAL_MS stale on return. Check immediately rather
+      // than making the user wait out the remainder of the cycle.
+      void verifySession();
     };
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
@@ -119,7 +140,15 @@ export function AuthSessionSync() {
       }
     };
 
-    const interval = window.setInterval(verifySession, AUTH_STATUS_INTERVAL_MS);
+    // Gate inside the callback rather than tearing the timer down and rebuilding
+    // it on every visibility flip — same pattern as
+    // extensions/workplaces/state/workspace-sync.ts, which is the reference
+    // implementation for polling discipline in this codebase.
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void verifySession();
+      }
+    }, AUTH_STATUS_INTERVAL_MS);
 
     return () => {
       isCancelled = true;
