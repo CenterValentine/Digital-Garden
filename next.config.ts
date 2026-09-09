@@ -3,6 +3,12 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   /* config options here */
+  // Emit a self-contained server bundle at .next/standalone so the app can run
+  // under any Node runtime (Docker, Coolify, a bare VM) and not only on Vercel's
+  // build-output API. Vercel ignores this key, so it is inert for Vercel deploys
+  // and only costs a slightly longer build. Keeping it on permanently means the
+  // portable path is always exercised rather than discovered under pressure.
+  output: "standalone",
   // Skip Next.js's built-in TypeScript pass during `next build`. It's
   // redundant with the project's own `pnpm typecheck` (tsc --noEmit) that
   // runs locally and in .github/workflows/quality.yml. The in-build pass
