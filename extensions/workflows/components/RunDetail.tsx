@@ -19,6 +19,9 @@ import { deriveChain } from "../graph/chain";
 import { workflowGraphSchema } from "../graph/schema";
 import { getAnyNodeMetadata } from "../nodes/triggers";
 
+/** Live-run refresh cadence. Only armed while a run is non-terminal and the tab is visible. */
+const RUN_POLL_MS = 5000;
+
 const STATUS_STYLES: Record<WorkflowRunStatusValue, string> = {
   queued: "bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-200",
   running: "bg-blue-100 text-blue-700 dark:bg-blue-900/60 dark:text-blue-200",
@@ -290,14 +293,16 @@ export function RunDetail({
     void load();
   }, [load]);
   const active = run ? !isTerminal(run.status) : true;
-  // Open + still moving + visible. 3 s is justified while a human is watching
-  // a run progress; it is not justified in a backgrounded tab, where the same
-  // interval is 20 database reads a minute nobody will see.
+  // Three conditions, all required: the detail is open, the run is non-terminal,
+  // and the tab is visible. A terminal run never arms this effect, so a settled
+  // workflow costs nothing — which is what makes the live case affordable.
+  // 5s rather than 3s: step transitions are seconds-scale, so the difference is
+  // imperceptible to a watcher and cuts request volume by 40%.
   useEffect(() => {
     if (!active) return;
     const timer = setInterval(() => {
       if (document.visibilityState === "visible") void load();
-    }, 3000);
+    }, RUN_POLL_MS);
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") void load();
     };
