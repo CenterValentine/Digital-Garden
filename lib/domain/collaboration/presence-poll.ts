@@ -18,6 +18,7 @@
  */
 
 import { useCallback, useMemo, useSyncExternalStore } from "react";
+import { registerPollingTask } from "@/lib/core/polling/scheduler";
 
 import { getCollaborationBrowserSessionId } from "@/lib/domain/collaboration/runtime";
 
@@ -78,7 +79,7 @@ function recordsEqual(a: PresenceRecord[], b: PresenceRecord[]): boolean {
 class PresencePoller {
   private subscribers = new Map<string, Set<() => void>>();
   private cache = new Map<string, PresenceRecord[]>();
-  private intervalId: number | null = null;
+  private unregisterPoll: (() => void) | null = null;
   // Shared by the `focus` and `visibilitychange` listeners. The visibility
   // guard matters for the latter: visibilitychange fires on the hidden
   // transition too, and refreshing on the way out is exactly the tick we are
@@ -111,27 +112,27 @@ class PresencePoller {
   }
 
   private start() {
-    if (this.intervalId !== null || typeof window === "undefined") return;
-    // Hidden tabs skip the tick entirely. Batching already collapses N
-    // subscribers into ceil(N/16) requests; gating on visibility collapses the
-    // idle case to zero, which is what actually keeps the database reaching its
-    // autosuspend threshold. The existing focus listener covers catch-up, and
-    // visibilitychange is added alongside it because a tab can become visible
-    // without the window ever receiving focus (split-screen, tab switch in an
-    // already-focused window).
-    this.intervalId = window.setInterval(() => {
-      if (document.visibilityState !== "visible") return;
-      void this.fetchIds([...this.subscribers.keys()]);
-    }, POLL_INTERVAL_MS);
+    if (this.unregisterPoll !== null || typeof window === "undefined") return;
+    // Gating (hidden AND idle both pause) lives in the scheduler. Batching still
+    // lives here: N subscribers collapse to ceil(N/16) requests per tick, which
+    // is the property that made this module the unification model in the first
+    // place. The two compose — the scheduler decides WHETHER to tick, this class
+    // decides how few requests a tick costs.
+    //
+    // per-tab, not leader: different tabs subscribe to different contentIds, so
+    // one tab's answer is not another's.
+    this.unregisterPoll = registerPollingTask({
+      id: "collaboration-presence-poll",
+      intervalMs: POLL_INTERVAL_MS,
+      run: () => this.fetchIds([...this.subscribers.keys()]),
+    });
     window.addEventListener("focus", this.onFocus);
     document.addEventListener("visibilitychange", this.onFocus);
   }
 
   private stop() {
-    if (this.intervalId !== null) {
-      window.clearInterval(this.intervalId);
-      this.intervalId = null;
-    }
+    this.unregisterPoll?.();
+    this.unregisterPoll = null;
     window.removeEventListener("focus", this.onFocus);
     document.removeEventListener("visibilitychange", this.onFocus);
   }
