@@ -10,6 +10,7 @@
  */
 
 import type { DmMessageDTO } from "@/lib/domain/messaging/types";
+import { registerPollingTask } from "@/lib/core/polling/scheduler";
 
 export type TransportScope =
   | { kind: "badge" }
@@ -51,7 +52,8 @@ export function getSharedNotificationTransport(): NotificationTransport {
 
 interface ThreadScopeState {
   refCount: number;
-  timer: ReturnType<typeof setInterval> | null;
+  /** Unregister function for this thread's scheduler task. */
+  timer: (() => void) | null;
   /** ISO watermark — only messages newer than this are fetched. */
   lastSeen: string;
   polling: boolean;
@@ -62,7 +64,8 @@ export function createPollingTransport(): NotificationTransport {
   const threadScopes = new Map<string, ThreadScopeState>();
 
   let badgeRefCount = 0;
-  let badgeTimer: ReturnType<typeof setInterval> | null = null;
+  // Holds an UNREGISTER function now, not a timer id.
+  let badgeTimer: (() => void) | null = null;
   let badgeSince: string | null = null;
   let badgePolling = false;
   let started = false;
@@ -127,19 +130,19 @@ export function createPollingTransport(): NotificationTransport {
     }
   }
 
-  // Hidden tabs do not poll. `handleFocus` already fires an immediate refresh
-  // when the tab becomes visible, so a backgrounded tab loses nothing by
-  // skipping ticks — it catches up the moment anyone looks at it.
-  function isVisible() {
-    return typeof document === "undefined" || document.visibilityState === "visible";
-  }
-
   function ensureBadgeTimer() {
     if (started && badgeRefCount > 0 && !badgeTimer) {
       void pollBadge();
-      badgeTimer = setInterval(() => {
-        if (isVisible()) void pollBadge();
-      }, BADGE_INTERVAL_MS);
+      // per-tab, NOT leader — despite the unread count being identical in every
+      // tab. Leader election requires the RESULT to propagate cross-tab, and
+      // `emit` here reaches only this tab's own listeners. A leader-elected badge
+      // would leave every follower tab's bell frozen. Revisit if this transport
+      // ever gains a BroadcastChannel.
+      badgeTimer = registerPollingTask({
+        id: "notifications-badge",
+        intervalMs: BADGE_INTERVAL_MS,
+        run: pollBadge,
+      });
     }
   }
 
@@ -147,9 +150,11 @@ export function createPollingTransport(): NotificationTransport {
     const scope = threadScopes.get(threadId);
     if (started && scope && !scope.timer) {
       void pollThread(threadId);
-      scope.timer = setInterval(() => {
-        if (isVisible()) void pollThread(threadId);
-      }, THREAD_INTERVAL_MS);
+      scope.timer = registerPollingTask({
+        id: `notifications-thread:${threadId}`,
+        intervalMs: THREAD_INTERVAL_MS,
+        run: () => pollThread(threadId),
+      });
     }
   }
 
@@ -183,12 +188,12 @@ export function createPollingTransport(): NotificationTransport {
       window.removeEventListener("focus", handleFocus);
       document.removeEventListener("visibilitychange", handleFocus);
       if (badgeTimer) {
-        clearInterval(badgeTimer);
+        badgeTimer();
         badgeTimer = null;
       }
       for (const scope of threadScopes.values()) {
         if (scope.timer) {
-          clearInterval(scope.timer);
+          scope.timer();
           scope.timer = null;
         }
       }
@@ -201,7 +206,7 @@ export function createPollingTransport(): NotificationTransport {
         return () => {
           badgeRefCount = Math.max(0, badgeRefCount - 1);
           if (badgeRefCount === 0 && badgeTimer) {
-            clearInterval(badgeTimer);
+            badgeTimer();
             badgeTimer = null;
           }
         };
@@ -225,7 +230,7 @@ export function createPollingTransport(): NotificationTransport {
         if (!state) return;
         state.refCount -= 1;
         if (state.refCount <= 0) {
-          if (state.timer) clearInterval(state.timer);
+          if (state.timer) state.timer();
           threadScopes.delete(threadId);
         }
       };

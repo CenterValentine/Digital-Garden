@@ -58,6 +58,18 @@ interface Declared {
    * continuity dominates frequency.
    */
   estimatedMonthlyCostUsd?: number;
+  /**
+   * Set on a "ui-only" entry whose FILE contains network calls that have been
+   * traced and confirmed unrelated to its timer — an event handler, a form
+   * submit, a one-shot load.
+   *
+   * This exists so the ui-only check keeps its teeth. Without it the check would
+   * be either too blunt (flagging legitimate files and training people to
+   * reclassify reflexively) or absent (letting a network poller hide behind the
+   * one policy that skips every other check). Requiring an explicit flag means
+   * somebody had to look.
+   */
+  networkUnrelated?: true;
 }
 
 /**
@@ -66,46 +78,11 @@ interface Declared {
  */
 const REGISTRY: Declared[] = [
   // ── Network pollers: must pause when hidden ────────────────────────────────
-  {
-    file: "components/content/AuthSessionSync.tsx",
-    policy: "pause-when-hidden",
-    note: "60s session check. Mounts app-wide so it multiplies per tab; re-checks immediately on tab-visible.",
-  },
-  {
-    file: "components/content/headers/MainPanelHeader.tsx",
-    policy: "pause-when-hidden",
-    note: "10s tab-strip presence. Interval is coupled to STALE_AFTER_MS=45s in presence-server.ts.",
-  },
-  {
-    file: "components/share/SharedContentViewer.tsx",
-    policy: "pause-when-hidden",
-    note: "10s heartbeat + presence read (TWO db ops per tick) on public share pages.",
-  },
-  {
-    file: "lib/features/notifications/transport.ts",
-    policy: "pause-when-hidden",
-    note: "45s badge + thread polls. handleFocus already refreshes on becoming visible.",
-  },
-  {
-    file: "lib/domain/collaboration/presence-poll.ts",
-    policy: "pause-when-hidden",
-    note: "Shared module-level poller: N subscribers collapse to ceil(N/16) requests. The unification model for this codebase.",
-  },
-  {
-    file: "extensions/workplaces/state/workspace-sync.ts",
-    policy: "pause-when-hidden",
-    note: "Reference implementation — the visibility check lives inside the interval callback.",
-  },
-  {
-    file: "extensions/studio/components/RunsPanel.tsx",
-    policy: "pause-when-hidden",
-    note: "3s, the shortest interval in the app. Justified only while a run is in flight AND the tab is visible.",
-  },
-  {
-    file: "extensions/workflows/components/RunDetail.tsx",
-    policy: "pause-when-hidden",
-    note: "3s while a run is non-terminal and the tab is visible.",
-  },
+  // components/content/AuthSessionSync.tsx was REMOVED from this registry when it
+  // migrated to registerPollingTask(). That is the intended end state: the
+  // registry audits RAW timers, and a scheduler-registered task declares its own
+  // policy in code (whenHidden / whenIdle / keepAliveWhile), which the type
+  // system enforces far better than a string in a list.
 
   // ── Server-side timers ─────────────────────────────────────────────────────
   {
@@ -120,12 +97,35 @@ const REGISTRY: Declared[] = [
   },
 
   // ── Purely local timers: no network, exempt ────────────────────────────────
-  { file: "app/(public)/layout.tsx", policy: "ui-only", note: "4s hero carousel advance." },
+  {
+    file: "app/(public)/layout.tsx",
+    policy: "ui-only",
+    networkUnrelated: true,
+    note:
+      "4s hero carousel advance (goTo). The file's one fetch is an email-form submit handler — " +
+      "event-driven, unrelated to the timer. Traced 2026-09-09.",
+  },
   { file: "components/client/app-nav/app-nav.tsx", policy: "ui-only", note: "16ms animation frame driving nav rotation." },
   { file: "components/content/ai/CoBrowseIndicator.tsx", policy: "ui-only", note: "1s elapsed-time display tick." },
   { file: "components/content/ai/reasoning/reasoning-disclosure.ts", policy: "ui-only", note: "Local disclosure animation." },
   { file: "components/content/folder-views/MediaLightbox.tsx", policy: "ui-only", note: "Slideshow advance." },
   { file: "lib/domain/editor/extensions/blocks/stopwatch.ts", policy: "ui-only", note: "33ms stopwatch tick, local block state." },
+  {
+    file: "lib/core/polling/scheduler.ts",
+    policy: "pause-when-hidden",
+    note:
+      "THE app's polling timer — one base tick driving every registered task. Gating lives here rather than in each " +
+      "call site, so adding a task adds no timers. Engagement is pulled at tick time; hidden is authoritative and " +
+      "keepAliveWhile cannot override it.",
+  },
+  {
+    file: "lib/core/engagement/index.ts",
+    policy: "ui-only",
+    note:
+      "The engagement core's own 5s transition check — the ONLY timer it owns. Never touches the network; exists so " +
+      "streams can be told when the user goes idle. Runs only while subscribed. Pull-based consumers should call " +
+      "getEngagement() at their own tick and cost nothing.",
+  },
 
   // ── Known, not yet audited ─────────────────────────────────────────────────
   // These files contain BOTH timers and network calls, so they cannot be
@@ -169,8 +169,29 @@ const REGISTRY: Declared[] = [
 // `ReturnType<typeof setInterval>` has no following paren, so it cannot match.
 const CALL_RE = /setInterval\s*\(/g;
 const EVENTSOURCE_RE = /new\s+EventSource\s*\(/g;
-/** Any of these near a timer counts as a visibility guard. */
-const VISIBILITY_RE = /visibilityState|document\.hidden/;
+/**
+ * What counts as being gated.
+ *
+ * Two accepted forms, and both must be recognised:
+ *
+ *   - a direct check   `document.visibilityState` / `document.hidden`
+ *   - **delegation**   to the engagement core (`getEngagement`, `isEngaged`,
+ *                      `subscribeEngagement`)
+ *
+ * The second matters increasingly: the whole point of the scheduler is that
+ * individual call sites stop writing visibility checks and declare a policy
+ * instead. A gate that only recognised the literal form would flag correctly
+ * architected code and, worse, pressure people back toward hand-rolled checks.
+ */
+/**
+ * Network activity. Used to verify a "ui-only" declaration is telling the truth.
+ * Deliberately broad — a false positive costs one reclassification; a false
+ * negative hides a poller behind the one policy that skips every other check.
+ */
+const NETWORK_RE = /\bfetch\s*\(|new\s+EventSource|new\s+WebSocket|XMLHttpRequest|navigator\.sendBeacon/;
+
+const VISIBILITY_RE =
+  /visibilityState|document\.hidden|getEngagement|isEngaged|subscribeEngagement|registerPollingTask/;
 
 function walk(dir: string): string[] {
   let out: string[] = [];
@@ -230,6 +251,27 @@ function main() {
       );
     }
 
+    // "ui-only" is the one policy that skips every other check, which makes it
+    // the obvious place to hide a network poller — deliberately or by drift, when
+    // someone adds a fetch to a file that used to be a pure animation. Asserting
+    // the file has no network calls at all is a blunt proxy, but a correct one:
+    // a file whose timers are genuinely local has no reason to contain any.
+    if (
+      declared.policy === "ui-only" &&
+      !declared.networkUnrelated &&
+      NETWORK_RE.test(source)
+    ) {
+      errors.push(
+        `UI-ONLY LIES  ${rel}\n` +
+          `    Declared "ui-only" but the file makes network calls.\n` +
+          `    Either its timer does network work — in which case it belongs on the\n` +
+          `    scheduler via registerPollingTask() — or the calls are unrelated to the\n` +
+          `    timer, in which case trace them and set networkUnrelated: true with a note\n` +
+          `    saying what they are.\n` +
+          `    ${declared.note}`
+      );
+    }
+
     if (
       declared.policy === "background-allowed" &&
       typeof declared.estimatedMonthlyCostUsd !== "number"
@@ -256,8 +298,11 @@ function main() {
     if (!seen.has(d.file)) {
       errors.push(
         `STALE ENTRY   ${d.file}\n` +
-          `    Declared in the registry but no timer found (file moved, renamed, or timer removed).\n` +
-          `    Remove the entry.`
+          `    Declared in the registry but no raw timer found.\n` +
+          `    If this file MIGRATED to registerPollingTask(), that is expected — remove the\n` +
+          `    entry. A scheduler-registered task declares its own policy in code, which the\n` +
+          `    type system enforces better than this list can.\n` +
+          `    Otherwise the file moved, was renamed, or lost its timer.`
       );
     }
   }

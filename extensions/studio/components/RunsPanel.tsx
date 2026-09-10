@@ -12,6 +12,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { CheckCircle2, Loader2, XCircle } from "lucide-react";
 import { useContentStore } from "@/state/content-store";
+import { registerPollingTask } from "@/lib/core/polling/scheduler";
 
 export interface RunDtoClient {
   id: string;
@@ -71,17 +72,21 @@ export function RunsPanel({
   // cutting request volume by 40%.
   useEffect(() => {
     if (!anyRunning) return;
-    const timer = setInterval(() => {
-      if (document.visibilityState === "visible") {
-        void fetchRuns(folderId);
-      }
-    }, POLL_MS);
+    // keepAliveWhile: someone watching a progress bar without touching the mouse
+    // is at their MOST attentive, so idle must not freeze the display. It goes
+    // quiet the moment the run finishes, even if they are still sitting there.
+    const unregisterPoll = registerPollingTask({
+      id: `studio-runs:${folderId}`,
+      intervalMs: POLL_MS,
+      keepAliveWhile: () => anyRunning,
+      run: () => fetchRuns(folderId),
+    });
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") void fetchRuns(folderId);
     };
     document.addEventListener("visibilitychange", handleVisibilityChange);
     return () => {
-      clearInterval(timer);
+      unregisterPoll();
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [anyRunning, folderId, fetchRuns]);

@@ -1,4 +1,5 @@
 "use client";
+import { registerPollingTask } from "@/lib/core/polling/scheduler";
 
 import type { JSONContent } from "@tiptap/core";
 import Link from "next/link";
@@ -336,19 +337,25 @@ export function SharedContentViewer({ content }: SharedContentViewerProps) {
     // Bundling both into one `tick` is what forced the read to run at the
     // write's cadence. Splitting them cuts reads by 6x while leaving the
     // freshness contract intact.
-    const heartbeatInterval = window.setInterval(() => {
-      if (document.visibilityState === "visible") void heartbeat();
-    }, SHARE_HEARTBEAT_INTERVAL_MS);
-    const presenceInterval = window.setInterval(() => {
-      if (document.visibilityState === "visible") void fetchPresence();
-    }, SHARE_PRESENCE_READ_INTERVAL_MS);
+    // Both idle-gated: an idle viewer is arguably not "present", so letting the
+    // heartbeat lapse is correct rather than merely cheap.
+    const unregisterHeartbeat = registerPollingTask({
+      id: `share-presence-heartbeat:${content.id}`,
+      intervalMs: SHARE_HEARTBEAT_INTERVAL_MS,
+      run: heartbeat,
+    });
+    const unregisterRead = registerPollingTask({
+      id: `share-presence-read:${content.id}`,
+      intervalMs: SHARE_PRESENCE_READ_INTERVAL_MS,
+      run: fetchPresence,
+    });
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") void tick();
     };
     document.addEventListener("visibilitychange", handleVisibilityChange);
     return () => {
-      window.clearInterval(heartbeatInterval);
-      window.clearInterval(presenceInterval);
+      unregisterHeartbeat();
+      unregisterRead();
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [content.id]);

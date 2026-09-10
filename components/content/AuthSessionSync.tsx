@@ -10,24 +10,24 @@ import {
   subscribeAuthSessionEvents,
 } from "@/lib/infrastructure/auth/client-session-events";
 import { clientLogger } from "@/lib/core/logger/client";
+import { registerPollingTask } from "@/lib/core/polling/scheduler";
+import { installSessionInterceptor } from "@/lib/infrastructure/auth/session-interceptor";
 
-// 60 s, and only while the tab is visible.
+// A slow SAFETY NET, not the detection mechanism.
 //
-// This poll drives *proactive* UI sign-out only. Authorization itself happens
-// server-side on every real API call, so a revoked session can never actually
-// do anything — a slower poll just means a stale UI for longer, and only in a
-// tab nobody is looking at.
+// Detection now happens three other ways, all of them instant and all of them
+// free (D15 in POLLING-DISCIPLINE-PLAN.md):
 //
-// The cost matters because this component mounts app-wide: its interval
-// multiplies by every open tab, and each call validates the session against
-// Postgres. At 10 s ungated it was the single largest source of idle database
-// load in the app, which on metered infrastructure is billed twice — once for
-// the function that serves it and once for the database that never gets to
-// sleep. See docs/notes-feature/infrastructure/PLATFORM-PORTABILITY.md.
+//   another tab signed out   -> BroadcastChannel, via subscribeAuthSessionEvents
+//   the user does anything   -> the 401 interceptor installed below
+//   actively collaborating   -> Hocuspocus push
 //
-// Paired with an immediate re-check on tab-visible, so someone returning to a
-// backgrounded tab never waits a full minute to learn they were signed out.
-const AUTH_STATUS_INTERVAL_MS = 60_000;
+// So this poll exists only to catch the case where a session dies and the user
+// then does nothing at all — which by definition nobody is waiting on. Ten
+// minutes is deliberately longer than Neon's 5-minute autosuspend window, so an
+// untouched app leaves the database genuinely contiguous quiet rather than
+// prodding it awake every minute.
+const AUTH_STATUS_INTERVAL_MS = 10 * 60 * 1000;
 const SIGNED_OUT_MESSAGE = "You were signed out. Sign in again to continue editing.";
 // Require this many consecutive 401s before triggering sign-out.
 // Three in a row is authoritative: at a 60 s cadence every check is far past
@@ -65,28 +65,13 @@ export function AuthSessionSync() {
     const unsubscribe = subscribeAuthSessionEvents(handleSignedOut);
     let isCancelled = false;
     let consecutiveFailures = 0;
+    // Assigned below; referenced from verifySession, which only runs once the
+    // scheduler ticks — long after this closure is fully initialised.
+    let unregisterPoll: (() => void) | null = null;
 
-    // When the tab becomes visible again after a sleep/suspend, the frozen
-    // interval timer fires immediately on wake. Any cached null from the moment
-    // the computer slept carries forward into the first post-wake poll, making
-    // a transient DB reconnection error look like two consecutive 401s.
-    // Resetting here ensures the post-wake count always starts at 0.
-    const handleVisibilityChange = () => {
-      if (document.visibilityState !== "visible") return;
-      if (consecutiveFailures > 0) {
-        clientLogger.info({
-          layer: "ui",
-          event: "session_check:counter_reset_on_wake",
-          summary: `Resetting ${consecutiveFailures} consecutive failure(s) after tab visibility restored`,
-        });
-        consecutiveFailures = 0;
-      }
-      // The interval does not run while hidden, so the session state may be up
-      // to AUTH_STATUS_INTERVAL_MS stale on return. Check immediately rather
-      // than making the user wait out the remainder of the cycle.
-      void verifySession();
-    };
-    document.addEventListener("visibilitychange", handleVisibilityChange);
+    // Learn about revocation from requests we were already making. This is the
+    // primary detection path; everything below is a fallback.
+    const uninstallInterceptor = installSessionInterceptor();
 
     const verifySession = async () => {
       // Guard at entry: if sign-out has already been triggered (isCancelled),
@@ -116,7 +101,7 @@ export function AuthSessionSync() {
             // log noise and duplicate publishSignedOut calls seen when the interval
             // keeps firing during the router.replace transition.
             isCancelled = true;
-            window.clearInterval(interval);
+            unregisterPoll?.();
             clientLogger.warn({
               layer: "ui",
               event: "session_check:signing_out",
@@ -140,21 +125,27 @@ export function AuthSessionSync() {
       }
     };
 
-    // Gate inside the callback rather than tearing the timer down and rebuilding
-    // it on every visibility flip — same pattern as
-    // extensions/workplaces/state/workspace-sync.ts, which is the reference
-    // implementation for polling discipline in this codebase.
-    const interval = window.setInterval(() => {
-      if (document.visibilityState === "visible") {
-        void verifySession();
-      }
-    }, AUTH_STATUS_INTERVAL_MS);
+    // Registered with the shared scheduler rather than owning a timer. Gating
+    // (hidden and idle both pause) lives in the scheduler, so there is nothing
+    // to check here.
+    //
+    // scope: "leader" matters more than the interval does. This component mounts
+    // app-wide, so before leader election five open tabs meant five independent
+    // session checks for one human. Now exactly one tab asks, and the answer
+    // reaches the others over the BroadcastChannel this component already
+    // subscribes to above.
+    unregisterPoll = registerPollingTask({
+      id: "auth-session-check",
+      intervalMs: AUTH_STATUS_INTERVAL_MS,
+      scope: "leader",
+      run: verifySession,
+    });
 
     return () => {
       isCancelled = true;
-      window.clearInterval(interval);
+      unregisterPoll?.();
+      uninstallInterceptor();
       unsubscribe();
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [pathname, router, searchParams]);
 
