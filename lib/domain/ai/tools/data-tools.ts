@@ -735,6 +735,205 @@ export function createDataTools(ctx: ToolExecuteContext) {
         }
       },
     }),
+    // ─── propose_database_columns ───────────────────────────
+    // D3 (owner report 2026-09-10). The toolkit could read a database,
+    // write its cells, and mint a whole new one — but it could not add a
+    // column to a table that already existed. "Update the charter database
+    // to ensure it has these 26 columns" was, until now, unanswerable by
+    // construction; the model could only discover that after spending its
+    // whole step budget.
+    //
+    // Deliberately ADD-ONLY. Rename/retype/remove are a different risk
+    // class: a retype can invalidate every cell in a column and a remove
+    // hides data, so those stay a human action in the grid. Adding a column
+    // cannot damage an existing row — it only widens the shape.
+    //
+    // Proposal, not a write: the sentinel renders as
+    // DatabaseColumnsProposalCard and the USER's Apply click POSTs each
+    // column. Same contract as every other propose_* tool.
+    propose_database_columns: tool({
+      description:
+        "Propose NEW columns for an EXISTING database — the way to answer \"make sure this database has these fields\". Renders a review card; NOTHING is written until the user clicks Apply, so never claim the columns exist. Add-only by design: it cannot rename, retype, or delete a column (those stay the user's own action in the grid — say so if asked). Call describe_database first; columns the table already has are reported as present and dropped from the proposal, so propose the FULL wanted set and let the diff sort it out. Every column needs a real description (what goes in it, where values come from), and select/multiSelect/status need their initial options or they reject every value.",
+      inputSchema: z.object({
+        databaseId: z
+          .string()
+          .optional()
+          .describe(
+            "The database's id or exact name; omit in a chat open on the database"
+          ),
+        columns: z
+          .array(
+            z.object({
+              name: z.string().min(1).max(120),
+              type: z
+                .enum([
+                  "text",
+                  "longText",
+                  "number",
+                  "checkbox",
+                  "date",
+                  "select",
+                  "multiSelect",
+                  "status",
+                  "url",
+                  "email",
+                  "file",
+                ])
+                .describe(
+                  "Column type. Money/counts → number; paragraphs → longText; a vocabulary the USER controls → select/multiSelect/status (with options); anything free-form → text."
+                ),
+              description: z
+                .string()
+                .min(8)
+                .max(500)
+                .describe(
+                  "REQUIRED: what goes in this column and where its values come from — this is the model-facing capture context, not decoration."
+                ),
+              options: z
+                .array(
+                  z.object({
+                    label: z.string().min(1).max(120),
+                    color: z.string().optional(),
+                    group: z.enum(["todo", "active", "done"]).optional(),
+                  })
+                )
+                .max(50)
+                .optional()
+                .describe(
+                  "select/multiSelect/status ONLY, and REQUIRED for them: the initial vocabulary."
+                ),
+            })
+          )
+          .min(1)
+          .max(30)
+          .describe("The columns you want the database to have, in display order."),
+        rationale: z
+          .string()
+          .max(300)
+          .optional()
+          .describe("One sentence on why these fit — shown on the card."),
+      }),
+      execute: async (input) => {
+        try {
+          const dbRef = await resolveDatabaseRef(ctx, input.databaseId);
+          if ("refusal" in dbRef) return dbRef.refusal;
+          const gate = await resolveJurisdiction(ctx, dbRef.id);
+          if ("refusal" in gate) return gate.refusal;
+          const { table, level } = gate;
+          if (table.mode === "query") {
+            return "Query databases synthesize their columns from the query — they have no schema to extend.";
+          }
+          // Schema access is stricter than cell writes; the Apply POST would
+          // 403, so teach that now instead of rendering a dead card.
+          if (!canAlterSchema(level)) {
+            return "Only this database's owner can add columns — tell the user, and suggest they ask the owner.";
+          }
+
+          const live = table.columns.filter((c) => !c.deletedAt);
+          const liveLower = new Map(
+            live.map((c) => [c.name.trim().toLowerCase(), c])
+          );
+
+          // The "ensure it has" diff: a column the table already has is
+          // reported as present, never re-proposed. This is what lets the
+          // model send the whole wanted schema without checking first.
+          const alreadyPresent: string[] = [];
+          const seen = new Set<string>();
+          const additions: Array<{
+            name: string;
+            type: string;
+            description: string;
+            options?: Array<{
+              label: string;
+              color?: string;
+              group?: "todo" | "active" | "done";
+            }>;
+          }> = [];
+
+          for (const raw of input.columns) {
+            const name = raw.name.trim().slice(0, 120);
+            if (!name) continue;
+            const lower = name.toLowerCase();
+            if (seen.has(lower)) {
+              return `Duplicate column name "${name}" in the proposal — every column needs a distinct name.`;
+            }
+            seen.add(lower);
+            const existing = liveLower.get(lower);
+            if (existing) {
+              alreadyPresent.push(
+                existing.type === raw.type
+                  ? name
+                  : `${name} (exists as ${existing.type}, you asked for ${raw.type})`
+              );
+              continue;
+            }
+            const selectLike =
+              raw.type === "select" ||
+              raw.type === "multiSelect" ||
+              raw.type === "status";
+            if (selectLike && (!raw.options || raw.options.length === 0)) {
+              return `"${name}" is a ${raw.type} column with NO initial options — an option-less ${raw.type} rejects every value written to it. Provide the vocabulary, or make it a text column if the values are free-form.`;
+            }
+            if (!selectLike && raw.options && raw.options.length > 0) {
+              return `"${name}" is a ${raw.type} column — options belong only to select/multiSelect/status.`;
+            }
+            additions.push({
+              name,
+              type: raw.type,
+              description: raw.description.trim(),
+              ...(raw.options
+                ? {
+                    options: raw.options
+                      .map((o) => ({
+                        label: o.label.trim().slice(0, 120),
+                        ...(o.color && /^[a-z][a-z0-9-]{0,23}$/.test(o.color)
+                          ? { color: o.color }
+                          : {}),
+                        ...(raw.type === "status"
+                          ? { group: o.group ?? ("todo" as const) }
+                          : {}),
+                      }))
+                      .filter((o) => o.label.length > 0),
+                  }
+                : {}),
+            });
+          }
+
+          // Nothing to do is an ANSWER, not an error — and a valuable one:
+          // "the database already has everything you asked for" is exactly
+          // what the user wanted to know. Returning text (not a card) keeps
+          // the model from claiming it changed anything.
+          if (additions.length === 0) {
+            return (
+              `"${table.title}" already has every column you listed` +
+              (alreadyPresent.length > 0
+                ? `: ${alreadyPresent.join(", ")}. `
+                : ". ") +
+              "Nothing to add — tell the user the schema is already complete. " +
+              "Renaming, retyping, or removing a column is not something you can do; that is theirs to do in the grid."
+            );
+          }
+
+          return JSON.stringify({
+            __databaseColumnsProposal: true,
+            databaseId: dbRef.id,
+            databaseTitle: table.title,
+            rationale: input.rationale?.trim() || null,
+            columns: additions,
+            alreadyPresent,
+            existingCount: live.length,
+          });
+        } catch (error) {
+          logger.warn({
+            layer: "ai",
+            event: "data_tools:propose_columns_caught",
+            summary: "propose_database_columns failed",
+            error,
+          });
+          return "Proposing the columns failed with an internal error — nothing was changed; tell the user.";
+        }
+      },
+    }),
     // ─── propose_output_database ────────────────────────────
     // P5 (EXTRACTION-TO-DATABASE-PLAN §3.7, D1 reversed): the AI structures
     // the output database — schema derived from the charter's objective,

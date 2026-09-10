@@ -219,7 +219,7 @@ const MENTION_RE = /@\[([^\]]+)\]\(([^)]+)\)/g;
 
 /** Default mention search hint copy keyed by tool id. */
 const COMMAND_HINTS: Record<string, string> = {
-  searchNotes: "Search my notes for ",
+  search_content: "Search my garden for ",
   getCurrentNote: "Read the current note",
   createNote: "Create a new note titled ",
 };

@@ -50,6 +50,7 @@ function segment(overrides: Partial<TurnSegment>): TurnSegment {
     maxTokensSource: "catalog",
     reasoningConfig: null,
     toolCount: 53,
+    finalStepReserved: false,
     ...overrides,
   };
 }
@@ -202,6 +203,23 @@ console.log("turn-diagnostics contract checks");
     const flags = deriveTurnFlags(
       [{ type: "text", text: "…" }],
       [segment({ finishReason: "tool-calls", stepsUsed: 7, stepCap: 7 })],
+    );
+    assert.ok(flags.includes("step-cap-hit"));
+  });
+  ok("step-cap-hit: reserved final step still counts (D1)", () => {
+    // The final-step reservation forces the terminal step to finish "stop",
+    // which is precisely the signal the old tool-calls-only test relied on.
+    // Without finalStepReserved the fix would blind its own diagnostic.
+    const flags = deriveTurnFlags(
+      [{ type: "text", text: "I ran out of steps." }],
+      [
+        segment({
+          finishReason: "stop",
+          stepsUsed: 8,
+          stepCap: 8,
+          finalStepReserved: true,
+        }),
+      ],
     );
     assert.ok(flags.includes("step-cap-hit"));
   });
