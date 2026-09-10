@@ -56,9 +56,23 @@ export interface PollingTask {
    */
   keepAliveWhile?: () => boolean;
   /**
-   * "leader" — only one tab in this browser runs it. Use for anything whose
-   * answer is identical across tabs (session checks, notification badges).
-   * "per-tab" (default) — every tab runs its own, for tab-specific state.
+   * "leader" — only one tab in this browser runs it.
+   * "per-tab" (default) — every tab runs its own.
+   *
+   * ⚠ **"leader" is only safe when the RESULT propagates cross-tab.** The elected
+   * tab performs the fetch; every other tab performs nothing. If the result
+   * lands only in the leader's own store, every follower silently starves —
+   * a frozen bell, a stale list — and it looks like a caching bug, not a
+   * scheduling one.
+   *
+   * The bar is a real cross-tab channel carrying the *answer*, not merely a
+   * "something changed, go refetch" nudge — a nudge just restores per-tab
+   * polling by another name.
+   *
+   * Today only `auth-session-check` qualifies, because `publishSignedOut()`
+   * broadcasts over BroadcastChannel with a localStorage fallback. Notification
+   * badges and workspace-sync were both tried as "leader" and reverted for
+   * exactly this reason.
    */
   scope?: "leader" | "per-tab";
   run: () => void | Promise<void>;

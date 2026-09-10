@@ -28,6 +28,7 @@ import { getTabIcon, getTabIconGroupKey } from "./tab-icons";
 import { PaneTabAddButton } from "./PaneTabAddButton";
 import { useExtensionShellTabMenuSections } from "@/lib/extensions/client-registry";
 import { getCollaborationBrowserSessionId } from "@/lib/domain/collaboration/runtime";
+import { registerPollingTask } from "@/lib/core/polling/scheduler";
 import { prefetchContent } from "@/lib/domain/content/prefetch";
 import { BorrowedTabBadge } from "@/extensions/workplaces/components/BorrowedTabBadge";
 
@@ -590,11 +591,13 @@ export function MainPanelHeader({
     // looking at the tab strip in a backgrounded window. Each call is a
     // Postgres read, so an ungated 10 s interval keeps the database from ever
     // reaching its autosuspend threshold.
-    const interval = window.setInterval(() => {
-      if (document.visibilityState === "visible") {
-        void fetchPresence();
-      }
-    }, PRESENCE_POLL_INTERVAL_MS);
+    // per-tab: this polls THIS tab's open contentIds, so another tab's answer
+    // would be the wrong one.
+    const unregisterPoll = registerPollingTask({
+      id: "main-panel-tab-presence",
+      intervalMs: PRESENCE_POLL_INTERVAL_MS,
+      run: fetchPresence,
+    });
     // Catch up immediately on return rather than making someone stare at stale
     // tab chrome for up to a full interval.
     const handleVisibilityChange = () => {
@@ -604,7 +607,7 @@ export function MainPanelHeader({
 
     return () => {
       isCancelled = true;
-      window.clearInterval(interval);
+      unregisterPoll();
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [tabContentIds]);

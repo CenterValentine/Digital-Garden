@@ -71,41 +71,6 @@ const REGISTRY: Declared[] = [
   // registry audits RAW timers, and a scheduler-registered task declares its own
   // policy in code (whenHidden / whenIdle / keepAliveWhile), which the type
   // system enforces far better than a string in a list.
-  {
-    file: "components/content/headers/MainPanelHeader.tsx",
-    policy: "pause-when-hidden",
-    note: "10s tab-strip presence. Interval is coupled to STALE_AFTER_MS=45s in presence-server.ts.",
-  },
-  {
-    file: "components/share/SharedContentViewer.tsx",
-    policy: "pause-when-hidden",
-    note: "10s heartbeat + presence read (TWO db ops per tick) on public share pages.",
-  },
-  {
-    file: "lib/features/notifications/transport.ts",
-    policy: "pause-when-hidden",
-    note: "45s badge + thread polls. handleFocus already refreshes on becoming visible.",
-  },
-  {
-    file: "lib/domain/collaboration/presence-poll.ts",
-    policy: "pause-when-hidden",
-    note: "Shared module-level poller: N subscribers collapse to ceil(N/16) requests. The unification model for this codebase.",
-  },
-  {
-    file: "extensions/workplaces/state/workspace-sync.ts",
-    policy: "pause-when-hidden",
-    note: "Reference implementation — the visibility check lives inside the interval callback.",
-  },
-  {
-    file: "extensions/studio/components/RunsPanel.tsx",
-    policy: "pause-when-hidden",
-    note: "3s, the shortest interval in the app. Justified only while a run is in flight AND the tab is visible.",
-  },
-  {
-    file: "extensions/workflows/components/RunDetail.tsx",
-    policy: "pause-when-hidden",
-    note: "3s while a run is non-terminal and the tab is visible.",
-  },
 
   // ── Server-side timers ─────────────────────────────────────────────────────
   {

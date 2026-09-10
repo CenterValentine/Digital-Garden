@@ -2,13 +2,15 @@ import type { ContentWorkspaceResponse } from "@/extensions/workplaces/server";
 import { useWorkspaceStore, registerMutationBroadcast } from "./workspace-store";
 import { configurePendingIntentBackstop } from "@/state/content-store";
 import { warmContentSummaryCache } from "@/lib/domain/content/content-summary-cache";
+import { registerPollingTask } from "@/lib/core/polling/scheduler";
 
 const SYNC_CHANNEL_NAME = "dg-workspace-sync";
 const POLL_INTERVAL_MS = 15_000;
 const MENU_OPEN_DEBOUNCE_MS = 2_000;
 
 let channel: BroadcastChannel | null = null;
-let pollTimer: ReturnType<typeof setInterval> | null = null;
+/** Holds an UNREGISTER function now, not a timer id. */
+let pollTimer: (() => void) | null = null;
 let menuOpenTimer: ReturnType<typeof setTimeout> | null = null;
 let installed = false;
 
@@ -60,11 +62,17 @@ export function installWorkspaceSync(): () => void {
 
   registerMutationBroadcast(() => broadcastWorkspaceMutation());
 
-  pollTimer = setInterval(() => {
-    if (document.visibilityState === "visible") {
-      void fetchAndApply();
-    }
-  }, POLL_INTERVAL_MS);
+  // This file was the reference implementation for hand-rolled visibility
+  // gating. It now demonstrates the successor: gating is declared, not written.
+  // per-tab, NOT leader. The BroadcastChannel here signals "a mutation
+  // happened", prompting each tab to fetch its own copy — it does not carry the
+  // RESULT. A leader-elected poll would therefore update only the leader and
+  // leave every other tab stale.
+  pollTimer = registerPollingTask({
+    id: "workspace-sync",
+    intervalMs: POLL_INTERVAL_MS,
+    run: fetchAndApply,
+  });
 
   const handleOnline = () => {
     void fetchAndApply();
@@ -85,7 +93,7 @@ export function installWorkspaceSync(): () => void {
     channel?.close();
     channel = null;
     if (pollTimer) {
-      clearInterval(pollTimer);
+      pollTimer();
       pollTimer = null;
     }
     if (menuOpenTimer) {

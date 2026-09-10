@@ -18,6 +18,7 @@ import {
 import { deriveChain } from "../graph/chain";
 import { workflowGraphSchema } from "../graph/schema";
 import { getAnyNodeMetadata } from "../nodes/triggers";
+import { registerPollingTask } from "@/lib/core/polling/scheduler";
 
 /** Live-run refresh cadence. Only armed while a run is non-terminal and the tab is visible. */
 const RUN_POLL_MS = 5000;
@@ -300,15 +301,18 @@ export function RunDetail({
   // imperceptible to a watcher and cuts request volume by 40%.
   useEffect(() => {
     if (!active) return;
-    const timer = setInterval(() => {
-      if (document.visibilityState === "visible") void load();
-    }, RUN_POLL_MS);
+    const unregisterPoll = registerPollingTask({
+      id: "workflow-run-detail",
+      intervalMs: RUN_POLL_MS,
+      keepAliveWhile: () => active,
+      run: load,
+    });
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") void load();
     };
     document.addEventListener("visibilitychange", handleVisibilityChange);
     return () => {
-      clearInterval(timer);
+      unregisterPoll();
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [active, load]);
