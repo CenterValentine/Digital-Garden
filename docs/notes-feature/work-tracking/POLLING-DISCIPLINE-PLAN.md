@@ -615,6 +615,160 @@ Today five *visible* tabs run five independent `AuthSessionSync` intervals for o
 
 ---
 
+## Phase 5 — The browser extension — SHIPPED (2026-09-10)
+
+Found by asking what the extension's webpage view does when nobody is using it.
+The answer was: everything it always does. **Zero** engagement gating existed
+anywhere in ~9,500 lines — no `visibilityState`, no `hasFocus`, no `chrome.idle`.
+
+### D18 — `chrome.alarms` is the most expensive poller in the system
+
+Three persistent alarms, all reaching the database:
+
+| Alarm | Was | Now | Reaches |
+|---|---|---|---|
+| `dg-workflow-badge` | 1 min | event-driven | bearer lookup **+** `listRunsForOwner` |
+| `dg-pull-sync` | 5 min | 15 min, gated | `pullDeltas` |
+| `dg-embed-session-refresh` | 20 min | gated on panel-open OR engaged | session exchange |
+
+Alarms are **persistent**: they survive service-worker eviction and browser
+restarts, and fire with every tab closed, the side panel shut and the window
+minimized. Nothing DOM-based could ever have gated them.
+
+The 1-minute badge alarm alone held Neon above its 5-minute autosuspend
+threshold for every hour the browser was running — **the whole compute bill,
+with the app itself completely idle**. Modelled at ~$11/mo (Chrome ~16 h/day) to
+~$16/mo (24/7), anchored on the measured never-suspending figure below.
+
+The counterintuitive part, and the reason all three had to move together:
+under continuity billing the alarms **overlap rather than add**. Gating the
+1-minute badge while leaving `dg-pull-sync` at 5 minutes would have saved
+approximately nothing. `dg-pull-sync` at 5 minutes was the worst available
+value — exactly ON the threshold, so the database could never sleep, while
+buying no responsiveness a cursor-based delta sync could possibly need.
+
+### D19 — The service worker needs its own engagement core, not a shared one
+
+`lib/core/engagement` is unusable in a service worker: there is no DOM. So
+`src/background/engagement.js` mirrors it — same three states, same policy
+vocabulary, different sensors.
+
+| app (DOM) | extension (`chrome.*`) |
+|---|---|
+| `visibilityState === "hidden"` | no focused window, or `idle` state `"locked"` |
+| input events → `lastInputAt` | `chrome.idle.queryState(60)` |
+| `subscribeEngagement()` | `idle.onStateChanged` + `windows.onFocusChanged` |
+
+`chrome.idle` is in one respect the **better** sensor: it reads OS-level input,
+so it sees the user typing in another application, which the DOM version can
+only infer.
+
+**One rule inverts.** The app attaches listeners lazily on first subscribe and
+detaches on the last. MV3 forbids that: Chrome evicts an idle worker after ~30 s
+and restarts it on the next event, and listeners must be registered
+**synchronously at module top level** or the restarted worker silently receives
+nothing. They attach unconditionally at import; the subscriber set is pure
+fan-out and owns no lifecycle.
+
+### D20 — The badge is a current-state display, so it needs no steady-state poll
+
+The badge reflects workflow runs. The extension knows when it dispatched one,
+and the poll result says whether any run is still live — so the steady-state
+poll is not performed at all:
+
+- **60 s** while a run is `waiting`/`running`/`queued`
+- **15 min** discovery backstop, for runs started elsewhere (the app's own
+  workflow UI, an n8n inbound trigger). Deliberately *past* the 5-minute
+  threshold, so the database sleeps between checks even mid-session.
+- **one refresh on the return to active**, floored at 60 s so alt-tabbing cannot
+  become a poll storm — `windows.onFocusChanged` fires on every window switch
+- nothing otherwise
+
+Safe because nothing accumulates while paused: a single fetch is always a
+complete restore. This is the same property that made close-and-refetch correct
+for the SSE streams in D12.
+
+The alarm keeps its 1-minute period — waking the worker is microseconds of local
+CPU. **Fine-grained alarm, coarse-grained fetching.**
+
+Refreshes that follow a user action still call `refreshWorkflowBadge()` directly
+and ungated. That is a load, not a poll.
+
+### D21 — `dg-embed-session-refresh` is gated on panel-open OR engaged
+
+The one alarm not gated purely on engagement. Its token lives 30 minutes and the
+20-minute forced refresh exists specifically to avoid a dead-cookie window, so a
+skipped refresh is a **correctness bug, not a saving**. Two consumers can hold a
+token: the side panel (detectable via the existing `dgPanelOpen` flag) and an
+overlay content panel on a page (not detectable — but the user is necessarily
+engaged while using it). Hence OR: it skips only when nobody is engaged *and* no
+panel is open, which is the overnight case and the bulk of the cost.
+
+**Residual, accepted:** a side panel left open overnight keeps refreshing every
+20 minutes (~25% duty cycle). Closing that needs a 401-triggered re-mint in the
+panel so the refresh can be dropped safely; tracked, not built.
+
+### D22 — Visibility was never enough for the side panel
+
+The side panel is registered **globally** (`sidePanel.setOptions` with no
+`tabId`), so it stays on screen — and reports `visible` — across every tab
+switch, for as long as it is open. A normal tab hides when you switch away; a
+side panel never does, and it is a surface people deliberately leave up for days.
+
+Both conversation SSE streams gated on `visibilityState` only, so in the panel
+they **never closed at all**. The panel was not an edge case for the
+visibility-only gate; it was its worst case. Both now use
+`subscribeEngagement`. The cache store additionally honours the *current* state
+at connect time rather than waiting for a transition, since a restoring
+background tab can already be idle when it subscribes.
+
+### D23 — The gate's blind spot was what the walker SKIPPED, not where it started
+
+`polling:check` reported "15 timer files, all accounted for" while never opening
+the extension. Two holes:
+
+- `SOURCE_FILE_RE` was `/\.(ts|tsx)$/`. The extension is plain JavaScript.
+  `extensions/` was **already** a scan root — the *file extension* was the hole.
+  Exactly the earlier `state/` miss, one layer out.
+- `chrome.alarms.create` is a recurring timer that looks nothing like one, and
+  nothing in the gate matched it.
+
+Both closed: scan widened to `.js`, a `periodInMinutes` matcher added (one-shot
+`when`/`delayInMinutes` deliberately excluded), and `dist/` skipped so the
+esbuild bundle does not double-count every timer at a path nobody can fix.
+**15 → 18 timer files.**
+
+**The lesson is now explicit in the file:** check what the walker skips, not just
+where it starts.
+
+### D24 — The static gate cannot check logic; that is what the smoke suite is for
+
+Mutation-testing surfaced this cleanly. Breaking the *logic* of an engagement
+check while leaving the call in place passes `polling:check` — correctly, since
+it verifies a check **exists**, not that the mapping is right.
+
+`scripts/extension-engagement-smoke.ts` (21 assertions) covers the executable
+half: state mapping including locked-screen and no-windows, the degraded path
+when the `idle` permission is absent, transition delivery and dedupe, and
+subscriber isolation. Mutation-tested three ways — dropping the locked
+short-circuit, the transition dedupe, or the subscriber `try`/`catch` each fails
+it. `pnpm polling:smoke` now runs both suites.
+
+### D25 — The overlay's 1 s tick is battery, not billing
+
+`setInterval(_onUrlChange, 1000)` runs in **every open tab on every https page**,
+forever. It only reaches the network when the URL actually changed with the
+associations popover open, so it costs the user's battery rather than the meter.
+Now skipped while the tab is hidden; the navigation events it backstops
+(`popstate`, `hashchange`, the Navigation API) fire regardless, so nothing is
+missed.
+
+Not to be confused with the overlay's `markActivity` / `DG_OVERLAY_IDLE_MS`
+(2 400 ms) — that is a **UI fade** for the handle, with no network meaning. It
+reads like a gate and is not one.
+
+---
+
 ## Measured facts (2026-09-09)
 
 | | |
@@ -624,6 +778,7 @@ Today five *visible* tabs run five independent `AuthSessionSync` intervals for o
 | Presence SSE consumers | 1 |
 | Presence batch-route consumers | 3 |
 | Timer files scanned | 20 — 8 gated, 6 ui-only, 2 server, 4 unreviewed |
+| Timer files scanned (after D23, 2026-09-10) | 18 — 4 gated, 9 ui-only, 2 server, 3 unreviewed |
 | Conversations SSE cost | ~1 460 GB-hrs/month per always-open tab (~97% of the memory line) |
 | Neon Free plan ceiling | 100 CU-hours/project — the pre-fix workload used ~154 |
 
