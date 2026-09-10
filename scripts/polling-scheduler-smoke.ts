@@ -17,6 +17,7 @@ type Listener = (...args: unknown[]) => void;
 
 const store = new Map<string, string>();
 let visibility: "visible" | "hidden" = "visible";
+let focused = true;
 const listeners = new Map<string, Set<Listener>>();
 
 function addListener(type: string, fn: Listener) {
@@ -33,6 +34,7 @@ function removeListener(type: string, fn: Listener) {
   },
   addEventListener: addListener,
   removeEventListener: removeListener,
+  hasFocus: () => focused,
 };
 
 const localStorageStub = {
@@ -101,6 +103,24 @@ async function main() {
   withClockOffset(IDLE_AFTER_MS + 1_000, () => {
     check("hidden takes precedence over idle", getEngagement(), "hidden");
   });
+
+  // Input to an UNFOCUSED window must not reset the idle countdown, or a mouse
+  // crossing a second-monitor PWA would keep it "active" forever.
+  reset();
+  const fireInput = () => {
+    for (const fn of listeners.get("pointermove") ?? []) fn();
+  };
+  // Subscribe so the module attaches its listeners.
+  const unsub = (await import("@/lib/core/engagement")).subscribeEngagement(() => {});
+  focused = false;
+  withClockOffset(IDLE_AFTER_MS + 1_000, () => {
+    fireInput();
+    check("pointermove while UNFOCUSED does not reset idle", getEngagement(), "idle");
+  });
+  focused = true;
+  fireInput();
+  check("pointermove while focused does reset idle", getEngagement(), "active");
+  unsub();
 
   // ── Scheduler gating ─────────────────────────────────────────────────────────
 

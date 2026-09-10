@@ -87,6 +87,18 @@ const subscribers = new Set<(state: Engagement) => void>();
  * decision-making to the moment someone asks — which is where it is needed.
  */
 function markInput() {
+  // Input to an UNFOCUSED window does not count.
+  //
+  // An unfocused window receives no keyboard events, but it does still receive
+  // `pointermove` when the cursor crosses it — which on a multi-monitor setup
+  // happens constantly on the way somewhere else. Without this guard a PWA
+  // parked on a second monitor would have its idle countdown reset by a mouse
+  // passing over it, and could stay "active" indefinitely without anyone ever
+  // using it. That is the exact scenario this module exists to catch.
+  //
+  // Clicking an unfocused window to use it is unaffected: the `focus` event
+  // fires first and stamps activity through handleFocusOrVisibility below.
+  if (typeof document !== "undefined" && !document.hasFocus()) return;
   lastInputAt = Date.now();
   if (current !== "active") recompute();
 }
@@ -111,7 +123,11 @@ function recompute() {
   }
 }
 
-function handleVisibilityChange() {
+function handleFocusOrVisibility() {
+  // Bound to BOTH `focus` and `visibilitychange`, which cover different
+  // transitions: `focus` fires when an unfocused window is clicked into,
+  // `visibilitychange` when a backgrounded tab is switched to.
+  //
   // Returning to a tab counts as engagement in itself — otherwise a tab that was
   // hidden for an hour would come back already idle and stay paused until the
   // user happened to move the mouse.
@@ -127,8 +143,8 @@ function attach() {
   for (const event of ACTIVITY_EVENTS) {
     window.addEventListener(event, markInput, { passive: true });
   }
-  window.addEventListener("focus", handleVisibilityChange);
-  document.addEventListener("visibilitychange", handleVisibilityChange);
+  window.addEventListener("focus", handleFocusOrVisibility);
+  document.addEventListener("visibilitychange", handleFocusOrVisibility);
   transitionTimer = setInterval(recompute, TRANSITION_CHECK_MS);
 }
 
@@ -138,8 +154,8 @@ function detach() {
   for (const event of ACTIVITY_EVENTS) {
     window.removeEventListener(event, markInput);
   }
-  window.removeEventListener("focus", handleVisibilityChange);
-  document.removeEventListener("visibilitychange", handleVisibilityChange);
+  window.removeEventListener("focus", handleFocusOrVisibility);
+  document.removeEventListener("visibilitychange", handleFocusOrVisibility);
   if (transitionTimer !== null) {
     clearInterval(transitionTimer);
     transitionTimer = null;
