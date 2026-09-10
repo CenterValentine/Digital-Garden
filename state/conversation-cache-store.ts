@@ -26,6 +26,7 @@
  */
 
 import { create } from "zustand";
+import { getEngagement, subscribeEngagement } from "@/lib/core/engagement";
 import type {
   ConversationEvent,
   ConversationAssociationSourceLiteral,
@@ -132,8 +133,8 @@ async function fetchAssociations(
 let eventSource: EventSource | null = null;
 let refCount = 0;
 let focusHandlerBound = false;
-/** Stable identity so removeEventListener actually detaches it. */
-let visibilityHandler: (() => void) | null = null;
+/** Engagement unsubscribe, held so disconnect() can detach it. */
+let unsubscribeEngagement: (() => void) | null = null;
 
 /**
  * Attach the shared stream. Extracted so the visibility handler can reopen it
@@ -306,27 +307,35 @@ export const useConversationCacheStore = create<ConversationCacheState>(
       if (!focusHandlerBound) {
         window.addEventListener("focus", get().refetchAllCached);
 
-        // The stream is CLOSED while the tab is hidden and reopened on return.
+        // The stream is CLOSED whenever the user is not actively engaged, and
+        // reopened on return.
         //
         // Vercel bills Fluid Provisioned Memory for an SSE request's entire
         // lifetime, including time idle in I/O — and an SSE response never
         // completes. One held-open stream at the default 2 GB is roughly
         // 1,460 GB-hrs/month whether or not anything is watching it.
         //
+        // Gated on ENGAGEMENT rather than visibility. Visibility missed the two
+        // cases where a stream is most likely to be forgotten: a window open on
+        // a second monitor, and the browser extension's side panel — registered
+        // globally, so it reports `visible` across every tab switch for as long
+        // as it is open, which for a side panel can be days.
+        //
         // Closing is safe because refetchAllCached reconciles anything missed
-        // while hidden. `focus` alone would not be enough to trigger that:
-        // it fires when a whole browser window regains focus, while
-        // `visibilitychange` covers switching to a tab inside a window that
-        // already had it. Both paths are bound.
-        visibilityHandler = () => {
-          if (document.visibilityState === "visible") {
+        // while closed; it runs on every return to active, and `focus` remains
+        // bound above for the window-level case.
+        unsubscribeEngagement = subscribeEngagement((state) => {
+          if (state === "active") {
             openStream((event) => get().applyEvent(event));
             void get().refetchAllCached();
           } else {
             closeStream();
           }
-        };
-        document.addEventListener("visibilitychange", visibilityHandler);
+        });
+        // Engagement can already be idle/hidden at connect time (a background
+        // tab restoring its session), so honour the CURRENT state rather than
+        // waiting for a transition that may never come.
+        if (getEngagement() !== "active") closeStream();
         focusHandlerBound = true;
       }
     },
@@ -337,9 +346,9 @@ export const useConversationCacheStore = create<ConversationCacheState>(
       closeStream();
       if (focusHandlerBound) {
         window.removeEventListener("focus", get().refetchAllCached);
-        if (visibilityHandler) {
-          document.removeEventListener("visibilitychange", visibilityHandler);
-          visibilityHandler = null;
+        if (unsubscribeEngagement) {
+          unsubscribeEngagement();
+          unsubscribeEngagement = null;
         }
         focusHandlerBound = false;
       }
