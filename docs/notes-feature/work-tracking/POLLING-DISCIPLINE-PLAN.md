@@ -2,6 +2,7 @@
 
 **Last updated:** 2026-09-09
 **Status:** Phase 0 shipped (PR #213). Phases 1–4 not started.
+**⚠ Phase 0 does NOT address an always-open PWA** — every gate it shipped keys on visibility, and a visible-but-idle PWA never triggers one. See "The dominant case" below. Phase 2 is the fix.
 **Invariant:** *the page goes cold when nobody is actively using it.*
 
 ---
@@ -406,6 +407,51 @@ Worth stating explicitly, because "pause" could mean several things:
 **Idle resumption (Phase 2)** will follow the same shape: any of the D10 activity events stamps `lastActivityAt`, engagement flips back to `active`, and the next tick proceeds. Surfaces that need instant resumption rather than next-tick get an explicit catch-up, same as visibility.
 
 **Mutation-tested both directions:** an unregistered poller produced `UNREGISTERED`; stripping a visibility guard produced `NOT GATED`; restoring gave `✓ 20 timer files: 8 gated, 6 ui-only, 2 server, 4 awaiting audit`.
+
+---
+
+## ⚠ The dominant case: a visible, idle PWA — and what Phase 0 does about it
+
+**Read this before assuming the bill is fixed. It is not, for the most likely usage pattern.**
+
+An installed PWA left open all day is `document.visibilityState === "visible"` the entire time. It never fires `visibilitychange`. **Every gate shipped in Phase 0 keys on visibility**, so in this scenario essentially none of them engage.
+
+### What actually runs in an open, untouched PWA today
+
+| Poller | Interval | Running? | Touches Postgres |
+|---|---|---|---|
+| `AuthSessionSync` | 60 s | **yes** | yes |
+| `notifications/transport` badge | 45 s | **yes** | yes |
+| `presence-poll` | 10 s | **yes**, if a Note Window is mounted | yes |
+| `MainPanelHeader` | 10 s | **yes**, if tabs are open | yes |
+| conversations SSE ×2 | held open | **open** | no (in-process bus) |
+| `RunsPanel` / `RunDetail` | 5 s | only during an active run | yes |
+
+### Why the interval reductions do not help here
+
+Neon autosuspends after **5 minutes without a query**. `AuthSessionSync` at 60 s produces a maximum gap of 60 s. **60 s < 5 min, so the database never suspends** — exactly as it did not at 10 s.
+
+Cutting 10 s → 60 s reduced query *volume* six-fold, which is real but cheap; it did **not** buy any contiguous quiet, which is the expensive part (D14). For this scenario the Neon line is essentially **unchanged by Phase 0**.
+
+Likewise both conversation SSE streams stay **open**, because the tab is visible — so the Vercel provisioned-memory line is also unchanged.
+
+### Estimated cost of a visible, idle PWA — after Phase 0
+
+| Meter | Estimate | Changed by Phase 0? |
+|---|---|---|
+| Neon compute (never suspends) | ~$19 / mo | **No** |
+| Vercel provisioned memory (2 held SSEs) | ~$15–31 / mo | **No** |
+| Vercel invocations | < $1 | marginally |
+| Cloud Run | **~$0** | already handled — `INACTIVITY_SLEEP_DELAY_MS` = 10 min |
+| **Total** | **≈ $35–50 / mo** | |
+
+### What this means for sequencing
+
+**Phase 0 fixed backgrounded tabs. It did not fix the always-open PWA.** The only meter already handled for this case is Cloud Run, and that is because the collaboration runtime implemented inactivity sleep long before this document existed (D2b) — further evidence that the engagement core should be lifted from there rather than rebuilt (D13).
+
+**Phase 2 is therefore not "the largest remaining win" — for this usage pattern it is the *only* win.** Everything else is rounding error until idle gating exists.
+
+Concretely, once Phase 2 lands with a 60 s idle threshold (D9), an untouched PWA goes quiet on all three meters within about a minute, and the same table becomes roughly **$2–4/month**.
 
 ---
 
