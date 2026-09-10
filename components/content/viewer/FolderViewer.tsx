@@ -116,14 +116,14 @@ export function FolderViewer({
   return (
     <div className="flex h-full flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-white/10 px-6 py-2">
+      <div className="flex items-center justify-between border-b border-border px-6 py-2">
         <div className="flex items-center gap-2">
-          <Folder className="h-4 w-4 text-gray-600" />
-          <h1 className="text-sm font-medium text-gray-900 leading-tight">{title}</h1>
+          <Folder className="h-4 w-4 text-muted-foreground" />
+          <h1 className="text-sm font-medium text-foreground leading-tight">{title}</h1>
         </div>
 
         {/* View Mode Toggle */}
-        <div className="flex items-center gap-1 rounded-md border border-white/10 bg-white/5 p-1">
+        <div className="flex items-center gap-1 rounded-md border border-border bg-muted/50 p-1">
           {(["list", "gallery", "kanban", "dashboard", "canvas"] as const).map((mode) => (
             <button
               key={mode}
@@ -131,7 +131,7 @@ export function FolderViewer({
               className={`rounded p-1.5 transition-colors ${
                 viewMode === mode
                   ? "bg-primary/20 text-primary"
-                  : "text-gray-400 hover:bg-white/10 hover:text-white"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
               }`}
               title={`${mode.charAt(0).toUpperCase() + mode.slice(1)} view`}
             >

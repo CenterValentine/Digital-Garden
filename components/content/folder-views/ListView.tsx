@@ -133,7 +133,7 @@ export function ListView({
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="text-sm text-gray-600">Loading folder contents...</div>
+        <div className="text-sm text-muted-foreground">Loading folder contents...</div>
       </div>
     );
   }
@@ -141,9 +141,9 @@ export function ListView({
   if (children.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-center px-4">
-        <Folder className="h-16 w-16 text-gray-400 mb-4" />
-        <p className="text-sm text-gray-600 mb-2">This folder is empty</p>
-        <p className="text-xs text-gray-500">
+        <Folder className="h-16 w-16 text-muted-foreground mb-4" />
+        <p className="text-sm text-muted-foreground mb-2">This folder is empty</p>
+        <p className="text-xs text-muted-foreground">
           Add content using the plus button or context menu
         </p>
       </div>
@@ -164,7 +164,7 @@ export function ListView({
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg border transition-colors text-left ${
                 isSelected
                   ? "border-primary bg-primary/10 ring-2 ring-primary/20"
-                  : "border-white/10 hover:bg-white/5"
+                  : "border-border hover:bg-muted/50"
               }`}
               style={
                 isSelected
@@ -175,17 +175,17 @@ export function ListView({
                     }
               }
             >
-              <div className={isSelected ? "text-primary" : "text-gray-600"}>
+              <div className={isSelected ? "text-primary" : "text-muted-foreground"}>
                 {getIcon(child.contentType)}
               </div>
               <div className="flex-1 min-w-0">
-                <div className={`text-sm font-medium truncate ${isSelected ? "text-primary" : "text-gray-900"}`}>
+                <div className={`text-sm font-medium truncate ${isSelected ? "text-primary" : "text-foreground"}`}>
                   {child.title}
                   {displayExtension && (
-                    <span className="text-gray-600">{displayExtension}</span>
+                    <span className="text-muted-foreground">{displayExtension}</span>
                   )}
                 </div>
-                <div className="text-xs text-gray-500">
+                <div className="text-xs text-muted-foreground">
                   {child.contentType === "folder" ? "Folder" : "Document"}
                 </div>
               </div>

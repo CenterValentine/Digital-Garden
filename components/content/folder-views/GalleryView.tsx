@@ -181,7 +181,7 @@ export function GalleryView({
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="text-sm text-gray-600">Loading gallery...</div>
+        <div className="text-sm text-muted-foreground">Loading gallery...</div>
       </div>
     );
   }
@@ -189,9 +189,9 @@ export function GalleryView({
   if (mediaItems.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-center px-4">
-        <ImageIcon className="h-16 w-16 text-gray-400 mb-4" />
-        <p className="text-sm text-gray-600 mb-2">No media files in this folder</p>
-        <p className="text-xs text-gray-500">
+        <ImageIcon className="h-16 w-16 text-muted-foreground mb-4" />
+        <p className="text-sm text-muted-foreground mb-2">No media files in this folder</p>
+        <p className="text-xs text-muted-foreground">
           Upload images or videos to see them in gallery view
         </p>
       </div>
@@ -201,8 +201,8 @@ export function GalleryView({
   return (
     <>
       {/* Gallery Header with Slideshow Button */}
-      <div className="flex-none px-6 py-3 border-b border-white/10 flex items-center justify-between">
-        <div className="text-sm text-gray-400">
+      <div className="flex-none px-6 py-3 border-b border-border flex items-center justify-between">
+        <div className="text-sm text-muted-foreground">
           {mediaItems.length} {mediaItems.length === 1 ? "item" : "items"}
         </div>
         <Button
@@ -227,7 +227,7 @@ export function GalleryView({
               <button
                 key={item.id}
                 onClick={() => handleItemClick(index)}
-                className="group relative rounded-lg border border-white/10 overflow-hidden hover:ring-2 hover:ring-primary/50 transition-all"
+                className="group relative rounded-lg border border-border overflow-hidden hover:ring-2 hover:ring-primary/50 transition-all"
                 style={{
                   background: glass0.background,
                   backdropFilter: glass0.backdropFilter,
@@ -256,8 +256,8 @@ export function GalleryView({
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
                     {/* Loading skeleton with subtle pulse */}
-                    <div className="absolute inset-0 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 animate-pulse" />
-                    <FileImage className="h-12 w-12 text-gray-400 relative z-10" />
+                    <div className="absolute inset-0 bg-muted animate-pulse" />
+                    <FileImage className="h-12 w-12 text-muted-foreground relative z-10" />
                   </div>
                 )}
               </div>
