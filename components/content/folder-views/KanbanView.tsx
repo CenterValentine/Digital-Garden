@@ -102,7 +102,7 @@ function SortableCard({
       style={style}
       {...attributes}
       {...listeners}
-      className="p-3 mb-2 rounded-lg border border-white/10 cursor-move hover:border-primary/30 transition-colors"
+      className="p-3 mb-2 rounded-lg border border-border cursor-move hover:border-primary/30 transition-colors"
     >
       <div
         style={{
@@ -111,21 +111,21 @@ function SortableCard({
         }}
       >
         <div className="flex items-start justify-between gap-2 mb-2">
-          <h4 className="text-sm font-medium text-gray-900 flex-1">
+          <h4 className="text-sm font-medium text-foreground flex-1">
             {item.title}
             {displayExtension && (
-              <span className="text-gray-600">{displayExtension}</span>
+              <span className="text-muted-foreground">{displayExtension}</span>
             )}
           </h4>
           <button
             onClick={handleOpenContent}
-            className="flex-shrink-0 p-1 rounded hover:bg-white/20 transition-colors"
+            className="flex-shrink-0 p-1 rounded hover:bg-muted transition-colors"
             title="Open in main panel"
           >
-            <ExternalLink className="h-3.5 w-3.5 text-gray-600" />
+            <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
           </button>
         </div>
-        <p className="text-xs text-gray-600 line-clamp-3">{previewLines}</p>
+        <p className="text-xs text-muted-foreground line-clamp-3">{previewLines}</p>
       </div>
     </div>
   );
@@ -402,7 +402,7 @@ export function KanbanView({
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="text-sm text-gray-600">Loading kanban board...</div>
+        <div className="text-sm text-muted-foreground">Loading kanban board...</div>
       </div>
     );
   }
@@ -419,10 +419,10 @@ export function KanbanView({
           {columns.map((column) => (
             <DroppableColumn key={column.id} column={column}>
               {/* Column header */}
-              <div className="p-4 border-b border-white/10">
-                <h3 className="text-sm font-semibold text-gray-900 flex items-center justify-between">
+              <div className="p-4 border-b border-border">
+                <h3 className="text-sm font-semibold text-foreground flex items-center justify-between">
                   {column.title}
-                  <span className="text-xs text-gray-500 ml-2">
+                  <span className="text-xs text-muted-foreground ml-2">
                     {column.items.length}
                   </span>
                 </h3>
@@ -441,17 +441,17 @@ export function KanbanView({
 
                 {column.items.length === 0 && (
                   <div className="flex flex-col items-center justify-center py-8 text-center">
-                    <FileText className="h-12 w-12 text-gray-400 mb-2" />
-                    <p className="text-xs text-gray-500">No cards yet</p>
+                    <FileText className="h-12 w-12 text-muted-foreground mb-2" />
+                    <p className="text-xs text-muted-foreground">No cards yet</p>
                   </div>
                 )}
               </div>
 
               {/* Add card button */}
-              <div className="p-4 border-t border-white/10">
+              <div className="p-4 border-t border-border">
                 <button
                   onClick={() => handleAddCard(column.id)}
-                  className="w-full flex items-center justify-center gap-2 py-2 text-sm text-gray-600 hover:text-gray-900 transition-colors"
+                  className="w-full flex items-center justify-center gap-2 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
                 >
                   <Plus className="h-4 w-4" />
                   Add Card
@@ -473,11 +473,11 @@ export function KanbanView({
               const previewLines = preview.split("\n").slice(0, 3).join("\n");
 
               return (
-                <div className="p-3 rounded-lg border border-primary bg-white shadow-lg w-80">
-                  <h4 className="text-sm font-medium text-gray-900 mb-2">
+                <div className="p-3 rounded-lg border border-primary bg-background shadow-lg w-80">
+                  <h4 className="text-sm font-medium text-foreground mb-2">
                     {activeItem.title}
                   </h4>
-                  <p className="text-xs text-gray-600 line-clamp-3">{previewLines}</p>
+                  <p className="text-xs text-muted-foreground line-clamp-3">{previewLines}</p>
                 </div>
               );
             })()
