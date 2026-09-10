@@ -58,6 +58,18 @@ interface Declared {
    * continuity dominates frequency.
    */
   estimatedMonthlyCostUsd?: number;
+  /**
+   * Set on a "ui-only" entry whose FILE contains network calls that have been
+   * traced and confirmed unrelated to its timer — an event handler, a form
+   * submit, a one-shot load.
+   *
+   * This exists so the ui-only check keeps its teeth. Without it the check would
+   * be either too blunt (flagging legitimate files and training people to
+   * reclassify reflexively) or absent (letting a network poller hide behind the
+   * one policy that skips every other check). Requiring an explicit flag means
+   * somebody had to look.
+   */
+  networkUnrelated?: true;
 }
 
 /**
@@ -85,7 +97,14 @@ const REGISTRY: Declared[] = [
   },
 
   // ── Purely local timers: no network, exempt ────────────────────────────────
-  { file: "app/(public)/layout.tsx", policy: "ui-only", note: "4s hero carousel advance." },
+  {
+    file: "app/(public)/layout.tsx",
+    policy: "ui-only",
+    networkUnrelated: true,
+    note:
+      "4s hero carousel advance (goTo). The file's one fetch is an email-form submit handler — " +
+      "event-driven, unrelated to the timer. Traced 2026-09-09.",
+  },
   { file: "components/client/app-nav/app-nav.tsx", policy: "ui-only", note: "16ms animation frame driving nav rotation." },
   { file: "components/content/ai/CoBrowseIndicator.tsx", policy: "ui-only", note: "1s elapsed-time display tick." },
   { file: "components/content/ai/reasoning/reasoning-disclosure.ts", policy: "ui-only", note: "Local disclosure animation." },
@@ -164,6 +183,13 @@ const EVENTSOURCE_RE = /new\s+EventSource\s*\(/g;
  * instead. A gate that only recognised the literal form would flag correctly
  * architected code and, worse, pressure people back toward hand-rolled checks.
  */
+/**
+ * Network activity. Used to verify a "ui-only" declaration is telling the truth.
+ * Deliberately broad — a false positive costs one reclassification; a false
+ * negative hides a poller behind the one policy that skips every other check.
+ */
+const NETWORK_RE = /\bfetch\s*\(|new\s+EventSource|new\s+WebSocket|XMLHttpRequest|navigator\.sendBeacon/;
+
 const VISIBILITY_RE =
   /visibilityState|document\.hidden|getEngagement|isEngaged|subscribeEngagement|registerPollingTask/;
 
@@ -221,6 +247,27 @@ function main() {
       errors.push(
         `NOT GATED     ${rel}\n` +
           `    Declared "pause-when-hidden" but contains no visibilityState check.\n` +
+          `    ${declared.note}`
+      );
+    }
+
+    // "ui-only" is the one policy that skips every other check, which makes it
+    // the obvious place to hide a network poller — deliberately or by drift, when
+    // someone adds a fetch to a file that used to be a pure animation. Asserting
+    // the file has no network calls at all is a blunt proxy, but a correct one:
+    // a file whose timers are genuinely local has no reason to contain any.
+    if (
+      declared.policy === "ui-only" &&
+      !declared.networkUnrelated &&
+      NETWORK_RE.test(source)
+    ) {
+      errors.push(
+        `UI-ONLY LIES  ${rel}\n` +
+          `    Declared "ui-only" but the file makes network calls.\n` +
+          `    Either its timer does network work — in which case it belongs on the\n` +
+          `    scheduler via registerPollingTask() — or the calls are unrelated to the\n` +
+          `    timer, in which case trace them and set networkUnrelated: true with a note\n` +
+          `    saying what they are.\n` +
           `    ${declared.note}`
       );
     }

@@ -1,8 +1,8 @@
 # Polling Discipline — decisions, shipped work, and what remains
 
 **Last updated:** 2026-09-09
-**Status:** Phase 0 shipped (PR #213). Phases 1–4 not started.
-**⚠ Phase 0 does NOT address an always-open PWA** — every gate it shipped keys on visibility, and a visible-but-idle PWA never triggers one. See "The dominant case" below. Phase 2 is the fix.
+**Status:** Phases 0, 2, 2b and 4 shipped. Phase 1 (Hocuspocus awareness) forked; Phase 3 partially absorbed into Phase 2.
+**Always-open PWA: FIXED.** Idle gating now exists and all ten pollers are on the shared scheduler, so an untouched PWA goes quiet on every meter within ~60 s. The warning that used to live here — that Phase 0 only handled *hidden* tabs — no longer applies.
 **Invariant:** *the page goes cold when nobody is actively using it.*
 
 ---
@@ -152,9 +152,17 @@ gating endangers them:
 polls*. Push transports (SSE, WebSocket, streaming HTTP) and UI-only timers are
 untouched by design. That is the payoff of keeping the distinction sharp.
 
-**TODO before Phase 2 ships:** trace co-browse and extraction/quest status polling
-and classify them. Both are long-running surfaces a user plausibly watches without
-touching anything.
+**RESOLVED 2026-09-09.** Both traced, and neither is a risk:
+
+- **Co-browse / agentic browsing** — the only timer is `CoBrowseIndicator`'s 1 s
+  elapsed-time tick, verified to make no network calls. The agent drives the page
+  via CDP in the extension and results arrive over the chat stream, so there is
+  no status polling to gate.
+- **Extraction / quest sittings** — **no timers at all** in the quest or sitting
+  UI. Generation progress arrives over the chat stream, which is push.
+
+Both are structurally safe for the same reason the rest of the passive-watch list
+is: idle gating applies only to network polls, and neither surface has one.
 
 ### D2a — Could `MainPanelHeader` / `presence-poll` move to Hocuspocus after all?
 
@@ -234,6 +242,46 @@ So the interceptor must act only on 401s from **our own routes**, and only when 
 `AuthSessionSync` mounts app-wide and is the **last-man-standing poller** — gate everything else perfectly and it alone still keeps Neon from ever suspending. Gating it helps; **removing its job** is better. With push and piggyback carrying detection, the poll becomes a fallback nobody relies on, and can run slowly enough to leave Neon the contiguous quiet it needs.
 
 **The reframe: an idle user does not need to know they are signed out.** Nothing can happen to them — the server rejects everything. The instant they act, the interceptor fires. Detection latency only matters if harm can occur in the gap, and none can.
+
+### D16 — `scope: "leader"` requires the RESULT to propagate cross-tab
+
+Found while migrating, before it shipped. The notification badge and
+`workspace-sync` were both first written as `scope: "leader"`, on the reasoning
+that an unread count is identical in every tab. **That is true and irrelevant.**
+
+Leader election means the elected tab fetches and **every other tab fetches
+nothing**. If the result lands only in the leader's own store, every follower
+starves — a frozen bell, a stale list — and it presents as a caching bug rather
+than a scheduling one, which is the worst kind to debug.
+
+`workspace-sync` fails the same test more subtly: it *has* a BroadcastChannel,
+but it carries *"a mutation happened, go refetch"*, not the answer. **A nudge is
+not propagation** — it just restores per-tab polling under another name.
+
+**The bar:** a real cross-tab channel carrying the *answer*. Today only
+`auth-session-check` clears it, because `publishSignedOut()` broadcasts over
+BroadcastChannel with a localStorage fallback. The constraint is documented on
+the `scope` field itself, where someone reaching for `"leader"` will read it.
+
+### D17 — `ui-only` must not be a hiding place
+
+`ui-only` skips every other check, which makes it the obvious place to park a
+network poller — deliberately, or by drift when someone later adds a `fetch` to a
+file that used to be a pure animation.
+
+The gate now asserts a `ui-only` file makes **no network calls at all**. That is
+blunt, and deliberately so: a file whose timers are genuinely local has no reason
+to contain any.
+
+For the legitimate exception — a local timer in a file with unrelated network
+code — set `networkUnrelated: true` with a note saying what was traced. The first
+real instance was `app/(public)/layout.tsx`: a 4 s carousel timer alongside an
+email-form submit handler, event-driven and unrelated.
+
+**Honest limitation:** `networkUnrelated` is an escape hatch, and mutation
+testing confirms a determined person can walk through it by asserting something
+false. The mitigation is that it requires a human to write the assertion and it
+shows up in the diff. That is the trade, not a claim of airtightness.
 
 ### D14a — "Zero background pinging" is per-meter, not global
 
