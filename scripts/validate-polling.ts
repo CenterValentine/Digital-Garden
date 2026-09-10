@@ -27,7 +27,21 @@ const REPO_ROOT = process.cwd();
 const SCAN_ROOTS = ["app", "components", "lib", "extensions", "state"].map((d) =>
   join(REPO_ROOT, d)
 );
-const SOURCE_FILE_RE = /\.(ts|tsx)$/;
+// `.js` is included for the browser extension, whose source is plain JavaScript.
+// It was omitted in the first two versions of this gate, and that is exactly how
+// three ungated chrome.alarms — reaching the database every 1, 5 and 20 minutes
+// with no tab open, no side panel and the browser minimized — went unaudited
+// while this gate reported all-clear. `extensions/` was already a scan root; the
+// FILE EXTENSION was the hole. Same failure as the `state/` miss above, one
+// layer out: check what the walker skips, not just where it starts.
+const SOURCE_FILE_RE = /\.(ts|tsx|js)$/;
+/**
+ * Build output. `dist/` holds the esbuild bundle of the extension source, so
+ * without this every extension timer is counted twice — once in the source it
+ * lives in, once in the bundle — and the bundle's minified path is not something
+ * anyone can register or fix.
+ */
+const SKIP_DIRS = new Set(["node_modules", "generated", "dist", ".next"]);
 
 /** How a declared timer is permitted to behave. */
 type Policy =
@@ -158,9 +172,44 @@ const REGISTRY: Declared[] = [
     file: "state/conversation-cache-store.ts",
     policy: "pause-when-hidden",
     note:
-      "The SECOND EventSource on the same endpoint — refcounted and shared across surfaces. Closed while hidden; " +
-      "refetchAllCached reconciles on return via both `focus` and `visibilitychange`. This file was missed by the " +
-      "first version of this gate because `state/` was not in SCAN_ROOTS.",
+      "The SECOND EventSource on the same endpoint — refcounted and shared across surfaces. Closed whenever engagement " +
+      "leaves `active`; refetchAllCached reconciles on return. This file was missed by the first version of this gate " +
+      "because `state/` was not in SCAN_ROOTS.",
+  },
+
+  // ── Browser extension ──────────────────────────────────────────────────────
+  // Plain JavaScript, and invisible to this gate until SOURCE_FILE_RE was
+  // widened to `.js`. The background worker in particular is the most expensive
+  // poller in the system: chrome.alarms fire with no tab open and the browser
+  // minimized, so nothing DOM-based could ever have gated them.
+  {
+    file: "extensions/browser-bookmarks/browser-extension/src/background/index.js",
+    policy: "pause-when-hidden",
+    note:
+      "Three persistent chrome.alarms, all reaching the database. Gated on the extension's own engagement core " +
+      "(src/background/engagement.js — chrome.idle + window focus, since a service worker has no DOM). The badge alarm " +
+      "fires every minute but only FETCHES when engaged and either a run is live (60s) or the discovery backstop is due " +
+      "(15min); pull-sync is engagement-gated and moved off the 5-minute autosuspend boundary to 15; the embed-session " +
+      "refresh is gated on the panel being open, not on engagement, because its 30-minute token TTL makes a skipped " +
+      "refresh a correctness bug rather than a saving.",
+  },
+  {
+    file: "extensions/browser-bookmarks/browser-extension/src/overlay/index.js",
+    policy: "ui-only",
+    networkUnrelated: true,
+    note:
+      "Two timers, neither of them a poll. (1) A 1s location.href check for SPA navigations, now skipped while the tab " +
+      "is hidden — it runs in EVERY open tab, so the cost is the user's battery rather than the meter, and it only " +
+      "reaches the network when the URL actually changed with the associations popover open. (2) A bounded per-run " +
+      "workflow pill that stops at DG_WF_POLL_MAX or on a terminal status, and goes through the background worker " +
+      "rather than fetching directly.",
+  },
+  {
+    file: "extensions/browser-bookmarks/browser-extension/src/agentic/cdp/actions.js",
+    policy: "ui-only",
+    note:
+      "1s countdown tick rendered into a co-browse banner on the page being driven. Local DOM text only; the CDP " +
+      "session it belongs to is user-initiated and bounded by the session itself.",
   },
 ];
 
@@ -169,6 +218,20 @@ const REGISTRY: Declared[] = [
 // `ReturnType<typeof setInterval>` has no following paren, so it cannot match.
 const CALL_RE = /setInterval\s*\(/g;
 const EVENTSOURCE_RE = /new\s+EventSource\s*\(/g;
+/**
+ * `chrome.alarms.create` is a recurring timer that looks nothing like one.
+ *
+ * It is the browser extension's `setInterval`, and it is STRICTLY worse for
+ * cost: alarms are persistent, so they survive service-worker eviction and
+ * browser restarts, and they fire with every tab closed, the side panel shut and
+ * the window minimized. A 1-minute alarm reaching the database held Neon above
+ * its 5-minute autosuspend threshold for every hour the browser was running —
+ * the entire compute bill, with the app itself completely idle.
+ *
+ * A `periodInMinutes` alarm recurs; a `when`/`delayInMinutes` one-shot does not,
+ * so only the recurring form is counted.
+ */
+const ALARM_RE = /periodInMinutes/g;
 /**
  * What counts as being gated.
  *
@@ -196,7 +259,7 @@ const VISIBILITY_RE =
 function walk(dir: string): string[] {
   let out: string[] = [];
   for (const entry of readdirSync(dir)) {
-    if (entry === "node_modules" || entry === "generated" || entry.startsWith(".")) continue;
+    if (SKIP_DIRS.has(entry) || entry.startsWith(".")) continue;
     const path = join(dir, entry);
     if (statSync(path).isDirectory()) out = out.concat(walk(path));
     else if (SOURCE_FILE_RE.test(path)) out.push(path);
@@ -226,7 +289,10 @@ function main() {
     const rel = relative(REPO_ROOT, abs);
     const source = readFileSync(abs, "utf8");
 
-    const timers = countMatches(source, CALL_RE) + countMatches(source, EVENTSOURCE_RE);
+    const timers =
+      countMatches(source, CALL_RE) +
+      countMatches(source, EVENTSOURCE_RE) +
+      countMatches(source, ALARM_RE);
     if (timers === 0) continue;
 
     seen.add(rel);

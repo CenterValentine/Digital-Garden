@@ -13,6 +13,12 @@
 // The modules read `typeof document` at call time rather than import time, so
 // stubbing here is sufficient and no jsdom dependency is needed.
 
+// Marks this file a MODULE. It imports its subject dynamically (the DOM stubs
+// below must exist before the module under test evaluates), so without this it
+// sits in the global scope and its helpers collide with the sibling
+// extension-engagement-smoke.ts suite.
+export {};
+
 type Listener = (...args: unknown[]) => void;
 
 const store = new Map<string, string>();
