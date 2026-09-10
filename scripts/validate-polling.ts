@@ -126,6 +126,22 @@ const REGISTRY: Declared[] = [
   { file: "components/content/ai/reasoning/reasoning-disclosure.ts", policy: "ui-only", note: "Local disclosure animation." },
   { file: "components/content/folder-views/MediaLightbox.tsx", policy: "ui-only", note: "Slideshow advance." },
   { file: "lib/domain/editor/extensions/blocks/stopwatch.ts", policy: "ui-only", note: "33ms stopwatch tick, local block state." },
+  {
+    file: "lib/core/polling/scheduler.ts",
+    policy: "pause-when-hidden",
+    note:
+      "THE app's polling timer — one base tick driving every registered task. Gating lives here rather than in each " +
+      "call site, so adding a task adds no timers. Engagement is pulled at tick time; hidden is authoritative and " +
+      "keepAliveWhile cannot override it.",
+  },
+  {
+    file: "lib/core/engagement/index.ts",
+    policy: "ui-only",
+    note:
+      "The engagement core's own 5s transition check — the ONLY timer it owns. Never touches the network; exists so " +
+      "streams can be told when the user goes idle. Runs only while subscribed. Pull-based consumers should call " +
+      "getEngagement() at their own tick and cost nothing.",
+  },
 
   // ── Known, not yet audited ─────────────────────────────────────────────────
   // These files contain BOTH timers and network calls, so they cannot be
@@ -169,8 +185,22 @@ const REGISTRY: Declared[] = [
 // `ReturnType<typeof setInterval>` has no following paren, so it cannot match.
 const CALL_RE = /setInterval\s*\(/g;
 const EVENTSOURCE_RE = /new\s+EventSource\s*\(/g;
-/** Any of these near a timer counts as a visibility guard. */
-const VISIBILITY_RE = /visibilityState|document\.hidden/;
+/**
+ * What counts as being gated.
+ *
+ * Two accepted forms, and both must be recognised:
+ *
+ *   - a direct check   `document.visibilityState` / `document.hidden`
+ *   - **delegation**   to the engagement core (`getEngagement`, `isEngaged`,
+ *                      `subscribeEngagement`)
+ *
+ * The second matters increasingly: the whole point of the scheduler is that
+ * individual call sites stop writing visibility checks and declare a policy
+ * instead. A gate that only recognised the literal form would flag correctly
+ * architected code and, worse, pressure people back toward hand-rolled checks.
+ */
+const VISIBILITY_RE =
+  /visibilityState|document\.hidden|getEngagement|isEngaged|subscribeEngagement|registerPollingTask/;
 
 function walk(dir: string): string[] {
   let out: string[] = [];
