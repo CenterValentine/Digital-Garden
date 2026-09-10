@@ -18,6 +18,8 @@ import {
   stripCharterMetadata,
   withCharterMetadata,
 } from "@/lib/domain/ai/charters/registry";
+import { parseCharter } from "@/lib/domain/ai/charters/parse";
+import type { JSONContent } from "@tiptap/core";
 import { logger, withRouteTrace, withSpan } from "@/lib/core/logger";
 
 const ROUTE_PATH = "/api/content/charters/mark";
@@ -49,7 +51,12 @@ export async function POST(request: NextRequest) {
           contentType: { in: ["note", "folder"] },
           deletedAt: null,
         },
-        select: { id: true, notePayload: { select: { metadata: true } } },
+        select: {
+          id: true,
+          // tiptapJson so the response can report whether this charter has a
+          // BODY (see the emptiness contract below).
+          notePayload: { select: { metadata: true, tiptapJson: true } },
+        },
       });
       if (!node) {
         return NextResponse.json(
@@ -77,7 +84,32 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      return NextResponse.json({ success: true });
+      // EMPTINESS CONTRACT (D5, owner report 2026-09-10). A charter is a
+      // written commissioning document: the marker says "this is a charter",
+      // the BODY says what the charter is. Marking a folder that has no
+      // NotePayload row takes the `create` branch above, which writes
+      // `{type:"doc",content:[]}` — so the promotion itself mints the empty
+      // charter, and the caller then reported success as readiness ("attach
+      // it from any chat with /charter"). It is not ready: attaching a
+      // bodyless charter yields "contains no instructions".
+      //
+      // The route already knows — it just wrote the document — so it says so
+      // and the caller can tell the truth. Reported, never blocked: marking
+      // first and writing after is a legitimate order of work.
+      const parsed = parseCharter(
+        (node.notePayload?.tiptapJson as JSONContent | undefined) ?? {
+          type: "doc",
+          content: [],
+        },
+      );
+      const hasBody =
+        parsed.phases.length > 0 || parsed.standingRules.content.length > 0;
+
+      return NextResponse.json({
+        success: true,
+        hasBody,
+        phaseCount: parsed.phases.length,
+      });
     } catch (error) {
       if (error instanceof Error && error.message === "Authentication required") {
         return NextResponse.json(

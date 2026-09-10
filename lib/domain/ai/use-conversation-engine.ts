@@ -638,6 +638,13 @@ interface CharterCommandSource {
   title: string;
   description: string;
   phaseCount: number;
+  /**
+   * Whether the charter has anything written in it (D5). Optional because a
+   * client can outlive a server that predates the field; `!== false` is the
+   * read, so an old response degrades to the previous behaviour rather than
+   * labelling every charter empty.
+   */
+  hasBody?: boolean;
 }
 
 /** The playbook currently attached to the composer (AI v3.2 T3). */
@@ -1550,9 +1557,14 @@ export function useConversationEngine({
     const charterItems: SuggestionItem[] = charters.map((p) => ({
       id: p.id,
       label: p.title,
-      description:
-        p.description ||
-        `Charter · ${p.phaseCount} phase${p.phaseCount === 1 ? "" : "s"}`,
+      // An EMPTY charter must say so here (D5): the picker previously showed
+      // `description || "N phases"`, so a charter with a description and no
+      // body looked exactly like a working one — at the one moment the user
+      // is deciding to attach it.
+      description: p.hasBody === false
+        ? `${p.description ? `${p.description} · ` : ""}Empty — nothing written in it yet`
+        : p.description ||
+          `Charter · ${p.phaseCount} phase${p.phaseCount === 1 ? "" : "s"}`,
       contentType: "charter",
     }));
     const toolItems: SuggestionItem[] = BASE_TOOL_IDS.map((id) => ({

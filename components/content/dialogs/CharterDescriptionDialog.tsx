@@ -85,12 +85,35 @@ function Body({
         setNotice("Couldn't save — please try again.");
         return;
       }
+      // The route reports whether this charter has a BODY (D5). A charter is
+      // a written commissioning document; the marker alone is a label on a
+      // blank page. Marking a folder with no NotePayload row makes the route
+      // CREATE an empty document — so the promotion itself mints the empty
+      // charter, and the old toast then promised it was ready to attach.
+      // It is not: attaching a bodyless charter reports "contains no
+      // instructions" and the run goes nowhere. Say which one they have.
+      const marked = (await res.json().catch(() => null)) as {
+        hasBody?: boolean;
+        phaseCount?: number;
+      } | null;
+      const hasBody = marked?.hasBody !== false;
       window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
-      toast.success(
-        editing
-          ? "Charter details updated"
-          : "Marked as charter — attach it from any chat with /charter",
-      );
+      if (editing) {
+        toast.success("Charter details updated");
+      } else if (hasBody) {
+        const phases = marked?.phaseCount ?? 0;
+        toast.success(
+          phases > 0
+            ? `Marked as charter (${phases} phase${phases === 1 ? "" : "s"}) — attach it from any chat with /charter`
+            : "Marked as charter — attach it from any chat with /charter",
+        );
+      } else {
+        toast.warning("Marked as charter — but it's empty", {
+          description:
+            "Open it and write what it should do. Text before the first heading is its standing rules; each ## heading is a phase. Until then, running it does nothing.",
+          duration: 8000,
+        });
+      }
       onClose();
     } catch {
       setBusy(false);
@@ -116,8 +139,10 @@ function Body({
             {title || "Untitled"}
           </p>
           <p className="text-xs text-gray-400">
-            The charter name is the file name. Its{" "}
-            <code className="text-[11px]">##</code> sections are its phases.
+            The charter name is the file name. Text before the first heading is
+            its standing rules; each{" "}
+            <code className="text-[11px]">##</code> section is a phase. A
+            charter with nothing written in it does nothing when run.
           </p>
         </div>
 

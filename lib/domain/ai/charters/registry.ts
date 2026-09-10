@@ -35,6 +35,17 @@ export interface CharterListItem {
   title: string;
   description: string;
   phaseCount: number;
+  /**
+   * Does this charter have anything WRITTEN in it — standing rules, phases,
+   * or both? (D5, owner report 2026-09-10.)
+   *
+   * Not derivable from `phaseCount`: a charter of pure standing rules and no
+   * `##` headings is perfectly valid, so 0 phases does not mean empty. The
+   * picker needs the real answer because it shows `description || "N phases"`
+   * — a described-but-blank charter was indistinguishable from a full one at
+   * exactly the moment the user chose to attach it.
+   */
+  hasBody: boolean;
 }
 
 /**
@@ -126,7 +137,15 @@ export async function listCharters(userId: string): Promise<CharterListItem[]> {
       row.notePayload?.metadata,
     );
     const json = row.notePayload?.tiptapJson as JSONContent | undefined;
-    const phaseCount = json ? parseCharter(json).phases.length : 0;
-    return { id: row.id, title: row.title, description, phaseCount };
+    const parsed = json ? parseCharter(json) : null;
+    return {
+      id: row.id,
+      title: row.title,
+      description,
+      phaseCount: parsed?.phases.length ?? 0,
+      hasBody:
+        parsed !== null &&
+        (parsed.phases.length > 0 || parsed.standingRules.content.length > 0),
+    };
   });
 }
