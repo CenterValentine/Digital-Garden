@@ -65,15 +65,18 @@ const TRANSITION_CHECK_MS = 5_000;
  * so no separate mousedown/touchstart pairs are needed. Scroll and wheel are
  * registered passive so they never block the compositor.
  */
-const ACTIVITY_EVENTS = [
-  "pointerdown",
-  "pointermove",
-  "keydown",
-  "wheel",
-  "scroll",
-] as const;
+const ACTIVITY_EVENTS = ["pointerdown", "keydown", "wheel", "scroll"] as const;
+
+/**
+ * How long the cursor must remain over the page before `pointermove` counts as
+ * engagement. Comfortably longer than any crossing, far shorter than any real
+ * hover.
+ */
+export const POINTER_DWELL_MS = 3_000;
 
 let lastInputAt = Date.now();
+/** When the cursor most recently entered the page; null while outside. */
+let pointerEnteredAt: number | null = null;
 let current: Engagement = "active";
 let listenersAttached = false;
 let transitionTimer: ReturnType<typeof setInterval> | null = null;
@@ -86,21 +89,54 @@ const subscribers = new Set<(state: Engagement) => void>();
  * would thrash. An assignment is effectively free, and it moves all the actual
  * decision-making to the moment someone asks — which is where it is needed.
  */
+/**
+ * Deliberate input. Any of these is unambiguous engagement, so they stamp
+ * immediately — nobody presses a key or scrolls a window by accident.
+ */
 function markInput() {
-  // Input to an UNFOCUSED window does not count.
-  //
-  // An unfocused window receives no keyboard events, but it does still receive
-  // `pointermove` when the cursor crosses it — which on a multi-monitor setup
-  // happens constantly on the way somewhere else. Without this guard a PWA
-  // parked on a second monitor would have its idle countdown reset by a mouse
-  // passing over it, and could stay "active" indefinitely without anyone ever
-  // using it. That is the exact scenario this module exists to catch.
-  //
-  // Clicking an unfocused window to use it is unaffected: the `focus` event
-  // fires first and stamps activity through handleFocusOrVisibility below.
-  if (typeof document !== "undefined" && !document.hasFocus()) return;
   lastInputAt = Date.now();
   if (current !== "active") recompute();
+}
+
+/**
+ * `pointermove` is the one AMBIGUOUS signal, so it is gated on dwell.
+ *
+ * It fires only while the cursor is physically over this window — but that
+ * covers two very different things:
+ *
+ *   TRANSIT   the cursor crossing this window on its way to another monitor,
+ *             the dock, or an adjacent app. Sub-second, and not engagement.
+ *   HOVERING  reading a visible-but-unfocused window on a second monitor.
+ *             Minutes, and absolutely engagement.
+ *
+ * Requiring the cursor to have been present for POINTER_DWELL_MS separates them
+ * cleanly, because no crossing lasts three seconds and no reading session is
+ * shorter.
+ *
+ * This distinction is not cosmetic. Neon needs five CONTIGUOUS query-free
+ * minutes to autosuspend, so a single incidental crossing every four minutes
+ * resets the idle countdown often enough that the database never sleeps — the
+ * full cost of polling nonstop, for a window nobody looked at. The meter does
+ * not reward mostly-quiet, only contiguously-quiet.
+ *
+ * Note this deliberately does NOT require focus. An unfocused window being read
+ * on a second monitor is real engagement, and an earlier version of this guard
+ * got that wrong.
+ */
+function markPointerMove() {
+  if (pointerEnteredAt === null) {
+    // First move since entering (or since page load with the cursor already
+    // inside, where no enter event fires) — start the dwell clock.
+    pointerEnteredAt = Date.now();
+    return;
+  }
+  if (Date.now() - pointerEnteredAt < POINTER_DWELL_MS) return;
+  markInput();
+}
+
+/** Cursor left the page: any accumulated dwell is void. */
+function handlePointerLeave() {
+  pointerEnteredAt = null;
 }
 
 function computeEngagement(): Engagement {
@@ -143,6 +179,10 @@ function attach() {
   for (const event of ACTIVITY_EVENTS) {
     window.addEventListener(event, markInput, { passive: true });
   }
+  window.addEventListener("pointermove", markPointerMove, { passive: true });
+  document.documentElement.addEventListener("pointerleave", handlePointerLeave, {
+    passive: true,
+  });
   window.addEventListener("focus", handleFocusOrVisibility);
   document.addEventListener("visibilitychange", handleFocusOrVisibility);
   transitionTimer = setInterval(recompute, TRANSITION_CHECK_MS);
@@ -154,6 +194,8 @@ function detach() {
   for (const event of ACTIVITY_EVENTS) {
     window.removeEventListener(event, markInput);
   }
+  window.removeEventListener("pointermove", markPointerMove);
+  document.documentElement.removeEventListener("pointerleave", handlePointerLeave);
   window.removeEventListener("focus", handleFocusOrVisibility);
   document.removeEventListener("visibilitychange", handleFocusOrVisibility);
   if (transitionTimer !== null) {
@@ -213,5 +255,6 @@ export function __resetEngagementForTests() {
   detach();
   subscribers.clear();
   lastInputAt = Date.now();
+  pointerEnteredAt = null;
   current = "active";
 }

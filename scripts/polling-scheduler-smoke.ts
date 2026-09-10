@@ -17,7 +17,6 @@ type Listener = (...args: unknown[]) => void;
 
 const store = new Map<string, string>();
 let visibility: "visible" | "hidden" = "visible";
-let focused = true;
 const listeners = new Map<string, Set<Listener>>();
 
 function addListener(type: string, fn: Listener) {
@@ -34,7 +33,10 @@ function removeListener(type: string, fn: Listener) {
   },
   addEventListener: addListener,
   removeEventListener: removeListener,
-  hasFocus: () => focused,
+  documentElement: {
+    addEventListener: addListener,
+    removeEventListener: removeListener,
+  },
 };
 
 const localStorageStub = {
@@ -104,23 +106,56 @@ async function main() {
     check("hidden takes precedence over idle", getEngagement(), "hidden");
   });
 
-  // Input to an UNFOCUSED window must not reset the idle countdown, or a mouse
-  // crossing a second-monitor PWA would keep it "active" forever.
+  // pointermove is dwell-gated: a crossing must not count, a hover must.
   reset();
-  const fireInput = () => {
-    for (const fn of listeners.get("pointermove") ?? []) fn();
+  const { subscribeEngagement, POINTER_DWELL_MS } = await import("@/lib/core/engagement");
+  const fire = (type: string) => {
+    for (const fn of listeners.get(type) ?? []) fn();
   };
-  // Subscribe so the module attaches its listeners.
-  const unsub = (await import("@/lib/core/engagement")).subscribeEngagement(() => {});
-  focused = false;
+  const unsub = subscribeEngagement(() => {});
+
+  // TRANSIT: cursor crosses, moves briefly, leaves. Never reaches the dwell bar.
   withClockOffset(IDLE_AFTER_MS + 1_000, () => {
-    fireInput();
-    check("pointermove while UNFOCUSED does not reset idle", getEngagement(), "idle");
+    fire("pointermove");                       // starts the dwell clock
+    fire("pointermove");                       // same instant — still under 3s
+    check("crossing does NOT count as engagement", getEngagement(), "idle");
   });
-  focused = true;
-  fireInput();
-  check("pointermove while focused does reset idle", getEngagement(), "active");
-  unsub();
+  fire("pointerleave");
+
+  // HOVERING: cursor enters and stays past the dwell bar, then moves.
+  reset();
+  const unsub2 = subscribeEngagement(() => {});
+  withClockOffset(IDLE_AFTER_MS + 1_000, () => {
+    fire("pointermove");                       // enters, clock starts
+  });
+  withClockOffset(IDLE_AFTER_MS + 1_000 + POINTER_DWELL_MS + 500, () => {
+    fire("pointermove");                       // still here, past the bar
+    check("hover past dwell DOES count", getEngagement(), "active");
+  });
+
+  // Leaving voids accumulated dwell.
+  //
+  // Sequenced carefully. NO reset() mid-test — a reset clears pointerEnteredAt
+  // itself, so the assertion would pass even with handlePointerLeave broken
+  // (an earlier version of this test did exactly that and mutation testing
+  // caught it). Instead the dwell clock is aged deliberately, so the ONLY thing
+  // that can keep the final move from counting is pointerleave doing its job.
+  reset();
+  const unsub3 = subscribeEngagement(() => {});
+  const enterAt = IDLE_AFTER_MS + 1_000;
+  const laterAt = enterAt + POINTER_DWELL_MS + IDLE_AFTER_MS + 2_000;
+
+  withClockOffset(enterAt, () => {
+    fire("pointermove");          // cursor enters; dwell clock starts
+  });
+  withClockOffset(laterAt, () => {
+    fire("pointerleave");         // must void the (now long) accumulated dwell
+    fire("pointermove");          // re-entry: restarts the clock, stamps nothing
+    // Without the void, this move would sit far past the dwell bar and stamp
+    // activity, reading "active".
+    check("pointerleave voids accumulated dwell", getEngagement(), "idle");
+  });
+  unsub(); unsub2(); unsub3();
 
   // ── Scheduler gating ─────────────────────────────────────────────────────────
 
