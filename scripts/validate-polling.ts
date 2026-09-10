@@ -66,11 +66,11 @@ interface Declared {
  */
 const REGISTRY: Declared[] = [
   // ── Network pollers: must pause when hidden ────────────────────────────────
-  {
-    file: "components/content/AuthSessionSync.tsx",
-    policy: "pause-when-hidden",
-    note: "60s session check. Mounts app-wide so it multiplies per tab; re-checks immediately on tab-visible.",
-  },
+  // components/content/AuthSessionSync.tsx was REMOVED from this registry when it
+  // migrated to registerPollingTask(). That is the intended end state: the
+  // registry audits RAW timers, and a scheduler-registered task declares its own
+  // policy in code (whenHidden / whenIdle / keepAliveWhile), which the type
+  // system enforces far better than a string in a list.
   {
     file: "components/content/headers/MainPanelHeader.tsx",
     policy: "pause-when-hidden",
@@ -286,8 +286,11 @@ function main() {
     if (!seen.has(d.file)) {
       errors.push(
         `STALE ENTRY   ${d.file}\n` +
-          `    Declared in the registry but no timer found (file moved, renamed, or timer removed).\n` +
-          `    Remove the entry.`
+          `    Declared in the registry but no raw timer found.\n` +
+          `    If this file MIGRATED to registerPollingTask(), that is expected — remove the\n` +
+          `    entry. A scheduler-registered task declares its own policy in code, which the\n` +
+          `    type system enforces better than this list can.\n` +
+          `    Otherwise the file moved, was renamed, or lost its timer.`
       );
     }
   }
