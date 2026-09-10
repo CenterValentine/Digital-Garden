@@ -1,6 +1,7 @@
 import { loadUrlPresets, resolvePreset, applyUrlStrategy, getStrategyOverrides, setStrategyOverride } from "../url-strategy.js";
 import * as cobrowse from "../agentic/cdp/index.js";
 import * as cobrowseSession from "../agentic/session.js";
+import { getEngagement, subscribeEngagement } from "./engagement.js";
 
 const STORAGE_KEYS = {
   config: "dgBrowserBookmarksConfig",
@@ -740,10 +741,109 @@ const WORKFLOW_BADGE_ALARM = "dg-workflow-badge";
 const WORKFLOW_SUCCESS_LINGER_MS = 10_000;
 const WORKFLOW_FAILURE_LINGER_MS = 30 * 60_000; // failures decay after 30 min
 
+/**
+ * Badge cadence, event-driven rather than time-driven.
+ *
+ * The badge reflects workflow runs. The extension already KNOWS when it started
+ * one, and `computeWorkflowBadge` tells us whether any run is still live — so
+ * the steady-state poll is pure waste and is simply not performed. Two cadences
+ * replace it:
+ *
+ *   LIVE       a run is waiting/running/queued. The user is watching something
+ *              they started, so stay responsive.
+ *   DISCOVERY  nothing live. The only runs that could appear are ones started
+ *              somewhere else (the app's own workflow UI, an n8n inbound
+ *              trigger). This is a pure SAFETY NET, not the responsiveness
+ *              mechanism — the refresh on return-to-active is, and in real use
+ *              people leave and re-enter the browser constantly. An hour of lag
+ *              on an ambient status dot, in the case where the user has sat in
+ *              Chrome without once leaving it, is immaterial.
+ *
+ * Both are additionally gated on engagement. Note what engagement can and cannot
+ * see: it knows the browser is focused and in use, NOT that the user cares about
+ * DG. Someone browsing Chrome all day without opening DG reads as fully engaged,
+ * so the discovery interval has to be cheap on its own merits rather than
+ * relying on the gate to suppress it. An hour sits far past Neon's 5-minute
+ * autosuspend threshold, so the database sleeps between checks either way.
+ */
+const BADGE_LIVE_INTERVAL_MS = 60_000;
+const BADGE_DISCOVERY_INTERVAL_MS = 60 * 60_000;
+/**
+ * Floor for wake-up refreshes. Returning to the browser should update the badge
+ * promptly, but windows.onFocusChanged fires on every window switch — without a
+ * floor, alt-tabbing would become a poll storm worse than the alarm we removed.
+ */
+const BADGE_WAKE_FLOOR_MS = 60_000;
+/** chrome.storage.session — survives worker eviction, cleared on browser restart. */
+const BADGE_SCHEDULE_KEY = "dgBadgeSchedule";
+
 /** null = no badge; else { text, color, urgent, transient } */
 let workflowBadgeState = null;
 let workflowBadgeInFlight = null;
 const lastBadgeRunStatus = new Map();
+
+/** Is any run still in a state worth watching? Drives the LIVE cadence. */
+function hasLiveRuns(runs) {
+  return runs.some(
+    (run) =>
+      run.status === "waiting" ||
+      run.status === "running" ||
+      run.status === "queued"
+  );
+}
+
+/**
+ * Badge schedule state. Lives in chrome.storage.session rather than a module
+ * variable because MV3 evicts the worker between alarms — an in-memory
+ * `lastFetchAt` would reset to 0 on every wake and re-enable the very polling
+ * this replaces. Clearing on browser restart is correct: a fresh session should
+ * get one immediate poll the first time the user engages.
+ */
+async function getBadgeSchedule() {
+  try {
+    const stored = await chrome.storage.session.get(BADGE_SCHEDULE_KEY);
+    const schedule = stored[BADGE_SCHEDULE_KEY];
+    return {
+      lastFetchAt: schedule?.lastFetchAt ?? 0,
+      live: schedule?.live === true,
+    };
+  } catch {
+    return { lastFetchAt: 0, live: false };
+  }
+}
+
+async function setBadgeSchedule(schedule) {
+  try {
+    await chrome.storage.session.set({ [BADGE_SCHEDULE_KEY]: schedule });
+  } catch {
+    // Storage unavailable — degrades to the pre-gate cadence, not to silence.
+  }
+}
+
+/**
+ * The gated entry point. Every SCHEDULED badge refresh goes through here;
+ * refreshes that follow a user action call refreshWorkflowBadge() directly,
+ * because that is a load, not a poll.
+ *
+ * @param {"alarm" | "returned"} reason
+ */
+async function maybeRefreshWorkflowBadge(reason) {
+  // Idle and hidden both pause. Unlike the app's scheduler there is no
+  // keepAliveWhile escape hatch: a toolbar badge nobody is looking at has no
+  // claim on a meter, and a live run is already covered by the overlay's own
+  // bounded per-run pill.
+  if ((await getEngagement()) !== "active") return;
+
+  const { lastFetchAt, live } = await getBadgeSchedule();
+  const cadence = live ? BADGE_LIVE_INTERVAL_MS : BADGE_DISCOVERY_INTERVAL_MS;
+  // A wake-up refreshes a stale badge immediately rather than waiting out the
+  // discovery interval — but never faster than the floor.
+  const required =
+    reason === "returned" ? Math.min(cadence, BADGE_WAKE_FLOOR_MS) : cadence;
+
+  if (Date.now() - lastFetchAt < required) return;
+  await refreshWorkflowBadge();
+}
 
 function computeWorkflowBadge(runs, now = Date.now()) {
   let waiting = false;
@@ -776,22 +876,35 @@ async function refreshWorkflowBadge() {
       const data = await apiFetch(
         "/api/integrations/browser-extension/workflows/runs?limit=15"
       );
-      workflowBadgeState = computeWorkflowBadge(data.runs || []);
+      const runs = data.runs || [];
+      // Record what this poll learned so the NEXT scheduled check knows which
+      // cadence applies. Written before the badge is painted so a failure in
+      // the chrome.action calls below can't leave the schedule unstamped and
+      // re-open a tight poll loop.
+      await setBadgeSchedule({ lastFetchAt: Date.now(), live: hasLiveRuns(runs) });
+      workflowBadgeState = computeWorkflowBadge(runs);
       if (workflowBadgeState) {
         await chrome.action.setBadgeText({ text: workflowBadgeState.text });
         await chrome.action.setBadgeBackgroundColor({
           color: workflowBadgeState.color,
         });
         if (workflowBadgeState.transient) {
-          // Best-effort green decay (~10s). If MV3 kills the worker first,
-          // the 1-minute alarm clears it instead.
+          // Best-effort green decay (~10s). If MV3 kills the worker first, the
+          // next scheduled check clears it instead. Calls refreshWorkflowBadge
+          // directly rather than the gated wrapper: this is a UI decay the user
+          // is watching, not a poll, and it is self-limiting (one shot).
           setTimeout(() => void refreshWorkflowBadge(), WORKFLOW_SUCCESS_LINGER_MS + 1000);
         }
       } else {
         await chrome.action.setBadgeText({ text: "" });
       }
     } catch {
-      // Unpaired / offline — leave the badge alone; the next alarm retries.
+      // Unpaired or offline. Stamp the ATTEMPT anyway so the discovery interval
+      // backs off: without this the schedule stays unstamped and every alarm
+      // retries at the base cadence, which is exactly the tight loop this whole
+      // change removes. `live` is deliberately cleared — we no longer know of a
+      // live run, and guessing "yes" would pick the fast cadence on no evidence.
+      await setBadgeSchedule({ lastFetchAt: Date.now(), live: false });
     } finally {
       workflowBadgeInFlight = null;
     }
@@ -1806,9 +1919,7 @@ chrome.runtime.onInstalled.addListener(async () => {
     title: "Ask AI about this page",
     contexts: ["page", "selection", "action"],
   });
-  chrome.alarms.create("dg-pull-sync", { periodInMinutes: 5 });
-  chrome.alarms.create("dg-embed-session-refresh", { periodInMinutes: 20 });
-  chrome.alarms.create(WORKFLOW_BADGE_ALARM, { periodInMinutes: 1 });
+  await ensureAlarms();
   // Plant the initial cookie so the iframe works right away after install/update
   await exchangeEmbedSession();
 });
@@ -1830,6 +1941,63 @@ void chrome.storage.session
     panelOpenFlag = r?.dgPanelOpen === true;
   })
   .catch(() => {});
+
+/**
+ * Durable panel-open check for paths that CAN afford an await — the alarm and
+ * engagement handlers, which have no user gesture to protect.
+ *
+ * Reads the persisted `dgPanelOpen` flag rather than `panelPort`, because an
+ * evicted worker restarts with `panelPort` null even while the panel is very
+ * much open. `panelPort` is still consulted as a positive override: if this
+ * worker is holding a live Port, the panel is open no matter what storage says.
+ */
+async function isPanelOpen() {
+  if (panelPort != null) return true;
+  try {
+    const stored = await chrome.storage.session.get("dgPanelOpen");
+    return stored?.dgPanelOpen === true;
+  } catch {
+    // Storage unavailable — fall back to the in-memory mirror. Erring toward
+    // "closed" here would silently stop refreshing a live panel's token, so
+    // prefer the last thing we actually knew.
+    return panelOpenFlag;
+  }
+}
+
+/**
+ * When a surface last asked for an embed session token.
+ *
+ * The refresh alarm needs to know whether anyone is HOLDING a token. The side
+ * panel is directly detectable; an overlay content panel on a page is not, and
+ * it announces neither its open nor its close. The first version of this gate
+ * used "the user is engaged" as a proxy for that — which meant browsing Chrome
+ * all day without touching DG kept minting tokens for nobody.
+ *
+ * The request itself is the real signal. A consumer that asked within the
+ * token's own lifetime may still be holding one; past that, whatever it had has
+ * expired anyway and a refresh could not help it.
+ */
+const EMBED_CONSUMER_KEY = "dgEmbedConsumerAt";
+/** Matches EMBED_SESSION_DURATION_MS on the server (30 min). */
+const EMBED_CONSUMER_WINDOW_MS = 30 * 60_000;
+
+async function noteEmbedConsumer() {
+  try {
+    await chrome.storage.session.set({ [EMBED_CONSUMER_KEY]: Date.now() });
+  } catch {
+    // Storage unavailable — the panel check below still covers the main case.
+  }
+}
+
+async function hasRecentEmbedConsumer() {
+  try {
+    const stored = await chrome.storage.session.get(EMBED_CONSUMER_KEY);
+    const at = stored?.[EMBED_CONSUMER_KEY];
+    return typeof at === "number" && Date.now() - at < EMBED_CONSUMER_WINDOW_MS;
+  } catch {
+    return false;
+  }
+}
 
 // Push the side-panel open/closed state so each tab's overlay keeps a LOCAL
 // belief and never has to query it at click time. That matters because
@@ -1949,20 +2117,109 @@ chrome.contextMenus.onClicked.addListener(async (info) => {
   }
 });
 
+/**
+ * Alarm periods, in minutes. Every one of these reaches the database, so the
+ * period is a billing decision as much as a product one.
+ *
+ * `dg-pull-sync` moved 5 → 60. Five minutes was the single worst available
+ * value: it sits EXACTLY on Neon's 5-minute autosuspend threshold, so the
+ * database could never sleep, while buying no responsiveness a bookmark-delta
+ * sync could possibly need. The pull is cursor-based, so a longer period loses
+ * nothing — it only converges later.
+ *
+ * These periods matter more than the engagement gate alone suggests, because
+ * engagement cannot tell "using the browser" from "using DG". Three alarms at
+ * 15/15/20 minutes produced an average gap of ~5.5 minutes — right on the
+ * autosuspend line — for anyone who simply had Chrome focused. Spacing them out
+ * is what lets the database actually sleep during those hours.
+ *
+ * The badge alarm keeps its 1-minute period because the alarm itself is free:
+ * it wakes the worker for microseconds of local CPU, and
+ * maybeRefreshWorkflowBadge decides whether anything reaches the network.
+ * Fine-grained alarm, coarse-grained fetching.
+ */
+const ALARM_PERIODS = {
+  "dg-pull-sync": 60,
+  "dg-embed-session-refresh": 20,
+  [WORKFLOW_BADGE_ALARM]: 1,
+};
+
+/**
+ * Create the alarms, idempotently, correcting any whose period has changed.
+ *
+ * Called from BOTH onInstalled and onStartup. Alarms are persistent, so an
+ * existing install already carries the old periods — recreating only on a
+ * mismatch migrates them without resetting the schedule of alarms that are
+ * already correct (a blind create() on every worker startup would push each
+ * alarm's next firing back and could starve it entirely on a busy worker).
+ */
+async function ensureAlarms() {
+  for (const [name, periodInMinutes] of Object.entries(ALARM_PERIODS)) {
+    try {
+      const existing = await chrome.alarms.get(name);
+      if (existing?.periodInMinutes === periodInMinutes) continue;
+      chrome.alarms.create(name, { periodInMinutes });
+    } catch {
+      chrome.alarms.create(name, { periodInMinutes });
+    }
+  }
+}
+
+// Alarms are persistent, but the periods above can change between versions and
+// a reloaded unpacked extension does not always fire onInstalled. onStartup is
+// the second chance that keeps an existing install's cadence honest.
+chrome.runtime.onStartup.addListener(() => {
+  void ensureAlarms();
+});
+
 chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (alarm.name === "dg-pull-sync") {
+    // Bookmark deltas converge; they are not latency-critical and nothing is
+    // lost by skipping a tick, because the sync is cursor-based. Idle and
+    // hidden both pause.
+    if ((await getEngagement()) !== "active") return;
     await runPullSync().catch((error) => {
       console.error("[DG Bookmarks] Pull sync failed", error);
     });
   }
   if (alarm.name === "dg-embed-session-refresh") {
+    // Gated on an actual token CONSUMER, not on engagement.
+    //
+    // The forced 20-minute refresh exists because the token lives 30 minutes,
+    // so a skipped refresh is a correctness bug (a dead-cookie window in a
+    // surface the user left open) rather than a saving — which is why this is
+    // the one alarm engagement alone must not decide.
+    //
+    // Two surfaces can hold a token: the side panel, and an overlay content
+    // panel on a page. Only the first is directly detectable, so the second is
+    // inferred from its token REQUEST rather than from user activity. Gating on
+    // the condition the work exists to serve, instead of a signal that merely
+    // correlates with it.
+    if (!(await isPanelOpen()) && !(await hasRecentEmbedConsumer())) return;
     await exchangeEmbedSession({ force: true }).catch((error) => {
       console.error("[DG Bookmarks] Embed session refresh failed", error);
     });
   }
   if (alarm.name === WORKFLOW_BADGE_ALARM) {
-    await refreshWorkflowBadge();
+    await maybeRefreshWorkflowBadge("alarm");
   }
+});
+
+// Returning to the browser is the moment a stale badge matters, and the only
+// moment a run started elsewhere needs to become visible. One refresh on the
+// transition to active replaces the entire steady-state poll it used to take to
+// notice. The badge is a CURRENT-STATE display, not an event log, so nothing
+// accumulates while paused — a single fetch is always a complete restore.
+subscribeEngagement((state) => {
+  if (state !== "active") return;
+  void maybeRefreshWorkflowBadge("returned");
+  // A panel left open across an idle stretch may be holding an expired embed
+  // token. Re-mint on the way back in, before the user can act on it.
+  (async () => {
+    if (await isPanelOpen()) await exchangeEmbedSession({ force: true });
+  })().catch(() => {
+    // Best effort — the panel's own on-load exchange is the backstop.
+  });
 });
 
 chrome.bookmarks.onCreated.addListener((id, bookmark) => {
@@ -3006,6 +3263,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return;
     }
     if (message.type === "refresh-embed-session") {
+      // Every surface that needs a token asks here — the side panel on load, and
+      // an overlay content panel when it opens. Stamping the request is how the
+      // refresh alarm knows a token is actually being HELD; see
+      // noteEmbedConsumer.
+      await noteEmbedConsumer();
       sendResponse({ ok: true, data: await exchangeEmbedSession() });
       return;
     }

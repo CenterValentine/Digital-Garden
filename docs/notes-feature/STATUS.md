@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-09-04
+last_updated: 2026-09-10
 current_epoch: 18
 current_sprint: 63
 sprint_status: in-progress
@@ -52,6 +52,16 @@ before planning and executing. There may be additions or modifications.
 Durable offline editing for the **plain/REST save path** (continuous localStorage draft + reconnect replay), tab-content preload, and clearer collaboration-degraded UX. Continuation of the May-17 anti-overwrite ("Phase I") guards and the 2026-06-11 canonical-`bodyHash` hotfix (#56). Today the conflict resolver only protects the **online plain path**; the collab path relies on Y.js IndexedDB + CRDT, and plain-path offline edits are **not** durably persisted (in-memory; reload can lose them).
 
 ## Recent Completions (Last 30 Days)
+
+**September 10, 2026** *(branch `fix/extension-engagement-gate`; typecheck / lint 151 (0 errors) / polling:check 18 files / polling:smoke 41 assertions / extension:build green; **no migration, no TipTap schema change → no Hocuspocus redeploy**; ⚠ requires `pnpm extension:build` **and a reload at `chrome://extensions`** — MV3 keeps the old service worker otherwise)*: **Browser extension engagement gating + conversation SSE** (plan: `POLLING-DISCIPLINE-PLAN.md` Phase 5, D18–D25)
+
+The cost work of PRs #212–#217 gated the app and left the extension untouched — and the extension turned out to hold the most expensive poller in the system. It had **no** engagement gating of any kind across ~9,500 lines: three persistent `chrome.alarms` reached the database every 1, 5 and 20 minutes with no tab open, the side panel shut and the browser minimized, because alarms survive service-worker eviction and browser restarts. Since Neon needs five *contiguous* query-free minutes to autosuspend, the 1-minute badge alarm alone held the database awake for every hour Chrome was running — modelled at **~$11–16/month**, re-creating the whole compute bill with the app completely idle. Because continuity billing makes the alarms **overlap rather than add**, gating one without the others would have saved approximately nothing.
+
+New `src/background/engagement.js` mirrors `lib/core/engagement` — same three states and policy vocabulary, different sensors, because a service worker has no DOM: `chrome.idle.queryState(60)` for the idle heuristic, window focus for the authoritative hidden state. One rule inverts: MV3 requires listeners registered **synchronously at module top level**, so they attach at import rather than lazily on first subscribe. The workflow badge becomes event-driven — 60s while a run is live, a 60-minute discovery backstop for runs started elsewhere, one refresh on return-to-active (floored at 60s so alt-tabbing is not a poll storm), nothing otherwise — safe because a badge is a current-state display, not an event log, so one fetch is always a complete restore. `dg-pull-sync` moved 5 → 60 min (5 sat exactly on the autosuspend threshold: maximum cost, zero benefit). `dg-embed-session-refresh` is gated on an actual token **consumer** rather than on engagement — engagement knows the browser is in use, not that the user cares about DG, so a browsing day was minting tokens for nobody; every surface that needs a token asks the background for one, so the request itself is the signal (D21).
+
+Both conversation SSE streams moved from `visibilityState` to `subscribeEngagement`. The side panel is registered **globally**, so it reports `visible` across every tab switch for as long as it is open — meaning a visibility-only gate never fired there at all. A side panel is a surface people leave up for days, so it was the visibility gate's worst case rather than an edge case.
+
+`polling:check` had reported all-clear while never opening the extension: `SOURCE_FILE_RE` was `/\.(ts|tsx)$/` and the extension is plain JavaScript (`extensions/` was already a scan root — the *file extension* was the hole, the earlier `state/` miss one layer out), and nothing matched `chrome.alarms.create` at all. Both closed, `dist/` skipped so the bundle does not double-count; 15 → 18 timer files. Mutation-tested five ways across the gate and the new 21-assertion `extension-engagement-smoke.ts`, which covers the case a static gate provably cannot: it verifies a check *exists*, never that the mapping is right.
 
 **September 4, 2026** *(merged **PR #203** — the consolidated "Releases 2–4" train, 38 commits since #202; typecheck / lint 151 / capture:check / ai:drift:check (63 tools) / prompt-cache:check / full build green; **no migration, no new TipTap block types → no Hocuspocus redeploy**; owner smoke across six sittings with all defects fixed in-branch pre-release)*: **Extraction→Database capture — Charters, Quests & Stage 2** (plan: `EXTRACTION-TO-DATABASE-PLAN.md`, §4.1 as-built)
 

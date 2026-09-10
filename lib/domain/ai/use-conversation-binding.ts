@@ -31,6 +31,11 @@ import { useAIChatStore } from "@/state/ai-chat-store";
 import { useSettingsStore } from "@/state/settings-store";
 import { normalizePersistedToolParts } from "@/lib/domain/ai/tool-state-persistence";
 import { stripRevertSnapshotFromParts } from "@/lib/domain/ai/compact-tool-outputs";
+import {
+  getEngagement,
+  subscribeEngagement,
+  type Engagement,
+} from "@/lib/core/engagement";
 // Usage, segments AND cost all fold in one place — turn-diagnostics owns
 // the per-request accumulator (it imports the client-safe pricing module
 // by direct path, never the Prisma-bearing ai-connections barrel).
@@ -711,7 +716,8 @@ export function useConversationBinding({
   // not generic messages, so we must `addEventListener(EVENT_NAME)` —
   // `es.onmessage` would silently drop every event (and produced the
   // initial "title doesn't update in the header" report).
-  // The stream is CLOSED while the tab is hidden and reopened on return.
+  // The stream is CLOSED whenever the user is not actively engaged, and
+  // reopened on return.
   //
   // This is the single most expensive line in the app's infrastructure bill.
   // Vercel bills Fluid Provisioned Memory for a request's entire lifetime,
@@ -719,12 +725,16 @@ export function useConversationBinding({
   // one held-open stream at the default 2 GB is ~1,460 GB-hrs/month. That was
   // ~97% of the observed memory charge, from a single forgotten tab.
   //
-  // Closing on hidden is safe because state/conversation-cache-store.ts binds
-  // `refetchAllCached` to window focus, so anything missed while hidden is
-  // reconciled on return rather than lost. `visibilitychange` is bound here too
-  // because the two events cover different cases: `focus` fires when the whole
-  // browser window regains focus, `visibilitychange` when a tab is switched to
-  // inside an already-focused window.
+  // Gated on ENGAGEMENT, not visibility. Visibility alone was not enough for two
+  // surfaces that matter: a note left open on a second monitor, and — far worse
+  // — the browser extension's side panel, which is registered globally and so
+  // stays `visible` across every tab switch for as long as it is open. A side
+  // panel is a surface people deliberately leave up for days, which made it the
+  // worst case for a visibility-only gate rather than an edge case.
+  //
+  // Closing is safe because state/conversation-cache-store.ts binds
+  // `refetchAllCached` to window focus, so anything missed while closed is
+  // reconciled on return rather than lost.
   useEffect(() => {
     if (!conversationId) return;
     if (typeof EventSource === "undefined") return;
@@ -761,15 +771,18 @@ export function useConversationBinding({
       es = null;
     };
 
-    const syncToVisibility = () => {
-      if (document.visibilityState === "visible") open();
+    const sync = (state: Engagement) => {
+      if (state === "active") open();
       else close();
     };
 
-    syncToVisibility();
-    document.addEventListener("visibilitychange", syncToVisibility);
+    sync(getEngagement());
+    // subscribeEngagement, not a visibilitychange listener: engagement owns both
+    // the hidden and the idle transitions, and a stream has no tick of its own
+    // to pull from — it has to be told when to close.
+    const unsubscribe = subscribeEngagement(sync);
     return () => {
-      document.removeEventListener("visibilitychange", syncToVisibility);
+      unsubscribe();
       close();
     };
   }, [conversationId]);

@@ -3336,8 +3336,18 @@ function wireRootEvents(state) {
   window.addEventListener("hashchange", _onUrlChange);
   // Navigation API (Chrome 102+) fires in isolated world for all SPA navigations
   try { if (window.navigation) window.navigation.addEventListener("navigate", _onUrlChange); } catch (_) {}
-  // Polling — universal fallback, location.href is readable from isolated world
-  setInterval(_onUrlChange, 1000);
+  // Polling — universal fallback, location.href is readable from isolated world.
+  // Skipped while the tab is hidden: this content script runs in EVERY open tab
+  // on every https page, so an ungated 1s timer is a per-tab background cost the
+  // user pays in battery across their whole session. A hidden tab cannot change
+  // its own URL without a navigation, and every navigation route above
+  // (popstate / hashchange / the Navigation API) fires an event that calls
+  // _onUrlChange directly — so nothing is missed, and switching back re-checks
+  // within a second regardless.
+  setInterval(() => {
+    if (document.visibilityState !== "visible") return;
+    _onUrlChange();
+  }, 1000);
 
   // Track text selected on the host page for flashcard creation.
   // selectionchange fires on every selection update; we read the text and

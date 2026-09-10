@@ -11,6 +11,7 @@
     "activeTab",
     "contextMenus",
     "alarms",
+    "idle",
     "scripting",
     "sidePanel",
     "debugger"

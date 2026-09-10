@@ -61,7 +61,7 @@
     "test:e2e:update": "playwright test --update-snapshots",
     "test:e2e:report": "playwright show-report",
     "polling:check": "tsx scripts/validate-polling.ts",
-    "polling:smoke": "tsx scripts/polling-scheduler-smoke.ts"
+    "polling:smoke": "tsx scripts/polling-scheduler-smoke.ts && tsx scripts/extension-engagement-smoke.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
