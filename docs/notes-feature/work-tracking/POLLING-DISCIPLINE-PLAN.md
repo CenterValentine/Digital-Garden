@@ -200,6 +200,41 @@ So using **the existence of a live collaboration WebSocket as the presence signa
 
 **Architectural consequence for D13:** the engagement core must be **extracted from the collaboration runtime, not built alongside it.** That runtime already owns a visibility threshold, an inactivity threshold, and a notion of "real editing." Building a second, parallel definition of idle in the scheduler would guarantee the two drift apart. Reuse or lift; do not duplicate.
 
+### D15 — Auth detection becomes **push + piggyback**; polling demoted to a safety net
+
+The 3-minute worst case in D3a is an artefact of polling being the *only* detection mechanism. It doesn't have to be.
+
+| Layer | Mechanism | Latency | Status |
+|---|---|---|---|
+| Same browser, other tab | BroadcastChannel + localStorage fallback | instant | **exists** |
+| User does anything at all | **401 interceptor** | instant | **build this** |
+| Actively collaborating | Hocuspocus server→client push | instant | **exists, needs extending** |
+| Safety net | `AuthSessionSync`, 5–10 min, idle-gated | slow, and that's fine | demote |
+
+#### The 401 interceptor
+
+Every API call already validates the session server-side, so **the 401 is the signal** — no separate question needs asking. What's missing is a central place to notice it. Today 401 handling is scattered across seven-plus call sites with no shared path to `publishSignedOut()`:
+
+```
+runtime.ts:1778, :2005        settings-store.ts:64
+AuthSessionSync.tsx:105       NoteWindowNodeView.tsx:369
+execute-with-fallback.ts:144  extensions/calendar/server/service.ts:326
+```
+
+**The trap: not every 401 means "session dead."** `execute-with-fallback.ts:144` treats 401 as *"AI provider key invalid"*. A naive global interceptor would sign a user out because their OpenAI key expired.
+
+So the interceptor must act only on 401s from **our own routes**, and only when carrying an **explicit marker** — a `code: "session_invalid"` body field or a `WWW-Authenticate` header — never on status alone.
+
+#### Hocuspocus push
+
+`server.ts:382` already emits `collaboration-access-revoked` and `runtime.ts:1893` already handles it. Extending it to carry *session* revocation costs nothing: it rides a connection that is already open, and that connection's lifetime is already bounded by sleep mode (D2b), so it never keeps Cloud Run awake beyond active use.
+
+#### Why this matters more than gating, for auth specifically
+
+`AuthSessionSync` mounts app-wide and is the **last-man-standing poller** — gate everything else perfectly and it alone still keeps Neon from ever suspending. Gating it helps; **removing its job** is better. With push and piggyback carrying detection, the poll becomes a fallback nobody relies on, and can run slowly enough to leave Neon the contiguous quiet it needs.
+
+**The reframe: an idle user does not need to know they are signed out.** Nothing can happen to them — the server rejects everything. The instant they act, the interceptor fires. Detection latency only matters if harm can occur in the gap, and none can.
+
 ### D14a — "Zero background pinging" is per-meter, not global
 
 Continuity constraints only work with genuinely zero background traffic — but **different traffic breaks different meters**, and conflating them leads to fixing the wrong thing:
@@ -491,6 +526,17 @@ registerPollingTask({
 - [ ] Idle gate at 60 s (D9), per-task opt-out (D7)
 - [ ] BroadcastChannel leader election among **visible, non-idle** tabs (D11)
 - [ ] Jitter so N tabs don't align their ticks
+
+### Phase 2b — Auth detection by push, not poll (D15)
+
+Arguably higher value than the scheduler for the auth path, because it *removes* the last-man-standing poller rather than merely gating it.
+
+- [ ] Central `apiFetch` wrapper (or a global response hook) that publishes signed-out on 401
+- [ ] **Only** on 401s from our own routes carrying an explicit marker (`code: "session_invalid"` / `WWW-Authenticate`) — never on status alone, or an expired AI provider key signs the user out
+- [ ] Migrate the seven-plus scattered 401 handlers onto it
+- [ ] Extend Hocuspocus `collaboration-access-revoked` to carry session revocation (rides the existing connection; no added Cloud Run cost)
+- [ ] Demote `AuthSessionSync` to a 5–10 min idle-gated safety net
+- [ ] Reconsider `CONSECUTIVE_FAILURES_REQUIRED` — with an interceptor as primary, the counter's transient-hiccup role changes
 
 **Why it matters, in one table:**
 
