@@ -628,8 +628,8 @@ Three persistent alarms, all reaching the database:
 | Alarm | Was | Now | Reaches |
 |---|---|---|---|
 | `dg-workflow-badge` | 1 min | event-driven | bearer lookup **+** `listRunsForOwner` |
-| `dg-pull-sync` | 5 min | 15 min, gated | `pullDeltas` |
-| `dg-embed-session-refresh` | 20 min | gated on panel-open OR engaged | session exchange |
+| `dg-pull-sync` | 5 min | 60 min, gated | `pullDeltas` |
+| `dg-embed-session-refresh` | 20 min | only while a token is held | session exchange |
 
 Alarms are **persistent**: they survive service-worker eviction and browser
 restarts, and fire with every tab closed, the side panel shut and the window
@@ -677,9 +677,10 @@ and the poll result says whether any run is still live — so the steady-state
 poll is not performed at all:
 
 - **60 s** while a run is `waiting`/`running`/`queued`
-- **15 min** discovery backstop, for runs started elsewhere (the app's own
-  workflow UI, an n8n inbound trigger). Deliberately *past* the 5-minute
-  threshold, so the database sleeps between checks even mid-session.
+- **60 min** discovery backstop, for runs started elsewhere (the app's own
+  workflow UI, an n8n inbound trigger). A safety net, not the responsiveness
+  mechanism — the return-to-active refresh is that. See D21 for why the period
+  cannot lean on the gate.
 - **one refresh on the return to active**, floored at 60 s so alt-tabbing cannot
   become a poll storm — `windows.onFocusChanged` fires on every window switch
 - nothing otherwise
@@ -694,19 +695,45 @@ CPU. **Fine-grained alarm, coarse-grained fetching.**
 Refreshes that follow a user action still call `refreshWorkflowBadge()` directly
 and ungated. That is a load, not a poll.
 
-### D21 — `dg-embed-session-refresh` is gated on panel-open OR engaged
+### D21 — Engagement means *the browser is in use*, not *DG is in use*
 
-The one alarm not gated purely on engagement. Its token lives 30 minutes and the
-20-minute forced refresh exists specifically to avoid a dead-cookie window, so a
-skipped refresh is a **correctness bug, not a saving**. Two consumers can hold a
-token: the side panel (detectable via the existing `dgPanelOpen` flag) and an
-overlay content panel on a page (not detectable — but the user is necessarily
-engaged while using it). Hence OR: it skips only when nobody is engaged *and* no
-panel is open, which is the overnight case and the bulk of the cost.
+The distinction the first version of Phase 5 missed. `chrome.idle` +
+window-focus answers "is the person at their computer with Chrome in front?" —
+it has no idea whether they care about DG. **Browsing Chrome all day without
+opening DG reads as fully engaged.**
 
-**Residual, accepted:** a side panel left open overnight keeps refreshing every
-20 minutes (~25% duty cycle). Closing that needs a 401-triggered re-mint in the
-panel so the refresh can be dropped safely; tracked, not built.
+That has two consequences.
+
+**The embed-session gate was wrong.** It ran on `panelOpen || engaged`, where
+`engaged` stood in for "an overlay content panel might be open" — the one token
+consumer that is not directly detectable. So an ordinary browsing day minted
+session tokens for nobody. The real signal was there all along: every surface
+that needs a token **asks the background for one**. Stamping that request and
+treating "asked within the token's own 30-minute lifetime" as a live consumer
+replaces the proxy with the thing itself.
+
+> Gate on the condition the work exists to serve, not on a signal that merely
+> correlates with it. A proxy that usually agrees is the kind that quietly bills
+> you every time it doesn't.
+
+**Alarm periods must be cheap on their own merits.** The gate cannot suppress
+them during ordinary browsing, and three alarms at 15/15/20 minutes averaged a
+~5.5-minute gap — right on the autosuspend line. Both stretched to 60 minutes:
+
+- **badge discovery 15 → 60 min.** It is a safety net for runs started
+  elsewhere, not the responsiveness mechanism; the return-to-active refresh is,
+  and people leave and re-enter the browser constantly.
+- **`dg-pull-sync` 15 → 60 min.** Cursor-based, so a longer period only
+  converges later.
+
+| DG unused, Chrome focused | Before D21 | After |
+|---|---|---|
+| ~3 h/day | ~$1.80/mo | ~$0.30/mo |
+| ~8 h/day | ~$4.90/mo | ~$0.50/mo |
+
+**Residual, accepted:** a side panel left open overnight still refreshes every
+20 minutes (~25% duty cycle) — it genuinely holds a token. Closing that needs a
+401-triggered re-mint in the panel; tracked, not built.
 
 ### D22 — Visibility was never enough for the side panel
 
