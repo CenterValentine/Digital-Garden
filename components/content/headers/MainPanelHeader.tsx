@@ -586,11 +586,26 @@ export function MainPanelHeader({
     };
 
     void fetchPresence();
-    const interval = window.setInterval(fetchPresence, PRESENCE_POLL_INTERVAL_MS);
+    // Hidden tabs do not poll — presence is advisory chrome, and nobody is
+    // looking at the tab strip in a backgrounded window. Each call is a
+    // Postgres read, so an ungated 10 s interval keeps the database from ever
+    // reaching its autosuspend threshold.
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void fetchPresence();
+      }
+    }, PRESENCE_POLL_INTERVAL_MS);
+    // Catch up immediately on return rather than making someone stare at stale
+    // tab chrome for up to a full interval.
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") void fetchPresence();
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
       isCancelled = true;
       window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [tabContentIds]);
 

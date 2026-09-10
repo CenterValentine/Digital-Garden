@@ -28,7 +28,7 @@ export interface RunDtoClient {
   createdAt: string;
 }
 
-const POLL_MS = 3000;
+const POLL_MS = 5000;
 
 export function RunsPanel({
   folderId,
@@ -63,11 +63,27 @@ export function RunsPanel({
   const runs = result?.forFolderId === folderId ? result.runs : [];
   const anyRunning = runs.some((r) => r.status === "running");
 
-  // Poll only while a run is in flight.
+  // Two independent conditions, both required: a run must be in flight AND the
+  // tab must be visible. With `anyRunning` false this effect never arms, so an
+  // idle Studio panel costs nothing at all — which is what makes 5s affordable
+  // for the case that does run. 5s rather than 3s because a run's step label
+  // updates on the order of seconds anyway; the extra 2s is imperceptible while
+  // cutting request volume by 40%.
   useEffect(() => {
     if (!anyRunning) return;
-    const timer = setInterval(() => fetchRuns(folderId), POLL_MS);
-    return () => clearInterval(timer);
+    const timer = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void fetchRuns(folderId);
+      }
+    }, POLL_MS);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") void fetchRuns(folderId);
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, [anyRunning, folderId, fetchRuns]);
 
   const openOutput = (run: RunDtoClient) => {

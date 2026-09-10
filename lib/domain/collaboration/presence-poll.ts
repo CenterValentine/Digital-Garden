@@ -79,7 +79,12 @@ class PresencePoller {
   private subscribers = new Map<string, Set<() => void>>();
   private cache = new Map<string, PresenceRecord[]>();
   private intervalId: number | null = null;
+  // Shared by the `focus` and `visibilitychange` listeners. The visibility
+  // guard matters for the latter: visibilitychange fires on the hidden
+  // transition too, and refreshing on the way out is exactly the tick we are
+  // trying to avoid.
   private readonly onFocus = () => {
+    if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
     void this.fetchIds([...this.subscribers.keys()]);
   };
 
@@ -107,10 +112,19 @@ class PresencePoller {
 
   private start() {
     if (this.intervalId !== null || typeof window === "undefined") return;
+    // Hidden tabs skip the tick entirely. Batching already collapses N
+    // subscribers into ceil(N/16) requests; gating on visibility collapses the
+    // idle case to zero, which is what actually keeps the database reaching its
+    // autosuspend threshold. The existing focus listener covers catch-up, and
+    // visibilitychange is added alongside it because a tab can become visible
+    // without the window ever receiving focus (split-screen, tab switch in an
+    // already-focused window).
     this.intervalId = window.setInterval(() => {
+      if (document.visibilityState !== "visible") return;
       void this.fetchIds([...this.subscribers.keys()]);
     }, POLL_INTERVAL_MS);
     window.addEventListener("focus", this.onFocus);
+    document.addEventListener("visibilitychange", this.onFocus);
   }
 
   private stop() {
@@ -119,6 +133,7 @@ class PresencePoller {
       this.intervalId = null;
     }
     window.removeEventListener("focus", this.onFocus);
+    document.removeEventListener("visibilitychange", this.onFocus);
   }
 
   private async fetchIds(ids: string[]): Promise<void> {

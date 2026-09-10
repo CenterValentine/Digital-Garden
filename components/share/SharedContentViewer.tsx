@@ -6,7 +6,12 @@ import { useEffect, useState } from "react";
 
 import { MarkdownEditor } from "@/components/content/editor/MarkdownEditor";
 
-const SHARE_PRESENCE_INTERVAL_MS = 10_000;
+// Must stay below STALE_AFTER_MS (45_000) in lib/domain/collaboration/presence-server.ts.
+// 30s leaves a 15s margin, so a single dropped beat still doesn't age this
+// viewer out of their own presence record.
+const SHARE_HEARTBEAT_INTERVAL_MS = 30_000;
+// Display only — no correctness constraint, so it runs as slowly as is useful.
+const SHARE_PRESENCE_READ_INTERVAL_MS = 60_000;
 const VISITOR_ADJECTIVES = ["Silver", "Quiet", "Golden", "Bright", "Gentle", "Blue"];
 const VISITOR_TRAITS = ["Windy", "Curious", "Clever", "Sunny", "Brisk", "Calm"];
 const VISITOR_ANIMALS = ["Raccoon", "Fox", "Heron", "Otter", "Finch", "Badger"];
@@ -319,8 +324,33 @@ export function SharedContentViewer({ content }: SharedContentViewerProps) {
     };
 
     void tick();
-    const interval = window.setInterval(tick, SHARE_PRESENCE_INTERVAL_MS);
-    return () => window.clearInterval(interval);
+    // The write and the read are deliberately on DIFFERENT cadences, because
+    // only one of them has a correctness constraint.
+    //
+    //   heartbeat  — MUST stay under STALE_AFTER_MS (45s) in presence-server.ts,
+    //                or this viewer ages out of their own presence record between
+    //                beats and flickers in and out for everyone else.
+    //   fetch      — pure display. Nobody needs sub-minute knowledge of who else
+    //                is reading a shared page, so it runs at a full minute.
+    //
+    // Bundling both into one `tick` is what forced the read to run at the
+    // write's cadence. Splitting them cuts reads by 6x while leaving the
+    // freshness contract intact.
+    const heartbeatInterval = window.setInterval(() => {
+      if (document.visibilityState === "visible") void heartbeat();
+    }, SHARE_HEARTBEAT_INTERVAL_MS);
+    const presenceInterval = window.setInterval(() => {
+      if (document.visibilityState === "visible") void fetchPresence();
+    }, SHARE_PRESENCE_READ_INTERVAL_MS);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") void tick();
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      window.clearInterval(heartbeatInterval);
+      window.clearInterval(presenceInterval);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, [content.id]);
 
   return (

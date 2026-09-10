@@ -11,7 +11,7 @@
     "dev:collab": "tsx server/hocuspocus/bootstrap.ts",
     "start:collab": "tsx server/hocuspocus/bootstrap.ts",
     "typecheck": "tsc --noEmit",
-    "build": "prisma generate && pnpm build:tokens && tsc --noEmit && pnpm collab:schema:check && pnpm note-edit:check && pnpm markdown:blocks:check && pnpm blockid:hygiene:check && pnpm reference-block:check && pnpm shortcut-mirror:check && pnpm extensions:check && pnpm charters:check && pnpm output-targets:check && pnpm prompt-cache:check && pnpm ai:diagnostics:check && pnpm model-routing:check && pnpm ai:pricing:check && pnpm inspector:check && pnpm ai:drift:check && pnpm ai:matrix:check && pnpm lint && next build --turbopack",
+    "build": "prisma generate && pnpm build:tokens && tsc --noEmit && pnpm collab:schema:check && pnpm note-edit:check && pnpm markdown:blocks:check && pnpm blockid:hygiene:check && pnpm reference-block:check && pnpm shortcut-mirror:check && pnpm extensions:check && pnpm polling:check && pnpm charters:check && pnpm output-targets:check && pnpm prompt-cache:check && pnpm ai:diagnostics:check && pnpm model-routing:check && pnpm ai:pricing:check && pnpm inspector:check && pnpm ai:drift:check && pnpm ai:matrix:check && pnpm lint && next build --turbopack",
     "vercel-build": "prisma generate && pnpm build:tokens && NODE_OPTIONS='--max-old-space-size=5120' next build --turbopack",
     "start": "next start",
     "lint": "eslint --max-warnings 151",
@@ -59,7 +59,8 @@
     "extension:dev": "node scripts/build-extension.mjs --dev",
     "test:e2e": "playwright test",
     "test:e2e:update": "playwright test --update-snapshots",
-    "test:e2e:report": "playwright show-report"
+    "test:e2e:report": "playwright show-report",
+    "polling:check": "tsx scripts/validate-polling.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
