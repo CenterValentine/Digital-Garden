@@ -753,19 +753,21 @@ const WORKFLOW_FAILURE_LINGER_MS = 30 * 60_000; // failures decay after 30 min
  *              they started, so stay responsive.
  *   DISCOVERY  nothing live. The only runs that could appear are ones started
  *              somewhere else (the app's own workflow UI, an n8n inbound
- *              trigger), and for an ambient status dot a quarter-hour of lag is
- *              immaterial. This is a backstop, not a poll.
+ *              trigger). This is a pure SAFETY NET, not the responsiveness
+ *              mechanism — the refresh on return-to-active is, and in real use
+ *              people leave and re-enter the browser constantly. An hour of lag
+ *              on an ambient status dot, in the case where the user has sat in
+ *              Chrome without once leaving it, is immaterial.
  *
- * Both are additionally gated on engagement, so neither runs while the user is
- * idle or away — which is what actually lets Neon reach its 5-minute autosuspend
- * threshold. DISCOVERY at 15 minutes also sits comfortably PAST that threshold,
- * so even during a long working session the database gets to sleep between
- * checks. (5 minutes would have been the worst possible choice: it sits exactly
- * ON the boundary, guaranteeing the database never suspends while buying no
- * responsiveness over 15.)
+ * Both are additionally gated on engagement. Note what engagement can and cannot
+ * see: it knows the browser is focused and in use, NOT that the user cares about
+ * DG. Someone browsing Chrome all day without opening DG reads as fully engaged,
+ * so the discovery interval has to be cheap on its own merits rather than
+ * relying on the gate to suppress it. An hour sits far past Neon's 5-minute
+ * autosuspend threshold, so the database sleeps between checks either way.
  */
 const BADGE_LIVE_INTERVAL_MS = 60_000;
-const BADGE_DISCOVERY_INTERVAL_MS = 15 * 60_000;
+const BADGE_DISCOVERY_INTERVAL_MS = 60 * 60_000;
 /**
  * Floor for wake-up refreshes. Returning to the browser should update the badge
  * promptly, but windows.onFocusChanged fires on every window switch — without a
@@ -1962,6 +1964,41 @@ async function isPanelOpen() {
   }
 }
 
+/**
+ * When a surface last asked for an embed session token.
+ *
+ * The refresh alarm needs to know whether anyone is HOLDING a token. The side
+ * panel is directly detectable; an overlay content panel on a page is not, and
+ * it announces neither its open nor its close. The first version of this gate
+ * used "the user is engaged" as a proxy for that — which meant browsing Chrome
+ * all day without touching DG kept minting tokens for nobody.
+ *
+ * The request itself is the real signal. A consumer that asked within the
+ * token's own lifetime may still be holding one; past that, whatever it had has
+ * expired anyway and a refresh could not help it.
+ */
+const EMBED_CONSUMER_KEY = "dgEmbedConsumerAt";
+/** Matches EMBED_SESSION_DURATION_MS on the server (30 min). */
+const EMBED_CONSUMER_WINDOW_MS = 30 * 60_000;
+
+async function noteEmbedConsumer() {
+  try {
+    await chrome.storage.session.set({ [EMBED_CONSUMER_KEY]: Date.now() });
+  } catch {
+    // Storage unavailable — the panel check below still covers the main case.
+  }
+}
+
+async function hasRecentEmbedConsumer() {
+  try {
+    const stored = await chrome.storage.session.get(EMBED_CONSUMER_KEY);
+    const at = stored?.[EMBED_CONSUMER_KEY];
+    return typeof at === "number" && Date.now() - at < EMBED_CONSUMER_WINDOW_MS;
+  } catch {
+    return false;
+  }
+}
+
 // Push the side-panel open/closed state so each tab's overlay keeps a LOCAL
 // belief and never has to query it at click time. That matters because
 // chrome.sidePanel.open() needs a live user gesture, and an async state query
@@ -2084,11 +2121,17 @@ chrome.contextMenus.onClicked.addListener(async (info) => {
  * Alarm periods, in minutes. Every one of these reaches the database, so the
  * period is a billing decision as much as a product one.
  *
- * `dg-pull-sync` moved 5 → 15. Five minutes was the single worst available
+ * `dg-pull-sync` moved 5 → 60. Five minutes was the single worst available
  * value: it sits EXACTLY on Neon's 5-minute autosuspend threshold, so the
  * database could never sleep, while buying no responsiveness a bookmark-delta
  * sync could possibly need. The pull is cursor-based, so a longer period loses
  * nothing — it only converges later.
+ *
+ * These periods matter more than the engagement gate alone suggests, because
+ * engagement cannot tell "using the browser" from "using DG". Three alarms at
+ * 15/15/20 minutes produced an average gap of ~5.5 minutes — right on the
+ * autosuspend line — for anyone who simply had Chrome focused. Spacing them out
+ * is what lets the database actually sleep during those hours.
  *
  * The badge alarm keeps its 1-minute period because the alarm itself is free:
  * it wakes the worker for microseconds of local CPU, and
@@ -2096,7 +2139,7 @@ chrome.contextMenus.onClicked.addListener(async (info) => {
  * Fine-grained alarm, coarse-grained fetching.
  */
 const ALARM_PERIODS = {
-  "dg-pull-sync": 15,
+  "dg-pull-sync": 60,
   "dg-embed-session-refresh": 20,
   [WORKFLOW_BADGE_ALARM]: 1,
 };
@@ -2140,19 +2183,19 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
     });
   }
   if (alarm.name === "dg-embed-session-refresh") {
-    // The ONE alarm not gated purely on engagement, deliberately.
+    // Gated on an actual token CONSUMER, not on engagement.
     //
     // The forced 20-minute refresh exists because the token lives 30 minutes,
     // so a skipped refresh is a correctness bug (a dead-cookie window in a
-    // surface the user left open) rather than a saving. Two consumers can be
-    // holding a token: the side panel, and an overlay content panel on a page.
-    // The first is detectable; the second is not, but the user is necessarily
-    // engaged while using it.
+    // surface the user left open) rather than a saving — which is why this is
+    // the one alarm engagement alone must not decide.
     //
-    // So the gate is OR, not AND: refresh while the panel is open, OR while the
-    // user is engaged. It skips only when both are false — nobody engaged and
-    // no panel — which is the overnight case, and the bulk of the cost.
-    if (!(await isPanelOpen()) && (await getEngagement()) !== "active") return;
+    // Two surfaces can hold a token: the side panel, and an overlay content
+    // panel on a page. Only the first is directly detectable, so the second is
+    // inferred from its token REQUEST rather than from user activity. Gating on
+    // the condition the work exists to serve, instead of a signal that merely
+    // correlates with it.
+    if (!(await isPanelOpen()) && !(await hasRecentEmbedConsumer())) return;
     await exchangeEmbedSession({ force: true }).catch((error) => {
       console.error("[DG Bookmarks] Embed session refresh failed", error);
     });
@@ -3220,6 +3263,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return;
     }
     if (message.type === "refresh-embed-session") {
+      // Every surface that needs a token asks here — the side panel on load, and
+      // an overlay content panel when it opens. Stamping the request is how the
+      // refresh alarm knows a token is actually being HELD; see
+      // noteEmbedConsumer.
+      await noteEmbedConsumer();
       sendResponse({ ok: true, data: await exchangeEmbedSession() });
       return;
     }
