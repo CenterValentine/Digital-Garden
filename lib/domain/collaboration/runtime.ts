@@ -16,6 +16,10 @@ import { getCollaborationServerExtensions } from "@/lib/domain/collaboration/ext
 import { sanitizeTipTapJsonWithExtensions } from "@/lib/domain/editor/unsupported-content";
 import { onNativeMessage } from "@/lib/mobile-bridge/client";
 import { clientLogger } from "@/lib/core/logger/client";
+import {
+  subscribeContentPresence,
+  type PresenceRecord,
+} from "@/lib/domain/collaboration/presence-poll";
 
 // Initial-promote deferral.
 //
@@ -278,11 +282,12 @@ interface DocumentRuntimeEntry {
   sessionSweepTimer: ReturnType<typeof setInterval> | null;
   presenceHeartbeatTimer: ReturnType<typeof setTimeout> | null;
   presenceHeartbeatInFlight: boolean;
-  presenceEventSource: EventSource | null;
+  /** Unsubscribe from the shared presence poller; null when not subscribed. */
+  presencePollUnsubscribe: (() => void) | null;
   // True once the tab has been hidden past VISIBILITY_SLEEP_DELAY_MS. Blocks
-  // the SSE presence stream from (re)opening and selects the deep-dormant
+  // the presence subscription from (re)opening and selects the deep-dormant
   // heartbeat cadence. Cleared when the tab becomes visible again.
-  presenceStreamSuspended: boolean;
+  presenceSuspended: boolean;
   broadcastChannel: BroadcastChannel | null;
   knownBrowserSessions: Map<string, BrowserSessionPresence>;
   pendingInitialContent: JSONContent | null;
@@ -333,7 +338,20 @@ const NOTE_CAPABILITY: ContentCollaborationCapability = {
 const COLLABORATION_CHANNEL_NAME = "dg-collaboration-runtime";
 const SESSION_STALE_AFTER_MS = 6000;
 const SESSION_ANNOUNCE_INTERVAL_MS = 2000;
-const PRESENCE_HEARTBEAT_INTERVAL_MS = 10_000;
+/**
+ * Active-tier heartbeat. 10 s → 20 s (D5, re-examined in Phase 1).
+ *
+ * The binding constraint is `STALE_AFTER_MS = 45_000` in presence-server.ts:
+ * miss enough beats and the server prunes our record, so a live tab's badge
+ * vanishes for everyone else. The margin that matters is surviving ONE dropped
+ * beat, and 20 s keeps it — two beats land at 40 s, still inside 45 s. 10 s was
+ * carrying a 4.5× margin nobody needed, at twice the write volume.
+ *
+ * 30 s would break the invariant: one dropped beat reaches 60 s and prunes a
+ * tab that is very much alive. Any further increase has to move STALE_AFTER_MS
+ * with it, and the two must always be reasoned about together.
+ */
+const PRESENCE_HEARTBEAT_INTERVAL_MS = 20_000;
 const PRESENCE_HEARTBEAT_IDLE_INTERVAL_MS = 30_000;
 const PRESENCE_HEARTBEAT_HIDDEN_INTERVAL_MS = 30_000;
 // Deep-dormant cadence: transport is deliberately asleep (sleep mode) and the
@@ -446,9 +464,9 @@ function pruneCleanLocalCacheManifestEntries() {
   }
 }
 
-export function getCollaborationBrowserSessionId() {
-  return getSessionStorageId("dg-collab-session-id", "session");
-}
+// Re-exported so the many existing importers keep working; the implementation
+// moved to browser-session.ts to break the runtime <-> presence-poll cycle.
+export { getCollaborationBrowserSessionId } from "@/lib/domain/collaboration/browser-session";
 
 function createConsumerId(
   descriptor: Omit<RuntimeConsumerDescriptor, "consumerId" | "contentId" | "mountedAt">
@@ -729,8 +747,8 @@ class CollaborationRuntimeManager {
       sessionSweepTimer: null,
       presenceHeartbeatTimer: null,
       presenceHeartbeatInFlight: false,
-      presenceEventSource: null,
-      presenceStreamSuspended: false,
+      presencePollUnsubscribe: null,
+      presenceSuspended: false,
       broadcastChannel: null,
       knownBrowserSessions: new Map(),
       pendingInitialContent: null,
@@ -907,8 +925,8 @@ class CollaborationRuntimeManager {
     if (typeof document !== "undefined" && document.visibilityState === "hidden") {
       entry.visibilitySleepTimer = setTimeout(() => {
         entry.visibilitySleepTimer = null;
-        entry.presenceStreamSuspended = true;
-        this.closePresenceStream(entry);
+        entry.presenceSuspended = true;
+        this.closePresenceSubscription(entry);
         this.maybeEnterSleepMode(entry);
       }, VISIBILITY_SLEEP_DELAY_MS);
     }
@@ -1318,34 +1336,41 @@ class CollaborationRuntimeManager {
     this.syncPresenceTransport(entry);
   }
 
-  private openPresenceStream(entry: DocumentRuntimeEntry) {
-    if (entry.presenceEventSource || entry.consumers.size === 0) return;
-    // Deep-hidden tabs don't need live badge updates; the stream reopens on
-    // tab-visible. This kills the server-side 10s Postgres poll for the
-    // lifetime of the suspension.
-    if (entry.presenceStreamSuspended) return;
-    const streamUrl = `/api/collaboration/presence/stream?contentId=${encodeURIComponent(
-      entry.contentId
-    )}&sessionId=${encodeURIComponent(this.sessionId)}`;
-    entry.presenceEventSource = new EventSource(streamUrl, { withCredentials: true });
-    entry.presenceEventSource.addEventListener("presence", (event) => {
-      this.handleRemotePresence(entry, event as MessageEvent<string>);
+  /**
+   * Subscribe to the SHARED presence poller (Phase 1).
+   *
+   * This replaced a dedicated EventSource per document whose server side
+   * re-queried Postgres every 10 s and, being an SSE response that never
+   * completes, was billed provisioned memory for the whole life of the tab.
+   *
+   * Awareness cannot do this job alone. Once connected, awareness is the better
+   * signal and `updateProviderPresence` owns the display — but awareness only
+   * ever describes peers we are ALREADY connected to. A document sleeping in
+   * `localOnly` has no provider and therefore no awareness, so nothing would
+   * ever tell it a collaborator arrived. That wake signal is what this
+   * subscription preserves, now riding a poll that already runs for the tab
+   * strip instead of a transport of its own.
+   */
+  private openPresenceSubscription(entry: DocumentRuntimeEntry) {
+    if (entry.presencePollUnsubscribe || entry.consumers.size === 0) return;
+    // Deep-hidden tabs don't need live badge updates; resubscribes on
+    // tab-visible.
+    if (entry.presenceSuspended) return;
+    entry.presencePollUnsubscribe = subscribeContentPresence(entry.contentId, (sessions) => {
+      this.handleRemotePresence(entry, sessions);
     });
-    entry.presenceEventSource.onerror = () => {
-      // EventSource reconnects automatically. Keep state unchanged to avoid false warnings.
-    };
   }
 
-  private closePresenceStream(entry: DocumentRuntimeEntry) {
-    entry.presenceEventSource?.close();
-    entry.presenceEventSource = null;
+  private closePresenceSubscription(entry: DocumentRuntimeEntry) {
+    entry.presencePollUnsubscribe?.();
+    entry.presencePollUnsubscribe = null;
   }
 
   private syncPresenceTransport(entry: DocumentRuntimeEntry) {
     if (!entry.broadcastChannel || this.isPresenceLeader(entry)) {
-      this.openPresenceStream(entry);
+      this.openPresenceSubscription(entry);
     } else {
-      this.closePresenceStream(entry);
+      this.closePresenceSubscription(entry);
     }
   }
 
@@ -1364,7 +1389,7 @@ class CollaborationRuntimeManager {
       !entry.state.reconnectIntent;
     if (
       transportDormant &&
-      (entry.presenceStreamSuspended ||
+      (entry.presenceSuspended ||
         Date.now() - entry.lastActivityAt >= INACTIVITY_SLEEP_DELAY_MS)
     ) {
       return PRESENCE_HEARTBEAT_SLEEP_INTERVAL_MS;
@@ -1491,21 +1516,16 @@ class CollaborationRuntimeManager {
     });
   }
 
-  private handleRemotePresence(entry: DocumentRuntimeEntry, event: MessageEvent<string>) {
-    try {
-      const payload = JSON.parse(event.data) as {
-        sessions?: Array<{ sessionId?: string; userId?: string; surfaceCount?: number }>;
-      };
-      this.applyRemotePresenceSessions(entry, payload.sessions ?? []);
-      entry.broadcastChannel?.postMessage({
-        type: "remote-presence-snapshot",
-        contentId: entry.contentId,
-        sessions: payload.sessions ?? [],
-        timestamp: Date.now(),
-      });
-    } catch {
-      // Ignore malformed presence events.
-    }
+  private handleRemotePresence(entry: DocumentRuntimeEntry, sessions: PresenceRecord[]) {
+    this.applyRemotePresenceSessions(entry, sessions);
+    // Fan out to the other tabs of this browser so only the leader subscribes.
+    // Kept from the SSE design: the poller is shared per-tab, not cross-tab.
+    entry.broadcastChannel?.postMessage({
+      type: "remote-presence-snapshot",
+      contentId: entry.contentId,
+      sessions,
+      timestamp: Date.now(),
+    });
   }
 
   private handleBroadcastMessage(entry: DocumentRuntimeEntry, payload: unknown) {
@@ -2127,7 +2147,7 @@ class CollaborationRuntimeManager {
     if (!entry) return;
     entry.state.networkState = "offline";
     this.clearProviderReconnect(entry);
-    this.closePresenceStream(entry);
+    this.closePresenceSubscription(entry);
     this.schedulePresenceHeartbeat(entry);
     if (entry.hocuspocusProvider) {
       entry.state.connectionState = "disconnectedButDirty";
@@ -2166,8 +2186,8 @@ class CollaborationRuntimeManager {
    * in the native shell, by the host app actually backgrounding.
    */
   private enterDeepHidden(entry: DocumentRuntimeEntry) {
-    entry.presenceStreamSuspended = true;
-    this.closePresenceStream(entry);
+    entry.presenceSuspended = true;
+    this.closePresenceSubscription(entry);
     this.maybeEnterSleepMode(entry);
   }
 
@@ -2183,8 +2203,8 @@ class CollaborationRuntimeManager {
     // Lift deep-hidden suspension: reopen the presence stream (if leader)
     // and heartbeat immediately so our record refreshes and we re-learn who
     // else is here without waiting out a dormant-cadence interval.
-    if (entry.presenceStreamSuspended) {
-      entry.presenceStreamSuspended = false;
+    if (entry.presenceSuspended) {
+      entry.presenceSuspended = false;
       this.syncPresenceTransport(entry);
       this.schedulePresenceHeartbeat(entry, 0);
     }
@@ -2369,7 +2389,7 @@ class CollaborationRuntimeManager {
     entry.bootstrapAbortController = null;
     entry.indexedDbProvider.destroy?.();
     if (entry.presenceHeartbeatTimer) clearTimeout(entry.presenceHeartbeatTimer);
-    this.closePresenceStream(entry);
+    this.closePresenceSubscription(entry);
     if (entry.ydocUpdateHandler) {
       entry.ydoc.off("update", entry.ydocUpdateHandler);
     }
