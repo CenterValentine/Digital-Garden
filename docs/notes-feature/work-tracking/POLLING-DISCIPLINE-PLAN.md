@@ -175,6 +175,51 @@ Cloud Run's free tier (~180,000 vCPU-seconds) covers about **7%** of a month. So
 
 **Conclusion:** the move is worth making, but only if the presence connection is itself governed by the same engagement core (D13) — closed when hidden, released when idle. Otherwise it is not a saving, it is a relocation of the bill to a more expensive meter.
 
+### D0 — Terminology: what "gated" means here
+
+**Gated** = the timer or stream consults engagement state and **suppresses its work** — skips the tick, or closes the connection — when nobody is engaged.
+**Ungated** = it runs at full cadence regardless of whether anyone is looking.
+
+Gating is about **conditional suppression, not interval length.** A 60 s ungated poll and a 10 s gated poll can easily cost the opposite of what their intervals suggest, because what matters is *how many contiguous minutes of quiet* the backend gets (D14).
+
+### D2b — CORRECTION to D2a: sleep mode already bounds the connection
+
+D2a priced an *always-on* Cloud Run instance at ~$66/month. **That is not the real baseline**, because the collaboration runtime already implements exactly the gating this document is proposing everywhere else:
+
+```
+runtime.ts:363   VISIBILITY_SLEEP_DELAY_MS  = 3 min hidden  → disconnect
+runtime.ts:364   INACTIVITY_SLEEP_DELAY_MS  = 10 min idle   → disconnect
+```
+
+with the comment *"disconnect Cloud Run WebSocket when no real editing is happening."*
+
+So using **the existence of a live collaboration WebSocket as the presence signal** — rather than moving polling onto Hocuspocus — is cheap, because that connection's lifetime is already governed by visibility **and** inactivity. Presence read from awareness while connected costs nothing extra: the socket is already open, awareness is already in memory, and no database is touched.
+
+**What Hocuspocus does when a user is idle:** the socket stays open and the server sends a Y.js stateless keepalive every **25 s** (`server.ts:461`), because `HocuspocusProvider` closes idle connections after 30 s of no *data* frames — WebSocket pings are control frames and don't count. That keepalive keeps the Cloud Run instance billing. Sleep mode is what stops it, after 3 min hidden or 10 min idle.
+
+**Architectural consequence for D13:** the engagement core must be **extracted from the collaboration runtime, not built alongside it.** That runtime already owns a visibility threshold, an inactivity threshold, and a notion of "real editing." Building a second, parallel definition of idle in the scheduler would guarantee the two drift apart. Reuse or lift; do not duplicate.
+
+### D14a — "Zero background pinging" is per-meter, not global
+
+Continuity constraints only work with genuinely zero background traffic — but **different traffic breaks different meters**, and conflating them leads to fixing the wrong thing:
+
+| Background activity | Breaks Neon sleep (5 min)? | Breaks Cloud Run sleep? |
+|---|---|---|
+| WebSocket ping / Y.js keepalive | **No** — never touches Postgres | **Yes** |
+| Awareness broadcast | **No** — in-memory only | **Yes** |
+| Presence heartbeat `POST` | **Yes** | No |
+| Session check | **Yes** | No |
+| Held SSE polling the DB every 10 s | **Yes** | No — bills Vercel memory instead |
+| Held SSE with no queries | No | No — bills Vercel memory |
+
+So the requirement is **not** "zero pings." It is:
+
+- **For Neon to sleep:** zero *database-touching requests* for 5+ contiguous minutes.
+- **For Cloud Run to sleep:** zero *open WebSockets* — keepalives count, and they are the point of sleep mode.
+- **For Vercel memory:** zero *held-open requests*, regardless of whether they query anything.
+
+Three meters, three different definitions of quiet. A change can improve one and worsen another — which is precisely the trap in D2a's naive version, where moving presence to Hocuspocus would have quieted Neon while waking Cloud Run.
+
 ### D14 — POLICY: any new poller or heartbeat must carry a cost estimate
 
 Before adding a recurring timer, heartbeat, or held stream, state its estimated monthly cost in the PR description **and** in its `polling:check` registry entry.
