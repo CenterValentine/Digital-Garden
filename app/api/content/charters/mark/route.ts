@@ -19,6 +19,8 @@ import {
   withCharterMetadata,
 } from "@/lib/domain/ai/charters/registry";
 import { parseCharter } from "@/lib/domain/ai/charters/parse";
+import { buildCharterStarterDoc } from "@/lib/domain/ai/charters/starter";
+import { writeNoteContent } from "@/lib/domain/content/write-note-content";
 import type { JSONContent } from "@tiptap/core";
 import { logger, withRouteTrace, withSpan } from "@/lib/core/logger";
 
@@ -37,6 +39,9 @@ export async function POST(request: NextRequest) {
       const contentId = typeof body.contentId === "string" ? body.contentId : null;
       const description =
         typeof body.description === "string" ? body.description.trim() : "";
+      // Opt-in starter body. Only ever honoured for a charter with NO body —
+      // promoting an already-written note must never touch its content.
+      const scaffold = body.scaffold === true;
       if (!contentId) {
         return NextResponse.json(
           { success: false, error: { message: "contentId is required" } },
@@ -53,6 +58,9 @@ export async function POST(request: NextRequest) {
         },
         select: {
           id: true,
+          // The charter's name is the file title — the starter body opens with
+          // it so a scaffolded page is about something from its first line.
+          title: true,
           // tiptapJson so the response can report whether this charter has a
           // BODY (see the emptiness contract below).
           notePayload: { select: { metadata: true, tiptapJson: true } },
@@ -102,14 +110,48 @@ export async function POST(request: NextRequest) {
           content: [],
         },
       );
-      const hasBody =
+      let hasBody =
         parsed.phases.length > 0 || parsed.standingRules.content.length > 0;
+      let phaseCount = parsed.phases.length;
 
-      return NextResponse.json({
-        success: true,
-        hasBody,
-        phaseCount: parsed.phases.length,
-      });
+      // STARTER BODY (D5). Opt-in, and only into a charter that has none: the
+      // caller offers it solely for an empty one, and this re-checks rather
+      // than trusting that, so a stale dialog can never overwrite writing.
+      //
+      // Routed through writeNoteContent, NEVER a NotePayload upsert: where a
+      // CollaborationDocument row exists, a payload write is masked in any
+      // open editor and destroyed by that session's next store (confirmed in
+      // production 2026-08-12). A folder promoted moments ago usually has no
+      // Y.Doc — but "usually" is exactly the assumption that path exists to
+      // remove. The shrink guard cannot trip here: it needs >=200 chars
+      // before, and this runs only when there are none.
+      let scaffolded = false;
+      if (scaffold && !hasBody) {
+        try {
+          const starter = buildCharterStarterDoc(node.title);
+          await writeNoteContent({
+            contentId: node.id,
+            ownerId: session.user.id,
+            mode: "replace",
+            content: starter,
+          });
+          hasBody = true;
+          phaseCount = parseCharter(starter).phases.length;
+          scaffolded = true;
+        } catch (scaffoldError) {
+          // The MARK is what the user asked for and it has already succeeded.
+          // A failed scaffold degrades to the empty-charter warning the caller
+          // shows anyway — never to a failed promotion.
+          logger.warn({
+            layer: "ai",
+            event: "charters_mark:scaffold_failed",
+            summary: "charter marked, but the starter body could not be written",
+            error: scaffoldError,
+          });
+        }
+      }
+
+      return NextResponse.json({ success: true, hasBody, phaseCount, scaffolded });
     } catch (error) {
       if (error instanceof Error && error.message === "Authentication required") {
         return NextResponse.json(
@@ -125,6 +167,80 @@ export async function POST(request: NextRequest) {
       });
       return NextResponse.json(
         { success: false, error: { message: "Failed to mark as playbook" } },
+        { status: 500 },
+      );
+    }
+  });
+}
+
+/**
+ * GET /api/content/charters/mark?contentId=… — preflight for the mark dialog.
+ *
+ * Reports whether the target already has a charter BODY, so the dialog offers
+ * the starter template only where it is safe (an empty charter) and never
+ * where it would amount to proposing an overwrite of someone's writing. The
+ * POST re-checks regardless; this exists to shape the UI, not to authorize.
+ */
+export async function GET(request: NextRequest) {
+  return withRouteTrace(request, { route: ROUTE_PATH }, async () => {
+    try {
+      const session = await withSpan(
+        { layer: "auth", name: "session" },
+        { summary: "session lookup" },
+        async () => requireAuth(),
+      );
+      const contentId = request.nextUrl.searchParams.get("contentId");
+      if (!contentId) {
+        return NextResponse.json(
+          { success: false, error: { message: "contentId is required" } },
+          { status: 400 },
+        );
+      }
+      const node = await prisma.contentNode.findFirst({
+        where: {
+          id: contentId,
+          ownerId: session.user.id,
+          contentType: { in: ["note", "folder"] },
+          deletedAt: null,
+        },
+        select: { notePayload: { select: { metadata: true, tiptapJson: true } } },
+      });
+      if (!node) {
+        return NextResponse.json(
+          { success: false, error: { message: "Note or folder not found" } },
+          { status: 404 },
+        );
+      }
+      const parsed = parseCharter(
+        (node.notePayload?.tiptapJson as JSONContent | undefined) ?? {
+          type: "doc",
+          content: [],
+        },
+      );
+      return NextResponse.json({
+        success: true,
+        data: {
+          isCharter: isCharterMetadata(node.notePayload?.metadata),
+          hasBody:
+            parsed.phases.length > 0 || parsed.standingRules.content.length > 0,
+          phaseCount: parsed.phases.length,
+        },
+      });
+    } catch (error) {
+      if (error instanceof Error && error.message === "Authentication required") {
+        return NextResponse.json(
+          { success: false, error: { message: "Unauthorized" } },
+          { status: 401 },
+        );
+      }
+      logger.error({
+        layer: "ai",
+        event: "charters_mark:preflight_caught",
+        summary: "charter mark preflight failed",
+        error,
+      });
+      return NextResponse.json(
+        { success: false, error: { message: "Failed to read charter state" } },
         { status: 500 },
       );
     }

@@ -15,7 +15,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -68,6 +68,36 @@ function Body({
   const [description, setDescription] = useState(initialDescription);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  // Preflight (D5): does this charter already have a body? The starter
+  // template is offered ONLY when it does not — on anything already written,
+  // the option would be proposing to overwrite the user's own work.
+  // `null` = not known yet, so the option stays hidden rather than flickering
+  // in and out while the request is in flight.
+  const [hasBody, setHasBody] = useState<boolean | null>(null);
+  const [useStarter, setUseStarter] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(
+      `/api/content/charters/mark?contentId=${encodeURIComponent(contentId)}`,
+      { credentials: "include" },
+    )
+      .then((r) => (r.ok ? r.json() : null))
+      .then((json) => {
+        if (cancelled) return;
+        // Unknown degrades to "has a body" — the conservative read, since it
+        // hides the option rather than offering a write we cannot justify.
+        setHasBody(json?.data?.hasBody !== false);
+      })
+      .catch(() => {
+        if (!cancelled) setHasBody(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [contentId]);
+
+  const offerStarter = hasBody === false && !editing;
 
   async function handleSave() {
     if (busy) return;
@@ -78,7 +108,12 @@ function Body({
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contentId, description: description.trim() }),
+        body: JSON.stringify({
+          contentId,
+          description: description.trim(),
+          // The route re-checks emptiness itself; this only carries intent.
+          scaffold: offerStarter && useStarter,
+        }),
       });
       if (!res.ok) {
         setBusy(false);
@@ -95,12 +130,19 @@ function Body({
       const marked = (await res.json().catch(() => null)) as {
         hasBody?: boolean;
         phaseCount?: number;
+        scaffolded?: boolean;
       } | null;
-      const hasBody = marked?.hasBody !== false;
+      const markedHasBody = marked?.hasBody !== false;
       window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
       if (editing) {
         toast.success("Charter details updated");
-      } else if (hasBody) {
+      } else if (marked?.scaffolded) {
+        toast.success("Marked as charter — added a starter outline", {
+          description:
+            "Open it and fill in the bracketed parts. Text before the first heading is its standing rules; each ## heading is a phase.",
+          duration: 8000,
+        });
+      } else if (markedHasBody) {
         const phases = marked?.phaseCount ?? 0;
         toast.success(
           phases > 0
@@ -173,6 +215,28 @@ function Body({
             className="w-full resize-y rounded-md border border-black/10 bg-black/[0.03] px-3 py-2 text-sm leading-relaxed text-gray-900 outline-none focus:border-indigo-400/50 dark:border-white/10 dark:bg-white/[0.04] dark:text-gray-100"
           />
         </div>
+
+        {offerStarter && (
+          <label className="flex cursor-pointer items-start gap-2 rounded-md border border-indigo-400/25 bg-indigo-500/[0.05] px-2.5 py-2">
+            <input
+              type="checkbox"
+              checked={useStarter}
+              onChange={(e) => setUseStarter(e.target.checked)}
+              className="mt-0.5 h-3.5 w-3.5 shrink-0 accent-current"
+            />
+            <span className="min-w-0 flex-1">
+              <span className="block text-xs font-medium text-gray-900 dark:text-gray-100">
+                Start from a template
+              </span>
+              <span className="block text-[11px] leading-snug text-gray-500 dark:text-gray-400">
+                This one is empty. Adds a starter outline — standing rules, a
+                Context section, and two phases with{" "}
+                <code className="text-[10px]">Done when:</code> conditions — for
+                you to fill in.
+              </span>
+            </span>
+          </label>
+        )}
 
         {notice && (
           <p className="text-xs text-amber-600 dark:text-amber-400">{notice}</p>
