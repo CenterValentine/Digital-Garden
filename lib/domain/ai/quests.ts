@@ -32,14 +32,25 @@ import type { Prisma } from "@/lib/database/generated/prisma";
 import { logger } from "@/lib/core/logger";
 import {
   createColumn,
+  createRelationPair,
   createRows,
   writeCells,
   type CellWrite,
 } from "@/lib/domain/data/server/mutations";
+import { keyAtEnd } from "@/lib/domain/data/ordering";
 import { generateUniqueSlug } from "@/lib/domain/content";
 import type { DataColumn } from "@/lib/domain/data";
 
-export const QUEST_SCHEMA_VERSION = 1;
+/**
+ * v2 (2026-09-11): row-level attachment. Every quest ledger carries a system
+ * "Quest" relation to its master row, and ONE relation per output table it
+ * captures into ("Output row · <table>") — a relation targets a single
+ * table, so several output tables mean several columns. Links live in
+ * DataRowLink and survive any cell edit. v1 ledgers upgrade in place on
+ * their next sitting (ensureQuestRelation / ensureOutputRelation are
+ * find-or-create).
+ */
+export const QUEST_SCHEMA_VERSION = 2;
 /** Charter-note metadata key holding its master ledger's node id (D10 stamp). */
 export const MASTER_LEDGER_META_KEY = "masterLedgerId";
 
@@ -139,6 +150,10 @@ export interface QuestInfo {
   sittingClosed?: boolean;
   masterCols: Record<string, string>;
   ledgerCols: Record<string, string>;
+  /** v2: the ledger's "Quest" relation column id (ledger row → master row). */
+  questRelationColumnId?: string;
+  /** v2: output-table id → the ledger's relation column id into that table. */
+  outputRelations?: Record<string, string>;
 }
 
 export function parseQuestInfo(value: unknown): QuestInfo | null {
@@ -193,6 +208,134 @@ async function liveColumns(tableId: string): Promise<DataColumn[]> {
     config: (c.config ?? {}) as DataColumn["config"],
     deletedAt: null,
   })) as unknown as DataColumn[];
+}
+
+/** Stamp DataColumnConfig.system onto an existing column (relation pairs
+ *  are minted by createRelationPair, which owns their config). */
+async function markColumnSystem(columnId: string): Promise<void> {
+  const col = await prisma.dataColumn.findUnique({
+    where: { id: columnId },
+    select: { config: true },
+  });
+  const config = (
+    col?.config && typeof col.config === "object" ? col.config : {}
+  ) as Record<string, unknown>;
+  await prisma.dataColumn.update({
+    where: { id: columnId },
+    data: { config: { ...config, system: true } as unknown as Prisma.InputJsonValue },
+  });
+}
+
+/** The ledger's live FORWARD relation columns, keyed by target table id. */
+async function ledgerRelations(
+  questLedgerId: string,
+): Promise<Record<string, string>> {
+  const cols = await prisma.dataColumn.findMany({
+    where: { tableId: questLedgerId, type: "relation", deletedAt: null },
+    select: { id: true, config: true },
+    orderBy: { createdAt: "asc" },
+  });
+  const out: Record<string, string> = {};
+  for (const c of cols) {
+    const cfg = (c.config ?? {}) as { relationTableId?: unknown; isBacklink?: unknown };
+    if (
+      typeof cfg.relationTableId === "string" &&
+      cfg.isBacklink !== true &&
+      !(cfg.relationTableId in out)
+    ) {
+      out[cfg.relationTableId] = c.id;
+    }
+  }
+  return out;
+}
+
+/**
+ * Ledger → master-row relation ("Quest"), find-or-create — the v2 upgrade
+ * path for v1 ledgers. Its backlink on the master ("Ledger rows") lists
+ * every item of the quest. Both are system columns.
+ */
+export async function ensureQuestRelation(
+  questLedgerId: string,
+  masterId: string,
+): Promise<string> {
+  const existing = (await ledgerRelations(questLedgerId))[masterId];
+  if (existing) return existing;
+  const pair = await createRelationPair(
+    questLedgerId,
+    masterId,
+    {
+      name: "Quest",
+      description:
+        "The quest this item belongs to — its row in the master ledger. Linked by the machinery on every recorded item.",
+    },
+    "Ledger rows",
+  );
+  await markColumnSystem(pair.forwardId);
+  await markColumnSystem(pair.backlinkId);
+  return pair.forwardId;
+}
+
+/**
+ * Ledger → output-table-row relation, ONE PER OUTPUT TABLE (a relation
+ * targets a single table, so a quest capturing into several tables gets
+ * several columns), minted when a sitting first captures into that table.
+ * The forward column is system; the backlink lands on the USER's output
+ * table under the quest's name and is deliberately not locked — that table
+ * is theirs.
+ */
+export async function ensureOutputRelation(
+  questLedgerId: string,
+  outputTableId: string,
+  questLabel: string,
+): Promise<string> {
+  const existing = (await ledgerRelations(questLedgerId))[outputTableId];
+  if (existing) return existing;
+  const target = await prisma.contentNode.findFirst({
+    where: { id: outputTableId, deletedAt: null },
+    select: { title: true },
+  });
+  const title = target?.title ?? "Output";
+  const pair = await createRelationPair(
+    questLedgerId,
+    outputTableId,
+    {
+      name: `Output row · ${title}`.slice(0, 255),
+      description: `The captured row in "${title}" for this item, when admitted. Linked by the machinery.`.slice(0, 280),
+    },
+    `Quest · ${questLabel}`.slice(0, 255),
+  );
+  await markColumnSystem(pair.forwardId);
+  return pair.forwardId;
+}
+
+/** Every output relation on a ledger (output-table id → column id) —
+ *  recomputed each sitting so tables from earlier sittings stay linkable. */
+export async function ledgerOutputRelations(
+  questLedgerId: string,
+  masterId: string,
+): Promise<Record<string, string>> {
+  const all = await ledgerRelations(questLedgerId);
+  delete all[masterId];
+  return all;
+}
+
+/** Idempotent row link — the same upsert as POST /data/[id]/links. */
+async function linkRows(
+  columnId: string,
+  fromRowId: string,
+  toRowId: string,
+): Promise<void> {
+  const last = await prisma.dataRowLink.findFirst({
+    where: { columnId, fromRowId },
+    orderBy: { position: "desc" },
+    select: { position: true },
+  });
+  await prisma.dataRowLink.upsert({
+    where: { columnId_fromRowId_toRowId: { columnId, fromRowId, toRowId } },
+    create: { columnId, fromRowId, toRowId, position: keyAtEnd(last?.position ?? null) },
+    update: {},
+    select: { id: true },
+  });
 }
 
 /** Create a system data node (mode inline, no seed rows) with an icon. */
@@ -372,6 +515,8 @@ export async function ensureQuest(input: {
 }): Promise<{
   questRowId: string;
   questLedgerId: string;
+  /** v2: the ledger's "Quest" relation column (ledger row → master row). */
+  questRelationColumnId: string;
   continued: boolean;
 } | null> {
   const { userId, masterId, masterCols } = input;
@@ -436,7 +581,38 @@ export async function ensureQuest(input: {
     // This used to return null, and the run silently fell back to the
     // markdown-only path. Mint the ledger and complete the row instead.
     const healed = !ledgerId;
-    if (!ledgerId) ledgerId = await mintQuestLedger();
+    let relinked = false;
+    if (!ledgerId) {
+      // RE-LINK before re-minting: cells are the user's to edit (owner,
+      // 2026-09-11), so a cleared link cell must not cost a duplicate
+      // ledger. The ledger is found the way the tree finds it — referenced
+      // to this charter, under the quest's name.
+      const orphan = await prisma.contentNode.findFirst({
+        where: {
+          ownerId: userId,
+          ownedByNoteId: input.charterId,
+          contentType: "data",
+          deletedAt: null,
+          title: `${label} — Quest Ledger`,
+        },
+        select: { id: true },
+        orderBy: { createdAt: "asc" },
+      });
+      relinked = !!orphan;
+      ledgerId = orphan?.id ?? (await mintQuestLedger());
+    }
+    // Output tables ACCUMULATE (owner question, 2026-09-11: "what if there
+    // are multiple output tables?"): the contentLink cell is an array, so a
+    // sitting that captures into a new table appends it; nothing is dropped.
+    const priorOutputs = Array.isArray(d[masterCols["Output table"]])
+      ? (d[masterCols["Output table"]] as unknown[]).filter(
+          (x): x is string => typeof x === "string",
+        )
+      : [];
+    const outputs =
+      input.outputTableId && !priorOutputs.includes(input.outputTableId)
+        ? [...priorOutputs, input.outputTableId]
+        : null;
     const sittings =
       typeof d[masterCols["Sittings"]] === "number"
         ? (d[masterCols["Sittings"]] as number)
@@ -462,8 +638,8 @@ export async function ensureQuest(input: {
       ...(input.questLogId
         ? [{ rowId: existing.id, columnKey: masterCols["Quest log"], value: [input.questLogId] }]
         : []),
-      ...(input.outputTableId
-        ? [{ rowId: existing.id, columnKey: masterCols["Output table"], value: [input.outputTableId] }]
+      ...(outputs
+        ? [{ rowId: existing.id, columnKey: masterCols["Output table"], value: outputs }]
         : []),
     ] as CellWrite[];
     const stamped = await writeCells(masterId, await liveColumns(masterId), writes);
@@ -487,15 +663,25 @@ export async function ensureQuest(input: {
       logger.info({
         layer: "ai",
         event: "quests:ledger_healed",
-        summary: `quest "${label}" had no live ledger — minted and linked`,
-        attrs: { masterId, questRowId: existing.id, questLedgerId: ledgerId },
+        summary: relinked
+          ? `quest "${label}" had a cleared ledger link — re-linked its ledger`
+          : `quest "${label}" had no live ledger — minted and linked`,
+        attrs: { masterId, questRowId: existing.id, questLedgerId: ledgerId, relinked },
       });
     }
-    return { questRowId: existing.id, questLedgerId: ledgerId, continued: true };
+    // v2 upgrade path: a v1 ledger gains its "Quest" relation here.
+    const questRelationColumnId = await ensureQuestRelation(ledgerId, masterId);
+    return {
+      questRowId: existing.id,
+      questLedgerId: ledgerId,
+      questRelationColumnId,
+      continued: true,
+    };
   }
 
-  // Create: quest ledger + master row.
+  // Create: quest ledger (+ its "Quest" relation to the master) + master row.
   const questLedgerId = await mintQuestLedger();
+  const questRelationColumnId = await ensureQuestRelation(questLedgerId, masterId);
   const [questRowId] = await createRows(masterId, await liveColumns(masterId), 1, userId);
   const writes: CellWrite[] = [
     { rowId: questRowId, columnKey: questKey, value: label },
@@ -533,7 +719,7 @@ export async function ensureQuest(input: {
     summary: `quest "${label}" created (ledger + master row)`,
     attrs: { masterId, questRowId, questLedgerId },
   });
-  return { questRowId, questLedgerId, continued: false };
+  return { questRowId, questLedgerId, questRelationColumnId, continued: false };
 }
 
 // ── Per-item dual-write (upsert by item key; continuous across sittings) ──
@@ -551,6 +737,8 @@ export async function recordQuestItem(input: {
     qualified?: boolean;
     verdict?: string;
     outputRowId?: string;
+    /** The output table that row lives in — selects the v2 relation column. */
+    outputTableId?: string;
     /**
      * Values for SCULPTED ledger columns (name → value) — resolved through
      * the quest's column map; unknown names are skipped, and the cell
@@ -606,6 +794,29 @@ export async function recordQuestItem(input: {
     writes,
   );
   if (!result.ok) return null;
+  // Row-level attachment (v2): the item links to its quest row, and an
+  // admitted item links to its captured row in THAT output table. Links are
+  // additive and survive cell edits; a link failure never unwrites the row.
+  try {
+    if (quest.questRelationColumnId) {
+      await linkRows(quest.questRelationColumnId, rowId, quest.questRowId);
+    }
+    const outCol =
+      item.outputRowId && item.outputTableId
+        ? quest.outputRelations?.[item.outputTableId]
+        : undefined;
+    if (outCol && item.outputRowId) {
+      await linkRows(outCol, rowId, item.outputRowId);
+    }
+  } catch (error) {
+    logger.warn({
+      layer: "ai",
+      event: "quests:link_failed",
+      summary: "quest item row written, but its relation link failed",
+      error,
+      attrs: { questLedgerId: quest.questLedgerId, rowId },
+    });
+  }
   return { rowId, updated: !!existing };
 }
 

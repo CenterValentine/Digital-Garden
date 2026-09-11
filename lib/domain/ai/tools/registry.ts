@@ -40,7 +40,9 @@ import { createColumn } from "@/lib/domain/data/server/mutations";
 import {
   closeSitting,
   ensureMasterLedger,
+  ensureOutputRelation,
   ensureQuest,
+  ledgerOutputRelations,
   parseQuestInfo,
   questSeenKeys,
   recordQuestItem,
@@ -880,6 +882,21 @@ export function createBaseTools(ctx: ToolExecuteContext) {
                     .replace(/[^a-z0-9]+/g, "-")
                     .replace(/^-+|-+$/g, "")
                     .slice(0, 60) || "quest");
+                // Row-level attachment (quests v2): the capture table of THIS
+                // sitting gets its relation column on the ledger; the map is
+                // recomputed from the ledger so earlier sittings' tables stay
+                // linkable (a quest may capture into several tables).
+                if (captureCfg) {
+                  await ensureOutputRelation(
+                    ensured.questLedgerId,
+                    captureCfg.tableId,
+                    questLabel,
+                  );
+                }
+                const outputRelations = await ledgerOutputRelations(
+                  ensured.questLedgerId,
+                  master.masterId,
+                );
                 questInfo = {
                   sittingId: crypto.randomUUID(),
                   masterId: master.masterId,
@@ -893,6 +910,8 @@ export function createBaseTools(ctx: ToolExecuteContext) {
                       : null,
                   masterCols: master.masterCols,
                   ledgerCols: await tableColumnKeys(ensured.questLedgerId),
+                  questRelationColumnId: ensured.questRelationColumnId,
+                  outputRelations,
                 };
                 // Quest memory (rejects INCLUDED): items this quest already
                 // scored in ANY earlier sitting — the recurring token saver
@@ -1222,6 +1241,9 @@ export function createBaseTools(ctx: ToolExecuteContext) {
                 qualified,
                 verdict,
                 outputRowId: capturedRowId,
+                ...(capturedRowId && runCaptureConfig
+                  ? { outputTableId: runCaptureConfig.tableId }
+                  : {}),
                 ...(questCells ? { extraCells: questCells } : {}),
               },
             });
