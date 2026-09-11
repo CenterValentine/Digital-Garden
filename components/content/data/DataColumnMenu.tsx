@@ -18,7 +18,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
-import { Check, Plus, Trash2, X } from "lucide-react";
+import { Check, Lock, Plus, Trash2, X } from "lucide-react";
 import { cn } from "@/lib/core/utils";
 import { PanelPortal } from "./PanelPortal";
 import {
@@ -544,6 +544,11 @@ export function ColumnEditForm({
   const [name, setName] = useState(column.name);
   const [description, setDescription] = useState(column.description ?? "");
   const [busy, setBusy] = useState(false);
+  // System column (charter ledger machinery — DataColumnConfig.system): name,
+  // type, options and existence are locked server-side (mutations.ts). The
+  // form mirrors that so a Save never trips the lock — only the description
+  // (and, via drag, the position) is sent for these.
+  const locked = column.config?.system === true;
 
   // Options editor (select / multiSelect / status). Cells store option IDS
   // (plan D3), so editing a label here renames it everywhere at once, and
@@ -680,13 +685,13 @@ export function ColumnEditForm({
       await onSave({
         name: trimmed,
         description: description.trim() || null,
-        ...(isSelectLike
+        ...(!locked && isSelectLike
           ? { config: { ...column.config, options: cleaned } }
           : {}),
-        ...(isNumber ? { config: buildNumberConfig() } : {}),
-        ...(isTextLike ? { config: buildTextConfig() } : {}),
-        ...(isDate ? { config: buildDateConfig() } : {}),
-        ...(isCheckbox ? { config: buildCheckboxConfig() } : {}),
+        ...(!locked && isNumber ? { config: buildNumberConfig() } : {}),
+        ...(!locked && isTextLike ? { config: buildTextConfig() } : {}),
+        ...(!locked && isDate ? { config: buildDateConfig() } : {}),
+        ...(!locked && isCheckbox ? { config: buildCheckboxConfig() } : {}),
       });
       onClose();
     } finally {
@@ -706,6 +711,7 @@ export function ColumnEditForm({
     isCheckbox,
     buildCheckboxConfig,
     column.config,
+    locked,
     busy,
     onSave,
     onClose,
@@ -717,12 +723,14 @@ export function ColumnEditForm({
         Name
       </label>
       <input
-        autoFocus={autoFocus}
+        autoFocus={autoFocus && !locked}
         value={name}
         onChange={(e) => setName(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === "Enter") void save();
         }}
+        disabled={locked}
+        title={locked ? "System column — its name is locked" : undefined}
         className={fieldClass}
       />
 
@@ -925,7 +933,7 @@ export function ColumnEditForm({
         </>
       )}
 
-      {isSelectLike && (
+      {isSelectLike && !locked && (
         <>
           <label className="mb-1 mt-3 block text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
             Options
@@ -1057,6 +1065,14 @@ export function ColumnEditForm({
             title="Rows are titled from this column"
           >
             Primary column
+          </span>
+        ) : locked ? (
+          <span
+            className="flex items-center gap-1 text-[10px] text-muted-foreground"
+            title="Part of the charter's ledger machinery — name, type, options and existence are locked; the description is yours to edit"
+          >
+            <Lock className="h-3 w-3" />
+            System column
           </span>
         ) : (
           <button

@@ -56,6 +56,33 @@ export interface CellWrite {
 
 // ── Cells ────────────────────────────────────────────────────────────────
 
+/** Reason shared by every system-column refusal (grid, route, AI tools). */
+export const SYSTEM_COLUMN_LOCK_REASON =
+  "This is a system column of a charter ledger — its name, type, options and existence are locked. The description and position can change; add a new column for anything else.";
+
+/** DataColumnConfig.system — the charter-ledger machinery lock. */
+export function isSystemColumnConfig(config: unknown): boolean {
+  return (
+    !!config &&
+    typeof config === "object" &&
+    (config as { system?: unknown }).system === true
+  );
+}
+
+/** Key-sorted stringify so a config round-tripped through the grid (jsonb
+ *  reorders keys) compares equal to the stored one. */
+function canonicalJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    return `{${Object.keys(record)
+      .sort()
+      .map((k) => `${JSON.stringify(k)}:${canonicalJson(record[k])}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(value) ?? "null";
+}
+
 /**
  * Write cells, optionally under CAS.
  *
@@ -606,7 +633,28 @@ export async function updateColumn(
     /** Fractional key. A drag rewrites ONE column — the point of D7. */
     position?: string;
   }
-): Promise<void> {
+): Promise<{ ok: boolean; reason?: string }> {
+  // System columns (DataColumnConfig.system — charter ledger machinery) are
+  // read BY NAME and by the option ids the quest code minted, so their shape
+  // is locked: a changed name or config is refused, never applied.
+  // Description and position stay free. Compared against the live row so an
+  // unchanged round-trip from the grid's Save (which resends both) passes.
+  const current = await prisma.dataColumn.findUnique({
+    where: { id: columnId },
+    select: { name: true, config: true },
+  });
+  if (!current) return { ok: false, reason: "Column not found" };
+  if (isSystemColumnConfig(current.config)) {
+    if (patch.name !== undefined && patch.name !== current.name) {
+      return { ok: false, reason: SYSTEM_COLUMN_LOCK_REASON };
+    }
+    if (
+      patch.config !== undefined &&
+      canonicalJson(patch.config) !== canonicalJson(current.config ?? {})
+    ) {
+      return { ok: false, reason: SYSTEM_COLUMN_LOCK_REASON };
+    }
+  }
   await prisma.$transaction(async (tx) => {
     const column = await tx.dataColumn.update({
       where: { id: columnId },
@@ -626,6 +674,7 @@ export async function updateColumn(
     });
     await refreshTableSearchText(tx, column.tableId);
   });
+  return { ok: true };
 }
 
 /**
@@ -641,11 +690,16 @@ export async function softDeleteColumn(
 ): Promise<{ ok: boolean; reason?: string }> {
   const column = await prisma.dataColumn.findUnique({
     where: { id: columnId },
-    select: { isPrimary: true, tableId: true },
+    select: { isPrimary: true, tableId: true, config: true },
   });
   if (!column) return { ok: false, reason: "Column not found" };
   if (column.isPrimary) {
     return { ok: false, reason: "The primary column cannot be deleted" };
+  }
+  // The charter-ledger machinery reads system columns by name; deleting one
+  // would detach the ledger from its charter at the next sitting.
+  if (isSystemColumnConfig(column.config)) {
+    return { ok: false, reason: SYSTEM_COLUMN_LOCK_REASON };
   }
 
   await prisma.$transaction(async (tx) => {

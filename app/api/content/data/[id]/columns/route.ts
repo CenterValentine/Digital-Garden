@@ -317,12 +317,13 @@ export async function PATCH(request: NextRequest, { params }: { params: Params }
         }
       }
 
-      await updateColumn(body.columnId, {
+      const updated = await updateColumn(body.columnId, {
         name: body.name?.trim(),
         description: body.description,
         config: body.config,
         position: body.position,
       });
+      if (!updated.ok) return forbidden(updated.reason ?? "Cannot update column");
 
       // Name/description/config are semantic; a position-only PATCH is a
       // drag-reorder and deliberately does NOT dirty context (plan B1).
