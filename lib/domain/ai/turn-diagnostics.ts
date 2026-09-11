@@ -104,6 +104,17 @@ export interface TurnSegment {
   /** Compact description of the reasoning config applied (e.g. "deepseek:adaptive+low"). */
   reasoningConfig: string | null;
   toolCount: number;
+  /**
+   * True when the harness spent this request's LAST step on a forced
+   * text-only answer (`prepareStep` → `toolChoice: "none"`).
+   *
+   * Load-bearing for `step-cap-hit`: that flag used to key off
+   * `finishReason === "tool-calls"`, which is exactly the signal the
+   * reservation removes. A reserved final step always finishes "stop", so
+   * without this the fix would have silently blinded the diagnostic it
+   * exists to make visible.
+   */
+  finalStepReserved: boolean;
 }
 
 export interface TurnDiagnostics {
@@ -177,11 +188,16 @@ export function deriveTurnFlags(
     }
   }
 
+  // The model consumed every step it was given. Two terminal shapes mean
+  // the same thing: it ended still wanting tools ("tool-calls"), or the
+  // harness spent the last step forcing prose so the turn wouldn't end
+  // silently (finalStepReserved — that step finishes "stop" by
+  // construction). Both are "the harness, not the model, ended the loop".
   if (
     terminal &&
     terminal.stepCap > 0 &&
     terminal.stepsUsed >= terminal.stepCap &&
-    terminal.finishReason === "tool-calls"
+    (terminal.finishReason === "tool-calls" || terminal.finalStepReserved)
   ) {
     flags.push("step-cap-hit");
   }
@@ -323,6 +339,7 @@ export function readTurnSegment(raw: unknown): TurnSegment | null {
     steps,
     stepsTruncated: num(s.stepsTruncated),
     maxOutputTokens: numOrNull(s.maxOutputTokens),
+    finalStepReserved: s.finalStepReserved === true,
     maxTokensSource: MAX_TOKENS_SOURCES.includes(
       s.maxTokensSource as MaxTokensSource,
     )

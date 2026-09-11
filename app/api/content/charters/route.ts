@@ -2,7 +2,7 @@
  * Charter registry API (AI v3.2 T3).
  *
  * GET /api/content/charters — list the current user's charter notes for the
- * /charter picker (id, title, description, phaseCount). See
+ * /charter picker (id, title, description, phaseCount, hasBody). See
  * lib/domain/ai/charters/registry.
  */
 

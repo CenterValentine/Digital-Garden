@@ -36,7 +36,7 @@ export const BASE_TOOL_IDS = [
   "create_shortcut",
   "read_folder_context",
   "create_docx",
-  "searchNotes",
+  "search_content",
   "search_charters",
   "getCurrentNote",
   "createNote",
@@ -102,9 +102,10 @@ export const BASE_TOOL_METADATA: Record<BaseToolId, BaseToolMeta> = {
     description:
       "Generate a .docx from markdown and file it in the target folder (approval-gated)",
   },
-  searchNotes: {
-    name: "Search Notes",
-    description: "Search through your notes by title or content",
+  search_content: {
+    name: "Search Content",
+    description:
+      "Find anything in your garden by title or indexed content — notes, folders, databases, files — with each result's type, location, and id",
   },
   search_charters: {
     name: "Search Charters",

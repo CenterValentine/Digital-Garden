@@ -2,7 +2,7 @@
  * AI Tool Type Definitions
  *
  * Types for the base AI tools registry.
- * These tools are hard-coded application tools (searchNotes, getCurrentNote, createNote)
+ * These tools are hard-coded application tools (search_content, getCurrentNote, createNote)
  * plus editor tools (read_first_chunk, apply_diff, etc.) added in Sprint 39.
  */
 

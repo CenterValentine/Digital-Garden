@@ -56,6 +56,7 @@ import {
   extractSearchTextFromTipTap,
   markdownToTiptapResult,
 } from "@/lib/domain/content";
+import type { ContentType } from "@/lib/domain/content/types";
 import { linkifyWikiRefsInTiptap } from "@/lib/domain/editor/wiki-link-refs";
 import { generateAndStoreImage } from "@/lib/domain/ai/image/generate-and-store";
 import { IMAGE_PROVIDER_CATALOG } from "@/lib/domain/ai/image/catalog";
@@ -216,6 +217,38 @@ function estimateRunCostUsd(ctx: ToolExecuteContext): number | undefined {
  * `execute` needs the authenticated `userId` — which is only available
  * at request time in the API route.
  */
+/**
+ * Model-facing name for a content type, used by `search_content` results.
+ *
+ * Deliberately NOT `getContentTypeLabel` (lib/domain/content/types.ts): that
+ * one is the UI vocabulary ("Data Table"), while the tools speak of
+ * DATABASES (describe_database, query_database, propose_database_columns).
+ * A search result labelled "Data Table" would not tell the model which tool
+ * to reach for next; "database" does.
+ *
+ * Exhaustive `Record<ContentType, …>` on purpose — a new content type must
+ * fail the build here rather than silently search under a wrong name.
+ */
+const AI_CONTENT_TYPE_NAMES: Record<ContentType, string> = {
+  folder: "folder",
+  note: "note",
+  file: "file",
+  html: "html page",
+  template: "template",
+  code: "code file",
+  external: "external link",
+  chat: "chat",
+  visualization: "diagram",
+  data: "database",
+  hope: "goal",
+  workflow: "workflow",
+  shortcut: "shortcut",
+};
+
+function describeContentType(type: ContentType): string {
+  return AI_CONTENT_TYPE_NAMES[type];
+}
+
 export function createBaseTools(ctx: ToolExecuteContext) {
   // One acquisition budget per request scope: createBaseTools is called per
   // chat turn in the route, so every read_page in a single turn shares this
@@ -1790,7 +1823,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             select: { id: true },
           });
           if (!owned) {
-            return `Parent folder ${parentId} was not found. Use create_folder without parentId, or searchNotes to locate the right folder.`;
+            return `Parent folder ${parentId} was not found. Use create_folder without parentId, or search_content to locate the right folder.`;
           }
         }
         try {
@@ -2023,72 +2056,155 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         }
       },
     }),
-    searchNotes: tool({
+    // The GARDEN-WIDE finder (D2, owner report 2026-09-10). Replaces the old
+    // `searchNotes`, which was hard-scoped to `contentType: "note"` and so
+    // could not see databases, folders, files, or anything else. That blind
+    // spot cost a real turn its whole step budget: asked to update "the
+    // charter database", the model searched six times, found nothing, then
+    // guessed database names one at a time until the harness cut it off.
+    //
+    // `DataPayload.searchText` (title + column names) already existed for
+    // exactly this — the finder simply never read it.
+    search_content: tool({
       description:
-        "Search the user's notes by title or content. Returns matching note titles and excerpts.",
+        "Search everything the user owns — notes, folders, databases, files, and more — by title and indexed content. Returns each hit's TYPE, id, location, and a one-line excerpt, so you can pick the right follow-up tool (a [database] hit goes to describe_database, a [folder] hit to read_folder_context, a [note] hit to getCurrentNote). Search BEFORE guessing an id or a name: one call here beats a chain of failed lookups. Pass an EMPTY query with `types` to LIST what exists — `{query: \"\", types: [\"data\"]}` is how you see the user's databases when you don't know their names. Narrow with `types` only when you know the shape you want; the default covers notes, folders, and databases.",
       inputSchema: z.object({
-        query: z.string().describe("Search query to find notes"),
+        query: z
+          .string()
+          .describe(
+            'What to look for — matches titles and indexed content. EMPTY string = list the most recently updated of `types` (use this to enumerate, e.g. "which databases exist?").'
+          ),
+        types: z
+          .array(
+            z.enum([
+              "note",
+              "folder",
+              "data",
+              "file",
+              "code",
+              "html",
+              "external",
+              "visualization",
+              "workflow",
+              "chat",
+            ]),
+          )
+          .optional()
+          .describe(
+            'Restrict to these content types ("data" = a database). Default: note, folder, and data.',
+          ),
         limit: z
           .number()
           .min(1)
           .max(20)
           .optional()
-          .describe("Maximum number of results (default 5)"),
+          .describe("Maximum number of results (default 8)"),
       }),
-      execute: async ({ query, limit = 5 }) => {
+      execute: async ({ query, types, limit = 8 }) => {
+        const scope: ContentType[] =
+          types && types.length > 0
+            ? (types as ContentType[])
+            : ["note", "folder", "data"];
+        // ENUMERATION MODE. An empty query lists the most recent of `types`
+        // instead of matching nothing. This is the other half of the D2 fix:
+        // widening the search let the model FIND a database it could name,
+        // but "the charter database" named nothing that existed, and with no
+        // way to enumerate the model fell back to guessing names one call at
+        // a time until the step cap cut it off. Listing is the answer to
+        // "which ones are there?"; matching can't be.
+        const term = query.trim();
         const results = await prisma.contentNode.findMany({
           where: {
             ownerId: ctx.userId,
             deletedAt: null,
-            contentType: "note",
-            OR: [
-              { title: { contains: query, mode: "insensitive" } },
-              {
-                notePayload: {
-                  searchText: { contains: query, mode: "insensitive" },
-                },
-              },
-            ],
+            contentType: { in: scope },
+            ...(term
+              ? {
+                  OR: [
+                    { title: { contains: term, mode: "insensitive" } },
+                    {
+                      notePayload: {
+                        searchText: { contains: term, mode: "insensitive" },
+                      },
+                    },
+                    // Databases index title + column names here (schema B2),
+                    // so a table is findable by a FIELD the user names.
+                    {
+                      dataPayload: {
+                        searchText: { contains: term, mode: "insensitive" },
+                      },
+                    },
+                  ],
+                }
+              : {}),
           },
-          include: {
-            notePayload: {
-              select: { searchText: true, metadata: true },
+          select: {
+            id: true,
+            title: true,
+            contentType: true,
+            parent: { select: { title: true } },
+            notePayload: { select: { searchText: true, metadata: true } },
+            dataPayload: {
+              select: {
+                description: true,
+                rowCount: true,
+                _count: { select: { columns: true } },
+              },
             },
           },
           orderBy: { updatedAt: "desc" },
           take: limit,
         });
 
+        const scopeLabel = scope.map(describeContentType).join(", ");
         if (results.length === 0) {
-          return `No notes found matching "${query}".`;
+          return term
+            ? `Nothing matching "${term}" in ${scopeLabel}. ` +
+                "Before trying again: an EMPTY query with the same `types` LISTS what actually exists — do that rather than guessing another name. " +
+                "If the list doesn't contain what the user meant, ask them; do NOT guess ids or names."
+            : `The user has no ${scopeLabel} at all. Tell them so — there is nothing to search.`;
         }
 
         const summaries = results.map((r, i) => {
-          const excerpt = r.notePayload?.searchText?.slice(0, 150) || "";
-          // Flag playbook notes inline so a generic search still surfaces
-          // them unambiguously — no separate read needed to tell.
+          const kind = describeContentType(r.contentType);
+          const where = r.parent?.title ? ` — in "${r.parent.title}"` : "";
+          // Flag charter notes/folders inline so a generic search still
+          // surfaces them unambiguously — no separate read needed to tell.
           const tag = isCharterMetadata(r.notePayload?.metadata)
             ? " [CHARTER]"
             : "";
-          return `${i + 1}. "${r.title}"${tag} (id: ${r.id})${excerpt ? `\n   ${excerpt}...` : ""}`;
+          const head = `${i + 1}. [${kind}] "${r.title}"${tag} (id: ${r.id})${where}`;
+          if (r.dataPayload) {
+            const cols = r.dataPayload._count.columns;
+            const detail =
+              `${cols} column${cols === 1 ? "" : "s"}, ` +
+              `${r.dataPayload.rowCount} row${r.dataPayload.rowCount === 1 ? "" : "s"}`;
+            const purpose = r.dataPayload.description?.trim();
+            return `${head}\n   ${detail}${purpose ? ` · ${purpose}` : ""}\n   Read its schema: describe_database with this id.`;
+          }
+          const excerpt = r.notePayload?.searchText?.slice(0, 150) || "";
+          return `${head}${excerpt ? `\n   ${excerpt}...` : ""}`;
         });
 
-        return `Found ${results.length} note${results.length !== 1 ? "s" : ""} matching "${query}":\n\n${summaries.join("\n\n")}`;
+        const header = term
+          ? `Found ${results.length} result${results.length !== 1 ? "s" : ""} for "${term}"`
+          : `${results.length} most recently updated (${scopeLabel})`;
+        return `${header}:\n\n${summaries.join("\n\n")}`;
       },
     }),
 
     // The WALK primitive (FOLDER-CONTEXT-CAPSULE-PLAN Phase 5): capsules for
     // progressive folder disclosure. A mention injects the root capsule;
     // every descent is one visible call here. Playbooks reach folders by
-    // resolving the title via searchNotes first, then walking.
+    // resolving the title via search_content first, then walking.
     read_folder_context: tool({
       description:
-        "Read a folder's context capsule: its purpose (user directives + role), summary, signals (known gaps/ambiguities), and a machine-readable index of its DIRECT children — each with id, one-liner, token estimate, and freshness. Use it to understand a folder and decide which specific files to read; be frugal — prefer drilling via the index over reading every file. Call again with a subfolder's id (from the index) to descend one level. Resolve a folder's id from its name with searchNotes when you only have a title.",
+        "Read a folder's context capsule: its purpose (user directives + role), summary, signals (known gaps/ambiguities), and a machine-readable index of its DIRECT children — each with id, one-liner, token estimate, and freshness. Use it to understand a folder and decide which specific files to read; be frugal — prefer drilling via the index over reading every file. Call again with a subfolder's id (from the index) to descend one level. Resolve a folder's id from its name with search_content when you only have a title.",
       inputSchema: z.object({
         folderId: z
           .string()
           .describe(
-            "The folder's ContentNode id (from a capsule index, a mention, or searchNotes results)."
+            "The folder's ContentNode id (from a capsule index, a mention, or search_content results)."
           ),
       }),
       execute: async ({ folderId }) => {
@@ -2124,7 +2240,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
     }),
     search_charters: tool({
       description:
-        "List the user's charters (notes/folders marked as multi-phase procedures) with their descriptions. Use this — not searchNotes — when the user asks to run/find a charter by name or topic; it searches ONLY charters, so it won't return unrelated notes. If a charter is already attached to this chat (see the Active Charter section, if present), you don't need this — that one is already the answer.",
+        "List the user's charters (notes/folders marked as multi-phase procedures) with their descriptions. Use this — not search_content — when the user asks to run/find a charter by name or topic; it searches ONLY charters, so it won't return unrelated notes. If a charter is already attached to this chat (see the Active Charter section, if present), you don't need this — that one is already the answer.",
       inputSchema: z.object({
         query: z
           .string()
@@ -2231,7 +2347,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
       description:
         "Create a NEW note in the user's Digital Garden. Use this only when the user EXPLICITLY asks for a new file. " +
         "Ambiguous phrasings to watch for: 'update the note in this chat', 'add to this conversation's notes', 'put X in the note' — these do NOT mean 'create a new note'. They typically refer to an existing note. When the phrasing is ambiguous, ASK the user whether to create a new note or update an existing one before calling this tool. " +
-        "If they confirm a new note, this is the right tool. If they name an existing note, use `searchNotes` to find its id then use `updateNote`. " +
+        "If they confirm a new note, this is the right tool. If they name an existing note, use `search_content` to find its id then use `updateNote`. " +
         "Do NOT create output on your own initiative — only when the user asks for it. " +
         "Targeting: omit placement fields to use the configured output-target preset. If the user or active charter gives THIS note a different relative destination, pass `outputLocation` (`under_chat`, `under_content`, or `beside_content`). Pass `parentId` only for a specifically resolved folder UUID. A per-note instruction always overrides the preset. " +
         "HYPERLINKING: to link other garden content inline (notes OR folders), write wiki-links in the markdown — [[Exact Title]] or [[Exact Title|Shown Text]]. They become real clickable links, resolve by title, and a linked FOLDER also feeds its context to the AI when the note is used in chat or as a charter. Use the content's exact title; do not invent URL-style links for internal content.",
@@ -2479,7 +2595,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           select: { id: true, title: true, contentType: true },
         });
         if (!existing) {
-          return `Content "${contentId}" not found or deleted. Use searchNotes to find the right id.`;
+          return `Content "${contentId}" not found or deleted. Use search_content to find the right id.`;
         }
 
         // updateNote is CONTENT-ONLY — it structurally cannot rename. (Renaming
@@ -2593,7 +2709,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           select: { id: true, title: true, contentType: true },
         });
         if (!existing) {
-          return `Content "${contentId}" not found or deleted. Use searchNotes to find the right id.`;
+          return `Content "${contentId}" not found or deleted. Use search_content to find the right id.`;
         }
         await prisma.contentNode.update({
           where: { id: contentId },

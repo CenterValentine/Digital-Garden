@@ -178,7 +178,7 @@ export async function resolveDatabaseRef(
     if (bound) return { id: bound };
     return {
       refusal:
-        "No database given and this chat isn't open on one — pass databaseId (the id from the mention capsule) or the database's exact name.",
+        "No database given and this chat isn't open on one — pass databaseId (the id from the mention capsule), or find it first with search_content (types: [\"data\"]).",
     };
   }
   const matches = await prisma.contentNode.findMany({
@@ -194,11 +194,11 @@ export async function resolveDatabaseRef(
   if (matches.length === 1) return { id: matches[0].id };
   if (matches.length > 1) {
     return {
-      refusal: `More than one database is named "${trimmed}" — use the id from the mention capsule instead.`,
+      refusal: `More than one database is named "${trimmed}" — run search_content (types: ["data"]) and pass the right id.`,
     };
   }
   return {
-    refusal: `No database named "${trimmed}". Use the id (or exact name) from the mention capsule, or ask the user which database they mean.`,
+    refusal: `No database named "${trimmed}". Do NOT guess another name — run search_content (types: ["data"]) to see the real ones, then pass an id from the results. If none of them is what the user meant, ask them.`,
   };
 }
 

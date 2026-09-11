@@ -1270,6 +1270,8 @@ export async function POST(request: Request) {
         used: 0,
         truncated: 0,
         summaries: [] as TurnStepSummary[],
+        /** Set by prepareStep when the final step was forced text-only (D1). */
+        finalStepReserved: false,
       };
       // Playbook validation happens below, after the tool registry is built.
       // Tool closures retain this array reference, so trusted directives
@@ -1366,6 +1368,18 @@ export async function POST(request: Request) {
         string,
         { enabled?: boolean }
       > }).toolConfig ?? {};
+      // Rename compatibility (D2, 2026-09-10): `searchNotes` became
+      // `search_content`. toolConfig is keyed by tool id and defaults to
+      // ENABLED, so a user who had deliberately switched the old finder off
+      // would have had it silently switched back on under the new name.
+      // Carry the old entry forward when the new key is unset; the settings
+      // UI writes the new key from here on, so this fades on first save.
+      if (
+        toolConfig["search_content"] === undefined &&
+        toolConfig["searchNotes"] !== undefined
+      ) {
+        toolConfig["search_content"] = toolConfig["searchNotes"];
+      }
       const tools = Object.fromEntries(
         Object.entries(allTools).filter(
           ([id]) =>
@@ -1400,7 +1414,7 @@ export async function POST(request: Request) {
           "record_batch_checkpoint", "record_iteration_findings",
           // note output + grounding
           "createNote", "updateNote", "renameNote", "getCurrentNote",
-          "searchNotes", "read_folder_context",
+          "search_content", "read_folder_context",
           "read_first_chunk", "read_next_chunk", "read_previous_chunk",
           // run/plumbing
           "phase_checkpoint", "ask_user", "notify_user",
@@ -1746,7 +1760,7 @@ export async function POST(request: Request) {
           const availabilityLine =
             enabledDataTools.length === 0
               ? "ALL database tools are DISABLED in the user's settings. Do not attempt to call any of them. If the user asks for database operations, tell them to enable the tools under Settings → AI → AI Tools → Databases."
-              : `Database tools available this turn: ${enabledDataTools.join(", ")}. For reading or changing ROWS AND CELLS, use these — never searchNotes/getCurrentNote, which see only notes and will mislead you about row data.${
+              : `Database tools available this turn: ${enabledDataTools.join(", ")}. For reading or changing ROWS AND CELLS, use these — never search_content/getCurrentNote, which describe a database from the OUTSIDE (title, columns) and will mislead you about row data.${
                   disabledDataTools.length > 0
                     ? ` DISABLED in the user's settings (never call these; tell the user to enable them under Settings → AI → AI Tools → Databases if needed): ${disabledDataTools.join(", ")}.`
                     : " Disregard any earlier statements in this conversation that they were unavailable; verify current values with query_database instead of trusting prior turns."
@@ -2077,12 +2091,24 @@ export async function POST(request: Request) {
             const parsed = parseCharter(
               node.notePayload.tiptapJson as JSONContent,
             );
-            charterAwareness =
-              `\n\nThe content you're working in — "${node.title}" — is itself a CHARTER` +
-              (parsed.phases.length > 0
-                ? ` (${parsed.phases.length} phases)`
-                : "") +
-              `. Do NOT start running it on your own initiative. Only if the user asks you to run, start, or follow it: read its full content with getCurrentNote (contentId: ${ambientCharterId}), then follow its standing rules and phases in order, calling phase_checkpoint at each phase boundary.`;
+            // EMPTY-CHARTER AWARENESS (D4, owner report 2026-09-10). A
+            // charter with no phases AND no standing rules is a marker on a
+            // blank page. The old line still told the model to "read its
+            // full content with getCurrentNote" — which returns "(empty
+            // note)", a wasted step, after which the model went hunting for
+            // whatever the user must have meant. The explicit-attach path
+            // above has said "this charter is empty" since it was written;
+            // the ambient path simply never learned to.
+            const charterIsEmpty =
+              parsed.phases.length === 0 &&
+              parsed.standingRules.content.length === 0;
+            charterAwareness = charterIsEmpty
+              ? `\n\nThe content you're working in — "${node.title}" — is marked as a CHARTER but is EMPTY: no standing rules, no phases, nothing written in it yet. Do NOT read it (there is nothing there) and do NOT go looking for another charter or for content the user "must have meant". If the user's request depends on this charter's contents, say plainly that the charter is empty and ask them what belongs in it.`
+              : `\n\nThe content you're working in — "${node.title}" — is itself a CHARTER` +
+                (parsed.phases.length > 0
+                  ? ` (${parsed.phases.length} phases)`
+                  : "") +
+                `. Do NOT start running it on your own initiative. Only if the user asks you to run, start, or follow it: read its full content with getCurrentNote (contentId: ${ambientCharterId}), then follow its standing rules and phases in order, calling phase_checkpoint at each phase boundary.`;
           }
         } catch (awarenessError) {
           logger.warn({
@@ -2380,6 +2406,41 @@ export async function POST(request: Request) {
         // before it. Cap value + provenance hoisted above (stepCap /
         // stepCapSource) so diagnostics report the same number.
         stopWhen: stepCountIs(stepCap),
+        // FINAL-STEP RESERVATION (D1, owner report 2026-09-10). `stopWhen` is
+        // a guillotine, not a budget: it cuts AFTER the step boundary, so a
+        // turn whose last step emitted tool calls ends holding tool results
+        // with NO text and the user sees an empty assistant message. That is
+        // what happened to the "charter database" turn — 8/8 steps, 264k
+        // tokens, `step-cap-hit` logged server-side, nothing rendered.
+        //
+        // Forcing `toolChoice: "none"` on the last allowed step makes the
+        // model answer with what it has: what it tried, what it found, what
+        // it still needs. A turn can run out of steps; it can never run out
+        // of steps SILENTLY. The cost is one tool step at the ceiling, which
+        // was never going to produce a usable answer anyway.
+        //
+        // The nudge is not optional. A model whose tools vanish without
+        // explanation tends to narrate success it never achieved ("I've
+        // added the columns") — a confabulated answer is strictly worse
+        // than the silence this fixes. Telling it the loop is over makes
+        // the honest report the only available move.
+        prepareStep: ({ stepNumber, messages: stepMessages }) => {
+          if (stepNumber < stepCap - 1) return {};
+          stepsTracker.finalStepReserved = true;
+          return {
+            toolChoice: "none" as const,
+            messages: [
+              ...stepMessages,
+              {
+                role: "user" as const,
+                content:
+                  `[Harness notice — not from the user. This turn has used all ${stepCap} of its tool steps, so no further tool calls are possible. ` +
+                  "Answer NOW in plain prose with what you actually have. State what you were trying to do, what you found, and what is still missing or blocked. " +
+                  "Do NOT claim any action succeeded unless a tool result above confirms it. If you were mid-task, say so and name the ONE thing you need from the user to finish — a specific id, a name, or a decision.]",
+              },
+            ],
+          };
+        },
         system: buildSystemPrompt({
           hasImageTools: "generate_image" in tools,
           hasFlashcardTools: "list_decks" in tools,
@@ -2543,11 +2604,14 @@ export async function POST(request: Request) {
               },
             });
           }
-          if (finishReason === "tool-calls" && stepsTracker.used >= stepCap) {
+          if (
+            stepsTracker.used >= stepCap &&
+            (finishReason === "tool-calls" || stepsTracker.finalStepReserved)
+          ) {
             logger.warn({
               layer: "ai",
               event: "turn:step_cap_hit",
-              summary: `turn used all ${stepCap} steps (${stepCapSource}) and still wanted tools — harness ended the loop`,
+              summary: `turn used all ${stepCap} steps (${stepCapSource}) — harness ended the loop${stepsTracker.finalStepReserved ? " after reserving the final step for a text answer" : " while the model still wanted tools"}`,
               attrs: {
                 conversation_id: conversationIdForAssoc ?? null,
                 model: activeModelId,
@@ -2792,6 +2856,7 @@ export async function POST(request: Request) {
               maxTokensSource,
               reasoningConfig: reasoningConfigSummary,
               toolCount: activeToolCount,
+              finalStepReserved: stepsTracker.finalStepReserved,
             };
             const finishMeta = {
               ...routeMeta,

@@ -57,6 +57,10 @@ import {
   type ColumnOptionsProposalPayload,
 } from "./ColumnOptionsProposalCard";
 import {
+  DatabaseColumnsProposalCard,
+  type DatabaseColumnsProposalPayload,
+} from "./DatabaseColumnsProposalCard";
+import {
   OutputDatabaseProposalCard,
   type OutputDatabaseProposalPayload,
 } from "./OutputDatabaseProposalCard";
@@ -601,6 +605,7 @@ export const ChatMessage = memo(function ChatMessage({
     deckProposals,
     deckWithCardsProposals,
     columnOptionsProposals,
+    databaseColumnsProposals,
     outputDatabaseProposals,
     hasRunningTools,
   } = useMemo(() => {
@@ -614,6 +619,7 @@ export const ChatMessage = memo(function ChatMessage({
     const deckProps: DeckProposalPayload[] = [];
     const deckWithCardsProps: DeckWithCardsProposalPayload[] = [];
     const columnOptionsProps: ColumnOptionsProposalPayload[] = [];
+    const dbColumnsProps: DatabaseColumnsProposalPayload[] = [];
     const outputDbProps: OutputDatabaseProposalPayload[] = [];
     let running = false;
     const seenImageIds = new Set<string>();
@@ -670,6 +676,11 @@ export const ChatMessage = memo(function ChatMessage({
           columnOptionsProps.push(columnOptions);
           continue;
         }
+        const dbColumns = parseDatabaseColumnsProposal(tp.output);
+        if (dbColumns) {
+          dbColumnsProps.push(dbColumns);
+          continue;
+        }
         const outputDb = parseOutputDatabaseProposal(tp.output);
         if (outputDb) {
           outputDbProps.push(outputDb);
@@ -685,6 +696,7 @@ export const ChatMessage = memo(function ChatMessage({
       deckProposals: deckProps,
       deckWithCardsProposals: deckWithCardsProps,
       columnOptionsProposals: columnOptionsProps,
+      databaseColumnsProposals: dbColumnsProps,
       outputDatabaseProposals: outputDbProps,
       hasRunningTools: running,
     };
@@ -1282,6 +1294,7 @@ export const ChatMessage = memo(function ChatMessage({
               if (parseDeckProposal(toolPart.output) !== null) return null;
               if (parseDeckWithCardsProposal(toolPart.output) !== null) return null;
               if (parseColumnOptionsProposal(toolPart.output) !== null) return null;
+              if (parseDatabaseColumnsProposal(toolPart.output) !== null) return null;
               if (parseOutputDatabaseProposal(toolPart.output) !== null) return null;
             }
 
@@ -1393,6 +1406,16 @@ export const ChatMessage = memo(function ChatMessage({
         {columnOptionsProposals.map((payload, i) => (
           <ColumnOptionsProposalCard
             key={`column-options-${i}`}
+            payload={payload}
+          />
+        ))}
+
+        {/* Database-column proposals (D3) — Apply POSTs one column at a
+            time to an EXISTING table, so a mid-way failure reports a partial
+            result rather than an all-or-nothing lie. */}
+        {databaseColumnsProposals.map((payload, i) => (
+          <DatabaseColumnsProposalCard
+            key={`db-columns-${i}`}
             payload={payload}
           />
         ))}
@@ -2503,6 +2526,23 @@ function parseOutputDatabaseProposal(
   return null;
 }
 
+function parseDatabaseColumnsProposal(
+  result: unknown
+): DatabaseColumnsProposalPayload | null {
+  if (result === undefined) return null;
+  const str = typeof result === "string" ? result : JSON.stringify(result);
+  if (!str.includes('"__databaseColumnsProposal"')) return null;
+  try {
+    const parsed = JSON.parse(str);
+    if (parsed.__databaseColumnsProposal) {
+      return parsed as DatabaseColumnsProposalPayload;
+    }
+  } catch {
+    /* not valid JSON */
+  }
+  return null;
+}
+
 function parseColumnOptionsProposal(
   result: unknown
 ): ColumnOptionsProposalPayload | null {
@@ -3556,6 +3596,9 @@ const TOOL_ACTION_LABELS: Record<string, [running: string, done: string]> = {
   plan: ["Planning the approach", "Planned the approach"],
   ask_user: ["Asking you a question", "Asked a question"],
   finish_with_summary: ["Wrapping up", "Wrapped up"],
+  search_content: ["Searching your garden", "Searched your garden"],
+  // Retired 2026-09-10 (renamed to search_content); kept so transcripts
+  // recorded before the rename still render a verb instead of a raw id.
   searchNotes: ["Searching your notes", "Searched your notes"],
   getCurrentNote: ["Reading a note", "Read a note"],
   createNote: ["Creating a note", "Created a note"],

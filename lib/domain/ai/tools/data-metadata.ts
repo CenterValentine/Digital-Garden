@@ -12,6 +12,7 @@ export const DATA_TOOL_IDS = [
   "insert_rows",
   "update_row",
   "propose_column_options",
+  "propose_database_columns",
   "propose_output_database",
 ] as const;
 
@@ -45,6 +46,11 @@ export const DATA_TOOL_METADATA: Record<
     name: "Propose Column Options",
     description:
       "Suggest category options for a select, multi-select, or status column as a review card — nothing is written until you click Apply on the card",
+  },
+  propose_database_columns: {
+    name: "Propose Database Columns",
+    description:
+      "Suggest NEW columns for an existing database as a review card — add-only (never renames, retypes, or deletes), and nothing is written until you click Apply",
   },
   propose_output_database: {
     name: "Propose Output Database",
