@@ -211,7 +211,11 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
     (isShortcut &&
       !shortcutBroken &&
       shortcut.targetContentType === "folder") ||
-    (isMirrorRow && data.contentType === "folder");
+    // Window reference rows are excluded even when they point at a folder:
+    // the mirror transform only builds children for shortcut rows, so the
+    // chevron would open onto nothing. A folder-window row is a flat pointer
+    // — clicking it opens the folder itself.
+    (isMirrorRow && data.contentType === "folder" && !data.windowRef);
 
   const hasNestedContent = (node.children?.length ?? 0) > 0 || projectsAFolder;
   const usesRowToggle = hasNestedContent && !isPeopleNode;
@@ -1092,11 +1096,13 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
             <span
               aria-hidden
               title={
-                shortcutPurged
-                  ? "Shortcut target no longer exists"
-                  : shortcutBroken
-                    ? "Shortcut target was deleted"
-                    : `Shortcut to ${shortcut?.targetTitle ?? "another item"}`
+                data.windowRef
+                  ? "Windowed in this note"
+                  : shortcutPurged
+                    ? "Shortcut target no longer exists"
+                    : shortcutBroken
+                      ? "Shortcut target was deleted"
+                      : `Shortcut to ${shortcut?.targetTitle ?? "another item"}`
               }
               className={`absolute -bottom-0.5 -right-1 flex h-3 w-3 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-black/10 dark:bg-gray-800 dark:ring-white/15 ${
                 shortcutBroken
@@ -1104,7 +1110,11 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
                   : "text-gray-500 dark:text-gray-400"
               }`}
             >
-              <LucideIcons.ArrowUpRight className="h-2 w-2" />
+              {data.windowRef ? (
+                <LucideIcons.AppWindow className="h-2 w-2" />
+              ) : (
+                <LucideIcons.ArrowUpRight className="h-2 w-2" />
+              )}
             </span>
           </span>
         ) : data.role === "referenced" ? (

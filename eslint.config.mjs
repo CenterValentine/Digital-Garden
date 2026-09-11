@@ -65,6 +65,9 @@ const eslintConfig = defineConfig([
       // Utilities transitively reachable from "use client" boundaries
       "lib/domain/content/tag-sync.ts",
       "lib/domain/content/image-refs.ts",
+      // Same class as image-refs (and also runs inside the Hocuspocus server,
+      // which has never carried the app logger) — migrates in the same sweep.
+      "lib/domain/content/window-refs.ts",
       "lib/domain/content/markdown.ts",
       "lib/domain/content/person-mention-sync.ts",
       "lib/domain/content/metadata-validation.ts",
