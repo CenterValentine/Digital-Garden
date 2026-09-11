@@ -53,7 +53,7 @@ Durable offline editing for the **plain/REST save path** (continuous localStorag
 
 ## Recent Completions (Last 30 Days)
 
-**September 10, 2026** *(branch `fix/charter-quest-kinks`; typecheck / lint 151 (0 errors) / ai:drift:check (64 tools) / turn-diagnostics 22 checks / full build green; **no migration, no TipTap schema change → no Hocuspocus redeploy**)*: **Charter & database kinks — the silent turn, the invisible database, the unaddable column, the blank charter** (owner report + prod transcript `51978de4`, conversation node `10faf636`)
+**September 10, 2026** *(**PR #220**, branch `feat/charters-and-database-reach`; typecheck / lint 151 (0 errors) / ai:drift:check (64 tools) / turn-diagnostics 22 checks / charters:check incl. starter round-trip / full build green ×3; **no migration, no TipTap schema change → no Hocuspocus redeploy**)*: **Charter & database kinks — the silent turn, the invisible database, the unaddable column, the blank charter** (owner report + prod transcript `51978de4`, conversation node `10faf636`)
 
 One production turn exposed five independent defects at once. Asked to "update the charter database to ensure it has the following columns" from a chat rooted in a charter folder, the assistant spent **264k tokens across 8/8 steps** and returned **an empty message**. The turn's own metadata named the cause the moment it was read back: `flags: ["step-cap-hit"]`, `finishReason: "tool-calls"`, `stepsUsed: 8 / stepCap: 8`, `toolCount: 58`.
 
