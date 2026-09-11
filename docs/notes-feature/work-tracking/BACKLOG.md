@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-08-29
+last_updated: 2026-09-11
 ---
 
 # Sprint Backlog
@@ -19,6 +19,11 @@ The `/f/<token>` capability link (FilePayload.publicToken → 302 to a presigned
 - [ ] **R2 `uploadFile` returns a seven-day presigned URL** (`lib/infrastructure/storage/r2-provider.ts` ~L195) and `POST /api/media/upload` stores that URL directly into hero / gallery block attributes. On R2-backed accounts those block images plausibly expire a week after upload. Unverified in prod — check a hero block older than seven days. Fix direction: media uploads should create a FilePayload (or at least a token-bearing record) and store the `/f/` link, not a presign.
 - [ ] **Owner-facing revocation.** Nothing in the UI rotates or clears a file's `publicToken` yet. A "Reset share link" action on the file node (context menu or file viewer) that nulls the token closes the loop; trashing the node already 404s the link.
 - [ ] **Copy inside the browser-extension embed.** The share-link prime request rides plain fetch cookies, which the `/embed`-scoped session does not provide; copies there fall back to the absolute private URL. Route the prime through the embed bridge (`X-Embed-Session` / `?_t=`) if embed copy matters.
+## Window reference rows — follow-ups (2026-09-11, branch `feat/window-reference-drawer`)
+
+- [ ] **Media-ref freshness gap (latent, pre-existing):** `syncImageReferences` runs only on the REST PATCH and browser-extension paths — the collaboration store hook (`storeCollaborationYDocState`) never calls it, and Y.js-first saves are the primary write path. Embedded media edges (which drive Reference Drawer ownership resolution in the tree route) can therefore go stale for collab-edited notes until some REST-path write lands. The window-ref sync added by this branch DOES hook the store path — extending the media sync the same way needs its own care because it carries ref-count-gated soft-delete (`softDeleteIfOrphaned`), which must not run against a transient/partial snapshot.
+- [ ] **Edge backfill:** `window-ref` edges materialize on a note's first save after deploy. Existing notes show no window rows until then. Acceptable lazily; a one-shot backfill script (walk NotePayloads → `syncWindowReferences`) would close it if anyone notices.
+- [ ] **Shared projection-row helper:** window rows are the second consumer of the mirror-row contract (path-scoped id + `mirrorOf` + `isShortcutMirror`). If a third appears, extract the contract (id minting, view-only guards) into one module instead of a third parallel implementation.
 
 ## Quest master ledger under-counts sitting tokens (2026-09-04, first production quest)
 
