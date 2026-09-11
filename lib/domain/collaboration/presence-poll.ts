@@ -20,7 +20,7 @@
 import { useCallback, useMemo, useSyncExternalStore } from "react";
 import { registerPollingTask } from "@/lib/core/polling/scheduler";
 
-import { getCollaborationBrowserSessionId } from "@/lib/domain/collaboration/runtime";
+import { getCollaborationBrowserSessionId } from "@/lib/domain/collaboration/browser-session";
 
 /**
  * Transport states that represent an actively-synced collaboration
@@ -174,6 +174,26 @@ class PresencePoller {
 }
 
 const presencePoller = new PresencePoller();
+
+/**
+ * Non-React subscription, for the collaboration runtime.
+ *
+ * The runtime is a plain class, not a component, and it needs the same answer
+ * the hook below computes — so it subscribes here rather than opening its own
+ * transport. That is the whole point of Phase 1: the runtime used to hold a
+ * dedicated SSE per document whose server side re-queried Postgres every 10 s.
+ * Folding it into this poller costs nothing extra, because a document the
+ * runtime has open is almost always already being polled for the tab strip, and
+ * the batch route collapses the ids either way.
+ */
+export function subscribeContentPresence(
+  contentId: string,
+  callback: (sessions: PresenceRecord[]) => void,
+): () => void {
+  return presencePoller.subscribe(contentId, () => {
+    callback(presencePoller.getSnapshot(contentId));
+  });
+}
 
 export interface ContentPresence {
   sessions: PresenceRecord[];
