@@ -108,10 +108,16 @@ export async function POST(request: NextRequest) {
         title?: unknown;
         parentId?: unknown;
         columns?: unknown;
+        /** Table-level purpose (≤280) — feeds the AI schema digest (plan B1/D9). */
+        description?: unknown;
       } | null;
 
       const title =
         typeof body?.title === "string" ? body.title.trim().slice(0, 120) : "";
+      const description =
+        typeof body?.description === "string" && body.description.trim()
+          ? body.description.trim().slice(0, 280)
+          : null;
       if (!title) {
         return NextResponse.json(
           { success: false, error: { code: "BAD_REQUEST", message: "title is required" } },
@@ -208,6 +214,7 @@ export async function POST(request: NextRequest) {
               mode: "inline",
               source: {} as unknown as Prisma.InputJsonValue,
               searchText: title.toLowerCase(),
+              ...(description ? { description } : {}),
             },
           },
         },
