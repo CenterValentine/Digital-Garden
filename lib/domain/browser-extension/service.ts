@@ -5,6 +5,7 @@ import { normalizeUrl } from "@/lib/domain/content/external-validation";
 import { markdownToTiptapResult, tiptapToMarkdown } from "@/lib/domain/content/markdown";
 import { syncContentTags } from "@/lib/domain/content/tag-sync";
 import { syncImageReferences } from "@/lib/domain/content/image-refs";
+import { syncWindowReferences } from "@/lib/domain/content/window-refs";
 import { syncPersonMentions } from "@/lib/domain/content/person-mention-sync";
 import { getServerExtensions } from "@/lib/domain/editor/extensions-server";
 import { sanitizeTipTapJsonWithExtensions } from "@/lib/domain/editor/unsupported-content";
@@ -1125,6 +1126,7 @@ export async function updateExtensionNoteContent(
 
   await syncContentTags(contentId, json, userId);
   await syncImageReferences(contentId, json, userId);
+  await syncWindowReferences(prisma, contentId, json);
   await syncPersonMentions(contentId, json, userId);
 
   return getExtensionNoteContent(userId, contentId);

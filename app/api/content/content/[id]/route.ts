@@ -31,6 +31,7 @@ import {
   syncImageReferences,
   softDeleteIfOrphaned,
 } from "@/lib/domain/content/image-refs";
+import { syncWindowReferences } from "@/lib/domain/content/window-refs";
 import { syncPersonMentions } from "@/lib/domain/content/person-mention-sync";
 import {
   resolveContentAccess,
@@ -1016,6 +1017,10 @@ export async function PATCH(
 
             // Sprint 37: Sync image references (ContentLink with linkType "image-ref")
             await syncImageReferences(id, json, userId);
+
+            // Window-ref edges (Reference Drawer window rows) — REST fallback
+            // path; the collaboration store hook covers Y.js-first saves.
+            await syncWindowReferences(prisma, id, json);
 
             await syncPersonMentions(id, json, userId);
           }
