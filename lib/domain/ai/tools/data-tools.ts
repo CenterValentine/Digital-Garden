@@ -643,6 +643,12 @@ export function createDataTools(ctx: ToolExecuteContext) {
           if (!column) {
             return `No column named "${input.column}". Columns here: ${live.map((c) => c.name).join(", ")}.`;
           }
+          // Charter-ledger machinery columns: the quest code writes option
+          // ids it minted, so their vocabularies are locked (the Apply PATCH
+          // would be refused anyway — teach it now, not after a dead card).
+          if (column.config?.system === true) {
+            return `"${column.name}" is a SYSTEM column of a charter ledger — its options are written by the quest machinery and are locked. Propose a NEW column for a user-controlled vocabulary instead (propose_database_columns).`;
+          }
           if (
             column.type !== "select" &&
             column.type !== "multiSelect" &&
@@ -1000,7 +1006,10 @@ export function createDataTools(ctx: ToolExecuteContext) {
             }),
           )
           .min(1)
-          .max(20)
+          // Mirrors the create route's cap (app/api/content/data POST rejects
+          // more than 30). A lower cap here forced a lossy consolidation of a
+          // 26-column spec for no reason (prod, 2026-09-11).
+          .max(30)
           .describe("The schema, in display order."),
         dedupeColumn: z
           .string()
@@ -1084,9 +1093,15 @@ export function createDataTools(ctx: ToolExecuteContext) {
                 ownerId: ctx.userId,
                 deletedAt: null,
               },
-              select: { parentId: true },
+              select: { id: true, parentId: true, contentType: true },
             });
-            parentId = charterNode?.parentId ?? null;
+            // A folder charter IS the charter's folder (same rule as the
+            // quest ledgers in lib/domain/ai/quests.ts).
+            parentId = charterNode
+              ? charterNode.contentType === "folder"
+                ? charterNode.id
+                : charterNode.parentId
+              : null;
           }
           if (!parentId && ctx.targetFolderId) {
             parentId = ctx.targetFolderId;

@@ -95,6 +95,9 @@ export function OutputDatabaseProposalCard({
         body: JSON.stringify({
           title: payload.title,
           columns: payload.columns,
+          // The proposal's one-line purpose becomes the table's description —
+          // it used to be shown on the card and then dropped on Apply.
+          ...(payload.purpose ? { description: payload.purpose } : {}),
           ...(payload.parentId ? { parentId: payload.parentId } : {}),
         }),
       });

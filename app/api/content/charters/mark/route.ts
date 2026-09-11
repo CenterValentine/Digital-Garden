@@ -19,7 +19,11 @@ import {
   withCharterMetadata,
 } from "@/lib/domain/ai/charters/registry";
 import { parseCharter } from "@/lib/domain/ai/charters/parse";
-import { buildCharterStarterDoc } from "@/lib/domain/ai/charters/starter";
+import {
+  buildCharterStarterDoc,
+  countStarterPlaceholderPhases,
+} from "@/lib/domain/ai/charters/starter";
+import { ensureMasterLedger } from "@/lib/domain/ai/quests";
 import { writeNoteContent } from "@/lib/domain/content/write-note-content";
 import type { JSONContent } from "@tiptap/core";
 import { logger, withRouteTrace, withSpan } from "@/lib/core/logger";
@@ -92,6 +96,33 @@ export async function POST(request: NextRequest) {
         },
       });
 
+      // LEDGER AT MARK (owner directive 2026-09-11). The master ledger used
+      // to be minted lazily on the first approved run (D10), which left a
+      // freshly marked charter with no visible quest tracking — and sent the
+      // owner off to build a "charter database" by hand (prod: Career Hunt
+      // Charters, an orphan table nothing reads). Mint it here, idempotently:
+      // it lands as referenced content under the charter (ownedByNoteId), so
+      // the reference chip shows it from the moment of marking. Re-marking
+      // an older charter is the backfill path. Best-effort: the MARK is what
+      // was asked for and has already succeeded.
+      let masterLedgerId: string | null = null;
+      let masterLedgerCreated = false;
+      try {
+        const master = await ensureMasterLedger(session.user.id, {
+          contentId: node.id,
+          title: node.title,
+        });
+        masterLedgerId = master?.masterId ?? null;
+        masterLedgerCreated = master?.created === true;
+      } catch (ledgerError) {
+        logger.warn({
+          layer: "ai",
+          event: "charters_mark:ledger_failed",
+          summary: "charter marked, but its master ledger could not be created",
+          error: ledgerError,
+        });
+      }
+
       // EMPTINESS CONTRACT (D5, owner report 2026-09-10). A charter is a
       // written commissioning document: the marker says "this is a charter",
       // the BODY says what the charter is. Marking a folder that has no
@@ -113,6 +144,9 @@ export async function POST(request: NextRequest) {
       let hasBody =
         parsed.phases.length > 0 || parsed.standingRules.content.length > 0;
       let phaseCount = parsed.phases.length;
+      // Starter headings still reading "[name the first phase]" — reported so
+      // the dialog can say a run would start on a placeholder.
+      let templatePhases = countStarterPlaceholderPhases(parsed);
 
       // STARTER BODY (D5). Opt-in, and only into a charter that has none: the
       // caller offers it solely for an empty one, and this re-checks rather
@@ -136,7 +170,9 @@ export async function POST(request: NextRequest) {
             content: starter,
           });
           hasBody = true;
-          phaseCount = parseCharter(starter).phases.length;
+          const starterParsed = parseCharter(starter);
+          phaseCount = starterParsed.phases.length;
+          templatePhases = countStarterPlaceholderPhases(starterParsed);
           scaffolded = true;
         } catch (scaffoldError) {
           // The MARK is what the user asked for and it has already succeeded.
@@ -151,7 +187,15 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      return NextResponse.json({ success: true, hasBody, phaseCount, scaffolded });
+      return NextResponse.json({
+        success: true,
+        hasBody,
+        phaseCount,
+        scaffolded,
+        templatePhases,
+        masterLedgerId,
+        masterLedgerCreated,
+      });
     } catch (error) {
       if (error instanceof Error && error.message === "Authentication required") {
         return NextResponse.json(
@@ -224,6 +268,7 @@ export async function GET(request: NextRequest) {
           hasBody:
             parsed.phases.length > 0 || parsed.standingRules.content.length > 0,
           phaseCount: parsed.phases.length,
+          templatePhases: countStarterPlaceholderPhases(parsed),
         },
       });
     } catch (error) {

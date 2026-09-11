@@ -5,6 +5,7 @@ import { parseCharter } from "@/lib/domain/ai/charters/parse";
 import {
   buildCharterStarterDoc,
   CHARTER_STARTER_PHASE_TITLES,
+  countStarterPlaceholderPhases,
 } from "@/lib/domain/ai/charters/starter";
 import { renderCharterSectionPlain } from "@/lib/domain/ai/charters/render";
 import {
@@ -540,3 +541,37 @@ assert.match(
 }
 
 console.log("Charter parser checks passed.");
+
+// ── Starter placeholder detection (mark + attached-context warning) ─────────
+// The scaffold's two phase headings still read "[name the … phase]" until the
+// user edits them; real sections pasted BELOW the scaffold parse alongside
+// them, and a run would start on the placeholder.
+const untouchedStarter = parseCharter(buildCharterStarterDoc("Career Hunt"));
+assert.equal(countStarterPlaceholderPhases(untouchedStarter), 2);
+const pastedBelowScaffold = parseCharter({
+  type: "doc",
+  content: [
+    ...(buildCharterStarterDoc("Career Hunt").content ?? []),
+    heading(2, "Charter purpose"),
+    paragraph("Discover promising roles and capture them before they vanish."),
+    heading(2, "Initial screening criteria"),
+    paragraph("Remote, product operations, senior or above."),
+  ],
+});
+assert.equal(pastedBelowScaffold.phases.length, untouchedStarter.phases.length + 2);
+assert.equal(countStarterPlaceholderPhases(pastedBelowScaffold), 2);
+const oneRenamed = parseCharter({
+  type: "doc",
+  content: (buildCharterStarterDoc("Career Hunt").content ?? []).map((node) =>
+    node.type === "heading" &&
+    node.content?.[0]?.text === CHARTER_STARTER_PHASE_TITLES[1]
+      ? heading(2, "Phase 1 — Discover openings")
+      : node,
+  ),
+});
+assert.equal(countStarterPlaceholderPhases(oneRenamed), 1);
+assert.equal(
+  countStarterPlaceholderPhases(parseCharter({ type: "doc", content: [] })),
+  0,
+);
+console.log("charter placeholder detection ok");

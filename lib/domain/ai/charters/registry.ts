@@ -149,3 +149,24 @@ export async function listCharters(userId: string): Promise<CharterListItem[]> {
     };
   });
 }
+
+/**
+ * Is this node (owner-scoped, live) a charter? The chat route uses it to
+ * treat a chat BOUND to a charter — the charter is the active content and
+ * this is its side chat — as an attachment (owner directive 2026-09-11).
+ */
+export async function isCharterNodeId(
+  userId: string,
+  contentId: string,
+): Promise<boolean> {
+  const node = await prisma.contentNode.findFirst({
+    where: {
+      id: contentId,
+      ownerId: userId,
+      contentType: { in: ["note", "folder"] },
+      deletedAt: null,
+    },
+    select: { notePayload: { select: { metadata: true } } },
+  });
+  return !!node && isCharterMetadata(node.notePayload?.metadata);
+}

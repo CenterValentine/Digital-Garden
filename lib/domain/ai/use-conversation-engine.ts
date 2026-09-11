@@ -1595,6 +1595,22 @@ export function useConversationEngine({
     setActiveCharterTitle(null);
   }, []);
 
+  // BOUND CHARTER (owner directive 2026-09-11): a chat opened ON a charter is
+  // attached to it without a /charter pick. The server resolves the binding
+  // authoritatively (chat route: boundCharterId); this mirrors it in the
+  // composer chip and the persisted message part so what the user sees and
+  // what the model got agree. An explicit pick still wins.
+  const boundCharter = useMemo(
+    () =>
+      !activeCharterId && contentId
+        ? (charters.find((c) => c.id === contentId) ?? null)
+        : null,
+    [activeCharterId, contentId, charters],
+  );
+  const effectiveCharterId = activeCharterId ?? boundCharter?.id ?? null;
+  const effectiveCharterTitle =
+    activeCharterTitle ?? boundCharter?.title ?? null;
+
   // ── output target (WS7) ──
   // Where new content lands by default; persisted client-side per chat so the
   // choice sticks across reloads. Keyed by conversationId when bound, else
@@ -2584,16 +2600,16 @@ export function useConversationEngine({
   }, [messages]);
 
   const activeCharter = useMemo<ActiveCharter | null>(() => {
-    if (!activeCharterId) return null;
+    if (!effectiveCharterId) return null;
     const phaseCount =
-      charters.find((p) => p.id === activeCharterId)?.phaseCount ?? 0;
+      charters.find((p) => p.id === effectiveCharterId)?.phaseCount ?? 0;
     return {
-      id: activeCharterId,
-      title: activeCharterTitle ?? "",
+      id: effectiveCharterId,
+      title: effectiveCharterTitle ?? "",
       phaseIndex: resolvedPhaseIndex,
       phaseCount,
     };
-  }, [activeCharterId, activeCharterTitle, charters, resolvedPhaseIndex]);
+  }, [effectiveCharterId, effectiveCharterTitle, charters, resolvedPhaseIndex]);
 
   // Stream-time freshness (v3.1 R2): dispatch artifact refresh as tool
   // outputs ARRIVE in the stream, not just at turn end — a playbook turn
@@ -2637,7 +2653,7 @@ export function useConversationEngine({
       // Attached playbook (AI v3.2 T3) — read at request time so approval
       // resumes / internal sends carry the same binding as the turn that
       // started them.
-      charterId: activeCharterId,
+      charterId: effectiveCharterId,
       activePhaseIndex: resolvedPhaseIndex,
       // Output-target chip (WS7): where new content lands by default.
       outputTarget,
@@ -2661,7 +2677,7 @@ export function useConversationEngine({
     activeContextId,
     providerId,
     modelId,
-    activeCharterId,
+    effectiveCharterId,
     resolvedPhaseIndex,
     outputTarget,
     modelPinned,
@@ -3011,15 +3027,15 @@ export function useConversationEngine({
     const parts: UIMessage["parts"] = [
       createOutputTargetMessagePart(outputTarget),
     ];
-    if (activeCharterId) {
+    if (effectiveCharterId) {
       // Unlike the composer-only chip, this data part belongs to the sent
       // user turn, survives persistence/reload, and renders alongside that
       // message. The server validates the id independently before adding
       // authoritative model context.
       parts.push(
         createCharterMessageAttachmentPart({
-          id: activeCharterId,
-          title: activeCharterTitle ?? "Attached charter",
+          id: effectiveCharterId,
+          title: effectiveCharterTitle ?? "Attached charter",
           phaseIndex: resolvedPhaseIndex,
           phaseCount: activeCharter?.phaseCount ?? 0,
         }),
@@ -3088,7 +3104,7 @@ export function useConversationEngine({
           // of currentPage). Null in the embed panel / when nothing readable.
           viewedContent: getActiveViewedContentHint(),
           // Attached playbook (AI v3.2 T3).
-          charterId: activeCharterId,
+          charterId: effectiveCharterId,
           activePhaseIndex: resolvedPhaseIndex,
           // Output-target chip (WS7).
           outputTarget,
@@ -3118,8 +3134,8 @@ export function useConversationEngine({
     activeContextId,
     providerId,
     modelId,
-    activeCharterId,
-    activeCharterTitle,
+    effectiveCharterId,
+    effectiveCharterTitle,
     activeCharter,
     resolvedPhaseIndex,
     outputTarget,
@@ -3144,7 +3160,7 @@ export function useConversationEngine({
       // currentPage). Null in the embed panel and when nothing readable is focused.
       viewedContent: getActiveViewedContentHint(),
       // Attached playbook (AI v3.2 T3) rides re-runs too, for continuity.
-      charterId: activeCharterId,
+      charterId: effectiveCharterId,
       activePhaseIndex: resolvedPhaseIndex,
       // Output-target chip (WS7).
       outputTarget,
@@ -3157,7 +3173,7 @@ export function useConversationEngine({
       conversationId,
       providerId,
       modelId,
-      activeCharterId,
+      effectiveCharterId,
       resolvedPhaseIndex,
       outputTarget,
       modelPinned,
@@ -3182,11 +3198,11 @@ export function useConversationEngine({
       const editedParts: UIMessage["parts"] = [
         createOutputTargetMessagePart(outputTarget),
       ];
-      if (activeCharterId) {
+      if (effectiveCharterId) {
         editedParts.push(
           createCharterMessageAttachmentPart({
-            id: activeCharterId,
-            title: activeCharterTitle ?? "Attached charter",
+            id: effectiveCharterId,
+            title: effectiveCharterTitle ?? "Attached charter",
             phaseIndex: resolvedPhaseIndex,
             phaseCount: activeCharter?.phaseCount ?? 0,
           }),
@@ -3206,8 +3222,8 @@ export function useConversationEngine({
       providerId,
       modelId,
       truncateRef,
-      activeCharterId,
-      activeCharterTitle,
+      effectiveCharterId,
+      effectiveCharterTitle,
       activeCharter,
       resolvedPhaseIndex,
       outputTarget,

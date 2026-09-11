@@ -463,7 +463,6 @@ const promptText =
   "\n" +
   buildSystemPrompt({
     ...basePromptCtx,
-    charterAwareness: "playbook awareness",
     hasAttachedCharter: false,
   });
 

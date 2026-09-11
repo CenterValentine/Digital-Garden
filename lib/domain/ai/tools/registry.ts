@@ -40,7 +40,9 @@ import { createColumn } from "@/lib/domain/data/server/mutations";
 import {
   closeSitting,
   ensureMasterLedger,
+  ensureOutputRelation,
   ensureQuest,
+  ledgerOutputRelations,
   parseQuestInfo,
   questSeenKeys,
   recordQuestItem,
@@ -851,16 +853,17 @@ export function createBaseTools(ctx: ToolExecuteContext) {
               // All quest artifacts (ledger + log) home in the charter's
               // folder — one findable cluster, no root/chat scatter (owner
               // policy 2026-09-02).
-              questHomeFolderId = master.charterParentId;
+              questHomeFolderId = master.questHomeFolderId;
               const questLabel = (questArg ?? label).trim().slice(0, 120);
               const ensured = await ensureQuest({
                 userId: ctx.userId,
                 charterTitle: ctx.activeCharter.title,
+                charterId: ctx.activeCharter.contentId,
                 masterId: master.masterId,
                 masterCols: master.masterCols,
                 questLabel,
                 objective,
-                targetFolderId: master.charterParentId,
+                targetFolderId: master.questHomeFolderId,
                 outputTableId: captureCfg?.tableId,
                 ...(questColumns && questColumns.length > 0
                   ? { extraColumns: questColumns }
@@ -879,6 +882,21 @@ export function createBaseTools(ctx: ToolExecuteContext) {
                     .replace(/[^a-z0-9]+/g, "-")
                     .replace(/^-+|-+$/g, "")
                     .slice(0, 60) || "quest");
+                // Row-level attachment (quests v2): the capture table of THIS
+                // sitting gets its relation column on the ledger; the map is
+                // recomputed from the ledger so earlier sittings' tables stay
+                // linkable (a quest may capture into several tables).
+                if (captureCfg) {
+                  await ensureOutputRelation(
+                    ensured.questLedgerId,
+                    captureCfg.tableId,
+                    questLabel,
+                  );
+                }
+                const outputRelations = await ledgerOutputRelations(
+                  ensured.questLedgerId,
+                  master.masterId,
+                );
                 questInfo = {
                   sittingId: crypto.randomUUID(),
                   masterId: master.masterId,
@@ -892,6 +910,8 @@ export function createBaseTools(ctx: ToolExecuteContext) {
                       : null,
                   masterCols: master.masterCols,
                   ledgerCols: await tableColumnKeys(ensured.questLedgerId),
+                  questRelationColumnId: ensured.questRelationColumnId,
+                  outputRelations,
                 };
                 // Quest memory (rejects INCLUDED): items this quest already
                 // scored in ANY earlier sitting — the recurring token saver
@@ -1119,7 +1139,13 @@ export function createBaseTools(ctx: ToolExecuteContext) {
       }),
       execute: async ({ ledgerRunKey, itemKey, itemLabel, url, status, qualified, fitPercent, verdict, artifactTitle, capture, questCells }) => {
         const placement = resolveToolOutputPlacement(ctx);
-        if (!placement.parentId && !placement.ownedByNoteId) {
+        // Quest logs are keyed globally (upsertRunLedger "quest:" keys), so a
+        // sitting in a chat with no target folder still finds its log. Only
+        // quest-less runs need a placement to write into — this bail used to
+        // fire BEFORE the quest dual-write, leaving a quest with zero rows
+        // (lifecycle audit 2026-09-11).
+        const questKeyed = ledgerRunKey.startsWith("quest:");
+        if (!questKeyed && !placement.parentId && !placement.ownedByNoteId) {
           return { ok: false, note: "No target folder set, so no ledger was written. Continue the run; reconcile in the roll-up." };
         }
         // Prefer an explicit url; fall back to itemKey when it IS a url (url-tier
@@ -1186,6 +1212,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         // the run (markdown stays authoritative until P4b's cutover).
         const questState = parseQuestInfo(runState?.questInfo);
         const sittingClosed = Boolean(questState?.sittingClosed);
+        let questWriteNote = "";
         if (questState && !sittingClosed) {
           try {
             const isUrlKey = /^https?:\/\//.test(itemKey);
@@ -1196,7 +1223,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             // instead of advancing the same trajectory. The tier records
             // the identity actually used.
             const ledgerItemKey = url?.trim() || itemKey;
-            await recordQuestItem({
+            const questRecorded = await recordQuestItem({
               userId: ctx.userId,
               quest: questState,
               item: {
@@ -1214,9 +1241,25 @@ export function createBaseTools(ctx: ToolExecuteContext) {
                 qualified,
                 verdict,
                 outputRowId: capturedRowId,
+                ...(capturedRowId && runCaptureConfig
+                  ? { outputTableId: runCaptureConfig.tableId }
+                  : {}),
                 ...(questCells ? { extraCells: questCells } : {}),
               },
             });
+            // A null here is a REFUSED ledger write (a system column the
+            // machinery needs is gone or retyped) — it used to be ignored,
+            // so the item reported ok while its row was never written.
+            if (!questRecorded) {
+              questWriteNote =
+                "quest ledger refused this item's row — the ledger's system columns may have been altered; tell the user";
+              logger.warn({
+                layer: "ai",
+                event: "quests:record_item_refused",
+                summary: "quest-ledger row write refused",
+                attrs: { ledgerRunKey, itemKey: ledgerItemKey },
+              });
+            }
           } catch (error) {
             logger.warn({
               layer: "ai",
@@ -1232,6 +1275,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           (typeof fitPercent === "number" ? ` · fit ${Math.round(fitPercent)}%` : "") +
           (qualified === true ? " · **qualified**" : qualified === false ? " · not qualified" : "") +
           (captureNote ? ` · ${captureNote}` : "") +
+          (questWriteNote ? ` · ⚠ ${questWriteNote}` : "") +
           (verdict ? `\n\n${verdict}` : "");
         try {
           const ledger = await upsertRunLedger(
@@ -1270,6 +1314,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
                     "this sitting is CLOSED (findings already recorded) — the quest ledger was NOT updated",
                 }
               : {}),
+            ...(questWriteNote ? { questWarning: questWriteNote } : {}),
             next: captureErrors
               ? "The ledger line is recorded but the row was REJECTED whole (no partial rows). Fix exactly the cells named in captureErrors and call record_item_result AGAIN for this SAME itemKey with corrected capture.cells — then continue to the next item."
               : sittingClosed

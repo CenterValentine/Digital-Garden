@@ -150,7 +150,6 @@ const orderedPrompt = buildSystemPrompt({
   chatContentId: undefined,
   autoPronounceDefault: false,
   charterContext: "CACHEABLE_PLAYBOOK_PHASE",
-  charterAwareness: "",
   rootedContentSection: "RUN_SPECIFIC_ROOT",
   outputTargetSection: "RUN_SPECIFIC_OUTPUT_TARGET",
   userContextSection: "RUN_SPECIFIC_USER_CONTEXT",

@@ -143,6 +143,17 @@ export interface DataColumnConfig {
    */
   maxLength?: number;
   /**
+   * Machinery column of a charter ledger (lib/domain/ai/quests.ts). The
+   * quest code reads these columns BY NAME and writes option ids it minted,
+   * so a rename, retype, option edit, or delete silently detaches the ledger
+   * from its charter (owner smoke: one renamed master column → a second
+   * quest ledger on the next sitting). The SHAPE is locked server-side
+   * (mutations.ts) and greyed in the grid; description and position stay
+   * free, and cells stay editable. A config specialization, not a DB column
+   * (plan D11 doctrine — same pattern as imageOnly on file).
+   */
+  system?: boolean;
+  /**
    * `checkbox` — how the cell renders. Default native checkbox; the icon
    * variants toggle on click like the checkbox does; "text" renders
    * true/false as words. DISPLAY-ONLY — cells store booleans in every
