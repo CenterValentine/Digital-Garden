@@ -1,7 +1,7 @@
 # Polling Discipline — decisions, shipped work, and what remains
 
 **Last updated:** 2026-09-09
-**Status:** Phases 0, 2, 2b and 4 shipped. Phase 1 (Hocuspocus awareness) forked; Phase 3 partially absorbed into Phase 2.
+**Status:** Phases 0, 1, 2, 2b, 4 and 5 shipped. Phase 3 partially absorbed into Phase 2. `polling:check` is at **0 files awaiting audit**.
 **Always-open PWA: FIXED.** Idle gating now exists and all ten pollers are on the shared scheduler, so an untouched PWA goes quiet on every meter within ~60 s. The warning that used to live here — that Phase 0 only handled *hidden* tabs — no longer applies.
 **Invariant:** *the page goes cold when nobody is actively using it.*
 
@@ -538,17 +538,106 @@ Concretely, once Phase 2 lands with a 60 s idle threshold (D9), an untouched PWA
 
 ---
 
-## Phase 1 — Hocuspocus awareness delegation (forked)
+## Phase 1 — Hocuspocus awareness delegation — SHIPPED (2026-09-10)
 
-Per D1 and D2. Being developed on a separate branch.
+Per D1 and D2.
 
-- [ ] Extend awareness payload beyond `activeSurfaceCount` (`runtime.ts:1648`) to carry the presence fields the UI needs
-- [ ] Subscribe to `awareness.on("change")` in place of the SSE
-- [ ] Delete `app/api/collaboration/presence/stream/route.ts`
-- [ ] Delete the `presenceEventSource` path and `presenceStreamSuspended` machinery
-- [ ] Verify the batch route's three consumers are untouched (D2)
-- [ ] Re-examine the 10 s / `STALE_AFTER_MS = 45_000` coupling (D5) now that it can move
-- [ ] Update the `polling:check` registry: `runtime.ts` should leave `unreviewed`
+- [x] Subscribe to awareness in place of the SSE — **partially; see D27, the checklist was wrong**
+- [x] Delete `app/api/collaboration/presence/stream/route.ts`
+- [x] Delete the `presenceEventSource` path and `presenceStreamSuspended` machinery
+- [x] Verify the batch route's three consumers are untouched (D2)
+- [x] Re-examine the 10 s / `STALE_AFTER_MS = 45_000` coupling (D5) — active 10 s → 20 s
+- [x] Update the `polling:check` registry — all three `unreviewed` files audited; **0 remaining**
+- [ ] ~~Extend the awareness payload beyond `activeSurfaceCount`~~ — unnecessary (D27)
+
+### D27 — Awareness cannot replace the SSE alone; display and wake are different questions
+
+The original checklist said "subscribe to `awareness.on("change")` in place of
+the SSE." That is wrong, and it would have shipped a silent regression.
+
+**Awareness only describes peers you are already connected to.** A document
+sleeping in `localOnly` has no provider, therefore no awareness — so nothing
+would ever tell it a collaborator had arrived. `applyRemotePresenceSessions`
+calling `promote()` on remote presence is the **wake path**, and awareness
+structurally cannot see the thing that would wake it. Pure awareness would have
+left a sleeping tab asleep forever while someone edited alongside it.
+
+So the two jobs are split by what each signal can actually answer:
+
+| | Signal | Why |
+|---|---|---|
+| **Display**, while connected | Y.js awareness (`updateProviderPresence`, unchanged) | Real-time, finer-grained, free — no network of its own |
+| **Wake**, while disconnected | The shared presence poller | The only thing that can see peers you are not connected to |
+
+The wake signal now rides the batched 10 s poll that already runs for the tab
+strip, instead of a transport of its own. Marginal cost is ~zero: a document the
+runtime has open is nearly always already in that batch.
+
+**What actually got deleted** — the expensive part, and the real point of the
+phase: a dedicated `EventSource` per open document whose server side re-queried
+Postgres every 10 s and, being an SSE response that never completes, billed
+Vercel provisioned memory for the life of the tab. Plus the in-process pub/sub
+that fed it (`subscribeCollaborationPresence` / `notifyCollaborationPresence` and
+the global listener store), which only ever delivered same-instance events —
+which is why the 10 s interval existed underneath it.
+
+`getCollaborationBrowserSessionId` moved to `browser-session.ts`: `presence-poll.ts`
+imported it from `runtime.ts`, so subscribing the other way would have closed an
+import cycle.
+
+### D26 — Deep-dormant tabs stop heartbeating entirely
+
+**The finding:** a single note left open in a background tab kept Neon awake
+indefinitely. The dormant tier heartbeat every **5 minutes** — exactly the
+autosuspend threshold, the same trap `dg-pull-sync` was in (D21) — so the
+database never got five contiguous quiet minutes. One forgotten tab undid the
+whole engagement effort.
+
+**Why stopping is safe, and not merely cheap:** the primary reader already
+discards these records. `ACTIVE_TRANSPORT_STATES` in `presence-poll.ts`
+deliberately excludes dormant sessions from the Note Window edit gate — so the
+writes were feeding a filter. We were paying to produce rows the main consumer
+throws away.
+
+**What it costs:** the grey "here but asleep" badge from PR #101. Dormant now
+releases its record (`surfaceCount: 0`) so collaborators see the session leave
+promptly rather than watching a stale badge for up to 8 minutes. It returns
+within a second of the tab coming back. Accepted by the owner explicitly.
+
+**The dangerous half was resuming, not stopping.** Every activity path used to
+stamp `lastActivityAt` and rely on the next 5-minute beat to re-evaluate the
+cadence. With no timer left running, nothing re-evaluates anything — and two
+paths had no reschedule at all: the Y.doc update handler (**the user typing**)
+and `updateConsumer`. A user who came back and started working would have stayed
+invisible to their collaborators for as long as they kept at it: silent on their
+side, indistinguishable from a presence bug on everyone else's.
+
+> Turning a self-rescheduling timer OFF removes the thing that was re-deciding.
+> Any state the timer used to re-read has to be re-read by whatever wakes it,
+> and every wake path has to be enumerated — not assumed.
+
+`noteLocalActivity` now stamps and resumes together, and `handleBecameVisible`
+lifts `presenceReleased` alongside `presenceSuspended` (the hidden and idle
+dormancy routes set different flags).
+
+The cadence decision moved to `presence-cadence.ts` as a **pure function**, so it
+can be tested at all: the runtime is a stateful singleton wired to the DOM,
+IndexedDB and Y.js, which puts its branches out of a test's reach.
+`presence-cadence-smoke.ts` (17 assertions) covers the tiers, the staleness
+contract, all three never-dormant guards, and the resume path.
+
+### D5 — REVISITED: active heartbeat 10 s → 20 s
+
+The binding constraint is `STALE_AFTER_MS = 45_000`: miss enough beats and the
+server prunes a live tab's record. What matters is surviving **one** dropped
+beat, and 20 s keeps it — two beats land at 40 s, inside the window. 10 s was
+carrying a 4.5× margin nobody needed, at twice the write volume. 30 s would break
+it (two misses reach 60 s).
+
+Noted while testing: the **idle and hidden tiers (30 s) have no one-drop margin
+at all** — pre-existing, not introduced here. Raising either requires moving
+`STALE_AFTER_MS` with it. The smoke suite asserts the steady-state contract for
+every tier so this cannot drift unnoticed.
 
 ---
 

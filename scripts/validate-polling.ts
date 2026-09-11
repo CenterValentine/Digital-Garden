@@ -100,11 +100,6 @@ const REGISTRY: Declared[] = [
 
   // ── Server-side timers ─────────────────────────────────────────────────────
   {
-    file: "app/api/collaboration/presence/stream/route.ts",
-    policy: "server",
-    note: "SSE refresh loop. Cost is the held-open stream itself, not the timer.",
-  },
-  {
     file: "app/api/conversations/events/route.ts",
     policy: "server",
     note: "SSE heartbeat that keeps proxies from idling the stream out.",
@@ -133,6 +128,20 @@ const REGISTRY: Declared[] = [
       "keepAliveWhile cannot override it.",
   },
   {
+    file: "lib/domain/collaboration/runtime.ts",
+    policy: "background-allowed",
+    estimatedMonthlyCostUsd: 4,
+    note:
+      "AUDITED in Phase 1 (was unreviewed). Three timers: a 2s browser-session announce and a 1s session sweep, both " +
+      "BroadcastChannel/in-memory with NO network; and the presence heartbeat, which is a real network write and the " +
+      "reason this is background-allowed rather than pause-when-hidden. It cannot simply stop: the server prunes a " +
+      "record that stops beating (STALE_AFTER_MS 45s active / DORMANT_STALE_AFTER_MS 8min), so pausing it deletes a " +
+      "live user's badge for everyone else. Tiered instead — 20s active (D5, halved in Phase 1; two beats land inside " +
+      "the 45s window so one drop is survivable), 30s hidden/idle, 5min deep-dormant. The dedicated presence SSE this " +
+      "file used to hold was DELETED in Phase 1; it now subscribes to the shared presence poller instead. " +
+      "⚠ The 5min dormant tier still sits on Neon's 5-minute autosuspend boundary — see D26.",
+  },
+  {
     file: "lib/core/engagement/index.ts",
     policy: "ui-only",
     note:
@@ -147,19 +156,24 @@ const REGISTRY: Declared[] = [
   // Owned by the collaboration/AI surfaces; audit alongside the Hocuspocus
   // presence delegation rather than here.
   {
-    file: "lib/domain/collaboration/runtime.ts",
-    policy: "unreviewed",
-    note: "Presence heartbeat scheduling + browser-session sweep. Tiered cadence already exists (45s active / 5min dormant). Audit with the awareness delegation.",
-  },
-  {
     file: "components/content/editor/MarkdownEditor.tsx",
-    policy: "unreviewed",
-    note: "1s syncRemoteCollaborators + 500ms scheduleRefresh — believed local Y.js awareness reads, unverified.",
+    policy: "ui-only",
+    networkUnrelated: true,
+    note:
+      "AUDITED in Phase 1 (was unreviewed, and the suspicion was right). Two timers, both local: 1s " +
+      "syncRemoteCollaborators reads Y.js awareness off the in-memory provider — no network, which is precisely the " +
+      "delegation Phase 1 is about; 500ms scheduleRefresh is a DOM layout recompute alongside scroll/resize/ " +
+      "MutationObserver. The file's two fetches are NodeView event handlers that create a visualization on user " +
+      "action. Traced 2026-09-10.",
   },
   {
     file: "components/content/ai/ChatMessage.tsx",
-    policy: "unreviewed",
-    note: "Timer purpose untraced; file also performs fetches.",
+    policy: "ui-only",
+    networkUnrelated: true,
+    note:
+      "AUDITED in Phase 1 (was unreviewed). One timer: WorkingIndicator's 1s elapsed-seconds counter, local setState, " +
+      "mounted only for the duration of a thinking segment. The single fetch is the reply-to-note action handler. " +
+      "Traced 2026-09-10.",
   },
   {
     file: "lib/domain/ai/use-conversation-binding.ts",
