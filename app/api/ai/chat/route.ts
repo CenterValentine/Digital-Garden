@@ -209,7 +209,7 @@ import { prisma } from "@/lib/database/client";
 import type { Prisma } from "@/lib/database/generated/prisma";
 import { logger, spanPayload, startSpan, withRouteTrace, withSpan } from "@/lib/core/logger";
 import { readRunLedgerCaptureConfig } from "@/lib/domain/ai/run-ledger";
-import { parseQuestInfo } from "@/lib/domain/ai/quests";
+import { MASTER_LEDGER_META_KEY, parseQuestInfo } from "@/lib/domain/ai/quests";
 import { after } from "next/server";
 import { assembleFolderChatContext } from "@/extensions/studio/server/source-selection";
 import { refreshContextOnAccess } from "@/lib/domain/ai-context/context-refresh";
@@ -234,7 +234,11 @@ import type {
 } from "@/lib/domain/ai/model-directive";
 import { renderCharterSection } from "@/lib/domain/ai/charters/render";
 import { getServerExtensions } from "@/lib/domain/editor/extensions-server";
-import { isCharterMetadata } from "@/lib/domain/ai/charters/registry";
+import {
+  isCharterMetadata,
+  isCharterNodeId,
+} from "@/lib/domain/ai/charters/registry";
+import { countStarterPlaceholderPhases } from "@/lib/domain/ai/charters/starter";
 import {
   configurePhaseCheckpointGate,
   createPhaseCheckpointGate,
@@ -456,11 +460,28 @@ export async function POST(request: Request) {
       // fetch+parse of the playbook note on attached-playbook turns.
       // Attach-mode + phase-index derivation MUST mirror the downstream block:
       //   - explicit `body.charterId` → progressive disclosure, clamped index
+      //   - BOUND charter (the chat's content IS a charter) → same as explicit
       //   - rooted execution cue → all phases visible, active phase is phase 0
-      //   - ambient (viewing a playbook without attaching) does NOT route
       // S2a wires the OUTPUT into nothing — the ladder consumes it in S2b.
+      //
+      // BOUND CHARTER = ATTACHED (owner directive 2026-09-11). A chat opened
+      // ON a charter — the charter is the active content, this is its side
+      // chat — used to be "ambient": a one-line awareness hint, no
+      // activeCharter, so the quest machinery never engaged and "make the
+      // database for this charter" became an orphan table (prod: Career
+      // Hunt Charters). The binding IS the attachment now. Attachment is not
+      // execution: standing rules + current phase load and the quest
+      // machinery binds, but the model still runs only when asked. Resolved
+      // ONCE here; the routing resolver and the context block both read it,
+      // which keeps the two derivations mirrored as required.
+      const boundCharterId =
+        typeof body.charterId !== "string" &&
+        contentId &&
+        (await isCharterNodeId(session.user.id, contentId))
+          ? contentId
+          : null;
       const routingExplicitCharterId =
-        typeof body.charterId === "string" ? body.charterId : null;
+        typeof body.charterId === "string" ? body.charterId : boundCharterId;
       const routingRootedCharterId =
         !routingExplicitCharterId &&
         contentId &&
@@ -1412,6 +1433,9 @@ export async function POST(request: Request) {
           // the iteration harness itself
           "propose_item_iteration", "record_item_result",
           "record_batch_checkpoint", "record_iteration_findings",
+          // mid-run schema grace (D8) — this diet stripped it, so the only
+          // window it exists for never had it (lifecycle audit 2026-09-11)
+          "add_quest_ledger_column",
           // note output + grounding
           "createNote", "updateNote", "renameNote", "getCurrentNote",
           "search_content", "read_folder_context",
@@ -1836,31 +1860,21 @@ export async function POST(request: Request) {
       // itself marked as a playbook) are called out so the model follows
       // their own directives rather than treating them as passive reading.
       let charterContext = "";
-      let charterAwareness = "";
       let attachedCharterResolved = false;
       let rootedCharterResolved = false;
       let attachedPlaybookTitle = "";
       // An EXPLICIT attach (/playbook picker) gets the full progressive
       // disclosure below — standing rules + the active phase + reference
       // manifest, and flips the checkpoint cadence.
+      // A chat BOUND to a charter is attached to it (boundCharterId, resolved
+      // with the routing block above) — the former "ambient awareness" tier
+      // is gone (owner directive 2026-09-11, reversing the 2026-08 call).
       const explicitPlaybookId =
-        typeof body.charterId === "string" ? body.charterId : null;
+        typeof body.charterId === "string" ? body.charterId : boundCharterId;
       const rootedPlaybookId =
         !explicitPlaybookId &&
         contentId &&
         requestsRootedCharterExecution(messages)
-          ? contentId
-          : null;
-      // AMBIENT: the user is chatting FROM a note/folder that is itself a
-      // playbook, without attaching it. We do NOT auto-run it — that would
-      // flip EVERY casual message on a playbook-anchored chat into playbook
-      // mode (per-turn phase injection + the stricter checkpoint cadence)
-      // the user never asked for. Instead, add a one-line AWARENESS hint so
-      // the model can run it WHEN ASKED and knows the content's id — which
-      // is what fixes "it couldn't look at what I'm actively viewing" without
-      // hijacking the whole conversation.
-      const ambientCharterId =
-        !explicitPlaybookId && !rootedPlaybookId && contentId
           ? contentId
           : null;
       if (explicitPlaybookId) {
@@ -1898,6 +1912,35 @@ export async function POST(request: Request) {
             const parsed = parseCharter(
               charterNode.notePayload.tiptapJson as JSONContent,
             );
+            // LEDGER AWARENESS (owner directive 2026-09-11). The master
+            // ledger is minted at mark and referenced to this charter, but
+            // no prompt string ever said so — "create the charter's
+            // database" routed to propose_output_database and produced an
+            // orphan table. Name the ledger, its shape, and the tools that
+            // may touch it.
+            const stampedMasterId = (
+              charterNode.notePayload.metadata as Record<string, unknown> | null
+            )?.[MASTER_LEDGER_META_KEY];
+            const masterLedger =
+              typeof stampedMasterId === "string"
+                ? await prisma.contentNode.findFirst({
+                    where: {
+                      id: stampedMasterId,
+                      ownerId: session.user.id,
+                      contentType: "data",
+                      deletedAt: null,
+                    },
+                    select: { id: true, title: true },
+                  })
+                : null;
+            const ledgerNote = masterLedger
+              ? `\n\n**Ledgers:** this charter's master ledger is the database "${masterLedger.title}" (id ${masterLedger.id}) — one row per QUEST (an ongoing matter, e.g. one job hunt). A quest and its per-item QUEST LEDGER are created when the user approves propose_item_iteration with a \`quest\` name; never create quest rows by hand. The user may extend either ledger with propose_database_columns (add-only). Their SYSTEM columns are locked — no rename, retype, option edit, or delete — say so if asked. Do NOT call propose_output_database to "create this charter's database": it exists. Output databases are only for CAPTURED items (captureTo).`
+              : "";
+            const placeholderCount = countStarterPlaceholderPhases(parsed);
+            const placeholderNote =
+              placeholderCount > 0
+                ? `\n\n**Unfilled template:** ${placeholderCount} phase heading${placeholderCount === 1 ? " is" : "s are"} still the starter placeholder ("[name the first phase]"). Tell the user before running anything, and never execute a placeholder phase — ask them to rename or delete it.`
+                : "";
             if (parsed.phases.length > 0) {
               const rawIndex =
                 typeof body.activePhaseIndex === "number" ? body.activePhaseIndex : 0;
@@ -1963,7 +2006,9 @@ export async function POST(request: Request) {
                 (standingText
                   ? `**Standing rules (always apply):**\n${standingText}\n\n`
                   : "") +
-                `**Current phase (the ONLY phase detail loaded):**\n${phaseText}${referenceContext.manifest}`;
+                `**Current phase (the ONLY phase detail loaded):**\n${phaseText}${referenceContext.manifest}` +
+                ledgerNote +
+                placeholderNote;
             } else {
               // A valid marked playbook can be empty. Keep its explicit
               // identity in context instead of silently falling through to
@@ -1971,7 +2016,8 @@ export async function POST(request: Request) {
               // the missing instructions, never search for a replacement.
               charterContext =
                 `\n\n## Active Charter: "${charterNode.title}"\n` +
-                "This charter is explicitly attached, but it contains no instructions. Do not search for another charter. Tell the user this attached charter is empty and needs content before it can run.";
+                "This charter is explicitly attached, but it contains no instructions. Do not search for another charter. Tell the user this attached charter is empty and needs content before it can run." +
+                ledgerNote;
             }
           }
         } catch (playbookError) {
@@ -2068,54 +2114,6 @@ export async function POST(request: Request) {
             summary:
               "explicit rooted playbook injection failed — continuing without it",
             error: rootedPlaybookError,
-          });
-        }
-      } else if (ambientCharterId) {
-        try {
-          const node = await prisma.contentNode.findFirst({
-            where: {
-              id: ambientCharterId,
-              ownerId: session.user.id,
-              contentType: { in: ["note", "folder"] },
-              deletedAt: null,
-            },
-            select: {
-              title: true,
-              notePayload: { select: { tiptapJson: true, metadata: true } },
-            },
-          });
-          if (
-            node?.notePayload &&
-            isCharterMetadata(node.notePayload.metadata)
-          ) {
-            const parsed = parseCharter(
-              node.notePayload.tiptapJson as JSONContent,
-            );
-            // EMPTY-CHARTER AWARENESS (D4, owner report 2026-09-10). A
-            // charter with no phases AND no standing rules is a marker on a
-            // blank page. The old line still told the model to "read its
-            // full content with getCurrentNote" — which returns "(empty
-            // note)", a wasted step, after which the model went hunting for
-            // whatever the user must have meant. The explicit-attach path
-            // above has said "this charter is empty" since it was written;
-            // the ambient path simply never learned to.
-            const charterIsEmpty =
-              parsed.phases.length === 0 &&
-              parsed.standingRules.content.length === 0;
-            charterAwareness = charterIsEmpty
-              ? `\n\nThe content you're working in — "${node.title}" — is marked as a CHARTER but is EMPTY: no standing rules, no phases, nothing written in it yet. Do NOT read it (there is nothing there) and do NOT go looking for another charter or for content the user "must have meant". If the user's request depends on this charter's contents, say plainly that the charter is empty and ask them what belongs in it.`
-              : `\n\nThe content you're working in — "${node.title}" — is itself a CHARTER` +
-                (parsed.phases.length > 0
-                  ? ` (${parsed.phases.length} phases)`
-                  : "") +
-                `. Do NOT start running it on your own initiative. Only if the user asks you to run, start, or follow it: read its full content with getCurrentNote (contentId: ${ambientCharterId}), then follow its standing rules and phases in order, calling phase_checkpoint at each phase boundary.`;
-          }
-        } catch (awarenessError) {
-          logger.warn({
-            layer: "ai",
-            event: "playbook:chat:awareness_failed",
-            summary: "ambient playbook awareness failed — continuing without it",
-            error: awarenessError,
           });
         }
       }
@@ -2475,7 +2473,6 @@ export async function POST(request: Request) {
           userContextSection,
           mentionedContext,
           charterContext,
-          charterAwareness,
           rootedContentSection,
           outputTargetSection: renderOutputTargetInstruction(outputTarget),
           hasAttachedCharter: attachedCharterResolved,

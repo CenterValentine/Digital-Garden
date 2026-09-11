@@ -124,3 +124,24 @@ export function buildCharterStarterDoc(title: string): JSONContent {
     ],
   };
 }
+
+/**
+ * How many of a parsed charter's phases are still the starter's unfilled
+ * placeholder headings ("Phase 1 — [name the first phase]"). Real sections
+ * pasted BELOW an untouched scaffold parse as real + placeholder phases
+ * together, and a run would start with the placeholder (prod 2026-09-11:
+ * 23 written sections under two template headings). Reported at mark and
+ * in the attached-charter context; never auto-deleted — the text is the
+ * user's to remove.
+ */
+export function countStarterPlaceholderPhases(parsed: {
+  phases: Array<{ title: string }>;
+}): number {
+  const placeholders = new Set(
+    CHARTER_STARTER_PHASE_TITLES.filter((t) => t.includes("[name the")).map((t) =>
+      t.trim().toLowerCase(),
+    ),
+  );
+  return parsed.phases.filter((p) => placeholders.has(p.title.trim().toLowerCase()))
+    .length;
+}

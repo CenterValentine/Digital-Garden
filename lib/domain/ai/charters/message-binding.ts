@@ -42,10 +42,10 @@ export function requestsRootedCharterExecution(
 ): boolean {
   const text = getLatestUserMessageText(messages);
   return (
-    /\b(?:execute|run|follow|start)\s+(?:this|the\s+current)\s+(?:file|note|content|playbook)\b/i.test(
+    /\b(?:execute|run|follow|start)\s+(?:this|the\s+current)\s+(?:file|note|content|playbook|charter)\b/i.test(
       text,
     ) ||
-    /\b(?:execute|run|follow|start)\s+(?:this|the\s+current)\s+(?:file|note|content)\s+as\s+(?:a\s+)?playbook\b/i.test(
+    /\b(?:execute|run|follow|start)\s+(?:this|the\s+current)\s+(?:file|note|content)\s+as\s+(?:a\s+)?(?:playbook|charter)\b/i.test(
       text,
     )
   );

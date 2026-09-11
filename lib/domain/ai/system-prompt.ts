@@ -176,15 +176,6 @@ export interface SystemPromptContext {
    */
   charterContext?: string;
   /**
-   * Lightweight one-liner (AI v3.2 T3, Finding 2 fix) shown when the user is
-   * chatting FROM a note/folder that is itself a playbook but hasn't attached
-   * it. Unlike `charterContext`, this does NOT inject phase detail or flip
-   * the checkpoint cadence — it just makes the model aware it can run the
-   * anchored playbook on request. Empty when not on a playbook or when one is
-   * explicitly attached (that path uses the full `charterContext` instead).
-   */
-  charterAwareness?: string;
-  /**
    * What this chat is rooted in (title + type), so the model resolves "this
    * file / the current note / this playbook" to the chat's own subject
    * without the user re-naming it. Empty for full-page chats / workflows.
@@ -333,6 +324,7 @@ export function buildSystemPrompt(ctx: SystemPromptContext): string {
   if (ctx.hasItemIteration) {
     sections.push(
       "Per-item iteration: when the user asks you to apply an analysis (usually an attached charter) to EACH of several items — the jobs on a board, their open tabs, a set of URLs — the LEDGER, not your memory, is the loop's source of truth. " +
+        "With a charter attached, quests live in the charter's MASTER LEDGER (a database: one row per quest) and each quest gets its own QUEST LEDGER (one row per item) when its run is approved — both are the user's databases: open them, extend them with propose_database_columns; their SYSTEM columns are locked (never rename, retype, re-option or delete them). Never propose_output_database to make 'the charter's database' — the master ledger already exists; output databases are only for CAPTURED items. " +
       "When the user wants results captured in a DATABASE, declare captureTo on propose_item_iteration (target database, admission rule, column names) — the approval card is their consent to write. With capture approved, every item meeting the admission rule must include capture.cells on its record_item_result (use the exact option labels the approval returned); a rejected capture writes NO row — fix the named cells and re-record that same item. Never pass cells for items that fail the admission rule. When NO suitable table exists (or the user asks for one), FIRST call propose_output_database — design the schema from the objective with a real description on every column and initial options for any select/status — then, after the user clicks Apply on that card, propose the run with captureTo naming the new table. For a REFINEMENT pass over already-captured leads, propose with source \"database-rows\" (captureTo names the table; the server enumerates its rows as the items and cells update each row in place). " +
         "ENUMERATE FIRST (co-browse `collect` for a list page" +
         (ctx.hasListTabs
@@ -366,8 +358,6 @@ export function buildSystemPrompt(ctx: SystemPromptContext): string {
   // intentionally follows Active Playbook, preserving the reusable procedure
   // prefix across chats rooted in different content.
   if (ctx.rootedContentSection) sections.push(ctx.rootedContentSection);
-  // Ambient-playbook awareness is a cheap hint, not executable phase context.
-  if (ctx.charterAwareness) sections.push(ctx.charterAwareness);
   // Date only (no time), after the cross-run playbook prefix. A date rollover
   // invalidates current-date/run context without invalidating the reusable
   // procedure prefix before it.

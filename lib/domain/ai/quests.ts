@@ -208,6 +208,14 @@ async function createSystemTable(input: {
     description: string;
     config?: Record<string, unknown>;
     primary?: boolean;
+    /**
+     * Machinery core column: stamped DataColumnConfig.system so the grid,
+     * the column routes and the AI tools refuse to rename / retype / re-
+     * option / delete it — this module reads it BY NAME and writes the
+     * option ids minted here. Sculpted (AI-shaped, per-matter) columns are
+     * NOT system: the user owns those.
+     */
+    system?: boolean;
   }>;
 }): Promise<string> {
   const slug = await generateUniqueSlug(input.title, input.userId);
@@ -240,7 +248,9 @@ async function createSystemTable(input: {
       name: col.name,
       type: col.type as Parameters<typeof createColumn>[1]["type"],
       description: col.description,
-      config: col.config as Parameters<typeof createColumn>[1]["config"],
+      config: (col.system
+        ? { ...(col.config ?? {}), system: true }
+        : col.config) as Parameters<typeof createColumn>[1]["config"],
     });
   }
   const primaryName = input.columns.find((c) => c.primary)?.name;
@@ -261,15 +271,30 @@ export async function ensureMasterLedger(
 ): Promise<{
   masterId: string;
   masterCols: Record<string, string>;
-  /** The charter's folder — quest artifacts nest here so the charter
-   *  neighborhood is their one findable home (owner: no root scatter). */
-  charterParentId: string | null;
+  /** Where quest artifacts (ledgers, logs) home: the charter itself when it
+   *  is a folder, else its containing folder — one findable cluster, never
+   *  root scatter (owner policy 2026-09-02; folder rule 2026-09-11). */
+  questHomeFolderId: string | null;
+  /** True when THIS call minted the master (mark-time creation reports it). */
+  created: boolean;
 } | null> {
   const note = await prisma.contentNode.findFirst({
     where: { id: charter.contentId, ownerId: userId, deletedAt: null },
-    select: { id: true, parentId: true, notePayload: { select: { metadata: true } } },
+    select: {
+      id: true,
+      parentId: true,
+      contentType: true,
+      notePayload: { select: { metadata: true } },
+    },
   });
   if (!note) return null;
+  // A FOLDER charter (its body lives in the folder "Notes" editor) IS the
+  // charter's folder. Storing beside it left "Career Hunt I" empty while its
+  // ledgers sat in the parent (prod, 2026-09-11). A note charter homes in
+  // its containing folder. Either way the master is ALSO referenced to the
+  // charter (ownedByNoteId), so the charter's reference chip shows it.
+  const questHomeFolderId =
+    note.contentType === "folder" ? note.id : note.parentId;
   const meta =
     note.notePayload?.metadata && typeof note.notePayload.metadata === "object"
       ? (note.notePayload.metadata as Record<string, unknown>)
@@ -285,7 +310,8 @@ export async function ensureMasterLedger(
       return {
         masterId: alive.id,
         masterCols: await columnKeysByName(alive.id),
-        charterParentId: note.parentId,
+        questHomeFolderId,
+        created: false,
       };
     }
     // Stamp points at a deleted node — self-heal by re-creating below.
@@ -294,10 +320,10 @@ export async function ensureMasterLedger(
   const masterId = await createSystemTable({
     userId,
     title: `${charter.title} — Master Ledger`,
-    parentId: note.parentId,
+    parentId: questHomeFolderId,
     ownedByNoteId: charter.contentId,
     icon: "lucide:LibraryBig",
-    columns: MASTER_COLUMNS,
+    columns: MASTER_COLUMNS.map((c) => ({ ...c, system: true })),
   });
   await prisma.notePayload.update({
     where: { contentId: charter.contentId },
@@ -317,7 +343,8 @@ export async function ensureMasterLedger(
   return {
     masterId,
     masterCols: await columnKeysByName(masterId),
-    charterParentId: note.parentId,
+    questHomeFolderId,
+    created: true,
   };
 }
 
@@ -326,6 +353,8 @@ export async function ensureMasterLedger(
 export async function ensureQuest(input: {
   userId: string;
   charterTitle: string;
+  /** The charter this quest belongs to — its ledger is referenced to it. */
+  charterId: string;
   masterId: string;
   masterCols: Record<string, string>;
   questLabel: string;
@@ -337,7 +366,7 @@ export async function ensureQuest(input: {
    * AI-sculpted ledger columns (§3.6): shaped per matter at CREATION only —
    * a scoring task adds its criteria, a collection task adds none. Merged
    * after the machinery core; names colliding with core columns are
-   * dropped. Ignored when continuing an existing quest.
+   * dropped. Ignored when continuing a quest that already has a ledger.
    */
   extraColumns?: Array<{ name: string; type: string; description: string }>;
 }): Promise<{
@@ -351,45 +380,7 @@ export async function ensureQuest(input: {
   const ledgerLinkKey = masterCols["Quest ledger"];
   if (!questKey || !ledgerLinkKey) return null;
 
-  // Continue: case-insensitive label match over the master's rows (a master
-  // holds dozens of quests at most — a scan is the simple, correct lookup).
-  const rows = await prisma.dataRow.findMany({
-    where: { tableId: masterId, deletedAt: null },
-    select: { id: true, data: true },
-  });
-  const existing = rows.find((r) => {
-    const v = ((r.data ?? {}) as Record<string, unknown>)[questKey];
-    return typeof v === "string" && v.trim().toLowerCase() === label.toLowerCase();
-  });
-  if (existing) {
-    const links = ((existing.data ?? {}) as Record<string, unknown>)[
-      ledgerLinkKey
-    ];
-    const ledgerId = Array.isArray(links) && typeof links[0] === "string" ? links[0] : null;
-    if (!ledgerId) return null;
-    // Sitting stamp: count + date + status active.
-    const d = (existing.data ?? {}) as Record<string, unknown>;
-    const sittings =
-      typeof d[masterCols["Sittings"]] === "number"
-        ? (d[masterCols["Sittings"]] as number)
-        : 0;
-    const writes: CellWrite[] = [
-      { rowId: existing.id, columnKey: masterCols["Sittings"], value: sittings + 1 },
-      { rowId: existing.id, columnKey: masterCols["Last sitting"], value: new Date().toISOString().slice(0, 10) },
-      { rowId: existing.id, columnKey: masterCols["Status"], value: "opt-active" },
-      ...(input.questLogId
-        ? [{ rowId: existing.id, columnKey: masterCols["Quest log"], value: [input.questLogId] }]
-        : []),
-      ...(input.outputTableId
-        ? [{ rowId: existing.id, columnKey: masterCols["Output table"], value: [input.outputTableId] }]
-        : []),
-    ] as CellWrite[];
-    await writeCells(masterId, await liveColumns(masterId), writes);
-    return { questRowId: existing.id, questLedgerId: ledgerId, continued: true };
-  }
-
-  // Create: quest ledger (machinery core + sculpted columns, D6 Map icon)
-  // + master row.
+  // Quest-ledger schema: machinery core (SYSTEM columns) + sculpted extras.
   const coreNames = new Set(
     QUEST_LEDGER_COLUMNS.map((c) => c.name.toLowerCase()),
   );
@@ -401,14 +392,110 @@ export async function ensureQuest(input: {
       type: c.type,
       description: c.description.trim().slice(0, 300),
     }));
-  const questLedgerId = await createSystemTable({
-    userId,
-    title: `${label} — Quest Ledger`,
-    parentId: input.targetFolderId,
-    icon: "lucide:Map",
-    columns: [...QUEST_LEDGER_COLUMNS, ...sculpted],
-  });
+  const mintQuestLedger = () =>
+    createSystemTable({
+      userId,
+      title: `${label} — Quest Ledger`,
+      parentId: input.targetFolderId,
+      // Referenced to the charter like the master, so the charter's
+      // reference chip is the one place every quest artifact is found.
+      ownedByNoteId: input.charterId,
+      icon: "lucide:Map",
+      columns: [
+        ...QUEST_LEDGER_COLUMNS.map((c) => ({ ...c, system: true })),
+        ...sculpted,
+      ],
+    });
   const today = new Date().toISOString().slice(0, 10);
+
+  // Continue: case-insensitive label match over the master's rows (a master
+  // holds dozens of quests at most — a scan is the simple, correct lookup).
+  const rows = await prisma.dataRow.findMany({
+    where: { tableId: masterId, deletedAt: null },
+    select: { id: true, data: true },
+  });
+  const existing = rows.find((r) => {
+    const v = ((r.data ?? {}) as Record<string, unknown>)[questKey];
+    return typeof v === "string" && v.trim().toLowerCase() === label.toLowerCase();
+  });
+  if (existing) {
+    const d = (existing.data ?? {}) as Record<string, unknown>;
+    const links = d[ledgerLinkKey];
+    let ledgerId =
+      Array.isArray(links) && typeof links[0] === "string" ? links[0] : null;
+    if (ledgerId) {
+      const alive = await prisma.contentNode.findFirst({
+        where: { id: ledgerId, ownerId: userId, contentType: "data", deletedAt: null },
+        select: { id: true },
+      });
+      if (!alive) ledgerId = null;
+    }
+    // A quest row with no live ledger is the user's own declaration of a
+    // quest — typed into the master grid or inserted by the AI (the master
+    // is visible from mark time now) — or a row whose ledger was trashed.
+    // This used to return null, and the run silently fell back to the
+    // markdown-only path. Mint the ledger and complete the row instead.
+    const healed = !ledgerId;
+    if (!ledgerId) ledgerId = await mintQuestLedger();
+    const sittings =
+      typeof d[masterCols["Sittings"]] === "number"
+        ? (d[masterCols["Sittings"]] as number)
+        : 0;
+    const objectiveBlank =
+      typeof d[masterCols["Objective"]] !== "string" ||
+      !(d[masterCols["Objective"]] as string).trim();
+    const writes: CellWrite[] = [
+      { rowId: existing.id, columnKey: masterCols["Sittings"], value: sittings + 1 },
+      { rowId: existing.id, columnKey: masterCols["Last sitting"], value: today },
+      { rowId: existing.id, columnKey: masterCols["Status"], value: "opt-active" },
+      ...(healed
+        ? [
+            { rowId: existing.id, columnKey: ledgerLinkKey, value: [ledgerId] },
+            ...(typeof d[masterCols["Started"]] === "string"
+              ? []
+              : [{ rowId: existing.id, columnKey: masterCols["Started"], value: today }]),
+            ...(objectiveBlank
+              ? [{ rowId: existing.id, columnKey: masterCols["Objective"], value: input.objective.slice(0, 2000) }]
+              : []),
+          ]
+        : []),
+      ...(input.questLogId
+        ? [{ rowId: existing.id, columnKey: masterCols["Quest log"], value: [input.questLogId] }]
+        : []),
+      ...(input.outputTableId
+        ? [{ rowId: existing.id, columnKey: masterCols["Output table"], value: [input.outputTableId] }]
+        : []),
+    ] as CellWrite[];
+    const stamped = await writeCells(masterId, await liveColumns(masterId), writes);
+    if (!stamped.ok) {
+      // A refused stamp means the master no longer matches this module (a
+      // column the machinery needs is gone or retyped). Say so loudly rather
+      // than run a sitting the master will never record.
+      logger.warn({
+        layer: "ai",
+        event: "quests:master_stamp_refused",
+        summary: `master ledger refused the sitting stamp for quest "${label}"`,
+        attrs: {
+          masterId,
+          questRowId: existing.id,
+          refused: JSON.stringify(stamped.results).slice(0, 2000),
+        },
+      });
+      return null;
+    }
+    if (healed) {
+      logger.info({
+        layer: "ai",
+        event: "quests:ledger_healed",
+        summary: `quest "${label}" had no live ledger — minted and linked`,
+        attrs: { masterId, questRowId: existing.id, questLedgerId: ledgerId },
+      });
+    }
+    return { questRowId: existing.id, questLedgerId: ledgerId, continued: true };
+  }
+
+  // Create: quest ledger + master row.
+  const questLedgerId = await mintQuestLedger();
   const [questRowId] = await createRows(masterId, await liveColumns(masterId), 1, userId);
   const writes: CellWrite[] = [
     { rowId: questRowId, columnKey: questKey, value: label },
@@ -425,7 +512,21 @@ export async function ensureQuest(input: {
       ? [{ rowId: questRowId, columnKey: masterCols["Quest log"], value: [input.questLogId] }]
       : []),
   ] as CellWrite[];
-  await writeCells(masterId, await liveColumns(masterId), writes);
+  const written = await writeCells(masterId, await liveColumns(masterId), writes);
+  if (!written.ok) {
+    logger.warn({
+      layer: "ai",
+      event: "quests:master_row_refused",
+      summary: `master ledger refused the new quest row for "${label}"`,
+      attrs: {
+        masterId,
+        questRowId,
+        questLedgerId,
+        refused: JSON.stringify(written.results).slice(0, 2000),
+      },
+    });
+    return null;
+  }
   logger.info({
     layer: "ai",
     event: "quests:created",
