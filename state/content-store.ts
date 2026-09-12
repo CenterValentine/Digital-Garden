@@ -1821,8 +1821,15 @@ export const useContentStore = create<ContentState>((set, get) => ({
 
   clearAllWorkspaceTabs: () => {
     commitWorkspace(set, (state) => {
-      Object.values(state.tabs).forEach((tab) =>
-        rememberIntent(tab.contentId, "close")
+      // Close-intents cover pane-attached tabs only. The `tabs` record also
+      // holds residue from previously visited workspaces (restoreWorkspace
+      // merges it forward), and an intent for content this workspace never
+      // displayed would be recorded against the wrong workspace's peers.
+      Object.values(state.panes).forEach((pane) =>
+        pane.tabIds.forEach((tabId) => {
+          const tab = state.tabs[tabId];
+          if (tab) rememberIntent(tab.contentId, "close");
+        })
       );
       const activePaneId = isPaneVisible(state.layoutMode, state.activePaneId)
         ? state.activePaneId

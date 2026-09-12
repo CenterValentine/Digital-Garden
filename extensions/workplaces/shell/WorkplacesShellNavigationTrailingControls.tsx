@@ -10,6 +10,7 @@ import {
   getPaneLabel,
   type WorkspacePaneId,
 } from "@/state/content-store";
+import { collectPaneAttachedTabs } from "@/state/workspace-tab-filter-store";
 
 /**
  * Clear-tabs control.
@@ -29,8 +30,12 @@ export function WorkplacesShellNavigationTrailingControls() {
     (state) => state.clearAllWorkspaceTabs
   );
   const closeContentTab = useContentStore((state) => state.closeContentTab);
+  // Pane-attached tabs only — the raw `tabs` record accumulates entries
+  // across workspace switches (restoreWorkspace merges; panes are rebuilt),
+  // so counting it directly inflates the number with other workspaces'
+  // residue. See collectPaneAttachedTabs.
   const workspaceTabCount = useContentStore(
-    (state) => Object.keys(state.tabs).length
+    (state) => collectPaneAttachedTabs(state.panes, state.tabs).length
   );
   const layoutMode = useContentStore((state) => state.layoutMode);
   const panes = useContentStore((state) => state.panes);
