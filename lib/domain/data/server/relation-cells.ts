@@ -60,7 +60,8 @@ export function relationWriteBlock(column: DataColumn): string | null {
 export async function resolveRelationCell(
   column: DataColumn,
   raw: unknown,
-  viewerId: string
+  viewerId: string,
+  cache?: RelationTargetCache
 ): Promise<{ rowIds: string[] } | { error: string }> {
   const blocked = relationWriteBlock(column);
   if (blocked) return { error: blocked };
@@ -86,55 +87,11 @@ export async function resolveRelationCell(
     };
   }
 
-  const target = await prisma.dataPayload.findUnique({
-    where: { contentId: targetTableId },
-    select: {
-      content: { select: { title: true } },
-      columns: {
-        where: { deletedAt: null },
-        orderBy: { position: "asc" },
-      },
-      rows: {
-        where: { deletedAt: null },
-        select: { id: true, data: true },
-      },
-    },
-  });
-  if (!target) {
+  const index = await loadTargetIndex(targetTableId, cache);
+  if (!index) {
     return { error: `${column.name}'s target database no longer exists.` };
   }
-
-  const primary =
-    target.columns.find((c) => c.isPrimary) ?? target.columns[0] ?? null;
-
-  // Title → row id. Design scale (plan D1) makes an in-memory index fine,
-  // and it is one query for the whole batch rather than one per entry.
-  const byTitle = new Map<string, string[]>();
-  if (primary) {
-    for (const row of target.rows) {
-      const data = (row.data ?? {}) as Record<string, unknown>;
-      const text = cellToText(
-        {
-          id: primary.id,
-          key: primary.key,
-          name: primary.name,
-          type: primary.type,
-          position: primary.position,
-          isPrimary: primary.isPrimary,
-          config: (primary.config ?? {}) as DataColumn["config"],
-          description: primary.description,
-          deletedAt: null,
-        },
-        data[primary.key] as never
-      );
-      if (!text) continue;
-      const key = text.trim().toLowerCase();
-      const list = byTitle.get(key);
-      if (list) list.push(row.id);
-      else byTitle.set(key, [row.id]);
-    }
-  }
-  const liveIds = new Set(target.rows.map((r) => r.id));
+  const { title: targetTitle, byTitle, liveIds } = index;
 
   const rowIds: string[] = [];
   const missing: string[] = [];
@@ -162,15 +119,94 @@ export async function resolveRelationCell(
 
   if (missing.length > 0) {
     return {
-      error: `${column.name}: "${missing.join('", "')}" ${missing.length === 1 ? "is not a row" : "are not rows"} in "${target.content.title}". Link only to rows that exist — create them there first, or query_database that table for the exact titles.`,
+      error: `${column.name}: "${missing.join('", "')}" ${missing.length === 1 ? "is not a row" : "are not rows"} in "${targetTitle}". Link only to rows that exist — create them there first, or query_database that table for the exact titles.`,
     };
   }
   if (ambiguous.length > 0) {
     return {
-      error: `${column.name}: "${ambiguous.join('", "')}" ${ambiguous.length === 1 ? "matches" : "match"} more than one row in "${target.content.title}" — use the row id from query_database instead of the title.`,
+      error: `${column.name}: "${ambiguous.join('", "')}" ${ambiguous.length === 1 ? "matches" : "match"} more than one row in "${targetTitle}" — use the row id from query_database instead of the title.`,
     };
   }
   return { rowIds };
+}
+
+
+/**
+ * One target table's title index, built once and reused.
+ *
+ * Without the cache, a 25-row insert touching two relation columns would
+ * re-read the same target table 50 times. The index is per tool call and
+ * deliberately not shared beyond it — rows created earlier in the same call
+ * must not be visible as link targets from a stale snapshot.
+ */
+export type RelationTargetCache = Map<string, TargetIndex | null>;
+
+export function createRelationTargetCache(): RelationTargetCache {
+  return new Map();
+}
+
+interface TargetIndex {
+  title: string;
+  /** Lower-cased primary-cell text → row ids carrying it. */
+  byTitle: Map<string, string[]>;
+  liveIds: Set<string>;
+}
+
+async function loadTargetIndex(
+  targetTableId: string,
+  cache?: RelationTargetCache
+): Promise<TargetIndex | null> {
+  const cached = cache?.get(targetTableId);
+  if (cached !== undefined) return cached;
+
+  const target = await prisma.dataPayload.findUnique({
+    where: { contentId: targetTableId },
+    select: {
+      content: { select: { title: true } },
+      columns: { where: { deletedAt: null }, orderBy: { position: "asc" } },
+      rows: { where: { deletedAt: null }, select: { id: true, data: true } },
+    },
+  });
+  if (!target) {
+    cache?.set(targetTableId, null);
+    return null;
+  }
+
+  const primary =
+    target.columns.find((c) => c.isPrimary) ?? target.columns[0] ?? null;
+  const byTitle = new Map<string, string[]>();
+  if (primary) {
+    for (const row of target.rows) {
+      const data = (row.data ?? {}) as Record<string, unknown>;
+      const text = cellToText(
+        {
+          id: primary.id,
+          key: primary.key,
+          name: primary.name,
+          type: primary.type,
+          position: primary.position,
+          isPrimary: primary.isPrimary,
+          config: (primary.config ?? {}) as DataColumn["config"],
+          description: primary.description,
+          deletedAt: null,
+        },
+        data[primary.key] as never
+      );
+      if (!text) continue;
+      const key = text.trim().toLowerCase();
+      const list = byTitle.get(key);
+      if (list) list.push(row.id);
+      else byTitle.set(key, [row.id]);
+    }
+  }
+
+  const index: TargetIndex = {
+    title: target.content.title,
+    byTitle,
+    liveIds: new Set(target.rows.map((r) => r.id)),
+  };
+  cache?.set(targetTableId, index);
+  return index;
 }
 
 /**

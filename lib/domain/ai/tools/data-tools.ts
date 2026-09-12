@@ -37,6 +37,7 @@ import {
 } from "@/lib/domain/data/server/resolve";
 import { buildDataSchemaDigest } from "@/lib/domain/data/server/digest";
 import {
+  createRelationTargetCache,
   resolveRelationCell,
   writeRelationLinks,
 } from "@/lib/domain/data/server/relation-cells";
@@ -582,6 +583,8 @@ export function createDataTools(ctx: ToolExecuteContext) {
           > = [];
           const skipped: string[] = [];
           const errors: string[] = [];
+          // One read per target table for the whole batch, not per cell.
+          const relationCache = createRelationTargetCache();
           for (let i = 0; i < input.rows.length; i++) {
             const rowInput = input.rows[i];
             const cells: Record<string, unknown> = {};
@@ -596,7 +599,8 @@ export function createDataTools(ctx: ToolExecuteContext) {
                 const resolved = await resolveRelationCell(
                   column,
                   raw,
-                  ctx.userId
+                  ctx.userId,
+                  relationCache
                 );
                 if ("error" in resolved) {
                   errors.push(`Row ${i + 1}: ${resolved.error}`);
