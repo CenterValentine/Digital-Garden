@@ -41,6 +41,118 @@ function describeOptions(options: SelectOption[] | undefined): string {
   return ` — options: ${shown}${more}`;
 }
 
+
+// ── Relation graph (plan AI-RELATIONAL-DATABASE-REACH P3) ────────────────
+//
+// A relation rendered as "- Claims (relation)" told a model nothing: not the
+// target, not which half of the pair it is, not what a rollup counts. A
+// production session read exactly that and concluded the product had no
+// relations at all, then wrote the owner a feature request asking for them.
+// The graph IS the schema for a linked set of tables, so the digest names it.
+//
+// Determinism holds: every name here is a schema-level fact, so the hash
+// moves only when the schema does. Renaming a target table does re-hash this
+// table's digest — correct, since this digest's text genuinely changed.
+
+interface GraphNames {
+  /** DataPayload.contentId → table title. */
+  tables: Map<string, string>;
+  /** DataColumn.id → column name (targets AND same-table relations). */
+  columns: Map<string, string>;
+}
+
+type DigestColumn = {
+  id: string;
+  name: string;
+  type: string;
+  config: unknown;
+};
+
+/**
+ * One batched lookup for every table/column id the graph columns point at.
+ * Two queries regardless of column count; skipped entirely (no queries) for
+ * a table with no relation-family columns, which is most tables.
+ */
+async function resolveGraphNames(
+  columns: DigestColumn[]
+): Promise<GraphNames> {
+  const tableIds = new Set<string>();
+  const columnIds = new Set<string>();
+  for (const column of columns) {
+    if (!GRAPH_TYPES.has(column.type)) continue;
+    const config = (column.config ?? {}) as unknown as DataColumnConfig;
+    if (config.relationTableId) tableIds.add(config.relationTableId);
+    for (const id of [
+      config.symmetricColumnId,
+      config.relationColumnId,
+      config.lookupColumnId,
+      config.rollupColumnId,
+    ]) {
+      if (id) columnIds.add(id);
+    }
+  }
+  if (tableIds.size === 0 && columnIds.size === 0) {
+    return { tables: new Map(), columns: new Map() };
+  }
+
+  const [tables, targetColumns] = await Promise.all([
+    tableIds.size > 0
+      ? prisma.contentNode.findMany({
+          where: { id: { in: [...tableIds] } },
+          select: { id: true, title: true },
+        })
+      : Promise.resolve([]),
+    columnIds.size > 0
+      ? prisma.dataColumn.findMany({
+          where: { id: { in: [...columnIds] } },
+          select: { id: true, name: true },
+        })
+      : Promise.resolve([]),
+  ]);
+
+  const names: GraphNames = {
+    tables: new Map(tables.map((t) => [t.id, t.title])),
+    columns: new Map(targetColumns.map((c) => [c.id, c.name])),
+  };
+  // Same-table relations (what a lookup/rollup traverses) are already in
+  // hand — no query needed, and they win over a stale fetch.
+  for (const column of columns) names.columns.set(column.id, column.name);
+  return names;
+}
+
+const GRAPH_TYPES = new Set(["relation", "lookup", "rollup"]);
+
+/** The bracketed graph clause for a relation, lookup, or rollup column. */
+function describeGraph(
+  column: DigestColumn,
+  config: DataColumnConfig,
+  graph: GraphNames
+): string {
+  const table = (id: string | undefined) =>
+    (id && graph.tables.get(id)) || "an unavailable database";
+  const col = (id: string | undefined) =>
+    (id && graph.columns.get(id)) || "an unavailable column";
+
+  if (column.type === "relation") {
+    const target = table(config.relationTableId);
+    // The backlink half owns no links; saying so is what stops a model
+    // from trying to write through it (the links route refuses).
+    return config.isBacklink
+      ? ` [backlink → ${target}; mirrors "${col(config.symmetricColumnId)}" there, filled by linking from that side]`
+      : ` [relation → ${target}; linked rows, mirrored as "${col(config.symmetricColumnId)}" there]`;
+  }
+  if (column.type === "lookup") {
+    return ` [lookup: reads "${col(config.lookupColumnId)}" through "${col(config.relationColumnId)}" — computed, not writable]`;
+  }
+  if (column.type === "rollup") {
+    const fn = config.rollupFn ?? "count";
+    const over =
+      fn === "count" ? "" : ` of "${col(config.rollupColumnId)}"`;
+    return ` [rollup: ${fn}${over} through "${col(config.relationColumnId)}" — computed, not writable]`;
+  }
+  return "";
+}
+
 /**
  * Build the digest text, or null when the node has no data payload.
  * User-authored descriptions (D9) make this a genuinely good context
@@ -64,7 +176,13 @@ export async function buildDataSchemaDigest(
         // would shift the context hash on every drag — churn with no
         // semantic change. Same reasoning as the bucketed row count.
         orderBy: { key: "asc" },
-        select: { name: true, type: true, description: true, config: true },
+        select: {
+          id: true,
+          name: true,
+          type: true,
+          description: true,
+          config: true,
+        },
       },
       views: {
         orderBy: { position: "asc" },
@@ -82,6 +200,8 @@ export async function buildDataSchemaDigest(
   if (payload.description) lines.push(payload.description);
   lines.push(`Size: ${bucketRowCount(payload.rowCount)}`);
 
+  const graph = await resolveGraphNames(payload.columns);
+
   lines.push("", "Columns:");
   for (const column of payload.columns) {
     const config = (column.config ?? {}) as unknown as DataColumnConfig;
@@ -97,7 +217,7 @@ export async function buildDataSchemaDigest(
           : " [uploaded attachments — cell ids must be FILE nodes; the user uploads via the cell's +, or attach a file you created]"
         : column.type === "contentLink"
           ? " [references to existing app content — notes, folders, any node]"
-          : "";
+          : describeGraph(column, config, graph);
     lines.push(
       `- ${column.name} (${column.type})${intent}${desc}${describeOptions(config.options)}`
     );

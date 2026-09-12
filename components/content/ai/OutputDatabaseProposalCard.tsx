@@ -33,6 +33,16 @@ export interface OutputDatabaseProposalPayload {
       group?: "todo" | "active" | "done";
     }>;
     primary?: boolean;
+    /** relation — the existing database this column links to (title or id). */
+    target?: string;
+    /** relation — what the mirrored column on the target is called. */
+    backlinkName?: string;
+    /** lookup · rollup — the relation column on THIS table it reads across. */
+    through?: string;
+    /** lookup — the target column shown. rollup — the column aggregated. */
+    column?: string;
+    /** rollup — the aggregation. */
+    fn?: string;
   }>;
   dedupeColumn: string | null;
   /** Resolved destination — charter folder, else the chat's target. */
@@ -74,6 +84,28 @@ function loadAppliedState(
     /* storage unavailable — Apply stays enabled */
   }
   return { status: "idle" };
+}
+
+
+/** What a relation/lookup/rollup column does, in the user's words. */
+function describeLink(
+  col: OutputDatabaseProposalPayload["columns"][number],
+): string | null {
+  if (col.type === "relation" && col.target) {
+    return col.backlinkName
+      ? `links to ${col.target} · appears there as "${col.backlinkName}"`
+      : `links to ${col.target}`;
+  }
+  if (col.type === "lookup" && col.through) {
+    return `reads ${col.column ?? "a value"} through ${col.through}`;
+  }
+  if (col.type === "rollup" && col.through) {
+    const fn = col.fn ?? "count";
+    return fn === "count"
+      ? `counts linked rows through ${col.through}`
+      : `${fn} of ${col.column ?? "a value"} through ${col.through}`;
+  }
+  return null;
 }
 
 export function OutputDatabaseProposalCard({
@@ -198,6 +230,11 @@ export function OutputDatabaseProposalCard({
             <div className="text-[11px] text-gray-500 dark:text-gray-400">
               {col.description}
             </div>
+            {describeLink(col) && (
+              <div className="text-[10px] text-indigo-600/80 dark:text-indigo-300/80">
+                {describeLink(col)}
+              </div>
+            )}
             {col.options && col.options.length > 0 && (
               <div className="mt-0.5 flex flex-wrap gap-1">
                 {col.options.map((o) => (

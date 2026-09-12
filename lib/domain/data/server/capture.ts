@@ -141,7 +141,14 @@ export async function preflightCapture(
           .join(", ")}. Fix the captureTo columns and re-propose.`,
       );
     }
-    const blocked = writeBlockReason(column);
+    // Relation columns are writable by the ROW tools (they resolve targets
+    // and write links), but a capture run stamps cells through writeCells
+    // and has no link path — so capture keeps refusing them, explicitly,
+    // rather than inheriting a `writeBlockReason` that no longer covers it.
+    const blocked =
+      column.type === "relation"
+        ? `${column.name} is a relation — a capture run cannot fill links. Capture the target's name into a text column, or link the rows afterwards with update_row.`
+        : writeBlockReason(column);
     if (blocked) {
       return refuse(
         `${blocked} Remove "${column.name}" from captureTo and re-propose.`,

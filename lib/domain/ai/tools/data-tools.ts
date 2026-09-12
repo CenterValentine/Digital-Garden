@@ -37,12 +37,20 @@ import {
 } from "@/lib/domain/data/server/resolve";
 import { buildDataSchemaDigest } from "@/lib/domain/data/server/digest";
 import {
+  createRelationTargetCache,
+  resolveRelationCell,
+  writeRelationLinks,
+} from "@/lib/domain/data/server/relation-cells";
+import { NEW_TABLE_REF_PREFIX } from "@/lib/domain/data/server/linked-schema";
+import {
   createRows,
   writeCells,
   type CellWrite,
 } from "@/lib/domain/data/server/mutations";
 import { ensureLedgersForMasterRows } from "@/lib/domain/ai/quests";
 import {
+  AI_PROPOSABLE_COLUMN_TYPES,
+  ROLLUP_FNS,
   cellToText,
   deriveRowTitle,
   operatorsForType,
@@ -59,6 +67,217 @@ const MAX_LIMIT = 100;
 const RESULT_BYTE_BUDGET = 4096;
 const INSERT_CAP = 25;
 const CONFIRM_THRESHOLD = 10;
+
+// ── Proposed-column schema (plan AI-RELATIONAL-DATABASE-REACH P1) ────────
+//
+// ONE schema for every propose_* tool that describes columns. It used to be
+// two hand-copied Zod enums, and when the product gained relations, lookups
+// and rollups, neither copy grew: a model asked to link three tables found
+// no relation type in its own schema, built the links as hand-typed text ids,
+// and filed a feature request asking for what already shipped. The type list
+// now comes from `AI_PROPOSABLE_COLUMN_TYPES`, and `ai:drift:check` fails if
+// anything here goes back to a literal.
+
+const proposedOption = z.object({
+  label: z.string().min(1).max(120),
+  color: z.string().optional(),
+  group: z.enum(["todo", "active", "done"]).optional(),
+});
+
+const proposedColumn = z.object({
+  name: z.string().min(1).max(120),
+  type: z
+    .enum(AI_PROPOSABLE_COLUMN_TYPES)
+    .describe(
+      "Column type. Money/counts → number; paragraphs → longText; a vocabulary the USER controls → select/multiSelect/status (with options); a link to rows of ANOTHER database → relation (set target); a value read across a relation → lookup; a count/sum over one → rollup; anything free-form → text."
+    ),
+  description: z
+    .string()
+    .min(8)
+    .max(500)
+    .describe(
+      "REQUIRED: what goes in this column and where its values come from — this is the model-facing capture context, not decoration."
+    ),
+  options: z
+    .array(proposedOption)
+    .max(50)
+    .optional()
+    .describe(
+      "select/multiSelect/status ONLY, and REQUIRED for them: the initial vocabulary."
+    ),
+  target: z
+    .string()
+    .max(160)
+    .optional()
+    .describe(
+      "relation ONLY, and REQUIRED for it: the database this column links to — its exact title or id. In propose_linked_databases, use \"$new:<Title>\" for a table in that same proposal."
+    ),
+  backlinkName: z
+    .string()
+    .max(120)
+    .optional()
+    .describe(
+      "relation only: what the mirrored column on the TARGET should be called (it appears there automatically). Defaults to this table's name."
+    ),
+  through: z
+    .string()
+    .max(120)
+    .optional()
+    .describe(
+      "lookup/rollup ONLY, and REQUIRED for them: the name of the relation column on THIS table to read across."
+    ),
+  column: z
+    .string()
+    .max(120)
+    .optional()
+    .describe(
+      "lookup: the column on the target table to show. rollup: the column to aggregate (omit for count)."
+    ),
+  fn: z
+    .enum(ROLLUP_FNS)
+    .optional()
+    .describe("rollup only: the aggregation. Defaults to count."),
+});
+
+type ProposedColumn = z.infer<typeof proposedColumn>;
+
+/**
+ * Shape checks the Zod schema cannot express (a relation needs a target, a
+ * select needs options). Returns a refusal the tool hands straight back to
+ * the model, or null when the column is well-formed.
+ */
+function checkProposedColumn(column: ProposedColumn): string | null {
+  const name = column.name.trim();
+  const selectLike =
+    column.type === "select" ||
+    column.type === "multiSelect" ||
+    column.type === "status";
+  if (selectLike && (!column.options || column.options.length === 0)) {
+    return `"${name}" is a ${column.type} column with NO initial options — an option-less ${column.type} rejects every value written to it. Provide the vocabulary, or make it a text column if the values are free-form.`;
+  }
+  if (!selectLike && column.options && column.options.length > 0) {
+    return `"${name}" is a ${column.type} column — options belong only to select/multiSelect/status.`;
+  }
+  if (column.type === "relation" && !column.target?.trim()) {
+    return `"${name}" is a relation column with no target — name the database it links to.`;
+  }
+  if (column.type !== "relation" && column.target) {
+    return `"${name}" is a ${column.type} column — target belongs only to relation columns.`;
+  }
+  if (
+    (column.type === "lookup" || column.type === "rollup") &&
+    !column.through?.trim()
+  ) {
+    return `"${name}" is a ${column.type} column with no through — name the relation column on this table it reads across.`;
+  }
+  if (column.type === "lookup" && !column.column?.trim()) {
+    return `"${name}" is a lookup with no column — name what it should read on the target table.`;
+  }
+  if (
+    column.type === "rollup" &&
+    (column.fn ?? "count") !== "count" &&
+    !column.column?.trim()
+  ) {
+    return `"${name}" is a ${column.fn} rollup with no column — name what it aggregates.`;
+  }
+  return null;
+}
+
+
+/**
+ * Resolve a relation target for a proposal, or return the refusal the model
+ * should read. Done at PROPOSE time so a target typo costs a tool result
+ * instead of a failed Apply the user has to interpret.
+ */
+async function resolveRelationTarget(
+  ctx: ToolExecuteContext,
+  target: string
+): Promise<{ id: string; title: string } | string> {
+  const ref = target.trim();
+  const node = await prisma.contentNode.findFirst({
+    where: {
+      ownerId: ctx.userId,
+      contentType: "data",
+      deletedAt: null,
+      OR: [{ id: UUID_RE.test(ref) ? ref : undefined }, { title: ref }],
+    },
+    select: { id: true, title: true },
+  });
+  if (!node) {
+    return `Relation target "${ref}" is not one of the user's databases. Use its exact title (describe_database or the mention capsule shows it), or propose the target table too.`;
+  }
+  return node;
+}
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+
+/**
+ * Where a proposed table should live (owner policy: no root scatter — a
+ * table minted at root among hundreds of files is invisible). Beside the
+ * active charter, else the chat's target folder, else nowhere in
+ * particular. Shared by every tool that proposes a new database.
+ */
+async function resolveProposalParent(
+  ctx: ToolExecuteContext
+): Promise<{ id: string; title: string } | null> {
+  let parentId: string | null = null;
+  if (ctx.activeCharter) {
+    const charterNode = await prisma.contentNode.findFirst({
+      where: {
+        id: ctx.activeCharter.contentId,
+        ownerId: ctx.userId,
+        deletedAt: null,
+      },
+      select: { id: true, parentId: true, contentType: true },
+    });
+    // A folder charter IS the charter's folder (same rule as the quest
+    // ledgers in lib/domain/ai/quests.ts).
+    parentId = charterNode
+      ? charterNode.contentType === "folder"
+        ? charterNode.id
+        : charterNode.parentId
+      : null;
+  }
+  if (!parentId && ctx.targetFolderId) parentId = ctx.targetFolderId;
+  if (!parentId) return null;
+  const parent = await prisma.contentNode.findFirst({
+    where: { id: parentId, ownerId: ctx.userId, deletedAt: null },
+    select: { id: true, title: true },
+  });
+  return parent ?? null;
+}
+
+/** The card payload for one proposed column — graph fields only when set. */
+function serialiseProposedColumn(column: ProposedColumn) {
+  return {
+    name: column.name.trim().slice(0, 120),
+    type: column.type,
+    description: column.description.trim(),
+    ...(column.options && column.options.length > 0
+      ? {
+          options: column.options
+            .map((o) => ({
+              label: o.label.trim().slice(0, 120),
+              ...(o.color && /^[a-z][a-z0-9-]{0,23}$/.test(o.color)
+                ? { color: o.color }
+                : {}),
+              ...(column.type === "status"
+                ? { group: o.group ?? ("todo" as const) }
+                : {}),
+            }))
+            .filter((o) => o.label.length > 0),
+        }
+      : {}),
+    ...(column.target ? { target: column.target.trim() } : {}),
+    ...(column.backlinkName ? { backlinkName: column.backlinkName.trim() } : {}),
+    ...(column.through ? { through: column.through.trim() } : {}),
+    ...(column.column ? { column: column.column.trim() } : {}),
+    ...(column.type === "rollup" ? { fn: column.fn ?? ("count" as const) } : {}),
+  };
+}
+
 
 export function createDataTools(ctx: ToolExecuteContext) {
   return {
@@ -284,7 +503,7 @@ export function createDataTools(ctx: ToolExecuteContext) {
 
     insert_rows: tool({
       description:
-        "Append new rows to an associated database. APPEND-ONLY: cannot modify or delete existing rows. Each row is {columnName: value}; select/status/multiSelect accept option labels; dates are ISO strings; file/contentLink cells take arrays of content ids. Max 25 rows per call; batches over 10 require confirmedByUser: true, which you may set ONLY after the user explicitly approved the batch in conversation. Use dedupeBy with a url column when collecting from the web so re-runs never duplicate rows.",
+        "Append new rows to an associated database. APPEND-ONLY: cannot modify or delete existing rows. Each row is {columnName: value}; select/status/multiSelect accept option labels; dates are ISO strings; file/contentLink cells take arrays of content ids. A RELATION cell takes the linked rows' titles (or row ids from query_database) — one value or an array — and the link is written after the row exists, so you can create a row and link it in the same call; the target row must already exist, and the mirrored column on the other table fills in by itself. Max 25 rows per call; batches over 10 require confirmedByUser: true, which you may set ONLY after the user explicitly approved the batch in conversation. Use dedupeBy with a url column when collecting from the web so re-runs never duplicate rows.",
       inputSchema: z.object({
         databaseId: z
           .string()
@@ -357,15 +576,39 @@ export function createDataTools(ctx: ToolExecuteContext) {
           // Translate + validate every row BEFORE creating anything, so a
           // bad batch fails whole instead of half-landing.
           const prepared: Array<Record<string, unknown>> = [];
+          // Relation cells are resolved per row but written AFTER the row
+          // exists — a link needs both ends (plan P4).
+          const preparedLinks: Array<
+            Array<{ columnId: string; rowIds: string[] }>
+          > = [];
           const skipped: string[] = [];
           const errors: string[] = [];
+          // One read per target table for the whole batch, not per cell.
+          const relationCache = createRelationTargetCache();
           for (let i = 0; i < input.rows.length; i++) {
             const rowInput = input.rows[i];
             const cells: Record<string, unknown> = {};
+            const links: Array<{ columnId: string; rowIds: string[] }> = [];
             for (const [ref, raw] of Object.entries(rowInput)) {
               const column = findColumn(live, ref);
               if (!column) {
                 errors.push(`Row ${i + 1}: no column named "${ref}".`);
+                continue;
+              }
+              if (column.type === "relation") {
+                const resolved = await resolveRelationCell(
+                  column,
+                  raw,
+                  ctx.userId,
+                  relationCache
+                );
+                if ("error" in resolved) {
+                  errors.push(`Row ${i + 1}: ${resolved.error}`);
+                  continue;
+                }
+                if (resolved.rowIds.length > 0) {
+                  links.push({ columnId: column.id, rowIds: resolved.rowIds });
+                }
                 continue;
               }
               const blocked = writeBlockReason(column);
@@ -389,6 +632,7 @@ export function createDataTools(ctx: ToolExecuteContext) {
               if (typeof v === "string" && v) seen.add(v.trim().toLowerCase());
             }
             prepared.push(cells);
+            preparedLinks.push(links);
           }
           if (errors.length > 0) {
             return `Nothing inserted — fix these first:\n${errors.join("\n")}\nColumns here: ${live.map((c) => c.name).join(", ")}.`;
@@ -411,6 +655,19 @@ export function createDataTools(ctx: ToolExecuteContext) {
           });
           const result = await writeCells(databaseId, live, writes);
           const failed = result.results.filter((r) => r.status === "error");
+
+          // Links last: the rows they point FROM had to exist first.
+          let linksWritten = 0;
+          for (const [i, rowId] of rowIds.entries()) {
+            for (const link of preparedLinks[i] ?? []) {
+              const { added } = await writeRelationLinks(
+                link.columnId,
+                rowId,
+                link.rowIds
+              );
+              linksWritten += added;
+            }
+          }
           // Hard rule (quests): named rows inserted into a charter's master
           // ledger are quests the moment they exist — each gets its ledger.
           const questLedgers = await ensureLedgersForMasterRows(
@@ -420,7 +677,11 @@ export function createDataTools(ctx: ToolExecuteContext) {
           ).catch(() => 0);
 
           const parts = [
-            `Inserted ${rowIds.length} row${rowIds.length === 1 ? "" : "s"}.`,
+            `Inserted ${rowIds.length} row${rowIds.length === 1 ? "" : "s"}${
+              linksWritten > 0
+                ? ` and ${linksWritten} link${linksWritten === 1 ? "" : "s"}`
+                : ""
+            }.`,
           ];
           if (questLedgers > 0) {
             parts.push(
@@ -456,7 +717,7 @@ export function createDataTools(ctx: ToolExecuteContext) {
 
     update_row: tool({
       description:
-        "Update cells in ONE existing row. Only the columns you pass change — when the user under-specifies, OMIT everything they didn't mention, never guess a value. Pass null to CLEAR a cell, and only when the user asked for it to be blank. Get the rowId from query_database (each result line starts with [rowId]); pass expect with the current values from that same read — a stale expect fails safe instead of overwriting someone's edit, and the result tells you to re-query. All-or-nothing: if any cell is stale or invalid, no cell changes. Cannot touch relations (links) or computed columns, and cannot create or delete rows. File cells accept ONLY ids of file nodes (uploaded attachments, or files you created with a file tool) — other content belongs in a contentLink cell; to attach something from the user's disk, ask them to upload via the cell's + first.",
+        "Update cells in ONE existing row. Only the columns you pass change — when the user under-specifies, OMIT everything they didn't mention, never guess a value. Pass null to CLEAR a cell, and only when the user asked for it to be blank. Get the rowId from query_database (each result line starts with [rowId]); pass expect with the current values from that same read — a stale expect fails safe instead of overwriting someone's edit, and the result tells you to re-query. All-or-nothing: if any cell is stale or invalid, no cell changes. A RELATION cell takes the linked rows' titles (or their row ids) and REPLACES that cell's links, exactly like writing any other cell — pass the full set you want, and null to unlink everything; this is also how you link two rows that already exist. Computed columns (lookup, rollup) have no stored value and cannot be written, and this tool cannot create or delete rows. File cells accept ONLY ids of file nodes (uploaded attachments, or files you created with a file tool) — other content belongs in a contentLink cell; to attach something from the user's disk, ask them to upload via the cell's + first.",
       inputSchema: z.object({
         databaseId: z
           .string()
@@ -515,10 +776,30 @@ export function createDataTools(ctx: ToolExecuteContext) {
 
           const writes: CellWrite[] = [];
           const errors: string[] = [];
+          // Relation cells are written as links after the cell writes land,
+          // so an all-or-nothing cell failure still leaves links untouched.
+          const relationWrites: Array<{ columnId: string; rowIds: string[] }> =
+            [];
           for (const [ref, raw] of entries) {
             const column = findColumn(live, ref);
             if (!column) {
               errors.push(`No column named "${ref}".`);
+              continue;
+            }
+            if (column.type === "relation") {
+              const resolved = await resolveRelationCell(
+                column,
+                raw === null || raw === "" ? [] : raw,
+                ctx.userId
+              );
+              if ("error" in resolved) {
+                errors.push(resolved.error);
+                continue;
+              }
+              relationWrites.push({
+                columnId: column.id,
+                rowIds: resolved.rowIds,
+              });
               continue;
             }
             const blocked = writeBlockReason(column);
@@ -572,13 +853,36 @@ export function createDataTools(ctx: ToolExecuteContext) {
               .map((f) => f.message)
               .join("; ")}. Nothing changed (all-or-nothing).`;
           }
+          // Links last, and only once every cell write succeeded.
+          // A relation cell REPLACES the row's links for that column, the
+          // way writing any other cell replaces its value.
+          let added = 0;
+          let removed = 0;
+          for (const link of relationWrites) {
+            const delta = await writeRelationLinks(
+              link.columnId,
+              input.rowId,
+              link.rowIds
+            );
+            added += delta.added;
+            removed += delta.removed;
+          }
+
           // Hard rule (quests): naming a master-ledger row makes it a quest.
           const questLedgers = await ensureLedgersForMasterRows(
             ctx.userId,
             databaseId,
             [input.rowId],
           ).catch(() => 0);
-          return `Updated ${writes.length} cell${writes.length === 1 ? "" : "s"} on the row.${questLedgers > 0 ? " The row is a quest now — its quest ledger was minted under the charter." : ""} The user sees the change in the grid and can undo it there.`;
+          const cellPart =
+            writes.length > 0
+              ? `Updated ${writes.length} cell${writes.length === 1 ? "" : "s"} on the row.`
+              : "Updated the row.";
+          const linkPart =
+            added > 0 || removed > 0
+              ? ` Links: ${added} added, ${removed} removed.`
+              : "";
+          return `${cellPart}${linkPart}${questLedgers > 0 ? " The row is a quest now — its quest ledger was minted under the charter." : ""} The user sees the change in the grid and can undo it there.`;
         } catch (error) {
           logger.warn({
             layer: "ai",
@@ -778,7 +1082,7 @@ export function createDataTools(ctx: ToolExecuteContext) {
     // column. Same contract as every other propose_* tool.
     propose_database_columns: tool({
       description:
-        "Propose NEW columns for an EXISTING database — the way to answer \"make sure this database has these fields\". Renders a review card; NOTHING is written until the user clicks Apply, so never claim the columns exist. Add-only by design: it cannot rename, retype, or delete a column (those stay the user's own action in the grid — say so if asked). Call describe_database first; columns the table already has are reported as present and dropped from the proposal, so propose the FULL wanted set and let the diff sort it out. Every column needs a real description (what goes in it, where values come from), and select/multiSelect/status need their initial options or they reject every value.",
+        "Propose NEW columns for an EXISTING database — the way to answer \"make sure this database has these fields\". Renders a review card; NOTHING is written until the user clicks Apply, so never claim the columns exist. Add-only by design: it cannot rename, retype, or delete a column (those stay the user's own action in the grid — say so if asked). Call describe_database first; columns the table already has are reported as present and dropped from the proposal, so propose the FULL wanted set and let the diff sort it out. Every column needs a real description (what goes in it, where values come from), and select/multiSelect/status need their initial options or they reject every value. This is also how a table gains a LINK to another one: propose a relation column with `target` set to that database's exact title — its mirrored column appears there automatically. When the table to link to does not exist yet, use propose_linked_databases instead.",
       inputSchema: z.object({
         databaseId: z
           .string()
@@ -787,48 +1091,7 @@ export function createDataTools(ctx: ToolExecuteContext) {
             "The database's id or exact name; omit in a chat open on the database"
           ),
         columns: z
-          .array(
-            z.object({
-              name: z.string().min(1).max(120),
-              type: z
-                .enum([
-                  "text",
-                  "longText",
-                  "number",
-                  "checkbox",
-                  "date",
-                  "select",
-                  "multiSelect",
-                  "status",
-                  "url",
-                  "email",
-                  "file",
-                ])
-                .describe(
-                  "Column type. Money/counts → number; paragraphs → longText; a vocabulary the USER controls → select/multiSelect/status (with options); anything free-form → text."
-                ),
-              description: z
-                .string()
-                .min(8)
-                .max(500)
-                .describe(
-                  "REQUIRED: what goes in this column and where its values come from — this is the model-facing capture context, not decoration."
-                ),
-              options: z
-                .array(
-                  z.object({
-                    label: z.string().min(1).max(120),
-                    color: z.string().optional(),
-                    group: z.enum(["todo", "active", "done"]).optional(),
-                  })
-                )
-                .max(50)
-                .optional()
-                .describe(
-                  "select/multiSelect/status ONLY, and REQUIRED for them: the initial vocabulary."
-                ),
-            })
-          )
+          .array(proposedColumn)
           .min(1)
           .max(30)
           .describe("The columns you want the database to have, in display order."),
@@ -892,36 +1155,31 @@ export function createDataTools(ctx: ToolExecuteContext) {
               );
               continue;
             }
-            const selectLike =
-              raw.type === "select" ||
-              raw.type === "multiSelect" ||
-              raw.type === "status";
-            if (selectLike && (!raw.options || raw.options.length === 0)) {
-              return `"${name}" is a ${raw.type} column with NO initial options — an option-less ${raw.type} rejects every value written to it. Provide the vocabulary, or make it a text column if the values are free-form.`;
+            const problem = checkProposedColumn(raw);
+            if (problem) return problem;
+            if (raw.target?.startsWith(NEW_TABLE_REF_PREFIX)) {
+              return `"${name}" targets ${raw.target}, but this tool only adds columns to a table that already exists. Use propose_linked_databases to create the target alongside it.`;
             }
-            if (!selectLike && raw.options && raw.options.length > 0) {
-              return `"${name}" is a ${raw.type} column — options belong only to select/multiSelect/status.`;
+            if (raw.type === "relation") {
+              const target = await resolveRelationTarget(ctx, raw.target!);
+              if (typeof target === "string") return target;
             }
-            additions.push({
-              name,
-              type: raw.type,
-              description: raw.description.trim(),
-              ...(raw.options
-                ? {
-                    options: raw.options
-                      .map((o) => ({
-                        label: o.label.trim().slice(0, 120),
-                        ...(o.color && /^[a-z][a-z0-9-]{0,23}$/.test(o.color)
-                          ? { color: o.color }
-                          : {}),
-                        ...(raw.type === "status"
-                          ? { group: o.group ?? ("todo" as const) }
-                          : {}),
-                      }))
-                      .filter((o) => o.label.length > 0),
-                  }
-                : {}),
-            });
+            // A lookup/rollup must read through a relation that exists on
+            // this table or arrives in this same proposal — checked here so
+            // the model fixes it now instead of on a failed Apply.
+            if (raw.type === "lookup" || raw.type === "rollup") {
+              const through = raw.through!.trim().toLowerCase();
+              const inProposal = input.columns.some(
+                (c) => c.type === "relation" && c.name.trim().toLowerCase() === through
+              );
+              const onTable = live.some(
+                (c) => c.type === "relation" && c.name.trim().toLowerCase() === through
+              );
+              if (!inProposal && !onTable) {
+                return `"${name}" reads through "${raw.through}", which is not a relation column on "${table.title}" and is not in this proposal. Propose the relation too, or point at an existing one.`;
+              }
+            }
+            additions.push(serialiseProposedColumn(raw));
           }
 
           // Nothing to do is an ANSWER, not an error — and a valuable one:
@@ -968,7 +1226,7 @@ export function createDataTools(ctx: ToolExecuteContext) {
     // the USER's Apply click creates the table (POST /api/content/data).
     propose_output_database: tool({
       description:
-        "Propose a NEW database for capturing results when no suitable table exists (or the user asks for one). Renders a review card — NOTHING is created until the user clicks Apply, so never claim the database exists. Derive the schema from the run's objective and write a real description on EVERY column (what goes in it, where values come from) — descriptions are the capture mapping context. Type rule: select/status ONLY for vocabularies the user controls (pipeline stages, your own categories) and ALWAYS with initial options; text for anything the web invents (titles, companies, locations). Include a url column when items have pages — it becomes the dedupe identity. Prefer binding to an EXISTING table when one fits; propose creation only when none does. After the user applies, bind the new table via captureTo in propose_item_iteration.",
+        "Propose ONE new database for capturing results when no suitable table exists (or the user asks for one). Renders a review card — NOTHING is created until the user clicks Apply, so never claim the database exists. Derive the schema from the run's objective and write a real description on EVERY column (what goes in it, where values come from) — descriptions are the capture mapping context. Type rule: select/status ONLY for vocabularies the user controls (pipeline stages, your own categories) and ALWAYS with initial options; text for anything the web invents (titles, companies, locations); a relation (with `target`) to point at rows of a database that ALREADY exists — never a text column of ids standing in for a link. Include a url column when items have pages — it becomes the dedupe identity. Prefer binding to an EXISTING table when one fits; propose creation only when none does. If the user wants SEVERAL tables that reference each other, use propose_linked_databases — this tool creates one. After the user applies, bind the new table via captureTo in propose_item_iteration.",
       inputSchema: z.object({
         title: z
           .string()
@@ -982,42 +1240,7 @@ export function createDataTools(ctx: ToolExecuteContext) {
           .describe("One sentence on what this table captures — shown on the card."),
         columns: z
           .array(
-            z.object({
-              name: z.string().min(1).max(120),
-              type: z
-                .enum([
-                  "text",
-                  "longText",
-                  "number",
-                  "url",
-                  "date",
-                  "checkbox",
-                  "select",
-                  "multiSelect",
-                  "status",
-                  "file",
-                  "email",
-                  "phone",
-                ])
-                .describe("Column type — see the type rule in the tool description."),
-              description: z
-                .string()
-                .min(8)
-                .max(500)
-                .describe(
-                  "REQUIRED on every column: what goes in it and where values come from — this is the model-facing capture context, not decoration.",
-                ),
-              options: z
-                .array(
-                  z.object({
-                    label: z.string().min(1).max(120),
-                    color: z.string().optional(),
-                    group: z.enum(["todo", "active", "done"]).optional(),
-                  }),
-                )
-                .max(50)
-                .optional()
-                .describe("select/multiSelect/status: the initial vocabulary (REQUIRED for those types — an option-less select rejects every value)."),
+            proposedColumn.extend({
               primary: z
                 .boolean()
                 .optional()
@@ -1048,35 +1271,19 @@ export function createDataTools(ctx: ToolExecuteContext) {
               return `Duplicate column name "${name}" — every column needs a distinct name.`;
             }
             seen.add(lower);
-            const selectLike =
-              raw.type === "select" ||
-              raw.type === "multiSelect" ||
-              raw.type === "status";
-            if (selectLike && (!raw.options || raw.options.length === 0)) {
-              return `"${name}" is a ${raw.type} column with NO initial options — an option-less ${raw.type} rejects every captured value (owner smoke, 2026-09-02). Provide the initial vocabulary, or make it a text column if the web controls the values.`;
+            const problem = checkProposedColumn(raw);
+            if (problem) return problem;
+            // A single new table cannot host a `$new:` reference — there is
+            // no sibling in this proposal to point at.
+            if (raw.target?.startsWith(NEW_TABLE_REF_PREFIX)) {
+              return `"${name}" targets ${raw.target}, but this tool creates ONE table. Use propose_linked_databases to create tables that reference each other.`;
             }
-            if (!selectLike && raw.options && raw.options.length > 0) {
-              return `"${name}" is a ${raw.type} column — options belong only to select/multiSelect/status.`;
+            if (raw.type === "relation") {
+              const target = await resolveRelationTarget(ctx, raw.target!);
+              if (typeof target === "string") return target;
             }
             columns.push({
-              name: name.slice(0, 120),
-              type: raw.type,
-              description: raw.description.trim(),
-              ...(raw.options
-                ? {
-                    options: raw.options
-                      .map((o) => ({
-                        label: o.label.trim().slice(0, 120),
-                        ...(o.color && /^[a-z][a-z0-9-]{0,23}$/.test(o.color)
-                          ? { color: o.color }
-                          : {}),
-                        ...(raw.type === "status"
-                          ? { group: o.group ?? ("todo" as const) }
-                          : {}),
-                      }))
-                      .filter((o) => o.label.length > 0),
-                  }
-                : {}),
+              ...serialiseProposedColumn(raw),
               ...(raw.primary ? { primary: true } : {}),
             });
           }
@@ -1100,39 +1307,9 @@ export function createDataTools(ctx: ToolExecuteContext) {
               return `dedupeColumn "${input.dedupeColumn}" is not one of the proposed columns.`;
             }
           }
-          // Placement (owner policy: no root scatter — a table minted at
-          // root among hundreds of files is invisible): home the new table
-          // beside the active charter, else in the chat's target folder.
-          let parentId: string | null = null;
-          let parentTitle: string | null = null;
-          if (ctx.activeCharter) {
-            const charterNode = await prisma.contentNode.findFirst({
-              where: {
-                id: ctx.activeCharter.contentId,
-                ownerId: ctx.userId,
-                deletedAt: null,
-              },
-              select: { id: true, parentId: true, contentType: true },
-            });
-            // A folder charter IS the charter's folder (same rule as the
-            // quest ledgers in lib/domain/ai/quests.ts).
-            parentId = charterNode
-              ? charterNode.contentType === "folder"
-                ? charterNode.id
-                : charterNode.parentId
-              : null;
-          }
-          if (!parentId && ctx.targetFolderId) {
-            parentId = ctx.targetFolderId;
-          }
-          if (parentId) {
-            const parent = await prisma.contentNode.findFirst({
-              where: { id: parentId, ownerId: ctx.userId, deletedAt: null },
-              select: { id: true, title: true },
-            });
-            parentId = parent?.id ?? null;
-            parentTitle = parent?.title ?? null;
-          }
+          const parent = await resolveProposalParent(ctx);
+          const parentId = parent?.id ?? null;
+          const parentTitle = parent?.title ?? null;
           return JSON.stringify({
             __outputDatabaseProposal: true,
             title: input.title.trim().slice(0, 120),
@@ -1153,6 +1330,211 @@ export function createDataTools(ctx: ToolExecuteContext) {
             error,
           });
           return "Proposing the database failed with an internal error — nothing was created; tell the user.";
+        }
+      },
+    }),
+    // ─── propose_linked_databases ───────────────────────────
+    // P2 (plan AI-RELATIONAL-DATABASE-REACH). Origin: a production session
+    // asked for three tables that reference each other. The model could only
+    // answer with four independent proposal cards — three tables plus a
+    // column addition — so nothing could point at anything, and it fell back
+    // to hand-typed text ids (EXP-012) for every link.
+    //
+    // A linked schema is one decision, so it is one card and one transaction.
+    // Deliberately a SEPARATE tool from propose_output_database: that tool's
+    // one-table contract is named in several prompts and by the capture flow,
+    // and widening it would change what every one of those already means.
+    propose_linked_databases: tool({
+      description:
+        "Propose a SET of databases that reference each other — the way to answer \"build these tables and link them\". Renders ONE review card; nothing is created until the user clicks Apply, which creates every table, relation and rollup in a single transaction (all of it, or none). Use this whenever two or more tables need to point at each other, or when a table the user ALREADY has should link to new ones — put that one in `extend` rather than rebuilding it as an index of the others. Inside `tables`, a relation targets a sibling with \"$new:<Title>\"; anywhere, it targets an existing database by exact title. Relations are two-sided: the mirrored column appears on the target automatically, so never propose both halves. NEVER invent text \"ID\" columns to stand in for links.",
+      inputSchema: z.object({
+        tables: z
+          .array(
+            z.object({
+              title: z.string().min(1).max(120),
+              purpose: z
+                .string()
+                .max(300)
+                .optional()
+                .describe("One sentence on what this table holds — shown on the card and kept as its description."),
+              columns: z
+                .array(
+                  proposedColumn.extend({
+                    primary: z
+                      .boolean()
+                      .optional()
+                      .describe("Mark exactly ONE column as the primary (the row's title)."),
+                  }),
+                )
+                .min(1)
+                .max(30),
+            }),
+          )
+          .max(6)
+          .optional()
+          .describe("New tables to create, in order. Omit when you are only linking tables that already exist."),
+        extend: z
+          .array(
+            z.object({
+              database: z
+                .string()
+                .min(1)
+                .max(160)
+                .describe("An EXISTING database — its exact title or id."),
+              columns: z
+                .array(proposedColumn)
+                .min(1)
+                .max(30)
+                .describe("Columns to ADD to it — usually the relation(s) joining it to the new tables."),
+            }),
+          )
+          .max(6)
+          .optional()
+          .describe("Tables the user already has that should join this set. Add-only: this never renames, retypes, or removes a column."),
+        rationale: z
+          .string()
+          .max(300)
+          .optional()
+          .describe("One sentence on how these fit together — shown on the card."),
+      }),
+      execute: async (input) => {
+        try {
+          const tables = input.tables ?? [];
+          const extend = input.extend ?? [];
+          if (tables.length === 0 && extend.length === 0) {
+            return "Nothing proposed — give at least one new table, or one existing database to extend.";
+          }
+
+          const newTitles = tables.map((t) => t.title.trim());
+          const newTitleSet = new Set(newTitles.map((t) => t.toLowerCase()));
+          if (newTitleSet.size !== newTitles.length) {
+            return "Two proposed tables share a title — each needs a distinct one, since relations address them by name.";
+          }
+
+          // Resolve every existing database ONCE: the extend targets, and
+          // every relation target that is not a sibling in this proposal.
+          const extendTargets: Array<{ id: string; title: string; columns: unknown[] }> = [];
+          for (const entry of extend) {
+            const dbRef = await resolveDatabaseRef(ctx, entry.database);
+            if ("refusal" in dbRef) return dbRef.refusal;
+            const gate = await resolveJurisdiction(ctx, dbRef.id);
+            if ("refusal" in gate) return gate.refusal;
+            if (gate.table.mode === "query") {
+              return `"${gate.table.title}" is a query database — it synthesizes its columns from the query and has no schema to extend.`;
+            }
+            if (!canAlterSchema(gate.level)) {
+              return `Only "${gate.table.title}"'s owner can add columns to it — tell the user, and suggest they ask the owner.`;
+            }
+            extendTargets.push({
+              id: dbRef.id,
+              title: gate.table.title,
+              columns: [],
+            });
+          }
+
+          // Validate every column of every table, new and extended.
+          const specs: Array<{
+            label: string;
+            columns: ProposedColumn[];
+            relationNames: Set<string>;
+          }> = [
+            ...tables.map((t) => ({
+              label: t.title.trim(),
+              columns: t.columns as ProposedColumn[],
+              relationNames: new Set<string>(),
+            })),
+            ...extend.map((e, i) => ({
+              label: extendTargets[i].title,
+              columns: e.columns as ProposedColumn[],
+              relationNames: new Set<string>(),
+            })),
+          ];
+
+          for (const spec of specs) {
+            const seen = new Set<string>();
+            for (const column of spec.columns) {
+              const name = column.name.trim();
+              const lower = name.toLowerCase();
+              if (seen.has(lower)) {
+                return `"${spec.label}" proposes two columns called "${name}" — every column needs a distinct name.`;
+              }
+              seen.add(lower);
+              const problem = checkProposedColumn(column);
+              if (problem) return `"${spec.label}": ${problem}`;
+              if (column.type === "relation") {
+                spec.relationNames.add(lower);
+                const target = column.target!.trim();
+                if (target.startsWith(NEW_TABLE_REF_PREFIX)) {
+                  const wanted = target.slice(NEW_TABLE_REF_PREFIX.length).toLowerCase();
+                  if (!newTitleSet.has(wanted)) {
+                    return `"${spec.label}": relation "${name}" targets ${target}, but no table in this proposal is called "${target.slice(NEW_TABLE_REF_PREFIX.length)}".`;
+                  }
+                } else if (!newTitleSet.has(target.toLowerCase())) {
+                  const resolved = await resolveRelationTarget(ctx, target);
+                  if (typeof resolved === "string") {
+                    return `"${spec.label}": ${resolved}`;
+                  }
+                }
+              }
+            }
+            // Lookups and rollups resolve against this table's relations —
+            // the ones proposed here, plus (for an extended table) any it
+            // already has. Checked now so Apply cannot fail on a typo.
+            for (const column of spec.columns) {
+              if (column.type !== "lookup" && column.type !== "rollup") continue;
+              const through = column.through!.trim().toLowerCase();
+              if (spec.relationNames.has(through)) continue;
+              const existing = extendTargets.find((t) => t.title === spec.label);
+              const live = existing
+                ? await prisma.dataColumn.findFirst({
+                    where: {
+                      tableId: existing.id,
+                      type: "relation",
+                      deletedAt: null,
+                      name: column.through!.trim(),
+                    },
+                    select: { id: true },
+                  })
+                : null;
+              if (!live) {
+                return `"${spec.label}": ${column.type} "${column.name}" reads through "${column.through}", which is not a relation column there or in this proposal.`;
+              }
+            }
+          }
+
+          // Placement: same rule as propose_output_database — beside the
+          // active charter, else the chat's target folder, never root.
+          const parent = await resolveProposalParent(ctx);
+
+          return JSON.stringify({
+            __linkedDatabasesProposal: true,
+            rationale: input.rationale?.trim() || null,
+            parentId: parent?.id ?? null,
+            parentTitle: parent?.title ?? null,
+            tables: tables.map((t) => ({
+              title: t.title.trim().slice(0, 120),
+              purpose: t.purpose?.trim() || null,
+              columns: (t.columns as Array<ProposedColumn & { primary?: boolean }>).map(
+                (c) => ({
+                  ...serialiseProposedColumn(c),
+                  ...(c.primary ? { primary: true } : {}),
+                }),
+              ),
+            })),
+            extend: extend.map((e, i) => ({
+              databaseId: extendTargets[i].id,
+              databaseTitle: extendTargets[i].title,
+              columns: (e.columns as ProposedColumn[]).map(serialiseProposedColumn),
+            })),
+          });
+        } catch (error) {
+          logger.warn({
+            layer: "ai",
+            event: "data_tools:propose_linked_dbs_caught",
+            summary: "propose_linked_databases failed",
+            error,
+          });
+          return "Proposing the linked schema failed with an internal error — nothing was created; tell the user.";
         }
       },
     }),

@@ -512,7 +512,28 @@ export async function createColumn(
     config?: DataColumnConfig;
   }
 ): Promise<string> {
-  return prisma.$transaction(async (tx) => {
+  return prisma.$transaction((tx) => createColumnTx(tx, tableId, input));
+}
+
+/**
+ * The body of `createColumn`, on a caller-supplied transaction.
+ *
+ * Exists so a multi-table schema can be created as ONE transaction (plan
+ * AI-RELATIONAL-DATABASE-REACH P2): a linked set of tables that half-applies
+ * is worse than one that fails, and nested `prisma.$transaction` calls cannot
+ * give that guarantee.
+ */
+export async function createColumnTx(
+  tx: Prisma.TransactionClient,
+  tableId: string,
+  input: {
+    name: string;
+    type: DataColumn["type"];
+    description?: string | null;
+    config?: DataColumnConfig;
+  }
+): Promise<string> {
+  {
     const existing = await tx.dataColumn.findMany({
       where: { tableId },
       select: { key: true, position: true },
@@ -544,7 +565,7 @@ export async function createColumn(
 
     await refreshTableSearchText(tx, tableId);
     return created.id;
-  });
+  }
 }
 
 /**
@@ -561,7 +582,20 @@ export async function createRelationPair(
   input: { name: string; description?: string | null },
   backlinkName: string
 ): Promise<{ forwardId: string; backlinkId: string }> {
-  return prisma.$transaction(async (tx) => {
+  return prisma.$transaction((tx) =>
+    createRelationPairTx(tx, tableId, targetTableId, input, backlinkName)
+  );
+}
+
+/** `createRelationPair` on a caller-supplied transaction (see createColumnTx). */
+export async function createRelationPairTx(
+  tx: Prisma.TransactionClient,
+  tableId: string,
+  targetTableId: string,
+  input: { name: string; description?: string | null },
+  backlinkName: string
+): Promise<{ forwardId: string; backlinkId: string }> {
+  {
     const makeColumn = async (
       onTableId: string,
       name: string,
@@ -613,7 +647,7 @@ export async function createRelationPair(
     await refreshTableSearchText(tx, tableId);
     await refreshTableSearchText(tx, targetTableId);
     return { forwardId: forward.id, backlinkId: backlink.id };
-  });
+  }
 }
 
 /**
@@ -716,7 +750,7 @@ export async function softDeleteColumn(
  * Recompute the table's schema-derived search text (plan B2), so a table
  * stays findable by its column names after any schema edit.
  */
-async function refreshTableSearchText(
+export async function refreshTableSearchText(
   tx: Prisma.TransactionClient,
   tableId: string
 ): Promise<void> {

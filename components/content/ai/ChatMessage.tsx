@@ -65,6 +65,10 @@ import {
   type OutputDatabaseProposalPayload,
 } from "./OutputDatabaseProposalCard";
 import {
+  LinkedDatabasesProposalCard,
+  type LinkedDatabasesProposalPayload,
+} from "./LinkedDatabasesProposalCard";
+import {
   BatchGalleryCard,
   type BatchGalleryGroup,
   type BatchGalleryItem,
@@ -607,6 +611,7 @@ export const ChatMessage = memo(function ChatMessage({
     columnOptionsProposals,
     databaseColumnsProposals,
     outputDatabaseProposals,
+    linkedDatabasesProposals,
     hasRunningTools,
   } = useMemo(() => {
     const images: ImagePayload[] = [];
@@ -621,6 +626,7 @@ export const ChatMessage = memo(function ChatMessage({
     const columnOptionsProps: ColumnOptionsProposalPayload[] = [];
     const dbColumnsProps: DatabaseColumnsProposalPayload[] = [];
     const outputDbProps: OutputDatabaseProposalPayload[] = [];
+    const linkedDbProps: LinkedDatabasesProposalPayload[] = [];
     let running = false;
     const seenImageIds = new Set<string>();
     const seenAudioIds = new Set<string>();
@@ -684,6 +690,11 @@ export const ChatMessage = memo(function ChatMessage({
         const outputDb = parseOutputDatabaseProposal(tp.output);
         if (outputDb) {
           outputDbProps.push(outputDb);
+          continue;
+        }
+        const linkedDbs = parseLinkedDatabasesProposal(tp.output);
+        if (linkedDbs) {
+          linkedDbProps.push(linkedDbs);
         }
       }
     }
@@ -698,6 +709,7 @@ export const ChatMessage = memo(function ChatMessage({
       columnOptionsProposals: columnOptionsProps,
       databaseColumnsProposals: dbColumnsProps,
       outputDatabaseProposals: outputDbProps,
+      linkedDatabasesProposals: linkedDbProps,
       hasRunningTools: running,
     };
   }, [message.parts]);
@@ -1296,6 +1308,7 @@ export const ChatMessage = memo(function ChatMessage({
               if (parseColumnOptionsProposal(toolPart.output) !== null) return null;
               if (parseDatabaseColumnsProposal(toolPart.output) !== null) return null;
               if (parseOutputDatabaseProposal(toolPart.output) !== null) return null;
+              if (parseLinkedDatabasesProposal(toolPart.output) !== null) return null;
             }
 
             return (
@@ -1425,6 +1438,15 @@ export const ChatMessage = memo(function ChatMessage({
         {outputDatabaseProposals.map((payload, i) => (
           <OutputDatabaseProposalCard
             key={`output-db-${i}`}
+            payload={payload}
+          />
+        ))}
+
+        {/* Linked-database proposals (P2) — Apply creates every table and
+            relation in ONE transaction via POST /api/content/data/batch. */}
+        {linkedDatabasesProposals.map((payload, i) => (
+          <LinkedDatabasesProposalCard
+            key={`linked-dbs-${i}`}
             payload={payload}
           />
         ))}
@@ -2519,6 +2541,23 @@ function parseOutputDatabaseProposal(
     const parsed = JSON.parse(str);
     if (parsed.__outputDatabaseProposal) {
       return parsed as OutputDatabaseProposalPayload;
+    }
+  } catch {
+    /* not valid JSON */
+  }
+  return null;
+}
+
+function parseLinkedDatabasesProposal(
+  result: unknown
+): LinkedDatabasesProposalPayload | null {
+  if (result === undefined) return null;
+  const str = typeof result === "string" ? result : JSON.stringify(result);
+  if (!str.includes('"__linkedDatabasesProposal"')) return null;
+  try {
+    const parsed = JSON.parse(str);
+    if (parsed.__linkedDatabasesProposal) {
+      return parsed as LinkedDatabasesProposalPayload;
     }
   } catch {
     /* not valid JSON */

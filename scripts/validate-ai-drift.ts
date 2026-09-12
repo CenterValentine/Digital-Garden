@@ -10,7 +10,7 @@
  * hand-touch four files each holding a copy of the same fact. These gates
  * make that class of drift a build failure instead of a production incident.
  *
- * Five gates, all failures reported in one run:
+ * Six gates, all failures reported in one run:
  *   1. Model identity tables agree (catalog ↔ templates ↔ types unions ↔
  *      settings enum ↔ legacy MODEL_MAP)
  *   2. Catalog completeness for consumed fields (maxOutput; reasoning floor)
@@ -18,6 +18,8 @@
  *      user-configurable or harness-internal, never unclassified/stale)
  *   4. Prompt/description tool-name references resolve to real tools
  *   5. Every AdapterKind has a resolveChatModelFromConnection branch
+ *   6. Database column types agree (product list ↔ AI-proposable list ↔ the
+ *      proposal tools ↔ the create routes)
  *
  * Design notes:
  * - Tool definitions are SOURCE-SCANNED, not instantiated: the factory import
@@ -61,6 +63,11 @@ import {
   OPEN_TAB_AND_READ_DESCRIPTION,
 } from "../lib/domain/ai/tools/open-tab-and-read";
 import { buildSystemPrompt } from "../lib/domain/ai/system-prompt";
+
+import {
+  AI_PROPOSABLE_COLUMN_TYPES,
+  IMPLEMENTED_COLUMN_TYPES,
+} from "../lib/domain/data/types";
 
 const ROOT = path.resolve(__dirname, "..");
 const read = (rel: string) => readFileSync(path.join(ROOT, rel), "utf8");
@@ -510,6 +517,88 @@ for (const template of CONNECTION_TEMPLATES) {
   }
 }
 
+
+// ─────────────────────────────────────────────────────────────────────────
+// Gate 6 — database column types agree everywhere
+// ─────────────────────────────────────────────────────────────────────────
+//
+// The drift this gate exists for happened in production (conversation
+// c66c8efd, 2026-09-12). The proposal tools and the create route each held a
+// hand-copied subset of DataColumnType. When Phase 4 added relation, lookup
+// and rollup, no copy grew — so a model asked to link three tables saw no
+// relation type in its own schema, built the links as hand-typed text ids,
+// and wrote the owner a feature request asking for relations that already
+// shipped. The lists are the bug; this gate is the fix.
+
+const IMPLEMENTED_NOT_PROPOSABLE = new Set(["person"]);
+
+{
+  const proposable = new Set<string>(AI_PROPOSABLE_COLUMN_TYPES);
+  const expected = new Set(
+    IMPLEMENTED_COLUMN_TYPES.filter((t) => !IMPLEMENTED_NOT_PROPOSABLE.has(t)),
+  );
+  assertSetEqual(
+    "gate6",
+    "AI_PROPOSABLE_COLUMN_TYPES vs IMPLEMENTED_COLUMN_TYPES minus person",
+    proposable,
+    expected,
+  );
+
+  // No tool may re-declare the list. `longText` is the tell: it appears in
+  // every hand-copied column-type enum and nowhere else.
+  const dataToolsSource = read("lib/domain/ai/tools/data-tools.ts");
+  if (!/z\s*\.enum\(\s*AI_PROPOSABLE_COLUMN_TYPES\s*\)/.test(dataToolsSource)) {
+    fail(
+      "gate6",
+      "lib/domain/ai/tools/data-tools.ts no longer builds its column-type enum from AI_PROPOSABLE_COLUMN_TYPES — the proposal tools and the product must not keep separate lists",
+    );
+  }
+  for (const match of dataToolsSource.matchAll(/z\s*\.enum\(\[([\s\S]{0,600}?)\]\)/g)) {
+    if (match[1].includes('"longText"')) {
+      fail(
+        "gate6",
+        "lib/domain/ai/tools/data-tools.ts declares a literal column-type enum — use the shared `proposedColumn` schema so the tools and the product cannot diverge",
+      );
+    }
+  }
+
+  // Same for the create routes: the one place that decides what a caller may
+  // create is lib/domain/data/server/linked-schema.ts.
+  for (const routeFile of [
+    "app/api/content/data/route.ts",
+    "app/api/content/data/batch/route.ts",
+  ]) {
+    if (read(routeFile).includes('"longText"')) {
+      fail(
+        "gate6",
+        `${routeFile} declares its own set of creatable column types — validation belongs to applyLinkedSchema, which reads AI_PROPOSABLE_COLUMN_TYPES`,
+      );
+    }
+  }
+
+  // Every proposal tool describes columns with the shared schema.
+  const proposalTools = [
+    "propose_database_columns",
+    "propose_output_database",
+    "propose_linked_databases",
+  ];
+  for (const name of proposalTools) {
+    if (!dataToolsSource.includes(`${name}: tool({`)) {
+      fail("gate6", `${name} is missing from lib/domain/ai/tools/data-tools.ts`);
+    }
+  }
+  const proposedColumnUses = (
+    dataToolsSource.match(/\bproposedColumn\b/g) ?? []
+  ).length;
+  // One definition, one type alias, and at least one use per proposal tool.
+  if (proposedColumnUses < proposalTools.length + 2) {
+    fail(
+      "gate6",
+      `only ${proposedColumnUses} references to \`proposedColumn\` in data-tools.ts — every propose_* tool that takes columns must use the shared schema`,
+    );
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────
 // Report
 // ─────────────────────────────────────────────────────────────────────────
@@ -524,5 +613,5 @@ if (failures.length > 0) {
 }
 
 console.log(
-  `ai:drift:check passed — ${PROVIDER_CATALOG.length} providers, ${allCatalogModelIds.size} catalog models, ${CONNECTION_TEMPLATES.length} templates, ${realToolNames.size} tools (${configurable.size} configurable, ${internal.size} harness-internal), ${ADAPTER_KINDS.length} adapters`,
+  `ai:drift:check passed — ${PROVIDER_CATALOG.length} providers, ${allCatalogModelIds.size} catalog models, ${CONNECTION_TEMPLATES.length} templates, ${realToolNames.size} tools (${configurable.size} configurable, ${internal.size} harness-internal), ${ADAPTER_KINDS.length} adapters, ${AI_PROPOSABLE_COLUMN_TYPES.length} proposable column types`,
 );

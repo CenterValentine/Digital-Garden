@@ -89,9 +89,11 @@ export function normalizeCellInput(column: DataColumn, raw: unknown): unknown {
 
 /** Cells no write tool may target, with the reason the model needs. */
 export function writeBlockReason(column: DataColumn): string | null {
-  if (column.type === "relation") {
-    return `${column.name} is a relation — links change through the table UI, not cell writes (not supported by this tool yet).`;
-  }
+  // `relation` is deliberately NOT here any more (plan
+  // AI-RELATIONAL-DATABASE-REACH P4). A relation cell's value is its set of
+  // links, so the write tools accept it like any other cell and hand it to
+  // resolveRelationCell / writeRelationLinks. Backlinks and target-less
+  // relations are still refused — by `relationWriteBlock`, which knows why.
   if (column.type === "lookup" || column.type === "rollup") {
     return `${column.name} is computed from a relation — it has no stored value to write.`;
   }
@@ -171,7 +173,11 @@ export function prepareCaptureCells(
       );
       continue;
     }
-    const blocked = writeBlockReason(column);
+    // Capture writes cells, never links (see the note in writeBlockReason).
+    const blocked =
+      column.type === "relation"
+        ? `${column.name} is a relation — a capture run cannot fill links. Capture the target's name into a text column, or link the rows afterwards with update_row.`
+        : writeBlockReason(column);
     if (blocked) {
       errors.push(blocked);
       continue;

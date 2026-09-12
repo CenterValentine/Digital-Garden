@@ -10,6 +10,18 @@ last_updated: 2026-09-11
 
 ---
 
+## AI relational database reach — SHIPPED 2026-09-12 (branch `feat/ai-relational-database-reach`)
+
+Plan: [AI-RELATIONAL-DATABASE-REACH-PLAN.md](AI-RELATIONAL-DATABASE-REACH-PLAN.md). Built as one release train; see §3 for the commit table and what the build changed about the plan.
+
+- [x] **Let the assistant see the graph** — digest names relation targets, lookup paths and rollup functions; limit-scoping prompt rule; relational-database prompt block; `ai:drift:check` gate 6 pins the column vocabulary (mutation-tested three ways).
+- [x] **One consent for a linked schema** — `propose_linked_databases`, `POST /api/content/data/batch` in one transaction, `LinkedDatabasesProposalCard` leading with the edges.
+- [x] **Fill the links** — relation cells in `insert_rows` / `update_row`, addressed by target row title or id.
+- [ ] **Owner smoke** (plan §5): replay the recorded request; add a relation + rollup to an existing table; populate from the ledger note.
+- [ ] **Annotate feature-request note `3cc169ea`** with what shipped and which layer each of its five gaps lived in, so the document that started this reflects the outcome.
+- [ ] **Migrate the four prod tables** from that session (text `Claim IDs` / `Source IDs` / `Experience ID` columns → real relations). Owner action in the grid, or a one-off script.
+- [ ] **`note-sections` enumeration source** for `propose_item_iteration` — the governed route for migrating notes too long to attach. Unscheduled.
+
 ## Public file links — follow-ups (2026-09-11, after PR #227 `feat/shareable-image-links`)
 
 The `/f/<token>` capability link (FilePayload.publicToken → 302 to a presigned URL) now exists; these are the other places that still emit the session-only `/api/content/content/<id>/download?stream=true` path and should be switched to it.
