@@ -1,8 +1,8 @@
 /**
  * Database tool metadata (client-safe) — plan Phase 6 / B5.
  *
- * All three are user-configurable: the owner asked for a real opt-out from
- * AI database access, so these get settings toggles rather than
+ * All of these are user-configurable: the owner asked for a real opt-out
+ * from AI database access, so they get settings toggles rather than
  * harness-internal status. NO server imports here.
  */
 
@@ -14,6 +14,7 @@ export const DATA_TOOL_IDS = [
   "propose_column_options",
   "propose_database_columns",
   "propose_output_database",
+  "propose_linked_databases",
 ] as const;
 
 export type DataToolId = (typeof DATA_TOOL_IDS)[number];
@@ -56,5 +57,10 @@ export const DATA_TOOL_METADATA: Record<
     name: "Propose Output Database",
     description:
       "Design a new capture database (schema, per-column descriptions, initial category options) as a review card — nothing is created until you click Apply on the card",
+  },
+  propose_linked_databases: {
+    name: "Propose Linked Databases",
+    description:
+      "Design a set of databases that reference each other — relations, backlinks, and rollups included — as one review card; Apply creates all of them in a single transaction, or none of them",
   },
 };
