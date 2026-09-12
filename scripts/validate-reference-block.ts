@@ -28,6 +28,10 @@ import {
   expandReferences,
   referenceGroupKey,
 } from "@/lib/features/content/reference-group";
+import {
+  toWindowReferenceRow,
+  windowReferenceRowId,
+} from "@/lib/features/content/window-reference";
 import { findTreeNodeById } from "@/lib/domain/content/tree-drop-target";
 import type { TreeNode } from "@/lib/domain/content/types";
 
@@ -265,9 +269,103 @@ const EMPTY = new Set<string>();
   );
 }
 
+// --- Window reference rows (tree-API synthesis contract) -------------------
+//
+// The tree route derives a row per window-ref edge via toWindowReferenceRow
+// and appends it to the host note's `references`. Two invariants matter and
+// neither is visible to tsc:
+//  1. ARRAY ALIASING. The clone must RESET children/references, never share
+//     the real node's arrays — a shared array lets mutations bleed between
+//     the real row and every window row of it, and drags the target's
+//     subtree into the drawer.
+//  2. ID NAMESPACING. `wref:` ids must collide with nothing: not a raw uuid,
+//     not a `refs:` drawer key, not an `smirror:` mirror path — react-arborist
+//     silently corrupts when one id names two rows.
+{
+  const target = node("target-note", {
+    children: [node("target-child")],
+    references: [node("target-attachment", { role: "referenced" })],
+  });
+  const row = toWindowReferenceRow(target, "host-note");
+
+  check(
+    "window row: id is path-scoped under the host",
+    row.id === windowReferenceRowId("host-note", "target-note") &&
+      row.id === "wref:host-note/target-note",
+    row.id,
+  );
+  check(
+    "window row: carries the mirror-row contract",
+    row.mirrorOf === "target-note" &&
+      row.isShortcutMirror === true &&
+      row.windowRef?.targetId === "target-note",
+  );
+  check("window row: re-parented under the host", row.parentId === "host-note");
+  check("window row: role forced to referenced", row.role === "referenced");
+  check(
+    "window row: children and references reset, not aliased",
+    row.children.length === 0 &&
+      row.references?.length === 0 &&
+      row.children !== target.children &&
+      row.references !== target.references,
+  );
+  check(
+    "window row: source node left unmutated",
+    target.id === "target-note" &&
+      target.parentId === null &&
+      target.children.length === 1 &&
+      target.mirrorOf === undefined,
+  );
+  check(
+    "wref prefix collides with no other namespace",
+    !windowReferenceRowId("h", "t").startsWith("refs:") &&
+      !windowReferenceRowId("h", "t").startsWith("smirror:") &&
+      windowReferenceRowId("h", "t") !== "t",
+  );
+}
+
+{
+  // Window rows ride the drawer: spliced in when the host's chip is open,
+  // tagged as nested references, and left out of children when it is not.
+  const target = node("target-note");
+  const host = node("host-note", {
+    references: [toWindowReferenceRow(target, "host-note")],
+  });
+  const data = [host];
+
+  const closed = expandReferences(data, EMPTY, EMPTY);
+  check(
+    "window row: stays out of children while the drawer is closed",
+    closed === data && closed[0].children.length === 0,
+  );
+
+  const open = expandReferences(
+    data,
+    new Set([referenceGroupKey("host-note")]),
+    EMPTY,
+  );
+  const spliced = open[0].children[0];
+  check(
+    "window row: splices into children when the drawer opens",
+    open[0].children.length === 1 &&
+      spliced?.id === "wref:host-note/target-note",
+  );
+  check(
+    "window row: tagged as a nested reference when spliced",
+    spliced?.isNestedReference === true && spliced?.referenceEdge === "only",
+  );
+  check(
+    "window row: findTreeNodeById resolves it inside the references array",
+    findTreeNodeById(data, "wref:host-note/target-note")?.windowRef?.targetId ===
+      "target-note",
+  );
+}
+
 if (failures > 0) {
   console.error(`\nreference-block:check — ${failures} check(s) failed.\n`);
   process.exit(1);
 }
 
-console.log("reference-block:check — OK (identity, ordering, edges, nesting)");
+console.log(
+  "reference-block:check — OK (identity, ordering, edges, nesting, window rows)",
+);
