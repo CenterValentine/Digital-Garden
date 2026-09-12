@@ -965,14 +965,27 @@ export function LeftSidebarContent({
     };
     findPositions(originalTree);
 
-    // Resolve every dragged node. If any can't be found we bail before
-    // touching the optimistic tree.
+    // Resolve every dragged node, dropping any id that no longer names a live
+    // row rather than aborting the whole drag.
+    //
+    // react-arborist reports drag ids from its internal selection set, and it
+    // does NOT prune that set when `data` changes — its `selectedNodes` getter
+    // filters on read, but the drag hook reads the raw `selectedIds`. So a dead
+    // id can ride along in `dragIds` even though the user only grabbed live
+    // rows: a `temp-…` placeholder swapped for its real id after inline
+    // creation, or a node a refetch removed while it was selected. The row the
+    // user actually grabbed is always live (you can only drag a visible row),
+    // so keeping the resolvable ids and moving those matches how react-arborist
+    // itself treats the selection. Before this, one stale companion id aborted
+    // the entire drag with "could not be found in the current tree" — a freshly
+    // created item was unmovable until the tree was refetched (which cleared the
+    // stale id as a side effect). Only bail when nothing at all resolves.
     const dragged = dragIds
       .map((id) => ({ id, node: findTreeNodeById(originalTree, id) }))
       .filter((x): x is { id: string; node: TreeNode } => x.node !== null);
-    if (dragged.length !== dragIds.length) {
+    if (dragged.length === 0) {
       toast.error("Failed to move item", {
-        description: "One or more dragged items could not be found in the current tree.",
+        description: "The dragged item could not be found in the current tree.",
       });
       return;
     }
@@ -1117,9 +1130,12 @@ export function LeftSidebarContent({
 
       // Drag-moves refresh the tree locally (optimistic update above), so
       // outside listeners — the main-panel path breadcrumb — need their own
-      // signal that ancestry may have changed.
+      // signal that ancestry may have changed. Reports the ids that actually
+      // moved (resolved), not the raw drag ids, which may carry a stale entry.
       window.dispatchEvent(
-        new CustomEvent("dg:content-moved", { detail: { ids: dragIds } }),
+        new CustomEvent("dg:content-moved", {
+          detail: { ids: dragged.map((d) => d.id) },
+        }),
       );
 
       if (peopleDragged.length > 0) {
