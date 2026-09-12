@@ -41,6 +41,7 @@ import {
   writeCells,
   type CellWrite,
 } from "@/lib/domain/data/server/mutations";
+import { ensureLedgersForMasterRows } from "@/lib/domain/ai/quests";
 import {
   cellToText,
   deriveRowTitle,
@@ -410,10 +411,22 @@ export function createDataTools(ctx: ToolExecuteContext) {
           });
           const result = await writeCells(databaseId, live, writes);
           const failed = result.results.filter((r) => r.status === "error");
+          // Hard rule (quests): named rows inserted into a charter's master
+          // ledger are quests the moment they exist — each gets its ledger.
+          const questLedgers = await ensureLedgersForMasterRows(
+            ctx.userId,
+            databaseId,
+            rowIds,
+          ).catch(() => 0);
 
           const parts = [
             `Inserted ${rowIds.length} row${rowIds.length === 1 ? "" : "s"}.`,
           ];
+          if (questLedgers > 0) {
+            parts.push(
+              `${questLedgers} quest ledger${questLedgers === 1 ? "" : "s"} minted under the charter — these rows are quests now; a run proposed with that quest name continues them.`,
+            );
+          }
           if (skipped.length > 0) {
             parts.push(`Skipped ${skipped.length} duplicate${skipped.length === 1 ? "" : "s"}:\n${skipped.join("\n")}`);
           }
@@ -559,7 +572,13 @@ export function createDataTools(ctx: ToolExecuteContext) {
               .map((f) => f.message)
               .join("; ")}. Nothing changed (all-or-nothing).`;
           }
-          return `Updated ${writes.length} cell${writes.length === 1 ? "" : "s"} on the row. The user sees the change in the grid and can undo it there.`;
+          // Hard rule (quests): naming a master-ledger row makes it a quest.
+          const questLedgers = await ensureLedgersForMasterRows(
+            ctx.userId,
+            databaseId,
+            [input.rowId],
+          ).catch(() => 0);
+          return `Updated ${writes.length} cell${writes.length === 1 ? "" : "s"} on the row.${questLedgers > 0 ? " The row is a quest now — its quest ledger was minted under the charter." : ""} The user sees the change in the grid and can undo it there.`;
         } catch (error) {
           logger.warn({
             layer: "ai",

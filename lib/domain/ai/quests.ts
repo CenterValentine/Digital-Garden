@@ -460,6 +460,45 @@ export async function ensureMasterLedger(
     // Stamp points at a deleted node — self-heal by re-creating below.
   }
 
+  // ADOPT before minting (prod 2026-09-11): a wiped stamp — the starter
+  // scaffold used to replace the payload's metadata — must never cost a
+  // second master. The master is referenced to the charter and carries the
+  // D6 icon, so find it the way the tree does and re-stamp.
+  const adoptable = await prisma.contentNode.findFirst({
+    where: {
+      ownerId: userId,
+      ownedByNoteId: charter.contentId,
+      contentType: "data",
+      customIcon: "lucide:LibraryBig",
+      deletedAt: null,
+    },
+    select: { id: true },
+    orderBy: { createdAt: "asc" },
+  });
+  if (adoptable) {
+    await prisma.notePayload.update({
+      where: { contentId: charter.contentId },
+      data: {
+        metadata: {
+          ...meta,
+          [MASTER_LEDGER_META_KEY]: adoptable.id,
+        } as unknown as Prisma.InputJsonValue,
+      },
+    });
+    logger.info({
+      layer: "ai",
+      event: "quests:master_adopted",
+      summary: `master ledger re-stamped for charter ${charter.title}`,
+      attrs: { masterId: adoptable.id, charterId: charter.contentId },
+    });
+    return {
+      masterId: adoptable.id,
+      masterCols: await columnKeysByName(adoptable.id),
+      questHomeFolderId,
+      created: false,
+    };
+  }
+
   const masterId = await createSystemTable({
     userId,
     title: `${charter.title} — Master Ledger`,
@@ -489,6 +528,135 @@ export async function ensureMasterLedger(
     questHomeFolderId,
     created: true,
   };
+}
+
+// ── Hard rule: a quest row never exists without its ledger ───────────────
+
+/** Is this table a charter's master ledger? A cheap gate for the row and
+ *  cell hooks: one PK lookup on the table (D6 icon + charter ownership are
+ *  the marker), one on its charter (the stamp confirms it). */
+async function masterLedgerCharter(
+  userId: string,
+  tableId: string,
+): Promise<{ contentId: string; questHomeFolderId: string | null } | null> {
+  const table = await prisma.contentNode.findFirst({
+    where: {
+      id: tableId,
+      ownerId: userId,
+      contentType: "data",
+      customIcon: "lucide:LibraryBig",
+      deletedAt: null,
+      ownedByNoteId: { not: null },
+    },
+    select: { ownedByNoteId: true },
+  });
+  if (!table?.ownedByNoteId) return null;
+  const charter = await prisma.contentNode.findFirst({
+    where: { id: table.ownedByNoteId, ownerId: userId, deletedAt: null },
+    select: {
+      id: true,
+      parentId: true,
+      contentType: true,
+      notePayload: { select: { metadata: true } },
+    },
+  });
+  if (!charter) return null;
+  const meta = (charter.notePayload?.metadata ?? {}) as Record<string, unknown>;
+  if (meta[MASTER_LEDGER_META_KEY] !== tableId) return null;
+  return {
+    contentId: charter.id,
+    questHomeFolderId:
+      charter.contentType === "folder" ? charter.id : charter.parentId,
+  };
+}
+
+/**
+ * Hard rule (owner, 2026-09-11): a quest row never exists without its quest
+ * ledger — "creating the thing creates its ledger", the same rule marking a
+ * charter follows. Called by every path that can put a NAMED row into a
+ * master ledger outside a run: the grid's cell writes (blank rows are
+ * created first and named after), insert_rows, update_row. Rows with a
+ * blank Quest name wait for their name. Re-links an existing ledger before
+ * minting. Returns how many ledgers were minted or re-linked; a cheap no-op
+ * for any other table.
+ */
+export async function ensureLedgersForMasterRows(
+  userId: string,
+  tableId: string,
+  rowIds: string[],
+): Promise<number> {
+  if (rowIds.length === 0) return 0;
+  const charter = await masterLedgerCharter(userId, tableId);
+  if (!charter) return 0;
+  const masterCols = await columnKeysByName(tableId);
+  const questKey = masterCols["Quest"];
+  const ledgerLinkKey = masterCols["Quest ledger"];
+  if (!questKey || !ledgerLinkKey) return 0;
+  const rows = await prisma.dataRow.findMany({
+    where: { id: { in: rowIds }, tableId, deletedAt: null },
+    select: { id: true, data: true },
+  });
+  let count = 0;
+  for (const row of rows) {
+    const d = (row.data ?? {}) as Record<string, unknown>;
+    const label =
+      typeof d[questKey] === "string"
+        ? (d[questKey] as string).trim().slice(0, 120)
+        : "";
+    if (!label) continue;
+    const links = d[ledgerLinkKey];
+    const linked =
+      Array.isArray(links) && typeof links[0] === "string" ? links[0] : null;
+    if (linked) {
+      const alive = await prisma.contentNode.findFirst({
+        where: { id: linked, ownerId: userId, contentType: "data", deletedAt: null },
+        select: { id: true },
+      });
+      if (alive) continue;
+    }
+    const orphan = await prisma.contentNode.findFirst({
+      where: {
+        ownerId: userId,
+        ownedByNoteId: charter.contentId,
+        contentType: "data",
+        deletedAt: null,
+        title: `${label} — Quest Ledger`,
+      },
+      select: { id: true },
+      orderBy: { createdAt: "asc" },
+    });
+    const ledgerId =
+      orphan?.id ??
+      (await createSystemTable({
+        userId,
+        title: `${label} — Quest Ledger`,
+        parentId: charter.questHomeFolderId,
+        ownedByNoteId: charter.contentId,
+        icon: "lucide:Map",
+        columns: QUEST_LEDGER_COLUMNS.map((c) => ({ ...c, system: true })),
+      }));
+    await ensureQuestRelation(ledgerId, tableId);
+    const stamped = await writeCells(tableId, await liveColumns(tableId), [
+      { rowId: row.id, columnKey: ledgerLinkKey, value: [ledgerId] },
+    ] as CellWrite[]);
+    if (!stamped.ok) {
+      logger.warn({
+        layer: "ai",
+        event: "quests:ledger_for_row_refused",
+        summary: `master refused the ledger link for quest "${label}"`,
+        attrs: { masterId: tableId, questRowId: row.id, questLedgerId: ledgerId },
+      });
+      continue;
+    }
+    count += 1;
+    logger.info({
+      layer: "ai",
+      event: "quests:ledger_for_row",
+      summary: `quest "${label}" declared in the master — ledger ${orphan ? "re-linked" : "minted"}`,
+      attrs: { masterId: tableId, questRowId: row.id, questLedgerId: ledgerId },
+    });
+  }
+  return count;
 }
 
 // ── Continue-or-create a quest (D9) ───────────────────────────────────────
