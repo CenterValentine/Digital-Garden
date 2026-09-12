@@ -7,23 +7,24 @@
  * Same contract as the sibling proposal cards: the tool wrote NOTHING; this
  * card's Apply click is the commit.
  *
- * Two things differ from ColumnOptionsProposalCard, both because this one
- * commits over SEVERAL requests (one POST per column) rather than a single
- * wholesale PATCH:
+ * Apply re-reads the live schema first and drops any name that appeared since
+ * the proposal — the model's diff is a snapshot, and the user may have added
+ * a column by hand in the meantime — then commits what is left through
+ * POST /api/content/data/batch, which applies the whole set in ONE
+ * transaction.
  *
- *   1. Apply re-reads the live schema first and skips any name that appeared
- *      since the proposal — the model's diff is a snapshot, and the user may
- *      have added a column by hand in the meantime.
- *   2. A failure partway through is reported as a PARTIAL result, and the
- *      applied flag records only what actually landed. Half a schema applied
- *      but reported as "done" would be the worst outcome here: the user
- *      would never know which columns to add themselves.
+ * It used to POST one column at a time and report a PARTIAL result when a
+ * column failed midway. That was the honest thing to do given the endpoint,
+ * but it left the user to work out which columns to add by hand. It also
+ * could not express a relation whose lookup or rollup is in the same
+ * proposal, because those name a column id that does not exist until the
+ * relation is created. One transaction removes both problems: everything
+ * lands, or nothing does and the message names what was wrong.
  */
 
 import { useCallback, useState } from "react";
 import { AlertTriangle, Check, Columns3, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { generateColumnKey, type SelectOption } from "@/lib/domain/data";
 import { dispatchDataSchemaChanged } from "@/components/content/data/events";
 
 export interface DatabaseColumnsProposalPayload {
@@ -40,6 +41,16 @@ export interface DatabaseColumnsProposalPayload {
       color?: string;
       group?: "todo" | "active" | "done";
     }>;
+    /** relation — the database this column links to (title or id). */
+    target?: string;
+    /** relation — what the mirrored column on the target is called. */
+    backlinkName?: string;
+    /** lookup · rollup — the relation column on THIS table it reads across. */
+    through?: string;
+    /** lookup — the target column shown. rollup — the column aggregated. */
+    column?: string;
+    /** rollup — the aggregation. */
+    fn?: string;
   }>;
   /** Names the tool found already on the table — shown, never applied. */
   alreadyPresent: string[];
@@ -48,9 +59,8 @@ export interface DatabaseColumnsProposalPayload {
 
 type ApplyState =
   | { status: "idle" }
-  | { status: "applying"; done: number; total: number }
+  | { status: "applying" }
   | { status: "applied"; count: number }
-  | { status: "partial"; count: number; failed: string[]; message: string }
   | { status: "error"; message: string };
 
 /**
@@ -82,6 +92,30 @@ function loadAppliedState(payload: DatabaseColumnsProposalPayload): ApplyState {
   return { status: "idle" };
 }
 
+
+/**
+ * The one line that tells the user what a graph column actually does. A
+ * relation's mirrored column appears on the OTHER table, which is invisible
+ * from this card unless it is said out loud.
+ */
+function describeLink(col: DatabaseColumnsProposalPayload["columns"][number]): string | null {
+  if (col.type === "relation" && col.target) {
+    return col.backlinkName
+      ? `links to ${col.target} · appears there as "${col.backlinkName}"`
+      : `links to ${col.target}`;
+  }
+  if (col.type === "lookup" && col.through) {
+    return `reads ${col.column ?? "a value"} through ${col.through}`;
+  }
+  if (col.type === "rollup" && col.through) {
+    const fn = col.fn ?? "count";
+    return fn === "count"
+      ? `counts linked rows through ${col.through}`
+      : `${fn} of ${col.column ?? "a value"} through ${col.through}`;
+  }
+  return null;
+}
+
 export function DatabaseColumnsProposalCard({
   payload,
 }: {
@@ -98,13 +132,11 @@ export function DatabaseColumnsProposalCard({
 
   const apply = useCallback(async () => {
     const wanted = payload.columns.filter((_, i) => checked[i]);
-    setState({ status: "applying", done: 0, total: wanted.length });
-    let created = 0;
-    const failed: string[] = [];
+    setState({ status: "applying" });
     try {
       // Fresh read: the proposal's diff is a snapshot, and the user may have
-      // added one of these by hand since. Re-skipping here keeps Apply
-      // idempotent rather than erroring on a duplicate name.
+      // added one of these by hand since. Dropping them here keeps Apply
+      // idempotent rather than failing the batch on a duplicate name.
       const readRes = await fetch(`/api/content/data/${payload.databaseId}`, {
         credentials: "include",
       });
@@ -124,67 +156,60 @@ export function DatabaseColumnsProposalCard({
           .filter((c) => !c.deletedAt)
           .map((c) => c.name.trim().toLowerCase())
       );
+      const columns = wanted.filter(
+        (c) => !liveNames.has(c.name.trim().toLowerCase())
+      );
 
-      for (const col of wanted) {
-        if (liveNames.has(col.name.trim().toLowerCase())) continue;
-        const options: SelectOption[] | undefined = col.options?.map((o) => ({
-          id: generateColumnKey(),
-          label: o.label,
-          ...(o.color ? { color: o.color } : {}),
-          ...(col.type === "status" ? { group: o.group ?? "todo" } : {}),
-        }));
-        const res = await fetch(
-          `/api/content/data/${payload.databaseId}/columns`,
-          {
-            method: "POST",
-            credentials: "include",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              name: col.name,
-              type: col.type,
-              description: col.description,
-              ...(options ? { config: { options } } : {}),
-            }),
-          }
-        );
-        const json = await res.json().catch(() => null);
-        if (!res.ok || !json?.success) {
-          failed.push(col.name);
-          continue;
+      if (columns.length === 0) {
+        try {
+          localStorage.setItem(storageKey(payload), "0");
+        } catch {
+          /* best-effort persistence */
         }
-        created += 1;
-        setState({ status: "applying", done: created, total: wanted.length });
+        setState({ status: "applied", count: 0 });
+        toast.success(`"${payload.databaseTitle}" already had those columns`);
+        return;
       }
 
+      const res = await fetch("/api/content/data/batch", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          extend: [{ database: payload.databaseId, columns }],
+        }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !json?.success) {
+        throw new Error(
+          json?.error?.message ?? "Could not add the columns"
+        );
+      }
+
+      const created = columns.length;
       try {
         localStorage.setItem(storageKey(payload), String(created));
       } catch {
         /* best-effort persistence */
       }
-      if (created > 0) dispatchDataSchemaChanged(payload.databaseId, "chat");
-
-      if (failed.length > 0) {
-        const message = `${created} of ${wanted.length} added — these failed: ${failed.join(", ")}`;
-        setState({ status: "partial", count: created, failed, message });
-        toast.warning(message);
-        return;
+      dispatchDataSchemaChanged(payload.databaseId, "chat");
+      // A relation also minted its mirrored column on the target table, whose
+      // grid is very likely open in another pane.
+      for (const table of (json.data?.extended ?? []) as Array<{ id: string }>) {
+        if (table.id !== payload.databaseId) {
+          dispatchDataSchemaChanged(table.id, "chat");
+        }
       }
+
       setState({ status: "applied", count: created });
       toast.success(
-        created === 0
-          ? `"${payload.databaseTitle}" already had those columns`
-          : `${created} column${created === 1 ? "" : "s"} added to "${payload.databaseTitle}"`
+        `${created} column${created === 1 ? "" : "s"} added to "${payload.databaseTitle}"`
       );
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Network error adding columns";
-      // A throw after some columns landed is still a partial result — say so
-      // rather than implying nothing changed.
-      if (created > 0) {
-        setState({ status: "partial", count: created, failed, message });
-        toast.warning(`${created} added before failing: ${message}`);
-        return;
-      }
+      // The batch is all-or-nothing, so a failure means the table is
+      // untouched — say that plainly rather than leaving it ambiguous.
       setState({ status: "error", message });
       toast.error(message);
     }
@@ -259,6 +284,11 @@ export function DatabaseColumnsProposalCard({
                   {col.options.map((o) => o.label).join(" · ")}
                 </span>
               )}
+              {describeLink(col) && (
+                <span className="block text-[10px] text-indigo-600/80 dark:text-indigo-300/80">
+                  {describeLink(col)}
+                </span>
+              )}
             </span>
           </label>
         ))}
@@ -270,10 +300,12 @@ export function DatabaseColumnsProposalCard({
         </p>
       )}
 
-      {(state.status === "error" || state.status === "partial") && (
+      {state.status === "error" && (
         <div className="flex items-start gap-1.5 rounded-md bg-red-500/10 px-2 py-1.5 text-[12px] text-red-700 dark:text-red-300">
           <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          <span>{state.message}</span>
+          <span>
+            {state.message} — nothing was added.
+          </span>
         </div>
       )}
 
@@ -286,10 +318,10 @@ export function DatabaseColumnsProposalCard({
         {state.status === "applying" ? (
           <>
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            Adding {state.done}/{state.total}…
+            Adding…
           </>
-        ) : state.status === "error" || state.status === "partial" ? (
-          "Retry the rest"
+        ) : state.status === "error" ? (
+          "Try again"
         ) : (
           `Add ${selectedCount} of ${payload.columns.length}`
         )}

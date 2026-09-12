@@ -76,10 +76,17 @@ export interface LinkedSchemaSpec {
     parentId?: string | null;
     columns: LinkedColumnSpec[];
   }>;
-  /** Columns to add to tables that already exist. */
+  /**
+   * Columns to add to tables that already exist.
+   *
+   * Already RESOLVED and AUTHORIZED by the caller. Schema access is a ladder
+   * (`canAlterSchema`), not plain ownership — a grant can confer it — and the
+   * ladder lives with the routes that own it. This function executes; it does
+   * not adjudicate who may extend what.
+   */
   extend?: Array<{
-    /** The table's id, or its exact title. */
-    database: string;
+    tableId: string;
+    title: string;
     columns: LinkedColumnSpec[];
   }>;
 }
@@ -311,22 +318,15 @@ export async function applyLinkedSchema(
     validateColumns(`"${title}"`, newTables[i].columns, { requirePrimary: true });
   });
 
-  // Existing tables to extend — resolved and ownership-checked up front.
+  // Existing tables to extend — authorized by the caller, still checked for
+  // existence so a stale id fails with a name instead of a foreign-key error.
   const extendTargets: Array<{ id: string; title: string }> = [];
   for (const entry of extend) {
     const node = await prisma.contentNode.findFirst({
-      where: {
-        ownerId,
-        contentType: "data",
-        deletedAt: null,
-        OR: [
-          { id: isUuid(entry.database) ? entry.database : undefined },
-          { title: entry.database },
-        ],
-      },
+      where: { id: entry.tableId, contentType: "data", deletedAt: null },
       select: { id: true, title: true },
     });
-    if (!node) fail(`"${entry.database}" is not one of your databases.`);
+    if (!node) fail(`"${entry.title}" no longer exists.`);
     validateColumns(`"${node.title}"`, entry.columns, { requirePrimary: false });
     extendTargets.push(node);
   }

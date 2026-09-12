@@ -11,11 +11,13 @@
  * where the interesting part of the result is the edges. Both run the same
  * `applyLinkedSchema` core, so there is one implementation of the rules.
  *
- * Owner-only by contract. `applyLinkedSchema` resolves every table against
- * the caller's own live nodes, so a relation can never be drawn into — or a
- * column added to — a database someone else owns, even one shared with edit
- * rights. Extending a shared table stays the single-column route's job,
- * which has the jurisdiction ladder.
+ * Authorization is this route's job, not the domain function's: new tables
+ * belong to the caller, and every table in `extend` goes through the same
+ * `canAlterSchema` ladder the single-column route uses — so a database shared
+ * with owner-level rights can join a schema, while one shared for editing
+ * cannot have columns added to it. Relation TARGETS stay owner-resolved
+ * inside `applyLinkedSchema`: drawing a relation into a table also mints a
+ * column there.
  */
 
 import { NextRequest, NextResponse, after } from "next/server";
@@ -28,6 +30,21 @@ import {
   type LinkedColumnSpec,
 } from "@/lib/domain/data/server/linked-schema";
 import { markContextDirty } from "@/lib/domain/ai-context/context-dirty";
+import { prisma } from "@/lib/database/client";
+import {
+  canAlterSchema,
+  resolveDataTableAccess,
+} from "@/lib/domain/data/server/access";
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function badRequest(message: string) {
+  return NextResponse.json(
+    { success: false, error: { code: "BAD_REQUEST", message } },
+    { status: 400 }
+  );
+}
 
 const ROUTE_PATH = "/api/content/data/batch";
 
@@ -60,14 +77,50 @@ export async function POST(request: NextRequest) {
             : []) as LinkedColumnSpec[],
         })
       );
-      const extend = (Array.isArray(body?.extend) ? body.extend : []).map(
-        (e) => ({
-          database: typeof e?.database === "string" ? e.database : "",
-          columns: (Array.isArray(e?.columns)
-            ? e.columns
+      // Resolve + authorize each extend target before anything is written.
+      const extend: Array<{
+        tableId: string;
+        title: string;
+        columns: LinkedColumnSpec[];
+      }> = [];
+      for (const raw of Array.isArray(body?.extend) ? body.extend : []) {
+        const ref = typeof raw?.database === "string" ? raw.database.trim() : "";
+        if (!ref) {
+          return badRequest("Every extend entry needs a database id or title.");
+        }
+        const node = await prisma.contentNode.findFirst({
+          where: {
+            contentType: "data",
+            deletedAt: null,
+            OR: [
+              { id: UUID_RE.test(ref) ? ref : undefined },
+              { title: ref, ownerId: session.user.id },
+            ],
+          },
+          select: { id: true, title: true },
+        });
+        if (!node) return badRequest(`"${ref}" is not one of your databases.`);
+        const level = await resolveDataTableAccess(node.id, session.user.id);
+        if (!canAlterSchema(level)) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: {
+                code: "FORBIDDEN",
+                message: `Only "${node.title}"'s owner can add columns to it.`,
+              },
+            },
+            { status: 403 }
+          );
+        }
+        extend.push({
+          tableId: node.id,
+          title: node.title,
+          columns: (Array.isArray(raw?.columns)
+            ? raw.columns
             : []) as LinkedColumnSpec[],
-        })
-      );
+        });
+      }
 
       const result = await withSpan(
         { layer: "content", name: "data_linked_schema_apply" },
