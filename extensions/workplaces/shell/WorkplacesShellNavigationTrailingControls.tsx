@@ -453,13 +453,17 @@ export function WorkplacesShellNavigationTrailingControls() {
                 }}
               />
 
-              {idleTargets.length > 0 || typeTargets.length > 0 ? (
-                <div className="my-1 h-px bg-black/5 dark:bg-white/10" />
-              ) : null}
+              <div className="my-1 h-px bg-black/5 dark:bg-white/10" />
 
-              {idleTargets.length > 0 ? (
-                <ChipRow label="Idle">
-                  {idleTargets.map((target) => (
+              {/*
+                The Idle row renders even with nothing to offer. A dimension
+                that appears only once it happens to have members is
+                indistinguishable from a broken one, and the hint teaches the
+                threshold that makes chips show up.
+              */}
+              <ChipRow label="Idle">
+                {idleTargets.length > 0 ? (
+                  idleTargets.map((target) => (
                     <ClearChip
                       key={target.key}
                       label={target.label}
@@ -472,9 +476,16 @@ export function WorkplacesShellNavigationTrailingControls() {
                         )
                       }
                     />
-                  ))}
-                </ChipRow>
-              ) : null}
+                  ))
+                ) : (
+                  <span
+                    className="py-0.5 text-xs text-gray-400 dark:text-gray-500"
+                    title="Tabs you haven't opened or viewed for an hour or more appear here."
+                  >
+                    nothing idle yet
+                  </span>
+                )}
+              </ChipRow>
 
               {typeTargets.length > 0 ? (
                 <ChipRow label="Type">

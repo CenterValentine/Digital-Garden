@@ -85,14 +85,18 @@ export function buildActivationTimes(
  * Effective last-touched time, or null when this surface has no signal at all
  * (the caller decides what to do with an unknown — the clear-tabs menu leaves
  * such tabs out of every idle bucket rather than guessing them stale).
+ *
+ * A recorded activation ALWAYS wins over the first-sighting stamp, and the two
+ * are never maxed together. First sighting is the timestamp of this surface
+ * noticing a tab, which says nothing about the user: the first time this store
+ * runs it stamps every open tab "now", and maxing would then report a tab
+ * genuinely untouched for hours as touched seconds ago — burying every bucket.
+ * First sighting fills a gap; it does not get a vote when real data exists.
  */
 export function resolveLastTouchedAt(
   contentId: string,
   firstSeenAt: Record<string, number>,
   activationAt: Map<string, number>
 ): number | null {
-  const activated = activationAt.get(contentId);
-  const seen = firstSeenAt[contentId];
-  if (activated === undefined && seen === undefined) return null;
-  return Math.max(activated ?? 0, seen ?? 0);
+  return activationAt.get(contentId) ?? firstSeenAt[contentId] ?? null;
 }
