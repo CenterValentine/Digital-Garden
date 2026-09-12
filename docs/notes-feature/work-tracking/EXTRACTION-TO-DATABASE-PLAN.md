@@ -200,6 +200,12 @@ A **quest is one implementation of a charter** — its commission — and an ong
 
 **Owner clarification (2026-09-11) — what the lock is and is not:** the lock is on the system columns' *definition* (name, type, options, existence). Cells and rows are never blocked, for the grid or the AI: an AI or any mechanism adding a quest row to the master is expected, and a cleared link cell is repaired, not punished — `ensureQuest` now **re-links** the quest's existing ledger (found by `ownedByNoteId` = charter + title) before it would ever mint a replacement. The machinery fills every system column itself on each sitting, which is what makes cell-level protection unnecessary.
 
+**Markers survive every write; side chats attach; quest rows always have a ledger (owner smoke of PR #221, 2026-09-11 evening — branch `feat/charter-icons-sidechat-quest-ledgers`):**
+
+- **Metadata merge.** `writeNoteContent` (the REST fallback + every AI note edit + the starter scaffold) replaced `NotePayload.metadata` wholesale, wiping `charter`, `charterDescription`, `masterLedgerId`, and would wipe run-ledger keys / capture / quest config on any quest log it touched. It now merges prior metadata, owning only the three stat keys. The mark route scaffolds first and stamps last. `ensureMasterLedger` adopts an existing referenced master before minting — re-marking a wiped charter repairs it in place.
+- **Every side chat attaches its content.** The bound content is an implicit first @-mention (own slot; cap 6 with it, 5 without): notes load their body, folders their capsule, databases their digest. Charters still take the charter path; a chat or workflow is its own subject. Per-turn token cost equals the mention machinery's, which the owner already pays for explicit mentions.
+- **Hard rule for quest rows.** A named row in a master ledger gets its quest ledger immediately — `ensureLedgersForMasterRows`, hooked into cell writes, `insert_rows`, `update_row`. Blank rows wait for a name; an existing ledger is re-linked before a new one is minted; the master is recognised by D6 icon + charter ownership + stamp (two PK lookups), so every other table pays almost nothing.
+
 **AI tools that may update a ledger (the answer to "what tool does the job"):**
 
 | Ask | Tool | Protection |
