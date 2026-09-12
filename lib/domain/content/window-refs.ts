@@ -91,15 +91,27 @@ export async function syncWindowReferences(
       });
     }
 
+    let addedCount = 0;
     if (newIds.length > 0) {
-      // Windows can target ids the user typed or pasted; the FK would reject
-      // a nonexistent target, so filter to real, live notes first.
-      const validTargets = await prisma.contentNode.findMany({
-        where: { id: { in: newIds }, deletedAt: null },
-        select: { id: true },
+      // Windows can target ids the user typed or pasted, so targets are
+      // validated before insert: a nonexistent id would trip the FK, and a
+      // target belonging to ANOTHER owner must never get an edge. Such an
+      // edge would be inert today — the tree route only renders nodes it
+      // fetched for the current owner — but an edge crossing a tenancy
+      // boundary is a trap for the next consumer that reads this link type
+      // without scoping. Host and targets are fetched in one query so the
+      // ownership check costs nothing extra.
+      const rows = await prisma.contentNode.findMany({
+        where: { id: { in: [noteId, ...newIds] }, deletedAt: null },
+        select: { id: true, ownerId: true },
       });
+      const hostOwnerId = rows.find((row) => row.id === noteId)?.ownerId;
+      const validTargets = hostOwnerId
+        ? rows.filter((row) => row.id !== noteId && row.ownerId === hostOwnerId)
+        : [];
+
       if (validTargets.length > 0) {
-        await prisma.contentLink.createMany({
+        const { count } = await prisma.contentLink.createMany({
           data: validTargets.map(({ id }) => ({
             sourceId: noteId,
             targetId: id,
@@ -107,12 +119,15 @@ export async function syncWindowReferences(
           })),
           skipDuplicates: true, // Respect @@unique([sourceId, targetId, linkType])
         });
+        addedCount = count;
       }
     }
 
-    if (orphanedLinkIds.length > 0 || newIds.length > 0) {
+    if (orphanedLinkIds.length > 0 || addedCount > 0) {
+      // Reports rows actually written, not candidates found — targets
+      // rejected as dead or cross-owner must not inflate the count.
       console.log(
-        `[syncWindowReferences] note=${noteId}: +${newIds.length} -${orphanedLinkIds.length} window refs`,
+        `[syncWindowReferences] note=${noteId}: +${addedCount} -${orphanedLinkIds.length} window refs`,
       );
     }
   } catch (error) {
