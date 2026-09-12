@@ -2478,6 +2478,7 @@ export async function POST(request: Request) {
           hasResearchTools: "extract_structured" in tools,
           hasListTabs: LIST_TABS in tools,
           hasItemIteration: "propose_item_iteration" in tools,
+          hasDatabaseTools: "describe_database" in tools,
           viewedContentHint,
           // Runtime identity (v3.1): what this turn is ACTUALLY served by,
           // from live routing — so the model self-identifies from ground
