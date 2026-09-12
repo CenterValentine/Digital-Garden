@@ -281,6 +281,92 @@ function walk(dir: string): string[] {
   return out;
 }
 
+/**
+ * Self-rescheduling `setTimeout` — a recurring timer that never says
+ * `setInterval`.
+ *
+ *   const schedule = () => {
+ *     timer = setTimeout(async () => { await poll(); schedule(); }, MS);
+ *   };
+ *
+ * This is the THIRD spelling of "recurring" to get past this gate, after `.js`
+ * files and `chrome.alarms`. It hid a 10s data-rows poll that was hidden-gated
+ * but not idle-gated, so an open table polled forever while nobody touched it —
+ * found by the owner in a network tab, not by CI.
+ *
+ * Matching is deliberately narrow, because precision matters more here than in
+ * the setInterval check: `setInterval` is ALWAYS recurring, whereas `setTimeout`
+ * is overwhelmingly one-shots and debounces (59 files pair it with a fetch).
+ * Three conditions must hold together:
+ *
+ *   1. a named function/method containing a `setTimeout` within ~1200 chars,
+ *   2. that same name called again inside the ~600 chars after it (the
+ *      recursion — and NOT a fresh `const`/`let` binding of the name, which is
+ *      shadowing, e.g. `const blob = await res.blob()`),
+ *   3. the file reaches the network at all.
+ *
+ * False positives remain (an AbortController timeout near a same-named call).
+ * They cost one line in REVIEWED_RECURRING_TIMEOUTS; a false negative costs a
+ * poller nobody sees until it shows up on an invoice.
+ */
+const RECURRING_KEYWORDS = new Set([
+  "if", "for", "while", "switch", "catch", "return",
+  "function", "constructor", "typeof", "await", "new", "do", "else",
+]);
+const RECURRING_NETWORK_RE = /\bfetch\s*\(|navigator\.sendBeacon|XMLHttpRequest/;
+
+function findSelfReschedulingTimers(source: string): string[] {
+  const found: string[] = [];
+  if (!RECURRING_NETWORK_RE.test(source)) return found;
+  const decl =
+    /(?:function\s+(\w+)\s*\(|(?:const|let|var)\s+(\w+)\s*=|^[ \t]*(?:private|protected|public)?[ \t]*(?:static[ \t]+)?(?:async[ \t]+)?(\w+)[ \t]*\([^)]*\)[ \t]*[:{])/gm;
+  let match: RegExpExecArray | null;
+  while ((match = decl.exec(source))) {
+    const name = match[1] ?? match[2] ?? match[3];
+    if (!name || RECURRING_KEYWORDS.has(name)) continue;
+    const timeoutAt = source.indexOf("setTimeout(", match.index);
+    if (timeoutAt === -1 || timeoutAt - match.index > 1200) continue;
+    const body = source.slice(timeoutAt, timeoutAt + 600);
+    if (!new RegExp(`\\b${name}\\s*\\(`).test(body)) continue;
+    if (new RegExp(`(?:const|let|var)\\s+${name}\\b`).test(body)) continue;
+    found.push(name);
+  }
+  return [...new Set(found)];
+}
+
+/**
+ * Files whose self-rescheduling timers have been traced. One line each: what
+ * the timer is, and why it is not an ungated poll.
+ */
+const REVIEWED_RECURRING_TIMEOUTS: Record<string, string> = {
+  "lib/domain/collaboration/runtime.ts":
+    "schedulePresenceHeartbeat — THE recurring one, tiered and audited in the registry above. shouldReconnectProvider is reconnect backoff, bounded by PROVIDER_RECONNECT_MAX_MS.",
+  "components/content/ai/ChatMessage.tsx":
+    "dispatch — false positive; the only timer is WorkingIndicator's 1s display counter (registered above as ui-only).",
+  "extensions/workplaces/state/workspace-sync.ts":
+    "fetchAndApply — already on the scheduler via registerPollingTask; the setTimeout is a retry, not the cadence.",
+  "lib/core/logger/client.ts":
+    "scheduleFlush — DEBOUNCED batch flush, not a poll: it only arms when a log event is queued, returns early if a timer already exists, and flushBeacon returns early on an empty queue. No events, no timer, no request.",
+  "extensions/daily-notes/components/PeriodicNotesShellController.tsx":
+    "scheduleNextRun — genuinely recurring, but the delay is getNextPeriodicRolloverDelay(): it fires at the next DAILY rollover. One request per day.",
+  "components/content/ai-context/ContextAiPanel.tsx":
+    "saveDirectives — debounced save, armed by user edits.",
+  "components/settings/ui/save-state.ts":
+    "send / clearTimer — the settings autosave debounce.",
+  "lib/domain/ai/acquisition/server-fetch.ts":
+    "fetchOnce — server-side retry with backoff, bounded by attempt count.",
+  "lib/domain/ai/image/generate.ts":
+    "json — false positive; a poll-for-result loop bounded by a deadline, server-side.",
+  "lib/domain/tenancy/use-user-tenants.ts":
+    "fetchUserTenants — false positive. The setTimeout is `inflight = null` at delay 0, an in-flight dedup reset.",
+  "extensions/workplaces/state/workspace-store.ts":
+    "fetchWorkspaceMutation — false positive. The setTimeout is an AbortController request timeout.",
+  "extensions/flashcards/components/FlashcardReviewOverlay.tsx":
+    "goToIndex — false positive; card-advance animation timing.",
+  "extensions/browser-bookmarks/browser-extension/src/background/index.js":
+    "finish — false positive; a co-browse operation timeout.",
+};
+
 function countMatches(source: string, re: RegExp): number {
   return (source.match(new RegExp(re.source, "g")) ?? []).length;
 }
@@ -290,6 +376,7 @@ function main() {
   const errors: string[] = [];
   const warnings: string[] = [];
   const seen = new Set<string>();
+  const reschedulingSeen = new Set<string>();
 
   const files = SCAN_ROOTS.filter((root) => {
     try {
@@ -302,6 +389,25 @@ function main() {
   for (const abs of files) {
     const rel = relative(REPO_ROOT, abs);
     const source = readFileSync(abs, "utf8");
+
+    // Self-rescheduling setTimeout is checked SEPARATELY from the timer count,
+    // against its own reviewed list. It has lower precision than the other
+    // matchers, so folding it into the main registry would flood a list whose
+    // value depends on every entry being worth reading.
+    const rescheduling = findSelfReschedulingTimers(source);
+    if (rescheduling.length > 0) {
+      reschedulingSeen.add(rel);
+      if (!(rel in REVIEWED_RECURRING_TIMEOUTS)) {
+        errors.push(
+          `RECURRING     ${rel}\n` +
+            `    Self-rescheduling setTimeout: ${rescheduling.join(", ")}\n` +
+            `    A setTimeout that re-arms itself is a recurring timer, and this file\n` +
+            `    reaches the network. Route it through registerPollingTask() so it\n` +
+            `    inherits hidden AND idle gating, or add a line to\n` +
+            `    REVIEWED_RECURRING_TIMEOUTS saying why it is not a poll.`
+        );
+      }
+    }
 
     const timers =
       countMatches(source, CALL_RE) +
@@ -390,6 +496,15 @@ function main() {
   if (warnings.length > 0) {
     console.warn(`\n⚠  ${warnings.length} timer file(s) awaiting audit:\n`);
     for (const w of warnings) console.warn(`  ${w}\n`);
+  }
+
+  for (const file of Object.keys(REVIEWED_RECURRING_TIMEOUTS)) {
+    if (reschedulingSeen.has(file)) continue;
+    errors.push(
+      `STALE RECURRING  ${file}\n` +
+        `    Listed in REVIEWED_RECURRING_TIMEOUTS but no self-rescheduling timer\n` +
+        `    was found. If it moved to registerPollingTask(), remove the entry.`
+    );
   }
 
   if (errors.length > 0) {
