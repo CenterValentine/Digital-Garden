@@ -1544,7 +1544,29 @@ export async function POST(request: Request) {
       );
 
       // Fetch mentioned content for @ mentions (max 5 to limit token usage)
-      const mentionedContentIds: string[] = body.mentionedContentIds ?? [];
+      // EVERY side chat attaches the content it lives under (owner directive
+      // 2026-09-11, generalizing the charter rule): the bound content rides
+      // as an implicit FIRST mention, so its body / folder capsule / database
+      // digest loads the way an @-mention's does — no getCurrentNote
+      // round-trip. Charters take the charter path instead (progressive
+      // disclosure), a chat or workflow is its own subject, and an explicit
+      // mention of the same id dedupes. The bound content gets its own slot
+      // so it never eats one of the user's five.
+      const boundAttachId =
+        contentId &&
+        !isChatContent &&
+        !openWorkflowTitle &&
+        contentId !== boundCharterId &&
+        contentId !== routingRootedCharterId
+          ? contentId
+          : null;
+      const requestedMentionIds: string[] = Array.isArray(body.mentionedContentIds)
+        ? body.mentionedContentIds.filter((id: unknown): id is string => typeof id === "string")
+        : [];
+      const mentionedContentIds: string[] = boundAttachId
+        ? [boundAttachId, ...requestedMentionIds.filter((id) => id !== boundAttachId)]
+        : requestedMentionIds;
+      const mentionCap = boundAttachId ? 6 : 5;
 
       // Auto-association interceptor (Session 4a):
       // When this turn is bound to a Conversation entity (sidebar's
@@ -1556,7 +1578,7 @@ export async function POST(request: Request) {
         // Fire-and-forget — failure here shouldn't block the chat call.
         // Each call is idempotent (upsert) and capped via LRU inside.
         void Promise.all(
-          mentionedContentIds.slice(0, 5).map((cid) =>
+          mentionedContentIds.slice(0, mentionCap).map((cid) =>
             addAutoAssociation(
               session.user.id,
               conversationIdForAssoc,
@@ -1575,7 +1597,7 @@ export async function POST(request: Request) {
           async (span) => {
             const result = await prisma.contentNode.findMany({
               where: {
-                id: { in: mentionedContentIds.slice(0, 5) },
+                id: { in: mentionedContentIds.slice(0, mentionCap) },
                 ownerId: session.user.id,
                 deletedAt: null,
               },
@@ -2151,10 +2173,15 @@ export async function POST(request: Request) {
               : "")
           : rootedCharterResolved
             ? `\n\nThis chat is rooted in **"${rootedContentTitle}"** (a ${rootedContentType ?? "content"}), and the user explicitly asked to execute it as the Active Charter. Its validated instructions are already loaded; do not read or search for another charter.`
-            : `\n\nThis chat is rooted in **"${rootedContentTitle}"** (a ${rootedContentType ?? "content"}) — that is what this conversation is about. When the user refers to "this file", "this note", "the current one", "this charter", etc. without naming it, they mean "${rootedContentTitle}".` +
-              (readable
-                ? ` Read its content with getCurrentNote (contentId: ${contentId}) when you need it.`
-                : "");
+            : boundAttachId
+              ? `\n\nThis chat is ATTACHED to **"${rootedContentTitle}"** (a ${rootedContentType ?? "content"}) — that is what this conversation is about, and its content is already loaded below under the referenced content (a side chat attaches whatever it lives under). When the user refers to "this file", "this note", "this database", "the current one", etc. without naming it, they mean "${rootedContentTitle}". Do not search for it.` +
+                (readable
+                  ? ` If the loaded content is truncated, getCurrentNote (contentId: ${contentId}) returns the full body.`
+                  : "")
+              : `\n\nThis chat is rooted in **"${rootedContentTitle}"** (a ${rootedContentType ?? "content"}) — that is what this conversation is about. When the user refers to "this file", "this note", "the current one", "this charter", etc. without naming it, they mean "${rootedContentTitle}".` +
+                (readable
+                  ? ` Read its content with getCurrentNote (contentId: ${contentId}) when you need it.`
+                  : "");
       }
 
       // Resolve the selected custom-instruction context, if any. Sent by
