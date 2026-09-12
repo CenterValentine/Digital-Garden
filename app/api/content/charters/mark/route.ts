@@ -77,62 +77,17 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const metadata = withCharterMetadata(
-        (node.notePayload?.metadata as Record<string, unknown> | null) ?? null,
-        description,
-      );
-      // upsert, not update — a folder's notePayload is created lazily by its
-      // Notes editor on first edit, so a freshly-created folder with content
-      // already typed may not have a row yet even though notePayload.metadata
-      // above read null via the optional relation.
-      await prisma.notePayload.upsert({
-        where: { contentId: node.id },
-        update: { metadata: metadata as unknown as Prisma.InputJsonValue },
-        create: {
-          contentId: node.id,
-          tiptapJson: { type: "doc", content: [] } as unknown as Prisma.InputJsonValue,
-          searchText: "",
-          metadata: metadata as unknown as Prisma.InputJsonValue,
-        },
-      });
-
-      // LEDGER AT MARK (owner directive 2026-09-11). The master ledger used
-      // to be minted lazily on the first approved run (D10), which left a
-      // freshly marked charter with no visible quest tracking — and sent the
-      // owner off to build a "charter database" by hand (prod: Career Hunt
-      // Charters, an orphan table nothing reads). Mint it here, idempotently:
-      // it lands as referenced content under the charter (ownedByNoteId), so
-      // the reference chip shows it from the moment of marking. Re-marking
-      // an older charter is the backfill path. Best-effort: the MARK is what
-      // was asked for and has already succeeded.
-      let masterLedgerId: string | null = null;
-      let masterLedgerCreated = false;
-      try {
-        const master = await ensureMasterLedger(session.user.id, {
-          contentId: node.id,
-          title: node.title,
-        });
-        masterLedgerId = master?.masterId ?? null;
-        masterLedgerCreated = master?.created === true;
-      } catch (ledgerError) {
-        logger.warn({
-          layer: "ai",
-          event: "charters_mark:ledger_failed",
-          summary: "charter marked, but its master ledger could not be created",
-          error: ledgerError,
-        });
-      }
-
       // EMPTINESS CONTRACT (D5, owner report 2026-09-10). A charter is a
       // written commissioning document: the marker says "this is a charter",
       // the BODY says what the charter is. Marking a folder that has no
-      // NotePayload row takes the `create` branch above, which writes
+      // NotePayload row takes the `create` branch of the metadata upsert
+      // below, which writes
       // `{type:"doc",content:[]}` — so the promotion itself mints the empty
       // charter, and the caller then reported success as readiness ("attach
       // it from any chat with /charter"). It is not ready: attaching a
       // bodyless charter yields "contains no instructions".
       //
-      // The route already knows — it just wrote the document — so it says so
+      // The route knows — it is about to write the document — so it says so
       // and the caller can tell the truth. Reported, never blocked: marking
       // first and writing after is a legitimate order of work.
       const parsed = parseCharter(
@@ -185,6 +140,56 @@ export async function POST(request: NextRequest) {
             error: scaffoldError,
           });
         }
+      }
+
+      // ORDER (prod 2026-09-11): the starter scaffold above is a full
+      // payload write. writeNoteContent now merges metadata, but stamping the
+      // markers AFTER any body write keeps them safe from a replacing writer
+      // for good — the flag and the ledger stamp are the last thing written.
+      const metadata = withCharterMetadata(
+        (node.notePayload?.metadata as Record<string, unknown> | null) ?? null,
+        description,
+      );
+      // upsert, not update — a folder's notePayload is created lazily by its
+      // Notes editor on first edit, so a freshly-created folder with content
+      // already typed may not have a row yet even though notePayload.metadata
+      // above read null via the optional relation.
+      await prisma.notePayload.upsert({
+        where: { contentId: node.id },
+        update: { metadata: metadata as unknown as Prisma.InputJsonValue },
+        create: {
+          contentId: node.id,
+          tiptapJson: { type: "doc", content: [] } as unknown as Prisma.InputJsonValue,
+          searchText: "",
+          metadata: metadata as unknown as Prisma.InputJsonValue,
+        },
+      });
+
+      // LEDGER AT MARK (owner directive 2026-09-11). The master ledger used
+      // to be minted lazily on the first approved run (D10), which left a
+      // freshly marked charter with no visible quest tracking — and sent the
+      // owner off to build a "charter database" by hand (prod: Career Hunt
+      // Charters, an orphan table nothing reads). Mint it here, idempotently:
+      // it lands as referenced content under the charter (ownedByNoteId), so
+      // the reference chip shows it from the moment of marking. Re-marking
+      // an older charter is the backfill path. Best-effort: the MARK is what
+      // was asked for and has already succeeded.
+      let masterLedgerId: string | null = null;
+      let masterLedgerCreated = false;
+      try {
+        const master = await ensureMasterLedger(session.user.id, {
+          contentId: node.id,
+          title: node.title,
+        });
+        masterLedgerId = master?.masterId ?? null;
+        masterLedgerCreated = master?.created === true;
+      } catch (ledgerError) {
+        logger.warn({
+          layer: "ai",
+          event: "charters_mark:ledger_failed",
+          summary: "charter marked, but its master ledger could not be created",
+          error: ledgerError,
+        });
       }
 
       return NextResponse.json({

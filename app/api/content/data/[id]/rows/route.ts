@@ -34,6 +34,7 @@ import {
   writeCells,
   type CellWrite,
 } from "@/lib/domain/data/server/mutations";
+import { ensureLedgersForMasterRows } from "@/lib/domain/ai/quests";
 import { DEFAULT_ROW_PAGE_SIZE } from "@/lib/domain/data";
 
 const ROUTE_PATH = "/api/content/data/[id]/rows";
@@ -232,6 +233,27 @@ export async function PATCH(request: NextRequest, { params }: { params: Params }
           return outcome;
         }
       );
+
+      // Hard rule (quests, owner 2026-09-11): a NAMED row in a charter's
+      // master ledger gets its quest ledger the moment it is named — the grid
+      // creates blank rows first and the name arrives here. A cheap no-op for
+      // every other table; a hook failure never fails the cell write.
+      if (ok) {
+        try {
+          await ensureLedgersForMasterRows(
+            session.user.id,
+            id,
+            [...new Set(body.writes.map((w) => w.rowId))],
+          );
+        } catch (hookError) {
+          logger.warn({
+            layer: "content",
+            event: "data:rows_patch:quest_hook_caught",
+            summary: "quest-ledger hook failed after a cell write",
+            error: hookError,
+          });
+        }
+      }
 
       // 409 for a stale batch: the request was well-formed and permitted, it
       // just lost a race. The client turns this into "skipped — someone else

@@ -143,7 +143,21 @@ function Body({
         ? " Its master ledger is under its reference chip."
         : "";
       window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
-      if (editing) {
+      if (editing && templatePhases > 0) {
+        // Editing details on a charter still wearing the starter scaffold:
+        // the placeholder reminder must not be lost behind the edit path.
+        toast.warning(
+          `Charter details updated — ${templatePhases} phase heading${templatePhases === 1 ? " is" : "s are"} still a starter placeholder`,
+          {
+            description:
+              'Rename or delete the "[name the … phase]" headings before running; a run starts with the first phase it finds.' +
+              (marked?.masterLedgerCreated
+                ? " Its master ledger was created under its reference chip."
+                : ""),
+            duration: 8000,
+          },
+        );
+      } else if (editing) {
         // Re-marking an older charter is the backfill path for the ledger.
         toast.success(
           marked?.masterLedgerCreated

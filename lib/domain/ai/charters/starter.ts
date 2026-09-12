@@ -137,11 +137,14 @@ export function buildCharterStarterDoc(title: string): JSONContent {
 export function countStarterPlaceholderPhases(parsed: {
   phases: Array<{ title: string }>;
 }): number {
-  const placeholders = new Set(
-    CHARTER_STARTER_PHASE_TITLES.filter((t) => t.includes("[name the")).map((t) =>
-      t.trim().toLowerCase(),
-    ),
-  );
-  return parsed.phases.filter((p) => placeholders.has(p.title.trim().toLowerCase()))
-    .length;
+  // Match the bracketed placeholder PHRASE, not the whole starter title: an
+  // editor that normalizes the em dash or the spacing around it would
+  // otherwise silence the warning, and a half-edited heading that still
+  // carries "[name the …]" is still a placeholder.
+  return parsed.phases.filter((p) =>
+    STARTER_PLACEHOLDER_PHRASE.test(p.title),
+  ).length;
 }
+
+/** The bracketed phrase every starter phase heading carries until edited. */
+const STARTER_PLACEHOLDER_PHRASE = /\[name the (?:first|second) phase\]/i;
