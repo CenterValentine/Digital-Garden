@@ -381,7 +381,13 @@ model FilePayload {
   createdAt        DateTime        @default(now()) @db.Timestamptz(6)
   updatedAt        DateTime        @updatedAt @db.Timestamptz(6)
   searchText       String          @default("")
-  content          ContentNode     @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  /// Capability token behind the public file link (`/f/<token>`). Minted
+  /// lazily the first time a share link is requested for the file; null means
+  /// no link has ever been issued. Rotating (or nulling) it revokes every
+  /// copy of the link that has left the app.
+  publicToken      String?         @unique @db.VarChar(64)
+
+  content ContentNode @relation(fields: [contentId], references: [id], onDelete: Cascade)
 
   @@index([uploadStatus])
   @@index([storageProvider, uploadedAt(sort: Desc)])
@@ -541,7 +547,7 @@ model User {
   tags                    Tag[]
   trashedContent          TrashBin[]
   viewGrants              ViewGrant[]
-  dataViews               DataView[]                @relation("DataViewOwner")
+  dataViews               DataView[]               @relation("DataViewOwner")
   peopleGroups            PeopleGroup[]
   peopleDefaultGroups     PeopleGroup[]            @relation("DefaultPeopleGroup")
   people                  Person[]
@@ -619,14 +625,13 @@ model ContentWorkspace {
   parentWorkspaceId String?                @db.Uuid
   dormantAt         DateTime?              @db.Timestamptz(6)
 
-  owner         User                           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  viewRoot      ContentNode?                   @relation("WorkspaceViewRoot", fields: [viewRootContentId], references: [id], onDelete: SetNull)
-  items         ContentWorkspaceItem[]
-  tabs          ContentWorkspaceTab[]
-  layoutRecords ContentWorkspaceLayoutRecord[]
-  parentWorkspace ContentWorkspace?  @relation("WorkspaceWorkbenches", fields: [parentWorkspaceId], references: [id], onDelete: Cascade)
-  workbenches     ContentWorkspace[] @relation("WorkspaceWorkbenches")
-
+  owner           User                           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  viewRoot        ContentNode?                   @relation("WorkspaceViewRoot", fields: [viewRootContentId], references: [id], onDelete: SetNull)
+  items           ContentWorkspaceItem[]
+  tabs            ContentWorkspaceTab[]
+  layoutRecords   ContentWorkspaceLayoutRecord[]
+  parentWorkspace ContentWorkspace?              @relation("WorkspaceWorkbenches", fields: [parentWorkspaceId], references: [id], onDelete: Cascade)
+  workbenches     ContentWorkspace[]             @relation("WorkspaceWorkbenches")
 
   @@unique([ownerId, slug])
   @@unique([parentWorkspaceId, viewRootContentId])
@@ -634,7 +639,6 @@ model ContentWorkspace {
   @@index([ownerId, isMain])
   @@index([expiresAt])
   @@index([parentWorkspaceId])
-
 }
 
 model ContentWorkspaceItem {
@@ -1581,8 +1585,8 @@ model DataRow {
   updatedAt DateTime  @updatedAt @db.Timestamptz(6)
   deletedAt DateTime? @db.Timestamptz(6)
 
-  table    DataPayload  @relation(fields: [tableId], references: [contentId], onDelete: Cascade)
-  content  ContentNode? @relation("PromotedDataRow", fields: [contentId], references: [id], onDelete: SetNull)
+  table    DataPayload   @relation(fields: [tableId], references: [contentId], onDelete: Cascade)
+  content  ContentNode?  @relation("PromotedDataRow", fields: [contentId], references: [id], onDelete: SetNull)
   linksOut DataRowLink[] @relation("DataLinkFrom")
   linksIn  DataRowLink[] @relation("DataLinkTo")
 

@@ -10,6 +10,16 @@ last_updated: 2026-08-29
 
 ---
 
+## Public file links — follow-ups (2026-09-11, after PR #227 `feat/shareable-image-links`)
+
+The `/f/<token>` capability link (FilePayload.publicToken → 302 to a presigned URL) now exists; these are the other places that still emit the session-only `/api/content/content/<id>/download?stream=true` path and should be switched to it.
+
+- [ ] **Published notes with uploaded images are likely broken for visitors.** `components/public/TipTapContent.tsx` renders image nodes with their stored `src`, which is the owner-only download route; an anonymous visitor gets 401/500. Rewrite image `src` at render time via `ensurePublicFileLinks` (server-side, the owner is the page's author). Verify in a private window before and after.
+- [ ] **Markdown export emits the private path.** `lib/domain/export/converters/markdown.ts` `case "image"` writes `![alt](src)` with the stored src. Resolve `contentId` → `/f/<token>` (absolute, using the request origin) so exported vaults render images outside the app.
+- [ ] **R2 `uploadFile` returns a seven-day presigned URL** (`lib/infrastructure/storage/r2-provider.ts` ~L195) and `POST /api/media/upload` stores that URL directly into hero / gallery block attributes. On R2-backed accounts those block images plausibly expire a week after upload. Unverified in prod — check a hero block older than seven days. Fix direction: media uploads should create a FilePayload (or at least a token-bearing record) and store the `/f/` link, not a presign.
+- [ ] **Owner-facing revocation.** Nothing in the UI rotates or clears a file's `publicToken` yet. A "Reset share link" action on the file node (context menu or file viewer) that nulls the token closes the loop; trashing the node already 404s the link.
+- [ ] **Copy inside the browser-extension embed.** The share-link prime request rides plain fetch cookies, which the `/embed`-scoped session does not provide; copies there fall back to the absolute private URL. Route the prime through the embed bridge (`X-Embed-Session` / `?_t=`) if embed copy matters.
+
 ## Quest master ledger under-counts sitting tokens (2026-09-04, first production quest)
 
 - [x] **FIXED same day (`chore/release-tail`)**: the route now sums the turn's earlier segments (riding the trailing assistant message's `metadata.segments`) into `ctx.priorTurnUsage`; `turnTokensSoFar()` + `estimateRunCostUsd()` stamp turn-cumulative numbers at every checkpoint and at `closeSitting`. Residual caveat: prior segments are priced at the current executed model, so mixed-model turns carry an estimate — which is all the stamp ever claimed.
