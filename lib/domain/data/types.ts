@@ -67,6 +67,55 @@ export const IMPLEMENTED_COLUMN_TYPES: readonly DataColumnType[] = [
 ];
 
 /**
+ * The types the AI may PROPOSE, and the only types any create/extend API
+ * accepts (plan AI-RELATIONAL-DATABASE-REACH P1).
+ *
+ * This exists because it did not. The proposal tools and the create route
+ * each carried their own hand-copied subset of column types, and when Phase 4
+ * added relations, lookups, and rollups, none of those copies grew. A
+ * production session then asked for three linked tables, found no relation
+ * type in its tool schema, built the links as hand-typed text ids, and wrote
+ * the owner a feature request asking for relations the product already had.
+ * The parallel lists were the bug; one list, pinned by `ai:drift:check`, is
+ * the fix.
+ *
+ * `person` is the single deliberate exclusion: its cells store an id from
+ * either the User table or the people extension (`config.personSource`), a
+ * choice a proposal card has no way to put to the user yet. Everything else
+ * the grid offers, the AI may propose.
+ *
+ * ORDER IS THE TOOL-SCHEMA ORDER. Keep the common types first: it is what a
+ * model reads first in the enum, and "money → number, paragraphs → longText"
+ * should be reachable before the graph types.
+ */
+export const AI_PROPOSABLE_COLUMN_TYPES = [
+  "text",
+  "longText",
+  "number",
+  "checkbox",
+  "date",
+  "select",
+  "multiSelect",
+  "status",
+  "url",
+  "email",
+  "file",
+  "contentLink",
+  "relation",
+  "lookup",
+  "rollup",
+] as const satisfies readonly DataColumnType[];
+
+export type ProposableColumnType = (typeof AI_PROPOSABLE_COLUMN_TYPES)[number];
+
+/** The graph types: a relation, or something computed through one. */
+export const RELATION_FAMILY_TYPES: readonly DataColumnType[] = [
+  "relation",
+  "lookup",
+  "rollup",
+];
+
+/**
  * Types that store nothing in `DataRow.data` — either because the value lives
  * elsewhere (`relation` → DataRowLink) or because it is derived at read time.
  * Writing a cell for one of these is a bug, not a no-op, so the encoder
