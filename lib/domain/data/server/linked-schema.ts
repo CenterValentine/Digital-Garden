@@ -286,6 +286,71 @@ function validateColumns(
   }
 }
 
+
+/**
+ * Refuse a spec that draws BOTH directions of the same relation.
+ *
+ * A relation is already two-sided: creating "Experiences → Claims" mints the
+ * mirrored column on Claims automatically. A spec that also asks for
+ * "Claims → Experiences" therefore describes four columns where the author
+ * meant two, and the duplicate names collide into "Claims and metrics 2".
+ *
+ * Observed in production 2026-09-12: a model proposed all six directions
+ * between three tables. The prompt already says to propose one side; this is
+ * the enforcement, so no caller can commit the shape by accident.
+ */
+function assertNoReciprocalPairs(
+  newTables: NonNullable<LinkedSchemaSpec["tables"]>,
+  titles: string[],
+  extend: NonNullable<LinkedSchemaSpec["extend"]>,
+  extendTargets: Array<{ id: string; title: string }>,
+  targets: Map<string, ResolvedTarget>
+): void {
+  /** A stable identity for a table in this spec: "new:<i>" or "id:<uuid>". */
+  const targetKey = (ref: string): string | null => {
+    const resolved = targets.get(ref);
+    if (!resolved) return null;
+    return resolved.existingId
+      ? `id:${resolved.existingId}`
+      : `new:${resolved.newTableIndex}`;
+  };
+
+  const edges = new Map<string, { from: string; to: string; column: string }>();
+  const sides: Array<{ key: string; label: string; columns: LinkedColumnSpec[] }> = [
+    ...newTables.map((t, i) => ({
+      key: `new:${i}`,
+      label: titles[i],
+      columns: t.columns,
+    })),
+    ...extend.map((e, i) => ({
+      key: `id:${extendTargets[i].id}`,
+      label: extendTargets[i].title,
+      columns: e.columns,
+    })),
+  ];
+
+  for (const side of sides) {
+    for (const column of side.columns) {
+      if (!RELATION_TYPES.has(column.type) || !column.target) continue;
+      const to = targetKey(column.target);
+      if (!to || to === side.key) continue; // self-relations are legitimate
+      const forward = `${side.key}->${to}`;
+      const backward = `${to}->${side.key}`;
+      const mirror = edges.get(backward);
+      if (mirror) {
+        fail(
+          `"${side.label}" and "${mirror.from}" each propose a relation to the other ("${column.name.trim()}" and "${mirror.column}"). A relation is two-sided — creating one mints the mirrored column on the far table automatically. Keep ONE of them and set its backlinkName to what the other side should be called.`
+        );
+      }
+      edges.set(forward, {
+        from: side.label,
+        to: String(to),
+        column: column.name.trim(),
+      });
+    }
+  }
+}
+
 // ── Apply ────────────────────────────────────────────────────────────────
 
 /**
@@ -332,6 +397,7 @@ export async function applyLinkedSchema(
   }
 
   const targets = await resolveTargets(ownerId, spec, titles);
+  assertNoReciprocalPairs(newTables, titles, extend, extendTargets, targets);
 
   // Slugs are generated before the transaction (they query for collisions).
   // Within one batch, later titles must see earlier ones, so they are taken

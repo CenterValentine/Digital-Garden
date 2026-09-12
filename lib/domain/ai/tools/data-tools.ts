@@ -213,6 +213,54 @@ const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 
+
+/**
+ * The refusal for a spec that draws both directions of one relation, or null
+ * when it does not. A relation is two-sided already: proposing "A → B" mints
+ * the mirrored column on B, so also proposing "B → A" asks for four columns
+ * where two were meant.
+ *
+ * Mirrors the hard check in `applyLinkedSchema` (which protects every
+ * caller); this copy exists so the MODEL is told at propose time, while it
+ * can still fix the spec inside the same turn.
+ */
+function findReciprocalRelation(
+  newSides: Array<{ key: string; label: string; columns: ProposedColumn[] }>,
+  extendSides: Array<{ key: string; label: string; columns: ProposedColumn[] }>,
+  newTitles: Set<string>,
+  resolveExisting: (lowerTitle: string) => string | null
+): string | null {
+  const keyOf = (target: string): string | null => {
+    const ref = target.trim();
+    const bare = ref.startsWith(NEW_TABLE_REF_PREFIX)
+      ? ref.slice(NEW_TABLE_REF_PREFIX.length)
+      : ref;
+    const lower = bare.toLowerCase();
+    if (newTitles.has(lower)) return `new:${lower}`;
+    return resolveExisting(lower);
+  };
+
+  const seen = new Map<string, { label: string; column: string }>();
+  for (const side of [...newSides, ...extendSides]) {
+    for (const column of side.columns) {
+      if (column.type !== "relation" || !column.target) continue;
+      const to = keyOf(column.target);
+      // An unresolvable target is another check's job; a self-relation is
+      // legitimate (a table pointing at its own rows).
+      if (!to || to === side.key) continue;
+      const mirror = seen.get(`${to}->${side.key}`);
+      if (mirror) {
+        return `"${side.label}" and "${mirror.label}" each propose a relation to the other ("${column.name.trim()}" and "${mirror.column}"). A relation is TWO-SIDED — creating one mints the mirrored column on the far table automatically. Keep only one of them, and set its backlinkName to what the other side should be called.`;
+      }
+      seen.set(`${side.key}->${to}`, {
+        label: side.label,
+        column: column.name.trim(),
+      });
+    }
+  }
+  return null;
+}
+
 /**
  * Where a proposed table should live (owner policy: no root scatter — a
  * table minted at root among hundreds of files is invisible). Beside the
@@ -1501,6 +1549,33 @@ export function createDataTools(ctx: ToolExecuteContext) {
               }
             }
           }
+
+          // Both halves of the same relation is the mistake a model makes
+          // here (prod 2026-09-12: all six directions between three tables).
+          // A relation already mints its mirror on the far side, so the spec
+          // would describe four columns where two were meant, with the
+          // duplicates colliding into "Sources 2". Caught at PROPOSE time so
+          // the model fixes it now, not on the user's failed Apply.
+          const reciprocal = findReciprocalRelation(
+            tables.map((t, i) => ({
+              key: `new:${newTitles[i].toLowerCase()}`,
+              label: newTitles[i],
+              columns: t.columns as ProposedColumn[],
+            })),
+            extend.map((e, i) => ({
+              key: `id:${extendTargets[i].id}`,
+              label: extendTargets[i].title,
+              columns: e.columns as ProposedColumn[],
+            })),
+            newTitleSet,
+            (title) => {
+              const match = extendTargets.find(
+                (t) => t.title.toLowerCase() === title
+              );
+              return match ? `id:${match.id}` : null;
+            }
+          );
+          if (reciprocal) return reciprocal;
 
           // Placement: same rule as propose_output_database — beside the
           // active charter, else the chat's target folder, never root.
