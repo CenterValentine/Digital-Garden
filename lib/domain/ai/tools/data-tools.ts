@@ -36,6 +36,10 @@ import {
   writeBlockReason,
 } from "@/lib/domain/data/server/resolve";
 import { buildDataSchemaDigest } from "@/lib/domain/data/server/digest";
+import {
+  resolveRelationCell,
+  writeRelationLinks,
+} from "@/lib/domain/data/server/relation-cells";
 import { NEW_TABLE_REF_PREFIX } from "@/lib/domain/data/server/linked-schema";
 import {
   createRows,
@@ -498,7 +502,7 @@ export function createDataTools(ctx: ToolExecuteContext) {
 
     insert_rows: tool({
       description:
-        "Append new rows to an associated database. APPEND-ONLY: cannot modify or delete existing rows. Each row is {columnName: value}; select/status/multiSelect accept option labels; dates are ISO strings; file/contentLink cells take arrays of content ids. Max 25 rows per call; batches over 10 require confirmedByUser: true, which you may set ONLY after the user explicitly approved the batch in conversation. Use dedupeBy with a url column when collecting from the web so re-runs never duplicate rows.",
+        "Append new rows to an associated database. APPEND-ONLY: cannot modify or delete existing rows. Each row is {columnName: value}; select/status/multiSelect accept option labels; dates are ISO strings; file/contentLink cells take arrays of content ids. A RELATION cell takes the linked rows' titles (or row ids from query_database) — one value or an array — and the link is written after the row exists, so you can create a row and link it in the same call; the target row must already exist, and the mirrored column on the other table fills in by itself. Max 25 rows per call; batches over 10 require confirmedByUser: true, which you may set ONLY after the user explicitly approved the batch in conversation. Use dedupeBy with a url column when collecting from the web so re-runs never duplicate rows.",
       inputSchema: z.object({
         databaseId: z
           .string()
@@ -571,15 +575,36 @@ export function createDataTools(ctx: ToolExecuteContext) {
           // Translate + validate every row BEFORE creating anything, so a
           // bad batch fails whole instead of half-landing.
           const prepared: Array<Record<string, unknown>> = [];
+          // Relation cells are resolved per row but written AFTER the row
+          // exists — a link needs both ends (plan P4).
+          const preparedLinks: Array<
+            Array<{ columnId: string; rowIds: string[] }>
+          > = [];
           const skipped: string[] = [];
           const errors: string[] = [];
           for (let i = 0; i < input.rows.length; i++) {
             const rowInput = input.rows[i];
             const cells: Record<string, unknown> = {};
+            const links: Array<{ columnId: string; rowIds: string[] }> = [];
             for (const [ref, raw] of Object.entries(rowInput)) {
               const column = findColumn(live, ref);
               if (!column) {
                 errors.push(`Row ${i + 1}: no column named "${ref}".`);
+                continue;
+              }
+              if (column.type === "relation") {
+                const resolved = await resolveRelationCell(
+                  column,
+                  raw,
+                  ctx.userId
+                );
+                if ("error" in resolved) {
+                  errors.push(`Row ${i + 1}: ${resolved.error}`);
+                  continue;
+                }
+                if (resolved.rowIds.length > 0) {
+                  links.push({ columnId: column.id, rowIds: resolved.rowIds });
+                }
                 continue;
               }
               const blocked = writeBlockReason(column);
@@ -603,6 +628,7 @@ export function createDataTools(ctx: ToolExecuteContext) {
               if (typeof v === "string" && v) seen.add(v.trim().toLowerCase());
             }
             prepared.push(cells);
+            preparedLinks.push(links);
           }
           if (errors.length > 0) {
             return `Nothing inserted — fix these first:\n${errors.join("\n")}\nColumns here: ${live.map((c) => c.name).join(", ")}.`;
@@ -625,6 +651,19 @@ export function createDataTools(ctx: ToolExecuteContext) {
           });
           const result = await writeCells(databaseId, live, writes);
           const failed = result.results.filter((r) => r.status === "error");
+
+          // Links last: the rows they point FROM had to exist first.
+          let linksWritten = 0;
+          for (const [i, rowId] of rowIds.entries()) {
+            for (const link of preparedLinks[i] ?? []) {
+              const { added } = await writeRelationLinks(
+                link.columnId,
+                rowId,
+                link.rowIds
+              );
+              linksWritten += added;
+            }
+          }
           // Hard rule (quests): named rows inserted into a charter's master
           // ledger are quests the moment they exist — each gets its ledger.
           const questLedgers = await ensureLedgersForMasterRows(
@@ -634,7 +673,11 @@ export function createDataTools(ctx: ToolExecuteContext) {
           ).catch(() => 0);
 
           const parts = [
-            `Inserted ${rowIds.length} row${rowIds.length === 1 ? "" : "s"}.`,
+            `Inserted ${rowIds.length} row${rowIds.length === 1 ? "" : "s"}${
+              linksWritten > 0
+                ? ` and ${linksWritten} link${linksWritten === 1 ? "" : "s"}`
+                : ""
+            }.`,
           ];
           if (questLedgers > 0) {
             parts.push(
@@ -670,7 +713,7 @@ export function createDataTools(ctx: ToolExecuteContext) {
 
     update_row: tool({
       description:
-        "Update cells in ONE existing row. Only the columns you pass change — when the user under-specifies, OMIT everything they didn't mention, never guess a value. Pass null to CLEAR a cell, and only when the user asked for it to be blank. Get the rowId from query_database (each result line starts with [rowId]); pass expect with the current values from that same read — a stale expect fails safe instead of overwriting someone's edit, and the result tells you to re-query. All-or-nothing: if any cell is stale or invalid, no cell changes. Cannot touch relations (links) or computed columns, and cannot create or delete rows. File cells accept ONLY ids of file nodes (uploaded attachments, or files you created with a file tool) — other content belongs in a contentLink cell; to attach something from the user's disk, ask them to upload via the cell's + first.",
+        "Update cells in ONE existing row. Only the columns you pass change — when the user under-specifies, OMIT everything they didn't mention, never guess a value. Pass null to CLEAR a cell, and only when the user asked for it to be blank. Get the rowId from query_database (each result line starts with [rowId]); pass expect with the current values from that same read — a stale expect fails safe instead of overwriting someone's edit, and the result tells you to re-query. All-or-nothing: if any cell is stale or invalid, no cell changes. A RELATION cell takes the linked rows' titles (or their row ids) and REPLACES that cell's links, exactly like writing any other cell — pass the full set you want, and null to unlink everything; this is also how you link two rows that already exist. Computed columns (lookup, rollup) have no stored value and cannot be written, and this tool cannot create or delete rows. File cells accept ONLY ids of file nodes (uploaded attachments, or files you created with a file tool) — other content belongs in a contentLink cell; to attach something from the user's disk, ask them to upload via the cell's + first.",
       inputSchema: z.object({
         databaseId: z
           .string()
@@ -729,10 +772,30 @@ export function createDataTools(ctx: ToolExecuteContext) {
 
           const writes: CellWrite[] = [];
           const errors: string[] = [];
+          // Relation cells are written as links after the cell writes land,
+          // so an all-or-nothing cell failure still leaves links untouched.
+          const relationWrites: Array<{ columnId: string; rowIds: string[] }> =
+            [];
           for (const [ref, raw] of entries) {
             const column = findColumn(live, ref);
             if (!column) {
               errors.push(`No column named "${ref}".`);
+              continue;
+            }
+            if (column.type === "relation") {
+              const resolved = await resolveRelationCell(
+                column,
+                raw === null || raw === "" ? [] : raw,
+                ctx.userId
+              );
+              if ("error" in resolved) {
+                errors.push(resolved.error);
+                continue;
+              }
+              relationWrites.push({
+                columnId: column.id,
+                rowIds: resolved.rowIds,
+              });
               continue;
             }
             const blocked = writeBlockReason(column);
@@ -786,13 +849,36 @@ export function createDataTools(ctx: ToolExecuteContext) {
               .map((f) => f.message)
               .join("; ")}. Nothing changed (all-or-nothing).`;
           }
+          // Links last, and only once every cell write succeeded.
+          // A relation cell REPLACES the row's links for that column, the
+          // way writing any other cell replaces its value.
+          let added = 0;
+          let removed = 0;
+          for (const link of relationWrites) {
+            const delta = await writeRelationLinks(
+              link.columnId,
+              input.rowId,
+              link.rowIds
+            );
+            added += delta.added;
+            removed += delta.removed;
+          }
+
           // Hard rule (quests): naming a master-ledger row makes it a quest.
           const questLedgers = await ensureLedgersForMasterRows(
             ctx.userId,
             databaseId,
             [input.rowId],
           ).catch(() => 0);
-          return `Updated ${writes.length} cell${writes.length === 1 ? "" : "s"} on the row.${questLedgers > 0 ? " The row is a quest now — its quest ledger was minted under the charter." : ""} The user sees the change in the grid and can undo it there.`;
+          const cellPart =
+            writes.length > 0
+              ? `Updated ${writes.length} cell${writes.length === 1 ? "" : "s"} on the row.`
+              : "Updated the row.";
+          const linkPart =
+            added > 0 || removed > 0
+              ? ` Links: ${added} added, ${removed} removed.`
+              : "";
+          return `${cellPart}${linkPart}${questLedgers > 0 ? " The row is a quest now — its quest ledger was minted under the charter." : ""} The user sees the change in the grid and can undo it there.`;
         } catch (error) {
           logger.warn({
             layer: "ai",
