@@ -1,6 +1,6 @@
 ---
 title: AI Relational Database Reach — plan
-status: proposed
+status: built (branch feat/ai-relational-database-reach, 2026-09-12)
 created: 2026-09-11
 origin: prod conversation `c66c8efd` ("Database Table Proposal and Links"), chat node `f938f857`, folder "Evidence" `87b50703`
 related: DATABASE-CONTENT-TYPE-PLAN.md (Phase 4), EXTRACTION-TO-DATABASE-PLAN.md (§3.6, §3.7, §10), AI-TOOLING-ROUND-PLAN.md (§2 capability-true gating)
@@ -303,27 +303,53 @@ quest ledger and stamp-back. Unscheduled; listed in §8 so it is not lost.
 After a linked-schema card is applied, the follow-up hint (existing
 `follow-ups.ts`) offers "Populate <table> from <long note in this folder>".
 
-## 3. PR shape — one release train (owner, 2026-09-11)
+## 3. PR shape — one release train (owner, 2026-09-11) — BUILT
 
-One PR, one branch. Nothing forces a split: no migration (relation config is
-JSON, `DataRowLink` exists), no TipTap change (no Hocuspocus redeploy), no
-endpoint the other pieces wait on, and every piece edits the same three files
-(`data-tools.ts`, `digest.ts`, `system-prompt.ts`), so separate PRs would only
-add rebases. Commits inside the train, in build order:
+One PR, one branch (`feat/ai-relational-database-reach`). Nothing forced a
+split: no migration (relation config is JSON, `DataRowLink` exists), no TipTap
+change (no Hocuspocus redeploy), no endpoint the other pieces waited on, and
+every piece edits the same three files.
 
-| Commit | Contents |
-|---|---|
-| 1 | P3 digest names relation targets, lookup paths, rollup fns |
-| 2 | P1 shared `AI_PROPOSABLE_COLUMN_TYPES`, both proposal enums + create route derive from it, drift gate (mutation-tested) |
-| 3 | P5 capability line + scoping rule, P6 existing-table sentence |
-| 4 | P2 `propose_linked_databases`, `POST /api/content/data/batch` (one transaction), `LinkedDatabasesProposalCard` |
-| 5 | P4 relation cells in `insert_rows` / `update_row` (title resolution, links after row, replace semantics under `expect`) |
-| 6 | P7 follow-up hint; STATUS / BACKLOG / this plan |
+| Commit | Contents | State |
+|---|---|---|
+| `ede241e4` | P3 digest names relation targets, lookup paths, rollup fns | ✅ |
+| `4f4443d4` | `applyLinkedSchema` + tx-aware column helpers + `AI_PROPOSABLE_COLUMN_TYPES` + the create route delegating to it | ✅ |
+| `d9980cc2` | P1 shared `proposedColumn` schema, `propose_linked_databases`, `/api/content/data/batch`, drift gate 6 (mutation-tested ×3) | ✅ |
+| `f3d53e3f` | P2 `LinkedDatabasesProposalCard`; both existing cards render graph columns; columns card moves to the batch endpoint | ✅ |
+| `cbfd8f19` | P5 limit-scoping rule + P6 relational-database prompt block | ✅ |
+| `f791e360` | P4 relation cells in `insert_rows` / `update_row` | ✅ |
 
-Defaults taken unless the owner says otherwise (§6): `person` deferred;
-update replaces the link set; the single-table proposal tool accepts relations
-to existing tables. One smoke pass replays the recorded request end to end
-(§5), then inserts the first experiences and claims from the ledger note.
+**Defaults taken** (§6, all as planned): `person` deferred; an update
+REPLACES a relation cell's links; the single-table proposal tool accepts
+relations to tables that already exist.
+
+### What the build changed about the plan
+
+- **No `link_rows`, and no separate linking step at all.** As decided. A
+  relation cell's value IS its links, so `insert_rows` resolves targets during
+  validation and writes links after the row exists; `update_row` diffs against
+  the current links under its existing `expect` guard.
+- **Authorization moved out of the domain function.** `applyLinkedSchema`
+  first resolved extend targets by `ownerId`, which would have locked out a
+  database shared with owner-level rights — `canAlterSchema` is a ladder, not
+  plain ownership. The batch route now resolves and authorizes; the domain
+  function executes. Relation TARGETS stay owner-resolved, because drawing a
+  relation into a table also mints a column there.
+- **The capture path keeps refusing relations, explicitly.** Dropping
+  `relation` from the shared `writeBlockReason` would have silently opened
+  `captureTo` runs to relation columns they cannot write (capture stamps cells
+  through `writeCells` and has no link path). Both capture call sites now
+  refuse with a reason that names the alternative.
+- **P7's follow-up hint became prompt guidance instead.** `follow-ups.ts`
+  generates suggestions with a model from the last exchange; there is no
+  rules table to add a row to. The "populate what you just created, from the
+  long note in this folder, filling relation cells with titles" instruction
+  went into the database prompt block, where the model actually decides.
+- **The single-table create route gained transactionality** as a side effect
+  of sharing the core. Its docstring used to say "atomically-ish".
+- **`phone` is no longer creatable.** It was in the create route's set and in
+  one tool enum, but in no type picker — the same drift in the other
+  direction. Gate 6 would fail if it came back.
 
 ## 4. Chips & traceability
 
@@ -362,10 +388,11 @@ and, when the model names a limit, the answer is the trace.
   show the claims; a claim naming an unknown experience is refused with the
   title named.
 
-## 6. Decisions needed (owner)
+## 6. Decisions — settled
 
 Settled 2026-09-11: `propose_linked_databases` (P2) approved; relation cells
-ride `insert_rows` / `update_row`, no separate linking tool (P4).
+ride `insert_rows` / `update_row`, no separate linking tool (P4). The rest
+were taken as the plan's defaults when the train was built (§3).
 
 1. **`person` columns in proposals.** Include now (`personSource: "person"`
    default) or defer? The plan defers; nothing in the recorded session needed it.

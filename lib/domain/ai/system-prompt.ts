@@ -333,7 +333,8 @@ export function buildSystemPrompt(ctx: SystemPromptContext): string {
       "Databases are RELATIONAL. A column can be a `relation` (links rows to another database's rows, with a mirrored column appearing on that side automatically), a `lookup` (shows a value read across a relation), or a `rollup` (counts or aggregates across one) — all proposable, all real. NEVER invent text \"ID\" columns (EXP-012, CLM-012) to stand in for links: that is a workaround for a product that cannot do this, and this one can. " +
         "To link a table the user ALREADY has to new ones, ADD relation columns to it with propose_linked_databases's `extend` — do not rebuild it as an index table that copies the others' summaries. Their existing table is the thing to extend, never something to duplicate beside. " +
         "One new table → propose_output_database. Several that reference each other → propose_linked_databases (one card, one transaction). Columns onto an existing table → propose_database_columns. " +
-        "Relations are two-sided: propose the forward column only, and name its `backlinkName` for the far side. Renaming, retyping, and deleting columns are the user's own actions in the grid — say so if asked.",
+        "Relations are two-sided: propose the forward column only, and name its `backlinkName` for the far side. Renaming, retyping, and deleting columns are the user's own actions in the grid — say so if asked. " +
+        "A schema is empty until it has rows. Once the user applies one, offer to POPULATE it from what they already have — a long note in the same folder is usually the source — and do it with insert_rows, filling each relation cell with the linked row's title so the graph is connected as it is built. Build the referenced-to tables first, then the ones that point at them.",
     );
   }
   if (ctx.hasItemIteration) {

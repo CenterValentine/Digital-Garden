@@ -10,14 +10,17 @@ last_updated: 2026-08-29
 
 ---
 
-## AI relational database reach (2026-09-11, from prod conversation `c66c8efd`)
+## AI relational database reach — SHIPPED 2026-09-12 (branch `feat/ai-relational-database-reach`)
 
-Plan: [AI-RELATIONAL-DATABASE-REACH-PLAN.md](AI-RELATIONAL-DATABASE-REACH-PLAN.md). The owner asked a database-bound chat to build three linked career-evidence tables; the model shipped text-ID "links" and a feature request reporting the tool surface as the product: relations, rollups, and backlinks all exist since Phase 4, but the proposal tools' type enums are hand-copied subsets of `IMPLEMENTED_COLUMN_TYPES` and the digest never names a relation, so nothing the model could read said otherwise. Owner's next step: migrate the ledger **note** into the tables.
+Plan: [AI-RELATIONAL-DATABASE-REACH-PLAN.md](AI-RELATIONAL-DATABASE-REACH-PLAN.md). Built as one release train; see §3 for the commit table and what the build changed about the plan.
 
-- [ ] **One PR (owner, 2026-09-11) — commits in order.** (a) Let the assistant see the graph: schema digest names relation targets / lookup paths / rollup fns; capability line listing what the grid supports beyond the proposal tools + scoping rule "name the TOOL that lacks it"; `propose_database_columns` accepts `relation` / `lookup` / `rollup` to existing tables (columns route already calls `createRelationPair`); `ai:drift:check` pins proposal enums ≡ create-route types ≡ `AI_PROPOSABLE_COLUMN_TYPES` (mutation-tested).
-- [ ] (b) One consent for a linked schema (**approved**): `propose_linked_databases` (N new tables + relation columns onto existing ones, `$new:` targets), `POST /api/content/data/batch` in one transaction, one card / one Apply / nothing-or-everything.
-- [ ] (c) Fill the links: relation cells in `insert_rows` / `update_row` (no new tool; titles resolve server-side, links written after the row), follow-up hint offering population from a long sibling note; later a `note-sections` iteration source for notes too long to attach.
-- [ ] Defaults unless overridden (plan §6): `person` columns now or later; replace-vs-append semantics for relation cells on update; relations-to-existing inside `propose_output_database`.
+- [x] **Let the assistant see the graph** — digest names relation targets, lookup paths and rollup functions; limit-scoping prompt rule; relational-database prompt block; `ai:drift:check` gate 6 pins the column vocabulary (mutation-tested three ways).
+- [x] **One consent for a linked schema** — `propose_linked_databases`, `POST /api/content/data/batch` in one transaction, `LinkedDatabasesProposalCard` leading with the edges.
+- [x] **Fill the links** — relation cells in `insert_rows` / `update_row`, addressed by target row title or id.
+- [ ] **Owner smoke** (plan §5): replay the recorded request; add a relation + rollup to an existing table; populate from the ledger note.
+- [ ] **Annotate feature-request note `3cc169ea`** with what shipped and which layer each of its five gaps lived in, so the document that started this reflects the outcome.
+- [ ] **Migrate the four prod tables** from that session (text `Claim IDs` / `Source IDs` / `Experience ID` columns → real relations). Owner action in the grid, or a one-off script.
+- [ ] **`note-sections` enumeration source** for `propose_item_iteration` — the governed route for migrating notes too long to attach. Unscheduled.
 
 ## Public file links — follow-ups (2026-09-11, after PR #227 `feat/shareable-image-links`)
 
