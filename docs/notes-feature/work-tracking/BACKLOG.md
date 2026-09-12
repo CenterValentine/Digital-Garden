@@ -10,6 +10,15 @@ last_updated: 2026-08-29
 
 ---
 
+## AI relational database reach (2026-09-11, from prod conversation `c66c8efd`)
+
+Plan: [AI-RELATIONAL-DATABASE-REACH-PLAN.md](AI-RELATIONAL-DATABASE-REACH-PLAN.md). The owner asked a database-bound chat to build three linked career-evidence tables; the model shipped text-ID "links" and a feature request reporting the tool surface as the product: relations, rollups, and backlinks all exist since Phase 4, but the proposal tools' type enums are hand-copied subsets of `IMPLEMENTED_COLUMN_TYPES` and the digest never names a relation, so nothing the model could read said otherwise. Owner's next step: migrate the ledger **note** into the tables.
+
+- [ ] **One PR (owner, 2026-09-11) — commits in order.** (a) Let the assistant see the graph: schema digest names relation targets / lookup paths / rollup fns; capability line listing what the grid supports beyond the proposal tools + scoping rule "name the TOOL that lacks it"; `propose_database_columns` accepts `relation` / `lookup` / `rollup` to existing tables (columns route already calls `createRelationPair`); `ai:drift:check` pins proposal enums ≡ create-route types ≡ `AI_PROPOSABLE_COLUMN_TYPES` (mutation-tested).
+- [ ] (b) One consent for a linked schema (**approved**): `propose_linked_databases` (N new tables + relation columns onto existing ones, `$new:` targets), `POST /api/content/data/batch` in one transaction, one card / one Apply / nothing-or-everything.
+- [ ] (c) Fill the links: relation cells in `insert_rows` / `update_row` (no new tool; titles resolve server-side, links written after the row), follow-up hint offering population from a long sibling note; later a `note-sections` iteration source for notes too long to attach.
+- [ ] Defaults unless overridden (plan §6): `person` columns now or later; replace-vs-append semantics for relation cells on update; relations-to-existing inside `propose_output_database`.
+
 ## Public file links — follow-ups (2026-09-11, after PR #227 `feat/shareable-image-links`)
 
 The `/f/<token>` capability link (FilePayload.publicToken → 302 to a presigned URL) now exists; these are the other places that still emit the session-only `/api/content/content/<id>/download?stream=true` path and should be switched to it.
