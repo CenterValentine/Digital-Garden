@@ -101,10 +101,16 @@ export async function POST(request: NextRequest) {
       // `undefined` = leave ownership unchanged; null = detach from note.
       let ownerNoteUpdate: string | null | undefined = undefined;
       let storageTargetParentId = targetParentId;
+      // `undefined` = leave the role alone. Only database nesting moves it,
+      // in both directions — a table hidden behind a folder's reference chip
+      // because a nest was undone would be the "where did my table go?"
+      // failure the reference drawer exists to avoid.
+      let roleUpdate: "primary" | "referenced" | undefined = undefined;
 
       // Dropping a reference at ROOT detaches it from its note.
       if (targetParentId === null && content.role === "referenced") {
         ownerNoteUpdate = null;
+        if (content.contentType === "data") roleUpdate = "primary";
       }
 
       // Validate target parent
@@ -184,7 +190,48 @@ export async function POST(request: NextRequest) {
               },
               select: { id: true },
             }));
-          if (!isReferenceToNote && !isRowReturningHome && !isShortcutNesting) {
+          // A database may nest under another database (owner, 2026-09-13):
+          // a linked set of tables has a natural head, and the tree should be
+          // able to say so. The nested table becomes a reference behind its
+          // host's chip and detaches again on any folder drop.
+          const isDatabaseNesting =
+            content.contentType === "data" &&
+            targetParent.contentType === "data" &&
+            !isRowReturningHome;
+          if (isDatabaseNesting) {
+            // Reference ownership is not parentId, so the parentId cycle
+            // check below cannot see a loop built out of ownedByNoteId.
+            // Walk the host's own chain instead; a bounded walk, because a
+            // corrupt chain must not hang the request.
+            let cursor: string | null = targetParent.id;
+            for (let hop = 0; cursor && hop < 32; hop++) {
+              if (cursor === contentId) {
+                return NextResponse.json(
+                  {
+                    success: false,
+                    error: {
+                      code: "VALIDATION_ERROR",
+                      message:
+                        "That database is already nested inside this one — move it out first.",
+                    },
+                  },
+                  { status: 400 }
+                );
+              }
+              const host: { ownedByNoteId: string | null } | null =
+                await prisma.contentNode.findUnique({
+                  where: { id: cursor },
+                  select: { ownedByNoteId: true },
+                });
+              cursor = host?.ownedByNoteId ?? null;
+            }
+          }
+          if (
+            !isReferenceToNote &&
+            !isRowReturningHome &&
+            !isShortcutNesting &&
+            !isDatabaseNesting
+          ) {
             return NextResponse.json(
               {
                 success: false,
@@ -199,6 +246,13 @@ export async function POST(request: NextRequest) {
           if (isShortcutNesting) {
             // Stores plainly under targetParent — no ownerNoteUpdate, no
             // storage redirection. Deliberately falls through.
+          } else if (isDatabaseNesting) {
+            // Same shape as a reference re-home: display parentage via
+            // ownedByNoteId, storage in the host's folder so path and
+            // cascade invariants hold.
+            ownerNoteUpdate = targetParent.id;
+            storageTargetParentId = targetParent.parentId;
+            roleUpdate = "referenced";
           } else if (isRowReturningHome) {
             // Restore promotion's canonical ownership (ownedByNoteId = the
             // table) so a referenced row page partitions back behind the
@@ -216,6 +270,9 @@ export async function POST(request: NextRequest) {
           // note — it becomes folder-level referenced content, adjacent to
           // primary content.
           ownerNoteUpdate = null;
+          // A database dropped into a folder is a first-class table again,
+          // not something filed behind that folder's reference chip.
+          if (content.contentType === "data") roleUpdate = "primary";
         }
 
         if (targetParentId === contentId) {
@@ -283,12 +340,18 @@ export async function POST(request: NextRequest) {
       // Apply the reference-ownership change decided above (re-home under a
       // note, or detach on an explicit folder/root drop).
       if (
-        ownerNoteUpdate !== undefined &&
-        ownerNoteUpdate !== content.ownedByNoteId
+        (ownerNoteUpdate !== undefined &&
+          ownerNoteUpdate !== content.ownedByNoteId) ||
+        (roleUpdate !== undefined && roleUpdate !== content.role)
       ) {
         await prisma.contentNode.update({
           where: { id: contentId },
-          data: { ownedByNoteId: ownerNoteUpdate },
+          data: {
+            ...(ownerNoteUpdate !== undefined
+              ? { ownedByNoteId: ownerNoteUpdate }
+              : {}),
+            ...(roleUpdate !== undefined ? { role: roleUpdate } : {}),
+          },
         });
       }
 
