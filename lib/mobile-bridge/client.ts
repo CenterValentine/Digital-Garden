@@ -72,6 +72,26 @@ export function openExternalUrl(url: string): void {
   }
 }
 
+/**
+ * Navigate to an auth-gated destination the way the current environment
+ * requires. Returns true when it handled the navigation.
+ *
+ * Native WebView shell: WKWebView does not reliably attach the session cookie
+ * to the RSC fetch behind a soft (client-side) navigation, so the destination's
+ * proxy/session check can run cookie-less and bounce to /sign-in — or the fetch
+ * simply fails and the navigation never resolves. Either way a caller that has
+ * already called preventDefault() is left with a dead control. A full document
+ * load sends the cookie with the top-level request.
+ *
+ * Outside the shell this returns false and the caller keeps its soft
+ * navigation, so desktop behavior is unchanged.
+ */
+export function navigateInNativeShell(target: string): boolean {
+  if (!isNativeShell()) return false;
+  window.location.assign(target);
+  return true;
+}
+
 /** Narrow an arbitrary payload to a NativeToWebMessage, or null. */
 function parseNativeToWebMessage(raw: unknown): NativeToWebMessage | null {
   let data: unknown = raw;

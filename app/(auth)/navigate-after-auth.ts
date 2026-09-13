@@ -1,4 +1,4 @@
-import { isNativeShell } from '@/lib/mobile-bridge/client'
+import { navigateInNativeShell } from '@/lib/mobile-bridge/client'
 
 /** Minimal shape of the Next.js router we need — avoids importing internals. */
 type SoftRouter = { push: (href: string) => void; refresh: () => void }
@@ -17,10 +17,7 @@ type SoftRouter = { push: (href: string) => void; refresh: () => void }
  * top-level request. Guarded by isNativeShell() so desktop is unchanged.
  */
 export function navigateAfterAuth(target: string, router: SoftRouter): void {
-  if (isNativeShell()) {
-    window.location.assign(target)
-    return
-  }
+  if (navigateInNativeShell(target)) return
   router.push(target)
   router.refresh()
 }

@@ -10,8 +10,9 @@
  * client island so this page can fetch from Prisma on the server.
  */
 
-import Link from "next/link";
 import { redirect } from "next/navigation";
+
+import ShellLink from "@/components/client/ShellLink";
 
 import { getCurrentSession } from "@/lib/infrastructure/auth/middleware";
 import { prisma } from "@/lib/database/client";
@@ -62,17 +63,17 @@ export default async function MobileHomePage() {
         <p className={styles.subtitle}>Mobile</p>
       </header>
 
-      <Link href={PRIMARY.href} className={styles.primaryCard}>
+      <ShellLink href={PRIMARY.href} className={styles.primaryCard}>
         <span className={styles.cardTitle}>{PRIMARY.title}</span>
         <span className={styles.cardDesc}>{PRIMARY.desc}</span>
-      </Link>
+      </ShellLink>
 
       {recentNotes.length > 0 && (
         <section>
           <p className={styles.sectionLabel}>Recent notes</p>
           <div className={styles.recent}>
             {recentNotes.map((note) => (
-              <Link
+              <ShellLink
                 key={note.id}
                 href={`/mobile/note/${note.id}`}
                 className={styles.recentItem}
@@ -83,7 +84,7 @@ export default async function MobileHomePage() {
                 <span className={styles.recentMeta}>
                   {formatDate(note.updatedAt)}
                 </span>
-              </Link>
+              </ShellLink>
             ))}
           </div>
         </section>
@@ -91,10 +92,10 @@ export default async function MobileHomePage() {
 
       <div className={styles.grid}>
         {SECONDARY.map((item) => (
-          <Link key={item.href} href={item.href} className={styles.card}>
+          <ShellLink key={item.href} href={item.href} className={styles.card}>
             <span className={styles.cardTitle}>{item.title}</span>
             <span className={styles.cardDesc}>{item.desc}</span>
-          </Link>
+          </ShellLink>
         ))}
       </div>
 
