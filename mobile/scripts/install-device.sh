@@ -39,6 +39,23 @@ echo "    web target: ${WEB_URL}"
 # -allowProvisioningUpdates lets Xcode mint/refresh the provisioning profile
 # and register the device with the team automatically (required weekly, since
 # free-team profiles are short-lived).
+# Before the build, make sure the phone's developer disk image is mounted.
+# After an iOS update (or the first connection to a new Xcode) the device sits
+# in "Preparing" until the personalized DDI mounts, and that mount is refused
+# while the screen is locked (kAMDMobileImageMounterDeviceLocked). xcodebuild
+# then times out with "Device is busy (Preparing ...)". Poll here so the
+# unlock can happen at leisure instead of failing the whole run.
+echo "==> Checking developer services on the phone (unlock it if prompted)"
+for attempt in $(seq 1 30); do
+  OUT=$(xcrun devicectl device info ddiServices --device "${DEVICE_ID}" 2>&1 || true)
+  if ! grep -q "DeviceLocked" <<<"$OUT"; then
+    break
+  fi
+  [[ $attempt -eq 1 ]] && echo "    phone is locked — waiting for it to be unlocked..."
+  [[ $attempt -eq 30 ]] && { echo "error: device stayed locked for 5 minutes" >&2; exit 1; }
+  sleep 10
+done
+
 cd "$IOS_DIR"
 xcodebuild \
   -workspace DigitalGarden.xcworkspace \
