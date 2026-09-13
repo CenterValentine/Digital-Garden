@@ -10,6 +10,14 @@ last_updated: 2026-09-11
 
 ---
 
+## Duplicate relation columns in production (cleanup, 2026-09-13)
+
+From the first linked-schema run, before PR #234's reciprocal refusal shipped. The fix prevents recurrence but cannot remove what exists.
+
+- [ ] Delete the second `Experience` column on **Claims and metrics** (`7c3565e1`) — the table has a forward and a backlink with the same name.
+- [ ] Delete **`Claims and metrics 2`** on **Experiences** (`79477f2d`) — the collision-suffixed backlink of the duplicate pair.
+- [ ] Confirm the surviving pair still links both ways before deleting either.
+
 ## Referenced content: which relationships are actually FIXED? (review, 2026-09-13)
 
 Owner's rule (2026-09-13): **only referenced content that has a FIXED relationship with its parent should be unmovable** — everything else must be draggable out.
@@ -27,7 +35,7 @@ Plan: [AI-RELATIONAL-DATABASE-REACH-PLAN.md](AI-RELATIONAL-DATABASE-REACH-PLAN.m
 - [x] **Let the assistant see the graph** — digest names relation targets, lookup paths and rollup functions; limit-scoping prompt rule; relational-database prompt block; `ai:drift:check` gate 6 pins the column vocabulary (mutation-tested three ways).
 - [x] **One consent for a linked schema** — `propose_linked_databases`, `POST /api/content/data/batch` in one transaction, `LinkedDatabasesProposalCard` leading with the edges.
 - [x] **Fill the links** — relation cells in `insert_rows` / `update_row`, addressed by target row title or id.
-- [ ] **Production smoke** (PR #231 body has the 10-item list): replay the recorded request; bad-target rollback; relation + rollup onto an existing table; populate from the ledger note; refusal paths (unresolvable title, backlink write, captureTo relation).
+- [ ] **Production smoke** (PR #231 and PR #234 bodies each carry a 10-item list): replay the recorded request; bad-target rollback; relation + rollup onto an existing table; populate from the ledger note; refusal paths (unresolvable title, backlink write, captureTo relation).
 - [ ] **Annotate feature-request note `3cc169ea`** with what shipped and which layer each of its five gaps lived in, so the document that started this reflects the outcome.
 - [ ] **Migrate the four prod tables** from that session (text `Claim IDs` / `Source IDs` / `Experience ID` columns → real relations). Owner action in the grid, or a one-off script.
 - [ ] **`note-sections` enumeration source** for `propose_item_iteration` — the governed route for migrating notes too long to attach. Unscheduled.
