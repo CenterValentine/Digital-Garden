@@ -386,24 +386,32 @@ export function FileTree({
       return true;
     }
 
-    // Only allow dropping into folders — with ONE exception: referenced
-    // nodes may be dropped onto a NOTE (re-homing the reference under that
-    // note). Primary content can never gain a leaf parent; this is
+    // Only allow dropping into folders — with a short list of exceptions.
+    // Primary content generally cannot gain a leaf parent; this is
     // deliberately not Notion-style nesting.
     if (parentNode.data.contentType !== "folder") {
       const allReferences =
         dragNodes.length > 0 &&
         dragNodes.every((dragNode) => dragNode.data.role === "referenced");
-      // A database accepts exactly its own promoted rows back (plan Phase 5:
-      // rows are freely movable — that has to include the way home). Nothing
-      // else may nest under a data node.
+      // A database accepts its own promoted rows back (plan Phase 5: rows
+      // are freely movable — that has to include the way home).
       const allRowsOfThisTable =
         dragNodes.length > 0 &&
         dragNodes.every(
           (dragNode) => dragNode.data.promotedFromTableId === parentNode.data.id
         );
+      // …and it accepts other DATABASES (owner, 2026-09-13). A set of
+      // linked tables has a natural head — the index everything points at —
+      // and the tree should be able to say so. The nested table becomes a
+      // reference under its host and lives behind its chip; dragging it to a
+      // folder detaches it again, so nothing is locked in place.
+      const allDatabases =
+        dragNodes.length > 0 &&
+        dragNodes.every((dragNode) => dragNode.data.contentType === "data");
       const noteOk = parentNode.data.contentType === "note" && allReferences;
-      const dataOk = parentNode.data.contentType === "data" && allRowsOfThisTable;
+      const dataOk =
+        parentNode.data.contentType === "data" &&
+        (allRowsOfThisTable || allDatabases);
       if (!noteOk && !dataOk) {
         return false;
       }

@@ -6,9 +6,15 @@
  * Sits next to the TargetFolderChip. Where the folder chip is the chat's
  * OPERATING context, this one is where NEW content the assistant creates
  * lands by DEFAULT when the user doesn't tell it otherwise:
- *   - This chat        → nested under this chat (referenced) — the default
- *   - Next to this chat → under the origin content, a sibling of the chat
- *   - A folder…         → a chosen folder, as a plain (movable) node
+ *   - Under this chat     → nested under this chat (referenced)
+ *   - Under <file>       → nested under the content this chat is on
+ *   - Beside <file>      → that content's own folder
+ *   - Somewhere else…    → any chosen folder, as a plain node
+ *
+ * The two relative options NAME the content (owner, 2026-09-13) — "Under
+ * this content" made the reader work out which content that was, next to a
+ * tree full of similar names. Everything here is referenced placement, which
+ * the user can drag out of at any time; nothing is locked in place.
  *
  * The assistant can always override on an explicit request; this is only the
  * fallback. Selection persists per-conversation (handled by the engine) and
@@ -17,11 +23,19 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { MessageSquare, CornerDownRight, FolderOpen, Check } from "lucide-react";
+import {
+  MessageSquare,
+  CornerDownRight,
+  ArrowRight,
+  FolderOpen,
+  Check,
+  ChevronDown,
+} from "lucide-react";
 import { cn } from "@/lib/core/utils";
 import { calculateMenuPosition } from "@/lib/core/menu-positioning";
 import {
   getOutputTargetLabel,
+  truncateDestinationName,
   type OutputTarget,
 } from "@/lib/domain/ai/output-target";
 
@@ -60,17 +74,25 @@ export function OutputTargetChip({
   disabled = false,
   /** Hide the "next to this chat" option for full-page chats (no distinct origin). */
   hasOrigin = true,
+  /** Title of the content this chat is rooted on — names the two relative options. */
+  contentTitle = null,
   compact = false,
 }: {
   value: OutputTarget;
   onChange: (target: OutputTarget) => void;
   disabled?: boolean;
   hasOrigin?: boolean;
+  contentTitle?: string | null;
   compact?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [folders, setFolders] = useState<FlatFolder[] | null>(null);
   const [filter, setFilter] = useState("");
+  // The folder picker is the FOURTH option, not a permanently-open list
+  // stapled beneath three (owner, 2026-09-13). Collapsed it reads as a peer
+  // of the other destinations; it opens already-expanded when a folder is
+  // the current choice, so the selection stays visible.
+  const [pickerOpen, setPickerOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const buttonRef = useRef<HTMLButtonElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
@@ -101,11 +123,12 @@ export function OutputTargetChip({
         }),
       );
     }
+    setPickerOpen(value.mode === "folder");
     setOpen(true);
-  }, [open]);
+  }, [open, value.mode]);
 
   useEffect(() => {
-    if (!open || folders !== null) return;
+    if (!open || !pickerOpen || folders !== null) return;
     let cancelled = false;
     void (async () => {
       try {
@@ -129,7 +152,7 @@ export function OutputTargetChip({
     return () => {
       cancelled = true;
     };
-  }, [open, folders]);
+  }, [open, pickerOpen, folders]);
 
   useEffect(() => {
     if (!open) return;
@@ -154,6 +177,9 @@ export function OutputTargetChip({
     return q ? folders.filter((f) => f.title.toLowerCase().includes(q)) : folders;
   }, [folders, filter]);
   const isOverride = value.mode !== "chat";
+  const contentName = contentTitle?.trim()
+    ? truncateDestinationName(contentTitle)
+    : null;
 
   const pick = useCallback(
     (target: OutputTarget) => {
@@ -188,11 +214,15 @@ export function OutputTargetChip({
           <MessageSquare className="h-3 w-3 shrink-0 text-indigo-400" />
         ) : value.mode === "underContent" ? (
           <CornerDownRight className="h-3 w-3 shrink-0 text-indigo-400" />
+        ) : value.mode === "besideContent" ? (
+          <ArrowRight className="h-3 w-3 shrink-0 text-indigo-400" />
         ) : (
           <FolderOpen className="h-3 w-3 shrink-0" />
         )}
         {!compact && (
-          <span className="truncate">{getOutputTargetLabel(value)}</span>
+          <span className="truncate">
+            {getOutputTargetLabel(value, { contentTitle })}
+          </span>
         )}
       </button>
 
@@ -227,24 +257,51 @@ export function OutputTargetChip({
                 icon={
                   <CornerDownRight className="h-3.5 w-3.5 text-indigo-400" />
                 }
-                label="Under this content"
-                hint="A child of what this chat is on (beside the chat)"
+                label={
+                  contentName ? `Under ${contentName}` : "Under this content"
+                }
+                hint="Nested inside it, beside the chat"
                 onClick={() => pick({ mode: "underContent" })}
               />
               <Option
                 active={value.mode === "besideContent"}
-                icon={<FolderOpen className="h-3.5 w-3.5 text-indigo-400" />}
-                label="Beside this content"
-                hint="In the content's own folder"
+                icon={<ArrowRight className="h-3.5 w-3.5 text-indigo-400" />}
+                label={
+                  contentName ? `Beside ${contentName}` : "Beside this content"
+                }
+                hint="In the same folder as it"
                 onClick={() => pick({ mode: "besideContent" })}
               />
             </>
           )}
+          {/* Fourth destination. Collapsed it is a peer of the three above;
+              expanded it becomes the folder search it always was. */}
+          <Option
+            active={value.mode === "folder"}
+            icon={<FolderOpen className="h-3.5 w-3.5 text-yellow-500/80" />}
+            label="Somewhere else…"
+            hint={
+              value.mode === "folder"
+                ? `Currently ${value.folderTitle || "a folder"}`
+                : "Pick any folder in the tree"
+            }
+            trailing={
+              <ChevronDown
+                className={cn(
+                  "h-3 w-3 shrink-0 transition-transform",
+                  pickerOpen && "rotate-180",
+                )}
+              />
+            }
+            onClick={() => setPickerOpen((o) => !o)}
+          />
+          {pickerOpen && (
           <div className="flex min-h-0 flex-1 flex-col border-t border-black/5 dark:border-white/5">
             <input
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
-              placeholder="A folder…"
+              placeholder="Search folders…"
+              autoFocus
               className="w-full bg-transparent px-3 py-1.5 text-xs outline-none placeholder:text-gray-500"
             />
             <div className="min-h-0 flex-1 overflow-y-auto">
@@ -278,6 +335,7 @@ export function OutputTargetChip({
               )}
             </div>
           </div>
+          )}
           </div>,
           document.body,
         )}
@@ -291,12 +349,15 @@ function Option({
   label,
   hint,
   onClick,
+  trailing,
 }: {
   active: boolean;
   icon: React.ReactNode;
   label: string;
   hint: string;
   onClick: () => void;
+  /** Replaces the check mark — used by the folder row's expand chevron. */
+  trailing?: React.ReactNode;
 }) {
   return (
     <button
@@ -314,7 +375,10 @@ function Option({
         <span className="truncate font-medium">{label}</span>
         <span className="truncate text-[10px] text-gray-500">{hint}</span>
       </span>
-      {active && <Check className="ml-auto h-3 w-3 shrink-0" />}
+      <span className="ml-auto flex shrink-0 items-center gap-1">
+        {active && <Check className="h-3 w-3 shrink-0" />}
+        {trailing}
+      </span>
     </button>
   );
 }

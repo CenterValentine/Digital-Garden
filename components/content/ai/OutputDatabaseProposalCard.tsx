@@ -45,9 +45,12 @@ export interface OutputDatabaseProposalPayload {
     fn?: string;
   }>;
   dedupeColumn: string | null;
-  /** Resolved destination — charter folder, else the chat's target. */
+  /** Resolved destination — output folder, owner's folder, charter, target. */
   parentId?: string | null;
   parentTitle?: string | null;
+  /** Nest under this chat/content as a reference (Target output). */
+  ownerContentId?: string | null;
+  ownerTitle?: string | null;
 }
 
 type ApplyState =
@@ -131,6 +134,9 @@ export function OutputDatabaseProposalCard({
           // it used to be shown on the card and then dropped on Apply.
           ...(payload.purpose ? { description: payload.purpose } : {}),
           ...(payload.parentId ? { parentId: payload.parentId } : {}),
+          ...(payload.ownerContentId
+            ? { ownerContentId: payload.ownerContentId }
+            : {}),
         }),
       });
       const json = await res.json().catch(() => null);
@@ -205,9 +211,11 @@ export function OutputDatabaseProposalCard({
               Identity column: {payload.dedupeColumn}
             </div>
           )}
-          {payload.parentTitle && (
+          {(payload.ownerTitle || payload.parentTitle) && (
             <div className="text-[11px] text-gray-500 dark:text-gray-400">
-              Location: {payload.parentTitle}
+              {payload.ownerTitle
+                ? `Nested under ${payload.ownerTitle}`
+                : `Location: ${payload.parentTitle}`}
             </div>
           )}
         </div>

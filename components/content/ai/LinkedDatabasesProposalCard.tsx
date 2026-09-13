@@ -42,6 +42,9 @@ export interface LinkedDatabasesProposalPayload {
   rationale: string | null;
   parentId?: string | null;
   parentTitle?: string | null;
+  /** Nest the new tables under this chat/content as references. */
+  ownerContentId?: string | null;
+  ownerTitle?: string | null;
   tables: Array<{
     title: string;
     purpose: string | null;
@@ -173,6 +176,9 @@ export function LinkedDatabasesProposalCard({
             title: t.title,
             ...(t.purpose ? { description: t.purpose } : {}),
             ...(payload.parentId ? { parentId: payload.parentId } : {}),
+            ...(payload.ownerContentId
+              ? { ownerContentId: payload.ownerContentId }
+              : {}),
             columns: t.columns,
           })),
           extend: payload.extend.map((e) => ({
@@ -263,7 +269,11 @@ export function LinkedDatabasesProposalCard({
             {columnCount} column{columnCount === 1 ? "" : "s"}
             {edges.length > 0 &&
               ` · ${edges.length} relation${edges.length === 1 ? "" : "s"}`}
-            {payload.parentTitle && ` · in ${payload.parentTitle}`}
+            {payload.ownerTitle
+              ? ` · under ${payload.ownerTitle}`
+              : payload.parentTitle
+                ? ` · in ${payload.parentTitle}`
+                : ""}
           </div>
         </div>
       </div>

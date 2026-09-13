@@ -16,7 +16,7 @@ import { createPortal } from "react-dom";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { common, createLowlight } from "lowlight";
-import {
+import { AlertTriangle,
   Activity,
   Bot,
   BrainCircuit,
@@ -612,6 +612,7 @@ export const ChatMessage = memo(function ChatMessage({
     databaseColumnsProposals,
     outputDatabaseProposals,
     linkedDatabasesProposals,
+    unknownProposals,
     hasRunningTools,
   } = useMemo(() => {
     const images: ImagePayload[] = [];
@@ -627,6 +628,7 @@ export const ChatMessage = memo(function ChatMessage({
     const dbColumnsProps: DatabaseColumnsProposalPayload[] = [];
     const outputDbProps: OutputDatabaseProposalPayload[] = [];
     const linkedDbProps: LinkedDatabasesProposalPayload[] = [];
+    const unknownProps: string[] = [];
     let running = false;
     const seenImageIds = new Set<string>();
     const seenAudioIds = new Set<string>();
@@ -695,6 +697,13 @@ export const ChatMessage = memo(function ChatMessage({
         const linkedDbs = parseLinkedDatabasesProposal(tp.output);
         if (linkedDbs) {
           linkedDbProps.push(linkedDbs);
+          continue;
+        }
+        // No card claimed it. If it is still a proposal, say so rather than
+        // letting the turn's point disappear into a raw tool bubble.
+        const unknown = detectUnknownProposal(tp.output);
+        if (unknown && !unknownProps.includes(unknown)) {
+          unknownProps.push(unknown);
         }
       }
     }
@@ -710,6 +719,7 @@ export const ChatMessage = memo(function ChatMessage({
       databaseColumnsProposals: dbColumnsProps,
       outputDatabaseProposals: outputDbProps,
       linkedDatabasesProposals: linkedDbProps,
+      unknownProposals: unknownProps,
       hasRunningTools: running,
     };
   }, [message.parts]);
@@ -1309,6 +1319,9 @@ export const ChatMessage = memo(function ChatMessage({
               if (parseDatabaseColumnsProposal(toolPart.output) !== null) return null;
               if (parseOutputDatabaseProposal(toolPart.output) !== null) return null;
               if (parseLinkedDatabasesProposal(toolPart.output) !== null) return null;
+              // A proposal with no card in this build renders as a notice
+              // below, not as raw JSON in a tool bubble.
+              if (detectUnknownProposal(toolPart.output) !== null) return null;
             }
 
             return (
@@ -1449,6 +1462,26 @@ export const ChatMessage = memo(function ChatMessage({
             key={`linked-dbs-${i}`}
             payload={payload}
           />
+        ))}
+
+        {/* A proposal this build has no card for — the browser is behind the
+            server. Explicit beats a silently missing card. */}
+        {unknownProposals.map((sentinel) => (
+          <div
+            key={sentinel}
+            className="flex items-start gap-2 rounded-lg border border-amber-400/40 bg-amber-500/[0.06] px-3 py-2 text-[12px] text-amber-800 dark:border-amber-400/30 dark:bg-amber-500/[0.08] dark:text-amber-200"
+          >
+            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <span>
+              This turn produced a{" "}
+              <span className="font-medium">
+                {readableProposalName(sentinel)}
+              </span>{" "}
+              proposal that this page cannot display — the app was updated
+              since this tab was opened. Reload to see and apply it. Nothing
+              was created.
+            </span>
+          </div>
         ))}
 
         {/* Thinking indicator — shows during tool execution */}
@@ -2546,6 +2579,45 @@ function parseOutputDatabaseProposal(
     /* not valid JSON */
   }
   return null;
+}
+
+
+/**
+ * A proposal sentinel this build has no card for.
+ *
+ * Every propose_* tool returns `{"__<something>Proposal": true, ...}` and a
+ * matching card renders it. When the SERVER is ahead of the browser — a tab
+ * opened before a deploy — the sentinel arrives for a card that does not
+ * exist in the loaded bundle, and the turn's whole point vanishes: the model
+ * says "a review card is now available" and the user sees raw JSON, or
+ * nothing they recognize.
+ *
+ * Returns the sentinel's name so that case can SAY so. Silence here cost a
+ * production session (2026-09-12) that read as a feature failure.
+ */
+function detectUnknownProposal(result: unknown): string | null {
+  if (result === undefined) return null;
+  const str = typeof result === "string" ? result : JSON.stringify(result);
+  if (!str.includes("Proposal\"")) return null;
+  try {
+    const parsed = JSON.parse(str) as Record<string, unknown>;
+    const key = Object.keys(parsed).find(
+      (k) => k.startsWith("__") && k.endsWith("Proposal") && parsed[k] === true
+    );
+    return key ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** "__linkedDatabasesProposal" → "linked databases". */
+function readableProposalName(sentinel: string): string {
+  return sentinel
+    .replace(/^__/, "")
+    .replace(/Proposal$/, "")
+    .replace(/([A-Z])/g, " $1")
+    .trim()
+    .toLowerCase();
 }
 
 function parseLinkedDatabasesProposal(

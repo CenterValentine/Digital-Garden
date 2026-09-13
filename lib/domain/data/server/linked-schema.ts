@@ -74,6 +74,13 @@ export interface LinkedSchemaSpec {
     title: string;
     description?: string | null;
     parentId?: string | null;
+    /**
+     * Nest the new table as a REFERENCE under this node (the chat or content
+     * the user's Target-output setting names). Display parentage only: the
+     * node still stores in a folder, and the user can drag it out, which
+     * detaches it (see the move route's reference handling).
+     */
+    ownerContentId?: string | null;
     columns: LinkedColumnSpec[];
   }>;
   /**
@@ -286,6 +293,71 @@ function validateColumns(
   }
 }
 
+
+/**
+ * Refuse a spec that draws BOTH directions of the same relation.
+ *
+ * A relation is already two-sided: creating "Experiences → Claims" mints the
+ * mirrored column on Claims automatically. A spec that also asks for
+ * "Claims → Experiences" therefore describes four columns where the author
+ * meant two, and the duplicate names collide into "Claims and metrics 2".
+ *
+ * Observed in production 2026-09-12: a model proposed all six directions
+ * between three tables. The prompt already says to propose one side; this is
+ * the enforcement, so no caller can commit the shape by accident.
+ */
+function assertNoReciprocalPairs(
+  newTables: NonNullable<LinkedSchemaSpec["tables"]>,
+  titles: string[],
+  extend: NonNullable<LinkedSchemaSpec["extend"]>,
+  extendTargets: Array<{ id: string; title: string }>,
+  targets: Map<string, ResolvedTarget>
+): void {
+  /** A stable identity for a table in this spec: "new:<i>" or "id:<uuid>". */
+  const targetKey = (ref: string): string | null => {
+    const resolved = targets.get(ref);
+    if (!resolved) return null;
+    return resolved.existingId
+      ? `id:${resolved.existingId}`
+      : `new:${resolved.newTableIndex}`;
+  };
+
+  const edges = new Map<string, { from: string; to: string; column: string }>();
+  const sides: Array<{ key: string; label: string; columns: LinkedColumnSpec[] }> = [
+    ...newTables.map((t, i) => ({
+      key: `new:${i}`,
+      label: titles[i],
+      columns: t.columns,
+    })),
+    ...extend.map((e, i) => ({
+      key: `id:${extendTargets[i].id}`,
+      label: extendTargets[i].title,
+      columns: e.columns,
+    })),
+  ];
+
+  for (const side of sides) {
+    for (const column of side.columns) {
+      if (!RELATION_TYPES.has(column.type) || !column.target) continue;
+      const to = targetKey(column.target);
+      if (!to || to === side.key) continue; // self-relations are legitimate
+      const forward = `${side.key}->${to}`;
+      const backward = `${to}->${side.key}`;
+      const mirror = edges.get(backward);
+      if (mirror) {
+        fail(
+          `"${side.label}" and "${mirror.from}" each propose a relation to the other ("${column.name.trim()}" and "${mirror.column}"). A relation is two-sided — creating one mints the mirrored column on the far table automatically. Keep ONE of them and set its backlinkName to what the other side should be called.`
+        );
+      }
+      edges.set(forward, {
+        from: side.label,
+        to: String(to),
+        column: column.name.trim(),
+      });
+    }
+  }
+}
+
 // ── Apply ────────────────────────────────────────────────────────────────
 
 /**
@@ -332,6 +404,7 @@ export async function applyLinkedSchema(
   }
 
   const targets = await resolveTargets(ownerId, spec, titles);
+  assertNoReciprocalPairs(newTables, titles, extend, extendTargets, targets);
 
   // Slugs are generated before the transaction (they query for collisions).
   // Within one batch, later titles must see earlier ones, so they are taken
@@ -346,15 +419,29 @@ export async function applyLinkedSchema(
     slugs.push(slug);
   }
 
-  // Parent folders — each must be the caller's own live node.
+  // Parent folders and reference owners — each must be the caller's own live
+  // node. A named owner also decides the storage folder: a reference stores
+  // in its owner's folder so path and cascade invariants hold (the same rule
+  // the conversations service and the move route use).
   const parentIds: Array<string | null> = [];
+  const ownerIds: Array<string | null> = [];
   for (const table of newTables) {
-    if (!table.parentId) {
+    let owner: { id: string; parentId: string | null } | null = null;
+    if (table.ownerContentId) {
+      owner = await prisma.contentNode.findFirst({
+        where: { id: table.ownerContentId, ownerId, deletedAt: null },
+        select: { id: true, parentId: true },
+      });
+    }
+    ownerIds.push(owner?.id ?? null);
+
+    const wantedParent = owner ? owner.parentId : (table.parentId ?? null);
+    if (!wantedParent) {
       parentIds.push(null);
       continue;
     }
     const parent = await prisma.contentNode.findFirst({
-      where: { id: table.parentId, ownerId, deletedAt: null },
+      where: { id: wantedParent, ownerId, deletedAt: null },
       select: { id: true },
     });
     parentIds.push(parent?.id ?? null);
@@ -379,6 +466,9 @@ export async function applyLinkedSchema(
             slug: slugs[i],
             contentType: "data",
             parentId: parentIds[i],
+            ...(ownerIds[i]
+              ? { role: "referenced" as const, ownedByNoteId: ownerIds[i] }
+              : {}),
             displayOrder: 0,
             dataPayload: {
               create: {

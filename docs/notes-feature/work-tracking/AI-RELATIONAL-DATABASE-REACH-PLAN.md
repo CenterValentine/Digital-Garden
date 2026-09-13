@@ -1,6 +1,6 @@
 ---
 title: AI Relational Database Reach — plan
-status: built (branch feat/ai-relational-database-reach, 2026-09-12)
+status: merged (PR #231, merge commit 0114a80a, 2026-09-12) — production smoke pending
 created: 2026-09-11
 origin: prod conversation `c66c8efd` ("Database Table Proposal and Links"), chat node `f938f857`, folder "Evidence" `87b50703`
 related: DATABASE-CONTENT-TYPE-PLAN.md (Phase 4), EXTRACTION-TO-DATABASE-PLAN.md (§3.6, §3.7, §10), AI-TOOLING-ROUND-PLAN.md (§2 capability-true gating)
@@ -303,9 +303,9 @@ quest ledger and stamp-back. Unscheduled; listed in §8 so it is not lost.
 After a linked-schema card is applied, the follow-up hint (existing
 `follow-ups.ts`) offers "Populate <table> from <long note in this folder>".
 
-## 3. PR shape — one release train (owner, 2026-09-11) — BUILT
+## 3. PR shape — one release train (owner, 2026-09-11) — MERGED as PR #231
 
-One PR, one branch (`feat/ai-relational-database-reach`). Nothing forced a
+One PR, one branch (`feat/ai-relational-database-reach`), merged 2026-09-12 as `0114a80a`. Nothing forced a
 split: no migration (relation config is JSON, `DataRowLink` exists), no TipTap
 change (no Hocuspocus redeploy), no endpoint the other pieces waited on, and
 every piece edits the same three files.

@@ -385,6 +385,16 @@ export interface UseConversationEngineParams {
    */
   contentId?: string | null;
   /**
+   * Where this surface puts generated content before the user chooses.
+   * ChatPanel (a side chat) passes "underContent"; ChatViewer omits it and
+   * keeps the chat as owner. A stored per-chat choice still wins.
+   *
+   * A MODE, not an OutputTarget: a surface default is never a specific
+   * folder, and a primitive stays referentially stable across renders — an
+   * inline object would re-run the hydration effect on every parent render.
+   */
+  defaultOutputTargetMode?: "chat" | "underContent";
+  /**
    * Persistent Conversation entity id (Session 2+). When set, forwarded
    * to the chat route so it can write auto-associations on @mentions
    * and tool-calls, and resolve the active connection from the user's
@@ -1147,6 +1157,7 @@ export function useConversationEngine({
   contentId,
   conversationId,
   activeContextId,
+  defaultOutputTargetMode,
   initialMessages,
   historyReady = true,
   editExecutorRef,
@@ -1621,11 +1632,21 @@ export function useConversationEngine({
     conversationId,
     contentId,
   });
+  // A side chat's outputs belong to the content it was opened on, not to the
+  // conversation about it (owner, 2026-09-13) — so the surface supplies the
+  // starting destination and a stored choice still wins over it.
+  const surfaceDefaultOutputTarget = useMemo<OutputTarget>(
+    () =>
+      defaultOutputTargetMode === "underContent"
+        ? { mode: "underContent" }
+        : DEFAULT_OUTPUT_TARGET,
+    [defaultOutputTargetMode],
+  );
   const [outputTarget, setOutputTargetState] = useState<OutputTarget>(() => {
-    if (typeof window === "undefined") return DEFAULT_OUTPUT_TARGET;
+    if (typeof window === "undefined") return surfaceDefaultOutputTarget;
     return (
       readStoredOutputTarget(window.localStorage, outputTargetKey) ??
-      DEFAULT_OUTPUT_TARGET
+      surfaceDefaultOutputTarget
     );
   });
   const lastOutputTargetKeyRef = useRef<string | null>(outputTargetKey);
@@ -1653,13 +1674,14 @@ export function useConversationEngine({
       currentTarget: outputTarget,
       storedTarget,
       promotedTarget,
+      fallbackTarget: surfaceDefaultOutputTarget,
     });
     if (pendingPromotion) {
       pendingOutputTargetPromotionRef.current = null;
     }
     lastOutputTargetKeyRef.current = outputTargetKey;
     setOutputTargetState(resolvedTarget);
-  }, [outputTargetKey, outputTarget]);
+  }, [outputTargetKey, outputTarget, surfaceDefaultOutputTarget]);
 
   const setOutputTarget = useCallback(
     (t: OutputTarget) => {

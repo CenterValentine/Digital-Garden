@@ -213,15 +213,129 @@ const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 
+
 /**
- * Where a proposed table should live (owner policy: no root scatter — a
- * table minted at root among hundreds of files is invisible). Beside the
- * active charter, else the chat's target folder, else nowhere in
- * particular. Shared by every tool that proposes a new database.
+ * The refusal for a spec that draws both directions of one relation, or null
+ * when it does not. A relation is two-sided already: proposing "A → B" mints
+ * the mirrored column on B, so also proposing "B → A" asks for four columns
+ * where two were meant.
+ *
+ * Mirrors the hard check in `applyLinkedSchema` (which protects every
+ * caller); this copy exists so the MODEL is told at propose time, while it
+ * can still fix the spec inside the same turn.
  */
-async function resolveProposalParent(
+function findReciprocalRelation(
+  newSides: Array<{ key: string; label: string; columns: ProposedColumn[] }>,
+  extendSides: Array<{ key: string; label: string; columns: ProposedColumn[] }>,
+  newTitles: Set<string>,
+  resolveExisting: (lowerTitle: string) => string | null
+): string | null {
+  const keyOf = (target: string): string | null => {
+    const ref = target.trim();
+    const bare = ref.startsWith(NEW_TABLE_REF_PREFIX)
+      ? ref.slice(NEW_TABLE_REF_PREFIX.length)
+      : ref;
+    const lower = bare.toLowerCase();
+    if (newTitles.has(lower)) return `new:${lower}`;
+    return resolveExisting(lower);
+  };
+
+  const seen = new Map<string, { label: string; column: string }>();
+  for (const side of [...newSides, ...extendSides]) {
+    for (const column of side.columns) {
+      if (column.type !== "relation" || !column.target) continue;
+      const to = keyOf(column.target);
+      // An unresolvable target is another check's job; a self-relation is
+      // legitimate (a table pointing at its own rows).
+      if (!to || to === side.key) continue;
+      const mirror = seen.get(`${to}->${side.key}`);
+      if (mirror) {
+        return `"${side.label}" and "${mirror.label}" each propose a relation to the other ("${column.name.trim()}" and "${mirror.column}"). A relation is TWO-SIDED — creating one mints the mirrored column on the far table automatically. Keep only one of them, and set its backlinkName to what the other side should be called.`;
+      }
+      seen.set(`${side.key}->${to}`, {
+        label: side.label,
+        column: column.name.trim(),
+      });
+    }
+  }
+  return null;
+}
+
+export interface ProposalPlacement {
+  /** Storage folder for the new node. */
+  parentId: string | null;
+  parentTitle: string | null;
+  /**
+   * The chat (or content) the new table should be REFERENCED under, when the
+   * user's Target-output selection asks for that. Display parentage only —
+   * the node still stores in `parentId`, and the user can drag it out.
+   */
+  ownerContentId: string | null;
+  ownerTitle: string | null;
+}
+
+/**
+ * Where a proposed table should live.
+ *
+ * The database tools used to read only `targetFolderId`, so a chat whose
+ * Target output said "Under this chat" still got its tables as plain
+ * siblings — the setting was visible, promised nesting, and was silently
+ * ignored (owner report, prod 2026-09-13). They now honor the same
+ * precedence the note tools do:
+ *
+ *   1. an explicitly chosen output FOLDER (plain node there);
+ *   2. the output OWNER — nest as a reference under the chat/content;
+ *   3. beside the active charter (no root scatter);
+ *   4. the chat's target folder.
+ *
+ * A referenced table stores in its owner's folder, which keeps path and
+ * cascade invariants intact and is exactly what the move route expects when
+ * the user later drags it somewhere else.
+ */
+async function resolveProposalPlacement(
   ctx: ToolExecuteContext
-): Promise<{ id: string; title: string } | null> {
+): Promise<ProposalPlacement> {
+  const empty: ProposalPlacement = {
+    parentId: null,
+    parentTitle: null,
+    ownerContentId: null,
+    ownerTitle: null,
+  };
+
+  // 1. An explicit folder choice outranks everything below it.
+  if (ctx.outputParentOverride) {
+    const folder = await prisma.contentNode.findFirst({
+      where: { id: ctx.outputParentOverride, ownerId: ctx.userId, deletedAt: null },
+      select: { id: true, title: true },
+    });
+    if (folder) {
+      return { ...empty, parentId: folder.id, parentTitle: folder.title };
+    }
+  }
+
+  // 2. Nest under the chat (or the content the chat is on).
+  if (ctx.outputOwnerId) {
+    const owner = await prisma.contentNode.findFirst({
+      where: { id: ctx.outputOwnerId, ownerId: ctx.userId, deletedAt: null },
+      select: { id: true, title: true, parentId: true },
+    });
+    if (owner) {
+      const parent = owner.parentId
+        ? await prisma.contentNode.findFirst({
+            where: { id: owner.parentId, ownerId: ctx.userId, deletedAt: null },
+            select: { id: true, title: true },
+          })
+        : null;
+      return {
+        parentId: parent?.id ?? null,
+        parentTitle: parent?.title ?? null,
+        ownerContentId: owner.id,
+        ownerTitle: owner.title,
+      };
+    }
+  }
+
+  // 3/4. Charter folder, else the chat's target folder.
   let parentId: string | null = null;
   if (ctx.activeCharter) {
     const charterNode = await prisma.contentNode.findFirst({
@@ -241,12 +355,14 @@ async function resolveProposalParent(
       : null;
   }
   if (!parentId && ctx.targetFolderId) parentId = ctx.targetFolderId;
-  if (!parentId) return null;
+  if (!parentId) return empty;
   const parent = await prisma.contentNode.findFirst({
     where: { id: parentId, ownerId: ctx.userId, deletedAt: null },
     select: { id: true, title: true },
   });
-  return parent ?? null;
+  return parent
+    ? { ...empty, parentId: parent.id, parentTitle: parent.title }
+    : empty;
 }
 
 /** The card payload for one proposed column — graph fields only when set. */
@@ -1307,9 +1423,9 @@ export function createDataTools(ctx: ToolExecuteContext) {
               return `dedupeColumn "${input.dedupeColumn}" is not one of the proposed columns.`;
             }
           }
-          const parent = await resolveProposalParent(ctx);
-          const parentId = parent?.id ?? null;
-          const parentTitle = parent?.title ?? null;
+          const placement = await resolveProposalPlacement(ctx);
+          const parentId = placement.parentId;
+          const parentTitle = placement.parentTitle;
           return JSON.stringify({
             __outputDatabaseProposal: true,
             title: input.title.trim().slice(0, 120),
@@ -1321,6 +1437,8 @@ export function createDataTools(ctx: ToolExecuteContext) {
               null,
             parentId,
             parentTitle,
+            ownerContentId: placement.ownerContentId,
+            ownerTitle: placement.ownerTitle,
           });
         } catch (error) {
           logger.warn({
@@ -1502,15 +1620,45 @@ export function createDataTools(ctx: ToolExecuteContext) {
             }
           }
 
-          // Placement: same rule as propose_output_database — beside the
-          // active charter, else the chat's target folder, never root.
-          const parent = await resolveProposalParent(ctx);
+          // Both halves of the same relation is the mistake a model makes
+          // here (prod 2026-09-12: all six directions between three tables).
+          // A relation already mints its mirror on the far side, so the spec
+          // would describe four columns where two were meant, with the
+          // duplicates colliding into "Sources 2". Caught at PROPOSE time so
+          // the model fixes it now, not on the user's failed Apply.
+          const reciprocal = findReciprocalRelation(
+            tables.map((t, i) => ({
+              key: `new:${newTitles[i].toLowerCase()}`,
+              label: newTitles[i],
+              columns: t.columns as ProposedColumn[],
+            })),
+            extend.map((e, i) => ({
+              key: `id:${extendTargets[i].id}`,
+              label: extendTargets[i].title,
+              columns: e.columns as ProposedColumn[],
+            })),
+            newTitleSet,
+            (title) => {
+              const match = extendTargets.find(
+                (t) => t.title.toLowerCase() === title
+              );
+              return match ? `id:${match.id}` : null;
+            }
+          );
+          if (reciprocal) return reciprocal;
+
+          // Placement: the shared rule — an explicit output folder, else
+          // nested under the chat/content, else beside the charter, else the
+          // chat's target folder. Never root.
+          const placement = await resolveProposalPlacement(ctx);
 
           return JSON.stringify({
             __linkedDatabasesProposal: true,
             rationale: input.rationale?.trim() || null,
-            parentId: parent?.id ?? null,
-            parentTitle: parent?.title ?? null,
+            parentId: placement.parentId,
+            parentTitle: placement.parentTitle,
+            ownerContentId: placement.ownerContentId,
+            ownerTitle: placement.ownerTitle,
             tables: tables.map((t) => ({
               title: t.title.trim().slice(0, 120),
               purpose: t.purpose?.trim() || null,

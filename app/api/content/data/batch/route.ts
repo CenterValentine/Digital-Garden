@@ -53,6 +53,7 @@ interface BatchBody {
     title?: unknown;
     description?: unknown;
     parentId?: unknown;
+    ownerContentId?: unknown;
     columns?: unknown;
   }>;
   extend?: Array<{ database?: unknown; columns?: unknown }>;
@@ -72,6 +73,8 @@ export async function POST(request: NextRequest) {
               ? t.description.trim()
               : null,
           parentId: typeof t?.parentId === "string" ? t.parentId : null,
+          ownerContentId:
+            typeof t?.ownerContentId === "string" ? t.ownerContentId : null,
           columns: (Array.isArray(t?.columns)
             ? t.columns
             : []) as LinkedColumnSpec[],
