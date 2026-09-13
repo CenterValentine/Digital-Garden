@@ -45,6 +45,8 @@ interface ChatControlPanelProps {
   outputTarget: OutputTarget;
   onOutputTargetChange: (next: OutputTarget) => void;
   hasOrigin: boolean;
+  /** Title of the content this chat is rooted on — names the output options. */
+  originTitle?: string | null;
   modelPinned: boolean;
   onModelPinnedChange: (next: boolean) => void;
   activeContextId: string | null;
@@ -85,6 +87,7 @@ export function ChatControlPanel({
   outputTarget,
   onOutputTargetChange,
   hasOrigin,
+  originTitle = null,
   modelPinned,
   onModelPinnedChange,
   activeContextId,
@@ -235,6 +238,7 @@ export function ChatControlPanel({
                   value={outputTarget}
                   onChange={onOutputTargetChange}
                   hasOrigin={hasOrigin}
+                  contentTitle={originTitle}
                 />
               </PanelRow>
               <PanelRow

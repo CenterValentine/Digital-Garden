@@ -11,18 +11,61 @@ export type OutputTarget =
 
 export const DEFAULT_OUTPUT_TARGET: OutputTarget = { mode: "chat" };
 
-/** User-facing destination copy shared by the chip and reply-export dialog. */
-export function getOutputTargetLabel(target: OutputTarget): string {
+/**
+ * Longest file name a destination label carries before it is elided. Chosen
+ * against the chip's own max width — past this the truncation is doing the
+ * work anyway, and a long tail crowds out the preposition that carries the
+ * meaning ("Under" vs "Beside").
+ */
+const LABEL_NAME_MAX = 22;
+
+/** "Portfolio Summary.md" past the cap → "Portfolio Summar…". */
+export function truncateDestinationName(name: string): string {
+  const trimmed = name.trim();
+  if (trimmed.length <= LABEL_NAME_MAX) return trimmed;
+  return `${trimmed.slice(0, LABEL_NAME_MAX - 1).trimEnd()}…`;
+}
+
+/**
+ * User-facing destination copy shared by the chip and reply-export dialog.
+ *
+ * Naming the actual file beats "this content" (owner, 2026-09-13): the chat
+ * panel sits beside a tree of similar-looking names, and "Under this content"
+ * makes the reader reconstruct which content that is. `contentTitle` is the
+ * node the chat is rooted on; without it the generic wording still applies,
+ * so a surface that cannot resolve a title degrades rather than breaks.
+ */
+export function getOutputTargetLabel(
+  target: OutputTarget,
+  opts?: { contentTitle?: string | null },
+): string {
+  const name = opts?.contentTitle?.trim()
+    ? truncateDestinationName(opts.contentTitle)
+    : null;
   switch (target.mode) {
     case "chat":
       return "Under this chat";
     case "underContent":
-      return "Under this content";
+      return name ? `Under ${name}` : "Under this content";
     case "besideContent":
-      return "Beside this content";
+      return name ? `Beside ${name}` : "Beside this content";
     case "folder":
       return target.folderTitle || "Selected folder";
   }
+}
+
+/**
+ * The destination a chat starts on.
+ *
+ * A SIDE chat is opened on a piece of content, and its outputs almost always
+ * belong to that content rather than to the conversation about it (owner,
+ * 2026-09-13) — the chat is the means, the content is the subject. A
+ * full-page chat has no such subject, so it keeps owning its own outputs.
+ */
+export function defaultOutputTargetFor(opts: {
+  hasOrigin: boolean;
+}): OutputTarget {
+  return opts.hasOrigin ? { mode: "underContent" } : DEFAULT_OUTPUT_TARGET;
 }
 
 /**
@@ -158,12 +201,15 @@ export function resolveOutputTargetKeyChange({
   currentTarget,
   storedTarget,
   promotedTarget,
+  fallbackTarget,
 }: {
   previousKey: string | null;
   nextKey: string | null;
   currentTarget: OutputTarget;
   storedTarget: OutputTarget | null;
   promotedTarget?: OutputTarget | null;
+  /** The surface's own default — a side chat's is its rooted content. */
+  fallbackTarget?: OutputTarget;
 }): OutputTarget {
   if (previousKey === nextKey) {
     return currentTarget;
@@ -174,7 +220,7 @@ export function resolveOutputTargetKeyChange({
   if (storedTarget) {
     return storedTarget;
   }
-  return DEFAULT_OUTPUT_TARGET;
+  return fallbackTarget ?? DEFAULT_OUTPUT_TARGET;
 }
 
 export function renderOutputTargetInstruction(target: OutputTarget): string {

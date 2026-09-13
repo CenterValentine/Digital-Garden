@@ -74,6 +74,13 @@ export interface LinkedSchemaSpec {
     title: string;
     description?: string | null;
     parentId?: string | null;
+    /**
+     * Nest the new table as a REFERENCE under this node (the chat or content
+     * the user's Target-output setting names). Display parentage only: the
+     * node still stores in a folder, and the user can drag it out, which
+     * detaches it (see the move route's reference handling).
+     */
+    ownerContentId?: string | null;
     columns: LinkedColumnSpec[];
   }>;
   /**
@@ -412,15 +419,29 @@ export async function applyLinkedSchema(
     slugs.push(slug);
   }
 
-  // Parent folders — each must be the caller's own live node.
+  // Parent folders and reference owners — each must be the caller's own live
+  // node. A named owner also decides the storage folder: a reference stores
+  // in its owner's folder so path and cascade invariants hold (the same rule
+  // the conversations service and the move route use).
   const parentIds: Array<string | null> = [];
+  const ownerIds: Array<string | null> = [];
   for (const table of newTables) {
-    if (!table.parentId) {
+    let owner: { id: string; parentId: string | null } | null = null;
+    if (table.ownerContentId) {
+      owner = await prisma.contentNode.findFirst({
+        where: { id: table.ownerContentId, ownerId, deletedAt: null },
+        select: { id: true, parentId: true },
+      });
+    }
+    ownerIds.push(owner?.id ?? null);
+
+    const wantedParent = owner ? owner.parentId : (table.parentId ?? null);
+    if (!wantedParent) {
       parentIds.push(null);
       continue;
     }
     const parent = await prisma.contentNode.findFirst({
-      where: { id: table.parentId, ownerId, deletedAt: null },
+      where: { id: wantedParent, ownerId, deletedAt: null },
       select: { id: true },
     });
     parentIds.push(parent?.id ?? null);
@@ -445,6 +466,9 @@ export async function applyLinkedSchema(
             slug: slugs[i],
             contentType: "data",
             parentId: parentIds[i],
+            ...(ownerIds[i]
+              ? { role: "referenced" as const, ownedByNoteId: ownerIds[i] }
+              : {}),
             displayOrder: 0,
             dataPayload: {
               create: {

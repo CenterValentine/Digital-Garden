@@ -117,6 +117,8 @@ export async function POST(request: NextRequest) {
         title?: unknown;
         parentId?: unknown;
         columns?: unknown;
+        /** Nest the table as a reference under this chat/content (optional). */
+        ownerContentId?: unknown;
         /** Table-level purpose (≤280) — feeds the AI schema digest (plan B1/D9). */
         description?: unknown;
       } | null;
@@ -139,6 +141,10 @@ export async function POST(request: NextRequest) {
       // caller's own live nodes.
       const parentId =
         typeof body?.parentId === "string" && body.parentId ? body.parentId : null;
+      const ownerContentId =
+        typeof body?.ownerContentId === "string" && body.ownerContentId
+          ? body.ownerContentId
+          : null;
 
       let created: Awaited<ReturnType<typeof applyLinkedSchema>>;
       try {
@@ -148,6 +154,7 @@ export async function POST(request: NextRequest) {
               title,
               description,
               parentId,
+              ownerContentId,
               columns: rawColumns as LinkedColumnSpec[],
             },
           ],

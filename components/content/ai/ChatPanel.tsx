@@ -234,6 +234,9 @@ export function ChatPanel({
     getMessageStamp,
     seedMessageStamps,
   } = useConversationEngine({
+    // A side chat is opened ON something; its outputs belong to that
+    // content, not to the conversation about it (owner, 2026-09-13).
+    defaultOutputTargetMode: contentId ? "underContent" : undefined,
     conversationKey,
     contentId,
     conversationId,
@@ -317,8 +320,12 @@ export function ChatPanel({
     id: string;
     title: string | null;
   } | null>(null);
+  // The rooted content's OWN title (the location above is its folder).
+  // Names the "Under <file>" / "Beside <file>" output options.
+  const [originTitle, setOriginTitle] = useState<string | null>(null);
   useEffect(() => {
     setLocationFallback(null);
+    setOriginTitle(null);
     if (!contentId) return;
     let cancelled = false;
     (async () => {
@@ -337,6 +344,7 @@ export function ChatPanel({
         };
         const node = body?.data;
         if (!node || cancelled) return;
+        setOriginTitle(node.title ?? null);
         if (node.contentType === "folder") {
           setLocationFallback({ id: contentId, title: node.title ?? null });
           return;
@@ -1187,6 +1195,7 @@ export function ChatPanel({
               outputTarget={outputTarget}
               onOutputTargetChange={setOutputTarget}
               hasOrigin={Boolean(contentId)}
+              originTitle={originTitle}
               modelPinned={modelPinned}
               onModelPinnedChange={setModelPinned}
               activeContextId={activeContextId}
