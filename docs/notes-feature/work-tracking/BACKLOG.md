@@ -22,7 +22,7 @@ From the first linked-schema run, before PR #234's reciprocal refusal shipped. T
 
 Export already ships — `exportDatabaseCsv` (`lib/domain/data/server/export.ts`) writes a CSV of the default view plus a `.meta.json` sidecar — but only through **vault export** (`bulk-export.ts`); there is no per-table "Export CSV" affordance. Import is a **reserved shape with nothing behind it**: `lib/domain/data/import.ts` returns `NOT_IMPLEMENTED` and has zero consumers. Surfaced because moving a 28-item markdown ledger into the four-table Career Evidence Library had no file-based route at all.
 
-- [ ] **Per-table Export CSV** in the database toolbar/context menu, reusing `exportDatabaseCsv` (the sidecar already reserves the round-trip shape).
+- [ ] **Per-table Export CSV** in the database toolbar/context menu, reusing `exportDatabaseCsv` (the sidecar already reserves the round-trip shape). *2026-09-13:* the vault export now also writes a `.schema.md` sidecar per database (`lib/domain/data/schema-markdown.ts`), and the markdown/plaintext note exports carry accordion / card-panel headers and statsTable rows instead of flattening them.
 - [ ] **CSV/TSV import** behind `inferColumnsFromSamples` — header→column mapping card, type inference with confidence, select-vocabulary proposals from distinct values, provenance stamped in `DataPayload.source`. Relations import by target-row title (the same resolution `insert_rows` uses).
 - [ ] **Markdown-table → rows** as a thin variant of the same importer (paste or pick a note; each table row becomes a DataRow) — the cheapest bridge from an existing note to a database that needs no AI turn.
 

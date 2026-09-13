@@ -19,6 +19,79 @@ import { normalizeStopwatchAttrs } from "@/lib/domain/stopwatch";
 import { getHabitTrackerMarkdownLines } from "@/lib/domain/editor/extensions/blocks/habit-tracker";
 import { getStopwatchMarkdownLines } from "@/lib/domain/editor/extensions/blocks/stopwatch";
 
+/**
+ * Node types that live INSIDE a paragraph. A container whose children are
+ * all inline glues them; anything else is a block list and gets blank-line
+ * separation. Joining block children with "" — the old default — is how the
+ * vault export flattened a 28-accordion ledger into one run of prose.
+ */
+const INLINE_NODE_TYPES = new Set([
+  "text",
+  "hardBreak",
+  "wikiLink",
+  "tag",
+  "inlineTimestamp",
+  "personMention",
+  "mention",
+  "unsupportedInline",
+]);
+
+/** `headerLevel` is a string attr ("2") on the accordion; clamp to 1–6. */
+function clampHeadingLevel(raw: unknown): number {
+  const n = Number.parseInt(String(raw ?? ""), 10);
+  return Number.isFinite(n) && n >= 1 && n <= 6 ? n : 2;
+}
+
+function markdownCell(value: unknown): string {
+  return String(value ?? "")
+    .replace(/\|/g, "\\|")
+    .replace(/\s*\n\s*/g, " ")
+    .trim();
+}
+
+/** statsTable stores its rows as a JSON string in `attrs.items`. */
+function serializeStatsTable(node: JSONContent): string {
+  const attrs = node.attrs ?? {};
+  let items: Array<{ label?: unknown; value?: unknown }> = [];
+  try {
+    const parsed: unknown = JSON.parse(String(attrs.items ?? "[]"));
+    if (Array.isArray(parsed)) {
+      items = parsed as Array<{ label?: unknown; value?: unknown }>;
+    }
+  } catch {
+    items = [];
+  }
+  const caption = String(attrs.caption ?? "").trim();
+  const lines: string[] = [];
+  if (caption) lines.push(`**${caption}**`, "");
+  if (items.length === 0) return lines.join("\n").trim();
+  lines.push("| Label | Value |", "| --- | --- |");
+  for (const item of items) {
+    lines.push(`| ${markdownCell(item.label)} | ${markdownCell(item.value)} |`);
+  }
+  return lines.join("\n");
+}
+
+/**
+ * Render a TipTap document (or any node) to markdown with the export's own
+ * rules and default settings — for scripts and packet builders that want
+ * the export rendering without the converter's file plumbing.
+ */
+export function tiptapToMarkdownDocument(
+  json: JSONContent,
+  overrides: Partial<MarkdownExportSettings> = {}
+): string {
+  const settings: MarkdownExportSettings = {
+    includeMetadata: false,
+    includeFrontmatter: false,
+    preserveSemantics: true,
+    wikiLinkStyle: "[[]]",
+    codeBlockLanguagePrefix: true,
+    ...overrides,
+  };
+  return new MarkdownConverter().render(json, settings);
+}
+
 export class MarkdownConverter implements DocumentConverter {
   async convert(
     tiptapJson: JSONContent,
@@ -87,6 +160,43 @@ export class MarkdownConverter implements DocumentConverter {
     lines.push(content.trim());
 
     return lines.join("\n");
+  }
+
+  /** Public entry for callers that already hold a document and settings. */
+  render(json: JSONContent, settings: MarkdownExportSettings): string {
+    return this.serializeNode(json, settings).trim();
+  }
+
+  /** Children joined as blocks (blank-line separated) or inline (glued). */
+  private serializeChildren(
+    node: JSONContent,
+    settings: MarkdownExportSettings
+  ): string {
+    const children = node.content ?? [];
+    if (children.length === 0) return "";
+    const parts = children.map((n) => this.serializeNode(n, settings));
+    const inline = children.every((n) => INLINE_NODE_TYPES.has(n.type ?? ""));
+    return inline
+      ? parts.join("")
+      : parts.filter((p) => p.length > 0).join("\n\n");
+  }
+
+  /**
+   * Header-bearing containers (accordion, card panel): the header is an
+   * ATTR, not content, so it never reached the export — the vault export of
+   * a 28-accordion ledger came out as untitled prose. The header now exports
+   * as a heading at the block's own level, the body beneath it.
+   */
+  private serializeHeaderedContainer(
+    node: JSONContent,
+    settings: MarkdownExportSettings
+  ): string {
+    const headerText = String(node.attrs?.headerText ?? "").trim();
+    const body = this.serializeChildren(node, settings);
+    if (!headerText) return body;
+    const heading =
+      "#".repeat(clampHeadingLevel(node.attrs?.headerLevel)) + " " + headerText;
+    return body ? `${heading}\n\n${body}` : heading;
   }
 
   /**
@@ -353,12 +463,22 @@ export class MarkdownConverter implements DocumentConverter {
           ""
         );
 
+      case "accordion":
+      case "cardPanel":
+        return this.serializeHeaderedContainer(node, settings);
+
+      case "statsTable":
+        return serializeStatsTable(node);
+
+      case "dailySummary":
+      case "weeklySummary":
+        // Computed from activity at render time — nothing to export.
+        return "";
+
       default:
-        // Unknown node type - try to serialize children
-        return (
-          node.content?.map((n) => this.serializeNode(n, settings)).join("") ||
-          ""
-        );
+        // Unknown node type — keep whatever it holds, with block children
+        // blank-line separated and inline children glued.
+        return this.serializeChildren(node, settings);
     }
   }
 }

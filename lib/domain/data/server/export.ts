@@ -32,6 +32,8 @@ import {
   type DataColumn,
   type DataRow,
 } from "@/lib/domain/data";
+import { prisma } from "@/lib/database/client";
+import { renderDatabaseSchemaMarkdown } from "@/lib/domain/data/schema-markdown";
 
 /** Design-scale ceiling (plan D1: ≤10k rows per table). */
 const EXPORT_ROW_CAP = 10_000;
@@ -91,7 +93,51 @@ export interface DatabaseCsvExport {
   title: string;
   csv: string;
   meta: Record<string, unknown>;
+  /** `.schema.md` sidecar — the column vocabulary a reader or model needs. */
+  schemaMarkdown: string;
   rowCount: number;
+}
+
+/**
+ * Titles and column names the schema markdown references across tables
+ * (relation targets, mirrored columns, lookup/rollup sources). One query
+ * each; a table with no graph columns costs nothing.
+ */
+async function loadSchemaReferenceNames(columns: DataColumn[]): Promise<{
+  tableTitles: Record<string, string>;
+  columnNames: Record<string, string>;
+}> {
+  const tableIds = new Set<string>();
+  const columnIds = new Set<string>();
+  for (const c of columns) {
+    if (c.config.relationTableId) tableIds.add(c.config.relationTableId);
+    for (const id of [
+      c.config.symmetricColumnId,
+      c.config.relationColumnId,
+      c.config.lookupColumnId,
+      c.config.rollupColumnId,
+    ]) {
+      if (id) columnIds.add(id);
+    }
+  }
+  const [tables, cols] = await Promise.all([
+    tableIds.size
+      ? prisma.contentNode.findMany({
+          where: { id: { in: [...tableIds] } },
+          select: { id: true, title: true },
+        })
+      : [],
+    columnIds.size
+      ? prisma.dataColumn.findMany({
+          where: { id: { in: [...columnIds] } },
+          select: { id: true, name: true },
+        })
+      : [],
+  ]);
+  return {
+    tableTitles: Object.fromEntries(tables.map((t) => [t.id, t.title])),
+    columnNames: Object.fromEntries(cols.map((c) => [c.id, c.name])),
+  };
 }
 
 export async function exportDatabaseCsv(
@@ -158,5 +204,22 @@ export async function exportDatabaseCsv(
     ),
   };
 
-  return { title: table.title, csv, meta, rowCount: rows.length };
+  const schemaMarkdown = renderDatabaseSchemaMarkdown(
+    {
+      id: table.contentId,
+      title: table.title,
+      description: table.description,
+      rowCount: rows.length,
+      columns,
+    },
+    await loadSchemaReferenceNames(columns)
+  );
+
+  return {
+    title: table.title,
+    csv,
+    meta,
+    schemaMarkdown,
+    rowCount: rows.length,
+  };
 }
