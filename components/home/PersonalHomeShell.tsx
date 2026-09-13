@@ -37,7 +37,7 @@ interface GardenWindow {
 // Version query forces cache-bust when static files are updated.
 const GARDEN_SCRIPTS = [
   "/garden/garden-plants.js?v=3",
-  "/garden/garden-carousel.js",
+  "/garden/garden-carousel.js?v=2",
   "/garden/m44-home.js?v=4",
 ];
 
@@ -50,6 +50,16 @@ export function PersonalHomeShell({
     const w = window as Window & GardenWindow;
     // Boot exactly once per page load — survives React StrictMode's double-invoke
     // and any client re-render without stacking rAF loops or re-running the intro.
+    //
+    // This flag lives on `window`, so it is only cleared by a full document load.
+    // That makes a *hard* navigation part of this surface's contract: the vanilla
+    // engines are self-initializing IIFEs with no teardown, so the guard has to
+    // outlive React's lifecycle — which in turn means a second client-side mount
+    // of `/` in the same document would render the scaffold with no engines
+    // behind it (empty #garden/#nav, nothing clickable). Every link back into the
+    // garden is therefore a plain <a href="/">, never next/link — see
+    // components/personal/*.tsx. Re-introducing <Link href="/"> there silently
+    // reinstates that dead-garden state.
     if (w.__m44Booted) return;
     w.__m44Booted = true;
     w.CATS = cats;

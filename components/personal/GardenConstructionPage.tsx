@@ -1,15 +1,16 @@
 "use client";
 
-import Link from "next/link";
 import "./personal-pages.css";
 
 export function GardenConstructionPage() {
   return (
     <div className="personal-home personal-page garden-construction-page">
       <nav className="ab-bar">
-        <Link className="ab-back" href="/">
+        {/* Plain <a>: the garden home must boot in a fresh document — see components/home/PersonalHomeShell.tsx */}
+        {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- intentional full page load: the garden home is a global vanilla-JS engine that must reset (html class, window globals) on navigation; next/link's SPA transition blanks it. */}
+        <a className="ab-back" href="/">
           ← Back to the garden
-        </Link>
+        </a>
         <span className="ab-crumb">
           davidvalentine<span style={{ color: "var(--accent-warm)" }}>.</span>org
           {" "}/ <em>garden</em>
@@ -49,9 +50,11 @@ export function GardenConstructionPage() {
           The soil is doing its thing. Come back soon.
         </p>
 
-        <Link className="gc-back-cta" href="/">
+        {/* Plain <a>: the garden home must boot in a fresh document — see components/home/PersonalHomeShell.tsx */}
+        {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- intentional full page load: the garden home is a global vanilla-JS engine that must reset (html class, window globals) on navigation; next/link's SPA transition blanks it. */}
+        <a className="gc-back-cta" href="/">
           ← Back to the digital garden
-        </Link>
+        </a>
       </div>
     </div>
   );

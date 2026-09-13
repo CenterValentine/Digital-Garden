@@ -128,7 +128,9 @@ export function AboutPage({ data }: { data?: ProseData }) {
       </div>
 
       <footer className="ab-foot">
-        <Link href="/">Back to the garden</Link>
+        {/* Plain <a>: the garden home must boot in a fresh document — see components/home/PersonalHomeShell.tsx */}
+        {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- intentional full page load: the garden home is a global vanilla-JS engine that must reset (html class, window globals) on navigation; next/link's SPA transition blanks it. */}
+        <a href="/">Back to the garden</a>
         <span className="sep">·</span>
         <Link href="/results">Results</Link>
         <span className="sep">·</span>

@@ -236,9 +236,11 @@ export function ResumePage() {
             <span className="rv-l-role">
               Execution Engineer · Technology &amp; Operations
             </span>
-            <Link className="rv-l-back" href="/">
+            {/* Plain <a>: the garden home must boot in a fresh document — see components/home/PersonalHomeShell.tsx */}
+            {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- intentional full page load: the garden home is a global vanilla-JS engine that must reset (html class, window globals) on navigation; next/link's SPA transition blanks it. */}
+            <a className="rv-l-back" href="/">
               ← Back to garden
-            </Link>
+            </a>
             <span className="rv-l-tag">davidvalentine.org / résumé</span>
           </div>
           <div className="rv-cv-head">
@@ -415,9 +417,11 @@ export function ResumePage() {
                 <Link className="cta sec" href="/results">
                   See the work
                 </Link>
-                <Link className="cta sec" href="/">
+                {/* Plain <a>: the garden home must boot in a fresh document — see components/home/PersonalHomeShell.tsx */}
+                {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- intentional full page load: the garden home is a global vanilla-JS engine that must reset (html class, window globals) on navigation; next/link's SPA transition blanks it. */}
+                <a className="cta sec" href="/">
                   See the garden
-                </Link>
+                </a>
               </div>
             </div>
           </main>
