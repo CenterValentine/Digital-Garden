@@ -17,6 +17,7 @@ From the first linked-schema run, before PR #234's reciprocal refusal shipped. T
 - [ ] Delete the second `Experience` column on **Claims and metrics** (`7c3565e1`) — the table has a forward and a backlink with the same name.
 - [ ] Delete **`Claims and metrics 2`** on **Experiences** (`79477f2d`) — the collision-suffixed backlink of the duplicate pair.
 - [ ] Confirm the surviving pair still links both ways before deleting either.
+- *2026-09-14:* the Career Evidence Library was loaded (235 rows, 1,025 links) writing ONLY the canonical pair `Experiences.Claims and metrics ↔ Claims.Experience (backlink)`; the duplicate pair holds zero links, so both deletions above are now safe.
 
 ## Database CSV import + per-table export button (2026-09-12, from the career-evidence migration brainstorm)
 
@@ -40,6 +41,14 @@ Principle: `core/PRODUCT-PRINCIPLES.md` §2. Each item below serves the general 
 - [ ] **Accordion markdown codec** — `accordion` has no codec in `markdown-block-codecs.ts`, so chunk reads / source view emit it as a Tier-2 HTML div. A `<details><summary>headerText</summary>` (or heading) codec makes accordion-heavy notes legible to the model and to humans in source view. Guarded by `markdown:blocks:check`.
 - [ ] **Deliberate-gap semantics for cells** (raw). A row can be "incomplete on purpose" (the source was never captured) vs "not yet processed". Today only conventions distinguish them (placeholder rows, `Readiness: Needs detail`, `Evidence strength: Needs verification`, column descriptions saying blanks may be deliberate). Consider a first-class marker — a per-cell *unknown* sentinel or a table-level "gaps are deliberate" description the schema digest surfaces — so DG's AI neither fills gaps with invention nor treats them as work to redo.
 - [ ] **Flashcards → database schema (cleanup, very raw).** Flashcards carry their own Prisma models (`FlashcardDeck`, `Flashcard`, `FlashcardReviewAttempt`) beside the general `DataPayload` / `DataColumn` / `DataRow` schema that arrived later. Explore reducing flashcards to a *database with a review runtime*: a deck = a table with a locked system column set (front/back/media/FSRS state), the player and scheduler read rows, and `propose_cards_from_media` becomes an instance of note → rows. Data II already proved the Database → deck direction (PR #195). Owner intends to expand this later; record only the basis for now.
+
+## Loader hardening after the career-evidence migration (2026-09-14)
+
+The owner-run loader (`scripts/import-career-evidence.ts`) surfaced two things worth fixing in the product paths that share its helpers:
+
+- [ ] **`createRows` runs every insert inside one interactive transaction.** 99 rows over the Neon pooler crossed Prisma's 5 s default ceiling and rolled back. `insert_rows` caps at 25 so it is unlikely to hit this today, but a slow pooler moment could; either chunk inside `createRows`, raise the transaction timeout for that call, or batch-insert with `createMany` + a second query for ids.
+- [ ] **Library-style index tables upsert on the primary text column with no uniqueness guarantee.** Two ledger sections collapsed to the same title once trailing punctuation was trimmed; only the dry run caught it. Consider a dedupe warning in `insert_rows` when `dedupeBy` is the primary column and the batch itself contains duplicates.
+- [ ] **`Evidence strength`-style columns need their levels defined in the column description.** Two models given the same mapping read "Documented" differently (artifact exists vs. appears in a supplied document). The schema digest already carries descriptions to the model; a one-line definition per level is the cheapest guard.
 
 ## Referenced content: which relationships are actually FIXED? (review, 2026-09-13)
 
