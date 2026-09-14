@@ -56,6 +56,8 @@ const TABLES = {
 } as const;
 type TableKey = keyof typeof TABLES;
 const LOAD_ORDER: TableKey[] = ["experiences", "sources", "claims", "library"];
+/** Rows per createRows call — keeps each transaction far below Prisma's 5 s interactive limit over a pooled connection. */
+const CREATE_CHUNK = 10;
 
 /**
  * Relation columns to SKIP by (table, column name). The live Claims table
@@ -200,7 +202,14 @@ async function main() {
     const missing = rows.filter((r) => !rowIdByHuman[key].has(String(r[TABLES[key].idColumn])));
     console.log(`  ${key.padEnd(12)} ${rows.length} in payload → ${rows.length - missing.length} update, ${missing.length} create`);
     if (!DRY_RUN && missing.length > 0) {
-      const ids = await createRows(table.contentId, columns, missing.length, OWNER_ID);
+      // createRows runs one interactive transaction per call; 99 inserts in
+      // one call crossed Prisma's 5 s transaction ceiling over the Neon
+      // pooler (observed 2026-09-14). Chunk so each call stays well under it.
+      const ids: string[] = [];
+      for (let i = 0; i < missing.length; i += CREATE_CHUNK) {
+        const n = Math.min(CREATE_CHUNK, missing.length - i);
+        ids.push(...(await createRows(table.contentId, columns, n, OWNER_ID)));
+      }
       missing.forEach((r, i) => rowIdByHuman[key].set(String(r[TABLES[key].idColumn]), ids[i]));
     }
     summary[key].created += missing.length;
