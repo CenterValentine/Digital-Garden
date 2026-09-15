@@ -261,6 +261,17 @@ export async function writeRelationLinks(
       });
       added += 1;
     }
+    // AI digest discovery bit (plan §5.2): links are in the source hash,
+    // so both ends of every changed link are candidates.
+    if (added > 0 || stale.length > 0) {
+      await tx.dataRowDigest.updateMany({
+        where: {
+          rowId: { in: [fromRowId, ...rowIds, ...stale.map((l) => l.toRowId)] },
+          dirty: false,
+        },
+        data: { dirty: true },
+      });
+    }
     return { added, removed: stale.length };
   });
 }

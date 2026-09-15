@@ -181,6 +181,15 @@ export async function PATCH(
           { status: 404 }
         );
       }
+      const body = (await request.json()) as { query?: unknown; rowDigests?: unknown };
+      // AI row digests opt-in (AI-BULK-ROW-READING-PLAN §5): any table mode.
+      if (typeof body.rowDigests === "boolean" && body.query === undefined) {
+        await prisma.dataPayload.update({
+          where: { contentId: id },
+          data: { rowDigests: body.rowDigests },
+        });
+        return NextResponse.json({ success: true, data: { rowDigests: body.rowDigests } });
+      }
       if (payload.mode !== "query") {
         return NextResponse.json(
           { success: false, error: { code: "VALIDATION_ERROR", message: "Only query databases have a saved query" } },
@@ -188,7 +197,6 @@ export async function PATCH(
         );
       }
 
-      const body = (await request.json()) as { query?: unknown };
       const query = parseContentQuery(body.query);
 
       await prisma.dataPayload.update({

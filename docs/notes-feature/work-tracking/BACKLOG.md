@@ -51,6 +51,15 @@ The owner-run loader (`scripts/import-career-evidence.ts`) surfaced two things w
 - [ ] **`Evidence strength`-style columns need their levels defined in the column description.** Two models given the same mapping read "Documented" differently (artifact exists vs. appears in a supplied document). The schema digest already carries descriptions to the model; a one-line definition per level is the cheapest guard.
 
 
+## Right-sized database reads — follow-ups (2026-09-15, after the build)
+
+From `AI-BULK-ROW-READING-PLAN.md` §8; each is small and independent.
+- **Iteration card: per-line release controls.** The standing-context block lists the reads pinned for the run; a *release* (fold now) and *index only* control per line needs a way to change the applied lifetime after the fact — a tool-part annotation the fold reads. Today the block is informational.
+- **Charter-declared tables on the card, with sizes.** The card shows a generic line for tables the charter declares (`Reference tables`); sizing them pre-approval needs a small route (`GET …/standing-context?charterId=`) that returns tier + row count + estimate per declared table.
+- **Grid virtual "AI digest" column.** Hidden until a view shows it — but views have no column-visibility mechanism yet (`ColumnPref.hidden` is declared, not wired). Digests render on the row page/peek with a stale badge for now.
+- **`expand` (one-hop subgraph reads) and keyset cursor on sorted queries** — plan §6 (PR 2). Measured: nesting is the cheapest whole-graph encoding (22.7k vs 37.9k tokens for the evidence library).
+- **Standing context tier "index with digests" needs the table opted in** — the schema-rail switch is per table; a charter that declares digests on a table with digests off falls back to the index tier silently. Surface it on the iteration card once sizes are fetched.
+
 ## SQL passthrough for AI database reads — considering, not planned (2026-09-14)
 
 A tool that takes a SQL string from the model and runs it verbatim against the database, returning raw rows. Attractive because one flexible tool would cover every read shape (filter, join, group-by, subgraph). Parked while `query_database` gains `search`/`rowIds`/`groupBy`/`expand` through the one filter compiler (`AI-BULK-ROW-READING-PLAN.md`), which covers the same ground with the safeguards below intact. Revisit only if a read shape appears that the compiler cannot express.

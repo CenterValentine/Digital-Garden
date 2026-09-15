@@ -13,6 +13,7 @@
  */
 
 import { prisma } from "@/lib/database/client";
+import { canonicalJson } from "@/lib/domain/data/digest-hash";
 import type { Prisma } from "@/lib/database/generated/prisma";
 import {
   applyCell,
@@ -69,19 +70,7 @@ export function isSystemColumnConfig(config: unknown): boolean {
   );
 }
 
-/** Key-sorted stringify so a config round-tripped through the grid (jsonb
- *  reorders keys) compares equal to the stored one. */
-function canonicalJson(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
-  if (value && typeof value === "object") {
-    const record = value as Record<string, unknown>;
-    return `{${Object.keys(record)
-      .sort()
-      .map((k) => `${JSON.stringify(k)}:${canonicalJson(record[k])}`)
-      .join(",")}}`;
-  }
-  return JSON.stringify(value) ?? "null";
-}
+// canonicalJson lives in digest-hash.ts (shared with the row source hash).
 
 /**
  * Write cells, optionally under CAS.
@@ -243,6 +232,12 @@ export async function writeCells(
           data: data as unknown as Prisma.InputJsonValue,
           searchText: deriveRowSearchText(columns, data),
         },
+      });
+      // AI digest discovery bit (plan §5.2): read-time truth is the hash;
+      // this only makes "what needs work" an indexed query for the sweep.
+      await tx.dataRowDigest.updateMany({
+        where: { rowId, dirty: false },
+        data: { dirty: true },
       });
 
       // Title sync: the primary column is canonical, and writes through to

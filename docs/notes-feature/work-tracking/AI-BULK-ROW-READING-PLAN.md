@@ -1,6 +1,6 @@
 # AI Bulk Row Reading — Plan
 
-**Status:** PLAN FOR OWNER REVIEW (2026-09-14). Measurements in §2b; decisions in §3; **PR 1 = §4 + §5 in one migration-bearing PR** (owner: the migration ships with the reads); PR 2 (subgraph + sorted paging) §6; risks §7.
+**Status:** BUILT 2026-09-15 on `feat/right-sized-database-reads` (parts A + B; migration handed off — `scripts/handoff/2026-09-15-data-row-digests.md`); PRODUCTION SMOKE PENDING (§4.9, §5.6). Build notes in §8. PR 2 (subgraph + sorted paging) §6; risks §7.
 **Driving case:** the Career Evidence Library just loaded — 35 experiences / 66 sources / 99 claims / 35 index rows, 1,025 links. An AI asked to "draft a résumé bullet for every Ready experience with its claims and sources" has to read most of that graph, and today it cannot see the graph at all through the tool that reads rows.
 **Related:** `AI-RELATIONAL-DATABASE-REACH-PLAN.md` (P4 relation cells on write), `EXTRACTION-TO-DATABASE-PLAN.md` (database-rows iteration), `core/PRODUCT-PRINCIPLES.md` §2.
 
@@ -301,3 +301,11 @@ Background job chip on the table (and in the side chat when triggered on access)
 5. **`MAX_LIMIT` 1,000 with sorted queries** preselects ids then orders in SQL — already the design scale (≤10k rows).
 6. **Digest honesty.** The prompt must forbid inference beyond the cells (Principle 2, "gaps are data"); the read-format gate includes a fixture asserting a `[gap]` row's digest contains "gap".
 7. **Settings key placement.** `ai.*` is the right home (not `studio.*`); the digest opt-in is per table on `DataPayload`, not a user setting.
+
+## 8. Build notes (2026-09-15)
+
+- **Shipped as specified** except: mirrored relation halves stay in the index tier (§4.3 rule 3, reversed on prod evidence); index-tier relation cells show one 40-char title + `+N more`; `MAX_LIMIT` 100 → 1,000; the digest read side lives in `digest-read.ts` (below the row loader) and generation in `digests.ts` (above it) to avoid a cycle; the dirty bit is set inside the same transaction as the cell/link write (atomic, no fire-and-forget needed) and fire-and-log only on the links route.
+- **Standing context (D9)** is read by `propose_item_iteration` from the master row and returned as `standingContext` + an instruction; the read tool's charter promotion (rule 1b) makes those reads `run`. The `Reference tables` column is where the evidence library is declared for a job-hunt quest.
+- **Deferred to follow-ups (BACKLOG):** per-line *release* controls on the iteration card (the card only lists reads made in the same message before the proposal, and a generic line for charter-declared tables — sizes for declared tables would need a pre-approval fetch); the grid's virtual "AI digest" column (the view layer has no column-visibility mechanism yet; digests show on the row page/peek with a stale badge); `expand`; sorted cursor.
+- **Verification:** `pnpm data:read:check` (26 checks, two mutations caught); loaders, handle resolver, search, rowIds, group counts smoked read-only against the prod claims table; migration SQL ran clean in a rolled-back transaction on local Postgres; typecheck, lint (0 new warnings), `ai:drift:check`, `ai:matrix:check` green. The tool module cannot be loaded standalone under tsx (TipTap through the quests import), so the execute glue is covered by typecheck and the production smoke.
+- **Migration handoff:** `scripts/handoff/2026-09-15-data-row-digests.patch` + `.md` — additive; deploy ahead of the code; CI typecheck is red until the schema is applied on the branch.

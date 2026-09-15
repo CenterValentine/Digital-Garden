@@ -18,6 +18,7 @@ import { prisma } from "@/lib/database/client";
 // Value import, not `import type`: `Prisma.DbNull` below is a runtime
 // sentinel, not a type.
 import { Prisma } from "@/lib/database/generated/prisma";
+import { attachRowDigests } from "@/lib/domain/data/server/digest-read";
 import {
   cellToText,
   isFilterGroup,
@@ -135,6 +136,7 @@ export async function loadTable(
     description: payload.description,
     defaultViewId: payload.defaultViewId,
     rowCount: payload.rowCount,
+    rowDigests: payload.rowDigests,
     columns,
     views,
   };
@@ -915,8 +917,7 @@ export async function loadRowPage({
     const sortedDerived = await computeDerivedValues(raw, columns, sortedLinks);
     const sortedContentRefs = await hydrateContentRefs(raw, columns, viewerId);
     const sortedPersonRefs = await hydratePersonRefs(raw, columns, tableId, viewerId);
-    return {
-      rows: raw.map((r) => ({
+    const sortedRows: DataRow[] = raw.map((r) => ({
         id: r.id,
         tableId: r.tableId,
         sortKey: r.sortKey,
@@ -928,10 +929,9 @@ export async function loadRowPage({
         contentId: r.contentId,
         createdAt: r.createdAt.toISOString(),
         updatedAt: r.updatedAt.toISOString(),
-      })),
-      nextCursor: null,
-      total: ids.length,
-    };
+      }));
+    await attachRowDigests(sortedRows, columns);
+    return { rows: sortedRows, nextCursor: null, total: ids.length };
   }
 
   const cursorWhere: Prisma.DataRowWhereInput | null = cursor
@@ -974,8 +974,7 @@ export async function loadRowPage({
   const pageContentRefs = await hydrateContentRefs(page, columns, viewerId);
   const pagePersonRefs = await hydratePersonRefs(page, columns, tableId, viewerId);
 
-  return {
-    rows: page.map((r) => ({
+  const pageRows: DataRow[] = page.map((r) => ({
       id: r.id,
       tableId: r.tableId,
       sortKey: r.sortKey,
@@ -987,7 +986,10 @@ export async function loadRowPage({
       contentId: r.contentId,
       createdAt: r.createdAt.toISOString(),
       updatedAt: r.updatedAt.toISOString(),
-    })),
+    }));
+  await attachRowDigests(pageRows, columns);
+  return {
+    rows: pageRows,
     nextCursor: hasMore && last ? { sortKey: last.sortKey, id: last.id } : null,
     total,
   };

@@ -28,6 +28,7 @@ import {
   profileClause,
 } from "@/lib/domain/data/read-format";
 import type { DataColumn, DataRow } from "@/lib/domain/data";
+import { coverageLine, digestCoverageForRows } from "@/lib/domain/data/server/digest-read";
 import type { DataColumnConfig, SelectOption } from "@/lib/domain/data";
 
 function bucketRowCount(n: number): string {
@@ -192,6 +193,7 @@ export async function buildDataSchemaDigest(
       mode: true,
       description: true,
       rowCount: true,
+      rowDigests: true,
       content: { select: { title: true } },
       columns: {
         where: { deletedAt: null },
@@ -292,7 +294,13 @@ export async function buildDataSchemaDigest(
       });
       lines.push("", "Samples (index tier):", sample.text);
     }
-    lines.push("", await digestCoverageLine(nodeId));
+    lines.push(
+      "",
+      coverageLine(
+        payload.rowDigests,
+        await digestCoverageForRows(profileRows, profileColumns)
+      )
+    );
   }
 
   if (payload.views.length > 0) {
@@ -311,15 +319,6 @@ export async function buildDataSchemaDigest(
   );
 
   return lines.join("\n");
-}
-
-/**
- * AI-digest coverage for the profile (plan §5.4). Until the digest
- * sidecar ships this reports none; the line exists so the model learns the
- * vocabulary once.
- */
-async function digestCoverageLine(_nodeId: string): Promise<string> {
-  return "AI digests: none.";
 }
 
 /**

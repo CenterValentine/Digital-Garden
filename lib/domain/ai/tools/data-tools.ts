@@ -56,6 +56,12 @@ import {
   type RenderOptions,
 } from "@/lib/domain/data/read-format";
 import { estimateTokens } from "@/lib/domain/ai-context/tokens";
+import {
+  ON_ACCESS_MAX_ROWS,
+  describeRefresh,
+  loadRowDigests,
+  refreshRowDigests,
+} from "@/lib/domain/data/server/digests";
 import { PROVIDER_CATALOG } from "@/lib/domain/ai/providers/catalog";
 import { getUserSettings } from "@/lib/features/settings";
 import { buildDataSchemaDigest } from "@/lib/domain/data/server/digest";
@@ -545,6 +551,10 @@ export function createDataTools(ctx: ToolExecuteContext) {
           .string()
           .optional()
           .describe('"turn" (default) · "run" (for an iteration) · "chat" (only when the user asked)'),
+        digests: z
+          .union([z.boolean(), z.string()])
+          .optional()
+          .describe("Append each row's one-line AI digest (tables with digests on); stale ones are omitted and counted"),
         cursorSortKey: z.string().optional(),
         cursorId: z
           .string()
@@ -793,7 +803,47 @@ export function createDataTools(ctx: ToolExecuteContext) {
             );
           }
 
-          const full = formatRows({ rows, columns: shown, live, render });
+          // AI digests (plan §5.4): on-access refresh within a small time
+          // budget, then append fresh digests; stale/missing are counted.
+          let suffixByRow: Map<string, string> | undefined;
+          const digestFooters: string[] = [];
+          const wantDigests =
+            input.digests === true ||
+            (typeof input.digests === "string" && /^(true|yes|1)$/i.test(input.digests));
+          if (wantDigests) {
+            if (!table.rowDigests) {
+              digestFooters.push(
+                "[AI digests are off for this table — the owner can turn them on in the schema rail.]"
+              );
+            } else {
+              const refresh = await refreshRowDigests(ctx.userId, databaseId, {
+                trigger: "access",
+                maxRows: ON_ACCESS_MAX_ROWS,
+                budgetMs: 3000,
+              });
+              const digests = await loadRowDigests(rows, live);
+              suffixByRow = new Map();
+              let stale = 0;
+              let missing = 0;
+              for (const row of rows) {
+                const d = digests.get(row.id);
+                if (!d) missing++;
+                else if (!d.fresh) stale++;
+                else suffixByRow.set(row.id, d.text);
+              }
+              if (stale > 0 || missing > 0) {
+                digestFooters.push(
+                  `[${stale} digest${stale === 1 ? "" : "s"} stale, ${missing} missing — omitted; they refresh in the nightly sweep or via the schema rail.]`
+                );
+              }
+              if (refresh.refreshed > 0 || refresh.status === "no-route" || refresh.status === "budget-exhausted") {
+                digestFooters.push(describeRefresh(refresh));
+              }
+            }
+          }
+          footers.unshift(...digestFooters);
+
+          const full = formatRows({ rows, columns: shown, live, render, suffixByRow });
           const emit = (
             body: FormatRowsResult,
             mode: "index" | FormatRowsResult["mode"],
@@ -834,6 +884,7 @@ export function createDataTools(ctx: ToolExecuteContext) {
               columns: indexTierColumns(live),
               live,
               render: { ...render, fullColumns: undefined, ...INDEX_RELATION_RENDER },
+              suffixByRow,
             });
             if (index.tokens <= budget) {
               return emit(index, "index", [priceFooter]);
@@ -853,6 +904,7 @@ export function createDataTools(ctx: ToolExecuteContext) {
               columns: selection === "index" ? shown : indexTierColumns(live),
               live,
               render: { ...render, fullColumns: undefined, ...INDEX_RELATION_RENDER },
+              suffixByRow,
             });
             if (trial.tokens <= budget) {
               lo = mid;
