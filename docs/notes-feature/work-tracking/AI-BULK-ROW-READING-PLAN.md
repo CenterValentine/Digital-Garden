@@ -77,6 +77,7 @@ For context: a 200k-window model can hold the entire library eleven times over; 
 | D6 | **Per-row digests are a sidecar with a migration**, mirroring `AgenticMetadata`, never a cell. Staleness by hash, sweep discovery by dirty bit. **Ships in PR 1** with the reads — one release train, migration deployed ahead of code per the handoff rule. | Honest about what it is: AI-generated, provenance-bearing metadata. |
 | D7 | Not doing: SQL passthrough (backlogged as "considering" with its risks); rows in the mention capsule; user approval for small reads. | — |
 | D8 | **Charter- and quest-linked databases persist for the run by default.** A read of a table reachable through the attached charter's registry (master ledger, quest ledgers, output tables) during an active run gets `run` lifetime unless the charter, quest, or the user's prompt says otherwise; an explicit `lifetime: "turn"` from the model (following such an instruction) is honored. The iteration card states the standing context in plain words. | The charter's links are the consent; the rubric a charter names should not have to be re-read per batch. |
+| D9 | **Standing context is declared on the charter's registry, defaulted by the harness, overridden on the card.** A mention or charter link passes consent and the schema, never rows. The master ledger's registry rows gain a system column **Standing context** (`none` / `index` / `index with digests` (default) / `full`) with optional `Columns` and `Filter` text; during a run the first read of that table lands at the declared tier and is pinned for the run (D8). The iteration card shows each line with release / drop-to-index controls. Prose instructions still steer the model's `lifetime`/`columns`; the harness trusts only the column and the card. | The rubric a charter names is a property of the charter, versioned with it and visible in the grid — never a hidden setting. Associations the model makes across items are written as relation cells with handles, so they are data in the ledger, not memory. |
 
 ## 4. PR 1 (part A) — "Right-sized database reads"
 
@@ -201,6 +202,14 @@ The model's judgement is deliberately thin ("harness over prompt": a flag the mo
 
 The chip and transcript line always show the lifetime that was *applied*, never the one requested.
 
+### 4.6b Standing context declared on the charter registry (D9)
+
+- **Column.** `Standing context` — a `select` system column (`config.system: true`, options `none`, `index`, `index with digests`, `full`) on the charter's master ledger, minted at mark alongside the existing machinery columns; plus `Context columns` (text, comma-separated column names) and `Context filter` (text, one `column op value` clause) — both optional. Existing masters get the columns on next attach (the same lazy-mint path the quest code uses for missing system columns).
+- **Harness.** When a run starts with a charter attached, the harness reads the registry rows: for each linked table with a tier other than `none`, the run's first `query_database` on that table is executed at that tier (`columns`, `filters`, `digests` derived from the declaration) and pinned with `lifetime: "run"`; `full` is sized against the threshold like any read and asks for approval on the card if over. Tables at `none` follow the ordinary rules (§4.6a). A table with no registry row is not charter-linked and follows rules 1–2.
+- **Card.** The standing-context block (§4.6a rule 3) lists each declared table with its tier and estimated size; controls per line: *release* (do not pin) and *index only* (drop `full`/`digests` to the index tier). What the user leaves is what runs.
+- **Ledger.** Cross-item associations are written, not remembered: the quest ledger needs a relation column to each standing-context table (`propose_linked_databases` offers it at proposal time when missing), and `record_item_result` writes handles into it.
+- **Chips.** The pinned chip names the origin: `pinned for this run · declared by the Job Fit charter (index with digests)`.
+
 ### 4.7 Text surfaces that change (all reference `query_database` today)
 
 `data-tools.ts` (four tool descriptions), `data-metadata.ts` (settings descriptions — "never the whole table" is no longer true), `digest.ts` (tail), `relation-cells.ts` (error text now says "handle or title"), `capture.ts`, `filters.ts`, `types.ts` comments, the chat route's prompt lines, `AI-ARCHITECTURE.md` tool paragraph. `pnpm ai:drift:check` (prompt tool references) and `pnpm ai:matrix:check` run unchanged; no new tool, so the inventory gates are untouched.
@@ -223,6 +232,7 @@ Tool chip for `query_database`, live states: `reading` → `done` (`99 rows · 6
   7. "Anything about Intercom?" → `search`.
   8. `describe_database` → profiles + samples + descriptions.
   9. Next user turn after step 3 → the transcript shows the folded chip; the model answers a follow-up without re-reading unless it needs rows.
+  9c. Set Standing context = `full` on the library's registry row → the card shows the full read's estimate and asks for approval when over the threshold; *index only* on the card drops it to the index tier without re-proposing.
   9a. Attach the Job Fit charter (registry links the library) and start a first pass without reading first → the run's first read of Claims is promoted to `run`; the card would have shown nothing (no read yet), and the chip shows `pinned for this run · from the Job Fit charter`.
   9b. Start a job first pass (`propose_item_iteration`) after a `lifetime: "run"` read of the claims index → the read survives the first batch checkpoint and folds after `record_iteration_findings`; the chip shows the pin throughout.
   10. Set the threshold to 2,000 in settings → step 2 now asks for approval with the number on the card.
