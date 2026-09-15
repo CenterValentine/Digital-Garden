@@ -1,6 +1,6 @@
 # AI Bulk Row Reading — Plan
 
-**Status:** MEASURED (current-state map + token measurements 2026-09-14; build slices proposed, owner to pick)
+**Status:** DESIGN SETTLED (measurements 2026-09-14; owner decisions in §6; PR 1 = §6 items 1–4, PR 2 = digest)
 **Driving case:** the Career Evidence Library just loaded — 35 experiences / 66 sources / 99 claims / 35 index rows, 1,025 links. An AI asked to "draft a résumé bullet for every Ready experience with its claims and sources" has to read most of that graph, and today it cannot see the graph at all through the tool that reads rows.
 **Related:** `AI-RELATIONAL-DATABASE-REACH-PLAN.md` (P4 relation cells on write), `EXTRACTION-TO-DATABASE-PLAN.md` (database-rows iteration), `core/PRODUCT-PRINCIPLES.md` §2.
 
@@ -113,3 +113,17 @@ Gate for S1: the measurement harness (scratchpad `bulk/measure.ts`) reruns as a 
 2. **Relation default:** titles (readable, ~50–300 chars a cell) vs handles (~10 tokens). Proposed: titles capped at 3 per cell.
 3. **Budget ceiling:** default 6k tokens, max 10% of the model's context window. Numbers are a guess at the right order; the measured library says 20k reads the whole thing.
 4. **`expand` home:** a parameter on `query_database` (fewer tools; one description grows) or a separate `read_subgraph` tool (clearer, one more entry in the tool inventory + settings metadata + drift gate).
+
+## 6. Owner decisions (2026-09-14) and first-build plumbing
+
+**Decided:** one read tool, evolved in place — `query_database` keeps its name and ergonomics (jurisdiction, name resolution, filter compiler, lenient schema, teaching refusals) and gains `search`, `rowIds`, `expand`, `groupBy`, `budget`, `digests`. No sibling read tool: `search_content` finds tables, `query_database` finds rows, `propose_item_iteration` processes what a read picked. Row abstraction ships now (column profiles + samples in `describe_database`); a stored per-row digest ships as a second PR.
+
+**Budget and approval.** Default threshold is a user setting in AI settings (6,000 tokens; four registrations). The server formats the real result and counts it: under threshold → returned; over → the index tier for the same rows plus the exact price ("~14,200 tokens; call again with budget: 14200, the user will be asked"). `needsApproval` is a function of `budget` so the approval card carries the number. Big read = 2 calls + 1 approval; small read = 1 call.
+
+**Accumulation.** Bulk-read result parts are superseded in `context-diet.ts` at the next user message, the same fold as iteration snapshots; the marker names the read so the model can re-read (local, cached) if a later turn needs it.
+
+**Per-row digest.** Sidecar, not a cell: `DataRow.agentic` JSON `{ digest, hash, generatedAt, model }`, mirroring the folder capsule's `agenticMetadata` (AI context is provenance-bearing metadata, not user content). Staleness = `hash !== sha256(canonicalJson(data) + forward link ids)` at read time — never a timestamp (writing the digest bumps `updatedAt`). Written by a second job on the folder-context refresh engine (batches of 20 rows, gen-lock, daily spend accounting, per-table opt-in). Read via `digests: true` (stale ones omitted with a count); coverage reported by `describe_database`. Grid: read-only virtual column, hidden until a view shows it. Alternative rejected: a system column in `data` leaks into search text/exports and has no home for the hash (would need a second hidden stamp column).
+
+**Plumbing, PR 1 (no migration):** `query_database` formatting + `resolveRowRef` (8-hex handles on read and write) + backlinks-off + 120-char clip + token budget/`needsApproval` + TSV ≥ 20 rows + `search`/`rowIds`/`groupBy`; settings threshold; context fold; `describe_database` profiles (fill rate, distincts, min/max, avg length, per-column token estimate), 3 samples, digest coverage line; digest tail rewrite; measurement harness promoted to a script.
+**PR 2 (migration handoff):** `DataRow.agentic`, hash helper next to `canonicalJson`, refresh-engine job + per-table setting, virtual column, `digests` param.
+**Between them:** `expand` (one hop, forward relations, nested once, cap 10 per relation; linked tables reachable through a relation column of an associated table count as in jurisdiction).
