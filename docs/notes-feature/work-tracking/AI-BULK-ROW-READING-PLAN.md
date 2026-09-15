@@ -109,7 +109,7 @@ For context: a 200k-window model can hold the entire library eleven times over; 
 
 The effective budget is `min(input.budget ?? setting, modelCeiling)`. Nothing is silently truncated: every clip names what was dropped and the cheapest way to get it.
 
-**Approval.** `needsApproval: (input) => (input.budget ?? 0) > threshold` — the function form the phase-checkpoint tool already uses; verify at build time that this SDK version passes `input` to it (§7). The card is the existing `ToolApprovalCard`; `ApprovalPreview` gets a `query_database` branch: `Read "Claims and metrics" — up to 14,200 tokens (99 rows, 9 columns)`. The number is in the input, so the card cannot show a different figure from the one the model was quoted. Big read = 2 calls + 1 approval; small read = 1 call. Reads never need approval below the threshold.
+**Approval.** `needsApproval: (input) => (input.budget ?? 0) > threshold` — the function form the phase-checkpoint tool already uses; verify at build time that this SDK version passes `input` to it (§7). The card is the existing `ToolApprovalCard`; `ApprovalPreview` gets a `query_database` branch: `Read "Claims and metrics" — up to 14,200 tokens (99 rows, 9 columns)`. The number is in the input, so the card cannot show a different figure from the one the model was quoted. Big read = 2 calls + 1 approval; small read = 1 call. Reads never need approval below the threshold. The `propose_item_iteration` card additionally lists the reads it will pin for the run (§4.6a).
 
 ### 4.2 Output formats
 
@@ -171,6 +171,24 @@ The digest tail changes from "Rows are never included in context." to: `Rows: qu
 Model path only; the transcript keeps every byte. The UI collapse reuses the same predicate (one boundary implementation, two consumers — the existing rule for the iteration fold), rendering the folded chip already used for perception parts. Pinned reads render a pin state on the chip with size and lifetime and an unpin action. Cache note: at most one prefix re-miss per user turn from `turn` folds; pins never move the boundary.
 
 Guidance in the tool description: pin the **index tier with digests** for a run (≈6k for this library) and fetch specific rows by handle per item; pin full narratives only when the items need them.
+
+### 4.6a Lifetime judgement — what the prompt asks, what the harness decides
+
+The model's judgement is deliberately thin ("harness over prompt": a flag the model may set on its own authority is a flag it sets whenever convenient).
+
+**Tool description text (verbatim intent):**
+- `turn` (default): you are answering, drafting, or deciding now. Re-reads are cheap — never pin to avoid one.
+- `run`: the rows are a rubric or reference you will consult once per item across an iteration. Set it only on the read made just before proposing the run, or during one. Read the index tier with digests, not the narratives.
+- `chat`: only when the user asked to keep the table at hand or to work with it for a while. Never pin on your own initiative.
+- Anti-rule: a pin costs its size on every later turn. If you cannot name the future step that will use the rows, use `turn`.
+
+**Harness rules (no judgement required):**
+1. **Promotion by adjacency.** A `query_database` part in the same assistant turn as, and before, an approved `propose_item_iteration` is promoted to `run` whether or not the model set it.
+2. **Degradation by absence.** `run` with no active run and no proposal in the turn degrades to `turn`; the footer says so.
+3. **Consent travels.** The iteration approval card lists the reads it will pin: `Reference reads pinned for this run: Claims and metrics index · 99 rows · 6.1k tokens`. The run's standing context cost is on the card the user approves.
+4. **`chat` needs the user's words.** Granted only when the latest user message asked to keep or pin the table (soft check); otherwise degrades to `turn` and the footer tells the model to ask the user.
+
+The chip and transcript line always show the lifetime that was *applied*, never the one requested.
 
 ### 4.7 Text surfaces that change (all reference `query_database` today)
 
