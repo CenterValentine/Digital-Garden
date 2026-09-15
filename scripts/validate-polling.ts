@@ -116,6 +116,15 @@ const REGISTRY: Declared[] = [
   },
   { file: "components/client/app-nav/app-nav.tsx", policy: "ui-only", note: "16ms animation frame driving nav rotation." },
   { file: "components/content/ai/CoBrowseIndicator.tsx", policy: "ui-only", note: "1s elapsed-time display tick." },
+  {
+    file: "components/content/data/DataSchemaRail.tsx",
+    policy: "ui-only",
+    networkUnrelated: true,
+    note:
+      "1s elapsed-seconds counter shown only while a digest refresh is in flight (mounted/unmounted with digestBusy). " +
+      "The file's fetches are the toggle/refresh action handlers, not the timer. Landed in #235 without a registry " +
+      "entry; audited 2026-09-15.",
+  },
   { file: "components/content/ai/reasoning/reasoning-disclosure.ts", policy: "ui-only", note: "Local disclosure animation." },
   { file: "components/content/folder-views/MediaLightbox.tsx", policy: "ui-only", note: "Slideshow advance." },
   { file: "lib/domain/editor/extensions/blocks/stopwatch.ts", policy: "ui-only", note: "33ms stopwatch tick, local block state." },
