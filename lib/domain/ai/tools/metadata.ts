@@ -260,7 +260,7 @@ export const TOOL_GROUPS: ReadonlyArray<{
   {
     label: "Databases",
     description:
-      "Reading and appending rows in databases mentioned in the chat. Read is paged and bounded; writes are append-only.",
+      "Reading and appending rows in databases mentioned in the chat. Reads are sized in tokens and ask for approval above your threshold; writes are append-only.",
     ids: _DATA_TOOL_IDS,
   },
 ];

@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-09-11
+last_updated: 2026-09-12
 ---
 
 # Sprint Backlog
@@ -9,6 +9,69 @@ last_updated: 2026-09-11
 **Sprint Execution Protocol**: Before commencing any sprint, always ask the user for input before planning and executing — there may be additions or modifications.
 
 ---
+
+## Duplicate relation columns in production (cleanup, 2026-09-13)
+
+From the first linked-schema run, before PR #234's reciprocal refusal shipped. The fix prevents recurrence but cannot remove what exists.
+
+- [ ] Delete the second `Experience` column on **Claims and metrics** (`7c3565e1`) — the table has a forward and a backlink with the same name.
+- [ ] Delete **`Claims and metrics 2`** on **Experiences** (`79477f2d`) — the collision-suffixed backlink of the duplicate pair.
+- [ ] Confirm the surviving pair still links both ways before deleting either.
+- *2026-09-14:* the Career Evidence Library was loaded (235 rows, 1,025 links) writing ONLY the canonical pair `Experiences.Claims and metrics ↔ Claims.Experience (backlink)`; the duplicate pair holds zero links, so both deletions above are now safe.
+
+## Database CSV import + per-table export button (2026-09-12, from the career-evidence migration brainstorm)
+
+Export already ships — `exportDatabaseCsv` (`lib/domain/data/server/export.ts`) writes a CSV of the default view plus a `.meta.json` sidecar — but only through **vault export** (`bulk-export.ts`); there is no per-table "Export CSV" affordance. Import is a **reserved shape with nothing behind it**: `lib/domain/data/import.ts` returns `NOT_IMPLEMENTED` and has zero consumers. Surfaced because moving a 28-item markdown ledger into the four-table Career Evidence Library had no file-based route at all.
+
+- [ ] **Per-table Export CSV** in the database toolbar/context menu, reusing `exportDatabaseCsv` (the sidecar already reserves the round-trip shape). *2026-09-13:* the vault export now also writes a `.schema.md` sidecar per database (`lib/domain/data/schema-markdown.ts`), and the markdown/plaintext note exports carry accordion / card-panel headers and statsTable rows instead of flattening them.
+- [ ] **CSV/TSV import** behind `inferColumnsFromSamples` — header→column mapping card, type inference with confidence, select-vocabulary proposals from distinct values, provenance stamped in `DataPayload.source`. Relations import by target-row title (the same resolution `insert_rows` uses).
+- [ ] **Markdown-table → rows** as a thin variant of the same importer (paste or pick a note; each table row becomes a DataRow) — the cheapest bridge from an existing note to a database that needs no AI turn.
+
+## Unrefined → structured — feature soil (2026-09-12, from the career-evidence migration brainstorm)
+
+Principle: `core/PRODUCT-PRINCIPLES.md` §2. Each item below serves the general note ↔ database loop, not the one ledger that surfaced it.
+
+- [ ] **Paste rows into a database.** Paste a TSV / CSV / markdown-table block (or plain lines) into the grid → a mapping strip (source column → table column, type coercion, select labels resolved or proposed) → rows appended. The cheapest bridge from a spreadsheet, a chat answer, or another note into a table; shares its mapping/coercion core with the CSV importer above.
+- [ ] **Send block to database (context-menu action) — the table picker is the heart of it.** Right-click a block (accordion, heading section, list, table row) → *Send to database…* → picker with recent tables, search, and a *New table from this block* option → a proposal card pre-filled from the block, with the block's `blockId` recorded on the row (contentLink or provenance) so the row points back at its source. The picker should be the reusable tree-browse picker (`NoteWindowPicker` lineage), scoped to `data` nodes. Benefits: promotion without a chat turn; provenance for free; a natural home for the vocabulary pre-scan; the same picker later serves "send selection", "send chat output", and "send row to another table".
+- [ ] **`source: "document-sections"` for `propose_item_iteration`** — enumerate the bound note's accordions / headings / list items / dated entries as items keyed by `blockId` (a `"block"` keyTier, stronger than URL). Makes note → rows an approved, resumable run. Pairs with a vocabulary pre-scan step (one `propose_column_options` card up front) so per-item option collisions don't stall the run.
+- [ ] **`read_content_chunk(contentId, index)`** — chunk reads for any owned note, not only the bound one (the chunker exists; it just needs a content id instead of `loadNote()`). Defuses the 2,000-char mention cap for tools and lets satellites come from a second note.
+- [ ] **Mention pill character-count tooltip.** The `@mention` pill's `title` (`makeMentionPill`, `ChatInput.tsx`) should show the note's length and what the capsule will inject: e.g. `28,103 chars — first 2,000 injected`. Needs the count on the suggestion payload (`/api/content/content?search=` → add `charCount` from `searchText`, and the data/row suggest route) or a lazy fetch on hover. Small; intended to ship in the same session as the brainstorm if time allows.
+- [ ] **Model-aware mention budget** — replace the flat `slice(0, 2000)` (`app/api/ai/chat/route.ts`) with a budget derived from the model's `contextWindow` + cost tier (`PROVIDER_CATALOG`), a global default in `settings.ai` (compact / standard / full or an explicit number), a per-model override, and a per-turn chip override ("Full text"). Budget in tokens, allocated across mentions rather than per note; outline-first when truncating (headings + accordion `headerText`s via `outline-extractor.ts`); and *say* it's truncated (`showing 2,000 of 28,103 — read_content_chunk to continue`).
+- [ ] **Note character limit at the 1M-token equivalent.** Hard cap so a single note can never exceed ~1M tokens (≈ 3.5–4M characters; pick the constant from the catalog's largest context window and document the tokens-per-char assumption). Enforce in the editor — `CharacterCount` is already loaded in both extension sets; check TipTap's built-in `limit` option first — so typing/pasting past the cap is refused, with a sonner toast each time the user tries. Also enforce server-side on the note write path (REST + `write-note-content.ts`) so imports and scripts can't exceed it either. Prevention, not truncation: never drop content silently.
+- [ ] **Accordion markdown codec** — `accordion` has no codec in `markdown-block-codecs.ts`, so chunk reads / source view emit it as a Tier-2 HTML div. A `<details><summary>headerText</summary>` (or heading) codec makes accordion-heavy notes legible to the model and to humans in source view. Guarded by `markdown:blocks:check`.
+- [ ] **Deliberate-gap semantics for cells** (raw). A row can be "incomplete on purpose" (the source was never captured) vs "not yet processed". Today only conventions distinguish them (placeholder rows, `Readiness: Needs detail`, `Evidence strength: Needs verification`, column descriptions saying blanks may be deliberate). Consider a first-class marker — a per-cell *unknown* sentinel or a table-level "gaps are deliberate" description the schema digest surfaces — so DG's AI neither fills gaps with invention nor treats them as work to redo.
+- [ ] **Flashcards → database schema (cleanup, very raw).** Flashcards carry their own Prisma models (`FlashcardDeck`, `Flashcard`, `FlashcardReviewAttempt`) beside the general `DataPayload` / `DataColumn` / `DataRow` schema that arrived later. Explore reducing flashcards to a *database with a review runtime*: a deck = a table with a locked system column set (front/back/media/FSRS state), the player and scheduler read rows, and `propose_cards_from_media` becomes an instance of note → rows. Data II already proved the Database → deck direction (PR #195). Owner intends to expand this later; record only the basis for now.
+
+## Loader hardening after the career-evidence migration (2026-09-14)
+
+The owner-run loader (`scripts/import-career-evidence.ts`) surfaced two things worth fixing in the product paths that share its helpers:
+
+- [ ] **`createRows` runs every insert inside one interactive transaction.** 99 rows over the Neon pooler crossed Prisma's 5 s default ceiling and rolled back. `insert_rows` caps at 25 so it is unlikely to hit this today, but a slow pooler moment could; either chunk inside `createRows`, raise the transaction timeout for that call, or batch-insert with `createMany` + a second query for ids.
+- [ ] **Library-style index tables upsert on the primary text column with no uniqueness guarantee.** Two ledger sections collapsed to the same title once trailing punctuation was trimmed; only the dry run caught it. Consider a dedupe warning in `insert_rows` when `dedupeBy` is the primary column and the batch itself contains duplicates.
+- [ ] **`Evidence strength`-style columns need their levels defined in the column description.** Two models given the same mapping read "Documented" differently (artifact exists vs. appears in a supplied document). The schema digest already carries descriptions to the model; a one-line definition per level is the cheapest guard.
+
+
+## Right-sized database reads — follow-ups (2026-09-15, after the build)
+
+From `AI-BULK-ROW-READING-PLAN.md` §8; each is small and independent.
+- **Iteration card: per-line release controls.** The standing-context block lists the reads pinned for the run; a *release* (fold now) and *index only* control per line needs a way to change the applied lifetime after the fact — a tool-part annotation the fold reads. Today the block is informational.
+- **Charter-declared tables on the card, with sizes.** The card shows a generic line for tables the charter declares (`Reference tables`); sizing them pre-approval needs a small route (`GET …/standing-context?charterId=`) that returns tier + row count + estimate per declared table.
+- **Grid virtual "AI digest" column.** Hidden until a view shows it — but views have no column-visibility mechanism yet (`ColumnPref.hidden` is declared, not wired). Digests render on the row page/peek with a stale badge for now.
+- **`expand` (one-hop subgraph reads) and keyset cursor on sorted queries** — plan §6 (PR 2). Measured: nesting is the cheapest whole-graph encoding (22.7k vs 37.9k tokens for the evidence library).
+- **Standing context tier "index with digests" needs the table opted in** — the schema-rail switch is per table; a charter that declares digests on a table with digests off falls back to the index tier silently. Surface it on the iteration card once sizes are fetched.
+
+## SQL passthrough for AI database reads — considering, not planned (2026-09-14)
+
+A tool that takes a SQL string from the model and runs it verbatim against the database, returning raw rows. Attractive because one flexible tool would cover every read shape (filter, join, group-by, subgraph). Parked while `query_database` gains `search`/`rowIds`/`groupBy`/`expand` through the one filter compiler (`AI-BULK-ROW-READING-PLAN.md`), which covers the same ground with the safeguards below intact. Revisit only if a read shape appears that the compiler cannot express.
+
+Risks recorded at the time:
+- **Jurisdiction cannot be enforced.** Every read tool passes through `resolveJurisdiction`, so the model reaches only databases mentioned in the chat (or charter-linked). A SQL string can name any table id; guaranteeing a query touches only permitted rows means parsing and rewriting SQL — a project of its own.
+- **The model must know the storage layer.** Cells are keyed by opaque column keys, selects store option ids, links live in `DataRowLink`. The physical schema would have to ride along in context on every call — more tokens than the reads it saves.
+- **A read-only role reduces, not removes, the risk.** It stops writes but not expensive queries, cross-user reads through any table the role can see, or timing probes against the pooler.
+- **The teaching refusals vanish.** "No column named X — columns are …" is what makes weak models converge; a SQL error is not a lesson.
+- **Drift.** Column keys and option ids change under the model; a saved query in a charter would rot silently.
+
+Ad-hoc SQL keeps its proper home: a human at a terminal with the read-only role (`scripts/pg-read.sh`).
 
 ## Referenced content: which relationships are actually FIXED? (review, 2026-09-13)
 
@@ -27,7 +90,7 @@ Plan: [AI-RELATIONAL-DATABASE-REACH-PLAN.md](AI-RELATIONAL-DATABASE-REACH-PLAN.m
 - [x] **Let the assistant see the graph** — digest names relation targets, lookup paths and rollup functions; limit-scoping prompt rule; relational-database prompt block; `ai:drift:check` gate 6 pins the column vocabulary (mutation-tested three ways).
 - [x] **One consent for a linked schema** — `propose_linked_databases`, `POST /api/content/data/batch` in one transaction, `LinkedDatabasesProposalCard` leading with the edges.
 - [x] **Fill the links** — relation cells in `insert_rows` / `update_row`, addressed by target row title or id.
-- [ ] **Production smoke** (PR #231 body has the 10-item list): replay the recorded request; bad-target rollback; relation + rollup onto an existing table; populate from the ledger note; refusal paths (unresolvable title, backlink write, captureTo relation).
+- [ ] **Production smoke** (PR #231 and PR #234 bodies each carry a 10-item list): replay the recorded request; bad-target rollback; relation + rollup onto an existing table; populate from the ledger note; refusal paths (unresolvable title, backlink write, captureTo relation).
 - [ ] **Annotate feature-request note `3cc169ea`** with what shipped and which layer each of its five gaps lived in, so the document that started this reflects the outcome.
 - [ ] **Migrate the four prod tables** from that session (text `Claim IDs` / `Source IDs` / `Experience ID` columns → real relations). Owner action in the grid, or a one-off script.
 - [ ] **`note-sections` enumeration source** for `propose_item_iteration` — the governed route for migrating notes too long to attach. Unscheduled.

@@ -105,6 +105,9 @@ const aiSettingsSchema = z
     // documented maximum from the provider catalog instead. A number is an
     // explicit per-response output cap.
     maxTokens: z.number().min(1).max(200_000).nullable().optional(),
+    // Database reads larger than this (estimated tokens) pause for the
+    // user's approval; the card shows the estimate (AI-BULK-ROW-READING-PLAN D3).
+    bulkReadTokenThreshold: z.number().min(1_000).max(100_000).optional(),
     streamingEnabled: z.boolean().optional(),
     // Subtle typewriter reveal of streaming responses. Default on.
     typingEffect: z.boolean().optional(),
@@ -544,6 +547,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
     // null = model maximum (catalog-resolved per executed model). A flat
     // numeric default here silently truncated reasoning-heavy models.
     maxTokens: null,
+    bulkReadTokenThreshold: 6_000,
     streamingEnabled: true,
     typingEffect: true,
     conversationHistory: true,

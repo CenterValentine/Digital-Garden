@@ -60,8 +60,10 @@ import {
 import {
   stripOpenAIItemReferences,
   stripReasoningForResend,
+  supersedeBulkReads,
   supersedeIterationHistory,
 } from "@/lib/domain/ai/context-diet";
+import { DEFAULT_BULK_READ_THRESHOLD } from "@/lib/domain/ai/tools/data-tools";
 import {
   MAX_STEP_SUMMARIES,
   type MaxTokensSource,
@@ -443,6 +445,10 @@ export async function POST(request: Request) {
       // Load user's stored AI settings as defaults
       const userSettings = await getUserSettings(session.user.id);
       const aiSettings = userSettings.ai ?? {};
+      // Pinned bulk reads (AI-BULK-ROW-READING-PLAN §4.6) may hold twice
+      // the user's approval threshold, newest first.
+      const bulkReadPinnedAllowance =
+        2 * (aiSettings.bulkReadTokenThreshold ?? DEFAULT_BULK_READ_THRESHOLD);
       // Auto-pronounce: when on (default), the model is told to attach spoken
       // audio to non-English vocab cards by default. The proposal gate still
       // gates the actual TTS spend, so "default on" never auto-bills.
@@ -1530,7 +1536,13 @@ export async function POST(request: Request) {
       const resolvedMessages = resolveAttachmentsForModel(
         stripOpenAIItemReferences(
           stripReasoningForResend(
-            supersedeIterationHistory(repairedMessages),
+            // Bulk database reads fold by lifetime (turn/run/chat) — plan
+            // AI-BULK-ROW-READING §4.6; pinned reads survive, `turn`
+            // reads collapse once a newer user message exists.
+            supersedeBulkReads(
+              supersedeIterationHistory(repairedMessages),
+              { pinnedAllowanceTokens: bulkReadPinnedAllowance },
+            ),
             executedVendorId,
           ),
         ),

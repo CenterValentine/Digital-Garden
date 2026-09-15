@@ -87,7 +87,97 @@ const MASTER_COLUMNS: Array<{
   { name: "Quest ledger", type: "contentLink", description: "MANDATORY link — the quest's item-state database." },
   { name: "Output table", type: "contentLink", description: "MANDATORY link when capturing — where admitted rows land." },
   { name: "Quest log", type: "contentLink", description: "MANDATORY link — the quest's narrative note." },
+  // Standing context (AI-BULK-ROW-READING-PLAN D9): the reference tables a
+  // quest's items are judged against, and how much of each stays in
+  // context for the run. Declared here so it is versioned with the charter
+  // and visible in the grid, never a hidden setting.
+  { name: "Reference tables", type: "contentLink", description: "Databases every item of this quest is judged against (e.g. an evidence library). Read once at the declared tier and kept for the run." },
+  {
+    name: "Standing context",
+    type: "select",
+    description: "How much of each reference table stays in context for a run: none · index · index with digests (default) · full.",
+    config: {
+      options: [
+        { id: "opt-sc-none", label: "none", color: "gray" },
+        { id: "opt-sc-index", label: "index", color: "blue" },
+        { id: "opt-sc-index-digests", label: "index with digests", color: "green" },
+        { id: "opt-sc-full", label: "full", color: "amber" },
+      ],
+    },
+  },
+  { name: "Context columns", type: "text", description: "Optional — comma-separated column names to read from the reference tables (defaults to the tier's columns)." },
+  { name: "Context filter", type: "text", description: "Optional — one filter clause `Column op value` applied to the reference tables (e.g. Readiness is Ready for applications)." },
 ];
+
+/** Labels of the Standing context column, in tier order. */
+export type StandingContextTier = "none" | "index" | "index with digests" | "full";
+
+export interface StandingContextDeclaration {
+  tableId: string;
+  tier: StandingContextTier;
+  columns: string[];
+  filter: string | null;
+}
+
+/**
+ * Existing masters predate columns added later (the standing-context set,
+ * 2026-09-15). Lazy mint on attach: add any MASTER_COLUMNS the table lacks,
+ * system-locked, without touching the ones it has.
+ */
+async function ensureMasterColumns(masterId: string): Promise<void> {
+  const have = new Set(
+    (await liveColumns(masterId)).map((c) => c.name.toLowerCase()),
+  );
+  for (const col of MASTER_COLUMNS) {
+    if (have.has(col.name.toLowerCase())) continue;
+    await createColumn(masterId, {
+      name: col.name,
+      type: col.type as Parameters<typeof createColumn>[1]["type"],
+      description: col.description,
+      config: { ...(col.config ?? {}), system: true } as Parameters<typeof createColumn>[1]["config"],
+    });
+  }
+}
+
+/**
+ * The standing-context declaration on a quest's master row (plan §4.6b).
+ * Missing column or empty cell → no declarations (the ordinary rules apply).
+ */
+export async function readStandingContext(
+  masterId: string,
+  questRowId: string,
+  masterCols: Record<string, string>,
+): Promise<StandingContextDeclaration[]> {
+  const refKey = masterCols["Reference tables"];
+  if (!refKey) return [];
+  const row = await prisma.dataRow.findFirst({
+    where: { id: questRowId, tableId: masterId, deletedAt: null },
+    select: { data: true },
+  });
+  const data = (row?.data ?? {}) as Record<string, unknown>;
+  const refs = data[refKey];
+  if (!Array.isArray(refs) || refs.length === 0) return [];
+  const tierRaw = masterCols["Standing context"] ? data[masterCols["Standing context"]] : undefined;
+  const tierCol = MASTER_COLUMNS.find((c) => c.name === "Standing context");
+  const tierOptions = (tierCol?.config?.options ?? []) as Array<{ id: string; label: string }>;
+  const tierLabel =
+    tierOptions.find((o) => o.id === tierRaw)?.label ??
+    (typeof tierRaw === "string" ? tierRaw : "");
+  const tiers: StandingContextTier[] = ["none", "index", "index with digests", "full"];
+  const tier: StandingContextTier = tiers.includes(tierLabel as StandingContextTier)
+    ? (tierLabel as StandingContextTier)
+    : "index with digests";
+  const columnsRaw = masterCols["Context columns"] ? data[masterCols["Context columns"]] : undefined;
+  const columns =
+    typeof columnsRaw === "string"
+      ? columnsRaw.split(",").map((c) => c.trim()).filter(Boolean)
+      : [];
+  const filterRaw = masterCols["Context filter"] ? data[masterCols["Context filter"]] : undefined;
+  const filter = typeof filterRaw === "string" && filterRaw.trim() ? filterRaw.trim() : null;
+  return refs
+    .filter((r): r is string => typeof r === "string")
+    .map((tableId) => ({ tableId, tier, columns, filter }));
+}
 
 // ── Quest-ledger machinery core (fixed in P4a; sculpting arrives PR 4) ─────
 
@@ -450,6 +540,7 @@ export async function ensureMasterLedger(
       select: { id: true },
     });
     if (alive) {
+      await ensureMasterColumns(alive.id);
       return {
         masterId: alive.id,
         masterCols: await columnKeysByName(alive.id),
@@ -491,6 +582,7 @@ export async function ensureMasterLedger(
       summary: `master ledger re-stamped for charter ${charter.title}`,
       attrs: { masterId: adoptable.id, charterId: charter.contentId },
     });
+    await ensureMasterColumns(adoptable.id);
     return {
       masterId: adoptable.id,
       masterCols: await columnKeysByName(adoptable.id),

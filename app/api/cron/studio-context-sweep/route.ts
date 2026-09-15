@@ -9,6 +9,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { runContextSweep } from "@/lib/domain/ai-context/context-refresh";
+import { runRowDigestSweep } from "@/lib/domain/data/server/digests";
 import { logger } from "@/lib/core/logger";
 import { withRouteTrace } from "@/lib/core/logger/route-trace";
 
@@ -29,7 +30,9 @@ export async function POST(req: NextRequest) {
       }
 
       const result = await runContextSweep();
-      return NextResponse.json({ success: true, data: result });
+      // AI row digests ride the same nightly drain (AI-BULK-ROW-READING-PLAN §5.3).
+      const digests = await runRowDigestSweep();
+      return NextResponse.json({ success: true, data: { ...result, digests } });
     }
   );
 }

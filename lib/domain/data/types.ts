@@ -344,6 +344,11 @@ export interface DataRow {
   /** Person cells hydrated to display names, keyed by column id. */
   personRefs?: Record<string, PersonRef>;
   /**
+   * AI row digest (AI-BULK-ROW-READING-PLAN §5) — read-model attachment
+   * from the DataRowDigest sidecar; `fresh` is the hash verdict now.
+   */
+  digest?: { text: string; fresh: boolean; generatedAt: string };
+  /**
    * Lookup/rollup results, computed server-side at read time (plan D6 —
    * derived columns store NOTHING) and keyed by column id. Display-ready:
    * strings and numbers only, aggregated over targets the viewer can see.
@@ -529,6 +534,8 @@ export interface DataTable {
   description: string | null;
   defaultViewId: string | null;
   rowCount: number;
+  /** AI row digests opt-in (plan §5); owner-controlled in the schema rail. */
+  rowDigests: boolean;
   columns: DataColumn[];
   views: DataView[];
 }

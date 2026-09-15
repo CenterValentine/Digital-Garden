@@ -27,11 +27,10 @@ import {
   canRead,
   resolveDataTableAccess,
 } from "@/lib/domain/data/server/access";
-import {
-  cellToText,
-  type DataColumn,
-  type DataRow,
-} from "@/lib/domain/data";
+import type { DataColumn, DataRow } from "@/lib/domain/data";
+import { cellDisplayValue } from "@/lib/domain/data/read-format";
+import { prisma } from "@/lib/database/client";
+import { renderDatabaseSchemaMarkdown } from "@/lib/domain/data/schema-markdown";
 
 /** Design-scale ceiling (plan D1: ≤10k rows per table). */
 const EXPORT_ROW_CAP = 10_000;
@@ -53,45 +52,60 @@ function csvEscape(value: string): string {
   return value;
 }
 
-/**
- * Display text for one cell, resolved through the hydrated read-model:
- * relations/contentLinks/files as linked titles, person as display name,
- * lookup/rollup as computed values, everything else via cellToText.
- * Shared beyond CSV: POST /api/flashcards/from-data uses the same
- * extraction to turn two columns into card fronts/backs.
- */
-export function cellDisplayValue(row: DataRow, column: DataColumn): string {
-  switch (column.type) {
-    case "relation":
-      return (row.links?.[column.id] ?? [])
-        .map((l) => (l.restricted ? "" : l.title))
-        .filter(Boolean)
-        .join("; ");
-    case "contentLink":
-    case "file":
-      return (row.contentRefs?.[column.id] ?? [])
-        .map((r) => (r.restricted ? "" : r.title))
-        .filter(Boolean)
-        .join("; ");
-    case "person": {
-      const ref = row.personRefs?.[column.id];
-      return ref && !ref.restricted ? ref.name : "";
-    }
-    case "lookup":
-    case "rollup": {
-      const v = row.derived?.[column.id];
-      return v === undefined ? "" : String(v);
-    }
-    default:
-      return cellToText(column, row.data[column.key]);
-  }
-}
+// `cellDisplayValue` lives in the pure read-format module (AI bulk reads,
+// plan §4.3) so the CSV export and query_database share ONE renderer.
+// Re-exported: POST /api/flashcards/from-data imports it from here.
+export { cellDisplayValue } from "@/lib/domain/data/read-format";
 
 export interface DatabaseCsvExport {
   title: string;
   csv: string;
   meta: Record<string, unknown>;
+  /** `.schema.md` sidecar — the column vocabulary a reader or model needs. */
+  schemaMarkdown: string;
   rowCount: number;
+}
+
+/**
+ * Titles and column names the schema markdown references across tables
+ * (relation targets, mirrored columns, lookup/rollup sources). One query
+ * each; a table with no graph columns costs nothing.
+ */
+async function loadSchemaReferenceNames(columns: DataColumn[]): Promise<{
+  tableTitles: Record<string, string>;
+  columnNames: Record<string, string>;
+}> {
+  const tableIds = new Set<string>();
+  const columnIds = new Set<string>();
+  for (const c of columns) {
+    if (c.config.relationTableId) tableIds.add(c.config.relationTableId);
+    for (const id of [
+      c.config.symmetricColumnId,
+      c.config.relationColumnId,
+      c.config.lookupColumnId,
+      c.config.rollupColumnId,
+    ]) {
+      if (id) columnIds.add(id);
+    }
+  }
+  const [tables, cols] = await Promise.all([
+    tableIds.size
+      ? prisma.contentNode.findMany({
+          where: { id: { in: [...tableIds] } },
+          select: { id: true, title: true },
+        })
+      : [],
+    columnIds.size
+      ? prisma.dataColumn.findMany({
+          where: { id: { in: [...columnIds] } },
+          select: { id: true, name: true },
+        })
+      : [],
+  ]);
+  return {
+    tableTitles: Object.fromEntries(tables.map((t) => [t.id, t.title])),
+    columnNames: Object.fromEntries(cols.map((c) => [c.id, c.name])),
+  };
 }
 
 export async function exportDatabaseCsv(
@@ -158,5 +172,22 @@ export async function exportDatabaseCsv(
     ),
   };
 
-  return { title: table.title, csv, meta, rowCount: rows.length };
+  const schemaMarkdown = renderDatabaseSchemaMarkdown(
+    {
+      id: table.contentId,
+      title: table.title,
+      description: table.description,
+      rowCount: rows.length,
+      columns,
+    },
+    await loadSchemaReferenceNames(columns)
+  );
+
+  return {
+    title: table.title,
+    csv,
+    meta,
+    schemaMarkdown,
+    rowCount: rows.length,
+  };
 }

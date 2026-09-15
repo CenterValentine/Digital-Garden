@@ -19,6 +19,7 @@
 
 import { prisma } from "@/lib/database/client";
 import { cellToText, keyAtEnd, type DataColumn } from "@/lib/domain/data";
+import { matchRowRef } from "@/lib/domain/data/read-format";
 import { canRead, resolveDataTableAccess } from "./access";
 
 const UUID_RE =
@@ -107,6 +108,18 @@ export async function resolveRelationCell(
     }
     const matches = byTitle.get(entry.toLowerCase());
     if (!matches || matches.length === 0) {
+      // Not a title — an 8+ hex handle from a query_database line?
+      // (AI bulk reads, plan §4.3.) Titles win over handles so a row
+      // literally titled "deadbeef" still links by name.
+      const handle = matchRowRef(entry, liveIds);
+      if ("id" in handle) {
+        if (!rowIds.includes(handle.id)) rowIds.push(handle.id);
+        continue;
+      }
+      if ("ambiguous" in handle) {
+        ambiguous.push(entry);
+        continue;
+      }
       missing.push(entry);
       continue;
     }
@@ -119,12 +132,12 @@ export async function resolveRelationCell(
 
   if (missing.length > 0) {
     return {
-      error: `${column.name}: "${missing.join('", "')}" ${missing.length === 1 ? "is not a row" : "are not rows"} in "${targetTitle}". Link only to rows that exist — create them there first, or query_database that table for the exact titles.`,
+      error: `${column.name}: "${missing.join('", "')}" ${missing.length === 1 ? "is not a row" : "are not rows"} in "${targetTitle}". Link only to rows that exist — create them there first, or query_database that table for the exact titles or [handles].`,
     };
   }
   if (ambiguous.length > 0) {
     return {
-      error: `${column.name}: "${ambiguous.join('", "')}" ${ambiguous.length === 1 ? "matches" : "match"} more than one row in "${targetTitle}" — use the row id from query_database instead of the title.`,
+      error: `${column.name}: "${ambiguous.join('", "')}" ${ambiguous.length === 1 ? "matches" : "match"} more than one row in "${targetTitle}" — use the [handle] or full row id from query_database instead of the title.`,
     };
   }
   return { rowIds };
@@ -247,6 +260,17 @@ export async function writeRelationLinks(
         data: { columnId, fromRowId, toRowId, position },
       });
       added += 1;
+    }
+    // AI digest discovery bit (plan §5.2): links are in the source hash,
+    // so both ends of every changed link are candidates.
+    if (added > 0 || stale.length > 0) {
+      await tx.dataRowDigest.updateMany({
+        where: {
+          rowId: { in: [fromRowId, ...rowIds, ...stale.map((l) => l.toRowId)] },
+          dirty: false,
+        },
+        data: { dirty: true },
+      });
     }
     return { added, removed: stale.length };
   });

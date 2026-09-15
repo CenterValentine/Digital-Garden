@@ -12,6 +12,7 @@
  */
 
 import type { UIMessage } from "ai";
+import { parseReadHeader } from "@/lib/domain/data/read-format";
 
 /**
  * Drop reasoning parts from RESENT assistant history for providers that
@@ -225,6 +226,178 @@ export function supersedeIterationHistory(messages: UIMessage[]): UIMessage[] {
       return {
         ...(part as Record<string, unknown>),
         output: SUPERSEDED_STUB,
+      } as typeof part;
+    });
+    return changed ? { ...m, parts } : m;
+  });
+}
+
+
+// ── Bulk database reads (AI-BULK-ROW-READING-PLAN §4.6) ─────────────────
+
+/** Below this, a read is cheaper to keep than to perturb the cache over. */
+const BULK_READ_MIN_CHARS = 600;
+
+/** Pinned (`chat`) reads may hold at most this much, newest first. */
+export const DEFAULT_PINNED_ALLOWANCE_TOKENS = 12_000;
+
+const BULK_READ_STUB = (table: string, rows: number, tokens: number) =>
+  `[superseded — this database read (${rows} rows of "${table}", ~${Math.round(tokens / 100) / 10}k tokens) was digested into the reply that followed; call query_database again if a later step truly needs the rows]`;
+
+export type BulkReadFoldState = "kept" | "pinned-run" | "pinned-chat" | "folded";
+
+/**
+ * Applied lifetime + fold verdict for every query_database part, by
+ * (messageIdx, partIdx). ONE implementation for the model-facing fold and
+ * the UI collapse/pin chips (the iteration fold's rule, kept).
+ *
+ * Rules (plan §4.6a):
+ *  - `turn`: folds once an assistant message precedes the latest user message.
+ *  - promotion by adjacency: a `turn` read in the same assistant message as,
+ *    and before, an approved propose_item_iteration is treated as `run`.
+ *  - `run`: kept while that run is active (no record_iteration_findings yet);
+ *    once the run ends, folds like `turn`. `run` with no run ever started
+ *    after it degrades to `turn`.
+ *  - `chat`: kept newest-first until the pinned allowance is spent.
+ */
+export function bulkReadFoldStates(
+  messages: UIMessage[],
+  options: { pinnedAllowanceTokens?: number } = {},
+): Map<string, BulkReadFoldState> {
+  const allowance = options.pinnedAllowanceTokens ?? DEFAULT_PINNED_ALLOWANCE_TOKENS;
+  const key = (m: number, p: number) => `${m}:${p}`;
+  const out = new Map<string, BulkReadFoldState>();
+
+  let lastUserIdx = -1;
+  messages.forEach((m, i) => {
+    if (m.role === "user") lastUserIdx = i;
+  });
+
+  // Run state by message: which runs are active at the END of the
+  // transcript, and where each was proposed.
+  interface ReadPart {
+    messageIdx: number;
+    partIdx: number;
+    lifetime: "turn" | "run" | "chat";
+    tokens: number;
+    table: string;
+    rows: number;
+  }
+  const reads: ReadPart[] = [];
+  let runActive = false;
+  let runStart: { messageIdx: number; partIdx: number } | null = null;
+  const runSpans: Array<{ start: { messageIdx: number; partIdx: number }; end: { messageIdx: number } | null }> = [];
+
+  messages.forEach((m, messageIdx) => {
+    if (m.role !== "assistant") return;
+    m.parts.forEach((part, partIdx) => {
+      const p = part as { type?: string; state?: string; output?: unknown };
+      if (p.type === "tool-propose_item_iteration" && p.state === "output-available") {
+        const ok = (p.output as { ok?: boolean } | undefined)?.ok;
+        if (ok) {
+          runActive = true;
+          runStart = { messageIdx, partIdx };
+          runSpans.push({ start: runStart, end: null });
+        }
+      } else if (p.type === "tool-record_iteration_findings" && p.state === "output-available") {
+        if (runActive) {
+          runSpans[runSpans.length - 1].end = { messageIdx };
+        }
+        runActive = false;
+        runStart = null;
+      } else if (p.type === "tool-query_database" && p.state === "output-available") {
+        const text = typeof p.output === "string" ? p.output : "";
+        if (text.length < BULK_READ_MIN_CHARS) return;
+        const header = parseReadHeader(text);
+        reads.push({
+          messageIdx,
+          partIdx,
+          lifetime: header?.lifetime ?? "turn",
+          tokens: header?.tokens ?? Math.ceil(text.length / 4),
+          table: header?.table ?? "database",
+          rows: header?.rows ?? 0,
+        });
+      }
+    });
+  });
+
+  const inActiveRun = (r: ReadPart): boolean =>
+    runSpans.some(
+      (span) =>
+        span.end === null &&
+        (r.messageIdx > span.start.messageIdx ||
+          (r.messageIdx === span.start.messageIdx && r.partIdx >= span.start.partIdx)),
+    );
+  const adjacentToProposal = (r: ReadPart): boolean =>
+    runSpans.some(
+      (span) =>
+        span.end === null &&
+        span.start.messageIdx === r.messageIdx &&
+        r.partIdx < span.start.partIdx,
+    );
+
+  let pinnedSpent = 0;
+  // Newest first so the allowance keeps the latest pins.
+  for (const r of [...reads].reverse()) {
+    const k = key(r.messageIdx, r.partIdx);
+    const beforeLatestUser = r.messageIdx < lastUserIdx;
+    if (r.lifetime === "chat") {
+      if (pinnedSpent + r.tokens <= allowance) {
+        pinnedSpent += r.tokens;
+        out.set(k, "pinned-chat");
+      } else {
+        out.set(k, beforeLatestUser ? "folded" : "kept");
+      }
+      continue;
+    }
+    if (r.lifetime === "run" || adjacentToProposal(r)) {
+      if (inActiveRun(r) || adjacentToProposal(r)) {
+        out.set(k, "pinned-run");
+        continue;
+      }
+      // Run over (or never started): behaves as `turn`.
+    }
+    out.set(k, beforeLatestUser ? "folded" : "kept");
+  }
+  return out;
+}
+
+/** The UI's question for one part. */
+export function bulkReadFoldState(
+  states: Map<string, BulkReadFoldState>,
+  messageIdx: number,
+  partIdx: number,
+): BulkReadFoldState | null {
+  return states.get(`${messageIdx}:${partIdx}`) ?? null;
+}
+
+/**
+ * Model-path fold for bulk reads. Same contract as the other transforms:
+ * NEVER applied to originalMessages/persistence; the transcript keeps
+ * every byte.
+ */
+export function supersedeBulkReads(
+  messages: UIMessage[],
+  options: { pinnedAllowanceTokens?: number } = {},
+): UIMessage[] {
+  const states = bulkReadFoldStates(messages, options);
+  if (![...states.values()].some((s) => s === "folded")) return messages;
+  return messages.map((m, messageIdx) => {
+    if (m.role !== "assistant") return m;
+    let changed = false;
+    const parts = m.parts.map((part, partIdx) => {
+      if (states.get(`${messageIdx}:${partIdx}`) !== "folded") return part;
+      const p = part as { output?: unknown };
+      const text = typeof p.output === "string" ? p.output : "";
+      const header = parseReadHeader(text);
+      changed = true;
+      return {
+        ...(part as Record<string, unknown>),
+        output: BULK_READ_STUB(
+          header?.table ?? "database",
+          header?.rows ?? 0,
+          header?.tokens ?? Math.ceil(text.length / 4),
+        ),
       } as typeof part;
     });
     return changed ? { ...m, parts } : m;

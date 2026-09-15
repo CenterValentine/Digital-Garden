@@ -21,7 +21,9 @@ import {
   resolveDataTableAccess,
 } from "@/lib/domain/data/server/access";
 import { loadTable } from "@/lib/domain/data/server/queries";
+import { matchRowRef, parseRowRef } from "@/lib/domain/data/read-format";
 import type { DataTable } from "@/lib/domain/data";
+import { Prisma } from "@/lib/database/generated/prisma";
 
 /** The context ids database resolution needs — a structural subset of ToolExecuteContext. */
 export interface DataToolContext {
@@ -83,7 +85,7 @@ export async function boundTableIdFor(
  * own data behind the usual access checks — jurisdiction here is a
  * consent-visibility structure, not a cross-principal boundary.
  */
-async function charterRegistryAuthorizes(
+export async function charterRegistryAuthorizes(
   ctx: DataToolContext,
   databaseId: string,
 ): Promise<boolean> {
@@ -200,6 +202,67 @@ export async function resolveDatabaseRef(
   return {
     refusal: `No database named "${trimmed}". Do NOT guess another name — run search_content (types: ["data"]) to see the real ones, then pass an id from the results. If none of them is what the user meant, ask them.`,
   };
+}
+
+// ── Row references (AI bulk reads, plan §4.3) ───────────────────────────
+
+/**
+ * Resolve a model-supplied row reference — a full UUID or an 8+ hex
+ * handle (the `[ab12cd34]` at the start of every query_database line) —
+ * against ONE table's live rows. Ambiguity and absence are teaching
+ * refusals, never guesses: the write tools call this before touching a
+ * row, and a prefix that matches two rows must not pick either.
+ */
+export async function resolveRowRef(
+  tableId: string,
+  ref: string
+): Promise<{ id: string } | { refusal: string }> {
+  const results = await resolveRowRefs(tableId, [ref]);
+  return results[0];
+}
+
+/** Batch form — one query for a whole list of references. */
+export async function resolveRowRefs(
+  tableId: string,
+  refs: string[]
+): Promise<Array<{ id: string } | { refusal: string }>> {
+  const parsed = refs.map(parseRowRef);
+  const prefixes = parsed.filter((p) => p.kind === "prefix").map((p) => p.prefix);
+  const uuids = parsed.filter((p) => p.kind === "uuid").map((p) => p.id);
+  const liveIds = new Set<string>();
+  if (uuids.length > 0) {
+    const rows = await prisma.dataRow.findMany({
+      where: { tableId, deletedAt: null, id: { in: uuids } },
+      select: { id: true },
+    });
+    for (const r of rows) liveIds.add(r.id);
+  }
+  if (prefixes.length > 0) {
+    // uuid columns have no `startsWith`; the text cast is cheap at the
+    // design scale (≤10k rows) and a wrong-shaped prefix cannot inject —
+    // it was validated as hex above.
+    const rows = await prisma.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+      SELECT "id" FROM "DataRow"
+      WHERE "tableId" = ${tableId}::uuid AND "deletedAt" IS NULL
+        AND ${Prisma.join(prefixes.map((p) => Prisma.sql`"id"::text LIKE ${p + "%"}`), " OR ")}
+    `);
+    for (const r of rows) liveIds.add(r.id);
+  }
+  return refs.map((ref) => {
+    const m = matchRowRef(ref, liveIds);
+    if ("id" in m) return { id: m.id };
+    if ("invalid" in m) return { refusal: m.invalid };
+    if ("ambiguous" in m) {
+      return {
+        refusal: `"${ref}" matches ${m.ambiguous.length} rows here (${m.ambiguous
+          .map((id) => id.slice(0, 12))
+          .join(", ")}) — pass a longer handle or the full row id from query_database.`,
+      };
+    }
+    return {
+      refusal: `"${ref}" is not a live row of this database — take the handle from a query_database result line.`,
+    };
+  });
 }
 
 // The pure column helpers (findColumn / translateOptionValue /

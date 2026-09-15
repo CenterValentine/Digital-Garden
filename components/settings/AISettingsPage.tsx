@@ -68,6 +68,9 @@ import { useSettingsStore } from "@/state/settings-store";
 
 const MAX_TOKENS_MIN = 1;
 const MAX_TOKENS_MAX = 200_000;
+const BULK_READ_MIN = 1_000;
+const BULK_READ_MAX = 100_000;
+const BULK_READ_DEFAULT = 6_000;
 
 interface ToolConfigEntry {
   enabled?: boolean;
@@ -91,6 +94,7 @@ export default function AISettingsPage() {
   // deliberate choice) — normalize it to "unset" so legacy settings pick up
   // the catalog-resolved maximum instead of a silent truncation cap.
   const maxTokens = ai?.maxTokens === 4096 ? null : (ai?.maxTokens ?? null);
+  const bulkReadThreshold = ai?.bulkReadTokenThreshold ?? BULK_READ_DEFAULT;
   const typingEffect = ai?.typingEffect ?? true;
   const showAiHighlight = ai?.showAiHighlight ?? true;
   const showReasoning = ai?.showReasoning ?? true;
@@ -102,6 +106,7 @@ export default function AISettingsPage() {
   // Drafts for controls that commit on release/blur rather than keystroke.
   const [temperatureDraft, setTemperatureDraft] = useState<number | null>(null);
   const [maxTokensDraft, setMaxTokensDraft] = useState<string | null>(null);
+  const [bulkReadDraft, setBulkReadDraft] = useState<string | null>(null);
 
   // Connections for the tool override picker (cheap; ~1 row per configured
   // provider). Failure is non-fatal — empty list = no override options.
@@ -149,6 +154,18 @@ export default function AISettingsPage() {
     const clamped = Math.min(Math.max(parsed, MAX_TOKENS_MIN), MAX_TOKENS_MAX);
     if (clamped !== maxTokens) {
       void generation.track(setAISettings({ maxTokens: clamped }));
+    }
+  };
+
+  const commitBulkRead = () => {
+    if (bulkReadDraft === null) return;
+    const trimmed = bulkReadDraft.trim();
+    setBulkReadDraft(null);
+    const parsed = trimmed === "" ? BULK_READ_DEFAULT : parseInt(trimmed, 10);
+    if (Number.isNaN(parsed)) return;
+    const clamped = Math.min(Math.max(parsed, BULK_READ_MIN), BULK_READ_MAX);
+    if (clamped !== bulkReadThreshold) {
+      void generation.track(setAISettings({ bulkReadTokenThreshold: clamped }));
     }
   };
 
@@ -249,6 +266,30 @@ export default function AISettingsPage() {
               if (event.key === "Enter") {
                 event.preventDefault();
                 commitMaxTokens();
+              }
+            }}
+          />
+        </SettingRow>
+
+        <SettingRow
+          label="Database read approval"
+          description="Database reads larger than this many estimated tokens ask for your approval; the request shows the estimate. Smaller reads run without asking."
+          htmlFor="ai-bulk-read-threshold"
+        >
+          <Input
+            id="ai-bulk-read-threshold"
+            type="number"
+            min={BULK_READ_MIN}
+            max={BULK_READ_MAX}
+            step={500}
+            className="w-32"
+            value={bulkReadDraft ?? String(bulkReadThreshold)}
+            onChange={(event) => setBulkReadDraft(event.target.value)}
+            onBlur={commitBulkRead}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                commitBulkRead();
               }
             }}
           />

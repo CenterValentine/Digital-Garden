@@ -18,7 +18,7 @@ import {
   ModelRouteNotices,
 } from "../ai/ModelSwitchDivider";
 import { computeModelRouteDecorations } from "@/lib/domain/ai/model-directive";
-import { findIterationFoldBoundary } from "@/lib/domain/ai/context-diet";
+import { bulkReadFoldStates, findIterationFoldBoundary } from "@/lib/domain/ai/context-diet";
 import { aggregateSessionUsage } from "@/lib/features/ai-connections/usage/pricing";
 import { ChatControlPanel } from "../ai/ChatControlPanel";
 
@@ -601,6 +601,9 @@ function ChatViewerInner({
     () => findIterationFoldBoundary(messages),
     [messages],
   );
+  // Bulk database reads: folded / pinned per lifetime — the same predicate
+  // the model-facing assembly applies (AI-BULK-ROW-READING-PLAN §4.6).
+  const bulkReadFolds = useMemo(() => bulkReadFoldStates(messages), [messages]);
   // P3 owner ask: cumulative session usage for the avatar popover.
   const sessionUsage = useMemo(
     () => aggregateSessionUsage(messages),
@@ -886,6 +889,7 @@ function ChatViewerInner({
                     message={message}
                     messageIndex={i}
                     foldBoundary={iterationFoldBoundary}
+                  bulkReadFolds={bulkReadFolds}
                     sessionUsage={sessionUsage}
                     charterAttached={charterAttached}
                     providerId={stamp.providerId}

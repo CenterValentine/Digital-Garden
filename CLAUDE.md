@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Product Principles
+
+**Read [docs/notes-feature/core/PRODUCT-PRINCIPLES.md](docs/notes-feature/core/PRODUCT-PRINCIPLES.md) before designing a feature.** It records what this product is *for*, so a design can be judged before it is built. The first principle in short: **make the user's existing file/folder structure the path of least resistance** — prefer projecting the structure a user already maintains over letting them build a parallel one, because the convenient route and the structurally sound route should be the same route. Workbenches (PR #177) are the worked example: folders are the only vocabulary, deliberately. The second: **unrefined → structured is the core loop** — notes accumulate repeated units, and the product's job is the path from a note's own blocks into linked database rows (and back), with gaps recorded as deliberate placeholders rather than silence.
+
 ## Repository Overview
 
 **Next.js 16 application** — Digital Garden Content IDE, an Obsidian-inspired knowledge management system with panel-based layout, rich text editing, and multi-cloud storage.

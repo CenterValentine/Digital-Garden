@@ -67,6 +67,14 @@ export class PlainTextConverter implements DocumentConverter {
       )}\n`;
     }
 
+    // Header-bearing containers (accordion, card panel) keep their header in
+    // attrs, not content — without this line it never reached the export.
+    const headerText =
+      typeof node.attrs?.headerText === "string"
+        ? node.attrs.headerText.trim()
+        : "";
+    if (headerText) text += `${headerText}\n`;
+
     // Handle child nodes
     if (node.content && Array.isArray(node.content)) {
       for (const child of node.content) {
@@ -104,6 +112,14 @@ export class PlainTextConverter implements DocumentConverter {
       "callout",
       "habitTracker",
       "stopwatch",
+      "accordion",
+      "cardPanel",
+      "tabs",
+      "columns",
+      "blockColumns",
+      "statsTable",
+      "image",
+      "taskList",
     ];
 
     return blockTypes.includes(type || "");
