@@ -100,7 +100,12 @@ import {
 } from "@/lib/features/ai-connections/usage/pricing";
 import { ReasoningRouter } from "./reasoning/ReasoningRouter";
 import { parseCharterMessageAttachment } from "@/lib/domain/ai/charters/message-binding";
-import { shouldSupersedePart } from "@/lib/domain/ai/context-diet";
+import {
+  bulkReadFoldState,
+  shouldSupersedePart,
+  type BulkReadFoldState,
+} from "@/lib/domain/ai/context-diet";
+import { parseReadHeader } from "@/lib/domain/data/read-format";
 import { parseFolderContextMentionPart } from "@/lib/domain/ai-context/mention-part";
 import {
   parseContentWriteReceipts,
@@ -277,6 +282,8 @@ interface ChatMessageProps {
    */
   messageIndex?: number;
   foldBoundary?: { messageIdx: number; partIdx: number } | null;
+  /** Bulk database reads: fold/pin state per part (bulkReadFoldStates). */
+  bulkReadFolds?: Map<string, BulkReadFoldState> | null;
   /**
    * Cumulative session usage (all assistant turns so far, aggregated by the
    * surface) — the avatar popover shows it beside the turn's own numbers so
@@ -370,6 +377,36 @@ interface ChatMessageProps {
  * expanding shows the raw superseded output — user-only, costs no tokens,
  * and visually marks what the model no longer carries.
  */
+/** A `turn`-lifetime database read behind the latest user message (plan §4.6). */
+function FoldedBulkReadPart({ part }: { part: unknown }) {
+  const [expanded, setExpanded] = useState(false);
+  const p = part as { output?: unknown };
+  const raw = typeof p.output === "string" ? p.output : JSON.stringify(p.output, null, 2);
+  const h = parseReadHeader(raw);
+  return (
+    <div className="my-1">
+      <button
+        type="button"
+        onClick={() => setExpanded((e) => !e)}
+        className="inline-flex items-center gap-1.5 rounded-md border border-black/5 bg-black/[0.02] px-2 py-1 text-[11px] text-gray-500 transition-colors hover:bg-black/[0.05] dark:border-white/5 dark:bg-white/[0.03] dark:text-gray-400 dark:hover:bg-white/[0.06]"
+        title="Folded — the model no longer carries this read; it re-reads if a later step needs the rows. Expanding is free."
+      >
+        <ChevronRight
+          className={`h-3 w-3 shrink-0 transition-transform ${expanded ? "rotate-90" : ""}`}
+        />
+        <span>
+          query_database{h ? ` · ${h.rows} rows of ${h.table} · ~${(h.tokens / 1000).toFixed(1)}k` : ""} · folded — re-read if needed
+        </span>
+      </button>
+      {expanded && (
+        <pre className="mt-1 max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-md border border-black/5 bg-black/[0.02] p-2 text-[11px] text-gray-600 dark:border-white/5 dark:bg-white/[0.03] dark:text-gray-300">
+          {raw}
+        </pre>
+      )}
+    </div>
+  );
+}
+
 function FoldedPerceptionPart({ part }: { part: unknown }) {
   const [expanded, setExpanded] = useState(false);
   const p = part as { type?: string; output?: unknown };
@@ -411,6 +448,7 @@ export const ChatMessage = memo(function ChatMessage({
   isStreaming = false,
   messageIndex,
   foldBoundary = null,
+  bulkReadFolds = null,
   sessionUsage = null,
   charterAttached,
   resumedStream = false,
@@ -1064,6 +1102,16 @@ export const ChatMessage = memo(function ChatMessage({
           ) {
             return <FoldedPerceptionPart key={i} part={part} />;
           }
+          // Bulk database reads (plan §4.6): a `turn` read behind the
+          // latest user message renders folded; pinned reads carry their
+          // state into the tool bubble's summary.
+          const bulkState =
+            bulkReadFolds && typeof messageIndex === "number"
+              ? bulkReadFoldState(bulkReadFolds, messageIndex, i)
+              : null;
+          if (bulkState === "folded") {
+            return <FoldedBulkReadPart key={i} part={part} />;
+          }
           // Reasoning / "thinking" parts (Session 6). Routed to a
           // provider-themed renderer keyed on this message's stamped
           // providerId — not the panel's active provider — so branched
@@ -1295,11 +1343,26 @@ export const ChatMessage = memo(function ChatMessage({
               toolPart.state === "approval-requested" &&
               toolPart.approvalId
             ) {
+              // Standing context (plan §4.6a rule 3): database reads made
+              // in this same message BEFORE the proposal are pinned for the
+              // run — the card says so, with sizes, before the user approves.
+              const standingReads =
+                toolPart.toolName === "propose_item_iteration"
+                  ? message.parts
+                      .slice(0, i)
+                      .map((prior) => {
+                        const q = prior as { type?: string; state?: string; output?: unknown };
+                        if (q.type !== "tool-query_database" || q.state !== "output-available") return null;
+                        return parseReadHeader(typeof q.output === "string" ? q.output : "");
+                      })
+                      .filter((h): h is NonNullable<typeof h> => !!h)
+                  : [];
               return (
                 <ToolApprovalCard
                   key={i}
                   toolName={toolPart.toolName}
                   args={toolPart.input}
+                  standingReads={standingReads}
                   charterAttached={charterAttached}
                   approvalId={toolPart.approvalId}
                   onRespond={
@@ -1344,6 +1407,7 @@ export const ChatMessage = memo(function ChatMessage({
                 }
                 args={toolPart.input}
                 result={toolPart.output}
+                pinState={bulkState}
                 errorText={
                   !isStreaming &&
                   (toolPart.state === "input-streaming" ||
@@ -3017,6 +3081,34 @@ function ApprovalPreview({
       ? (a[key] as string)
       : undefined;
 
+  // Bulk database read above the user's threshold (plan §4.1): the number
+  // on the card is the number the model was quoted.
+  if (toolName === "query_database") {
+    const budget = Number(a.budget);
+    const cols = Array.isArray(a.columns)
+      ? (a.columns as unknown[]).map(String).join(", ")
+      : typeof a.columns === "string"
+        ? a.columns
+        : "index tier";
+    return (
+      <>
+        <div className="mx-3 mb-1.5 rounded-md border border-black/10 dark:border-white/10 bg-white/70 dark:bg-black/25 px-3 py-2 text-[11px] leading-snug text-gray-700 dark:text-gray-300">
+          <div className="text-[12.5px] font-semibold text-gray-800 dark:text-gray-200">
+            Read {str("databaseId") ? `"${str("databaseId")}"` : "this database"} — up to{" "}
+            {Number.isFinite(budget) ? budget.toLocaleString() : "?"} tokens
+          </div>
+          <div className="mt-0.5">Columns: {cols}</div>
+          {str("search") && <div>Search: {str("search")}</div>}
+          {str("lifetime") && <div>Kept: {str("lifetime")}</div>}
+          <div className="mt-0.5 text-gray-500 dark:text-gray-400">
+            Larger than your approval threshold (Settings → AI → Database read approval).
+          </div>
+        </div>
+        <ApprovalRawJson args={args} />
+      </>
+    );
+  }
+
   // Document tools: render the note/document as it will actually look.
   if (
     toolName === "createNote" ||
@@ -3235,10 +3327,13 @@ function ToolApprovalCard({
   onRespond,
   expired = false,
   charterAttached,
+  standingReads = [],
 }: {
   toolName: string;
   args: unknown;
   approvalId: string;
+  /** query_database reads in this message before the proposal (pinned for the run). */
+  standingReads?: Array<{ table: string; rows: number; tokens: number }>;
   onRespond?: (opts: {
     id: string;
     approved: boolean;
@@ -3268,6 +3363,31 @@ function ToolApprovalCard({
         </span>
       </div>
       <ApprovalPreview toolName={toolName} args={args} />
+      {toolName === "propose_item_iteration" &&
+        (standingReads.length > 0 || charterAttached) && (
+          <div className="mx-3 mb-1.5 rounded-md border border-black/10 dark:border-white/10 bg-white/70 dark:bg-black/25 px-3 py-1.5 text-[11px] leading-snug text-gray-700 dark:text-gray-300">
+            <div className="font-semibold">Standing context for this run</div>
+            {standingReads.map((r, idx) => (
+              <div key={idx}>
+                • {r.table} — {r.rows} rows · ~{(r.tokens / 1000).toFixed(1)}k tokens · read this turn
+              </div>
+            ))}
+            {charterAttached && (
+              <div>
+                • Tables the charter declares as standing context (Reference
+                tables on its master ledger) are read once and kept — each
+                read&apos;s chip shows its size.
+              </div>
+            )}
+            {standingReads.length > 0 && (
+              <div className="mt-0.5 text-gray-500 dark:text-gray-400">
+                ~{(standingReads.reduce((n, r) => n + r.tokens, 0) / 1000).toFixed(1)}k
+                tokens are re-sent with every item. These reads stay until the
+                run ends, then fold.
+              </div>
+            )}
+          </div>
+        )}
       {/* Pre-approval charter guard (owner foot-gun, hit three runs
           straight): a quest declared with NO charter attached runs as a
           legacy pass — no quest ledger, no dedup — and the model can only
@@ -3326,6 +3446,7 @@ function ToolCallBubble({
   errorText,
   isRevertable = false,
   onRevertEdit,
+  pinState = null,
 }: {
   toolName: string;
   toolCallId?: string;
@@ -3333,6 +3454,8 @@ function ToolCallBubble({
   args: unknown;
   result?: unknown;
   errorText?: string;
+  /** Bulk database reads: pinned-run / pinned-chat / kept (plan §4.8). */
+  pinState?: BulkReadFoldState | null;
   isRevertable?: boolean;
   onRevertEdit?: (toolCallId: string) => void;
 }) {
@@ -3411,6 +3534,22 @@ function ToolCallBubble({
         /* fall through to default summary */
       }
     }
+    // Bulk database read: rows · tokens · pin state (the header line is
+    // the durable trace; plan §4.8).
+    if (toolName === "query_database" && typeof result === "string") {
+      const h = parseReadHeader(result);
+      if (h) {
+        const pin =
+          pinState === "pinned-run"
+            ? h.lifetimeOrigin === "charter"
+              ? " · pinned for this run (charter)"
+              : " · pinned for this run"
+            : pinState === "pinned-chat"
+              ? " · pinned"
+              : "";
+        return `${h.rows} of ${h.total} rows · ~${(h.tokens / 1000).toFixed(1)}k tokens${pin}`;
+      }
+    }
     if (typeof result === "string") {
       const len = result.length;
       return `${len.toLocaleString()} char${len === 1 ? "" : "s"}`;
@@ -3423,7 +3562,7 @@ function ToolCallBubble({
       return `${keys.length} field${keys.length === 1 ? "" : "s"}`;
     }
     return "ok";
-  }, [isRunning, wasStopped, hasError, hasResult, result]);
+  }, [isRunning, wasStopped, hasError, hasResult, result, toolName, pinState]);
 
   // Human action phrase — describes what the tool is *doing* (present
   // tense while running, past tense when done) rather than echoing the

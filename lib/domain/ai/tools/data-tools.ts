@@ -1,12 +1,15 @@
 /**
  * Database tools — plan Phase 6 (replanned 2026-08-27), SERVER-ONLY.
  *
- * The token contract, enforced here rather than hoped for in prompts:
- * `query_database` returns at most one page unit (default 20, hard max
- * 100 = DEFAULT_ROW_PAGE_SIZE), serialized through `cellToText` into a
- * ~4KB budget with an explicit truncation report — the model learns to
- * NARROW, not to re-query bigger. Rows never ride the mention capsule;
- * these tools are the only row path.
+ * The token contract, enforced here rather than hoped for in prompts
+ * (AI-BULK-ROW-READING-PLAN §4, 2026-09-15): `query_database` sizes the
+ * REAL formatted result in tokens against the user's threshold
+ * (`ai.bulkReadTokenThreshold`, default 6k) and a per-model ceiling. Under
+ * it the read returns whole; over it the model gets the index tier plus
+ * the exact price and asks for `budget`, which pauses for the user's
+ * approval above the threshold. Rows never ride the mention capsule;
+ * these tools are the only row path. Rows are addressed by 8-hex
+ * handles everywhere (read and write) — a UUID was half the result.
  *
  * Jurisdiction is structural (plan Phase 6): every tool resolves its
  * database through the conversation's associations — a chat scoped to
@@ -28,13 +31,33 @@ import { logger } from "@/lib/core/logger";
 import { canAlterSchema, canWrite } from "@/lib/domain/data/server/access";
 import { loadRowPage } from "@/lib/domain/data/server/queries";
 import {
+  charterRegistryAuthorizes,
   findColumn,
   normalizeCellInput,
   resolveDatabaseRef,
   resolveJurisdiction,
+  resolveRowRef,
+  resolveRowRefs,
   translateOptionValue,
   writeBlockReason,
 } from "@/lib/domain/data/server/resolve";
+import {
+  GROUPABLE_TYPES,
+  READ_LIFETIMES,
+  allBulkColumns,
+  formatRows,
+  groupCountsLine,
+  indexTierColumns,
+  overBudgetFooter,
+  readHeaderLine,
+  type FormatRowsResult,
+  type ReadLifetime,
+  type RelationMode,
+  type RenderOptions,
+} from "@/lib/domain/data/read-format";
+import { estimateTokens } from "@/lib/domain/ai-context/tokens";
+import { PROVIDER_CATALOG } from "@/lib/domain/ai/providers/catalog";
+import { getUserSettings } from "@/lib/features/settings";
 import { buildDataSchemaDigest } from "@/lib/domain/data/server/digest";
 import {
   createRelationTargetCache,
@@ -52,19 +75,50 @@ import {
   AI_PROPOSABLE_COLUMN_TYPES,
   ROLLUP_FNS,
   cellToText,
-  deriveRowTitle,
   operatorsForType,
   type CellValue,
   type DataColumn,
+  type DataRow,
   type DataView,
   type FilterCondition,
   type FilterOperator,
 } from "@/lib/domain/data";
 import type { ToolExecuteContext } from "./types";
 
-const DEFAULT_LIMIT = 20;
-const MAX_LIMIT = 100;
-const RESULT_BYTE_BUDGET = 4096;
+const DEFAULT_LIMIT = 100;
+/** The token budget is the governor; the page is a safety rail (plan D1 scale). */
+const MAX_LIMIT = 1000;
+/** Cells in the index tier and in "all" clip here; named columns come whole. */
+const BULK_CLIP_CHARS = 120;
+/** Index-tier relation rendering: one short linked title, then "+N more". */
+const INDEX_RELATION_RENDER = { maxLinkedTitles: 1, linkedTitleClip: 40 } as const;
+/** Default threshold when the user has not set one (plan D3). */
+export const DEFAULT_BULK_READ_THRESHOLD = 6_000;
+/** Share of the executed model's window one read may take (plan §4.5). */
+const BULK_READ_CEILING_SHARE = 0.1;
+const BULK_READ_CEILING_FALLBACK = 20_000;
+
+function numberOf(v: unknown): number | null {
+  const n = typeof v === "string" ? Number(v) : typeof v === "number" ? v : NaN;
+  return Number.isFinite(n) ? Math.floor(n) : null;
+}
+
+export async function bulkReadThresholdFor(userId: string): Promise<number> {
+  const settings = await getUserSettings(userId).catch(() => null);
+  const n = settings?.ai?.bulkReadTokenThreshold;
+  return typeof n === "number" && Number.isFinite(n) && n > 0
+    ? n
+    : DEFAULT_BULK_READ_THRESHOLD;
+}
+
+export function bulkReadCeilingFor(modelId: string | undefined): number {
+  if (!modelId) return BULK_READ_CEILING_FALLBACK;
+  for (const provider of PROVIDER_CATALOG) {
+    const model = provider.models.find((m) => m.id === modelId);
+    if (model) return Math.max(1_000, Math.floor(model.contextWindow * BULK_READ_CEILING_SHARE));
+  }
+  return BULK_READ_CEILING_FALLBACK;
+}
 const INSERT_CAP = 25;
 const CONFIRM_THRESHOLD = 10;
 
@@ -399,7 +453,7 @@ export function createDataTools(ctx: ToolExecuteContext) {
   return {
     describe_database: tool({
       description:
-        "Read an associated database's full schema: columns with types, descriptions, and option vocabularies, plus views and approximate size. Use before querying when the capsule was truncated or you need exact column names. The database must be mentioned in this conversation.",
+        "Read an associated database's full schema WITH profiles: every column's type, description, option vocabulary, fill rate, value counts or ranges, and the token cost of reading it across the table; then three sample rows and AI-digest coverage. ~300–700 tokens. Use it to decide WHICH columns are worth reading before query_database. The database must be mentioned in this conversation.",
       inputSchema: z.object({
         databaseId: z
           .string()
@@ -414,7 +468,10 @@ export function createDataTools(ctx: ToolExecuteContext) {
           if ("refusal" in dbRef) return dbRef.refusal;
           const gate = await resolveJurisdiction(ctx, dbRef.id);
           if ("refusal" in gate) return gate.refusal;
-          const digest = await buildDataSchemaDigest(dbRef.id);
+          const digest = await buildDataSchemaDigest(dbRef.id, {
+            profile: true,
+            viewerId: ctx.userId,
+          });
           return digest ?? "This database has no schema yet.";
         } catch (error) {
           logger.warn({
@@ -430,7 +487,7 @@ export function createDataTools(ctx: ToolExecuteContext) {
 
     query_database: tool({
       description:
-        "Read rows from an associated database, filtered and sorted SERVER-SIDE — never page through everything to find three rows. Returns at most one page (default 20, max 100) of compact text rows plus the total match count; narrow your filters if truncated. Sorted queries return only the top rows (no cursor); unsorted queries return a cursor for deliberate paging. Filter ops by type: text-likes take is/isNot/contains/notContains/startsWith; numbers and dates take is/gt/gte/lt/lte; select/status take is/isNot (option label or id); multiSelect/relation-likes take hasAny/hasAll/hasNone; every column takes isEmpty/isNotEmpty.",
+        "Read rows from an associated database, filtered and sorted SERVER-SIDE. Default result = the INDEX TIER: every matching row as `[handle] Title · short cells` (~30 tokens a row; no long text, no mirrored backlinks). Narrow before you widen: `search` (any text in the row), `filters`, `rowIds` (the [handles] from an earlier read), `groupBy` (counts only, ~50 tokens). Widen deliberately: `columns: [names]` returns those columns in full, `columns: \"all\"` every column clipped at 120 chars. Results are sized in tokens against the user's threshold; over it you get the index tier plus the exact price of the full read and how to ask for it (`budget` — the user is asked to approve above their threshold). `lifetime` says how long the rows stay in context: \"turn\" (default) folds at the next user message; \"run\" keeps them for every item of an iteration you are about to propose or are inside (pin the INDEX with digests, not narratives); \"chat\" only when the user asked to keep the table at hand. A pin costs its size on every later turn — if you cannot name the future step that needs the rows, use \"turn\". Filter ops by type: text-likes take is/isNot/contains/notContains/startsWith; numbers and dates is/gt/gte/lt/lte; select/status is/isNot (option label or id); multiSelect/relation-likes hasAny/hasAll/hasNone; every column isEmpty/isNotEmpty. Sorted queries return the top rows (no cursor); unsorted queries return a cursor.",
       // Deliberately LENIENT schema (owner failure report, 2026-08-28): a
       // strict shape fails the whole call before execute with an opaque
       // validation error the model can't learn from. Validation lives in
@@ -452,22 +509,57 @@ export function createDataTools(ctx: ToolExecuteContext) {
           .describe(
             'ANDed conditions: [{column, op, value?}] — value omitted for isEmpty/isNotEmpty; option labels ok for select-likes'
           ),
+        search: z
+          .string()
+          .optional()
+          .describe("Text to find anywhere in a row (case-insensitive); ANDed with filters"),
+        rowIds: z
+          .array(z.string())
+          .optional()
+          .describe("Exactly these rows — [handles] or ids from an earlier result"),
         sortBy: z.string().optional().describe("Column name to sort by"),
         sortDirection: z.string().optional().describe("asc or desc"),
         columns: z
-          .array(z.string())
+          .union([z.array(z.string()), z.string()])
           .optional()
-          .describe("Column names to return; default primary + first 3"),
+          .describe(
+            'Column names to return in full, or "all" (every column, clipped). Default: the index tier'
+          ),
+        relations: z
+          .string()
+          .optional()
+          .describe('How relation cells render: "titles" (default, up to 3 as Title [handle]), "handles", or "counts"'),
+        groupBy: z
+          .string()
+          .optional()
+          .describe("Count rows per value of this select/status/checkbox/multiSelect/relation column — no rows returned"),
         limit: z
           .union([z.number(), z.string()])
           .optional()
-          .describe("Rows per page, default 20, max 100"),
+          .describe("Rows per page, default 100, max 1000 — the token budget is the real ceiling"),
+        budget: z
+          .union([z.number(), z.string()])
+          .optional()
+          .describe("Token budget for this read; above the user's threshold the user is asked to approve"),
+        lifetime: z
+          .string()
+          .optional()
+          .describe('"turn" (default) · "run" (for an iteration) · "chat" (only when the user asked)'),
         cursorSortKey: z.string().optional(),
         cursorId: z
           .string()
           .optional()
           .describe("Continue from a previous result's cursor"),
       }),
+      // The approval card carries the number because it is in the input:
+      // the model quotes the price the previous call gave it, and the user
+      // approves that figure (plan §4.1). Reads under the threshold never
+      // pause.
+      needsApproval: async (input) => {
+        const budget = numberOf(input.budget);
+        if (budget === null) return false;
+        return budget > (await bulkReadThresholdFor(ctx.userId));
+      },
       execute: async (input) => {
         try {
           const dbRef = await resolveDatabaseRef(ctx, input.databaseId);
@@ -477,6 +569,7 @@ export function createDataTools(ctx: ToolExecuteContext) {
           const databaseId = dbRef.id;
           const { table } = gate;
           const live = table.columns.filter((c) => !c.deletedAt);
+          const columnNames = () => live.map((c) => c.name).join(", ");
 
           // Compile the model's flat conditions through the ONE filter
           // compiler (plan Phase 2) — no third implementation. Key aliases
@@ -502,7 +595,7 @@ export function createDataTools(ctx: ToolExecuteContext) {
             const value = f.value === null ? undefined : f.value;
             const column = findColumn(live, columnRef);
             if (!column) {
-              return `No column named "${columnRef}" here. Columns: ${live.map((c) => c.name).join(", ")}.`;
+              return `No column named "${columnRef}" here. Columns: ${columnNames()}.`;
             }
             const allowed = operatorsForType(column.type);
             if (!allowed.includes(opRef as FilterOperator)) {
@@ -518,7 +611,7 @@ export function createDataTools(ctx: ToolExecuteContext) {
           let sorts: DataView["sorts"] = [];
           if (input.sortBy) {
             const column = findColumn(live, input.sortBy);
-            if (!column) return `No column named "${input.sortBy}" here.`;
+            if (!column) return `No column named "${input.sortBy}" here. Columns: ${columnNames()}.`;
             sorts = [
               {
                 columnId: column.id,
@@ -529,23 +622,113 @@ export function createDataTools(ctx: ToolExecuteContext) {
             ];
           }
 
+          // Column selection (plan §4.1): index tier by default, named
+          // columns in full, "all" clipped.
+          const columnsArg =
+            typeof input.columns === "string"
+              ? input.columns.trim().toLowerCase() === "all"
+                ? "all"
+                : [input.columns]
+              : input.columns;
+          let selection: "index" | "all" | "named" = "index";
+          let shown: DataColumn[];
+          const fullColumns = new Set<string>();
+          if (columnsArg === "all") {
+            selection = "all";
+            shown = allBulkColumns(live);
+          } else if (Array.isArray(columnsArg) && columnsArg.length > 0) {
+            selection = "named";
+            const unknown: string[] = [];
+            shown = [];
+            for (const ref of columnsArg) {
+              const c = findColumn(live, ref);
+              if (!c) unknown.push(ref);
+              else if (!shown.includes(c)) {
+                shown.push(c);
+                fullColumns.add(c.id);
+              }
+            }
+            if (unknown.length > 0) {
+              return `No column named ${unknown.map((u) => `"${u}"`).join(", ")} here. Columns: ${columnNames()}.`;
+            }
+          } else {
+            shown = indexTierColumns(live);
+          }
+
+          const relationsArg = (input.relations ?? "titles").trim().toLowerCase();
+          if (!["titles", "handles", "counts"].includes(relationsArg)) {
+            return 'relations must be "titles", "handles", or "counts".';
+          }
+          const render: RenderOptions = {
+            relations: relationsArg as RelationMode,
+            clipChars: BULK_CLIP_CHARS,
+            fullColumns,
+            // Index tier: ONE linked title (clipped to 40) plus "+N more"
+            // per cell — measured on the claims table 2026-09-15: two full
+            // titles cost 83 tokens/row, one short title 65, handles 43.
+            ...(selection === "index" ? INDEX_RELATION_RENDER : {}),
+          };
+
+          // Row handles (plan §4.3): resolve before loading so a bad
+          // handle is a teaching refusal, not an empty page.
+          let rowIds: string[] | undefined;
+          if (input.rowIds && input.rowIds.length > 0) {
+            const resolved = await resolveRowRefs(databaseId, input.rowIds);
+            const refusals = resolved.filter(
+              (r): r is { refusal: string } => "refusal" in r
+            );
+            if (refusals.length > 0) {
+              return `Nothing read — fix these row references first:\n${refusals.map((r) => r.refusal).join("\n")}`;
+            }
+            rowIds = resolved.map((r) => (r as { id: string }).id);
+          }
+
           // Synthetic view: loadRowPage reads only filters/sorts from it.
           const view = {
             filters: { op: "and", children: conditions },
             sorts,
           } as unknown as DataView;
 
-          const requestedLimit =
-            typeof input.limit === "string" ? Number(input.limit) : input.limit;
+          const requestedLimit = numberOf(input.limit);
           const limit = Math.min(
-            Math.max(
-              Number.isFinite(requestedLimit ?? NaN)
-                ? (requestedLimit as number)
-                : DEFAULT_LIMIT,
-              1
-            ),
+            Math.max(requestedLimit ?? DEFAULT_LIMIT, 1),
             MAX_LIMIT
           );
+
+          // Group-by (plan §4.1): counts over every matching row, no rows.
+          if (input.groupBy) {
+            const column = findColumn(live, input.groupBy);
+            if (!column) return `No column named "${input.groupBy}" here. Columns: ${columnNames()}.`;
+            if (!GROUPABLE_TYPES.has(column.type)) {
+              return `groupBy needs a select, status, checkbox, multiSelect, relation, or person column — ${column.name} is ${column.type}.`;
+            }
+            const all = await loadRowPage({
+              tableId: databaseId,
+              view,
+              columns: live,
+              cursor: null,
+              limit: MAX_LIMIT,
+              viewerId: ctx.userId,
+              search: input.search,
+              rowIds,
+            });
+            const line = groupCountsLine(all.rows, column);
+            const header = readHeaderLine({
+              table: table.title,
+              rows: all.rows.length,
+              total: all.total,
+              columns: 1,
+              tokens: estimateTokens(line),
+              lifetime: "turn",
+              mode: "groupBy",
+            });
+            const capNote =
+              all.total > all.rows.length
+                ? `\n[Counted the first ${all.rows.length} of ${all.total} rows — narrow with filters for exact counts.]`
+                : "";
+            return `${header}\n${line}${capNote}`;
+          }
+
           const page = await loadRowPage({
             tableId: databaseId,
             view,
@@ -556,55 +739,134 @@ export function createDataTools(ctx: ToolExecuteContext) {
                 : null,
             limit,
             viewerId: ctx.userId,
+            search: input.search,
+            rowIds,
           });
+          // rowIds: keep the order the model gave.
+          const rows = rowIds
+            ? rowIds
+                .map((id) => page.rows.find((r) => r.id === id))
+                .filter((r): r is DataRow => !!r)
+            : page.rows;
 
-          const primary = live.find((c) => c.isPrimary) ?? live[0];
-          const shown =
-            input.columns && input.columns.length > 0
-              ? input.columns
-                  .map((ref) => findColumn(live, ref))
-                  .filter((c): c is DataColumn => !!c)
-              : live.filter((c) => !c.isPrimary).slice(0, 3);
-
-          const lines: string[] = [];
-          let bytes = 0;
-          let clipped = 0;
-          for (const row of page.rows) {
-            const title = deriveRowTitle(live, row.data);
-            const rest = shown
-              .filter((c) => c.id !== primary?.id)
-              .map((c) => {
-                const text = cellToText(c, row.data[c.key]);
-                return text ? `${c.name}: ${text}` : null;
-              })
-              .filter(Boolean)
-              .join(" · ");
-            const line = `- [${row.id}] ${title}${rest ? ` — ${rest}` : ""}`;
-            if (bytes + line.length > RESULT_BYTE_BUDGET) {
-              clipped = page.rows.length - lines.length;
-              break;
-            }
-            bytes += line.length;
-            lines.push(line);
+          // Lifetime (plan §4.6a): the harness decides what it can. A
+          // charter-linked table during a charter chat is the rubric —
+          // `run` unless the model explicitly said `turn` (following the
+          // charter's own instruction). Everything else is as requested,
+          // defaulting to `turn`.
+          const requestedLifetime = (input.lifetime ?? "").trim().toLowerCase();
+          const validLifetime = READ_LIFETIMES.includes(requestedLifetime as ReadLifetime)
+            ? (requestedLifetime as ReadLifetime)
+            : null;
+          let lifetime: ReadLifetime = validLifetime ?? "turn";
+          let lifetimeOrigin: "charter" | "requested" | "default" = validLifetime
+            ? "requested"
+            : "default";
+          if (
+            ctx.activeCharter &&
+            validLifetime !== "turn" &&
+            (await charterRegistryAuthorizes(ctx, databaseId))
+          ) {
+            lifetime = validLifetime === "chat" ? "chat" : "run";
+            lifetimeOrigin = validLifetime === "chat" ? "requested" : "charter";
           }
 
-          const header = `${page.total} matching row${page.total === 1 ? "" : "s"}; showing ${lines.length}.`;
-          const footer: string[] = [];
-          if (clipped > 0) {
-            footer.push(
-              `[${clipped} fetched rows omitted for size — narrow with filters or request fewer columns.]`
-            );
+          // Budget (plan §4.1): tokens, not chars. Threshold from the
+          // user's settings; ceiling from the executed model's window.
+          const threshold = await bulkReadThresholdFor(ctx.userId);
+          const ceiling = bulkReadCeilingFor(ctx.executedModel?.modelId);
+          const requestedBudget = numberOf(input.budget);
+          if (requestedBudget !== null && requestedBudget > ceiling) {
+            return `budget ${requestedBudget.toLocaleString("en-US")} exceeds this model's ceiling of ${ceiling.toLocaleString("en-US")} tokens for one read. Narrow the read (columns, filters, search, rowIds) or ask for at most ${ceiling.toLocaleString("en-US")}.`;
           }
-          if (page.nextCursor) {
-            footer.push(
+          const budget = Math.min(requestedBudget ?? threshold, ceiling);
+          const approved = requestedBudget !== null && requestedBudget > threshold;
+
+          const footers: string[] = [];
+          if (page.nextCursor && !rowIds) {
+            footers.push(
               `More rows: pass cursorSortKey="${page.nextCursor.sortKey}" cursorId="${page.nextCursor.id}".`
             );
-          } else if (sorts.length > 0 && page.total > lines.length + clipped) {
-            footer.push(
+          } else if (sorts.length > 0 && page.total > rows.length) {
+            footers.push(
               "[Sorted queries return the top rows only — tighten filters to see the rest.]"
             );
           }
-          return [header, ...lines, ...footer].join("\n");
+
+          const full = formatRows({ rows, columns: shown, live, render });
+          const emit = (
+            body: FormatRowsResult,
+            mode: "index" | FormatRowsResult["mode"],
+            extra: string[]
+          ) => {
+            const header = readHeaderLine({
+              table: table.title,
+              rows: body.rows,
+              total: page.total,
+              columns: body.columns,
+              tokens: body.tokens,
+              lifetime,
+              lifetimeOrigin,
+              mode,
+              budgetTokens: requestedBudget ?? undefined,
+              approved,
+            });
+            return [header, body.text, ...extra, ...footers].filter(Boolean).join("\n");
+          };
+
+          if (full.tokens <= budget) {
+            return emit(full, selection === "index" ? "index" : full.mode, []);
+          }
+
+          // Over budget: serve the index tier for the same rows plus the
+          // exact price of what was asked (plan §4.1 sizing pass).
+          const priceFooter = overBudgetFooter({
+            fullTokens: full.tokens,
+            rows: full.rows,
+            columns: full.columns,
+            largest: full.columnTokens,
+            budget,
+            threshold,
+          });
+          if (selection !== "index") {
+            const index = formatRows({
+              rows,
+              columns: indexTierColumns(live),
+              live,
+              render: { ...render, fullColumns: undefined, ...INDEX_RELATION_RENDER },
+            });
+            if (index.tokens <= budget) {
+              return emit(index, "index", [priceFooter]);
+            }
+          }
+
+          // Even the index tier is over budget (a huge table): the rows
+          // that fit, the total, and the cheapest ways forward.
+          let kept = rows;
+          let partial = full;
+          let lo = 0;
+          let hi = rows.length;
+          while (lo < hi) {
+            const mid = Math.ceil((lo + hi) / 2);
+            const trial = formatRows({
+              rows: rows.slice(0, mid),
+              columns: selection === "index" ? shown : indexTierColumns(live),
+              live,
+              render: { ...render, fullColumns: undefined, ...INDEX_RELATION_RENDER },
+            });
+            if (trial.tokens <= budget) {
+              lo = mid;
+              partial = trial;
+              kept = rows.slice(0, mid);
+            } else {
+              hi = mid - 1;
+            }
+          }
+          const omitted = rows.length - kept.length;
+          return emit(partial, "index", [
+            `[${omitted} fetched rows omitted for size — narrow with filters, search, or groupBy; or raise budget (the user approves above ${threshold.toLocaleString("en-US")}).]`,
+            selection !== "index" ? priceFooter : "",
+          ]);
         } catch (error) {
           logger.warn({
             layer: "ai",
@@ -619,7 +881,7 @@ export function createDataTools(ctx: ToolExecuteContext) {
 
     insert_rows: tool({
       description:
-        "Append new rows to an associated database. APPEND-ONLY: cannot modify or delete existing rows. Each row is {columnName: value}; select/status/multiSelect accept option labels; dates are ISO strings; file/contentLink cells take arrays of content ids. A RELATION cell takes the linked rows' titles (or row ids from query_database) — one value or an array — and the link is written after the row exists, so you can create a row and link it in the same call; the target row must already exist, and the mirrored column on the other table fills in by itself. Max 25 rows per call; batches over 10 require confirmedByUser: true, which you may set ONLY after the user explicitly approved the batch in conversation. Use dedupeBy with a url column when collecting from the web so re-runs never duplicate rows.",
+        "Append new rows to an associated database. APPEND-ONLY: cannot modify or delete existing rows. Each row is {columnName: value}; select/status/multiSelect accept option labels; dates are ISO strings; file/contentLink cells take arrays of content ids. A RELATION cell takes the linked rows' titles (or their [handles] from query_database) — one value or an array — and the link is written after the row exists, so you can create a row and link it in the same call; the target row must already exist, and the mirrored column on the other table fills in by itself. Max 25 rows per call; batches over 10 require confirmedByUser: true, which you may set ONLY after the user explicitly approved the batch in conversation. Use dedupeBy with a url column when collecting from the web so re-runs never duplicate rows.",
       inputSchema: z.object({
         databaseId: z
           .string()
@@ -833,7 +1095,7 @@ export function createDataTools(ctx: ToolExecuteContext) {
 
     update_row: tool({
       description:
-        "Update cells in ONE existing row. Only the columns you pass change — when the user under-specifies, OMIT everything they didn't mention, never guess a value. Pass null to CLEAR a cell, and only when the user asked for it to be blank. Get the rowId from query_database (each result line starts with [rowId]); pass expect with the current values from that same read — a stale expect fails safe instead of overwriting someone's edit, and the result tells you to re-query. All-or-nothing: if any cell is stale or invalid, no cell changes. A RELATION cell takes the linked rows' titles (or their row ids) and REPLACES that cell's links, exactly like writing any other cell — pass the full set you want, and null to unlink everything; this is also how you link two rows that already exist. Computed columns (lookup, rollup) have no stored value and cannot be written, and this tool cannot create or delete rows. File cells accept ONLY ids of file nodes (uploaded attachments, or files you created with a file tool) — other content belongs in a contentLink cell; to attach something from the user's disk, ask them to upload via the cell's + first.",
+        "Update cells in ONE existing row. Only the columns you pass change — when the user under-specifies, OMIT everything they didn't mention, never guess a value. Pass null to CLEAR a cell, and only when the user asked for it to be blank. Get the rowId from query_database (each result line starts with its [handle]); pass expect with the current values from that same read — a stale expect fails safe instead of overwriting someone's edit, and the result tells you to re-query. All-or-nothing: if any cell is stale or invalid, no cell changes. A RELATION cell takes the linked rows' titles (or their [handles]) and REPLACES that cell's links, exactly like writing any other cell — pass the full set you want, and null to unlink everything; this is also how you link two rows that already exist. Computed columns (lookup, rollup) have no stored value and cannot be written, and this tool cannot create or delete rows. File cells accept ONLY ids of file nodes (uploaded attachments, or files you created with a file tool) — other content belongs in a contentLink cell; to attach something from the user's disk, ask them to upload via the cell's + first.",
       inputSchema: z.object({
         databaseId: z
           .string()
@@ -843,7 +1105,7 @@ export function createDataTools(ctx: ToolExecuteContext) {
           ),
         rowId: z
           .string()
-          .describe("The row to update — from a query_database result line"),
+          .describe("The row to update — the [handle] or id from a query_database result line"),
         cells: z
           .record(z.string(), z.union([
             z.string(),
@@ -883,6 +1145,12 @@ export function createDataTools(ctx: ToolExecuteContext) {
             return "Query databases project existing notes — edit the note itself, not rows.";
           }
           const live = table.columns.filter((c) => !c.deletedAt);
+
+          // Handles (plan §4.3): the [ab12cd34] from a read resolves to the
+          // row; an ambiguous or dead handle is a refusal, never a guess.
+          const rowRef = await resolveRowRef(databaseId, input.rowId);
+          if ("refusal" in rowRef) return `Not updated — ${rowRef.refusal}`;
+          const rowId = rowRef.id;
 
           const entries = Object.entries(input.cells);
           if (entries.length === 0) return "No cells given — nothing to change.";
@@ -930,7 +1198,7 @@ export function createDataTools(ctx: ToolExecuteContext) {
                 ? undefined
                 : normalizeCellInput(column, raw);
             const write: CellWrite = {
-              rowId: input.rowId,
+              rowId,
               columnKey: column.key,
               value,
             };
@@ -977,7 +1245,7 @@ export function createDataTools(ctx: ToolExecuteContext) {
           for (const link of relationWrites) {
             const delta = await writeRelationLinks(
               link.columnId,
-              input.rowId,
+              rowId,
               link.rowIds
             );
             added += delta.added;
@@ -988,7 +1256,7 @@ export function createDataTools(ctx: ToolExecuteContext) {
           const questLedgers = await ensureLedgersForMasterRows(
             ctx.userId,
             databaseId,
-            [input.rowId],
+            [rowId],
           ).catch(() => 0);
           const cellPart =
             writes.length > 0

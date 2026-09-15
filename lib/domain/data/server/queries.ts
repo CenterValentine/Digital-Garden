@@ -302,6 +302,14 @@ export interface LoadRowsOptions {
   now?: Date;
   /** Needed to redact relation targets the viewer cannot see (plan V1-3). */
   viewerId?: string;
+  /**
+   * AI bulk reads (plan §4.1): case-insensitive `contains` over
+   * `DataRow.searchText` — every text-ish cell — ANDed with the view's
+   * filters. Retrieval before walking.
+   */
+  search?: string;
+  /** AI bulk reads: exactly these rows (filters still apply). */
+  rowIds?: string[];
 }
 
 /**
@@ -865,12 +873,19 @@ export async function loadRowPage({
   limit = DEFAULT_ROW_PAGE_SIZE,
   now = new Date(),
   viewerId,
+  search,
+  rowIds,
 }: LoadRowsOptions): Promise<RowPage> {
   const filterWhere = view ? filterToWhere(view.filters, columns, now) : null;
 
+  const searchTerm = search?.trim();
   const baseWhere: Prisma.DataRowWhereInput = {
     tableId,
     deletedAt: null,
+    ...(rowIds && rowIds.length > 0 ? { id: { in: rowIds } } : {}),
+    ...(searchTerm
+      ? { searchText: { contains: searchTerm.toLowerCase(), mode: "insensitive" } }
+      : {}),
     ...(filterWhere ? { AND: [filterWhere] } : {}),
   };
 

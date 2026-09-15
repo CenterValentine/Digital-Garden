@@ -26,12 +26,12 @@ export const DATA_TOOL_METADATA: Record<
   query_database: {
     name: "Query Database",
     description:
-      "Read rows from an associated database — filtered, sorted, and paged server-side (20 rows default, 100 max per call; never the whole table)",
+      "Read rows from an associated database — filtered, searched, and sized in tokens server-side; whole-table reads above your approval threshold (Settings → AI) pause for your approval with the estimate on the card",
   },
   describe_database: {
     name: "Describe Database",
     description:
-      "Read an associated database's full schema: columns, types, option vocabularies, and views",
+      "Read an associated database's schema with column profiles (fill rates, vocabularies, ranges, read cost), sample rows, and views",
   },
   insert_rows: {
     name: "Insert Database Rows",

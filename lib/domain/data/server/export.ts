@@ -27,11 +27,8 @@ import {
   canRead,
   resolveDataTableAccess,
 } from "@/lib/domain/data/server/access";
-import {
-  cellToText,
-  type DataColumn,
-  type DataRow,
-} from "@/lib/domain/data";
+import type { DataColumn, DataRow } from "@/lib/domain/data";
+import { cellDisplayValue } from "@/lib/domain/data/read-format";
 import { prisma } from "@/lib/database/client";
 import { renderDatabaseSchemaMarkdown } from "@/lib/domain/data/schema-markdown";
 
@@ -55,39 +52,10 @@ function csvEscape(value: string): string {
   return value;
 }
 
-/**
- * Display text for one cell, resolved through the hydrated read-model:
- * relations/contentLinks/files as linked titles, person as display name,
- * lookup/rollup as computed values, everything else via cellToText.
- * Shared beyond CSV: POST /api/flashcards/from-data uses the same
- * extraction to turn two columns into card fronts/backs.
- */
-export function cellDisplayValue(row: DataRow, column: DataColumn): string {
-  switch (column.type) {
-    case "relation":
-      return (row.links?.[column.id] ?? [])
-        .map((l) => (l.restricted ? "" : l.title))
-        .filter(Boolean)
-        .join("; ");
-    case "contentLink":
-    case "file":
-      return (row.contentRefs?.[column.id] ?? [])
-        .map((r) => (r.restricted ? "" : r.title))
-        .filter(Boolean)
-        .join("; ");
-    case "person": {
-      const ref = row.personRefs?.[column.id];
-      return ref && !ref.restricted ? ref.name : "";
-    }
-    case "lookup":
-    case "rollup": {
-      const v = row.derived?.[column.id];
-      return v === undefined ? "" : String(v);
-    }
-    default:
-      return cellToText(column, row.data[column.key]);
-  }
-}
+// `cellDisplayValue` lives in the pure read-format module (AI bulk reads,
+// plan §4.3) so the CSV export and query_database share ONE renderer.
+// Re-exported: POST /api/flashcards/from-data imports it from here.
+export { cellDisplayValue } from "@/lib/domain/data/read-format";
 
 export interface DatabaseCsvExport {
   title: string;

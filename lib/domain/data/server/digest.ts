@@ -20,6 +20,14 @@
  */
 
 import { prisma } from "@/lib/database/client";
+import { loadRowPage, loadTable } from "@/lib/domain/data/server/queries";
+import {
+  columnProfile,
+  formatRows,
+  indexTierColumns,
+  profileClause,
+} from "@/lib/domain/data/read-format";
+import type { DataColumn, DataRow } from "@/lib/domain/data";
 import type { DataColumnConfig, SelectOption } from "@/lib/domain/data";
 
 function bucketRowCount(n: number): string {
@@ -159,8 +167,24 @@ function describeGraph(
  * document with zero LLM spend — a well-described table may never need a
  * generation pass at all.
  */
+export interface DigestOptions {
+  /**
+   * AI bulk reads (plan §4.4): append per-column profiles (fill rate,
+   * vocabularies, ranges, token cost), three sample rows in the index tier,
+   * and the AI-digest coverage line. describe_database asks for it; the
+   * mention capsule never does (its cost must not move per turn).
+   */
+  profile?: boolean;
+  /** Needed to hydrate relations for the profile/samples. */
+  viewerId?: string;
+}
+
+/** Profiles scan at most this many rows; the digest says so when hit. */
+export const PROFILE_ROW_CAP = 5_000;
+
 export async function buildDataSchemaDigest(
-  nodeId: string
+  nodeId: string,
+  options: DigestOptions = {}
 ): Promise<string | null> {
   const payload = await prisma.dataPayload.findUnique({
     where: { contentId: nodeId },
@@ -202,6 +226,31 @@ export async function buildDataSchemaDigest(
 
   const graph = await resolveGraphNames(payload.columns);
 
+  // Profiles read the live rows once (hydrated, so relations count).
+  let profileRows: DataRow[] | null = null;
+  let profileColumns: DataColumn[] = [];
+  if (options.profile) {
+    const table = await loadTable(nodeId, options.viewerId);
+    if (table) {
+      profileColumns = table.columns.filter((c) => !c.deletedAt);
+      const page = await loadRowPage({
+        tableId: nodeId,
+        view: null,
+        columns: profileColumns,
+        cursor: null,
+        limit: PROFILE_ROW_CAP,
+        viewerId: options.viewerId,
+      });
+      profileRows = page.rows;
+    }
+  }
+  const profileFor = (columnId: string): string => {
+    if (!profileRows) return "";
+    const column = profileColumns.find((c) => c.id === columnId);
+    if (!column) return "";
+    return ` — ${profileClause(columnProfile(profileRows, column))}`;
+  };
+
   lines.push("", "Columns:");
   for (const column of payload.columns) {
     const config = (column.config ?? {}) as unknown as DataColumnConfig;
@@ -219,8 +268,31 @@ export async function buildDataSchemaDigest(
           ? " [references to existing app content — notes, folders, any node]"
           : describeGraph(column, config, graph);
     lines.push(
-      `- ${column.name} (${column.type})${intent}${desc}${describeOptions(config.options)}`
+      `- ${column.name} (${column.type})${intent}${desc}${describeOptions(config.options)}${profileFor(column.id)}`
     );
+  }
+
+  if (profileRows) {
+    const total = profileRows.length;
+    const capped = total >= PROFILE_ROW_CAP;
+    lines.push(
+      "",
+      `Profile: ${total} row${total === 1 ? "" : "s"} scanned${capped ? ` (capped at ${PROFILE_ROW_CAP} — counts are of the scanned rows)` : ""}.`
+    );
+    if (total > 0) {
+      const pick = [0, Math.floor((total - 1) / 2), total - 1].filter(
+        (i, idx, arr) => arr.indexOf(i) === idx
+      );
+      const sample = formatRows({
+        rows: pick.map((i) => profileRows![i]),
+        columns: indexTierColumns(profileColumns),
+        live: profileColumns,
+        render: { relations: "titles", clipChars: 120, maxLinkedTitles: 1, linkedTitleClip: 40 },
+        mode: "labelled",
+      });
+      lines.push("", "Samples (index tier):", sample.text);
+    }
+    lines.push("", await digestCoverageLine(nodeId));
   }
 
   if (payload.views.length > 0) {
@@ -230,14 +302,24 @@ export async function buildDataSchemaDigest(
     );
   }
 
-  // The Phase 6 token contract, stated where the model reads it: schema
-  // rides the capsule, rows arrive ONLY through tools, paged and bounded.
+  // The token contract, stated where the model reads it: schema rides
+  // the capsule; rows arrive ONLY through query_database, sized in tokens
+  // (AI-BULK-ROW-READING-PLAN §4.4).
   lines.push(
     "",
-    "Rows are never included in context. Use query_database (filtered, paged) to read rows and describe_database for the full schema."
+    "Rows: query_database reads them — index tier by default (~30 tokens/row: [handle] Title · short cells), columns/rowIds/search/groupBy to narrow, budget to read more (the user approves above their threshold). describe_database adds column profiles and sample rows."
   );
 
   return lines.join("\n");
+}
+
+/**
+ * AI-digest coverage for the profile (plan §5.4). Until the digest
+ * sidecar ships this reports none; the line exists so the model learns the
+ * vocabulary once.
+ */
+async function digestCoverageLine(_nodeId: string): Promise<string> {
+  return "AI digests: none.";
 }
 
 /**

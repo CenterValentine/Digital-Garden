@@ -12,6 +12,11 @@
 import { tool, generateObject } from "ai";
 import { z } from "zod/v4";
 import { prisma } from "@/lib/database/client";
+import { resolveRowRefs } from "@/lib/domain/data/server/resolve";
+import {
+  readStandingContext,
+  type StandingContextDeclaration,
+} from "@/lib/domain/ai/quests";
 import {
   acquire,
   createAcquisitionBudget,
@@ -587,7 +592,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           .max(200)
           .optional()
           .describe(
-            "database-rows only: iterate exactly these rows, in this order (row ids from query_database). Omit to iterate the whole table in grid order (capped by itemCap).",
+            "database-rows only: iterate exactly these rows, in this order ([handles] or ids from query_database). Omit to iterate the whole table in grid order (capped by itemCap).",
           ),
         itemCap: z
           .number()
@@ -775,10 +780,26 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           if (!captureCfg) {
             return { ok: false, refusal: "Capture preflight did not resolve the table.", nextAction: "Re-propose." };
           }
+          // Handles (AI bulk reads, plan §4.3): the model narrows with the
+          // [ab12cd34] handles a query_database result showed it.
+          let resolvedRowIds = rowIds;
+          if (rowIds && rowIds.length > 0) {
+            const refs = await resolveRowRefs(captureCfg.tableId, rowIds);
+            const bad = refs.filter((r): r is { refusal: string } => "refusal" in r);
+            if (bad.length > 0) {
+              return {
+                ok: false,
+                refusal: `rowIds did not resolve:\n${bad.map((b) => b.refusal).join("\n")}`,
+                nextAction:
+                  "Re-propose with the [handles] or full ids from a query_database result of the captureTo database.",
+              };
+            }
+            resolvedRowIds = refs.map((r) => (r as { id: string }).id);
+          }
           const enumerated = await enumerateCaptureRows({
             userId: ctx.userId,
             config: captureCfg,
-            rowIds,
+            rowIds: resolvedRowIds,
             limit: itemCap,
           });
           if (!enumerated.items) {
@@ -843,6 +864,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         // per-item dual-writes and the P4b budget fallback never reload
         // schemas. Charter-less runs keep the legacy markdown-only path.
         let questInfo: QuestInfo | null = null;
+        let standingContext: StandingContextDeclaration[] = [];
         let questContinued = false;
         let questHomeFolderId: string | null = null;
         const alreadyScored = new Set<string>();
@@ -897,6 +919,15 @@ export function createBaseTools(ctx: ToolExecuteContext) {
                   ensured.questLedgerId,
                   master.masterId,
                 );
+                // Standing context (plan D9): the reference tables this
+                // quest declares on its master row — read once at the
+                // declared tier, kept for the run (the read tool promotes
+                // charter-linked tables to `run` on its own).
+                standingContext = await readStandingContext(
+                  master.masterId,
+                  ensured.questRowId,
+                  master.masterCols,
+                ).catch(() => []);
                 questInfo = {
                   sittingId: crypto.randomUUID(),
                   masterId: master.masterId,
@@ -1037,6 +1068,20 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           ...(questArg && !questInfo
             ? {
                 questIgnored: `quest "${questArg}" was NOT engaged — no charter is attached to this chat (or quest setup failed). This is a plain legacy run: NO quest ledger writes, NO cross-sitting dedup, NO master-ledger update. Never claim otherwise.`,
+              }
+            : {}),
+          ...(standingContext.filter((d) => d.tier !== "none").length > 0
+            ? {
+                standingContext: standingContext
+                  .filter((d) => d.tier !== "none")
+                  .map((d) => ({
+                    databaseId: d.tableId,
+                    tier: d.tier,
+                    ...(d.columns.length > 0 ? { columns: d.columns } : {}),
+                    ...(d.filter ? { filter: d.filter } : {}),
+                  })),
+                standingContextInstruction:
+                  'BEFORE item 1, read each standingContext database ONCE with query_database (lifetime: "run"; tier index → default columns; "index with digests" → digests: true; "full" → columns: "all"; apply the listed columns/filter). Judge every item against those rows; write matches as relation cells with the [handles]. Do not re-read per item.',
               }
             : {}),
           ...(captureCfg
