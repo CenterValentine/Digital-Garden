@@ -9,6 +9,7 @@
 "use client";
 
 import { createElement, useState, useEffect, useCallback, useMemo, useRef } from "react";
+import type { SaveMeta } from "@/lib/domain/content/save-meta";
 import { usePathname } from "next/navigation";
 import { AlertTriangle } from "lucide-react";
 import { ToolSurfaceProvider } from "@/lib/domain/tools";
@@ -1015,10 +1016,7 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
   // the API call, we verify it still matches the currently-viewed document.
   // An AbortController cancels any in-flight fetch if the user navigates away.
   const handleSave = useCallback(
-    async (
-      content: JSONContent,
-      meta?: { userInitiated?: boolean; secondsSinceInput?: number },
-    ) => {
+    async (content: JSONContent, meta?: SaveMeta) => {
       if (!selectedContentId) return;
       if (typeof navigator !== "undefined" && !navigator.onLine) {
         setHasUnsavedChanges(true);
@@ -1027,8 +1025,15 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
 
       // GUARD: Only discard saves when this pane has navigated to a different
       // document. Another pane becoming focused should not cancel the save.
+      //
+      // Not on a FLUSH. A flush fires precisely because the pane navigated (or
+      // the page is going away) with a save still pending, and the editor
+      // bound it to the document the edit came from: this closure's
+      // `selectedContentId` IS that document, and the PATCH URL below targets
+      // it. Re-checking the active pane here would reject every flush and
+      // restore the silent loss the flush exists to fix.
       const currentId = getPaneActiveContentId(useContentStore.getState(), paneId);
-      if (currentId !== selectedContentId) {
+      if (!meta?.flush && currentId !== selectedContentId) {
         clientLogger.warn({
           layer: "ui",
           event: "save:cross_document_blocked",
@@ -1048,12 +1053,16 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
         return;
       }
 
-      // Cancel any previous in-flight save
-      if (saveAbortControllerRef.current) {
-        saveAbortControllerRef.current.abort();
-      }
+      // Cancel any previous in-flight save. A flush stays OUT of this: it is
+      // the last write for a document we are leaving, and the next document's
+      // first save must not be able to abort it.
       const abortController = new AbortController();
-      saveAbortControllerRef.current = abortController;
+      if (!meta?.flush) {
+        if (saveAbortControllerRef.current) {
+          saveAbortControllerRef.current.abort();
+        }
+        saveAbortControllerRef.current = abortController;
+      }
 
       setIsSaving(true);
       setHasUnsavedChanges(true);
@@ -1096,7 +1105,9 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
               secondsSinceInput: meta.secondsSinceInput,
             }),
           }),
-          signal: abortController.signal,
+          // keepalive lets the request outlive a page that is unloading; an
+          // abort signal would be moot there, so it is omitted for that case.
+          ...(meta?.keepalive ? { keepalive: true } : { signal: abortController.signal }),
           }
         );
 

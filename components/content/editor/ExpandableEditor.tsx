@@ -16,6 +16,7 @@
 "use client";
 
 import { useCallback } from "react";
+import type { SaveMeta } from "@/lib/domain/content/save-meta";
 import { ChevronRight, ArrowUp, ArrowDown, BookmarkPlus } from "lucide-react";
 import { cn } from "@/lib/core/utils";
 import { MarkdownEditor } from "./MarkdownEditor";
@@ -38,10 +39,7 @@ interface ExpandableEditorProps {
    * a destructive-shrink risk should forward this to their PATCH body so
    * the server's content:write shrink guard can bypass on real user intent.
    */
-  onSave: (
-    content: JSONContent,
-    meta?: { userInitiated?: boolean; secondsSinceInput?: number },
-  ) => Promise<void>;
+  onSave: (content: JSONContent, meta?: SaveMeta) => Promise<void>;
   /** Read-only mode */
   readOnly?: boolean;
   /** Callback when a wiki-link is clicked */
@@ -111,10 +109,7 @@ export function ExpandableEditor({
   };
 
   const handleSave = useCallback(
-    async (
-      content: JSONContent,
-      meta?: { userInitiated?: boolean; secondsSinceInput?: number },
-    ) => {
+    async (content: JSONContent, meta?: SaveMeta) => {
       await onSave(content, meta);
     },
     [onSave]
