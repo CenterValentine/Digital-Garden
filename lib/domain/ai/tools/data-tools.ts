@@ -104,6 +104,24 @@ export const DEFAULT_BULK_READ_THRESHOLD = 6_000;
 const BULK_READ_CEILING_SHARE = 0.1;
 const BULK_READ_CEILING_FALLBACK = 20_000;
 
+/** `columns` as the model sends it: array, "all", a JSON-array string, or a comma list. */
+function parseColumnsArg(raw: unknown): "all" | string[] | undefined {
+  if (Array.isArray(raw)) return raw.map(String);
+  if (typeof raw !== "string") return undefined;
+  const trimmed = raw.trim();
+  if (!trimmed) return undefined;
+  if (trimmed.toLowerCase() === "all") return "all";
+  if (trimmed.startsWith("[")) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) return parsed.map(String);
+    } catch {
+      /* fall through to the comma split */
+    }
+  }
+  return trimmed.split(",").map((s) => s.trim()).filter(Boolean);
+}
+
 function numberOf(v: unknown): number | null {
   const n = typeof v === "string" ? Number(v) : typeof v === "number" ? v : NaN;
   return Number.isFinite(n) ? Math.floor(n) : null;
@@ -493,7 +511,7 @@ export function createDataTools(ctx: ToolExecuteContext) {
 
     query_database: tool({
       description:
-        "Read rows from an associated database, filtered and sorted SERVER-SIDE. Default result = the INDEX TIER: every matching row as `[handle] Title · short cells` (~30 tokens a row; no long text, no mirrored backlinks). Narrow before you widen: `search` (any text in the row), `filters`, `rowIds` (the [handles] from an earlier read), `groupBy` (counts only, ~50 tokens). Widen deliberately: `columns: [names]` returns those columns in full, `columns: \"all\"` every column clipped at 120 chars. Results are sized in tokens against the user's threshold; over it you get the index tier plus the exact price of the full read and how to ask for it (`budget` — the user is asked to approve above their threshold). `lifetime` says how long the rows stay in context: \"turn\" (default) folds at the next user message; \"run\" keeps them for every item of an iteration you are about to propose or are inside (pin the INDEX with digests, not narratives); \"chat\" only when the user asked to keep the table at hand. A pin costs its size on every later turn — if you cannot name the future step that needs the rows, use \"turn\". Filter ops by type: text-likes take is/isNot/contains/notContains/startsWith; numbers and dates is/gt/gte/lt/lte; select/status is/isNot (option label or id); multiSelect/relation-likes hasAny/hasAll/hasNone; every column isEmpty/isNotEmpty. Sorted queries return the top rows (no cursor); unsorted queries return a cursor.",
+        "Read rows from an associated database, filtered and sorted SERVER-SIDE. Default result = the INDEX TIER: every matching row as `[handle] Title · short cells` (~30 tokens a row; no long text, no mirrored backlinks). The index tier ALREADY includes every select, status, number, date, url and RELATION column (linked titles with handles) — do not name columns to get those; name columns only for long text you need in full, or pass `columns: \"all\"` for every column clipped at 120 chars. Narrow before you widen: `search` (any text in the row), `filters`, `rowIds` (the [handles] from an earlier read), `groupBy` (counts only, ~50 tokens). The mention capsule already lists the columns; call describe_database only for profiles, samples, or digest coverage. Results are sized in tokens against the user's threshold; over it you get the index tier plus the exact price of the full read and how to ask for it (`budget` — the user is asked to approve above their threshold). `lifetime` says how long the rows stay in context: \"turn\" (default) folds at the next user message; \"run\" keeps them for every item of an iteration you are about to propose or are inside (pin the INDEX with digests, not narratives); \"chat\" only when the user asked to keep the table at hand. A pin costs its size on every later turn — if you cannot name the future step that needs the rows, use \"turn\". Filter ops by type: text-likes take is/isNot/contains/notContains/startsWith; numbers and dates is/gt/gte/lt/lte; select/status is/isNot (option label or id); multiSelect/relation-likes hasAny/hasAll/hasNone; every column isEmpty/isNotEmpty. Sorted queries return the top rows (no cursor); unsorted queries return a cursor.",
       // Deliberately LENIENT schema (owner failure report, 2026-08-28): a
       // strict shape fails the whole call before execute with an opaque
       // validation error the model can't learn from. Validation lives in
@@ -634,12 +652,10 @@ export function createDataTools(ctx: ToolExecuteContext) {
 
           // Column selection (plan §4.1): index tier by default, named
           // columns in full, "all" clipped.
-          const columnsArg =
-            typeof input.columns === "string"
-              ? input.columns.trim().toLowerCase() === "all"
-                ? "all"
-                : [input.columns]
-              : input.columns;
+          // Lenient (prod smoke 2026-09-15, DeepSeek): the model passed
+          // columns as a JSON-array STRING, then as a comma list — two
+          // wasted calls. Accept both, like the filter aliases.
+          const columnsArg = parseColumnsArg(input.columns);
           let selection: "index" | "all" | "named" = "index";
           let shown: DataColumn[];
           const fullColumns = new Set<string>();
@@ -793,6 +809,16 @@ export function createDataTools(ctx: ToolExecuteContext) {
           const approved = requestedBudget !== null && requestedBudget > threshold;
 
           const footers: string[] = [];
+          // Named columns: say what else is here, so the model never
+          // spends a describe_database call re-learning names it could
+          // have read off the capsule (prod smoke 2026-09-15: one filtered
+          // read, then describe, then the same read again for Experience).
+          if (selection === "named") {
+            const others = live
+              .filter((c) => !shown.includes(c) && !c.isPrimary)
+              .map((c) => `${c.name} (${c.type})`);
+            if (others.length > 0) footers.push(`Other columns here: ${others.join(", ")}.`);
+          }
           if (page.nextCursor && !rowIds) {
             footers.push(
               `More rows: pass cursorSortKey="${page.nextCursor.sortKey}" cursorId="${page.nextCursor.id}".`

@@ -106,6 +106,40 @@ import {
   type BulkReadFoldState,
 } from "@/lib/domain/ai/context-diet";
 import { parseReadHeader } from "@/lib/domain/data/read-format";
+
+/** "~32 tokens" under a thousand, "~6.1k tokens" above (chips, cards). */
+function fmtTokens(n: number): string {
+  return n >= 1000 ? `~${(n / 1000).toFixed(1)}k tokens` : `~${Math.round(n)} tokens`;
+}
+
+const UUID_LIKE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Title of a content node the user can open, for cards that only hold an
+ * id (the approval card shows what the model passed — an id is honest but
+ * unreadable). Empty until fetched; falls back to nothing on error.
+ */
+function useNodeTitle(id: string | undefined): string | null {
+  // State keyed by the id it belongs to, so a changed id reads as "not
+  // fetched" without a synchronous reset inside the effect.
+  const [fetched, setFetched] = useState<{ id: string; title: string } | null>(null);
+  const valid = !!id && UUID_LIKE.test(id);
+  useEffect(() => {
+    if (!valid || !id) return;
+    let cancelled = false;
+    fetch(`/api/content/content/${id}`, { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((json) => {
+        const t = json?.data?.title ?? json?.data?.node?.title ?? json?.title;
+        if (!cancelled && typeof t === "string") setFetched({ id, title: t });
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [id, valid]);
+  return valid && fetched && fetched.id === id ? fetched.title : null;
+}
 import { parseFolderContextMentionPart } from "@/lib/domain/ai-context/mention-part";
 import {
   parseContentWriteReceipts,
@@ -395,7 +429,7 @@ function FoldedBulkReadPart({ part }: { part: unknown }) {
           className={`h-3 w-3 shrink-0 transition-transform ${expanded ? "rotate-90" : ""}`}
         />
         <span>
-          query_database{h ? ` · ${h.rows} rows of ${h.table} · ~${(h.tokens / 1000).toFixed(1)}k` : ""} · folded — re-read if needed
+          query_database{h ? ` · ${h.rows} rows of ${h.table} · ${fmtTokens(h.tokens)}` : ""} · folded — re-read if needed
         </span>
       </button>
       {expanded && (
@@ -3084,6 +3118,35 @@ function ApprovalPreview({
   // Bulk database read above the user's threshold (plan §4.1): the number
   // on the card is the number the model was quoted.
   if (toolName === "query_database") {
+    return <QueryDatabaseApprovalPreview args={args} a={a} str={str} />;
+  }
+
+  // Document tools: render the note/document as it will actually look.
+  if (
+    toolName === "createNote" ||
+    toolName === "updateNote" ||
+    toolName === "renameNote" ||
+    toolName === "create_docx"
+  ) {
+    return <DocumentApprovalPreview toolName={toolName} args={args} str={str} />;
+  }
+
+  return <ApprovalPreviewRest toolName={toolName} args={args} a={a} str={str} />;
+}
+
+function QueryDatabaseApprovalPreview({
+  args,
+  a,
+  str,
+}: {
+  args: unknown;
+  a: Record<string, unknown>;
+  str: (key: string) => string | undefined;
+}) {
+  const ref = str("databaseId");
+  const fetchedTitle = useNodeTitle(ref);
+  const label = fetchedTitle ?? (ref && !UUID_LIKE.test(ref) ? ref : null);
+  {
     const budget = Number(a.budget);
     const cols = Array.isArray(a.columns)
       ? (a.columns as unknown[]).map(String).join(", ")
@@ -3094,7 +3157,7 @@ function ApprovalPreview({
       <>
         <div className="mx-3 mb-1.5 rounded-md border border-black/10 dark:border-white/10 bg-white/70 dark:bg-black/25 px-3 py-2 text-[11px] leading-snug text-gray-700 dark:text-gray-300">
           <div className="text-[12.5px] font-semibold text-gray-800 dark:text-gray-200">
-            Read {str("databaseId") ? `"${str("databaseId")}"` : "this database"} — up to{" "}
+            Read {label ? `"${label}"` : "this database"} — up to{" "}
             {Number.isFinite(budget) ? budget.toLocaleString() : "?"} tokens
           </div>
           <div className="mt-0.5">Columns: {cols}</div>
@@ -3108,14 +3171,18 @@ function ApprovalPreview({
       </>
     );
   }
+}
 
-  // Document tools: render the note/document as it will actually look.
-  if (
-    toolName === "createNote" ||
-    toolName === "updateNote" ||
-    toolName === "renameNote" ||
-    toolName === "create_docx"
-  ) {
+function DocumentApprovalPreview({
+  toolName,
+  args,
+  str,
+}: {
+  toolName: string;
+  args: unknown;
+  str: (key: string) => string | undefined;
+}) {
+  {
     const title = str("title") ?? str("fileName") ?? "(untitled)";
     const abstract = str("abstract");
     const content = str("content") ?? str("markdown");
@@ -3151,6 +3218,19 @@ function ApprovalPreview({
     );
   }
 
+}
+
+function ApprovalPreviewRest({
+  toolName,
+  args,
+  a,
+  str,
+}: {
+  toolName: string;
+  args: unknown;
+  a: Record<string, unknown>;
+  str: (key: string) => string | undefined;
+}) {
   // Workflow authoring: graph summary, not the graph JSON.
   if (toolName === "propose_workflow" || toolName === "update_workflow") {
     const graph = (
@@ -3369,7 +3449,7 @@ function ToolApprovalCard({
             <div className="font-semibold">Standing context for this run</div>
             {standingReads.map((r, idx) => (
               <div key={idx}>
-                • {r.table} — {r.rows} rows · ~{(r.tokens / 1000).toFixed(1)}k tokens · read this turn
+                • {r.table} — {r.rows} rows · {fmtTokens(r.tokens)} · read this turn
               </div>
             ))}
             {charterAttached && (
@@ -3381,8 +3461,8 @@ function ToolApprovalCard({
             )}
             {standingReads.length > 0 && (
               <div className="mt-0.5 text-gray-500 dark:text-gray-400">
-                ~{(standingReads.reduce((n, r) => n + r.tokens, 0) / 1000).toFixed(1)}k
-                tokens are re-sent with every item. These reads stay until the
+                {fmtTokens(standingReads.reduce((n, r) => n + r.tokens, 0))} are
+                re-sent with every item. These reads stay until the
                 run ends, then fold.
               </div>
             )}
@@ -3547,7 +3627,7 @@ function ToolCallBubble({
             : pinState === "pinned-chat"
               ? " · pinned"
               : "";
-        return `${h.rows} of ${h.total} rows · ~${(h.tokens / 1000).toFixed(1)}k tokens${pin}`;
+        return `${h.rows} of ${h.total} rows · ${fmtTokens(h.tokens)}${pin}`;
       }
     }
     if (typeof result === "string") {

@@ -19,7 +19,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
-import { ChevronDown, ChevronRight, Info } from "lucide-react";
+import { ChevronDown, ChevronRight, Info, Loader2 } from "lucide-react";
 import { cn } from "@/lib/core/utils";
 import type { DataColumnType, DataTable } from "@/lib/domain/data";
 import { TYPE_GLYPH } from "./DataColumnHeader";
@@ -62,6 +62,21 @@ export function DataSchemaRail({ contentId }: DataSchemaRailProps) {
   // refresh, and the durable one-line outcome (chips & traceability).
   const [digestBusy, setDigestBusy] = useState(false);
   const [digestLine, setDigestLine] = useState<string | null>(null);
+  // Elapsed seconds while a refresh runs — a labeled wait spends patience,
+  // a silent one spends trust (owner smoke 2026-09-15: "stuck on refresh").
+  const [digestElapsed, setDigestElapsed] = useState(0);
+  useEffect(() => {
+    if (!digestBusy) {
+      setDigestElapsed(0);
+      return;
+    }
+    const started = Date.now();
+    const timer = window.setInterval(
+      () => setDigestElapsed(Math.floor((Date.now() - started) / 1000)),
+      1000
+    );
+    return () => window.clearInterval(timer);
+  }, [digestBusy]);
 
   const toggleDigests = useCallback(
     async (on: boolean) => {
@@ -94,7 +109,7 @@ export function DataSchemaRail({ contentId }: DataSchemaRailProps) {
   const refreshDigests = useCallback(async () => {
     if (!contentId) return;
     setDigestBusy(true);
-    setDigestLine("Refreshing digests…");
+    setDigestLine("Refreshing digests — batches of 20 rows, one model call each; the outcome line replaces this when done.");
     try {
       const res = await fetch(`/api/content/data/${contentId}/digests`, {
         method: "POST",
@@ -337,7 +352,14 @@ export function DataSchemaRail({ contentId }: DataSchemaRailProps) {
                   onClick={() => void refreshDigests()}
                   className="rounded-md border border-border/60 px-2 py-0.5 text-[11px] text-muted-foreground hover:bg-accent disabled:opacity-50"
                 >
-                  {digestBusy ? "Refreshing…" : "Refresh now"}
+                  {digestBusy ? (
+                    <span className="inline-flex items-center gap-1">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      Refreshing… {digestElapsed}s
+                    </span>
+                  ) : (
+                    "Refresh now"
+                  )}
                 </button>
               )}
               <button

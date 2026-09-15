@@ -179,7 +179,7 @@ async function seed(owner: string) {
     });
     for (let i = 0; i < writes.length; i += 200) {
       const out = await writeCells(tableId, live, writes.slice(i, i + 200));
-      const bad = out.results.filter((r) => r.status !== "ok");
+      const bad = out.results.filter((r) => r.status === "error" || r.status === "stale");
       if (bad.length > 0) console.warn(`  ${bad.length} cell write(s) rejected on ${table.title}:`, bad.slice(0, 3));
     }
     return ids;
