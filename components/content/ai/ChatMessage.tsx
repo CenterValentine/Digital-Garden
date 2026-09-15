@@ -411,25 +411,46 @@ interface ChatMessageProps {
  * expanding shows the raw superseded output — user-only, costs no tokens,
  * and visually marks what the model no longer carries.
  */
-/** A `turn`-lifetime database read behind the latest user message (plan §4.6). */
+/**
+ * A `turn`-lifetime database read behind the latest user message (plan
+ * §4.6). Reads as a CONTEXT EVENT, not a tool call (owner smoke
+ * 2026-09-15: the first version looked like an unhelpful long tool line):
+ * what left the model's context, how much it saves per turn, and that
+ * expanding is free.
+ */
 function FoldedBulkReadPart({ part }: { part: unknown }) {
   const [expanded, setExpanded] = useState(false);
   const p = part as { output?: unknown };
   const raw = typeof p.output === "string" ? p.output : JSON.stringify(p.output, null, 2);
   const h = parseReadHeader(raw);
+  const what = h
+    ? `${h.rows} row${h.rows === 1 ? "" : "s"} of "${h.table}"`
+    : "a database read";
   return (
-    <div className="my-1">
+    <div className="my-1.5">
       <button
         type="button"
         onClick={() => setExpanded((e) => !e)}
-        className="inline-flex items-center gap-1.5 rounded-md border border-black/5 bg-black/[0.02] px-2 py-1 text-[11px] text-gray-500 transition-colors hover:bg-black/[0.05] dark:border-white/5 dark:bg-white/[0.03] dark:text-gray-400 dark:hover:bg-white/[0.06]"
-        title="Folded — the model no longer carries this read; it re-reads if a later step needs the rows. Expanding is free."
+        className="group flex w-full items-start gap-2 rounded-md border border-dashed border-black/10 bg-transparent px-2.5 py-1.5 text-left text-[11px] text-gray-500 transition-colors hover:bg-black/[0.03] dark:border-white/10 dark:text-gray-400 dark:hover:bg-white/[0.04]"
+        title="This read left the model's context after the turn it served. It is not re-sent with later messages; the model reads the table again if a later step needs the rows. Expanding here is free."
       >
         <ChevronRight
-          className={`h-3 w-3 shrink-0 transition-transform ${expanded ? "rotate-90" : ""}`}
+          className={`mt-0.5 h-3 w-3 shrink-0 transition-transform ${expanded ? "rotate-90" : ""}`}
         />
-        <span>
-          query_database{h ? ` · ${h.rows} rows of ${h.table} · ${fmtTokens(h.tokens)}` : ""} · folded — re-read if needed
+        <span className="min-w-0">
+          <span className="mr-1.5 rounded-sm bg-black/[0.06] px-1 py-px text-[9.5px] font-semibold uppercase tracking-wide text-gray-600 dark:bg-white/[0.08] dark:text-gray-300">
+            Context folded
+          </span>
+          <span className="text-gray-600 dark:text-gray-300">{what}</span>
+          {h && (
+            <span>
+              {" "}
+              · {fmtTokens(h.tokens)} no longer re-sent each turn
+            </span>
+          )}
+          <span className="block text-[10px] text-gray-400 dark:text-gray-500">
+            Served the reply above; the model re-reads if a later step needs the rows. Expand to see what it read.
+          </span>
         </span>
       </button>
       {expanded && (
