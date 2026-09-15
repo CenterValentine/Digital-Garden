@@ -1,6 +1,6 @@
 # AI Bulk Row Reading — Plan
 
-**Status:** DESIGN SETTLED (measurements 2026-09-14; owner decisions in §6; PR 1 = §6 items 1–4, PR 2 = digest)
+**Status:** PLAN FOR OWNER REVIEW (2026-09-14). Measurements in §2b; decisions in §3; PR 1 spec §4; PR 2 (row digests, migration) §5; PR 3 §6; risks §7.
 **Driving case:** the Career Evidence Library just loaded — 35 experiences / 66 sources / 99 claims / 35 index rows, 1,025 links. An AI asked to "draft a résumé bullet for every Ready experience with its claims and sources" has to read most of that graph, and today it cannot see the graph at all through the tool that reads rows.
 **Related:** `AI-RELATIONAL-DATABASE-REACH-PLAN.md` (P4 relation cells on write), `EXTRACTION-TO-DATABASE-PLAN.md` (database-rows iteration), `core/PRODUCT-PRINCIPLES.md` §2.
 
@@ -65,65 +65,189 @@ With **7 tool steps per turn**, no table in the library can be read with its lon
 
 For context: a 200k-window model can hold the entire library eleven times over; the 128k models six times. The library is about the size of one long web page.
 
-## 3. Design — a tiered read model
+## 3. Decisions (settled with the owner, 2026-09-14)
 
-The efficient path is *right-sizing the read to the ask*, not one bigger page. Four tiers, each a small addition to the existing `query_database` unless noted:
+| # | Decision | Consequence |
+|---|---|---|
+| D1 | **One read tool: `query_database`, evolved in place.** No sibling `read_rows`. | Keeps the jurisdiction, name resolution, filter compiler, lenient schema and teaching refusals; touches no tool inventory, settings metadata or drift gate. `search_content` finds *tables*, `query_database` finds *rows*, `propose_item_iteration` processes what a read picked. |
+| D2 | **Whole-table reads are allowed, governed by a token budget, not a row cap.** | The server formats the real result and counts it. Under the threshold it returns; over it returns the index tier plus the exact price and how to approve. |
+| D3 | **The threshold is a user setting** (AI settings, default 6,000 tokens) with a per-model ceiling (10% of the catalog `contextWindow`). | Four registrations (schema, defaults, setter, page) or it silently reverts. |
+| D4 | **Bulk reads fold out of the resent context at the next user message**, the same mechanism as iteration snapshots. | A working session re-reads when it needs to (local, cached); the window stays lean. No `keep` flag in v1. |
+| D5 | **Row abstraction ships now** in `describe_database`: per-column profiles, three sample rows, digest coverage. Column descriptions stay in the digest. | ~300 tokens tells the model which columns are worth reading before any row is fetched. The mention capsule keeps schema + descriptions only; profiles are one call away. |
+| D6 | **Per-row digests are a sidecar with a migration**, mirroring `AgenticMetadata`, never a cell. Staleness by hash, sweep discovery by dirty bit. | Honest about what it is: AI-generated, provenance-bearing metadata. PR 2. |
+| D7 | Not doing: SQL passthrough; rows in the mention capsule; user approval for small reads. | — |
 
-| Tier | Ask it serves | Shape | Cost (this library) |
+## 4. PR 1 — "Right-sized database reads" (no migration)
+
+### 4.1 `query_database` contract
+
+**Parameters** (all optional; existing ones unchanged in meaning):
+
+| Parameter | Type | Default | Notes |
 |---|---|---|---|
-| **T0 Schema** | "what is here" | the digest (exists) | 0.2–0.7k / table |
-| **T1 Index** | "which rows matter" | every matching row as `[handle] Title · select/status/number/date cells` — no long text, no relations unless asked | ~30 tok / row |
-| **T2 Rows by handle** | "give me these six" | `rowIds: [...]` → full cells for exactly those rows | pay only for what was picked |
-| **T3 Subgraph** | "this experience with its claims and sources" | `expand: ["Claims and metrics", "Sources"]` — forward relations, each linked row nested once, per-relation cap | 0.2–0.6k / root row |
-| **T4 Bulk** | "read the whole thing" | header-once TSV, clipped cells, forward relations only, token budget the model may raise deliberately | 20k for all four tables |
+| `databaseId` | id or name | bound database | as today |
+| `filters` | `[{column, op, value}]` | none | as today, one filter compiler |
+| `search` | string | — | `contains` over `DataRow.searchText` (case-insensitive), ANDed with filters. Retrieval before walking. |
+| `rowIds` | string[] | — | handles or UUIDs; returns exactly these rows (in the given order), filters ignored |
+| `sortBy` / `sortDirection` | | | as today (cursor on sorted queries is PR 3) |
+| `columns` | string[] \| `"all"` | index tier | names → those columns, full length; `"all"` → every non-backlink column |
+| `relations` | `"titles"` \| `"handles"` \| `"counts"` | `"titles"` | how relation cells render (see 4.3) |
+| `groupBy` | column name | — | counts per value; no rows returned. select, status, checkbox, multiSelect, relation (by linked title) |
+| `limit` | number | 100 | `MAX_LIMIT` raised 100 → 1,000; the budget is the governor, not the page |
+| `budget` | number (tokens) | the user's threshold | above the threshold → `needsApproval`; above the model ceiling → refusal naming the ceiling |
+| `cursorSortKey` / `cursorId` | | | as today |
+| `digests` | boolean | false | PR 2 |
 
-Plus one retrieval primitive that often beats every tier: **`search`** — a `contains` over `DataRow.searchText` (already maintained on every write) so "anything about Intercom" is one small read, not a walk.
+**Index tier (the default `columns`):** primary + every `select`, `status`, `checkbox`, `number`, `date`, `url`, `email`, `person` column, plus the first `text` column that is not the primary. Never `longText`, never backlink relations, never `file`/`contentLink`. Forward relations included as titles. Measured at ~30 tokens a row on the claims table.
 
-### Cross-cutting rules (each measured above)
+**Sizing pass.** Load the page (`loadRowPage`, hydrated), format it, `estimateTokens` (the shared 4-chars/token helper in `lib/domain/ai-context/tokens.ts`; handles instead of UUIDs make the heuristic honest). Then:
 
-1. **Short handles everywhere.** Emit `[8-hex]` instead of the UUID; `update_row`, `insert_rows` relation cells, and `rowIds` accept a prefix that is unique within the resolved table (one `resolveRowRef` helper next to `resolveDatabaseRef`; ambiguous prefix → teaching refusal listing the candidates). Halves today's result size before any other change.
-2. **Hydrate every cell** through `cellDisplayValue` semantics (relations, lookups, rollups, files, people) — the export already does this; the tool must see what the export sees.
-3. **Relations render compactly.** Default: up to 3 linked titles each as `Title [handle]`, then `+N`. `relations: "handles" | "counts"` for cheaper reads. Backlink columns are **excluded by default** from T1/T4 (they duplicate the forward side); explicit `columns` still gets them.
-4. **Clip cells** at 120 chars by default; columns named explicitly in `columns` come back whole; `maxCellChars` overrides.
-5. **Budget in tokens, not chars.** Estimate at 4 chars/token; default ~6k tokens per call (≈6× today), `budget` raisable to a per-model share of `PROVIDER_CATALOG.contextWindow` (proposed 10%). The clip message names how many rows were dropped and the cheapest way to get them (narrow, `relations: "counts"`, `columns`).
-6. **Header-once above 20 rows.** Labelled lines stay for small results (readable); TSV for bulk.
-7. **Sorted queries page** via keyset on (sort value, sortKey, id) — needed once T4 exists, otherwise "all rows by X" stays impossible.
-8. **Digest tail changes** from "Rows are never included in context" to a one-line map of the tiers, so the model knows the cheap path exists.
+- `≤ effective budget` → return it.
+- `> effective budget` and the request was not the index tier → return the **index tier** for the same rows (itself budget-checked), then one footer line: `Full read: ~14,200 tokens (99 rows × 9 columns; largest: Narrative ~4.1k, Sources ~3.0k). Call again with budget: 14200 to read it — the user will be asked to approve. Cheaper: columns: [...] or relations: "counts".`
+- `> effective budget` and it already was the index tier (huge table) → the first rows that fit, the total, and `Narrow with filters, search, or groupBy.`
 
-### What stays deliberate
+The effective budget is `min(input.budget ?? setting, modelCeiling)`. Nothing is silently truncated: every clip names what was dropped and the cheapest way to get it.
 
-- The mention capsule still carries no rows (T1 is one call away and costs ~30 tokens a row; injecting it uninvited would charge every turn).
-- No SQL passthrough. No whole-table injection into the system prompt.
-- Bulk reads need no user approval (they cost tokens, not data); the `budget` parameter is the model's deliberate act, and the turn accumulator already reports the spend.
+**Approval.** `needsApproval: (input) => (input.budget ?? 0) > threshold` — the function form the phase-checkpoint tool already uses; verify at build time that this SDK version passes `input` to it (§7). The card is the existing `ToolApprovalCard`; `ApprovalPreview` gets a `query_database` branch: `Read "Claims and metrics" — up to 14,200 tokens (99 rows, 9 columns)`. The number is in the input, so the card cannot show a different figure from the one the model was quoted. Big read = 2 calls + 1 approval; small read = 1 call. Reads never need approval below the threshold.
 
-## 4. Build slices (proposed order; each independently shippable)
+### 4.2 Output formats
 
-| Slice | Contents | Size | Unlocks |
-|---|---|---|---|
-| **S1 Read correctness + cost** | hydrated cells; short handles on read **and** write (`resolveRowRef`); backlinks off by default; 120-char clip; token budget + `budget` param; TSV above 20 rows; digest tail | small (one file + one helper + one prompt line) | every table in the library readable in ≤2 calls; relations visible |
-| **S2 Index + fetch + search** | smarter default columns (T1); `rowIds`; `search` over `searchText` | small | pick-then-fetch pattern; retrieval instead of walks |
-| **S3 Subgraph** | `expand` one hop through forward relations, nested once, per-relation cap 10 | medium | "experience with claims and sources" in one call; the cheapest whole-graph encoding |
-| **S4 Sorted paging + group-by** | keyset cursor on sorted queries; `groupBy` counts through the filter compiler | medium | "all rows by Fit %"; "how many per bucket" for ~50 tokens |
+Small results (≤ 20 rows) keep the labelled line, with handles:
 
-Gate for S1: the measurement harness (scratchpad `bulk/measure.ts`) reruns as a script under `scripts/` against a local seed, asserting the claims table with all columns fits one call and that a relation cell renders its linked titles.
+```
+17 matching rows; showing 17.
+- [ba00e8be] [gap] No quantified result recorded · Claim ID: CLM-001 · Claim type: Qualitative outcome · Evidence strength: Needs verification · Experience: Reflection [bb36eb1f] · Sources: Original ledger passage — section 1 [52f556dc]
+```
 
-## 5. Decisions for the owner
+Bulk results (> 20 rows) switch to header-once TSV inside a fence, cells tab/newline-escaped, ids first:
 
-1. **Handle style:** 8-hex UUID prefix (generic, stateless) vs the table's own ID column when one exists (`EXP-007`, human, but not every table has one). Proposed: prefix always, and *also* show an ID-like text column when the table has one — the model may reference either.
-2. **Relation default:** titles (readable, ~50–300 chars a cell) vs handles (~10 tokens). Proposed: titles capped at 3 per cell.
-3. **Budget ceiling:** default 6k tokens, max 10% of the model's context window. Numbers are a guess at the right order; the measured library says 20k reads the whole thing.
-4. **`expand` home:** a parameter on `query_database` (fewer tools; one description grows) or a separate `read_subgraph` tool (clearer, one more entry in the tool inventory + settings metadata + drift gate).
+```
+99 rows (all). Columns: id, Claim or metric, Claim ID, Claim type, Evidence strength, Experience, Sources
+id	Claim or metric	Claim ID	Claim type	Evidence strength	Experience	Sources
+ba00e8be	[gap] No quantified result recorded	CLM-001	Qualitative outcome	Needs verification	Reflection [bb36eb1f]	Original ledger passage — section 1 [52f556dc]
+```
 
-## 6. Owner decisions (2026-09-14) and first-build plumbing
+`groupBy` returns one line: `Evidence strength — Documented 8 · Partially documented 45 · Recollection only 29 · Needs verification 17 · (empty) 0 — 99 rows.`
 
-**Decided:** one read tool, evolved in place — `query_database` keeps its name and ergonomics (jurisdiction, name resolution, filter compiler, lenient schema, teaching refusals) and gains `search`, `rowIds`, `expand`, `groupBy`, `budget`, `digests`. No sibling read tool: `search_content` finds tables, `query_database` finds rows, `propose_item_iteration` processes what a read picked. Row abstraction ships now (column profiles + samples in `describe_database`); a stored per-row digest ships as a second PR.
+### 4.3 Cells, handles, relations, clipping
 
-**Budget and approval.** Default threshold is a user setting in AI settings (6,000 tokens; four registrations). The server formats the real result and counts it: under threshold → returned; over → the index tier for the same rows plus the exact price ("~14,200 tokens; call again with budget: 14200, the user will be asked"). `needsApproval` is a function of `budget` so the approval card carries the number. Big read = 2 calls + 1 approval; small read = 1 call.
+- **Hydration.** One formatter, `cellDisplayValue` semantics (relations, lookups, rollups, files, people, contentLinks) — extracted from `export.ts` into a pure module `lib/domain/data/read-format.ts` shared by export and the tool, so "the AI sees what the export sees" is one code path.
+- **Handles.** Rows are emitted as `[8-hex]` (the UUID prefix). `resolveRowRef(tableId, ref)` next to `resolveDatabaseRef`: 36-char UUID → exact; 8+ hex chars → unique prefix among the table's live rows; ambiguous → teaching refusal listing the candidates with titles; none → refusal. Accepted by `update_row.rowId`, `update_row.expect`, relation cells in `insert_rows`/`update_row` (`resolveRelationCell`'s UUID branch grows a prefix branch), `rowIds` here, and `propose_item_iteration.rowIds`.
+- **Relations.** `"titles"` (default): up to 3 linked rows as `Title [handle]`, then `+N more`. `"handles"`: handles only. `"counts"`: `3 linked`. Backlink columns (`config.isBacklink`) are excluded from the index tier and from `"all"`; naming one in `columns` includes it.
+- **Clipping.** Cells in the index tier and in `"all"` are clipped at 120 chars with `…`; columns named explicitly in `columns` come back whole. Linked titles clip at 60.
 
-**Accumulation.** Bulk-read result parts are superseded in `context-diet.ts` at the next user message, the same fold as iteration snapshots; the marker names the read so the model can re-read (local, cached) if a later turn needs it.
+### 4.4 `describe_database` — column profiles, samples, coverage
 
-**Per-row digest.** Sidecar, not a cell: `DataRow.agentic` JSON `{ digest, hash, generatedAt, model }`, mirroring the folder capsule's `agenticMetadata` (AI context is provenance-bearing metadata, not user content). Staleness = `hash !== sha256(canonicalJson(data) + forward link ids)` at read time — never a timestamp (writing the digest bumps `updatedAt`). Written by a second job on the folder-context refresh engine (batches of 20 rows, gen-lock, daily spend accounting, per-table opt-in). Read via `digests: true` (stale ones omitted with a count); coverage reported by `describe_database`. Grid: read-only virtual column, hidden until a view shows it. Alternative rejected: a system column in `data` leaks into search text/exports and has no home for the hash (would need a second hidden stamp column).
+`buildDataSchemaDigest(nodeId, { profile: true })`; the mention capsule and `source-resolver.ts` keep calling it without the flag, so capsule cost does not move. With the flag, each column line keeps its description and gains a profile clause computed from the live rows (one pass over `data`/links, capped at the first 5,000 rows; the cap is stated when hit):
 
-**Plumbing, PR 1 (no migration):** `query_database` formatting + `resolveRowRef` (8-hex handles on read and write) + backlinks-off + 120-char clip + token budget/`needsApproval` + TSV ≥ 20 rows + `search`/`rowIds`/`groupBy`; settings threshold; context fold; `describe_database` profiles (fill rate, distincts, min/max, avg length, per-column token estimate), 3 samples, digest coverage line; digest tail rewrite; measurement harness promoted to a script.
-**PR 2 (migration handoff):** `DataRow.agentic`, hash helper next to `canonicalJson`, refresh-engine job + per-table setting, virtual column, `digests` param.
-**Between them:** `expand` (one hop, forward relations, nested once, cap 10 per relation; linked tables reachable through a relation column of an associated table count as in jurisdiction).
+- text/longText: `— filled 94/99 · avg 134 chars · ~4.4k tokens to read`
+- select/status/multiSelect/checkbox: `— Documented 8 · Partially documented 45 · Recollection only 29 · Needs verification 17 · empty 0`
+- number/date: `— 0 … 250,000 · filled 41/99` / `— 2019-01 … 2025-06`
+- relation/lookup/rollup: `— 96/99 linked · avg 1.4 · ~3.0k tokens as titles`
+- file/contentLink/person: `— filled n/N`
+
+Then `Samples (index tier):` three rows (first, middle, last by sort key) in the labelled format, and `AI digests: none` (PR 2 fills this in). Whole addition ≈ 300–400 tokens for the claims table.
+
+The digest tail changes from "Rows are never included in context." to: `Rows: query_database reads them — index tier by default (~30 tokens/row), columns/rowIds/search/groupBy to narrow, budget to read more (the user approves above their threshold).`
+
+### 4.5 Settings
+
+`ai.bulkReadTokenThreshold`: integer 1,000–100,000, default 6,000.
+
+1. `lib/features/settings/validation.ts` — `aiSettingsSchema` field + `DEFAULT_SETTINGS.ai`.
+2. `state/settings-store.ts` — flows through `setAISettings` (generic patch; verify the persisted `ai` object includes the new key in `saveToBackend`).
+3. `components/settings/AISettingsPage.tsx` — numeric field beside "Max tokens", same draft/commit pattern, help text: "Database reads larger than this ask for your approval; the request shows the estimated tokens."
+4. Server read: the tool reads the user's settings at execute time (as the chat route does for `maxTokens`); model ceiling from `PROVIDER_CATALOG[model].contextWindow × 0.10`.
+
+### 4.6 Context fold
+
+`supersedeBulkReads(messages)` in `lib/domain/ai/context-diet.ts`, applied in the chat route next to `supersedeIterationHistory`: in assistant messages **before the latest user message**, replace the output of `tool-query_database` parts whose output is ≥ 600 chars with `[superseded — this database read (99 rows of "Claims and metrics", 6.1k tokens) was digested into the reply that followed; call query_database again if a later step truly needs the rows]`. Model path only; the transcript keeps every byte. The UI collapse reuses the same predicate (one boundary implementation, two consumers — the existing rule for the iteration fold), rendering the folded chip already used for perception parts. Cache note: the fold boundary moves once per user turn, one prefix re-miss per turn at most.
+
+### 4.7 Text surfaces that change (all reference `query_database` today)
+
+`data-tools.ts` (four tool descriptions), `data-metadata.ts` (settings descriptions — "never the whole table" is no longer true), `digest.ts` (tail), `relation-cells.ts` (error text now says "handle or title"), `capture.ts`, `filters.ts`, `types.ts` comments, the chat route's prompt lines, `AI-ARCHITECTURE.md` tool paragraph. `pnpm ai:drift:check` (prompt tool references) and `pnpm ai:matrix:check` run unchanged; no new tool, so the inventory gates are untouched.
+
+### 4.8 Chips & traceability
+
+Tool chip for `query_database`, live states: `reading` → `done` (`99 rows · 6.1k tokens`) / `index served` (`99 rows as index · full read ~14.2k`) / `approval requested` → `approved` → `reading` → `done`, or `rejected` (`nothing read`). Degraded: `refused` with the refusal text. Folded (later turns): the existing folded chip, `query_database · folded — re-read if needed`. Click-to-expand shows the parameters, the row/column counts, the estimate versus the budget, and the threshold in force. Durable transcript line inside the tool part output header: `99 rows · 7 columns · ~6.1k tokens · budget 14.2k (approved)`. The turn accumulator already reports the model-side token spend; nothing new is needed there.
+
+### 4.9 Gates and smoke
+
+- **Pure module gate.** The formatter, sizing pass, index-tier column selection and handle resolution rules live in `lib/domain/data/read-format.ts` with no Prisma import; `scripts/check-read-format.ts` (`pnpm data:read:check`, wired into `build` like the other checks) runs fixtures: a relation cell renders its linked titles with handles; a backlink is absent from the index tier; a 99-row × 9-column fixture sizes over 6k and the over-budget path serves the index; a 35-row fixture with clipped cells sizes under; an ambiguous 8-hex prefix refuses with candidates. Mutation-test the gate before trusting a first PASS.
+- **Measurement harness** promoted to `scripts/measure-database-read.ts` (read-only URL, prints the §2b table for any table id) so the numbers can be re-checked after the change.
+- **Smoke on production** (post-deploy checklist in the PR body, Career Evidence Library):
+  1. Side chat on Claims: "Which claims need verification, and from which experience?" → one call, relations visible, handles shown.
+  2. "Read all experiences." → index tier, under 6k, no approval.
+  3. "Read the sources with their passages." → index + price → model asks → `budget` call → approval card shows the estimate → full TSV.
+  4. "Set CLM-012's evidence strength to Documented" → `update_row` with the handle from the read.
+  5. "Add a claim to EXP-007 linked to SRC-003" → `insert_rows` with handles in relation cells.
+  6. "How many claims per evidence strength?" → `groupBy`, one line.
+  7. "Anything about Intercom?" → `search`.
+  8. `describe_database` → profiles + samples + descriptions.
+  9. Next user turn after step 3 → the transcript shows the folded chip; the model answers a follow-up without re-reading unless it needs rows.
+  10. Set the threshold to 2,000 in settings → step 2 now asks for approval with the number on the card.
+
+## 5. PR 2 — "Row digests" (migration handoff)
+
+### 5.1 Schema
+
+New model, 1:1 with `DataRow`, mirroring `AgenticMetadata`:
+
+```prisma
+model DataRowDigest {
+  rowId       String    @id @db.Uuid
+  digest      String    @db.VarChar(400)
+  /// sha256 of canonicalJson(data) + sorted forward link ids at generation time — read-time staleness
+  sourceHash  String    @db.VarChar(64)
+  /// set by every cell/link write, cleared on generation — sweep discovery (indexed), never read-time truth
+  dirty       Boolean   @default(false)
+  model       String?   @db.VarChar(100)
+  generatedAt DateTime  @db.Timestamptz(6)
+  updatedAt   DateTime  @updatedAt @db.Timestamptz(6)
+  row         DataRow   @relation(fields: [rowId], references: [id], onDelete: Cascade)
+  @@index([dirty])
+}
+```
+
+`DataPayload.rowDigests Boolean @default(false)` — per-table opt-in (the table's settings sheet gets a switch: "AI digests — one line per row, refreshed in the background"). The PR ships the migration file plus the `prisma migrate diff` SQL and the exact steps in the body, per the handoff rule.
+
+### 5.2 Staleness and dirtiness
+
+- **Read-time truth is the hash.** `rowSourceHash(row, forwardLinkIds)` in `lib/domain/data/digest-hash.ts` (pure): `sha256(canonicalJson(data) + "|" + sortedLinkIds.join(","))`, `canonicalJson` lifted out of `mutations.ts` and exported. Stale ⇔ `sourceHash !== rowSourceHash(now)`. Undo back to the same content is fresh again; a relation change is stale because the links are in the hash.
+- **Dirty bit is discovery only.** `writeCells`, `createRows`, `writeRelationLinks`, and the relation-cell path set `dirty = true` on the touched rows (both ends of a link) inside their transactions; generation clears it. Same reasoning as `contextDirty`: "what needs work" as an indexed query, not a hash scan. A hiccup here can never fail a save (fire-and-log, as `context-dirty.ts` does).
+
+### 5.3 Generation
+
+- **Feature route** `row-digest` in `FEATURE_REGISTRY` (text, low-cost preferred, default Haiku 4.5; unconfigured → falls back to `studio-metadata`'s model, as `ai-context-enhanced` does). Run `pnpm ai:matrix` after adding it.
+- **Job** `refreshRowDigests(userId, tableId, { maxRows, budgetMs })` in `lib/domain/data/server/digests.ts`: candidates = dirty or missing rows of an opted-in table, oldest first; batches of 20; prompt = table description + column names with descriptions + each row's index-tier cells and clipped long text (400 chars/cell) + forward relation titles; output = JSON `[{ handle, digest }]`, digest ≤ 200 chars, evidence-preserving (states only what the cells say; a `[gap]` row digests as a gap). Validate handles against the batch; write `digest`, `sourceHash` (computed from the same snapshot the prompt saw), `model`, `generatedAt`, `dirty = false`. `recordSpend` per call against the existing `dailyCallCap`; a table-level claim stamp for cross-instance single flight (same CAS as `claimScope`).
+- **Triggers.** (a) On access: `query_database` with `digests: true` on an opted-in table whose candidates ≤ 40 refreshes them synchronously within a 3 s budget before formatting (the `ensureFolderContextFresh(budgetMs)` pattern), else serves what is fresh. (b) Nightly: the existing `studio-context-sweep` cron drains opted-in tables in bounded batches under the same cap stack. (c) Manual: a "Refresh digests" action in the table settings sheet.
+
+### 5.4 Reads and UI
+
+- `query_database({ digests: true })` appends `· ≈ <digest>` to each index-tier line; stale or missing ones are omitted and counted in the footer (`12 digests stale, 7 missing — omitted`). Index + digest measured at ~60 tokens a row, so 99 claims fit the default threshold.
+- `describe_database` coverage line: `AI digests: 80 fresh · 12 stale · 7 none (refreshed nightly; last 2026-09-14 02:10, Haiku 4.5)`.
+- Grid: read-only virtual column "AI digest" rendered like a lookup (`DataGridRow.tsx`/`DataRowFields.tsx`), hidden by default via the view's `ColumnPref.hidden`, stale rows badged. Row page properties block shows it last with the same badge. Export: `.schema.md` notes the column as AI-generated; the CSV includes it only when the view shows it.
+
+### 5.5 Chips & traceability
+
+Background job chip on the table (and in the side chat when triggered on access): `checking` → `refreshing 20/99` → `fresh` / `stale-served (12 stale)` / `failed (route unconfigured / cap reached)`. Click-to-expand: rows touched, model, tokens, elapsed. Durable line in the transcript when triggered from chat: `Digests refreshed: 20 rows · Haiku 4.5 · 2.1k tokens`; in the table's activity: the same line with the trigger (access / nightly / manual).
+
+### 5.6 Gates and smoke
+
+- `digest-hash` fixtures in the read-format gate: same content → same hash; a link change → different hash; key order irrelevant.
+- Smoke on production: opt the Claims table in → manual refresh → 99 digests → edit one claim's narrative → its digest reads stale in the grid and is omitted by `digests: true` → nightly (or manual) refresh clears it → describe shows coverage.
+
+## 6. PR 3 — subgraph reads and sorted paging
+
+- `expand: string[] | { [relation]: string[] }` — one hop through forward relation columns; each linked row nested once under its parent with its own index tier (or the named columns), cap 10 per relation with `+N more`; the nested block for a linked table is sized into the same budget. Jurisdiction rule: a table reachable through a relation column of an associated table is readable, behind the usual access checks (the charter-registry precedent: the link is the consent). Measured: nesting is the cheapest whole-graph encoding (22.7k vs 37.9k for this library).
+- Keyset cursor on sorted queries in `loadRowPage` (sort value, sortKey, id), so "all rows by Fit %" pages.
+
+## 7. Risks and things to verify first
+
+1. **`needsApproval` input.** Confirm this SDK version invokes the function form with the tool input (the checkpoint tool uses the zero-arg form). If it does not, fall back to a two-step: the over-budget call returns the price; the follow-up call carries `confirmedByUser` and the card is rendered by a proposal part instead.
+2. **Token estimate accuracy.** 4 chars/token underestimates UUID-heavy and code-heavy text; handles remove most of that. Measured hydrated TSV runs 4.3–4.6 chars/token, so the estimate is slightly conservative for prose, which is the safe direction.
+3. **Fold cache cost.** One prefix re-miss per user turn when a bulk read folds; accepted, same trade as the iteration fold.
+4. **Profiles on large tables.** The 5,000-row sample cap keeps `describe_database` bounded; state the cap in the output when hit.
+5. **`MAX_LIMIT` 1,000 with sorted queries** preselects ids then orders in SQL — already the design scale (≤10k rows).
+6. **Digest honesty.** The prompt must forbid inference beyond the cells (Principle 2, "gaps are data"); the read-format gate includes a fixture asserting a `[gap]` row's digest contains "gap".
+7. **Settings key placement.** `ai.*` is the right home (not `studio.*`); the digest opt-in is per table on `DataPayload`, not a user setting.
