@@ -477,7 +477,7 @@ export function createDataTools(ctx: ToolExecuteContext) {
   return {
     describe_database: tool({
       description:
-        "Read an associated database's full schema WITH profiles: every column's type, description, option vocabulary, fill rate, value counts or ranges, and the token cost of reading it across the table; then three sample rows and AI-digest coverage. ~300–700 tokens. Use it to decide WHICH columns are worth reading before query_database. The database must be mentioned in this conversation.",
+        "PROFILE an associated database: per column, the fill rate, value counts or ranges, and the token cost of reading it across the table; then three sample rows and AI-digest coverage (~700 tokens). The schema itself (columns, types, options, relations) is ALREADY in your context for every mentioned or open database — do NOT call this to confirm column names or relations; query_database's results also show them. Call it only when deciding which columns are worth a bulk read, or to check digest coverage.",
       inputSchema: z.object({
         databaseId: z
           .string()

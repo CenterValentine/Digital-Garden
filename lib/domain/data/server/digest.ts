@@ -315,7 +315,7 @@ export async function buildDataSchemaDigest(
   // (AI-BULK-ROW-READING-PLAN §4.4).
   lines.push(
     "",
-    "Rows: query_database reads them — index tier by default (~30 tokens/row: [handle] Title · short cells), columns/rowIds/search/groupBy to narrow, budget to read more (the user approves above their threshold). describe_database adds column profiles and sample rows."
+    "This schema is COMPLETE — every column, type, option and relation is listed above; never call describe_database to confirm names. Rows: query_database reads them — index tier by default ([handle] Title · every select/number/date/relation cell), columns/rowIds/search/groupBy to narrow, budget to read more (the user approves above their threshold). describe_database only adds fill rates, value counts, sample rows and digest coverage — call it for those, not for the schema."
   );
 
   return lines.join("\n");

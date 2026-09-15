@@ -9,6 +9,7 @@
  *
  *   pnpm exec tsx scripts/seed-bulk-read-smoke.ts             # create (idempotent: reuses existing)
  *   pnpm exec tsx scripts/seed-bulk-read-smoke.ts --cleanup   # delete everything it created
+ *   pnpm exec tsx scripts/seed-bulk-read-smoke.ts --realign   # rewrite an existing fixture's claims to the coherent pairing
  *   pnpm exec tsx scripts/seed-bulk-read-smoke.ts --owner you@example.com
  */
 
@@ -75,6 +76,65 @@ async function cleanup(owner: string) {
   }
   await prisma.contentNode.deleteMany({ where: { id: { in: nodes.map((n) => n.id) } } });
   console.log(`Deleted ${nodes.length} table(s): ${nodes.map((n) => n.title).join(", ")}`);
+}
+
+/**
+ * Coherent claim stories: title, numbers and narrative come from the SAME
+ * story so a reader never sees a rotated pairing (first fixture did; the
+ * model spent its reply explaining the rotation). Each row's title is made
+ * distinct with a period qualifier.
+ */
+const STORIES: Array<{ title: string; narrative: string; before?: number; after?: number; unit?: string; type: string }> = [
+  { title: "Recovery rate increased from 65% to 73%", narrative: "Reconciled the billing ledger against Stripe payouts after a migration left 1,400 invoices without settlement records; recovery rate measured from the weekly finance report, baseline the quarter before the change.", before: 65, after: 73, unit: "percent", type: "Quantitative metric" },
+  { title: "Approximately 250,000 duplicate contacts cleaned", narrative: "Owned the Intercom contact cleanup: identified roughly 250,000 duplicates created by a webhook retry loop, designed the merge rules with support, and ran the dedupe in batches over two weeks.", before: 250000, after: 0, unit: "contacts", type: "Scope or scale" },
+  { title: "Time-to-first-value fell from nine days to three", narrative: "Led the onboarding redesign for enterprise clinics — mapped the 14-step flow, cut it to 6, and wrote the Appcues tours; time-to-first-value measured from the onboarding dashboard.", before: 9, after: 3, unit: "days", type: "Quantitative metric" },
+  { title: "Lead-event loss reduced from 3% to under 0.2%", narrative: "Investigated an API outage that dropped 3% of Meta lead events; traced it to a token refresh race, added the retry with jitter, and documented the runbook.", before: 3, after: 0.2, unit: "percent", type: "Quantitative metric" },
+  { title: "Manual handoffs eliminated for 40 reps", narrative: "Built the Tray.io workflow that routes trial sign-ups to the right rep by segment and territory; replaced a manual spreadsheet handoff for the whole sales floor.", before: 40, after: 0, unit: "reps", type: "Qualitative outcome" },
+  { title: "212 properties reviewed, 38 retired", narrative: "Coordinated the HubSpot → Salesforce field mapping across sales, marketing and support; every property reviewed with its owner, 38 retired as unused.", before: 212, after: 174, unit: "properties", type: "Scope or scale" },
+  { title: "Alert noise cut by 60%", narrative: "Tuned Datadog monitors after on-call fatigue reports: thresholds rebased on p95, duplicate monitors merged, and a weekly alert review instituted.", before: 100, after: 40, unit: "percent", type: "Quantitative metric" },
+  { title: "$1.37M in recovered revenue over six months", narrative: "Chased failed and dunning invoices surfaced by the reconciliation; recovered revenue tracked against the finance ledger from January to June.", before: 0, after: 1370000, unit: "dollars", type: "Quantitative metric" },
+];
+const PERIODS = ["Q1 2024", "Q2 2024", "Q3 2024", "Q4 2024", "Q1 2025"];
+const STRENGTHS = ["Documented", "Partially documented", "Recollection only", "Needs verification"];
+
+function claimRow(i: number): Record<string, unknown> {
+  const gap = i % 13 === 12;
+  const story = STORIES[i % STORIES.length];
+  const period = PERIODS[Math.floor(i / STORIES.length) % PERIODS.length];
+  return {
+    "Claim or metric": gap ? `[gap] No quantified result recorded (${period})` : `${story.title} (${period})`,
+    "Claim ID": `CLM-${String(i + 1).padStart(3, "0")}`,
+    "Claim type": gap ? "Qualitative outcome" : story.type,
+    "Before value": gap ? undefined : story.before,
+    "After value": gap ? undefined : story.after,
+    Unit: gap ? undefined : story.unit,
+    Narrative: gap ? "Measure a concrete result; the ledger section records activity only." : `${story.narrative} Period: ${period}.`,
+    "Evidence strength": gap ? "Needs verification" : STRENGTHS[i % STRENGTHS.length],
+  };
+}
+
+/** Rewrite an existing fixture's claim titles/narratives/numbers to the coherent pairing. */
+async function realign(owner: string) {
+  const claims = (await existing(owner)).find((n) => n.title === `${PREFIX} Claims`);
+  if (!claims) {
+    console.log("No Claims fixture to realign.");
+    return;
+  }
+  const table = (await loadTable(claims.id, owner))!;
+  const live = table.columns.filter((c) => !c.deletedAt) as DataColumn[];
+  const rows = await prisma.dataRow.findMany({ where: { tableId: claims.id, deletedAt: null }, orderBy: { sortKey: "asc" }, select: { id: true } });
+  const writes: CellWrite[] = [];
+  rows.forEach((row, i) => {
+    const next = claimRow(i);
+    for (const name of ["Claim or metric", "Claim type", "Before value", "After value", "Unit", "Narrative"]) {
+      const column = findColumn(live, name)!;
+      const raw = next[name];
+      writes.push({ rowId: row.id, columnKey: column.key, value: raw === undefined ? undefined : normalizeCellInput(column, translateOptionValue(column, raw)) });
+    }
+  });
+  const out = await writeCells(claims.id, live, writes);
+  const bad = out.results.filter((r) => r.status === "error" || r.status === "stale");
+  console.log(`Realigned ${rows.length} claims (${bad.length} rejected writes). Their AI digests are now stale by hash.`);
 }
 
 async function seed(owner: string) {
@@ -216,20 +276,7 @@ async function seed(owner: string) {
   const expRows = await fill(expId, experiences);
 
   // Claims: 40; ~3 per experience; a few gaps and a few unverified.
-  const strength = ["Documented", "Partially documented", "Recollection only", "Needs verification"];
-  const claims = Array.from({ length: 40 }, (_, i) => {
-    const gap = i % 13 === 12;
-    return {
-      "Claim or metric": gap ? "[gap] No quantified result recorded" : pick(["Recovery rate increased from 65% to 73%", "Approximately 250,000 duplicate contacts cleaned", "Time-to-first-value fell from nine days to three", "Lead-event loss reduced from 3% to under 0.2%", "Manual handoffs eliminated for 40 reps", "212 properties reviewed, 38 retired", "Alert noise cut by 60%", "$1.37M in recovered revenue over six months"], i),
-      "Claim ID": `CLM-${String(i + 1).padStart(3, "0")}`,
-      "Claim type": pick(["Quantitative metric", "Qualitative outcome", "Scope or scale"], i),
-      "Before value": gap || i % 3 ? undefined : 65 + i,
-      "After value": gap || i % 3 ? undefined : 73 + i,
-      Unit: gap || i % 3 ? undefined : pick(["percent", "contacts", "days"], i),
-      Narrative: gap ? "Measure a concrete result; the ledger section records activity only." : `${pick(LOREM, i)} Measured from the weekly report; the baseline is the quarter before the change.`,
-      "Evidence strength": gap ? "Needs verification" : pick(strength, i),
-    };
-  });
+  const claims = Array.from({ length: 40 }, (_, i) => claimRow(i));
   const clmRows = await fill(clmId, claims);
 
   // Links: claim → experience (forward on Experiences.Claims and metrics), claim → sources, experience → sources.
@@ -267,6 +314,7 @@ async function main() {
   const email = ownerFlag >= 0 ? args[ownerFlag + 1] : DEFAULT_OWNER;
   const owner = await ownerId(email);
   if (args.includes("--cleanup")) await cleanup(owner);
+  else if (args.includes("--realign")) await realign(owner);
   else await seed(owner);
 }
 
