@@ -20,6 +20,11 @@
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Plus, Trash2, Undo2, Redo2, Layers } from "lucide-react";
+import {
+  registerPollingTask,
+  runPollingTaskNow,
+} from "@/lib/core/polling/scheduler";
+import { subscribeEngagement } from "@/lib/core/engagement";
 import { useDataFlashcardsDialogStore } from "@/state/data-flashcards-dialog-store";
 import { FLASHCARDS_EXTENSION_ID } from "@/extensions/flashcards/manifest";
 import { FLASHCARD_CHANGED_EVENT } from "@/extensions/flashcards/events";
@@ -443,21 +448,33 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
 
   // ── Poll ───────────────────────────────────────────────────────────────
   //
-  // Reuses the shared-poller shape `noteWindow` established rather than
-  // introducing a third concurrency mechanism beside Y.js and per-cell LWW.
-  // Suspended while the tab is hidden; runs once immediately on refocus.
+  // Goes through the shared scheduler, which owns BOTH the hidden and the idle
+  // gate. It used to run its own self-rescheduling setTimeout with a bare
+  // `document.hidden` check — pre-idle-gating semantics, so a table sitting
+  // open and untouched polled every 10s indefinitely. Being a setTimeout rather
+  // than a setInterval, it was also invisible to `polling:check`.
+  //
+  // `serverTime` is read through a ref so this effect depends only on the
+  // content id. Reading it from state would re-run the effect on every
+  // successful poll (each one advances serverTime), unregistering and
+  // re-registering the task on every tick.
+
+  const serverTimeRef = useRef<string | null>(null);
+  useEffect(() => {
+    serverTimeRef.current = state.serverTime;
+  }, [state.serverTime]);
 
   useEffect(() => {
-    if (!state.serverTime) return;
-
     let cancelled = false;
-    let timer: ReturnType<typeof setTimeout> | null = null;
 
     const poll = async () => {
-      if (cancelled || document.hidden) return;
+      const since = serverTimeRef.current;
+      // No baseline yet: the initial load has not landed, so there is nothing
+      // to ask for changes since.
+      if (cancelled || !since) return;
       try {
         const res = await fetch(
-          `/api/content/data/${contentId}/rows?since=${encodeURIComponent(state.serverTime!)}`,
+          `/api/content/data/${contentId}/rows?since=${encodeURIComponent(since)}`,
           { credentials: "include" }
         );
         const json = await res.json();
@@ -503,25 +520,27 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
       }
     };
 
-    const schedule = () => {
-      timer = setTimeout(async () => {
-        await poll();
-        if (!cancelled) schedule();
-      }, POLL_MS);
-    };
+    const taskId = `data-rows:${contentId}`;
+    const unregister = registerPollingTask({
+      id: taskId,
+      intervalMs: POLL_MS,
+      run: poll,
+    });
 
-    const onVisibility = () => {
-      if (!document.hidden) void poll();
-    };
+    // Catch up in one request when the user comes back, rather than waiting out
+    // a full interval. Safe to pause in between because the `since` cursor
+    // means nothing is lost — the next poll asks for everything that changed
+    // while we were quiet.
+    const unsubscribe = subscribeEngagement((engagement) => {
+      if (engagement === "active") runPollingTaskNow(taskId);
+    });
 
-    schedule();
-    document.addEventListener("visibilitychange", onVisibility);
     return () => {
       cancelled = true;
-      if (timer) clearTimeout(timer);
-      document.removeEventListener("visibilitychange", onVisibility);
+      unregister();
+      unsubscribe();
     };
-  }, [contentId, state.serverTime, load]);
+  }, [contentId, load]);
 
   // ── Viewport measurement ───────────────────────────────────────────────
 
