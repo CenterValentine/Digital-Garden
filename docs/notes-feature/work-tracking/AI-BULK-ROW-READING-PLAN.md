@@ -72,7 +72,7 @@ For context: a 200k-window model can hold the entire library eleven times over; 
 | D1 | **One read tool: `query_database`, evolved in place.** No sibling `read_rows`. | Keeps the jurisdiction, name resolution, filter compiler, lenient schema and teaching refusals; touches no tool inventory, settings metadata or drift gate. `search_content` finds *tables*, `query_database` finds *rows*, `propose_item_iteration` processes what a read picked. |
 | D2 | **Whole-table reads are allowed, governed by a token budget, not a row cap.** | The server formats the real result and counts it. Under the threshold it returns; over it returns the index tier plus the exact price and how to approve. |
 | D3 | **The threshold is a user setting** (AI settings, default 6,000 tokens) with a per-model ceiling (10% of the catalog `contextWindow`). | Four registrations (schema, defaults, setter, page) or it silently reverts. |
-| D4 | **Bulk reads fold out of the resent context at the next user message**, the same mechanism as iteration snapshots. | A working session re-reads when it needs to (local, cached); the window stays lean. No `keep` flag in v1. |
+| D4 | **Bulk reads carry a `lifetime`.** `"turn"` (default) folds at the next user message, the same mechanism as iteration snapshots; `"run"` survives every batch checkpoint of the active iteration run and folds when the run ends; `"chat"` stays pinned until the user unpins it or the chat's pinned allowance (2× the threshold) is exceeded. Pins are visible on the chip and in the transcript. | A job first pass reads the library once and scores every item against it; a one-off question costs nothing after its turn. Amended 2026-09-14 (owner: reads must be able to live between bulk reads). |
 | D5 | **Row abstraction ships now** in `describe_database`: per-column profiles, three sample rows, digest coverage. Column descriptions stay in the digest. | ~300 tokens tells the model which columns are worth reading before any row is fetched. The mention capsule keeps schema + descriptions only; profiles are one call away. |
 | D6 | **Per-row digests are a sidecar with a migration**, mirroring `AgenticMetadata`, never a cell. Staleness by hash, sweep discovery by dirty bit. | Honest about what it is: AI-generated, provenance-bearing metadata. PR 2. |
 | D7 | Not doing: SQL passthrough; rows in the mention capsule; user approval for small reads. | — |
@@ -96,6 +96,7 @@ For context: a 200k-window model can hold the entire library eleven times over; 
 | `limit` | number | 100 | `MAX_LIMIT` raised 100 → 1,000; the budget is the governor, not the page |
 | `budget` | number (tokens) | the user's threshold | above the threshold → `needsApproval`; above the model ceiling → refusal naming the ceiling |
 | `cursorSortKey` / `cursorId` | | | as today |
+| `lifetime` | `"turn"` \| `"run"` \| `"chat"` | `"turn"` | how long the result stays in the resent context (§4.6); `"run"` outside an active iteration run degrades to `"turn"` with a note |
 | `digests` | boolean | false | PR 2 |
 
 **Index tier (the default `columns`):** primary + every `select`, `status`, `checkbox`, `number`, `date`, `url`, `email`, `person` column, plus the first `text` column that is not the primary. Never `longText`, never backlink relations, never `file`/`contentLink`. Forward relations included as titles. Measured at ~30 tokens a row on the claims table.
@@ -159,9 +160,17 @@ The digest tail changes from "Rows are never included in context." to: `Rows: qu
 3. `components/settings/AISettingsPage.tsx` — numeric field beside "Max tokens", same draft/commit pattern, help text: "Database reads larger than this ask for your approval; the request shows the estimated tokens."
 4. Server read: the tool reads the user's settings at execute time (as the chat route does for `maxTokens`); model ceiling from `PROVIDER_CATALOG[model].contextWindow × 0.10`.
 
-### 4.6 Context fold
+### 4.6 Context fold and lifetimes
 
-`supersedeBulkReads(messages)` in `lib/domain/ai/context-diet.ts`, applied in the chat route next to `supersedeIterationHistory`: in assistant messages **before the latest user message**, replace the output of `tool-query_database` parts whose output is ≥ 600 chars with `[superseded — this database read (99 rows of "Claims and metrics", 6.1k tokens) was digested into the reply that followed; call query_database again if a later step truly needs the rows]`. Model path only; the transcript keeps every byte. The UI collapse reuses the same predicate (one boundary implementation, two consumers — the existing rule for the iteration fold), rendering the folded chip already used for perception parts. Cache note: the fold boundary moves once per user turn, one prefix re-miss per turn at most.
+`supersedeBulkReads(messages)` in `lib/domain/ai/context-diet.ts`, applied in the chat route next to `supersedeIterationHistory`. It folds `tool-query_database` parts whose output is ≥ 600 chars according to the part's recorded `lifetime`:
+
+- **`turn`**: parts in assistant messages before the latest user message are stubbed: `[superseded — this database read (99 rows of "Claims and metrics", 6.1k tokens) was digested into the reply that followed; call query_database again if a later step truly needs the rows]`.
+- **`run`**: exempt while an iteration run is active (the `findIterationFoldBoundary` run state), so the read survives every `record_batch_checkpoint`; stubbed once `record_iteration_findings` lands. The iteration fold itself never touches `query_database` parts (they are not perception parts): the rubric outlives the evidence by design.
+- **`chat`**: exempt until the user unpins it from the chip, or a newer `chat`-lifetime read pushes the chat's pinned total over the allowance (2× the threshold), in which case the oldest pin folds and the footer of the new read says so.
+
+Model path only; the transcript keeps every byte. The UI collapse reuses the same predicate (one boundary implementation, two consumers — the existing rule for the iteration fold), rendering the folded chip already used for perception parts. Pinned reads render a pin state on the chip with size and lifetime and an unpin action. Cache note: at most one prefix re-miss per user turn from `turn` folds; pins never move the boundary.
+
+Guidance in the tool description: pin the **index tier with digests** for a run (≈6k for this library) and fetch specific rows by handle per item; pin full narratives only when the items need them.
 
 ### 4.7 Text surfaces that change (all reference `query_database` today)
 
@@ -169,7 +178,7 @@ The digest tail changes from "Rows are never included in context." to: `Rows: qu
 
 ### 4.8 Chips & traceability
 
-Tool chip for `query_database`, live states: `reading` → `done` (`99 rows · 6.1k tokens`) / `index served` (`99 rows as index · full read ~14.2k`) / `approval requested` → `approved` → `reading` → `done`, or `rejected` (`nothing read`). Degraded: `refused` with the refusal text. Folded (later turns): the existing folded chip, `query_database · folded — re-read if needed`. Click-to-expand shows the parameters, the row/column counts, the estimate versus the budget, and the threshold in force. Durable transcript line inside the tool part output header: `99 rows · 7 columns · ~6.1k tokens · budget 14.2k (approved)`. The turn accumulator already reports the model-side token spend; nothing new is needed there.
+Tool chip for `query_database`, live states: `reading` → `done` (`99 rows · 6.1k tokens`, plus `pinned for this run` / `pinned` with an unpin action when lifetime is `run`/`chat`) / `index served` (`99 rows as index · full read ~14.2k`) / `approval requested` → `approved` → `reading` → `done`, or `rejected` (`nothing read`). Degraded: `refused` with the refusal text. Folded (later turns): the existing folded chip, `query_database · folded — re-read if needed`. Click-to-expand shows the parameters, the row/column counts, the estimate versus the budget, and the threshold in force. Durable transcript line inside the tool part output header: `99 rows · 7 columns · ~6.1k tokens · budget 14.2k (approved) · pinned for this run`. The turn accumulator already reports the model-side token spend; nothing new is needed there.
 
 ### 4.9 Gates and smoke
 
@@ -185,6 +194,7 @@ Tool chip for `query_database`, live states: `reading` → `done` (`99 rows · 6
   7. "Anything about Intercom?" → `search`.
   8. `describe_database` → profiles + samples + descriptions.
   9. Next user turn after step 3 → the transcript shows the folded chip; the model answers a follow-up without re-reading unless it needs rows.
+  9b. Start a job first pass (`propose_item_iteration`) after a `lifetime: "run"` read of the claims index → the read survives the first batch checkpoint and folds after `record_iteration_findings`; the chip shows the pin throughout.
   10. Set the threshold to 2,000 in settings → step 2 now asks for approval with the number on the card.
 
 ## 5. PR 2 — "Row digests" (migration handoff)
