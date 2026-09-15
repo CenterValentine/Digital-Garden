@@ -50,6 +50,20 @@ The owner-run loader (`scripts/import-career-evidence.ts`) surfaced two things w
 - [ ] **Library-style index tables upsert on the primary text column with no uniqueness guarantee.** Two ledger sections collapsed to the same title once trailing punctuation was trimmed; only the dry run caught it. Consider a dedupe warning in `insert_rows` when `dedupeBy` is the primary column and the batch itself contains duplicates.
 - [ ] **`Evidence strength`-style columns need their levels defined in the column description.** Two models given the same mapping read "Documented" differently (artifact exists vs. appears in a supplied document). The schema digest already carries descriptions to the model; a one-line definition per level is the cheapest guard.
 
+
+## SQL passthrough for AI database reads — considering, not planned (2026-09-14)
+
+A tool that takes a SQL string from the model and runs it verbatim against the database, returning raw rows. Attractive because one flexible tool would cover every read shape (filter, join, group-by, subgraph). Parked while `query_database` gains `search`/`rowIds`/`groupBy`/`expand` through the one filter compiler (`AI-BULK-ROW-READING-PLAN.md`), which covers the same ground with the safeguards below intact. Revisit only if a read shape appears that the compiler cannot express.
+
+Risks recorded at the time:
+- **Jurisdiction cannot be enforced.** Every read tool passes through `resolveJurisdiction`, so the model reaches only databases mentioned in the chat (or charter-linked). A SQL string can name any table id; guaranteeing a query touches only permitted rows means parsing and rewriting SQL — a project of its own.
+- **The model must know the storage layer.** Cells are keyed by opaque column keys, selects store option ids, links live in `DataRowLink`. The physical schema would have to ride along in context on every call — more tokens than the reads it saves.
+- **A read-only role reduces, not removes, the risk.** It stops writes but not expensive queries, cross-user reads through any table the role can see, or timing probes against the pooler.
+- **The teaching refusals vanish.** "No column named X — columns are …" is what makes weak models converge; a SQL error is not a lesson.
+- **Drift.** Column keys and option ids change under the model; a saved query in a charter would rot silently.
+
+Ad-hoc SQL keeps its proper home: a human at a terminal with the read-only role (`scripts/pg-read.sh`).
+
 ## Referenced content: which relationships are actually FIXED? (review, 2026-09-13)
 
 Owner's rule (2026-09-13): **only referenced content that has a FIXED relationship with its parent should be unmovable** — everything else must be draggable out.

@@ -1,6 +1,6 @@
 # AI Bulk Row Reading — Plan
 
-**Status:** PLAN FOR OWNER REVIEW (2026-09-14). Measurements in §2b; decisions in §3; PR 1 spec §4; PR 2 (row digests, migration) §5; PR 3 §6; risks §7.
+**Status:** PLAN FOR OWNER REVIEW (2026-09-14). Measurements in §2b; decisions in §3; **PR 1 = §4 + §5 in one migration-bearing PR** (owner: the migration ships with the reads); PR 2 (subgraph + sorted paging) §6; risks §7.
 **Driving case:** the Career Evidence Library just loaded — 35 experiences / 66 sources / 99 claims / 35 index rows, 1,025 links. An AI asked to "draft a résumé bullet for every Ready experience with its claims and sources" has to read most of that graph, and today it cannot see the graph at all through the tool that reads rows.
 **Related:** `AI-RELATIONAL-DATABASE-REACH-PLAN.md` (P4 relation cells on write), `EXTRACTION-TO-DATABASE-PLAN.md` (database-rows iteration), `core/PRODUCT-PRINCIPLES.md` §2.
 
@@ -74,10 +74,11 @@ For context: a 200k-window model can hold the entire library eleven times over; 
 | D3 | **The threshold is a user setting** (AI settings, default 6,000 tokens) with a per-model ceiling (10% of the catalog `contextWindow`). | Four registrations (schema, defaults, setter, page) or it silently reverts. |
 | D4 | **Bulk reads carry a `lifetime`.** `"turn"` (default) folds at the next user message, the same mechanism as iteration snapshots; `"run"` survives every batch checkpoint of the active iteration run and folds when the run ends; `"chat"` stays pinned until the user unpins it or the chat's pinned allowance (2× the threshold) is exceeded. Pins are visible on the chip and in the transcript. | A job first pass reads the library once and scores every item against it; a one-off question costs nothing after its turn. Amended 2026-09-14 (owner: reads must be able to live between bulk reads). |
 | D5 | **Row abstraction ships now** in `describe_database`: per-column profiles, three sample rows, digest coverage. Column descriptions stay in the digest. | ~300 tokens tells the model which columns are worth reading before any row is fetched. The mention capsule keeps schema + descriptions only; profiles are one call away. |
-| D6 | **Per-row digests are a sidecar with a migration**, mirroring `AgenticMetadata`, never a cell. Staleness by hash, sweep discovery by dirty bit. | Honest about what it is: AI-generated, provenance-bearing metadata. PR 2. |
-| D7 | Not doing: SQL passthrough; rows in the mention capsule; user approval for small reads. | — |
+| D6 | **Per-row digests are a sidecar with a migration**, mirroring `AgenticMetadata`, never a cell. Staleness by hash, sweep discovery by dirty bit. **Ships in PR 1** with the reads — one release train, migration deployed ahead of code per the handoff rule. | Honest about what it is: AI-generated, provenance-bearing metadata. |
+| D7 | Not doing: SQL passthrough (backlogged as "considering" with its risks); rows in the mention capsule; user approval for small reads. | — |
+| D8 | **Charter- and quest-linked databases persist for the run by default.** A read of a table reachable through the attached charter's registry (master ledger, quest ledgers, output tables) during an active run gets `run` lifetime unless the charter, quest, or the user's prompt says otherwise; an explicit `lifetime: "turn"` from the model (following such an instruction) is honored. The iteration card states the standing context in plain words. | The charter's links are the consent; the rubric a charter names should not have to be re-read per batch. |
 
-## 4. PR 1 — "Right-sized database reads" (no migration)
+## 4. PR 1 (part A) — "Right-sized database reads"
 
 ### 4.1 `query_database` contract
 
@@ -97,7 +98,7 @@ For context: a 200k-window model can hold the entire library eleven times over; 
 | `budget` | number (tokens) | the user's threshold | above the threshold → `needsApproval`; above the model ceiling → refusal naming the ceiling |
 | `cursorSortKey` / `cursorId` | | | as today |
 | `lifetime` | `"turn"` \| `"run"` \| `"chat"` | `"turn"` | how long the result stays in the resent context (§4.6); `"run"` outside an active iteration run degrades to `"turn"` with a note |
-| `digests` | boolean | false | PR 2 |
+| `digests` | boolean | false | §5 |
 
 **Index tier (the default `columns`):** primary + every `select`, `status`, `checkbox`, `number`, `date`, `url`, `email`, `person` column, plus the first `text` column that is not the primary. Never `longText`, never backlink relations, never `file`/`contentLink`. Forward relations included as titles. Measured at ~30 tokens a row on the claims table.
 
@@ -147,7 +148,7 @@ ba00e8be	[gap] No quantified result recorded	CLM-001	Qualitative outcome	Needs v
 - relation/lookup/rollup: `— 96/99 linked · avg 1.4 · ~3.0k tokens as titles`
 - file/contentLink/person: `— filled n/N`
 
-Then `Samples (index tier):` three rows (first, middle, last by sort key) in the labelled format, and `AI digests: none` (PR 2 fills this in). Whole addition ≈ 300–400 tokens for the claims table.
+Then `Samples (index tier):` three rows (first, middle, last by sort key) in the labelled format, and the digest coverage line (§5.4). Whole addition ≈ 300–400 tokens for the claims table.
 
 The digest tail changes from "Rows are never included in context." to: `Rows: query_database reads them — index tier by default (~30 tokens/row), columns/rowIds/search/groupBy to narrow, budget to read more (the user approves above their threshold).`
 
@@ -184,8 +185,18 @@ The model's judgement is deliberately thin ("harness over prompt": a flag the mo
 
 **Harness rules (no judgement required):**
 1. **Promotion by adjacency.** A `query_database` part in the same assistant turn as, and before, an approved `propose_item_iteration` is promoted to `run` whether or not the model set it.
+1b. **Promotion by charter link (D8).** During an active run with a charter attached, a read of a table reachable through the charter registry (`charterRegistryAuthorizes`) is promoted to `run` unless the model set `lifetime: "turn"` explicitly — which it does only when the charter, quest, or user prompt instructs it (the tool description says so). Tables the charter does not link follow rules 1–2.
 2. **Degradation by absence.** `run` with no active run and no proposal in the turn degrades to `turn`; the footer says so.
-3. **Consent travels.** The iteration approval card lists the reads it will pin: `Reference reads pinned for this run: Claims and metrics index · 99 rows · 6.1k tokens`. The run's standing context cost is on the card the user approves.
+3. **Consent travels — card wording.** The iteration approval card carries a "Standing context for this run" block, one line per read that will stay in context, with a per-line *release* control (released reads fold at the next user message instead). Wording, verbatim:
+
+   ```
+   Standing context for this run
+   • Claims and metrics — index with digests · 99 rows · ~6.1k tokens · from the Job Fit charter
+   • Experiences — index · 35 rows · ~0.9k tokens · read this turn
+   ~7.0k tokens are re-sent with every item. These reads stay until the run ends, then fold.
+   ```
+
+   "from the <charter> charter" marks a D8 promotion; "read this turn" marks adjacency; a read the model pinned explicitly says "kept at the model's request". The block appears only when at least one read will persist; a run with none says nothing, so the absence is not noise.
 4. **`chat` needs the user's words.** Granted only when the latest user message asked to keep or pin the table (soft check); otherwise degrades to `turn` and the footer tells the model to ask the user.
 
 The chip and transcript line always show the lifetime that was *applied*, never the one requested.
@@ -212,10 +223,11 @@ Tool chip for `query_database`, live states: `reading` → `done` (`99 rows · 6
   7. "Anything about Intercom?" → `search`.
   8. `describe_database` → profiles + samples + descriptions.
   9. Next user turn after step 3 → the transcript shows the folded chip; the model answers a follow-up without re-reading unless it needs rows.
+  9a. Attach the Job Fit charter (registry links the library) and start a first pass without reading first → the run's first read of Claims is promoted to `run`; the card would have shown nothing (no read yet), and the chip shows `pinned for this run · from the Job Fit charter`.
   9b. Start a job first pass (`propose_item_iteration`) after a `lifetime: "run"` read of the claims index → the read survives the first batch checkpoint and folds after `record_iteration_findings`; the chip shows the pin throughout.
   10. Set the threshold to 2,000 in settings → step 2 now asks for approval with the number on the card.
 
-## 5. PR 2 — "Row digests" (migration handoff)
+## 5. PR 1 (part B) — "Row digests" (the PR's migration)
 
 ### 5.1 Schema
 
@@ -265,7 +277,7 @@ Background job chip on the table (and in the side chat when triggered on access)
 - `digest-hash` fixtures in the read-format gate: same content → same hash; a link change → different hash; key order irrelevant.
 - Smoke on production: opt the Claims table in → manual refresh → 99 digests → edit one claim's narrative → its digest reads stale in the grid and is omitted by `digests: true` → nightly (or manual) refresh clears it → describe shows coverage.
 
-## 6. PR 3 — subgraph reads and sorted paging
+## 6. PR 2 — subgraph reads and sorted paging
 
 - `expand: string[] | { [relation]: string[] }` — one hop through forward relation columns; each linked row nested once under its parent with its own index tier (or the named columns), cap 10 per relation with `+N more`; the nested block for a linked table is sized into the same budget. Jurisdiction rule: a table reachable through a relation column of an associated table is readable, behind the usual access checks (the charter-registry precedent: the link is the consent). Measured: nesting is the cheapest whole-graph encoding (22.7k vs 37.9k for this library).
 - Keyset cursor on sorted queries in `loadRowPage` (sort value, sortKey, id), so "all rows by Fit %" pages.
