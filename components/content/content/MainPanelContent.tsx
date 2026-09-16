@@ -1531,11 +1531,20 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
       }
 
       type NoteItem = { id: string; title: string; slug: string; contentType: string };
-      // Notes AND folders (FOLDER-CONTEXT-CAPSULE follow-up): a folder
-      // wiki-link navigates to the folder and, in playbooks/chat, injects
-      // its context capsule like a chat mention.
+      // EVERY navigable content type, not just notes and folders. The filter
+      // used to be `note || folder`, which silently dropped databases from the
+      // dropdown — typing a table's exact name returned "No matches found"
+      // while the table sat in the tree beside it (owner report, 2026-09-16).
+      // Nothing upstream was missing: the search route returns all types, so
+      // this line was the whole gap.
+      //
+      // The denylist is deliberately short and holds only types that cannot be
+      // a meaningful link DESTINATION — a template is a thing you instantiate
+      // rather than reference, and a shortcut is already a pointer, so linking
+      // one would add a second hop to the same place.
+      const NON_LINKABLE = new Set(['template', 'shortcut']);
       const notes = ((result.data?.items as NoteItem[] | undefined) || [])
-        .filter((item) => item.contentType === 'note' || item.contentType === 'folder')
+        .filter((item) => !NON_LINKABLE.has(item.contentType))
         .map((item) => ({
           id: item.id,
           title: item.title,

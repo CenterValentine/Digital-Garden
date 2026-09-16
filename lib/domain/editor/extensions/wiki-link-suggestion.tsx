@@ -175,9 +175,14 @@ export const WikiLinkList = forwardRef<WikiLinkListRef, WikiLinkListProps>((prop
                   <span className="max-w-[10rem] shrink-0 truncate rounded border border-white/15 px-1 py-px text-[9px] uppercase tracking-wide text-gray-400">
                     {item.row.tableTitle}
                   </span>
-                ) : item.contentType === "folder" ? (
+                ) : item.contentType && item.contentType !== "note" ? (
+                  // Every non-note type is badged, not just folders. With
+                  // databases, files, bookmarks and diagrams all in one list,
+                  // the title alone stops being enough to tell them apart —
+                  // and a database and a note about that database routinely
+                  // share a name.
                   <span className="shrink-0 rounded border border-white/15 px-1 py-px text-[9px] uppercase tracking-wide text-gray-400">
-                    folder
+                    {item.contentType === "data" ? "database" : item.contentType}
                   </span>
                 ) : null}
               </span>
