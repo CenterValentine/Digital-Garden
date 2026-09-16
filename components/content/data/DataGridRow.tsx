@@ -32,12 +32,14 @@ import {
   Square,
   Star,
   ThumbsUp,
+  X,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/core/utils";
 import {
   cellToDisplayText,
   sortStatusOptions,
+  splitDelimited,
   type CellValue,
   type ContentRef,
   type DataColumn,
@@ -101,42 +103,75 @@ const CHECK_COLOR_CLASS: Record<string, string> = {
  * one chip costs a "+N" that reads 3 instead of 2 — the list is reachable
  * either way.
  */
-const CHIP_MIN_PX = 64; // a chip narrow enough to still read (~7 chars + …)
 const CHIP_GAP_PX = 4; // gap-1
 const CELL_PAD_PX = 16; // px-2, both sides
 const ADD_BTN_PX = 22; // the dashed "+" that rides along on editable cells
 const MORE_PILL_PX = 34; // the "+N" pill itself
+const CHIP_PAD_PX = 16; // px-2 inside a chip
+const CHAR_PX = 6.4; // ~11px system font, average advance
+const CHIP_MAX_PX = 144; // max-w-[9rem]
 
 /** Shared chip skin: never shrinks, ellipsizes past ~9rem. */
 const CHIP_CLASS =
   "shrink-0 max-w-[9rem] truncate rounded-full px-2 py-0.5 text-[11px]";
 
 /**
- * How many of `total` chips to render, and how many are hidden behind the
- * pill. Returns `hidden: 0` whenever everything fits — the pill is only
- * drawn when it is actually standing in for something.
+ * A chip's rendered width, estimated from its LABEL.
+ *
+ * The first cut used one flat minimum for every chip, which folded far too
+ * eagerly: a 180px column showed a single "Hello" and a "+4" because the
+ * budget assumed every chip was as wide as the widest plausible one (owner,
+ * 2026-09-16). Per-label estimation costs one multiply and gets two or three
+ * short tags into the same space.
+ */
+function estimateChipPx(label: string): number {
+  return Math.min(CHIP_MAX_PX, CHIP_PAD_PX + Math.max(1, label.length) * CHAR_PX);
+}
+
+/**
+ * How many of `labels` to render, and how many fold behind the pill.
+ * `hidden: 0` whenever everything fits — the pill is only drawn when it is
+ * actually standing in for something.
  */
 function chipBudget(
   width: number,
-  total: number,
-  opts: { hasAddButton: boolean; chipPx?: number }
+  labels: string[],
+  opts: { hasAddButton: boolean; fixedChipPx?: number }
 ): { shown: number; hidden: number } {
+  const total = labels.length;
   if (total <= 0) return { shown: 0, hidden: 0 };
-  const chipPx = opts.chipPx ?? CHIP_MIN_PX;
+  const widthOf = (label: string) =>
+    opts.fixedChipPx ?? estimateChipPx(label);
+
   const available =
     (width || DEFAULT_COLUMN_WIDTH) -
     CELL_PAD_PX -
     (opts.hasAddButton ? ADD_BTN_PX + CHIP_GAP_PX : 0);
-  const fits = Math.floor((available + CHIP_GAP_PX) / (chipPx + CHIP_GAP_PX));
+
+  // First pass: how many fit with no pill at all?
+  let used = 0;
+  let fits = 0;
+  for (const label of labels) {
+    const next = used + (fits > 0 ? CHIP_GAP_PX : 0) + widthOf(label);
+    if (next > available) break;
+    used = next;
+    fits++;
+  }
   if (fits >= total) return { shown: total, hidden: 0 };
-  // The pill costs a slot, so reserve room for it — but always show at
-  // least one chip, or the cell degrades to a bare count with no sample of
-  // what is in it.
-  const withPill = Math.floor(
-    (available - MORE_PILL_PX - CHIP_GAP_PX + CHIP_GAP_PX) /
-      (chipPx + CHIP_GAP_PX)
-  );
-  const shown = Math.max(1, Math.min(total - 1, withPill));
+
+  // Something folds, so the pill now costs space too. Re-measure against the
+  // smaller budget, but always show at least one chip: a bare count with no
+  // sample of the contents is worse than a slightly crowded cell.
+  const withPillBudget = available - MORE_PILL_PX - CHIP_GAP_PX;
+  used = 0;
+  let shown = 0;
+  for (const label of labels) {
+    const next = used + (shown > 0 ? CHIP_GAP_PX : 0) + widthOf(label);
+    if (next > withPillBudget) break;
+    used = next;
+    shown++;
+  }
+  shown = Math.max(1, Math.min(total - 1, shown));
   return { shown, hidden: total - shown };
 }
 
@@ -406,6 +441,8 @@ function DataCell({
   // Select-like cells edit through an anchored option picker instead of a
   // text draft. Seeded from forceEdit the same way (keyed remount), so
   // Enter-on-selected opens it too.
+  // The "+N" expansion: this cell's values, NOT the column vocabulary.
+  const [valuesOpen, setValuesOpen] = useState(false);
   const [optionsOpen, setOptionsOpen] = useState(
     () =>
       forceEdit &&
@@ -541,9 +578,11 @@ function DataCell({
       >
         {(() => {
           const all = links ?? [];
-          const { shown, hidden } = chipBudget(width, all.length, {
-            hasAddButton: editable,
-          });
+          const { shown, hidden } = chipBudget(
+            width,
+            all.map((l) => (l.restricted ? "Restricted" : l.title)),
+            { hasAddButton: editable }
+          );
           return (
             <>
               {all.slice(0, shown).map((link) => (
@@ -653,10 +692,16 @@ function DataCell({
           // Image chips are 28px thumbnails, not ~64px text pills, so the
           // budget is told the real chip size — an Images column fits four
           // or five where a link column fits two.
-          const { shown, hidden } = chipBudget(width, all.length, {
-            hasAddButton: editable,
-            chipPx: column.config.imageOnly ? 28 : undefined,
-          });
+          const { shown, hidden } = chipBudget(
+            width,
+            all.map((r) => (r.restricted ? "Restricted" : r.title)),
+            {
+              hasAddButton: editable,
+              // Image chips are 28px thumbnails, not text pills, so their
+              // width does not follow the label at all.
+              fixedChipPx: column.config.imageOnly ? 28 : undefined,
+            }
+          );
           return (
             <>
               {all.slice(0, shown).map((ref) =>
@@ -858,9 +903,11 @@ function DataCell({
               const opts = value
                 .map((id) => column.config.options?.find((o) => o.id === id))
                 .filter((o): o is NonNullable<typeof o> => Boolean(o));
-              const { shown, hidden } = chipBudget(width, opts.length, {
-                hasAddButton: editable,
-              });
+              const { shown, hidden } = chipBudget(
+                width,
+                opts.map((o) => o.label),
+                { hasAddButton: editable }
+              );
               return (
                 <>
                   {opts.slice(0, shown).map((opt) => (
@@ -875,12 +922,11 @@ function DataCell({
                   {hidden > 0 && (
                     <MoreChip
                       count={hidden}
-                      label={`Show all ${opts.length} options`}
+                      label={`Show this cell's ${opts.length} values`}
                       onClick={(e) => {
                         e.stopPropagation();
                         onSelect(rowId, column.key);
-                        if (editable) setOptionsOpen(true);
-                        else onOpenRow(rowId, column.id);
+                        setValuesOpen(true);
                       }}
                     />
                   )}
@@ -909,15 +955,56 @@ function DataCell({
             +
           </button>
         )}
-        {optionsOpen && editable && (
-          <PanelPortal open onDismiss={close}>
-            <SelectOptionsPanel
-              column={column}
-              value={value}
-              rowId={rowId}
-              onCommit={onCommit}
-              onCreateOption={onCreateOption}
-              onClose={close}
+        {optionsOpen &&
+          editable &&
+          (column.type === "multiSelect" && column.config.freeform ? (
+            // Free-form has no vocabulary to present, so it gets the
+            // type-and-pill editor instead of the checklist.
+            <PanelPortal open onDismiss={close}>
+              <FreeformTagsPanel
+                column={column}
+                value={value}
+                rowId={rowId}
+                onCommit={onCommit}
+                onCreateOption={onCreateOption}
+                onClose={close}
+              />
+            </PanelPortal>
+          ) : (
+            <PanelPortal open onDismiss={close}>
+              <SelectOptionsPanel
+                column={column}
+                value={value}
+                rowId={rowId}
+                onCommit={onCommit}
+                onCreateOption={onCreateOption}
+                onClose={close}
+              />
+            </PanelPortal>
+          ))}
+        {valuesOpen && (
+          <PanelPortal open onDismiss={() => setValuesOpen(false)}>
+            <CellValuesPanel
+              title={column.name}
+              values={(Array.isArray(value) ? value : [])
+                .map((id) => {
+                  const opt = column.config.options?.find((o) => o.id === id);
+                  return opt ? { id: opt.id, label: opt.label } : null;
+                })
+                .filter((v): v is { id: string; label: string } => Boolean(v))}
+              onRemove={
+                editable
+                  ? (id) =>
+                      onCommit(
+                        rowId,
+                        column.key,
+                        (Array.isArray(value) ? value : []).filter(
+                          (v) => v !== id
+                        )
+                      )
+                  : undefined
+              }
+              onClose={() => setValuesOpen(false)}
             />
           </PanelPortal>
         )}
@@ -1119,6 +1206,248 @@ function DataCell({
 }
 
 // ── Select-like option picker ────────────────────────────────────────────
+
+/**
+ * Values-only expansion for a "+N" click.
+ *
+ * The first cut opened the option CHECKLIST, which answers the wrong
+ * question: the user clicked a count of what is in this cell and got the
+ * column's whole vocabulary, most of it unrelated (owner, 2026-09-16). This
+ * lists exactly the cell's values, with an × per row when the cell is
+ * editable — reading is the point, editing is the courtesy.
+ */
+function CellValuesPanel({
+  title,
+  values,
+  onRemove,
+  onClose,
+}: {
+  title: string;
+  values: Array<{ id: string; label: string; muted?: boolean }>;
+  onRemove?: (id: string) => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="min-w-[180px] max-w-[280px] rounded-lg border border-border bg-popover p-1 shadow-lg">
+      <div className="flex items-center justify-between px-2 py-1">
+        <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+          {title}
+        </span>
+        <span className="text-[10px] text-muted-foreground">
+          {values.length}
+        </span>
+      </div>
+      <ul className="max-h-64 overflow-y-auto">
+        {values.map((v) => (
+          <li
+            key={v.id}
+            className="group flex items-center gap-1.5 rounded px-2 py-1 text-xs hover:bg-muted"
+          >
+            <span
+              className={cn(
+                "flex-1 truncate",
+                v.muted && "italic text-muted-foreground"
+              )}
+              title={v.label}
+            >
+              {v.label}
+            </span>
+            {onRemove && (
+              <button
+                type="button"
+                aria-label={`Remove ${v.label}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRemove(v.id);
+                }}
+                className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 group-hover:opacity-100 hover:bg-background hover:text-foreground"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            )}
+          </li>
+        ))}
+      </ul>
+      <button
+        type="button"
+        onClick={onClose}
+        className="mt-0.5 w-full rounded px-2 py-1 text-left text-[11px] text-muted-foreground hover:bg-muted"
+      >
+        Close
+      </button>
+    </div>
+  );
+}
+
+/**
+ * The free-form multi-select editor: type, and each delimiter completes a
+ * pill — the interaction people already know from email "To" fields.
+ *
+ * No checklist, because there is no vocabulary to pick from: whatever is
+ * typed becomes an option (minted server-side on write, capped by
+ * FREEFORM_OPTION_CAP). Quoting keeps a delimiter inside a value, and the
+ * quotes are stripped from the pill — `"hello world"` is one pill reading
+ * `hello world`.
+ *
+ * Backspace on an empty input removes the last pill, which is the other half
+ * of the email-field muscle memory and the reason there is no separate
+ * "delete mode".
+ */
+function FreeformTagsPanel({
+  column,
+  value,
+  rowId,
+  onCommit,
+  onCreateOption,
+  onClose,
+}: {
+  column: DataColumn;
+  value: CellValue | undefined;
+  rowId: string;
+  onCommit: (rowId: string, columnKey: string, value: unknown) => void;
+  onCreateOption?: (
+    column: DataColumn,
+    label: string
+  ) => Promise<{ id: string; label: string } | null>;
+  onClose: () => void;
+}) {
+  const options = column.config.options ?? [];
+  const [items, setItems] = useState<Array<{ id: string; label: string }>>(
+    () =>
+      Array.isArray(value)
+        ? value
+            .map((id) => options.find((o) => o.id === id))
+            .filter((o): o is NonNullable<typeof o> => Boolean(o))
+            .map((o) => ({ id: o.id, label: o.label }))
+        : []
+  );
+  const [draft, setDraft] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const commit = useCallback(
+    (next: Array<{ id: string; label: string }>) => {
+      setItems(next);
+      onCommit(
+        rowId,
+        column.key,
+        next.map((i) => i.id)
+      );
+    },
+    [onCommit, rowId, column.key]
+  );
+
+  /**
+   * Absorb the draft into pills.
+   *
+   * New labels are minted through onCreateOption — the SAME path "+ New
+   * option" uses — rather than left as raw text for the server's freeform
+   * net to mint. Both work, but only this one updates the client's copy of
+   * the column, and without that the cell renders a freshly typed pill as
+   * nothing at all (its id resolves against a stale option list) until the
+   * next refetch. The server-side mint stays the net for the AI and any
+   * non-grid writer.
+   */
+  const flushDraft = useCallback(
+    async (text: string) => {
+      const parts = splitDelimited(text, column.config.splitOn ?? ",");
+      setDraft("");
+      if (parts.length === 0) return;
+
+      const seen = new Set(items.map((i) => i.label.toLowerCase()));
+      const next = [...items];
+      setBusy(true);
+      try {
+        for (const part of parts) {
+          const key = part.toLowerCase();
+          if (seen.has(key)) continue;
+          seen.add(key);
+          const known = (column.config.options ?? []).find(
+            (o) => o.label.trim().toLowerCase() === key
+          );
+          if (known) {
+            next.push({ id: known.id, label: known.label });
+            continue;
+          }
+          const created = onCreateOption
+            ? await onCreateOption(column, part)
+            : null;
+          // No schema permission (or the mint failed): fall back to sending
+          // the LABEL, which the server's freeform pass will mint.
+          if (created) next.push({ id: created.id, label: created.label });
+          else next.push({ id: part, label: part });
+        }
+      } finally {
+        setBusy(false);
+      }
+      if (next.length !== items.length) commit(next);
+    },
+    [items, column, onCreateOption, commit]
+  );
+
+  return (
+    <div className="min-w-[220px] max-w-[320px] rounded-lg border border-border bg-popover p-2 shadow-lg">
+      <div className="flex flex-wrap items-center gap-1 rounded-md border border-border/60 bg-background px-1.5 py-1">
+        {items.map((item, i) => (
+          <span
+            key={`${item.id}-${i}`}
+            className="inline-flex max-w-[12rem] items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[11px]"
+          >
+            <span className="truncate">{item.label}</span>
+            <button
+              type="button"
+              aria-label={`Remove ${item.label}`}
+              onClick={() => commit(items.filter((_, j) => j !== i))}
+              className="shrink-0 rounded text-muted-foreground hover:text-foreground"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </span>
+        ))}
+        <input
+          autoFocus
+          value={draft}
+          disabled={busy}
+          onChange={(e) => {
+            const text = e.target.value;
+            // A delimiter keystroke completes the pill in place, so a value
+            // never sits in the input looking half-entered.
+            const delim = column.config.splitOn ?? ",";
+            if (text.endsWith(delim) || text.endsWith(" ")) {
+              void flushDraft(text);
+              return;
+            }
+            setDraft(text);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === "Tab") {
+              if (draft.trim()) {
+                e.preventDefault();
+                void flushDraft(draft);
+              }
+              return;
+            }
+            if (e.key === "Backspace" && draft === "" && items.length > 0) {
+              e.preventDefault();
+              commit(items.slice(0, -1));
+              return;
+            }
+            if (e.key === "Escape") onClose();
+          }}
+          onBlur={() => {
+            if (draft.trim()) void flushDraft(draft);
+          }}
+          placeholder={items.length === 0 ? "Type a value…" : ""}
+          className="min-w-[6rem] flex-1 bg-transparent px-1 py-0.5 text-xs outline-none disabled:opacity-60"
+        />
+      </div>
+      <p className="mt-1.5 px-0.5 text-[10px] leading-snug text-muted-foreground">
+        Comma, space or Enter completes a value. Quote to keep spaces —
+        <span className="font-mono"> &quot;hello world&quot;</span> is one
+        value.
+      </p>
+    </div>
+  );
+}
 
 interface SelectOptionsPanelProps {
   column: DataColumn;

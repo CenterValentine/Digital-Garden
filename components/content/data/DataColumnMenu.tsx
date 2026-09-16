@@ -113,27 +113,22 @@ interface AddColumnButtonProps {
 /** Picker-only pseudo-type: creates a `file` column with imageOnly set. */
 const IMAGES_KIND = "__images__";
 
-/**
- * Picker-only pseudo-type: a `multiSelect` whose vocabulary GROWS as you
- * type, split on commas. The shallow-list column — jot the values now,
- * without defining a vocabulary first. A config specialization, not an enum
- * member (plan D11 doctrine, same as Images).
- */
-const TAGS_KIND = "__tags__";
 
 /** Display label — "Images" for the imageOnly file specialization. */
 export function columnTypeLabel(column: DataColumn): string {
   if (column.type === "file" && column.config?.imageOnly) return "Images";
-  if (column.type === "multiSelect" && column.config?.freeform) return "Tags";
+  if (column.type === "multiSelect" && column.config?.freeform)
+    return "Multi-Select (free-form)";
   return TYPE_LABEL[column.type] ?? column.type;
 }
 
 export function AddColumnButton({ tableId, columns, onAdd }: AddColumnButtonProps) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
-  const [type, setType] = useState<
-    DataColumnType | typeof IMAGES_KIND | typeof TAGS_KIND
-  >("text");
+  const [type, setType] = useState<DataColumnType | typeof IMAGES_KIND>(
+    "text"
+  );
+  const [freeform, setFreeform] = useState(false);
   const [busy, setBusy] = useState(false);
   const [targetDbId, setTargetDbId] = useState("");
   const [withBacklink, setWithBacklink] = useState(true);
@@ -231,7 +226,7 @@ export function AddColumnButton({ tableId, columns, onAdd }: AddColumnButtonProp
     try {
       let config: DataColumnConfig | undefined;
       if (type === IMAGES_KIND) config = { imageOnly: true };
-      else if (type === TAGS_KIND)
+      else if (type === "multiSelect" && freeform)
         config = { freeform: true, splitOn: ",", options: [] };
       else if (type === "relation") config = { relationTableId: targetDbId };
       else if (type === "lookup")
@@ -250,12 +245,7 @@ export function AddColumnButton({ tableId, columns, onAdd }: AddColumnButtonProp
         config = { defaultChecked: true };
       await onAdd({
         name: trimmed,
-        type:
-          type === IMAGES_KIND
-            ? "file"
-            : type === TAGS_KIND
-              ? "multiSelect"
-              : type,
+        type: type === IMAGES_KIND ? "file" : type,
         config,
         createBacklink: type === "relation" ? withBacklink : undefined,
       });
@@ -266,6 +256,7 @@ export function AddColumnButton({ tableId, columns, onAdd }: AddColumnButtonProp
   }, [
     name,
     type,
+    freeform,
     targetDbId,
     withBacklink,
     isDerived,
@@ -312,12 +303,7 @@ export function AddColumnButton({ tableId, columns, onAdd }: AddColumnButtonProp
         <select
           value={type}
           onChange={(e) =>
-            setType(
-              e.target.value as
-                | DataColumnType
-                | typeof IMAGES_KIND
-                | typeof TAGS_KIND
-            )
+            setType(e.target.value as DataColumnType | typeof IMAGES_KIND)
           }
           className={fieldClass}
         >
@@ -329,10 +315,31 @@ export function AddColumnButton({ tableId, columns, onAdd }: AddColumnButtonProp
           {/* File specialization, not an enum member (plan D11): image-only
               accept + thumbnail cells with a lightbox. */}
           <option value={IMAGES_KIND}>Images</option>
-          {/* multiSelect specialization: options minted as you type, commas
-              split (quote a value to keep its comma). */}
-          <option value={TAGS_KIND}>Tags (free text list)</option>
         </select>
+        {type === "multiSelect" && (
+          // A SETTING on multi-select, not a second entry in the picker: a
+          // "Tags" pseudo-type looked identical to Multi-Select in the
+          // dropdown and behaved identically too, because the difference is
+          // in how the CELL is edited, not in what the column is (owner,
+          // 2026-09-16). Free-form swaps the checklist for a type-and-pill
+          // input — no vocabulary to pick from, just what you type.
+          <label className="mt-2 flex items-start gap-2 text-[11px] text-foreground">
+            <input
+              type="checkbox"
+              checked={freeform}
+              onChange={(e) => setFreeform(e.target.checked)}
+              className="mt-0.5"
+            />
+            <span>
+              Free-form
+              <span className="block text-[10px] text-muted-foreground">
+                Type values instead of choosing them — comma, space or Enter
+                completes each one. Quote a value to keep its spaces or
+                commas.
+              </span>
+            </span>
+          </label>
+        )}
         <p className="mt-1.5 text-[10px] leading-snug text-muted-foreground">
           Type is set once. To change it later, add a new column and move the
           values across.
