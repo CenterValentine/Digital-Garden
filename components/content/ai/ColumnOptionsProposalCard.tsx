@@ -22,10 +22,17 @@ import {
   type SelectOption,
 } from "@/lib/domain/data";
 import { dispatchDataSchemaChanged } from "@/components/content/data/events";
-import { useProposalRevision } from "./use-proposal-revision";
+import {
+  dispatchProposalApplied,
+  useProposalObsolete,
+  useProposalRevision,
+} from "./use-proposal-revision";
 import {
   ModifyProposalButton,
+  ProposalObsoleteNotice,
+  ProposalSupersededNotice,
   ProposalWithdrawnNotice,
+  useSupersededGuard,
 } from "./ProposalRevisionControls";
 
 export interface ColumnOptionsProposalPayload {
@@ -89,8 +96,11 @@ function loadAppliedState(payload: ColumnOptionsProposalPayload): ApplyState {
 
 export function ColumnOptionsProposalCard({
   payload,
+  superseded = false,
 }: {
   payload: ColumnOptionsProposalPayload;
+  /** A later message carries a newer proposal of this kind. */
+  superseded?: boolean;
 }) {
   const [state, setState] = useState<ApplyState>(() =>
     loadAppliedState(payload)
@@ -98,7 +108,8 @@ export function ColumnOptionsProposalCard({
   const [labels, setLabels] = useState<string[]>(() =>
     payload.options.map((o) => o.label)
   );
-  const revision = useProposalRevision(storageKey(payload));
+  const revision = useProposalRevision(storageKey(payload), !superseded);
+  const obsolete = useProposalObsolete("columnOptions", storageKey(payload));
 
   /**
    * Withdraw this card and hand the composer a revision request. The prompt
@@ -180,6 +191,9 @@ export function ColumnOptionsProposalCard({
           /* best-effort persistence */
         }
         setState({ status: "applied", count: 0 });
+        // Retire every OTHER card of this kind: a second apply now
+        // duplicates real tables rather than revising them.
+        dispatchProposalApplied("columnOptions", storageKey(payload));
         toast.info(`Those options are already on "${payload.columnName}"`);
         return;
       }
@@ -216,6 +230,9 @@ export function ColumnOptionsProposalCard({
       // Any open grid or context rail for this table reloads.
       dispatchDataSchemaChanged(payload.databaseId, "chat");
       setState({ status: "applied", count: fresh.length });
+      // Retire every OTHER card of this kind: a second apply now
+      // duplicates real tables rather than revising them.
+      dispatchProposalApplied("columnOptions", storageKey(payload));
       toast.success(
         payload.replace
           ? `Options replaced on "${payload.columnName}"`
@@ -228,6 +245,12 @@ export function ColumnOptionsProposalCard({
       toast.error(message);
     }
   }, [payload, labels, checked]);
+
+  const guard = useSupersededGuard(superseded, apply);
+
+  if (obsolete && state.status !== "applied") {
+    return <ProposalObsoleteNotice label="option set" />;
+  }
 
   if (revision.withdrawn) {
     return (
@@ -325,10 +348,12 @@ export function ColumnOptionsProposalCard({
         </div>
       )}
 
+      {superseded && <ProposalSupersededNotice />}
+
       <div className="flex flex-wrap items-center gap-2">
         <button
         type="button"
-        onClick={apply}
+        onClick={guard.onClick}
         disabled={state.status === "applying" || selectedCount === 0}
         className="inline-flex items-center gap-1.5 rounded-md border border-indigo-500/40 bg-indigo-500/[0.08] px-2.5 py-1 text-xs font-medium text-indigo-700 hover:bg-indigo-500/[0.14] disabled:cursor-not-allowed disabled:opacity-60 dark:border-indigo-400/30 dark:bg-indigo-500/[0.10] dark:text-indigo-300 dark:hover:bg-indigo-500/[0.18]"
       >
@@ -340,7 +365,11 @@ export function ColumnOptionsProposalCard({
         ) : state.status === "error" ? (
           "Retry"
         ) : (
-          `Apply ${selectedCount} of ${payload.options.length}`
+          guard.confirming ? (
+            "Apply anyway?"
+          ) : (
+            `Apply ${selectedCount} of ${payload.options.length}`
+          )
         )}
         </button>
         <ModifyProposalButton

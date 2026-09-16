@@ -154,6 +154,13 @@ export interface SelectOption {
   group?: StatusGroup;
 }
 
+/**
+ * Ceiling on options a freeform multiSelect may mint. Past this the column
+ * is not merely large — it is the wrong shape, and the write refuses with a
+ * message that names the promotion path rather than a number.
+ */
+export const FREEFORM_OPTION_CAP = 200;
+
 /** Rollup aggregations (plan Phase 4). All computed at read time (D6). */
 export const ROLLUP_FNS = ["count", "sum", "min", "max", "join"] as const;
 export type RollupFn = (typeof ROLLUP_FNS)[number];
@@ -221,6 +228,32 @@ export interface DataColumnConfig {
   /** `checkbox` — new rows start checked (stamped in createRows, so every
    * creation path — grid, board, forms, AI inserts — agrees). */
   defaultChecked?: boolean;
+  /**
+   * `multiSelect` — the vocabulary GROWS as the user types instead of being
+   * fixed up front. A label with no matching option mints one on write.
+   *
+   * This is the shallow-list capability: jot "Redis, Postgres, Zod" now,
+   * without stopping to define a vocabulary first. It stays a real
+   * `string[]` of option ids underneath, so `hasAny`/`hasAll`/`hasNone`,
+   * grouping, board views and digests all keep working — a comma-delimited
+   * `text` column would have bought the same typing convenience and lost
+   * every one of them.
+   *
+   * Minting is CAPPED (FREEFORM_OPTION_CAP). `config.options` is a JSON blob
+   * on the column row with no garbage collection, and `digest.ts` truncates
+   * the vocabulary it shows the AI at OPTION_CAP — past that the model
+   * proposes duplicates of options it cannot see. So the cap is not a
+   * limitation to hide but the moment to say the list has outgrown a cell
+   * and should become a table.
+   */
+  freeform?: boolean;
+  /**
+   * `multiSelect` — a delimiter that splits a typed or pasted STRING into
+   * the list this column stores. A parse hint, never a storage format: the
+   * cell still holds `string[]`, and nothing downstream learns about the
+   * comma. Quoted fields are honoured, so "Portland, OR" stays one item.
+   */
+  splitOn?: string;
   /** `relation` — the DataPayload.contentId this column points at. */
   relationTableId?: string;
   /** `relation` — the column id on the far side that mirrors this one. */

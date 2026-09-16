@@ -68,6 +68,7 @@ import {
   LinkedDatabasesProposalCard,
   type LinkedDatabasesProposalPayload,
 } from "./LinkedDatabasesProposalCard";
+import type { LatestProposalIndex } from "./use-proposal-revision";
 import {
   BatchGalleryCard,
   type BatchGalleryGroup,
@@ -316,6 +317,13 @@ interface ChatMessageProps {
    */
   messageIndex?: number;
   foldBoundary?: { messageIdx: number; partIdx: number } | null;
+  /**
+   * Last message index carrying a proposal of each kind (ChatPanel memo).
+   * A card in an EARLIER message than the latest of its kind renders
+   * superseded — Apply behind a confirm — so a re-proposal prompted by a
+   * typed reply cannot leave two equally live Apply buttons.
+   */
+  latestProposalIndex?: LatestProposalIndex;
   /** Bulk database reads: fold/pin state per part (bulkReadFoldStates). */
   bulkReadFolds?: Map<string, BulkReadFoldState> | null;
   /**
@@ -502,6 +510,7 @@ export const ChatMessage = memo(function ChatMessage({
   message,
   isStreaming = false,
   messageIndex,
+  latestProposalIndex,
   foldBoundary = null,
   bulkReadFolds = null,
   sessionUsage = null,
@@ -1548,10 +1557,17 @@ export const ChatMessage = memo(function ChatMessage({
             config. The already-applied flag is keyed by proposal CONTENT
             inside the card: message ids change when a streamed conversation
             persists, so they cannot key anything durable. */}
+        {/* A card demotes when a STRICTLY later message carries a proposal
+            of the same kind — same-turn siblings both stay live. */}
         {columnOptionsProposals.map((payload, i) => (
           <ColumnOptionsProposalCard
             key={`column-options-${i}`}
             payload={payload}
+            superseded={
+              messageIndex !== undefined &&
+              latestProposalIndex?.columnOptions !== undefined &&
+              messageIndex < latestProposalIndex.columnOptions
+            }
           />
         ))}
 
@@ -1562,6 +1578,11 @@ export const ChatMessage = memo(function ChatMessage({
           <DatabaseColumnsProposalCard
             key={`db-columns-${i}`}
             payload={payload}
+            superseded={
+              messageIndex !== undefined &&
+              latestProposalIndex?.databaseColumns !== undefined &&
+              messageIndex < latestProposalIndex.databaseColumns
+            }
           />
         ))}
 
@@ -1571,6 +1592,11 @@ export const ChatMessage = memo(function ChatMessage({
           <OutputDatabaseProposalCard
             key={`output-db-${i}`}
             payload={payload}
+            superseded={
+              messageIndex !== undefined &&
+              latestProposalIndex?.outputDatabase !== undefined &&
+              messageIndex < latestProposalIndex.outputDatabase
+            }
           />
         ))}
 
@@ -1580,6 +1606,11 @@ export const ChatMessage = memo(function ChatMessage({
           <LinkedDatabasesProposalCard
             key={`linked-dbs-${i}`}
             payload={payload}
+            superseded={
+              messageIndex !== undefined &&
+              latestProposalIndex?.linkedDatabases !== undefined &&
+              messageIndex < latestProposalIndex.linkedDatabases
+            }
           />
         ))}
 

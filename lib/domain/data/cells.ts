@@ -174,6 +174,61 @@ function encodeOptionIds(raw: unknown, column: DataColumn): EncodeResult {
   return out.length === 0 ? ok(undefined) : ok(out);
 }
 
+// ── Delimited input (config.splitOn) ─────────────────────────────────────
+
+/**
+ * Split one typed/pasted string into list items, honouring quoted fields.
+ *
+ * `Redis, Postgres` → ["Redis", "Postgres"]
+ * `"Portland, OR", Seattle` → ["Portland, OR", "Seattle"]
+ * `He said ""hi""` → [`He said "hi"`]   (doubled quote escapes a quote)
+ *
+ * These are RFC 4180 field semantics, and the doubled-quote escape is the
+ * reason this is hand-written rather than a `.split(delimiter)`: the
+ * repo's prefer-a-library rule was checked and no CSV parser is a
+ * dependency (import.ts hand-rolls its own), and pulling ~45KB of
+ * papaparse to split a single field is not the trade. A naive split would
+ * silently shred any label containing the delimiter — the exact bug that
+ * already exists in read-format.ts's display-string round-trip.
+ *
+ * Empty fields are dropped: a trailing comma is a typing artefact, not an
+ * instruction to store "".
+ */
+export function splitDelimited(raw: string, delimiter: string): string[] {
+  const delim = delimiter.length > 0 ? delimiter[0] : ",";
+  const out: string[] = [];
+  let field = "";
+  let quoted = false;
+  for (let i = 0; i < raw.length; i++) {
+    const ch = raw[i];
+    if (quoted) {
+      if (ch === '"') {
+        if (raw[i + 1] === '"') {
+          field += '"';
+          i++;
+        } else {
+          quoted = false;
+        }
+      } else {
+        field += ch;
+      }
+      continue;
+    }
+    if (ch === '"') {
+      quoted = true;
+      continue;
+    }
+    if (ch === delim) {
+      out.push(field.trim());
+      field = "";
+      continue;
+    }
+    field += ch;
+  }
+  out.push(field.trim());
+  return out.filter((f) => f.length > 0);
+}
+
 // ── Simple validators ────────────────────────────────────────────────────
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

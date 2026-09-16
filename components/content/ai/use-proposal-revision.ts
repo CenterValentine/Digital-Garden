@@ -29,7 +29,7 @@
  * mind must not destroy the proposal.
  */
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 /** Fired at ChatPanel, which pre-fills the composer with `detail.prompt`. */
 export const PROPOSAL_REVISE_EVENT = "dg:proposal-revise";
@@ -67,8 +67,23 @@ export interface ProposalRevision {
   restore: () => void;
 }
 
-export function useProposalRevision(storageKey: string): ProposalRevision {
-  const [withdrawn, setWithdrawn] = useState(() => loadWithdrawn(storageKey));
+/**
+ * @param isNewest whether this card is the latest proposal of its kind in
+ *   the conversation. It suppresses a STALE withdrawn flag: the flag is
+ *   keyed by content hash (message ids churn when a streamed conversation
+ *   persists, so id-keying vanishes on reload), which means withdrawing a
+ *   schema, asking for changes, then asking to revert produces an identical
+ *   re-proposal under the SAME key — and the fresh card would mount already
+ *   withdrawn. A card that is the newest of its kind is by definition not
+ *   the one that was withdrawn.
+ */
+export function useProposalRevision(
+  storageKey: string,
+  isNewest = false
+): ProposalRevision {
+  const [withdrawn, setWithdrawn] = useState(() =>
+    isNewest ? false : loadWithdrawn(storageKey)
+  );
 
   const persist = useCallback(
     (value: boolean) => {
@@ -101,4 +116,124 @@ export function useProposalRevision(storageKey: string): ProposalRevision {
   }, [persist]);
 
   return { withdrawn, requestRevision, restore };
+}
+
+// ── Supersession (the typed-reply path) ──────────────────────────────────
+//
+// Modify is the EXPLICIT exit, but most users ask for changes by typing a
+// reply instead of hunting for a button — and the model is now told a
+// proposal is a draft it may freely re-issue, so the conversational path is
+// the common one. Left alone it produces two live Apply buttons, and
+// applying the stale one builds a superseded schema in one transaction.
+//
+// So an older unapplied proposal of the same kind DEMOTES when a newer one
+// arrives: it stays visible and still applicable, behind a confirm, under a
+// note saying it was replaced. Demote rather than auto-withdraw, because
+// supersession here is INFERRED from ordering — the model may legitimately
+// propose two unrelated schemas in one turn — and an inference must not
+// silently destroy an option the user may still want. Modify stays the
+// confident path; this is the net under the other one.
+
+export const PROPOSAL_SENTINELS = {
+  linkedDatabases: '"__linkedDatabasesProposal"',
+  outputDatabase: '"__outputDatabaseProposal"',
+  databaseColumns: '"__databaseColumnsProposal"',
+  columnOptions: '"__columnOptionsProposal"',
+} as const;
+
+export type ProposalKind = keyof typeof PROPOSAL_SENTINELS;
+
+/** Last message index carrying a proposal of each kind. Missing = none. */
+export type LatestProposalIndex = Partial<Record<ProposalKind, number>>;
+
+/**
+ * Scans serialized message parts for each proposal sentinel. A string scan,
+ * not a parse: the card parsers already gate on exactly this `includes`
+ * check before doing any JSON work, and this runs over every message on
+ * every render, so the cheap half is the right half to reuse.
+ *
+ * SAME-TURN siblings are deliberately not superseded — only a STRICTLY
+ * later message demotes an earlier one — so a turn that proposes two
+ * related schemas leaves both live.
+ */
+export function latestProposalIndexByKind(
+  messages: ReadonlyArray<{ parts?: unknown }>
+): LatestProposalIndex {
+  const latest: LatestProposalIndex = {};
+  for (let i = 0; i < messages.length; i++) {
+    const parts = messages[i]?.parts;
+    if (!parts) continue;
+    let serialized: string;
+    try {
+      serialized = JSON.stringify(parts);
+    } catch {
+      continue;
+    }
+    for (const [kind, sentinel] of Object.entries(PROPOSAL_SENTINELS)) {
+      if (serialized.includes(sentinel)) {
+        latest[kind as ProposalKind] = i;
+      }
+    }
+  }
+  return latest;
+}
+
+// ── Obsolescence (a sibling actually landed) ─────────────────────────────
+//
+// Demotion alone is not enough once something has been APPLIED. A superseded
+// card is merely "probably not what you want"; a card whose sibling has
+// already created real tables is actively dangerous, because applying it now
+// does not replace that work — it duplicates it, and `propose_linked_
+// databases` duplicates a whole table set in one transaction.
+//
+// So the rule is blunt on purpose: once ANY proposal of kind K is applied,
+// every OTHER card of kind K retires and loses its Apply entirely. No index
+// comparison, no "was this one newer" reasoning — if a schema of this kind
+// now exists, the honest move is to ask the model what to do next, not to
+// stack a second one from a stale card.
+//
+// Session-scoped by design: this rides the CustomEvent seam the rest of the
+// database feature uses rather than persisting. After a reload the applied
+// card still reads applied and its siblings still read superseded (Apply
+// behind a confirm), so the failure mode of forgetting is a weaker warning,
+// never a missing one.
+
+export const PROPOSAL_APPLIED_EVENT = "dg:proposal-applied";
+
+export interface ProposalAppliedDetail {
+  kind: ProposalKind;
+  /** The applying card's storage key, so it can skip its own echo. */
+  key: string;
+}
+
+export function dispatchProposalApplied(
+  kind: ProposalKind,
+  key: string
+): void {
+  window.dispatchEvent(
+    new CustomEvent<ProposalAppliedDetail>(PROPOSAL_APPLIED_EVENT, {
+      detail: { kind, key },
+    })
+  );
+}
+
+/** True once a DIFFERENT card of the same kind has been applied. */
+export function useProposalObsolete(
+  kind: ProposalKind,
+  storageKey: string
+): boolean {
+  const [obsolete, setObsolete] = useState(false);
+  useEffect(() => {
+    function onApplied(e: Event) {
+      const detail = (e as CustomEvent).detail as
+        | ProposalAppliedDetail
+        | undefined;
+      if (!detail || detail.kind !== kind) return;
+      if (detail.key === storageKey) return; // our own apply
+      setObsolete(true);
+    }
+    window.addEventListener(PROPOSAL_APPLIED_EVENT, onApplied);
+    return () => window.removeEventListener(PROPOSAL_APPLIED_EVENT, onApplied);
+  }, [kind, storageKey]);
+  return obsolete;
 }

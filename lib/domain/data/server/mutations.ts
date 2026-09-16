@@ -24,7 +24,11 @@ import {
   deriveTableSearchText,
   encodeCell,
   isEncodeError,
+  generateColumnKey,
   generateUniqueColumnKey,
+  splitDelimited,
+  FREEFORM_OPTION_CAP,
+  type SelectOption,
   keyAtEnd,
   keysBetween,
   type CellValue,
@@ -32,6 +36,9 @@ import {
   type DataColumnConfig,
   type RowData,
 } from "@/lib/domain/data";
+// Not re-exported from the barrel (capture-core is capture-path code), but
+// pure and client-safe — it is the label/delimiter tolerance seam.
+import { translateOptionValue } from "@/lib/domain/data/capture-core";
 
 // ── Results ──────────────────────────────────────────────────────────────
 
@@ -73,6 +80,70 @@ export function isSystemColumnConfig(config: unknown): boolean {
 // canonicalJson lives in digest-hash.ts (shared with the row source hash).
 
 /**
+ * Grow a freeform multiSelect's vocabulary to cover the labels being written.
+ *
+ * MUTATES the column objects in `byKey` as well as the database row, because
+ * the validation pass that follows reads `column.config.options` to resolve
+ * labels — handing it the pre-mint column would reject the very options just
+ * created.
+ *
+ * Returns an error message (aborting the whole write) only when the cap is
+ * hit. That refusal is deliberate and is the feature's honest edge: an
+ * unbounded `config.options` blob degrades every schema read and silently
+ * truncates the vocabulary the AI can see, so the right answer past the cap
+ * is a table, not a bigger cell.
+ */
+async function mintFreeformOptions(
+  tx: Prisma.TransactionClient,
+  byKey: Map<string, DataColumn>,
+  writes: CellWrite[]
+): Promise<string | null> {
+  for (const [, column] of byKey) {
+    if (column.type !== "multiSelect" || !column.config.freeform) continue;
+
+    const relevant = writes.filter((w) => w.columnKey === column.key);
+    if (relevant.length === 0) continue;
+
+    const existing = column.config.options ?? [];
+    const seen = new Set(existing.map((o) => o.label.trim().toLowerCase()));
+    const byId = new Set(existing.map((o) => o.id));
+    const minted: SelectOption[] = [];
+
+    for (const write of relevant) {
+      // The value has already been through translateOptionValue, so known
+      // labels arrive as ids and only genuinely new labels are still text.
+      const raw =
+        typeof write.value === "string" && column.config.splitOn
+          ? splitDelimited(write.value, column.config.splitOn)
+          : write.value;
+      if (!Array.isArray(raw)) continue;
+      for (const entry of raw) {
+        if (typeof entry !== "string") continue;
+        const label = entry.trim();
+        if (!label || byId.has(label)) continue;
+        const key = label.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        minted.push({ id: generateColumnKey(), label: label.slice(0, 120) });
+      }
+    }
+
+    if (minted.length === 0) continue;
+    if (existing.length + minted.length > FREEFORM_OPTION_CAP) {
+      return `"${column.name}" would exceed ${FREEFORM_OPTION_CAP} options. A list this varied has outgrown a cell — turn it into its own database and link to it with a relation column.`;
+    }
+
+    const options = [...existing, ...minted];
+    column.config = { ...column.config, options };
+    await tx.dataColumn.update({
+      where: { id: column.id },
+      data: { config: column.config as unknown as Prisma.InputJsonValue },
+    });
+  }
+  return null;
+}
+
+/**
  * Write cells, optionally under CAS.
  *
  * All-or-nothing per call: a pasted range is one undo entry, so a partially
@@ -100,6 +171,23 @@ export async function writeCells(
 
     const results: CellWriteResult[] = [];
     const nextByRow = new Map<string, RowData>();
+
+    // Pass 0 — freeform multiSelect: mint options for labels that do not
+    // exist yet, IN THIS TRANSACTION, before anything is encoded.
+    //
+    // Minting cannot live in translateOptionValue with the rest of the
+    // label tolerance: that function is pure and cannot persist a
+    // vocabulary. It cannot live after encoding either, because the strict
+    // encoder rejects an unknown option — so the vocabulary has to grow
+    // first, and the column objects the loop below reads have to be the
+    // grown ones. Hence a pass of its own.
+    const mintError = await mintFreeformOptions(tx, byKey, writes);
+    if (mintError) {
+      return {
+        ok: false,
+        results: [{ status: "error", rowId: writes[0].rowId, message: mintError }],
+      };
+    }
 
     // Pass 1 — validate and check preconditions. Nothing is written yet.
     for (const write of writes) {
@@ -136,7 +224,21 @@ export async function writeCells(
         }
       }
 
-      const encoded = encodeCell(column, write.value);
+      // Shallow-list columns accept LABELS and delimited strings, not just
+      // option ids. translateOptionValue is the label-tolerance seam, but it
+      // only ran on the AI capture path (capture-core's normalizeCellInput)
+      // — the grid writes straight through here, so a user typing
+      // "Redis, Postgres" into a freeform cell would mint the options in
+      // pass 0 and then fail the strict encoder anyway. Applied narrowly to
+      // multiSelect rather than normalizing every type, so the grid's
+      // existing strictness elsewhere is unchanged.
+      const value =
+        column.type === "multiSelect" &&
+        (column.config.freeform || column.config.splitOn)
+          ? translateOptionValue(column, write.value)
+          : write.value;
+
+      const encoded = encodeCell(column, value);
       if (isEncodeError(encoded)) {
         results.push({
           status: "error",

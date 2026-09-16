@@ -18,10 +18,17 @@ import { useCallback, useState } from "react";
 import { Check, Loader2, Table2 } from "lucide-react";
 import { toast } from "sonner";
 import { useContentStore } from "@/state/content-store";
-import { useProposalRevision } from "./use-proposal-revision";
+import {
+  dispatchProposalApplied,
+  useProposalObsolete,
+  useProposalRevision,
+} from "./use-proposal-revision";
 import {
   ModifyProposalButton,
+  ProposalObsoleteNotice,
+  ProposalSupersededNotice,
   ProposalWithdrawnNotice,
+  useSupersededGuard,
 } from "./ProposalRevisionControls";
 
 export interface OutputDatabaseProposalPayload {
@@ -118,13 +125,17 @@ function describeLink(
 
 export function OutputDatabaseProposalCard({
   payload,
+  superseded = false,
 }: {
   payload: OutputDatabaseProposalPayload;
+  /** A later message carries a newer proposal of this kind. */
+  superseded?: boolean;
 }) {
   const [state, setState] = useState<ApplyState>(() =>
     loadAppliedState(payload),
   );
-  const revision = useProposalRevision(storageKey(payload));
+  const revision = useProposalRevision(storageKey(payload), !superseded);
+  const obsolete = useProposalObsolete("outputDatabase", storageKey(payload));
 
   /**
    * Withdraw this card and hand the composer a revision request. The prompt
@@ -171,6 +182,9 @@ export function OutputDatabaseProposalCard({
         /* best-effort persistence */
       }
       setState({ status: "applied", tableId });
+      // Retire every OTHER card of this kind: a second apply now
+      // duplicates real tables rather than revising them.
+      dispatchProposalApplied("outputDatabase", storageKey(payload));
       toast.success(`"${payload.title}" created`);
     } catch (err) {
       const message =
@@ -181,6 +195,12 @@ export function OutputDatabaseProposalCard({
       toast.error(message);
     }
   }, [payload]);
+
+  const guard = useSupersededGuard(superseded, apply);
+
+  if (obsolete && state.status !== "applied") {
+    return <ProposalObsoleteNotice label="database" />;
+  }
 
   if (revision.withdrawn) {
     return (
@@ -289,10 +309,12 @@ export function OutputDatabaseProposalCard({
         </div>
       )}
 
+      {superseded && <ProposalSupersededNotice />}
+
       <div className="flex items-center gap-2">
         <button
           type="button"
-          onClick={apply}
+          onClick={guard.onClick}
           disabled={state.status === "applying"}
           className="inline-flex items-center gap-1 rounded-md bg-sky-600/90 px-2.5 py-1 text-[11px] font-medium text-white transition-colors hover:bg-sky-600 disabled:opacity-50"
         >
@@ -301,7 +323,7 @@ export function OutputDatabaseProposalCard({
           ) : (
             <Check className="h-3 w-3" />
           )}
-          Create database
+          {guard.confirming ? "Apply anyway?" : "Create database"}
         </button>
         <ModifyProposalButton
           onClick={askForChanges}

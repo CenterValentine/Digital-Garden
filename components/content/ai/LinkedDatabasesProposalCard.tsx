@@ -21,10 +21,17 @@ import { AlertTriangle, ArrowRight, Check, Database, Loader2 } from "lucide-reac
 import { toast } from "sonner";
 import { dispatchDataSchemaChanged } from "@/components/content/data/events";
 import { useContentStore } from "@/state/content-store";
-import { useProposalRevision } from "./use-proposal-revision";
+import {
+  dispatchProposalApplied,
+  useProposalObsolete,
+  useProposalRevision,
+} from "./use-proposal-revision";
 import {
   ModifyProposalButton,
+  ProposalObsoleteNotice,
+  ProposalSupersededNotice,
   ProposalWithdrawnNotice,
+  useSupersededGuard,
 } from "./ProposalRevisionControls";
 
 const NEW_PREFIX = "$new:";
@@ -156,13 +163,17 @@ function describeComputed(col: ProposedColumn): string | null {
 
 export function LinkedDatabasesProposalCard({
   payload,
+  superseded = false,
 }: {
   payload: LinkedDatabasesProposalPayload;
+  /** A later message carries a newer proposal of this kind. */
+  superseded?: boolean;
 }) {
   const [state, setState] = useState<ApplyState>(() =>
     loadAppliedState(payload),
   );
-  const revision = useProposalRevision(storageKey(payload));
+  const revision = useProposalRevision(storageKey(payload), !superseded);
+  const obsolete = useProposalObsolete("linkedDatabases", storageKey(payload));
 
   /**
    * The revision request names the tables by title so the model knows which
@@ -234,6 +245,9 @@ export function LinkedDatabasesProposalCard({
         /* best-effort persistence */
       }
       setState({ status: "applied", tables: created });
+      // Retire every OTHER card of this kind: a second apply now
+      // duplicates real tables rather than revising them.
+      dispatchProposalApplied("linkedDatabases", storageKey(payload));
       toast.success(
         created.length > 0
           ? `${created.length} database${created.length === 1 ? "" : "s"} created`
@@ -246,6 +260,12 @@ export function LinkedDatabasesProposalCard({
       toast.error(message);
     }
   }, [payload]);
+
+  const guard = useSupersededGuard(superseded, apply);
+
+  if (obsolete && state.status !== "applied") {
+    return <ProposalObsoleteNotice label="schema" />;
+  }
 
   if (revision.withdrawn) {
     return (
@@ -410,10 +430,12 @@ export function LinkedDatabasesProposalCard({
         </div>
       )}
 
+      {superseded && <ProposalSupersededNotice />}
+
       <div className="flex flex-wrap items-center gap-2">
         <button
         type="button"
-        onClick={apply}
+        onClick={guard.onClick}
         disabled={state.status === "applying"}
         className="inline-flex items-center gap-1.5 rounded-md border border-sky-500/40 bg-sky-500/[0.08] px-2.5 py-1 text-xs font-medium text-sky-700 hover:bg-sky-500/[0.14] disabled:cursor-not-allowed disabled:opacity-60 dark:border-sky-400/30 dark:bg-sky-500/[0.10] dark:text-sky-300 dark:hover:bg-sky-500/[0.18]"
       >
@@ -425,7 +447,11 @@ export function LinkedDatabasesProposalCard({
         ) : state.status === "error" ? (
           "Try again"
         ) : (
-          "Create all"
+          guard.confirming ? (
+            "Apply anyway?"
+          ) : (
+            "Create all"
+          )
         )}
         </button>
         <ModifyProposalButton

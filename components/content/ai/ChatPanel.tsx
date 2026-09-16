@@ -20,7 +20,10 @@ import { PROVIDER_CATALOG } from "@/lib/domain/ai/providers/catalog";
 import { getProviderTheme } from "@/lib/design/system/ai-providers";
 import { useResolvedTheme } from "@/lib/features/theme/useResolvedTheme";
 import { ProviderIcon } from "./ProviderIcon";
-import { PROPOSAL_REVISE_EVENT } from "./use-proposal-revision";
+import {
+  PROPOSAL_REVISE_EVENT,
+  latestProposalIndexByKind,
+} from "./use-proposal-revision";
 import { toast } from "sonner";
 import { useEditorInstanceStore } from "@/state/editor-instance-store";
 import {
@@ -984,6 +987,15 @@ export function ChatPanel({
   );
   // P4c: the active iteration run's fold boundary — parts before it render
   // collapsed, mirroring exactly what the model-facing assembly stubs.
+  // Which message last carried a proposal of each kind. An older unapplied
+  // card demotes when a newer one arrives (see use-proposal-revision) —
+  // the net under the typed-reply path, where the user asks for changes in
+  // prose instead of clicking Modify and nothing withdraws on its own.
+  const latestProposalIndex = useMemo(
+    () => latestProposalIndexByKind(messages),
+    [messages]
+  );
+
   const iterationFoldBoundary = useMemo(
     () => findIterationFoldBoundary(messages),
     [messages],
@@ -1118,6 +1130,7 @@ export function ChatPanel({
                   message={message}
                   messageIndex={i}
                   foldBoundary={iterationFoldBoundary}
+                  latestProposalIndex={latestProposalIndex}
                   bulkReadFolds={bulkReadFolds}
                   sessionUsage={sessionUsage}
                   charterAttached={charterAttached}
