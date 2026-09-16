@@ -39,6 +39,7 @@ import {
   clearConflictDraft,
 } from "@/state/save-conflict-store";
 import { SaveConflictBanner } from "./SaveConflictBanner";
+import { SaveConflictDiff } from "./SaveConflictDiff";
 import { ContentPathBreadcrumb } from "./ContentPathBreadcrumb";
 import { EditorSkeleton } from "@/components/content/skeletons/EditorSkeleton";
 import { useTreeStateStore } from "@/state/tree-state-store";
@@ -311,13 +312,15 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
   const [titleDraft, setTitleDraft] = useState("");
   const titleInputRef = useRef<HTMLInputElement>(null);
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
-  // Read-only "their version" preview for the save-conflict "Open theirs"
-  // action — tabs are contentId-keyed, so we can't open a second tab for the
-  // same doc; a modal lets the user compare before choosing keep/take.
-  const [theirsPreview, setTheirsPreview] = useState<{
-    title: string;
-    content: JSONContent;
-  } | null>(null);
+  // Conflict comparison. Holds the SERVER copy; "mine" comes from the live
+  // conflict record, which now tracks the editor on every refused save.
+  const [conflictDiff, setConflictDiff] = useState<{
+    open: boolean;
+    theirs: JSONContent | null;
+    theirsUpdatedAt: string | null;
+    loading: boolean;
+    error: string | null;
+  }>({ open: false, theirs: null, theirsUpdatedAt: null, loading: false, error: null });
   const [contentCustomIcon, setContentCustomIcon] = useState<string | null>(null);
   const [contentIconColor, setContentIconColor] = useState<string | null>(null);
   const [contentType, setContentType] = useState<string | null>(null);
@@ -1284,45 +1287,64 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
   // Keep mine: re-save the user's edits, deliberately overwriting the newer
   // server copy. Advancing the baseline to the server's current hash makes the
   // forced PATCH's If-Match match, so it wins in one round-trip.
+  const closeConflictDiff = useCallback(() => {
+    setConflictDiff((prev) => ({ ...prev, open: false }));
+  }, []);
+
   const handleConflictKeepMine = useCallback(() => {
     if (!activeConflict || !selectedContentId) return;
     bodyHashRef.current = activeConflict.theirHash;
     const mine = activeConflict.mine;
     clearConflict(selectedContentId);
     clearConflictDraft(selectedContentId);
+    closeConflictDiff();
     void handleSave(mine, { userInitiated: true });
-  }, [activeConflict, selectedContentId, clearConflict, handleSave]);
+  }, [activeConflict, selectedContentId, clearConflict, handleSave, closeConflictDiff]);
 
   // Take theirs: discard local edits and reload the latest server version.
   const handleConflictTakeTheirs = useCallback(() => {
     if (!selectedContentId) return;
     clearConflict(selectedContentId);
     clearConflictDraft(selectedContentId);
+    closeConflictDiff();
     setRefreshTrigger((n) => n + 1);
-  }, [selectedContentId, clearConflict]);
+  }, [selectedContentId, clearConflict, closeConflictDiff]);
 
-  // Open theirs: fetch the latest server copy into a read-only preview so the
-  // user can compare/copy before deciding.
-  const handleConflictOpenTheirs = useCallback(async () => {
+  // Compare: fetch the server copy and open the diff. Opens FIRST with a
+  // loading state rather than after the round trip, so the click is
+  // acknowledged immediately and a slow fetch cannot look like a dead button.
+  const handleConflictCompare = useCallback(async () => {
     if (!selectedContentId) return;
+    setConflictDiff({
+      open: true,
+      theirs: null,
+      theirsUpdatedAt: null,
+      loading: true,
+      error: null,
+    });
     try {
       const res = await fetch(`/api/content/content/${selectedContentId}`, {
         credentials: "include",
       });
       const json = await res.json();
       const rawJson = json?.data?.note?.tiptapJson;
-      if (json?.success && rawJson) {
-        const parsed =
-          typeof rawJson === "string" ? JSON.parse(rawJson) : rawJson;
-        setTheirsPreview({
-          title: json.data.title ?? "Their version",
-          content: parsed as JSONContent,
-        });
-      } else {
-        toast.error("Couldn't load the other version.");
+      if (!json?.success || !rawJson) {
+        throw new Error(json?.error?.message ?? "no note body in the response");
       }
-    } catch {
-      toast.error("Couldn't load the other version.");
+      const parsed = typeof rawJson === "string" ? JSON.parse(rawJson) : rawJson;
+      setConflictDiff({
+        open: true,
+        theirs: parsed as JSONContent,
+        theirsUpdatedAt: json.data.note?.updatedAt ?? null,
+        loading: false,
+        error: null,
+      });
+    } catch (err) {
+      setConflictDiff((prev) => ({
+        ...prev,
+        loading: false,
+        error: err instanceof Error ? err.message : "request failed",
+      }));
     }
   }, [selectedContentId]);
 
@@ -2665,9 +2687,18 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
           active={Boolean(activeConflict)}
           onKeepMine={handleConflictKeepMine}
           onTakeTheirs={handleConflictTakeTheirs}
-          onOpenTheirs={handleConflictOpenTheirs}
-          theirsPreview={theirsPreview}
-          onCloseTheirs={() => setTheirsPreview(null)}
+          onCompare={handleConflictCompare}
+        />
+        <SaveConflictDiff
+          open={conflictDiff.open}
+          mine={activeConflict?.mine ?? null}
+          theirs={conflictDiff.theirs}
+          theirsUpdatedAt={conflictDiff.theirsUpdatedAt}
+          loading={conflictDiff.loading}
+          error={conflictDiff.error}
+          onKeepMine={handleConflictKeepMine}
+          onTakeTheirs={handleConflictTakeTheirs}
+          onClose={closeConflictDiff}
         />
         {isNonNoteContent ? (
           <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
