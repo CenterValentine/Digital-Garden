@@ -12,7 +12,7 @@
  * (preparation) in the P1/P2 build; behavior unchanged.
  */
 
-import { encodeCell, isEncodeError } from "./cells";
+import { encodeCell, isEncodeError, splitDelimited } from "./cells";
 import type { DataColumn } from "./types";
 
 // ── Column helpers (moved from server/resolve.ts) ─────────────────────────
@@ -48,8 +48,17 @@ export function translateOptionValue(
     return byLabel ? byLabel.id : v;
   };
   if (column.type === "select" || column.type === "status") return toId(value);
-  if (column.type === "multiSelect" && Array.isArray(value)) {
-    return value.map(toId);
+  if (column.type === "multiSelect") {
+    // A delimited STRING is the shallow-list input (config.splitOn): split
+    // it here, before the encoder, which is array-only by design. Without
+    // this a comma string falls straight through and dies as "Expected a
+    // list of options", which is true but useless.
+    const list =
+      typeof value === "string" && column.config.splitOn
+        ? splitDelimited(value, column.config.splitOn)
+        : value;
+    if (Array.isArray(list)) return list.map(toId);
+    return list;
   }
   return value;
 }

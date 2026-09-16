@@ -38,6 +38,7 @@ import {
   cellToText,
   COLUMN_WIDTH_MAX,
   COLUMN_WIDTH_MIN,
+  columnWidthMin,
   createUndoStack,
   encodeCell,
   isEncodeError,
@@ -47,6 +48,8 @@ import {
   keyForMove,
   pushOp,
   generateColumnKey,
+  optionMatchKey,
+  titleCaseLabel,
   redo as redoStack,
   undo as undoStack,
   type CellEdit,
@@ -285,6 +288,11 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
   const handleResizeStart = useCallback(
     (e: React.PointerEvent, columnId: string) => {
       const startWidth = columnWidths[columnId] ?? DEFAULT_COLUMN_WIDTH;
+      // Chip-list columns floor higher than COLUMN_WIDTH_MIN: their cells
+      // COMPRESS instead of clipping, so a 60px relation column renders
+      // single letters rather than a truncated list (owner, 2026-09-15).
+      const column = columns.find((c) => c.id === columnId);
+      const floor = column ? columnWidthMin(column) : COLUMN_WIDTH_MIN;
       resizeRef.current = {
         columnId,
         startX: e.clientX,
@@ -296,7 +304,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
         if (!r) return;
         const width = Math.round(
           Math.max(
-            COLUMN_WIDTH_MIN,
+            floor,
             Math.min(COLUMN_WIDTH_MAX, r.startWidth + (ev.clientX - r.startX))
           )
         );
@@ -316,7 +324,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
       window.addEventListener("pointermove", onMove);
       window.addEventListener("pointerup", onUp);
     },
-    [columnWidths, persistColumnWidth]
+    [columns, columnWidths, persistColumnWidth]
   );
 
   /**
@@ -1180,10 +1188,15 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
    */
   const createOption = useCallback(
     async (column: DataColumn, label: string) => {
-      const trimmed = label.trim().slice(0, 120);
-      if (!trimmed) return null;
+      const raw = label.trim().slice(0, 120);
+      if (!raw) return null;
+      // Title Case normalises on the way in; otherwise a free-form column
+      // preserves case, so `how` beside `How` is a second option rather
+      // than a silent reuse that retitles what the user typed.
+      const trimmed = column.config.titleCase ? titleCaseLabel(raw) : raw;
+      const key = optionMatchKey(trimmed, column.config);
       const existing = (column.config.options ?? []).find(
-        (o) => o.label.trim().toLowerCase() === trimmed.toLowerCase()
+        (o) => optionMatchKey(o.label, column.config) === key
       );
       if (existing) return existing;
       const option = {

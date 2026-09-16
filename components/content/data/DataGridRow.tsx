@@ -21,7 +21,7 @@
  * in this file's first draft.
  */
 
-import { memo, useCallback, useState } from "react";
+import { memo, useCallback, useEffect, useState } from "react";
 import {
   Check,
   Expand,
@@ -32,12 +32,17 @@ import {
   Square,
   Star,
   ThumbsUp,
+  X,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/core/utils";
 import {
   cellToDisplayText,
+  hasOpenFence,
+  optionMatchKey,
   sortStatusOptions,
+  splitDelimited,
+  titleCaseLabel,
   type CellValue,
   type ContentRef,
   type DataColumn,
@@ -81,6 +86,127 @@ const CHECK_COLOR_CLASS: Record<string, string> = {
  * parses that back as local time on commit). Shared with DataRowFields
  * so the grid and the peek seed identically.
  */
+/**
+ * Chip-list overflow accounting (owner report, 2026-09-15).
+ *
+ * A list cell is `display:flex` with `overflow-hidden`, and its chips carry
+ * `truncate` — which sets `overflow:hidden`, which makes each chip's
+ * automatic flex minimum resolve to ZERO. So N chips in a narrow cell do not
+ * overflow and clip; they each shrink to a sliver, and a relation column
+ * renders "O." "I." "W." instead of a truncated-but-readable list.
+ *
+ * The fix is two-sided: chips stop shrinking (CHIP_CLASS pins `shrink-0`
+ * with a max-width so long titles still ellipsize), and the cell shows only
+ * as many as actually fit, followed by a "+N" pill that opens the full list.
+ *
+ * The budget is computed from the column width rather than measured. A
+ * ResizeObserver pass would be exact, but this runs for every cell of every
+ * visible row on every width change; an arithmetic estimate is stable,
+ * synchronous, and cannot cause a layout-measure feedback loop. Being off by
+ * one chip costs a "+N" that reads 3 instead of 2 — the list is reachable
+ * either way.
+ */
+const CHIP_GAP_PX = 4; // gap-1
+const CELL_PAD_PX = 16; // px-2, both sides
+const ADD_BTN_PX = 22; // the dashed "+" that rides along on editable cells
+const MORE_PILL_PX = 34; // the "+N" pill itself
+const CHIP_PAD_PX = 16; // px-2 inside a chip
+const CHAR_PX = 6.4; // ~11px system font, average advance
+const CHIP_MAX_PX = 144; // max-w-[9rem]
+
+/** Shared chip skin: never shrinks, ellipsizes past ~9rem. */
+const CHIP_CLASS =
+  "shrink-0 max-w-[9rem] truncate rounded-full px-2 py-0.5 text-[11px]";
+
+/**
+ * A chip's rendered width, estimated from its LABEL.
+ *
+ * The first cut used one flat minimum for every chip, which folded far too
+ * eagerly: a 180px column showed a single "Hello" and a "+4" because the
+ * budget assumed every chip was as wide as the widest plausible one (owner,
+ * 2026-09-16). Per-label estimation costs one multiply and gets two or three
+ * short tags into the same space.
+ */
+function estimateChipPx(label: string): number {
+  return Math.min(CHIP_MAX_PX, CHIP_PAD_PX + Math.max(1, label.length) * CHAR_PX);
+}
+
+/**
+ * How many of `labels` to render, and how many fold behind the pill.
+ * `hidden: 0` whenever everything fits — the pill is only drawn when it is
+ * actually standing in for something.
+ */
+function chipBudget(
+  width: number,
+  labels: string[],
+  opts: { hasAddButton: boolean; fixedChipPx?: number }
+): { shown: number; hidden: number } {
+  const total = labels.length;
+  if (total <= 0) return { shown: 0, hidden: 0 };
+  const widthOf = (label: string) =>
+    opts.fixedChipPx ?? estimateChipPx(label);
+
+  const available =
+    (width || DEFAULT_COLUMN_WIDTH) -
+    CELL_PAD_PX -
+    (opts.hasAddButton ? ADD_BTN_PX + CHIP_GAP_PX : 0);
+
+  // First pass: how many fit with no pill at all?
+  let used = 0;
+  let fits = 0;
+  for (const label of labels) {
+    const next = used + (fits > 0 ? CHIP_GAP_PX : 0) + widthOf(label);
+    if (next > available) break;
+    used = next;
+    fits++;
+  }
+  if (fits >= total) return { shown: total, hidden: 0 };
+
+  // Something folds, so the pill now costs space too. Re-measure against the
+  // smaller budget, but always show at least one chip: a bare count with no
+  // sample of the contents is worse than a slightly crowded cell.
+  const withPillBudget = available - MORE_PILL_PX - CHIP_GAP_PX;
+  used = 0;
+  let shown = 0;
+  for (const label of labels) {
+    const next = used + (shown > 0 ? CHIP_GAP_PX : 0) + widthOf(label);
+    if (next > withPillBudget) break;
+    used = next;
+    shown++;
+  }
+  shown = Math.max(1, Math.min(total - 1, shown));
+  return { shown, hidden: total - shown };
+}
+
+/**
+ * The "+N" affordance. Deliberately a real button into the cell's OWN
+ * expand path (the row peek for relations/links, the options panel for
+ * multiSelect) rather than a nested horizontal scroller: the grid already
+ * scrolls on that axis, and a same-axis scroll region inside it steals
+ * trackpad momentum and shows no affordance at rest.
+ */
+function MoreChip({
+  count,
+  label,
+  onClick,
+}: {
+  count: number;
+  label: string;
+  onClick: (e: React.MouseEvent) => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+      className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium leading-none text-muted-foreground hover:bg-muted-foreground/20 hover:text-foreground"
+    >
+      +{count}
+    </button>
+  );
+}
+
 export function editDraftFor(
   column: DataColumn,
   value: CellValue | undefined
@@ -318,6 +444,8 @@ function DataCell({
   // Select-like cells edit through an anchored option picker instead of a
   // text draft. Seeded from forceEdit the same way (keyed remount), so
   // Enter-on-selected opens it too.
+  // The "+N" expansion: this cell's values, NOT the column vocabulary.
+  const [valuesOpen, setValuesOpen] = useState(false);
   const [optionsOpen, setOptionsOpen] = useState(
     () =>
       forceEdit &&
@@ -451,20 +579,42 @@ function DataCell({
         onDoubleClick={editable ? () => onOpenRow(rowId) : undefined}
         title={editable ? "Double-click to link rows" : undefined}
       >
-        {(links ?? []).map((link) => (
-          <span
-            key={link.linkId}
-            className={cn(
-              "truncate rounded-full px-2 py-0.5 text-[11px]",
-              link.restricted
-                ? "bg-muted italic text-muted-foreground"
-                : "bg-primary/10 text-primary"
-            )}
-            title={link.restricted ? "Restricted" : link.title}
-          >
-            {link.restricted ? "Restricted" : link.title}
-          </span>
-        ))}
+        {(() => {
+          const all = links ?? [];
+          const { shown, hidden } = chipBudget(
+            width,
+            all.map((l) => (l.restricted ? "Restricted" : l.title)),
+            { hasAddButton: editable }
+          );
+          return (
+            <>
+              {all.slice(0, shown).map((link) => (
+                <span
+                  key={link.linkId}
+                  className={cn(
+                    CHIP_CLASS,
+                    link.restricted
+                      ? "bg-muted italic text-muted-foreground"
+                      : "bg-primary/10 text-primary"
+                  )}
+                  title={link.restricted ? "Restricted" : link.title}
+                >
+                  {link.restricted ? "Restricted" : link.title}
+                </span>
+              ))}
+              {hidden > 0 && (
+                <MoreChip
+                  count={hidden}
+                  label={`Show all ${all.length} linked rows`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpenRow(rowId, column.id);
+                  }}
+                />
+              )}
+            </>
+          );
+        })()}
         {/* The + rides along whether the cell is empty or populated —
             linking more rows is as normal as linking the first one, and it
             is a real BUTTON straight into the peek, not a hint that only
@@ -540,53 +690,93 @@ function DataCell({
             : undefined
         }
       >
-        {(contentRefs ?? []).map((ref) =>
-          ref.restricted ? (
-            <span
-              key={ref.id}
-              className="truncate rounded-full bg-muted px-2 py-0.5 text-[11px] italic text-muted-foreground"
-              title="Restricted"
-            >
-              Restricted
-            </span>
-          ) : column.config.imageOnly ? (
-            // Images column: thumbnail, click to zoom. Hydration's
-            // thumbnail when processed, else the full image streams.
-            <button
-              key={ref.id}
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setLightbox(ref);
-              }}
-              title={`View "${ref.title}"`}
-              className="shrink-0 overflow-hidden rounded border border-border/60 hover:ring-2 hover:ring-primary/50"
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element -- tiny authed thumbnail; next/image adds nothing */}
-              <img
-                src={
-                  ref.file?.thumbnailUrl ??
-                  imageDownloadUrl(ref.id, imageVersion)
-                }
-                alt={ref.title}
-                className="h-7 w-7 object-cover"
-              />
-            </button>
-          ) : (
-            <button
-              key={ref.id}
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onOpenContent(ref);
-              }}
-              className="truncate rounded-full bg-primary/10 px-2 py-0.5 text-[11px] text-primary hover:bg-primary/20"
-              title={`Open "${ref.title}"`}
-            >
-              {ref.title}
-            </button>
-          )
-        )}
+        {(() => {
+          const all = contentRefs ?? [];
+          // Image chips are 28px thumbnails, not ~64px text pills, so the
+          // budget is told the real chip size — an Images column fits four
+          // or five where a link column fits two.
+          const { shown, hidden } = chipBudget(
+            width,
+            all.map((r) => (r.restricted ? "Restricted" : r.title)),
+            {
+              hasAddButton: editable,
+              // Image chips are 28px thumbnails, not text pills, so their
+              // width does not follow the label at all.
+              fixedChipPx: column.config.imageOnly ? 28 : undefined,
+            }
+          );
+          return (
+            <>
+              {all.slice(0, shown).map((ref) =>
+                ref.restricted ? (
+                  <span
+                    key={ref.id}
+                    className={cn(
+                      CHIP_CLASS,
+                      "bg-muted italic text-muted-foreground"
+                    )}
+                    title="Restricted"
+                  >
+                    Restricted
+                  </span>
+                ) : column.config.imageOnly ? (
+                  // Images column: thumbnail, click to zoom. Hydration's
+                  // thumbnail when processed, else the full image streams.
+                  <button
+                    key={ref.id}
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setLightbox(ref);
+                    }}
+                    title={`View "${ref.title}"`}
+                    className="shrink-0 overflow-hidden rounded border border-border/60 hover:ring-2 hover:ring-primary/50"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element -- tiny authed thumbnail; next/image adds nothing */}
+                    <img
+                      src={
+                        ref.file?.thumbnailUrl ??
+                        imageDownloadUrl(ref.id, imageVersion)
+                      }
+                      alt={ref.title}
+                      className="h-7 w-7 object-cover"
+                    />
+                  </button>
+                ) : (
+                  <button
+                    key={ref.id}
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onOpenContent(ref);
+                    }}
+                    className={cn(
+                      CHIP_CLASS,
+                      "bg-primary/10 text-primary hover:bg-primary/20"
+                    )}
+                    title={`Open "${ref.title}"`}
+                  >
+                    {ref.title}
+                  </button>
+                )
+              )}
+              {hidden > 0 && (
+                <MoreChip
+                  count={hidden}
+                  label={
+                    column.config.imageOnly
+                      ? `Show all ${all.length} images`
+                      : `Show all ${all.length} linked items`
+                  }
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpenRow(rowId, column.id);
+                  }}
+                />
+              )}
+            </>
+          );
+        })()}
         {editable && (
           <button
             type="button"
@@ -705,26 +895,54 @@ function DataCell({
         onDoubleClick={editable ? () => setOptionsOpen(true) : undefined}
         title={display || (editable ? "Double-click to choose" : undefined)}
       >
-        {column.type === "multiSelect" && Array.isArray(value) ? (
-          // One pill per chosen option, like relation chips — a single
-          // joined pill read as one value (owner, 2026-08-31). Removed
-          // options render nothing (their ids stay in the cell, plan D3).
-          value.map((id) => {
-            const opt = column.config.options?.find((o) => o.id === id);
-            return opt ? (
-              <span
-                key={id}
-                className="truncate rounded-full bg-muted px-2 py-0.5 text-[11px]"
-              >
-                {opt.label}
-              </span>
-            ) : null;
-          })
-        ) : display ? (
-          <span className="truncate rounded-full bg-muted px-2 py-0.5 text-[11px]">
-            {display}
-          </span>
-        ) : null}
+        {column.type === "multiSelect" && Array.isArray(value)
+          ? (() => {
+              // One pill per chosen option, like relation chips — a single
+              // joined pill read as one value (owner, 2026-08-31). Removed
+              // options render nothing (their ids stay in the cell, plan
+              // D3), so the budget counts RESOLVED options, not raw ids —
+              // otherwise "+2" could stand for two options that no longer
+              // exist and clicking through would show nothing.
+              const opts = value
+                .map((id) => column.config.options?.find((o) => o.id === id))
+                .filter((o): o is NonNullable<typeof o> => Boolean(o));
+              const { shown, hidden } = chipBudget(
+                width,
+                opts.map((o) => o.label),
+                { hasAddButton: editable }
+              );
+              return (
+                <>
+                  {opts.slice(0, shown).map((opt) => (
+                    <span
+                      key={opt.id}
+                      className={cn(CHIP_CLASS, "bg-muted")}
+                      title={opt.label}
+                    >
+                      {opt.label}
+                    </span>
+                  ))}
+                  {hidden > 0 && (
+                    <MoreChip
+                      count={hidden}
+                      label={`Show this cell's ${opts.length} values`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSelect(rowId, column.key);
+                        setValuesOpen(true);
+                      }}
+                    />
+                  )}
+                </>
+              );
+            })()
+          : display
+            ? (
+                <span className={cn(CHIP_CLASS, "bg-muted")} title={display}>
+                  {display}
+                </span>
+              )
+            : null}
         {editable && (
           <button
             type="button"
@@ -740,15 +958,56 @@ function DataCell({
             +
           </button>
         )}
-        {optionsOpen && editable && (
-          <PanelPortal open onDismiss={close}>
-            <SelectOptionsPanel
-              column={column}
-              value={value}
-              rowId={rowId}
-              onCommit={onCommit}
-              onCreateOption={onCreateOption}
-              onClose={close}
+        {optionsOpen &&
+          editable &&
+          (column.type === "multiSelect" && column.config.freeform ? (
+            // Free-form has no vocabulary to present, so it gets the
+            // type-and-pill editor instead of the checklist.
+            <PanelPortal open onDismiss={close}>
+              <FreeformTagsPanel
+                column={column}
+                value={value}
+                rowId={rowId}
+                onCommit={onCommit}
+                onCreateOption={onCreateOption}
+                onClose={close}
+              />
+            </PanelPortal>
+          ) : (
+            <PanelPortal open onDismiss={close}>
+              <SelectOptionsPanel
+                column={column}
+                value={value}
+                rowId={rowId}
+                onCommit={onCommit}
+                onCreateOption={onCreateOption}
+                onClose={close}
+              />
+            </PanelPortal>
+          ))}
+        {valuesOpen && (
+          <PanelPortal open onDismiss={() => setValuesOpen(false)}>
+            <CellValuesPanel
+              title={column.name}
+              values={(Array.isArray(value) ? value : [])
+                .map((id) => {
+                  const opt = column.config.options?.find((o) => o.id === id);
+                  return opt ? { id: opt.id, label: opt.label } : null;
+                })
+                .filter((v): v is { id: string; label: string } => Boolean(v))}
+              onRemove={
+                editable
+                  ? (index) =>
+                      onCommit(
+                        rowId,
+                        column.key,
+                        (Array.isArray(value) ? value : []).filter(
+                          (_, i) => i !== index
+                        )
+                      )
+                  : undefined
+              }
+              onClose={() => setValuesOpen(false)}
             />
           </PanelPortal>
         )}
@@ -950,6 +1209,315 @@ function DataCell({
 }
 
 // ── Select-like option picker ────────────────────────────────────────────
+
+/**
+ * Values-only expansion for a "+N" click.
+ *
+ * The first cut opened the option CHECKLIST, which answers the wrong
+ * question: the user clicked a count of what is in this cell and got the
+ * column's whole vocabulary, most of it unrelated (owner, 2026-09-16). This
+ * lists exactly the cell's values, with an × per row when the cell is
+ * editable — reading is the point, editing is the courtesy.
+ */
+function CellValuesPanel({
+  title,
+  values,
+  onRemove,
+  onClose,
+}: {
+  title: string;
+  values: Array<{ id: string; label: string; muted?: boolean }>;
+  /**
+   * Removal is by INDEX, not id: a column that allows duplicates holds the
+   * same id more than once, and filtering by id would delete every copy
+   * when the user clicked one.
+   */
+  onRemove?: (index: number) => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="min-w-[180px] max-w-[280px] rounded-lg border border-border bg-popover p-1 shadow-lg">
+      <div className="flex items-center justify-between px-2 py-1">
+        <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+          {title}
+        </span>
+        <span className="text-[10px] text-muted-foreground">
+          {values.length}
+        </span>
+      </div>
+      <ul className="max-h-64 overflow-y-auto">
+        {values.map((v, index) => (
+          <li
+            key={`${v.id}-${index}`}
+            className="group flex items-center gap-1.5 rounded px-2 py-1 text-xs hover:bg-muted"
+          >
+            <span
+              className={cn(
+                "flex-1 truncate",
+                v.muted && "italic text-muted-foreground"
+              )}
+              title={v.label}
+            >
+              {v.label}
+            </span>
+            {onRemove && (
+              <button
+                type="button"
+                aria-label={`Remove ${v.label}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRemove(index);
+                }}
+                className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 group-hover:opacity-100 hover:bg-background hover:text-foreground"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            )}
+          </li>
+        ))}
+      </ul>
+      <button
+        type="button"
+        onClick={onClose}
+        className="mt-0.5 w-full rounded px-2 py-1 text-left text-[11px] text-muted-foreground hover:bg-muted"
+      >
+        Close
+      </button>
+    </div>
+  );
+}
+
+/**
+ * The free-form multi-select editor: type, and each delimiter completes a
+ * pill — the interaction people already know from email "To" fields.
+ *
+ * No checklist, because there is no vocabulary to pick from: whatever is
+ * typed becomes an option (minted server-side on write, capped by
+ * FREEFORM_OPTION_CAP). Quoting keeps a delimiter inside a value, and the
+ * quotes are stripped from the pill — `"hello world"` is one pill reading
+ * `hello world`.
+ *
+ * Backspace on an empty input removes the last pill, which is the other half
+ * of the email-field muscle memory and the reason there is no separate
+ * "delete mode".
+ */
+function FreeformTagsPanel({
+  column,
+  value,
+  rowId,
+  onCommit,
+  onCreateOption,
+  onClose,
+}: {
+  column: DataColumn;
+  value: CellValue | undefined;
+  rowId: string;
+  onCommit: (rowId: string, columnKey: string, value: unknown) => void;
+  onCreateOption?: (
+    column: DataColumn,
+    label: string
+  ) => Promise<{ id: string; label: string } | null>;
+  onClose: () => void;
+}) {
+  const options = column.config.options ?? [];
+  const [items, setItems] = useState<Array<{ id: string; label: string }>>(
+    () =>
+      Array.isArray(value)
+        ? value
+            .map((id) => options.find((o) => o.id === id))
+            .filter((o): o is NonNullable<typeof o> => Boolean(o))
+            .map((o) => ({ id: o.id, label: o.label }))
+        : []
+  );
+  const [draft, setDraft] = useState("");
+  /**
+   * A value the user just re-typed that is already in the cell.
+   *
+   * Duplicates are dropped — a multi-select cell is a SET, and every
+   * consumer downstream assumes it (hasAny/hasAll/hasNone are set
+   * operations, grouping counts each value once, digests list it once). But
+   * dropping it SILENTLY makes the input look broken: you type a value,
+   * press comma, and nothing happens. Flashing the pill that already holds
+   * it turns a confusing non-event into an answer (owner, 2026-09-16).
+   */
+  const [duplicate, setDuplicate] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!duplicate) return;
+    const t = window.setTimeout(() => setDuplicate(null), 1200);
+    return () => window.clearTimeout(t);
+  }, [duplicate]);
+
+  const commit = useCallback(
+    (next: Array<{ id: string; label: string }>) => {
+      setItems(next);
+      onCommit(
+        rowId,
+        column.key,
+        next.map((i) => i.id)
+      );
+    },
+    [onCommit, rowId, column.key]
+  );
+
+  /**
+   * Absorb the draft into pills.
+   *
+   * The pill appears FIRST, on the keystroke, and the id is resolved behind
+   * it. Awaiting the mint before rendering put a visible gap between typing
+   * the delimiter and seeing the pill — the text vanished, then came back as
+   * a card (owner, 2026-09-16) — which reads as a stutter in the one
+   * interaction that has to feel immediate.
+   *
+   * A provisional pill carries its LABEL as its id. That is also the
+   * permanent fallback when there is no schema permission to mint with: the
+   * server's freeform pass accepts labels and mints them itself. So the
+   * optimistic state is not a lie waiting to be corrected — it is a valid
+   * value that usually gets upgraded to a real option id.
+   */
+  const flushDraft = useCallback(
+    async (text: string) => {
+      const parts = splitDelimited(text, column.config.splitOn ?? ",");
+      setDraft("");
+      if (parts.length === 0) return;
+
+      const allowDuplicates = column.config.allowDuplicates === true;
+      const keyOf = (label: string) => optionMatchKey(label, column.config);
+      const seen = new Set(items.map((i) => keyOf(i.label)));
+      const fresh: Array<{ id: string; label: string }> = [];
+      let repeated: string | null = null;
+      for (const part of parts) {
+        const typed = column.config.titleCase ? titleCaseLabel(part) : part;
+        const key = keyOf(typed);
+        if (seen.has(key) && !allowDuplicates) {
+          repeated = key;
+          continue;
+        }
+        seen.add(key);
+        const known = (column.config.options ?? []).find(
+          (o) => keyOf(o.label) === key
+        );
+        fresh.push(
+          known
+            ? { id: known.id, label: known.label }
+            : { id: typed, label: typed }
+        );
+      }
+      if (repeated) setDuplicate(repeated);
+      if (fresh.length === 0) return;
+
+      // Paint immediately, then reconcile.
+      const optimistic = [...items, ...fresh];
+      setItems(optimistic);
+
+      const needMint = fresh.filter((f) => f.id === f.label);
+      if (needMint.length === 0 || !onCreateOption) {
+        commit(optimistic);
+        return;
+      }
+
+      const resolved = new Map<string, string>();
+      for (const item of needMint) {
+        const created = await onCreateOption(column, item.label);
+        if (created) resolved.set(item.label, created.id);
+      }
+      // Rebuild from the LATEST state, not the snapshot we optimistically
+      // rendered: the user may have typed or removed a pill while the mints
+      // were in flight, and clobbering that would lose their edit.
+      setItems((current) => {
+        const next = current.map((i) =>
+          resolved.has(i.label) ? { ...i, id: resolved.get(i.label)! } : i
+        );
+        onCommit(
+          rowId,
+          column.key,
+          next.map((i) => i.id)
+        );
+        return next;
+      });
+    },
+    [items, column, onCreateOption, onCommit, rowId, commit]
+  );
+
+  return (
+    <div className="min-w-[220px] max-w-[320px] rounded-lg border border-border bg-popover p-2 shadow-lg">
+      <div className="flex flex-wrap items-center gap-1 rounded-md border border-border/60 bg-background px-1.5 py-1">
+        {items.map((item, i) => (
+          <span
+            key={`${item.id}-${i}`}
+            className={cn(
+              "inline-flex max-w-[12rem] items-center gap-1 rounded-full px-2 py-0.5 text-[11px] transition-colors",
+              duplicate === optionMatchKey(item.label, column.config)
+                ? "bg-amber-500/20 ring-1 ring-amber-500/60"
+                : "bg-muted"
+            )}
+            title={
+              duplicate === optionMatchKey(item.label, column.config)
+                ? "Already in this cell"
+                : undefined
+            }
+          >
+            <span className="truncate">{item.label}</span>
+            <button
+              type="button"
+              aria-label={`Remove ${item.label}`}
+              onClick={() => commit(items.filter((_, j) => j !== i))}
+              className="shrink-0 rounded text-muted-foreground hover:text-foreground"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </span>
+        ))}
+        <input
+          autoFocus
+          value={draft}
+          onChange={(e) => {
+            const text = e.target.value;
+            // The DELIMITER completes a pill in place — unless a backtick
+            // fence is open, where it is part of the value being typed.
+            //
+            // Space was a terminator at first (copying email "To" fields)
+            // and quotes protected values containing one; both lost to
+            // ordinary text, since spaces are in most tags and the
+            // apostrophe in "I'm" swallowed every later delimiter. A
+            // backtick never appears in ordinary tag text, so it is safe to
+            // give it meaning (owner, 2026-09-16).
+            const delim = column.config.splitOn ?? ",";
+            if (text.endsWith(delim) && !hasOpenFence(text)) {
+              void flushDraft(text);
+              return;
+            }
+            setDraft(text);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === "Tab") {
+              if (draft.trim()) {
+                e.preventDefault();
+                void flushDraft(draft);
+              }
+              return;
+            }
+            if (e.key === "Backspace" && draft === "" && items.length > 0) {
+              e.preventDefault();
+              commit(items.slice(0, -1));
+              return;
+            }
+            if (e.key === "Escape") onClose();
+          }}
+          onBlur={() => {
+            if (draft.trim()) void flushDraft(draft);
+          }}
+          placeholder={items.length === 0 ? "Type a value…" : ""}
+          className="min-w-[6rem] flex-1 bg-transparent px-1 py-0.5 text-xs outline-none"
+        />
+      </div>
+      <p className="mt-1.5 px-0.5 text-[10px] leading-snug text-muted-foreground">
+        Comma, Enter or Tab completes a value. For one containing a comma,
+        use <span className="font-mono">`Portland, OR`</span>.
+      </p>
+    </div>
+  );
+}
 
 interface SelectOptionsPanelProps {
   column: DataColumn;

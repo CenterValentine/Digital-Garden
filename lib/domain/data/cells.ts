@@ -165,13 +165,134 @@ function encodeOptionIds(raw: unknown, column: DataColumn): EncodeResult {
     if (!options.some((o) => o.id === entry)) {
       return fail("Unknown option for this column");
     }
-    // Order is significant (it is the display order), but duplicates are not.
-    if (!seen.has(entry)) {
+    // Order is significant (it is the display order). Duplicates normally
+    // are not — a controlled vocabulary cannot be picked twice — but a
+    // free-form list may opt into them (config.allowDuplicates).
+    if (column.config.allowDuplicates) {
+      out.push(entry);
+    } else if (!seen.has(entry)) {
       seen.add(entry);
       out.push(entry);
     }
   }
   return out.length === 0 ? ok(undefined) : ok(out);
+}
+
+// ── Option labels ────────────────────────────────────────────────
+
+/**
+ * Title-case a value, leaving deliberately-cased words alone.
+ *
+ * `body condition` -> `Body Condition`. A word that ALREADY contains a
+ * capital is left untouched, so `iPhone`, `macOS` and `eBay` survive —
+ * uppercasing their first letter is exactly the mangling a title-case
+ * feature must not do, and it is not hypothetical in a tag list of
+ * products or tools.
+ */
+export function titleCaseLabel(label: string): string {
+  return label
+    .split(/(\s+)/)
+    .map((part) =>
+      /\s/.test(part) || /[A-Z]/.test(part)
+        ? part
+        : part.charAt(0).toUpperCase() + part.slice(1)
+    )
+    .join("");
+}
+
+/**
+ * How two option labels are compared for "is this the same value?".
+ *
+ * Case-SENSITIVE when the column preserves case, which is the default for a
+ * free-form list: the user typing `how` next to an existing `How` means two
+ * values, and silently reusing the existing one retitled their input
+ * (owner, 2026-09-16). With `titleCase` on, both normalise first, so they
+ * legitimately collapse.
+ *
+ * Controlled vocabularies stay case-INSENSITIVE: their labels are picked
+ * from a list rather than typed, and the tolerance is what lets a model
+ * write `redis` for an option named `Redis`.
+ */
+export function optionMatchKey(
+  label: string,
+  config: { freeform?: boolean; titleCase?: boolean }
+): string {
+  const trimmed = label.trim();
+  if (config.titleCase) return titleCaseLabel(trimmed);
+  return config.freeform ? trimmed : trimmed.toLowerCase();
+}
+
+// ── Delimited input (config.splitOn) ─────────────────────────────
+
+/** The only quoting character. See splitDelimited for why it is this one. */
+const FENCE = "`";
+
+/**
+ * Split one typed/pasted string into list items on a delimiter.
+ *
+ * `Redis, Postgres` → ["Redis", "Postgres"]
+ * `hello world, next` → ["hello world", "next"]
+ * "`Portland, OR`, Seattle" → ["Portland, OR", "Seattle"]
+ *
+ * Quoting uses BACKTICKS, and only backticks (owner, 2026-09-16). The first
+ * version honoured RFC 4180 double/single quotes and did not survive contact
+ * with ordinary prose: the apostrophe in "I'm" opened a quote, which made
+ * every later delimiter literal, so
+ * `I'm going to try this again, now this` collapsed into one value with the
+ * apostrophes eaten. Apostrophes and quotation marks appear in real tags all
+ * the time; a backtick essentially never does, which is what makes it safe
+ * to give a parsing meaning.
+ *
+ * A doubled backtick inside a fenced value is a literal one.
+ *
+ * Empty fields are dropped: a trailing comma is a typing artefact, not an
+ * instruction to store "".
+ */
+export function splitDelimited(raw: string, delimiter: string): string[] {
+  const delim = delimiter.length > 0 ? delimiter[0] : ",";
+  const out: string[] = [];
+  let field = "";
+  let fenced = false;
+  for (let i = 0; i < raw.length; i++) {
+    const ch = raw[i];
+    if (ch === FENCE) {
+      if (fenced && raw[i + 1] === FENCE) {
+        field += FENCE;
+        i++;
+      } else {
+        fenced = !fenced;
+      }
+      continue;
+    }
+    if (!fenced && ch === delim) {
+      out.push(field.trim());
+      field = "";
+      continue;
+    }
+    field += ch;
+  }
+  out.push(field.trim());
+  return out.filter((f) => f.length > 0);
+}
+
+/**
+ * True while `text` sits inside an unclosed backtick fence.
+ *
+ * The type-and-pill editor uses this to know a delimiter keystroke is
+ * LITERAL rather than terminal, so typing "`Portland, " keeps accepting
+ * input instead of closing the pill on the comma.
+ */
+export function hasOpenFence(text: string): boolean {
+  let fenced = false;
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] !== FENCE) continue;
+    if (fenced && text[i + 1] === FENCE) {
+      i++;
+      continue;
+    }
+    fenced = !fenced;
+  }
+  return fenced;
 }
 
 // ── Simple validators ────────────────────────────────────────────────────

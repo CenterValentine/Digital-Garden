@@ -335,6 +335,10 @@ export function groupCountsLine(rows: DataRow[], column: DataColumn): string {
       const v = cellDisplayValue(row, column);
       values = v ? [v] : [];
     }
+    // Count each ROW once per distinct value: a cell that opted into
+    // duplicates (config.allowDuplicates) would otherwise report one row as
+    // two under the same heading.
+    values = [...new Set(values)];
     if (values.length === 0) {
       empty++;
       continue;
@@ -412,7 +416,10 @@ export function columnProfile(rows: DataRow[], column: DataColumn): ColumnProfil
       const v = cellDisplayValue(row, column);
       if (!v) continue;
       p.filled++;
-      const values = column.type === "multiSelect" ? v.split(", ") : [v];
+      const values =
+        column.type === "multiSelect"
+          ? [...new Set(v.split(", "))]
+          : [v];
       for (const x of values) counts.set(x, (counts.get(x) ?? 0) + 1);
     }
     // Declared option order first (the vocabulary), then anything else seen.

@@ -21,6 +21,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Check, Lock, Plus, Trash2, X } from "lucide-react";
 import { cn } from "@/lib/core/utils";
 import { PanelPortal } from "./PanelPortal";
+import { ToggleSwitch } from "./ToggleSwitch";
 import {
   formatNumberCell,
   generateColumnKey,
@@ -113,16 +114,24 @@ interface AddColumnButtonProps {
 /** Picker-only pseudo-type: creates a `file` column with imageOnly set. */
 const IMAGES_KIND = "__images__";
 
+
 /** Display label — "Images" for the imageOnly file specialization. */
 export function columnTypeLabel(column: DataColumn): string {
   if (column.type === "file" && column.config?.imageOnly) return "Images";
+  if (column.type === "multiSelect" && column.config?.freeform)
+    return "Multi-Select (free-form)";
   return TYPE_LABEL[column.type] ?? column.type;
 }
 
 export function AddColumnButton({ tableId, columns, onAdd }: AddColumnButtonProps) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
-  const [type, setType] = useState<DataColumnType | typeof IMAGES_KIND>("text");
+  const [type, setType] = useState<DataColumnType | typeof IMAGES_KIND>(
+    "text"
+  );
+  const [freeform, setFreeform] = useState(false);
+  const [allowDuplicates, setAllowDuplicates] = useState(false);
+  const [titleCase, setTitleCase] = useState(false);
   const [busy, setBusy] = useState(false);
   const [targetDbId, setTargetDbId] = useState("");
   const [withBacklink, setWithBacklink] = useState(true);
@@ -220,6 +229,16 @@ export function AddColumnButton({ tableId, columns, onAdd }: AddColumnButtonProp
     try {
       let config: DataColumnConfig | undefined;
       if (type === IMAGES_KIND) config = { imageOnly: true };
+      else if (type === "multiSelect" && freeform)
+        config = {
+          freeform: true,
+          splitOn: ",",
+          options: [],
+          ...(allowDuplicates ? { allowDuplicates: true } : {}),
+          ...(titleCase ? { titleCase: true } : {}),
+        };
+      else if ((type === "multiSelect" || type === "select") && titleCase)
+        config = { titleCase: true };
       else if (type === "relation") config = { relationTableId: targetDbId };
       else if (type === "lookup")
         config = {
@@ -248,6 +267,9 @@ export function AddColumnButton({ tableId, columns, onAdd }: AddColumnButtonProp
   }, [
     name,
     type,
+    freeform,
+    allowDuplicates,
+    titleCase,
     targetDbId,
     withBacklink,
     isDerived,
@@ -307,6 +329,43 @@ export function AddColumnButton({ tableId, columns, onAdd }: AddColumnButtonProp
               accept + thumbnail cells with a lightbox. */}
           <option value={IMAGES_KIND}>Images</option>
         </select>
+        {type === "multiSelect" && (
+          // A SETTING on multi-select, not a second entry in the picker: a
+          // "Tags" pseudo-type looked identical to Multi-Select in the
+          // dropdown and behaved identically too, because the difference is
+          // in how the CELL is edited, not in what the column is (owner,
+          // 2026-09-16). Free-form swaps the checklist for a type-and-pill
+          // input. The backtick rule is NOT repeated here — it belongs in
+          // the editor, where it is actionable.
+          <ToggleSwitch
+            checked={freeform}
+            onChange={setFreeform}
+            label="Free-form"
+            hint="Type values instead of picking them."
+          />
+        )}
+        {type === "multiSelect" && freeform && (
+          // Only offered ALONGSIDE free-form: a controlled vocabulary cannot
+          // be picked twice, so duplicates there would only ever be a bug.
+          <ToggleSwitch
+            checked={allowDuplicates}
+            onChange={setAllowDuplicates}
+            label="Allow repeats"
+            hint="The same value can appear more than once."
+            indented
+          />
+        )}
+        {(type === "multiSelect" || type === "select") && (
+          // Applies wherever options are MINTED — typed into a free-form
+          // cell, or added with "+ New option". With it off, case is
+          // significant and `how` beside `How` is a second value.
+          <ToggleSwitch
+            checked={titleCase}
+            onChange={setTitleCase}
+            label="Title Case"
+            hint="Capitalise new values as they are added."
+          />
+        )}
         <p className="mt-1.5 text-[10px] leading-snug text-muted-foreground">
           Type is set once. To change it later, add a new column and move the
           values across.

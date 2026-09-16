@@ -18,6 +18,21 @@ import { useCallback, useState } from "react";
 import { Check, Loader2, Table2 } from "lucide-react";
 import { toast } from "sonner";
 import { useContentStore } from "@/state/content-store";
+import {
+  dispatchProposalApplied,
+  matchExistingTitles,
+  useProposalObsolete,
+  useProposalRevision,
+  type ExistingDatabase,
+} from "./use-proposal-revision";
+import {
+  ModifyProposalButton,
+  ProposalExistsNotice,
+  ProposalObsoleteNotice,
+  ProposalSupersededNotice,
+  ProposalWithdrawnNotice,
+  useSupersededGuard,
+} from "./ProposalRevisionControls";
 
 export interface OutputDatabaseProposalPayload {
   __outputDatabaseProposal: true;
@@ -113,12 +128,32 @@ function describeLink(
 
 export function OutputDatabaseProposalCard({
   payload,
+  superseded = false,
+  existingDatabases,
 }: {
   payload: OutputDatabaseProposalPayload;
+  /** A later message carries a newer proposal of this kind. */
+  superseded?: boolean;
+  /** The user's existing databases, for the already-exists check. */
+  existingDatabases?: ExistingDatabase[];
 }) {
   const [state, setState] = useState<ApplyState>(() =>
     loadAppliedState(payload),
   );
+  const revision = useProposalRevision(storageKey(payload), !superseded);
+  const obsolete = useProposalObsolete("outputDatabase", storageKey(payload));
+
+  /**
+   * Withdraw this card and hand the composer a revision request. The prompt
+   * names what is being replaced so the model does not re-propose blind, and
+   * says the part it kept getting wrong: it may re-issue the WHOLE thing
+   * rather than waiting for an Apply it needs nothing from.
+   */
+  const askForChanges = useCallback(() => {
+    revision.requestRevision(
+      `I've sent the proposed database (${payload.title}) back for changes — nothing was applied. Re-propose the complete corrected version with these changes: `,
+    );
+  }, [payload, revision]);
 
   const apply = useCallback(async () => {
     setState({ status: "applying" });
@@ -153,6 +188,15 @@ export function OutputDatabaseProposalCard({
         /* best-effort persistence */
       }
       setState({ status: "applied", tableId });
+      // Retire every OTHER card of this kind: a second apply now
+      // duplicates real tables rather than revising them.
+      // A new database is a new NODE, so the file tree has to hear about
+      // it too. dispatchDataSchemaChanged only reaches the grid and the
+      // schema rail — the tree listens for dg:tree-refresh and nothing on
+      // the chat-apply path was firing it, so a database created from chat
+      // stayed invisible until a manual refresh (owner, 2026-09-16).
+      window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
+      dispatchProposalApplied("outputDatabase", storageKey(payload));
       toast.success(`"${payload.title}" created`);
     } catch (err) {
       const message =
@@ -163,6 +207,25 @@ export function OutputDatabaseProposalCard({
       toast.error(message);
     }
   }, [payload]);
+
+  // Already on the server under this name? Then Apply needs a confirm for
+  // the same reason a superseded card does — the risk is a duplicate, not a
+  // wrong design.
+  const existing = matchExistingTitles(
+    [payload.title],
+    existingDatabases ?? []
+  );
+  const guard = useSupersededGuard(superseded || Boolean(existing), apply);
+
+  if (obsolete && state.status !== "applied") {
+    return <ProposalObsoleteNotice label="database" />;
+  }
+
+  if (revision.withdrawn) {
+    return (
+      <ProposalWithdrawnNotice label="database" onRestore={revision.restore} />
+    );
+  }
 
   if (state.status === "applied") {
     return (
@@ -265,10 +328,18 @@ export function OutputDatabaseProposalCard({
         </div>
       )}
 
+      {superseded && <ProposalSupersededNotice />}
+      {existing && (
+        <ProposalExistsNotice
+          matches={existing}
+          onOpen={(id) => useContentStore.getState().setSelectedContentId(id)}
+        />
+      )}
+
       <div className="flex items-center gap-2">
         <button
           type="button"
-          onClick={apply}
+          onClick={guard.onClick}
           disabled={state.status === "applying"}
           className="inline-flex items-center gap-1 rounded-md bg-sky-600/90 px-2.5 py-1 text-[11px] font-medium text-white transition-colors hover:bg-sky-600 disabled:opacity-50"
         >
@@ -277,8 +348,12 @@ export function OutputDatabaseProposalCard({
           ) : (
             <Check className="h-3 w-3" />
           )}
-          Create database
+          {guard.confirming ? "Apply anyway?" : "Create database"}
         </button>
+        <ModifyProposalButton
+          onClick={askForChanges}
+          disabled={state.status === "applying"}
+        />
         <span className="text-[10px] text-gray-400 dark:text-gray-500">
           Nothing is created until you click.
         </span>

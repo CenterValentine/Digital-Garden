@@ -26,6 +26,18 @@ import { useCallback, useState } from "react";
 import { AlertTriangle, Check, Columns3, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { dispatchDataSchemaChanged } from "@/components/content/data/events";
+import {
+  dispatchProposalApplied,
+  useProposalObsolete,
+  useProposalRevision,
+} from "./use-proposal-revision";
+import {
+  ModifyProposalButton,
+  ProposalObsoleteNotice,
+  ProposalSupersededNotice,
+  ProposalWithdrawnNotice,
+  useSupersededGuard,
+} from "./ProposalRevisionControls";
 
 export interface DatabaseColumnsProposalPayload {
   __databaseColumnsProposal: true;
@@ -118,8 +130,11 @@ function describeLink(col: DatabaseColumnsProposalPayload["columns"][number]): s
 
 export function DatabaseColumnsProposalCard({
   payload,
+  superseded = false,
 }: {
   payload: DatabaseColumnsProposalPayload;
+  /** A later message carries a newer proposal of this kind. */
+  superseded?: boolean;
 }) {
   const [state, setState] = useState<ApplyState>(() =>
     loadAppliedState(payload)
@@ -127,6 +142,20 @@ export function DatabaseColumnsProposalCard({
   const [checked, setChecked] = useState<boolean[]>(() =>
     payload.columns.map(() => true)
   );
+  const revision = useProposalRevision(storageKey(payload), !superseded);
+  const obsolete = useProposalObsolete("databaseColumns", storageKey(payload));
+
+  /**
+   * Withdraw this card and hand the composer a revision request. The prompt
+   * names what is being replaced so the model does not re-propose blind, and
+   * says the part it kept getting wrong: it may re-issue the WHOLE thing
+   * rather than waiting for an Apply it needs nothing from.
+   */
+  const askForChanges = useCallback(() => {
+    revision.requestRevision(
+      `I've sent the proposed columns for ${payload.databaseTitle} back for changes — nothing was applied. Re-propose the complete corrected version with these changes: `,
+    );
+  }, [payload, revision]);
 
   const selectedCount = checked.filter(Boolean).length;
 
@@ -167,6 +196,9 @@ export function DatabaseColumnsProposalCard({
           /* best-effort persistence */
         }
         setState({ status: "applied", count: 0 });
+        // Retire every OTHER card of this kind: a second apply now
+        // duplicates real tables rather than revising them.
+        dispatchProposalApplied("databaseColumns", storageKey(payload));
         toast.success(`"${payload.databaseTitle}" already had those columns`);
         return;
       }
@@ -202,6 +234,9 @@ export function DatabaseColumnsProposalCard({
       }
 
       setState({ status: "applied", count: created });
+      // Retire every OTHER card of this kind: a second apply now
+      // duplicates real tables rather than revising them.
+      dispatchProposalApplied("databaseColumns", storageKey(payload));
       toast.success(
         `${created} column${created === 1 ? "" : "s"} added to "${payload.databaseTitle}"`
       );
@@ -214,6 +249,18 @@ export function DatabaseColumnsProposalCard({
       toast.error(message);
     }
   }, [payload, checked]);
+
+  const guard = useSupersededGuard(superseded, apply);
+
+  if (obsolete && state.status !== "applied") {
+    return <ProposalObsoleteNotice label="column set" />;
+  }
+
+  if (revision.withdrawn) {
+    return (
+      <ProposalWithdrawnNotice label="column set" onRestore={revision.restore} />
+    );
+  }
 
   if (state.status === "applied") {
     return (
@@ -309,9 +356,12 @@ export function DatabaseColumnsProposalCard({
         </div>
       )}
 
-      <button
+      {superseded && <ProposalSupersededNotice />}
+
+      <div className="flex flex-wrap items-center gap-2">
+        <button
         type="button"
-        onClick={apply}
+        onClick={guard.onClick}
         disabled={state.status === "applying" || selectedCount === 0}
         className="inline-flex items-center gap-1.5 rounded-md border border-indigo-500/40 bg-indigo-500/[0.08] px-2.5 py-1 text-xs font-medium text-indigo-700 hover:bg-indigo-500/[0.14] disabled:cursor-not-allowed disabled:opacity-60 dark:border-indigo-400/30 dark:bg-indigo-500/[0.10] dark:text-indigo-300 dark:hover:bg-indigo-500/[0.18]"
       >
@@ -323,9 +373,18 @@ export function DatabaseColumnsProposalCard({
         ) : state.status === "error" ? (
           "Try again"
         ) : (
-          `Add ${selectedCount} of ${payload.columns.length}`
+          guard.confirming ? (
+            "Apply anyway?"
+          ) : (
+            `Add ${selectedCount} of ${payload.columns.length}`
+          )
         )}
-      </button>
+        </button>
+        <ModifyProposalButton
+          onClick={askForChanges}
+          disabled={state.status === "applying"}
+        />
+      </div>
     </div>
   );
 }

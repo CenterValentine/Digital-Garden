@@ -21,6 +21,21 @@ import { AlertTriangle, ArrowRight, Check, Database, Loader2 } from "lucide-reac
 import { toast } from "sonner";
 import { dispatchDataSchemaChanged } from "@/components/content/data/events";
 import { useContentStore } from "@/state/content-store";
+import {
+  dispatchProposalApplied,
+  matchExistingTitles,
+  useProposalObsolete,
+  useProposalRevision,
+  type ExistingDatabase,
+} from "./use-proposal-revision";
+import {
+  ModifyProposalButton,
+  ProposalExistsNotice,
+  ProposalObsoleteNotice,
+  ProposalSupersededNotice,
+  ProposalWithdrawnNotice,
+  useSupersededGuard,
+} from "./ProposalRevisionControls";
 
 const NEW_PREFIX = "$new:";
 
@@ -151,12 +166,37 @@ function describeComputed(col: ProposedColumn): string | null {
 
 export function LinkedDatabasesProposalCard({
   payload,
+  superseded = false,
+  existingDatabases,
 }: {
   payload: LinkedDatabasesProposalPayload;
+  /** A later message carries a newer proposal of this kind. */
+  superseded?: boolean;
+  /** The user's existing databases, for the already-exists check. */
+  existingDatabases?: ExistingDatabase[];
 }) {
   const [state, setState] = useState<ApplyState>(() =>
     loadAppliedState(payload),
   );
+  const revision = useProposalRevision(storageKey(payload), !superseded);
+  const obsolete = useProposalObsolete("linkedDatabases", storageKey(payload));
+
+  /**
+   * The revision request names the tables by title so the model knows which
+   * card it is replacing, and states the rule it kept getting wrong: it may
+   * re-propose the WHOLE set, including tables that do not exist yet.
+   */
+  const askForChanges = useCallback(() => {
+    const names = [
+      ...payload.tables.map((t) => t.title),
+      ...payload.extend.map((e) => e.databaseTitle),
+    ];
+    const subject =
+      names.length > 0 ? `the proposed schema (${names.join(", ")})` : "that schema proposal";
+    revision.requestRevision(
+      `I've sent ${subject} back for changes — nothing was created. Re-propose the complete corrected set in one card (use $new: for tables that don't exist yet), with these changes: `,
+    );
+  }, [payload, revision]);
 
   const edges = collectEdges(payload);
   const tableCount = payload.tables.length;
@@ -211,6 +251,15 @@ export function LinkedDatabasesProposalCard({
         /* best-effort persistence */
       }
       setState({ status: "applied", tables: created });
+      // Retire every OTHER card of this kind: a second apply now
+      // duplicates real tables rather than revising them.
+      // A new database is a new NODE, so the file tree has to hear about
+      // it too. dispatchDataSchemaChanged only reaches the grid and the
+      // schema rail — the tree listens for dg:tree-refresh and nothing on
+      // the chat-apply path was firing it, so a database created from chat
+      // stayed invisible until a manual refresh (owner, 2026-09-16).
+      window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
+      dispatchProposalApplied("linkedDatabases", storageKey(payload));
       toast.success(
         created.length > 0
           ? `${created.length} database${created.length === 1 ? "" : "s"} created`
@@ -223,6 +272,28 @@ export function LinkedDatabasesProposalCard({
       toast.error(message);
     }
   }, [payload]);
+
+  // Only a set that exists IN FULL counts (matchExistingTitles): a
+  // half-present schema is one the user may genuinely want to finish, and
+  // the transaction creates only what is missing.
+  const existing = matchExistingTitles(
+    payload.tables.map((t) => t.title),
+    existingDatabases ?? []
+  );
+  const guard = useSupersededGuard(superseded || Boolean(existing), apply);
+
+  if (obsolete && state.status !== "applied") {
+    return <ProposalObsoleteNotice label="schema" />;
+  }
+
+  if (revision.withdrawn) {
+    return (
+      <ProposalWithdrawnNotice
+        label="schema"
+        onRestore={revision.restore}
+      />
+    );
+  }
 
   if (state.status === "applied") {
     return (
@@ -378,9 +449,18 @@ export function LinkedDatabasesProposalCard({
         </div>
       )}
 
-      <button
+      {superseded && <ProposalSupersededNotice />}
+      {existing && (
+        <ProposalExistsNotice
+          matches={existing}
+          onOpen={(id) => useContentStore.getState().setSelectedContentId(id)}
+        />
+      )}
+
+      <div className="flex flex-wrap items-center gap-2">
+        <button
         type="button"
-        onClick={apply}
+        onClick={guard.onClick}
         disabled={state.status === "applying"}
         className="inline-flex items-center gap-1.5 rounded-md border border-sky-500/40 bg-sky-500/[0.08] px-2.5 py-1 text-xs font-medium text-sky-700 hover:bg-sky-500/[0.14] disabled:cursor-not-allowed disabled:opacity-60 dark:border-sky-400/30 dark:bg-sky-500/[0.10] dark:text-sky-300 dark:hover:bg-sky-500/[0.18]"
       >
@@ -392,9 +472,18 @@ export function LinkedDatabasesProposalCard({
         ) : state.status === "error" ? (
           "Try again"
         ) : (
-          "Create all"
+          guard.confirming ? (
+            "Apply anyway?"
+          ) : (
+            "Create all"
+          )
         )}
-      </button>
+        </button>
+        <ModifyProposalButton
+          onClick={askForChanges}
+          disabled={state.status === "applying"}
+        />
+      </div>
     </div>
   );
 }
