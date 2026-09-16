@@ -14,6 +14,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { createPortal } from "react-dom";
 import { AlertTriangle, X } from "lucide-react";
 import type { JSONContent } from "@tiptap/core";
 import { compareVersions } from "@/lib/domain/content/conflict-diff";
@@ -86,9 +87,17 @@ export function SaveConflictDiff({
   const theirsWhen = relativeTime(theirsUpdatedAt);
   const wordDelta = comparison ? comparison.mine.words - comparison.theirs.words : 0;
 
-  return (
+  // PORTALED to document.body, and at the app's z-[200] modal level.
+  //
+  // z-index alone was not enough. This renders inside a pane whose glass
+  // surface sets `backdrop-filter`, which creates a stacking context — so
+  // `position: fixed` was contained by that pane and the side panels painted
+  // straight over the dialog (owner report, 2026-09-16). A portal escapes the
+  // containing block entirely; the z-index then only has to agree with the
+  // app's other modals. Same pattern the context menu already uses.
+  const dialog = (
     <div
-      className="fixed inset-0 z-[120] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
       aria-label="Compare your version with the server version"
@@ -239,4 +248,8 @@ export function SaveConflictDiff({
       </div>
     </div>
   );
+
+  return typeof document === "undefined"
+    ? dialog
+    : createPortal(dialog, document.body);
 }
