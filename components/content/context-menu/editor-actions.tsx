@@ -29,7 +29,7 @@ import {
   useContentStore,
   type WorkspacePaneId,
 } from "@/state/content-store";
-import { ArrowUpLeft, ArrowUpRight, ArrowDownLeft, ArrowDownRight } from "lucide-react";
+import { ArrowUpLeft, ArrowUpRight, ArrowDownLeft, ArrowDownRight, Check } from "lucide-react";
 
 /** Captured selection data — frozen when the context menu opens */
 interface SelectionCapture {
@@ -623,6 +623,34 @@ async function resolveWikiLinkAndOpen(
  * IMPORTANT: Selection is captured HERE (while menu is open and selection active),
  * not in the onClick handlers (which run after menu closes and selection may be lost).
  */
+/**
+ * Flip a wiki-link's per-link context expansion.
+ *
+ * Links expand by default — a read of the document pulls in the target's
+ * prompt-assembly text — so only an opt-out is ever stored. Finds the node by
+ * position in the document rather than by identity, because the context menu
+ * hands us a DOM element, not a ProseMirror node.
+ */
+function toggleWikiLinkExpansion(element: Element, nextExpand: boolean | null) {
+  const { editorsByContentId } = useEditorInstanceStore.getState();
+  const editor = Object.values(editorsByContentId).find(Boolean) ?? null;
+  if (!editor) return;
+  const pos = editor.view.posAtDOM(element, 0);
+  if (pos < 0) return;
+  const node = editor.state.doc.nodeAt(pos);
+  if (!node || node.type.name !== "wikiLink") return;
+  editor
+    .chain()
+    .focus()
+    .command(({ tr, dispatch }) => {
+      if (dispatch) {
+        tr.setNodeMarkup(pos, undefined, { ...node.attrs, expand: nextExpand });
+      }
+      return true;
+    })
+    .run();
+}
+
 export const editorActionProvider: ContextMenuActionProvider = (ctx) => {
   const hasSelection = ctx.hasSelection === true;
   const sections: ContextMenuSection[] = [];
@@ -634,6 +662,8 @@ export const editorActionProvider: ContextMenuActionProvider = (ctx) => {
     const targetTitle = wikiLinkEl.getAttribute("data-target-title");
     const targetId = wikiLinkEl.getAttribute("data-target-id");
     const headingSlug = wikiLinkEl.getAttribute("data-heading-slug");
+    // Default is EXPAND, so only an explicit "false" opts out.
+    const isExpanded = wikiLinkEl.getAttribute("data-expand") !== "false";
 
     // In-document heading link: "Open" scrolls to the heading; opening in
     // another pane is a note-level concept and doesn't apply.
@@ -686,6 +716,21 @@ export const editorActionProvider: ContextMenuActionProvider = (ctx) => {
                 void resolveWikiLinkAndOpen({ targetId, targetTitle }, pane.id);
               },
             })),
+          },
+          // Per-link context expansion. Reads as a PROPERTY of the link rather
+          // than a command, because that is what it is — hence the check, not a
+          // verb. Only an explicit opt-out is stored, so an untouched link
+          // carries no attribute at all.
+          {
+            id: "wiki-link-include-context",
+            label: "Include context",
+            icon: isExpanded ? <Check className="h-4 w-4" /> : undefined,
+            tooltip: isExpanded
+              ? `Reading this note also reads ${targetTitle}'s summary. Turn off to link without pulling its context in.`
+              : `This link is a plain reference — ${targetTitle}'s summary is not read with this note. Turn on to include it.`,
+            onClick: () => {
+              toggleWikiLinkExpansion(wikiLinkEl, isExpanded ? false : null);
+            },
           },
         ],
       });

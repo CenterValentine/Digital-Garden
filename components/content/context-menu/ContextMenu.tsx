@@ -207,7 +207,7 @@ function MenuAction({
           `}
         >
           {/* Left: Icon + Label */}
-          <div className="flex items-center gap-2 min-w-0">
+          <div className="flex items-center gap-2 min-w-0" title={action.tooltip}>
             {action.icon && <span className="flex-shrink-0 text-current opacity-70">{action.icon}</span>}
             <span className={`truncate ${action.destructive ? "text-red-600 dark:text-red-400" : ""}`}>
               {action.label}
