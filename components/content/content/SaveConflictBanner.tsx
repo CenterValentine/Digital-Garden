@@ -52,7 +52,9 @@ export function SaveConflictBanner({
               <p className="font-medium">This note changed elsewhere</p>
               <p className="text-amber-800/80 dark:text-amber-200/70">
                 Someone (or another device) updated it after you opened this
-                tab. Your edits are safe and unsaved — choose how to resolve.
+                tab. <strong>Saving is paused until you choose.</strong> Your
+                edits are kept on this device, but nothing reaches the server
+                until this is resolved.
               </p>
             </div>
           </div>

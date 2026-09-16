@@ -1069,12 +1069,30 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
       // (not the closure) so a conflict raised after this callback was created
       // still pauses it.
       if (useSaveConflictStore.getState().getConflict(selectedContentId)) {
+        // Refresh the stash so it holds the user's LATEST work, not a snapshot
+        // frozen at the moment of the 409. The stash used to be written once,
+        // there, and never again — so everything typed while the banner sat
+        // unanswered was neither saved nor stashed, and vanished on the next
+        // reload or tab close. It also meant "Keep mine" wrote a stale version.
+        // Re-stashing on every refused save makes the draft track the editor.
+        const openConflict = useSaveConflictStore
+          .getState()
+          .getConflict(selectedContentId);
+        stashConflictDraft(selectedContentId, content);
+        if (openConflict) {
+          // `mine` is what "Keep mine" writes, so it has to move with the
+          // editor too — otherwise resolving publishes the version frozen at
+          // the 409 and silently drops everything typed since.
+          useSaveConflictStore
+            .getState()
+            .setConflict({ ...openConflict, mine: content });
+        }
         // Never let this be silent again: a paused save with no request and
         // no log is indistinguishable from "the app is broken".
         clientLogger.warn({
           layer: "ui",
           event: "save:paused_conflict",
-          summary: "save paused — an unresolved conflict is open for this document",
+          summary: "save paused — an unresolved conflict is open; draft re-stashed",
           attrs: { content_id: selectedContentId },
         });
         setHasUnsavedChanges(true);
@@ -1243,6 +1261,26 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
   );
 
   // ── Save-conflict resolution (stale-tab overwrite mitigation) ───────────
+  // Closing the tab or reloading with a conflict open discards whatever the
+  // user typed since: the stash survives, but only the editor holds the live
+  // document, and no save can leave while the conflict stands. The browser's
+  // own confirmation is the last thing between that work and a click on the
+  // close button. Modern browsers ignore custom text and show their own
+  // wording, so returnValue is set purely to arm the prompt.
+  // Keyed on the BOOLEAN, not the conflict object: re-stashing replaces that
+  // object on every refused save, which would otherwise detach and re-attach
+  // the listener every couple of seconds for no behavioural gain.
+  const hasOpenConflict = Boolean(activeConflict);
+  useEffect(() => {
+    if (!hasOpenConflict) return;
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [hasOpenConflict]);
+
   // Keep mine: re-save the user's edits, deliberately overwriting the newer
   // server copy. Advancing the baseline to the server's current hash makes the
   // forced PATCH's If-Match match, so it wins in one round-trip.
