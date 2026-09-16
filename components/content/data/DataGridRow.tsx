@@ -21,7 +21,7 @@
  * in this file's first draft.
  */
 
-import { memo, useCallback, useState } from "react";
+import { memo, useCallback, useEffect, useState } from "react";
 import {
   Check,
   Expand,
@@ -38,7 +38,6 @@ import {
 import { cn } from "@/lib/core/utils";
 import {
   cellToDisplayText,
-  hasOpenQuote,
   sortStatusOptions,
   splitDelimited,
   type CellValue,
@@ -1323,6 +1322,23 @@ function FreeformTagsPanel({
         : []
   );
   const [draft, setDraft] = useState("");
+  /**
+   * A value the user just re-typed that is already in the cell.
+   *
+   * Duplicates are dropped — a multi-select cell is a SET, and every
+   * consumer downstream assumes it (hasAny/hasAll/hasNone are set
+   * operations, grouping counts each value once, digests list it once). But
+   * dropping it SILENTLY makes the input look broken: you type a value,
+   * press comma, and nothing happens. Flashing the pill that already holds
+   * it turns a confusing non-event into an answer (owner, 2026-09-16).
+   */
+  const [duplicate, setDuplicate] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!duplicate) return;
+    const t = window.setTimeout(() => setDuplicate(null), 1200);
+    return () => window.clearTimeout(t);
+  }, [duplicate]);
 
   const commit = useCallback(
     (next: Array<{ id: string; label: string }>) => {
@@ -1359,9 +1375,13 @@ function FreeformTagsPanel({
 
       const seen = new Set(items.map((i) => i.label.toLowerCase()));
       const fresh: Array<{ id: string; label: string }> = [];
+      let repeated: string | null = null;
       for (const part of parts) {
         const key = part.toLowerCase();
-        if (seen.has(key)) continue;
+        if (seen.has(key)) {
+          repeated = key;
+          continue;
+        }
         seen.add(key);
         const known = (column.config.options ?? []).find(
           (o) => o.label.trim().toLowerCase() === key
@@ -1372,6 +1392,7 @@ function FreeformTagsPanel({
             : { id: part, label: part }
         );
       }
+      if (repeated) setDuplicate(repeated);
       if (fresh.length === 0) return;
 
       // Paint immediately, then reconcile.
@@ -1413,7 +1434,17 @@ function FreeformTagsPanel({
         {items.map((item, i) => (
           <span
             key={`${item.id}-${i}`}
-            className="inline-flex max-w-[12rem] items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[11px]"
+            className={cn(
+              "inline-flex max-w-[12rem] items-center gap-1 rounded-full px-2 py-0.5 text-[11px] transition-colors",
+              duplicate === item.label.toLowerCase()
+                ? "bg-amber-500/20 ring-1 ring-amber-500/60"
+                : "bg-muted"
+            )}
+            title={
+              duplicate === item.label.toLowerCase()
+                ? "Already in this cell"
+                : undefined
+            }
           >
             <span className="truncate">{item.label}</span>
             <button
@@ -1431,17 +1462,14 @@ function FreeformTagsPanel({
           value={draft}
           onChange={(e) => {
             const text = e.target.value;
-            // The DELIMITER completes a pill in place; space does NOT.
-            //
-            // Space was a terminator at first, copying email "To" fields,
-            // and it made multi-word values require quoting — which the
-            // owner then fought twice in a row (2026-09-16). Most tags ARE
-            // multi-word ("Body Condition Score"), so the common case was
-            // paying for the rare one. Enter and Tab still commit instantly,
-            // so nothing got slower; quoting is now optional and only
-            // matters for a value containing the delimiter itself.
+            // The DELIMITER completes a pill in place. Nothing else does:
+            // space was a terminator at first (copying email "To" fields)
+            // and quotes protected values containing one, but both lost to
+            // ordinary text — spaces are in most tags, and the apostrophe in
+            // "I'm" opened a quote that swallowed every later delimiter
+            // (owner, 2026-09-16). Comma, Enter and Tab; no parsing.
             const delim = column.config.splitOn ?? ",";
-            if (text.endsWith(delim) && !hasOpenQuote(text)) {
+            if (text.endsWith(delim)) {
               void flushDraft(text);
               return;
             }
@@ -1470,9 +1498,8 @@ function FreeformTagsPanel({
         />
       </div>
       <p className="mt-1.5 px-0.5 text-[10px] leading-snug text-muted-foreground">
-        Comma, Enter or Tab completes a value. Spaces are fine —
-        <span className="font-mono"> hello world</span> is one value. Quote
-        to include a comma.
+        Comma, Enter or Tab completes a value. Everything else — spaces,
+        apostrophes, punctuation — is part of it.
       </p>
     </div>
   );

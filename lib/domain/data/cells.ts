@@ -174,91 +174,33 @@ function encodeOptionIds(raw: unknown, column: DataColumn): EncodeResult {
   return out.length === 0 ? ok(undefined) : ok(out);
 }
 
-// ── Delimited input (config.splitOn) ─────────────────────────────────────
+// ── Delimited input (config.splitOn) ─────────────────────────────
 
 /**
- * Split one typed/pasted string into list items, honouring quoted fields.
+ * Split one typed/pasted string into list items on a delimiter.
  *
  * `Redis, Postgres` → ["Redis", "Postgres"]
- * `"Portland, OR", Seattle` → ["Portland, OR", "Seattle"]
- * `'hello world', next` → ["hello world", "next"]
- * `"He said ""hi"""` → [`He said "hi"`]  (a doubled quote INSIDE a quoted
- *   field is a literal quote — RFC 4180. A bare `""` in unquoted text opens
- *   and closes an empty section instead: the same rule, not a special case.)
+ * `hello world, next` → ["hello world", "next"]
  *
- * Both quote styles are accepted. Single quotes are not RFC, but people type
- * them, and refusing them would split a value at a space the user thought
- * they had protected.
- *
- * These are RFC 4180 field semantics, and the doubled-quote escape is the
- * reason this is hand-written rather than a `.split(delimiter)`: the
- * repo's prefer-a-library rule was checked and no CSV parser is a
- * dependency (import.ts hand-rolls its own), and pulling ~45KB of
- * papaparse to split a single field is not the trade. A naive split would
- * silently shred any label containing the delimiter — the exact bug that
- * already exists in read-format.ts's display-string round-trip.
+ * NO QUOTE HANDLING, deliberately (owner, 2026-09-16). An earlier version
+ * honoured RFC 4180 quoting so a value could contain the delimiter. It did
+ * not survive contact with ordinary prose: the apostrophe in "I'm" opens a
+ * quote, which makes every following delimiter literal, so
+ * `I'm going to try this again, now this` collapsed into ONE value with the
+ * apostrophes eaten. Apostrophes are common in real tags; commas inside a
+ * tag are rare. Trading the rare capability for the common correctness is
+ * the right way round, and a value that truly needs a comma can still be
+ * pasted or set by the AI as an array.
  *
  * Empty fields are dropped: a trailing comma is a typing artefact, not an
  * instruction to store "".
  */
 export function splitDelimited(raw: string, delimiter: string): string[] {
-  const delim = delimiter.length > 0 ? delimiter[0] : ",";
-  const out: string[] = [];
-  let field = "";
-  let quote: '"' | "'" | null = null;
-  for (let i = 0; i < raw.length; i++) {
-    const ch = raw[i];
-    if (quote) {
-      if (ch === quote) {
-        if (raw[i + 1] === quote) {
-          field += quote;
-          i++;
-        } else {
-          quote = null;
-        }
-      } else {
-        field += ch;
-      }
-      continue;
-    }
-    if (ch === '"' || ch === "'") {
-      quote = ch;
-      continue;
-    }
-    if (ch === delim) {
-      out.push(field.trim());
-      field = "";
-      continue;
-    }
-    field += ch;
-  }
-  out.push(field.trim());
-  return out.filter((f) => f.length > 0);
-}
-
-/**
- * True while `text` sits inside an unclosed quote.
- *
- * The type-and-pill editor uses this to know that a delimiter keystroke is
- * LITERAL rather than terminal: typing `"hello ` must keep accepting input,
- * because the user is halfway through a value that contains a space. Without
- * it the pill closed on the space and quoting became unusable (owner,
- * 2026-09-16).
- */
-export function hasOpenQuote(text: string): boolean {
-  let quote: '"' | "'" | null = null;
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i];
-    if (quote) {
-      if (ch === quote) {
-        if (text[i + 1] === quote) i++;
-        else quote = null;
-      }
-      continue;
-    }
-    if (ch === '"' || ch === "'") quote = ch;
-  }
-  return quote !== null;
+  const delim = delimiter.length > 0 ? delimiter : ",";
+  return raw
+    .split(delim)
+    .map((field) => field.trim())
+    .filter((field) => field.length > 0);
 }
 
 // ── Simple validators ────────────────────────────────────────────────────
