@@ -165,8 +165,12 @@ function encodeOptionIds(raw: unknown, column: DataColumn): EncodeResult {
     if (!options.some((o) => o.id === entry)) {
       return fail("Unknown option for this column");
     }
-    // Order is significant (it is the display order), but duplicates are not.
-    if (!seen.has(entry)) {
+    // Order is significant (it is the display order). Duplicates normally
+    // are not — a controlled vocabulary cannot be picked twice — but a
+    // free-form list may opt into them (config.allowDuplicates).
+    if (column.config.allowDuplicates) {
+      out.push(entry);
+    } else if (!seen.has(entry)) {
       seen.add(entry);
       out.push(entry);
     }
@@ -176,31 +180,75 @@ function encodeOptionIds(raw: unknown, column: DataColumn): EncodeResult {
 
 // ── Delimited input (config.splitOn) ─────────────────────────────
 
+/** The only quoting character. See splitDelimited for why it is this one. */
+const FENCE = "`";
+
 /**
  * Split one typed/pasted string into list items on a delimiter.
  *
  * `Redis, Postgres` → ["Redis", "Postgres"]
  * `hello world, next` → ["hello world", "next"]
+ * "`Portland, OR`, Seattle" → ["Portland, OR", "Seattle"]
  *
- * NO QUOTE HANDLING, deliberately (owner, 2026-09-16). An earlier version
- * honoured RFC 4180 quoting so a value could contain the delimiter. It did
- * not survive contact with ordinary prose: the apostrophe in "I'm" opens a
- * quote, which makes every following delimiter literal, so
- * `I'm going to try this again, now this` collapsed into ONE value with the
- * apostrophes eaten. Apostrophes are common in real tags; commas inside a
- * tag are rare. Trading the rare capability for the common correctness is
- * the right way round, and a value that truly needs a comma can still be
- * pasted or set by the AI as an array.
+ * Quoting uses BACKTICKS, and only backticks (owner, 2026-09-16). The first
+ * version honoured RFC 4180 double/single quotes and did not survive contact
+ * with ordinary prose: the apostrophe in "I'm" opened a quote, which made
+ * every later delimiter literal, so
+ * `I'm going to try this again, now this` collapsed into one value with the
+ * apostrophes eaten. Apostrophes and quotation marks appear in real tags all
+ * the time; a backtick essentially never does, which is what makes it safe
+ * to give a parsing meaning.
+ *
+ * A doubled backtick inside a fenced value is a literal one.
  *
  * Empty fields are dropped: a trailing comma is a typing artefact, not an
  * instruction to store "".
  */
 export function splitDelimited(raw: string, delimiter: string): string[] {
-  const delim = delimiter.length > 0 ? delimiter : ",";
-  return raw
-    .split(delim)
-    .map((field) => field.trim())
-    .filter((field) => field.length > 0);
+  const delim = delimiter.length > 0 ? delimiter[0] : ",";
+  const out: string[] = [];
+  let field = "";
+  let fenced = false;
+  for (let i = 0; i < raw.length; i++) {
+    const ch = raw[i];
+    if (ch === FENCE) {
+      if (fenced && raw[i + 1] === FENCE) {
+        field += FENCE;
+        i++;
+      } else {
+        fenced = !fenced;
+      }
+      continue;
+    }
+    if (!fenced && ch === delim) {
+      out.push(field.trim());
+      field = "";
+      continue;
+    }
+    field += ch;
+  }
+  out.push(field.trim());
+  return out.filter((f) => f.length > 0);
+}
+
+/**
+ * True while `text` sits inside an unclosed backtick fence.
+ *
+ * The type-and-pill editor uses this to know a delimiter keystroke is
+ * LITERAL rather than terminal, so typing "`Portland, " keeps accepting
+ * input instead of closing the pill on the comma.
+ */
+export function hasOpenFence(text: string): boolean {
+  let fenced = false;
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] !== FENCE) continue;
+    if (fenced && text[i + 1] === FENCE) {
+      i++;
+      continue;
+    }
+    fenced = !fenced;
+  }
+  return fenced;
 }
 
 // ── Simple validators ────────────────────────────────────────────────────

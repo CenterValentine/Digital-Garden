@@ -129,6 +129,7 @@ export function AddColumnButton({ tableId, columns, onAdd }: AddColumnButtonProp
     "text"
   );
   const [freeform, setFreeform] = useState(false);
+  const [allowDuplicates, setAllowDuplicates] = useState(false);
   const [busy, setBusy] = useState(false);
   const [targetDbId, setTargetDbId] = useState("");
   const [withBacklink, setWithBacklink] = useState(true);
@@ -227,7 +228,12 @@ export function AddColumnButton({ tableId, columns, onAdd }: AddColumnButtonProp
       let config: DataColumnConfig | undefined;
       if (type === IMAGES_KIND) config = { imageOnly: true };
       else if (type === "multiSelect" && freeform)
-        config = { freeform: true, splitOn: ",", options: [] };
+        config = {
+          freeform: true,
+          splitOn: ",",
+          options: [],
+          ...(allowDuplicates ? { allowDuplicates: true } : {}),
+        };
       else if (type === "relation") config = { relationTableId: targetDbId };
       else if (type === "lookup")
         config = {
@@ -257,6 +263,7 @@ export function AddColumnButton({ tableId, columns, onAdd }: AddColumnButtonProp
     name,
     type,
     freeform,
+    allowDuplicates,
     targetDbId,
     withBacklink,
     isDerived,
@@ -334,7 +341,29 @@ export function AddColumnButton({ tableId, columns, onAdd }: AddColumnButtonProp
               Free-form
               <span className="block text-[10px] text-muted-foreground">
                 Type values instead of choosing them — comma, Enter or Tab
-                completes each one. Everything else is part of the value.
+                completes each one. Everything else is part of the value;
+                wrap in backticks to include a comma.
+              </span>
+            </span>
+          </label>
+        )}
+        {type === "multiSelect" && freeform && (
+          // Only offered ALONGSIDE free-form: a controlled vocabulary cannot
+          // be picked twice, so duplicates there would only ever be a bug.
+          // A jotted list is not a vocabulary, and a repeat in one can be
+          // what the author meant (owner, 2026-09-16).
+          <label className="mt-2 flex items-start gap-2 pl-5 text-[11px] text-foreground">
+            <input
+              type="checkbox"
+              checked={allowDuplicates}
+              onChange={(e) => setAllowDuplicates(e.target.checked)}
+              className="mt-0.5"
+            />
+            <span>
+              Allow repeats
+              <span className="block text-[10px] text-muted-foreground">
+                The same value can appear more than once. Off by default —
+                typing an existing value flashes the one you already have.
               </span>
             </span>
           </label>

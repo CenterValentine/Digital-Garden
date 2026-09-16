@@ -248,6 +248,22 @@ export interface DataColumnConfig {
    */
   freeform?: boolean;
   /**
+   * `multiSelect` — the cell may hold the SAME value more than once.
+   *
+   * Off by default, and nonsense for a controlled vocabulary: you cannot
+   * tick a checkbox twice, so a picker-driven column that stored duplicates
+   * would just be showing a bug. But a FREE-FORM list is not a vocabulary —
+   * it is a jotted list, and a repeat in one can be exactly what the author
+   * meant (owner, 2026-09-16). The picker only offers this alongside
+   * `freeform` for that reason.
+   *
+   * Set membership is unaffected: hasAny/hasAll/hasNone ask whether a value
+   * is present, and twice is still present. What DOES need care is counting
+   * — group counts and profiling must count each row once per distinct
+   * value, or a row holding "hello" twice reports as two rows.
+   */
+  allowDuplicates?: boolean;
+  /**
    * `multiSelect` — a delimiter that splits a typed or pasted STRING into
    * the list this column stores. A parse hint, never a storage format: the
    * cell still holds `string[]`, and nothing downstream learns about the

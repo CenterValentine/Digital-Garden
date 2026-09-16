@@ -38,6 +38,7 @@ import {
 import { cn } from "@/lib/core/utils";
 import {
   cellToDisplayText,
+  hasOpenFence,
   sortStatusOptions,
   splitDelimited,
   type CellValue,
@@ -994,12 +995,12 @@ function DataCell({
                 .filter((v): v is { id: string; label: string } => Boolean(v))}
               onRemove={
                 editable
-                  ? (id) =>
+                  ? (index) =>
                       onCommit(
                         rowId,
                         column.key,
                         (Array.isArray(value) ? value : []).filter(
-                          (v) => v !== id
+                          (_, i) => i !== index
                         )
                       )
                   : undefined
@@ -1224,7 +1225,12 @@ function CellValuesPanel({
 }: {
   title: string;
   values: Array<{ id: string; label: string; muted?: boolean }>;
-  onRemove?: (id: string) => void;
+  /**
+   * Removal is by INDEX, not id: a column that allows duplicates holds the
+   * same id more than once, and filtering by id would delete every copy
+   * when the user clicked one.
+   */
+  onRemove?: (index: number) => void;
   onClose: () => void;
 }) {
   return (
@@ -1238,9 +1244,9 @@ function CellValuesPanel({
         </span>
       </div>
       <ul className="max-h-64 overflow-y-auto">
-        {values.map((v) => (
+        {values.map((v, index) => (
           <li
-            key={v.id}
+            key={`${v.id}-${index}`}
             className="group flex items-center gap-1.5 rounded px-2 py-1 text-xs hover:bg-muted"
           >
             <span
@@ -1258,7 +1264,7 @@ function CellValuesPanel({
                 aria-label={`Remove ${v.label}`}
                 onClick={(e) => {
                   e.stopPropagation();
-                  onRemove(v.id);
+                  onRemove(index);
                 }}
                 className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 group-hover:opacity-100 hover:bg-background hover:text-foreground"
               >
@@ -1373,12 +1379,13 @@ function FreeformTagsPanel({
       setDraft("");
       if (parts.length === 0) return;
 
+      const allowDuplicates = column.config.allowDuplicates === true;
       const seen = new Set(items.map((i) => i.label.toLowerCase()));
       const fresh: Array<{ id: string; label: string }> = [];
       let repeated: string | null = null;
       for (const part of parts) {
         const key = part.toLowerCase();
-        if (seen.has(key)) {
+        if (seen.has(key) && !allowDuplicates) {
           repeated = key;
           continue;
         }
@@ -1462,14 +1469,17 @@ function FreeformTagsPanel({
           value={draft}
           onChange={(e) => {
             const text = e.target.value;
-            // The DELIMITER completes a pill in place. Nothing else does:
-            // space was a terminator at first (copying email "To" fields)
-            // and quotes protected values containing one, but both lost to
-            // ordinary text — spaces are in most tags, and the apostrophe in
-            // "I'm" opened a quote that swallowed every later delimiter
-            // (owner, 2026-09-16). Comma, Enter and Tab; no parsing.
+            // The DELIMITER completes a pill in place — unless a backtick
+            // fence is open, where it is part of the value being typed.
+            //
+            // Space was a terminator at first (copying email "To" fields)
+            // and quotes protected values containing one; both lost to
+            // ordinary text, since spaces are in most tags and the
+            // apostrophe in "I'm" swallowed every later delimiter. A
+            // backtick never appears in ordinary tag text, so it is safe to
+            // give it meaning (owner, 2026-09-16).
             const delim = column.config.splitOn ?? ",";
-            if (text.endsWith(delim)) {
+            if (text.endsWith(delim) && !hasOpenFence(text)) {
               void flushDraft(text);
               return;
             }
@@ -1498,8 +1508,9 @@ function FreeformTagsPanel({
         />
       </div>
       <p className="mt-1.5 px-0.5 text-[10px] leading-snug text-muted-foreground">
-        Comma, Enter or Tab completes a value. Everything else — spaces,
-        apostrophes, punctuation — is part of it.
+        Comma, Enter or Tab completes a value; spaces, apostrophes and
+        punctuation are part of it. To include a comma, wrap the value in
+        backticks — <span className="font-mono">`Portland, OR`</span>.
       </p>
     </div>
   );
