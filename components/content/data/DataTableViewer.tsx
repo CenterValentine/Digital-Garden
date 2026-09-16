@@ -38,6 +38,7 @@ import {
   cellToText,
   COLUMN_WIDTH_MAX,
   COLUMN_WIDTH_MIN,
+  columnWidthMin,
   createUndoStack,
   encodeCell,
   isEncodeError,
@@ -285,6 +286,11 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
   const handleResizeStart = useCallback(
     (e: React.PointerEvent, columnId: string) => {
       const startWidth = columnWidths[columnId] ?? DEFAULT_COLUMN_WIDTH;
+      // Chip-list columns floor higher than COLUMN_WIDTH_MIN: their cells
+      // COMPRESS instead of clipping, so a 60px relation column renders
+      // single letters rather than a truncated list (owner, 2026-09-15).
+      const column = columns.find((c) => c.id === columnId);
+      const floor = column ? columnWidthMin(column) : COLUMN_WIDTH_MIN;
       resizeRef.current = {
         columnId,
         startX: e.clientX,
@@ -296,7 +302,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
         if (!r) return;
         const width = Math.round(
           Math.max(
-            COLUMN_WIDTH_MIN,
+            floor,
             Math.min(COLUMN_WIDTH_MAX, r.startWidth + (ev.clientX - r.startX))
           )
         );
@@ -316,7 +322,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
       window.addEventListener("pointermove", onMove);
       window.addEventListener("pointerup", onUp);
     },
-    [columnWidths, persistColumnWidth]
+    [columns, columnWidths, persistColumnWidth]
   );
 
   /**

@@ -18,6 +18,11 @@ import { useCallback, useState } from "react";
 import { Check, Loader2, Table2 } from "lucide-react";
 import { toast } from "sonner";
 import { useContentStore } from "@/state/content-store";
+import { useProposalRevision } from "./use-proposal-revision";
+import {
+  ModifyProposalButton,
+  ProposalWithdrawnNotice,
+} from "./ProposalRevisionControls";
 
 export interface OutputDatabaseProposalPayload {
   __outputDatabaseProposal: true;
@@ -119,6 +124,19 @@ export function OutputDatabaseProposalCard({
   const [state, setState] = useState<ApplyState>(() =>
     loadAppliedState(payload),
   );
+  const revision = useProposalRevision(storageKey(payload));
+
+  /**
+   * Withdraw this card and hand the composer a revision request. The prompt
+   * names what is being replaced so the model does not re-propose blind, and
+   * says the part it kept getting wrong: it may re-issue the WHOLE thing
+   * rather than waiting for an Apply it needs nothing from.
+   */
+  const askForChanges = useCallback(() => {
+    revision.requestRevision(
+      `I've sent the proposed database (${payload.title}) back for changes — nothing was applied. Re-propose the complete corrected version with these changes: `,
+    );
+  }, [payload, revision]);
 
   const apply = useCallback(async () => {
     setState({ status: "applying" });
@@ -163,6 +181,12 @@ export function OutputDatabaseProposalCard({
       toast.error(message);
     }
   }, [payload]);
+
+  if (revision.withdrawn) {
+    return (
+      <ProposalWithdrawnNotice label="database" onRestore={revision.restore} />
+    );
+  }
 
   if (state.status === "applied") {
     return (
@@ -279,6 +303,10 @@ export function OutputDatabaseProposalCard({
           )}
           Create database
         </button>
+        <ModifyProposalButton
+          onClick={askForChanges}
+          disabled={state.status === "applying"}
+        />
         <span className="text-[10px] text-gray-400 dark:text-gray-500">
           Nothing is created until you click.
         </span>

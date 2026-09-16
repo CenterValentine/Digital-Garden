@@ -26,6 +26,11 @@ import { useCallback, useState } from "react";
 import { AlertTriangle, Check, Columns3, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { dispatchDataSchemaChanged } from "@/components/content/data/events";
+import { useProposalRevision } from "./use-proposal-revision";
+import {
+  ModifyProposalButton,
+  ProposalWithdrawnNotice,
+} from "./ProposalRevisionControls";
 
 export interface DatabaseColumnsProposalPayload {
   __databaseColumnsProposal: true;
@@ -127,6 +132,19 @@ export function DatabaseColumnsProposalCard({
   const [checked, setChecked] = useState<boolean[]>(() =>
     payload.columns.map(() => true)
   );
+  const revision = useProposalRevision(storageKey(payload));
+
+  /**
+   * Withdraw this card and hand the composer a revision request. The prompt
+   * names what is being replaced so the model does not re-propose blind, and
+   * says the part it kept getting wrong: it may re-issue the WHOLE thing
+   * rather than waiting for an Apply it needs nothing from.
+   */
+  const askForChanges = useCallback(() => {
+    revision.requestRevision(
+      `I've sent the proposed columns for ${payload.databaseTitle} back for changes — nothing was applied. Re-propose the complete corrected version with these changes: `,
+    );
+  }, [payload, revision]);
 
   const selectedCount = checked.filter(Boolean).length;
 
@@ -214,6 +232,12 @@ export function DatabaseColumnsProposalCard({
       toast.error(message);
     }
   }, [payload, checked]);
+
+  if (revision.withdrawn) {
+    return (
+      <ProposalWithdrawnNotice label="column set" onRestore={revision.restore} />
+    );
+  }
 
   if (state.status === "applied") {
     return (
@@ -309,7 +333,8 @@ export function DatabaseColumnsProposalCard({
         </div>
       )}
 
-      <button
+      <div className="flex flex-wrap items-center gap-2">
+        <button
         type="button"
         onClick={apply}
         disabled={state.status === "applying" || selectedCount === 0}
@@ -325,7 +350,12 @@ export function DatabaseColumnsProposalCard({
         ) : (
           `Add ${selectedCount} of ${payload.columns.length}`
         )}
-      </button>
+        </button>
+        <ModifyProposalButton
+          onClick={askForChanges}
+          disabled={state.status === "applying"}
+        />
+      </div>
     </div>
   );
 }

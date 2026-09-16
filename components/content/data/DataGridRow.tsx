@@ -81,6 +81,94 @@ const CHECK_COLOR_CLASS: Record<string, string> = {
  * parses that back as local time on commit). Shared with DataRowFields
  * so the grid and the peek seed identically.
  */
+/**
+ * Chip-list overflow accounting (owner report, 2026-09-15).
+ *
+ * A list cell is `display:flex` with `overflow-hidden`, and its chips carry
+ * `truncate` — which sets `overflow:hidden`, which makes each chip's
+ * automatic flex minimum resolve to ZERO. So N chips in a narrow cell do not
+ * overflow and clip; they each shrink to a sliver, and a relation column
+ * renders "O." "I." "W." instead of a truncated-but-readable list.
+ *
+ * The fix is two-sided: chips stop shrinking (CHIP_CLASS pins `shrink-0`
+ * with a max-width so long titles still ellipsize), and the cell shows only
+ * as many as actually fit, followed by a "+N" pill that opens the full list.
+ *
+ * The budget is computed from the column width rather than measured. A
+ * ResizeObserver pass would be exact, but this runs for every cell of every
+ * visible row on every width change; an arithmetic estimate is stable,
+ * synchronous, and cannot cause a layout-measure feedback loop. Being off by
+ * one chip costs a "+N" that reads 3 instead of 2 — the list is reachable
+ * either way.
+ */
+const CHIP_MIN_PX = 64; // a chip narrow enough to still read (~7 chars + …)
+const CHIP_GAP_PX = 4; // gap-1
+const CELL_PAD_PX = 16; // px-2, both sides
+const ADD_BTN_PX = 22; // the dashed "+" that rides along on editable cells
+const MORE_PILL_PX = 34; // the "+N" pill itself
+
+/** Shared chip skin: never shrinks, ellipsizes past ~9rem. */
+const CHIP_CLASS =
+  "shrink-0 max-w-[9rem] truncate rounded-full px-2 py-0.5 text-[11px]";
+
+/**
+ * How many of `total` chips to render, and how many are hidden behind the
+ * pill. Returns `hidden: 0` whenever everything fits — the pill is only
+ * drawn when it is actually standing in for something.
+ */
+function chipBudget(
+  width: number,
+  total: number,
+  opts: { hasAddButton: boolean; chipPx?: number }
+): { shown: number; hidden: number } {
+  if (total <= 0) return { shown: 0, hidden: 0 };
+  const chipPx = opts.chipPx ?? CHIP_MIN_PX;
+  const available =
+    (width || DEFAULT_COLUMN_WIDTH) -
+    CELL_PAD_PX -
+    (opts.hasAddButton ? ADD_BTN_PX + CHIP_GAP_PX : 0);
+  const fits = Math.floor((available + CHIP_GAP_PX) / (chipPx + CHIP_GAP_PX));
+  if (fits >= total) return { shown: total, hidden: 0 };
+  // The pill costs a slot, so reserve room for it — but always show at
+  // least one chip, or the cell degrades to a bare count with no sample of
+  // what is in it.
+  const withPill = Math.floor(
+    (available - MORE_PILL_PX - CHIP_GAP_PX + CHIP_GAP_PX) /
+      (chipPx + CHIP_GAP_PX)
+  );
+  const shown = Math.max(1, Math.min(total - 1, withPill));
+  return { shown, hidden: total - shown };
+}
+
+/**
+ * The "+N" affordance. Deliberately a real button into the cell's OWN
+ * expand path (the row peek for relations/links, the options panel for
+ * multiSelect) rather than a nested horizontal scroller: the grid already
+ * scrolls on that axis, and a same-axis scroll region inside it steals
+ * trackpad momentum and shows no affordance at rest.
+ */
+function MoreChip({
+  count,
+  label,
+  onClick,
+}: {
+  count: number;
+  label: string;
+  onClick: (e: React.MouseEvent) => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+      className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium leading-none text-muted-foreground hover:bg-muted-foreground/20 hover:text-foreground"
+    >
+      +{count}
+    </button>
+  );
+}
+
 export function editDraftFor(
   column: DataColumn,
   value: CellValue | undefined
@@ -451,20 +539,40 @@ function DataCell({
         onDoubleClick={editable ? () => onOpenRow(rowId) : undefined}
         title={editable ? "Double-click to link rows" : undefined}
       >
-        {(links ?? []).map((link) => (
-          <span
-            key={link.linkId}
-            className={cn(
-              "truncate rounded-full px-2 py-0.5 text-[11px]",
-              link.restricted
-                ? "bg-muted italic text-muted-foreground"
-                : "bg-primary/10 text-primary"
-            )}
-            title={link.restricted ? "Restricted" : link.title}
-          >
-            {link.restricted ? "Restricted" : link.title}
-          </span>
-        ))}
+        {(() => {
+          const all = links ?? [];
+          const { shown, hidden } = chipBudget(width, all.length, {
+            hasAddButton: editable,
+          });
+          return (
+            <>
+              {all.slice(0, shown).map((link) => (
+                <span
+                  key={link.linkId}
+                  className={cn(
+                    CHIP_CLASS,
+                    link.restricted
+                      ? "bg-muted italic text-muted-foreground"
+                      : "bg-primary/10 text-primary"
+                  )}
+                  title={link.restricted ? "Restricted" : link.title}
+                >
+                  {link.restricted ? "Restricted" : link.title}
+                </span>
+              ))}
+              {hidden > 0 && (
+                <MoreChip
+                  count={hidden}
+                  label={`Show all ${all.length} linked rows`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpenRow(rowId, column.id);
+                  }}
+                />
+              )}
+            </>
+          );
+        })()}
         {/* The + rides along whether the cell is empty or populated —
             linking more rows is as normal as linking the first one, and it
             is a real BUTTON straight into the peek, not a hint that only
@@ -540,53 +648,87 @@ function DataCell({
             : undefined
         }
       >
-        {(contentRefs ?? []).map((ref) =>
-          ref.restricted ? (
-            <span
-              key={ref.id}
-              className="truncate rounded-full bg-muted px-2 py-0.5 text-[11px] italic text-muted-foreground"
-              title="Restricted"
-            >
-              Restricted
-            </span>
-          ) : column.config.imageOnly ? (
-            // Images column: thumbnail, click to zoom. Hydration's
-            // thumbnail when processed, else the full image streams.
-            <button
-              key={ref.id}
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setLightbox(ref);
-              }}
-              title={`View "${ref.title}"`}
-              className="shrink-0 overflow-hidden rounded border border-border/60 hover:ring-2 hover:ring-primary/50"
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element -- tiny authed thumbnail; next/image adds nothing */}
-              <img
-                src={
-                  ref.file?.thumbnailUrl ??
-                  imageDownloadUrl(ref.id, imageVersion)
-                }
-                alt={ref.title}
-                className="h-7 w-7 object-cover"
-              />
-            </button>
-          ) : (
-            <button
-              key={ref.id}
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onOpenContent(ref);
-              }}
-              className="truncate rounded-full bg-primary/10 px-2 py-0.5 text-[11px] text-primary hover:bg-primary/20"
-              title={`Open "${ref.title}"`}
-            >
-              {ref.title}
-            </button>
-          )
-        )}
+        {(() => {
+          const all = contentRefs ?? [];
+          // Image chips are 28px thumbnails, not ~64px text pills, so the
+          // budget is told the real chip size — an Images column fits four
+          // or five where a link column fits two.
+          const { shown, hidden } = chipBudget(width, all.length, {
+            hasAddButton: editable,
+            chipPx: column.config.imageOnly ? 28 : undefined,
+          });
+          return (
+            <>
+              {all.slice(0, shown).map((ref) =>
+                ref.restricted ? (
+                  <span
+                    key={ref.id}
+                    className={cn(
+                      CHIP_CLASS,
+                      "bg-muted italic text-muted-foreground"
+                    )}
+                    title="Restricted"
+                  >
+                    Restricted
+                  </span>
+                ) : column.config.imageOnly ? (
+                  // Images column: thumbnail, click to zoom. Hydration's
+                  // thumbnail when processed, else the full image streams.
+                  <button
+                    key={ref.id}
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setLightbox(ref);
+                    }}
+                    title={`View "${ref.title}"`}
+                    className="shrink-0 overflow-hidden rounded border border-border/60 hover:ring-2 hover:ring-primary/50"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element -- tiny authed thumbnail; next/image adds nothing */}
+                    <img
+                      src={
+                        ref.file?.thumbnailUrl ??
+                        imageDownloadUrl(ref.id, imageVersion)
+                      }
+                      alt={ref.title}
+                      className="h-7 w-7 object-cover"
+                    />
+                  </button>
+                ) : (
+                  <button
+                    key={ref.id}
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onOpenContent(ref);
+                    }}
+                    className={cn(
+                      CHIP_CLASS,
+                      "bg-primary/10 text-primary hover:bg-primary/20"
+                    )}
+                    title={`Open "${ref.title}"`}
+                  >
+                    {ref.title}
+                  </button>
+                )
+              )}
+              {hidden > 0 && (
+                <MoreChip
+                  count={hidden}
+                  label={
+                    column.config.imageOnly
+                      ? `Show all ${all.length} images`
+                      : `Show all ${all.length} linked items`
+                  }
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpenRow(rowId, column.id);
+                  }}
+                />
+              )}
+            </>
+          );
+        })()}
         {editable && (
           <button
             type="button"
@@ -705,26 +847,53 @@ function DataCell({
         onDoubleClick={editable ? () => setOptionsOpen(true) : undefined}
         title={display || (editable ? "Double-click to choose" : undefined)}
       >
-        {column.type === "multiSelect" && Array.isArray(value) ? (
-          // One pill per chosen option, like relation chips — a single
-          // joined pill read as one value (owner, 2026-08-31). Removed
-          // options render nothing (their ids stay in the cell, plan D3).
-          value.map((id) => {
-            const opt = column.config.options?.find((o) => o.id === id);
-            return opt ? (
-              <span
-                key={id}
-                className="truncate rounded-full bg-muted px-2 py-0.5 text-[11px]"
-              >
-                {opt.label}
-              </span>
-            ) : null;
-          })
-        ) : display ? (
-          <span className="truncate rounded-full bg-muted px-2 py-0.5 text-[11px]">
-            {display}
-          </span>
-        ) : null}
+        {column.type === "multiSelect" && Array.isArray(value)
+          ? (() => {
+              // One pill per chosen option, like relation chips — a single
+              // joined pill read as one value (owner, 2026-08-31). Removed
+              // options render nothing (their ids stay in the cell, plan
+              // D3), so the budget counts RESOLVED options, not raw ids —
+              // otherwise "+2" could stand for two options that no longer
+              // exist and clicking through would show nothing.
+              const opts = value
+                .map((id) => column.config.options?.find((o) => o.id === id))
+                .filter((o): o is NonNullable<typeof o> => Boolean(o));
+              const { shown, hidden } = chipBudget(width, opts.length, {
+                hasAddButton: editable,
+              });
+              return (
+                <>
+                  {opts.slice(0, shown).map((opt) => (
+                    <span
+                      key={opt.id}
+                      className={cn(CHIP_CLASS, "bg-muted")}
+                      title={opt.label}
+                    >
+                      {opt.label}
+                    </span>
+                  ))}
+                  {hidden > 0 && (
+                    <MoreChip
+                      count={hidden}
+                      label={`Show all ${opts.length} options`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSelect(rowId, column.key);
+                        if (editable) setOptionsOpen(true);
+                        else onOpenRow(rowId, column.id);
+                      }}
+                    />
+                  )}
+                </>
+              );
+            })()
+          : display
+            ? (
+                <span className={cn(CHIP_CLASS, "bg-muted")} title={display}>
+                  {display}
+                </span>
+              )
+            : null}
         {editable && (
           <button
             type="button"

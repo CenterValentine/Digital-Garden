@@ -22,6 +22,11 @@ import {
   type SelectOption,
 } from "@/lib/domain/data";
 import { dispatchDataSchemaChanged } from "@/components/content/data/events";
+import { useProposalRevision } from "./use-proposal-revision";
+import {
+  ModifyProposalButton,
+  ProposalWithdrawnNotice,
+} from "./ProposalRevisionControls";
 
 export interface ColumnOptionsProposalPayload {
   __columnOptionsProposal: true;
@@ -93,6 +98,19 @@ export function ColumnOptionsProposalCard({
   const [labels, setLabels] = useState<string[]>(() =>
     payload.options.map((o) => o.label)
   );
+  const revision = useProposalRevision(storageKey(payload));
+
+  /**
+   * Withdraw this card and hand the composer a revision request. The prompt
+   * names what is being replaced so the model does not re-propose blind, and
+   * says the part it kept getting wrong: it may re-issue the WHOLE thing
+   * rather than waiting for an Apply it needs nothing from.
+   */
+  const askForChanges = useCallback(() => {
+    revision.requestRevision(
+      `I've sent the proposed options for ${payload.columnName} back for changes — nothing was applied. Re-propose the complete corrected version with these changes: `,
+    );
+  }, [payload, revision]);
   const [checked, setChecked] = useState<boolean[]>(() =>
     payload.options.map(() => true)
   );
@@ -211,6 +229,12 @@ export function ColumnOptionsProposalCard({
     }
   }, [payload, labels, checked]);
 
+  if (revision.withdrawn) {
+    return (
+      <ProposalWithdrawnNotice label="option set" onRestore={revision.restore} />
+    );
+  }
+
   if (state.status === "applied") {
     return (
       <div className="inline-flex items-center gap-2 rounded-lg border border-indigo-400/40 bg-indigo-500/[0.06] px-3 py-2 text-sm dark:border-indigo-400/30 dark:bg-indigo-500/[0.08]">
@@ -301,7 +325,8 @@ export function ColumnOptionsProposalCard({
         </div>
       )}
 
-      <button
+      <div className="flex flex-wrap items-center gap-2">
+        <button
         type="button"
         onClick={apply}
         disabled={state.status === "applying" || selectedCount === 0}
@@ -317,7 +342,12 @@ export function ColumnOptionsProposalCard({
         ) : (
           `Apply ${selectedCount} of ${payload.options.length}`
         )}
-      </button>
+        </button>
+        <ModifyProposalButton
+          onClick={askForChanges}
+          disabled={state.status === "applying"}
+        />
+      </div>
     </div>
   );
 }

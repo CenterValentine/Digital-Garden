@@ -460,6 +460,38 @@ export interface ColumnPref {
 export const COLUMN_WIDTH_MIN = 60;
 export const COLUMN_WIDTH_MAX = 1200;
 
+/**
+ * Column types whose cell renders a LIST of chips rather than one value.
+ * Shared by the width floor below and the grid's overflow accounting, so
+ * "is this a list cell?" is answered in one place instead of by three
+ * hand-kept `type === …` chains in DataGridRow.
+ */
+export const CHIP_LIST_COLUMN_TYPES: readonly DataColumnType[] = [
+  "multiSelect",
+  "relation",
+  "contentLink",
+  "file",
+];
+
+/**
+ * The narrowest a column may be dragged, BY TYPE.
+ *
+ * `COLUMN_WIDTH_MIN` (60) is the absolute floor and stays the contract the
+ * views PATCH route clamps to. But 60px is a legibility cliff for a chip
+ * list: flex children in those cells shrink rather than overflow, so a
+ * narrow list column does not clip — it compresses every chip to a single
+ * letter ("O." "I." "W."), which reads as broken rather than as truncated
+ * (owner report, 2026-09-15). A list column therefore floors high enough to
+ * show one readable chip plus the overflow pill.
+ */
+export function columnWidthMin(column: {
+  type: DataColumnType;
+  config?: { imageOnly?: boolean };
+}): number {
+  if (column.type === "file" && column.config?.imageOnly) return 96;
+  return CHIP_LIST_COLUMN_TYPES.includes(column.type) ? 140 : COLUMN_WIDTH_MIN;
+}
+
 /** Per-field overrides for a form view (plan O15) — view-scoped, not column. */
 export interface FormFieldConfig {
   label?: string;

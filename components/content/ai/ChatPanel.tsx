@@ -20,6 +20,7 @@ import { PROVIDER_CATALOG } from "@/lib/domain/ai/providers/catalog";
 import { getProviderTheme } from "@/lib/design/system/ai-providers";
 import { useResolvedTheme } from "@/lib/features/theme/useResolvedTheme";
 import { ProviderIcon } from "./ProviderIcon";
+import { PROPOSAL_REVISE_EVENT } from "./use-proposal-revision";
 import { toast } from "sonner";
 import { useEditorInstanceStore } from "@/state/editor-instance-store";
 import {
@@ -864,6 +865,24 @@ export function ChatPanel({
         "flashcard-request-next-batch",
         handleNextBatch,
       );
+  }, [setInput]);
+
+  // Proposal cards' "Modify" button (2026-09-15). Same deliberate loop-back
+  // as above: the card withdraws itself and we PRE-FILL the composer rather
+  // than submitting, because the useful part is the user saying what should
+  // change. Re-proposing was never blocked server-side — what was missing
+  // was an exit for the superseded card, so two live Apply buttons cannot
+  // coexist in the transcript.
+  useEffect(() => {
+    function handleRevise(e: Event) {
+      const detail = (e as CustomEvent).detail as
+        | { prompt?: string }
+        | undefined;
+      if (detail?.prompt) setInput(detail.prompt);
+    }
+    window.addEventListener(PROPOSAL_REVISE_EVENT, handleRevise);
+    return () =>
+      window.removeEventListener(PROPOSAL_REVISE_EVENT, handleRevise);
   }, [setInput]);
 
   // Trash button semantics:

@@ -21,6 +21,11 @@ import { AlertTriangle, ArrowRight, Check, Database, Loader2 } from "lucide-reac
 import { toast } from "sonner";
 import { dispatchDataSchemaChanged } from "@/components/content/data/events";
 import { useContentStore } from "@/state/content-store";
+import { useProposalRevision } from "./use-proposal-revision";
+import {
+  ModifyProposalButton,
+  ProposalWithdrawnNotice,
+} from "./ProposalRevisionControls";
 
 const NEW_PREFIX = "$new:";
 
@@ -157,6 +162,24 @@ export function LinkedDatabasesProposalCard({
   const [state, setState] = useState<ApplyState>(() =>
     loadAppliedState(payload),
   );
+  const revision = useProposalRevision(storageKey(payload));
+
+  /**
+   * The revision request names the tables by title so the model knows which
+   * card it is replacing, and states the rule it kept getting wrong: it may
+   * re-propose the WHOLE set, including tables that do not exist yet.
+   */
+  const askForChanges = useCallback(() => {
+    const names = [
+      ...payload.tables.map((t) => t.title),
+      ...payload.extend.map((e) => e.databaseTitle),
+    ];
+    const subject =
+      names.length > 0 ? `the proposed schema (${names.join(", ")})` : "that schema proposal";
+    revision.requestRevision(
+      `I've sent ${subject} back for changes — nothing was created. Re-propose the complete corrected set in one card (use $new: for tables that don't exist yet), with these changes: `,
+    );
+  }, [payload, revision]);
 
   const edges = collectEdges(payload);
   const tableCount = payload.tables.length;
@@ -223,6 +246,15 @@ export function LinkedDatabasesProposalCard({
       toast.error(message);
     }
   }, [payload]);
+
+  if (revision.withdrawn) {
+    return (
+      <ProposalWithdrawnNotice
+        label="schema"
+        onRestore={revision.restore}
+      />
+    );
+  }
 
   if (state.status === "applied") {
     return (
@@ -378,7 +410,8 @@ export function LinkedDatabasesProposalCard({
         </div>
       )}
 
-      <button
+      <div className="flex flex-wrap items-center gap-2">
+        <button
         type="button"
         onClick={apply}
         disabled={state.status === "applying"}
@@ -394,7 +427,12 @@ export function LinkedDatabasesProposalCard({
         ) : (
           "Create all"
         )}
-      </button>
+        </button>
+        <ModifyProposalButton
+          onClick={askForChanges}
+          disabled={state.status === "applying"}
+        />
+      </div>
     </div>
   );
 }
