@@ -9,6 +9,7 @@
 "use client";
 
 import { createElement, useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { stableStringify } from "@/lib/core/stable-stringify";
 import type { SaveMeta } from "@/lib/domain/content/save-meta";
 import { usePathname } from "next/navigation";
 import { AlertTriangle } from "lucide-react";
@@ -850,13 +851,32 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
         if (!cancelled && !isPageTemplateTab) {
           const draft = loadConflictDraft(selectedContentId);
           if (draft && bodyHashRef.current) {
-            setConflict({
-              contentId: selectedContentId,
-              mine: draft,
-              theirHash: bodyHashRef.current,
-            });
-            setNoteContent(draft);
-            setOutline(selectedContentId, extractOutline(draft));
+            // A stash IDENTICAL to the server copy has nothing to resolve.
+            // Left in place, it re-raises a conflict on EVERY load of this
+            // document: the view is replaced with the stale draft ("my edits
+            // revert when I come back") and handleSave pauses every save
+            // while a conflict exists ("nothing saves, even after the
+            // debounce") — a silent, permanent, per-document trap, keyed to
+            // whichever document once got a 409. Compare on the same
+            // canonical form the server hashes, and clear it.
+            const serverJson = result.data.note?.tiptapJson ?? null;
+            if (serverJson && stableStringify(draft) === stableStringify(serverJson)) {
+              clearConflictDraft(selectedContentId);
+              clientLogger.info({
+                layer: "ui",
+                event: "save_conflict:stale_draft_cleared",
+                summary: "stashed conflict draft matched the server copy; cleared without raising",
+                attrs: { content_id: selectedContentId },
+              });
+            } else {
+              setConflict({
+                contentId: selectedContentId,
+                mine: draft,
+                theirHash: bodyHashRef.current,
+              });
+              setNoteContent(draft);
+              setOutline(selectedContentId, extractOutline(draft));
+            }
           }
         }
       } catch (err) {
@@ -1049,6 +1069,32 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
       // (not the closure) so a conflict raised after this callback was created
       // still pauses it.
       if (useSaveConflictStore.getState().getConflict(selectedContentId)) {
+        // Refresh the stash so it holds the user's LATEST work, not a snapshot
+        // frozen at the moment of the 409. The stash used to be written once,
+        // there, and never again — so everything typed while the banner sat
+        // unanswered was neither saved nor stashed, and vanished on the next
+        // reload or tab close. It also meant "Keep mine" wrote a stale version.
+        // Re-stashing on every refused save makes the draft track the editor.
+        const openConflict = useSaveConflictStore
+          .getState()
+          .getConflict(selectedContentId);
+        stashConflictDraft(selectedContentId, content);
+        if (openConflict) {
+          // `mine` is what "Keep mine" writes, so it has to move with the
+          // editor too — otherwise resolving publishes the version frozen at
+          // the 409 and silently drops everything typed since.
+          useSaveConflictStore
+            .getState()
+            .setConflict({ ...openConflict, mine: content });
+        }
+        // Never let this be silent again: a paused save with no request and
+        // no log is indistinguishable from "the app is broken".
+        clientLogger.warn({
+          layer: "ui",
+          event: "save:paused_conflict",
+          summary: "save paused — an unresolved conflict is open; draft re-stashed",
+          attrs: { content_id: selectedContentId },
+        });
         setHasUnsavedChanges(true);
         return;
       }
@@ -1215,6 +1261,26 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
   );
 
   // ── Save-conflict resolution (stale-tab overwrite mitigation) ───────────
+  // Closing the tab or reloading with a conflict open discards whatever the
+  // user typed since: the stash survives, but only the editor holds the live
+  // document, and no save can leave while the conflict stands. The browser's
+  // own confirmation is the last thing between that work and a click on the
+  // close button. Modern browsers ignore custom text and show their own
+  // wording, so returnValue is set purely to arm the prompt.
+  // Keyed on the BOOLEAN, not the conflict object: re-stashing replaces that
+  // object on every refused save, which would otherwise detach and re-attach
+  // the listener every couple of seconds for no behavioural gain.
+  const hasOpenConflict = Boolean(activeConflict);
+  useEffect(() => {
+    if (!hasOpenConflict) return;
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [hasOpenConflict]);
+
   // Keep mine: re-save the user's edits, deliberately overwriting the newer
   // server copy. Advancing the baseline to the server's current hash makes the
   // forced PATCH's If-Match match, so it wins in one round-trip.
@@ -2489,15 +2555,6 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
           </div>
         ) : null}
 
-        {/* Save-conflict resolution (stale-tab / concurrent-edit overwrite) */}
-        <SaveConflictBanner
-          active={Boolean(activeConflict)}
-          onKeepMine={handleConflictKeepMine}
-          onTakeTheirs={handleConflictTakeTheirs}
-          onOpenTheirs={handleConflictOpenTheirs}
-          theirsPreview={theirsPreview}
-          onCloseTheirs={() => setTheirsPreview(null)}
-        />
 
         {/* Editor — kept MOUNTED (hidden) in source mode so the collab Y.doc
             connection and the live editor instance survive; applySourceMode
@@ -2594,6 +2651,24 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
           !selectedContentId.startsWith("person:") &&
           contentType !== "page-template" &&
           !isEmbedMode && <ContentToolbar contentId={selectedContentId} />}
+
+        {/* Save-conflict resolution (stale-tab / concurrent-edit overwrite).
+            Mounted at the TOP LEVEL, above every layout branch, deliberately.
+            It used to sit inside the note editor's title header, which only the
+            note branch renders — so a conflict raised on a folder/charter body,
+            a database, or any other non-note content had no visible exit: the
+            stashed draft replaced the view on every load and handleSave paused
+            every save, silently and indefinitely ("Career Hunt II",
+            2026-09-15). Whatever can raise a conflict must be able to show its
+            way out, so this renders regardless of content type. */}
+        <SaveConflictBanner
+          active={Boolean(activeConflict)}
+          onKeepMine={handleConflictKeepMine}
+          onTakeTheirs={handleConflictTakeTheirs}
+          onOpenTheirs={handleConflictOpenTheirs}
+          theirsPreview={theirsPreview}
+          onCloseTheirs={() => setTheirsPreview(null)}
+        />
         {isNonNoteContent ? (
           <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
             {notesPanelPosition === "above" && (

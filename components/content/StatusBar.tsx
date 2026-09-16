@@ -6,8 +6,10 @@
 
 "use client";
 
-import { CloudCheck, FileText, Clock } from "lucide-react";
+import { AlertTriangle, CloudCheck, FileText, Clock } from "lucide-react";
 import { useEditorStatsStore } from "@/state/editor-stats-store";
+import { useContentStore } from "@/state/content-store";
+import { useSaveConflictStore } from "@/state/save-conflict-store";
 
 export function StatusBar() {
   const {
@@ -20,8 +22,19 @@ export function StatusBar() {
     isSaving
   } = useEditorStatsStore();
 
+  // A conflict PAUSES every save for this document until it is resolved. Both
+  // indicators below used to keep reporting "Saved 3m ago" and "Synced"
+  // throughout — reassuring the user while their work piled up unsaved. The
+  // status bar is the one place that claims to know save state, so it has to
+  // be the one place that admits when saving has stopped.
+  const selectedContentId = useContentStore((state) => state.selectedContentId);
+  const hasConflict = useSaveConflictStore((state) =>
+    selectedContentId ? Boolean(state.conflicts[selectedContentId]) : false,
+  );
+
   // Format last saved time
   const getLastSavedText = () => {
+    if (hasConflict) return "Not saved — resolve conflict";
     if (isSaving) return "Saving...";
     if (!lastSaved) return "Not saved";
 
@@ -57,8 +70,16 @@ export function StatusBar() {
           <FileText className="h-3 w-3" />
           <span>{getFileTypeLabel()}</span>
         </div>
-        <div className="flex items-center gap-1">
-          <Clock className="h-3 w-3" />
+        <div
+          className={`flex items-center gap-1 ${
+            hasConflict ? "font-medium text-red-500 dark:text-red-400" : ""
+          }`}
+        >
+          {hasConflict ? (
+            <AlertTriangle className="h-3 w-3" />
+          ) : (
+            <Clock className="h-3 w-3" />
+          )}
           <span>{getLastSavedText()}</span>
         </div>
       </div>
@@ -81,9 +102,19 @@ export function StatusBar() {
             </>
           )}
         </div>
-        <div className="flex items-center gap-1">
-          <CloudCheck className="h-3 w-3" />
-          <span>{isSaving ? "Syncing..." : "Synced"}</span>
+        <div
+          className={`flex items-center gap-1 ${
+            hasConflict ? "font-medium text-red-500 dark:text-red-400" : ""
+          }`}
+        >
+          {hasConflict ? (
+            <AlertTriangle className="h-3 w-3" />
+          ) : (
+            <CloudCheck className="h-3 w-3" />
+          )}
+          <span>
+            {hasConflict ? "Paused" : isSaving ? "Syncing..." : "Synced"}
+          </span>
         </div>
       </div>
     </div>
