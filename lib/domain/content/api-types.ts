@@ -120,6 +120,14 @@ export interface ContentDetailResponse {
      * the field.
      */
     bodyHash?: string;
+    /**
+     * When this BODY was last written (NotePayload.updatedAt), as an ISO
+     * string. Distinct from the node's own `updatedAt`: a pure payload save
+     * deliberately does not bump the ContentNode, so only this field can say
+     * how old the server's text is. The conflict comparison shows it as
+     * "they saved 4 min ago". Optional — older responses predate it.
+     */
+    updatedAt?: string;
   };
   file?: {
     fileName: string;
