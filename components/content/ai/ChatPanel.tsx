@@ -23,6 +23,7 @@ import { ProviderIcon } from "./ProviderIcon";
 import {
   PROPOSAL_REVISE_EVENT,
   latestProposalIndexByKind,
+  useExistingDatabases,
 } from "./use-proposal-revision";
 import { toast } from "sonner";
 import { useEditorInstanceStore } from "@/state/editor-instance-store";
@@ -996,6 +997,14 @@ export function ChatPanel({
     [messages]
   );
 
+  // What already exists on the SERVER, so a card cannot offer to create a
+  // database that is already there. Fetched only when this conversation
+  // actually contains a database proposal — most chats never do.
+  const hasDatabaseProposal =
+    latestProposalIndex.linkedDatabases !== undefined ||
+    latestProposalIndex.outputDatabase !== undefined;
+  const existingDatabases = useExistingDatabases(hasDatabaseProposal);
+
   const iterationFoldBoundary = useMemo(
     () => findIterationFoldBoundary(messages),
     [messages],
@@ -1131,6 +1140,7 @@ export function ChatPanel({
                   messageIndex={i}
                   foldBoundary={iterationFoldBoundary}
                   latestProposalIndex={latestProposalIndex}
+                  existingDatabases={existingDatabases}
                   bulkReadFolds={bulkReadFolds}
                   sessionUsage={sessionUsage}
                   charterAttached={charterAttached}

@@ -68,7 +68,10 @@ import {
   LinkedDatabasesProposalCard,
   type LinkedDatabasesProposalPayload,
 } from "./LinkedDatabasesProposalCard";
-import type { LatestProposalIndex } from "./use-proposal-revision";
+import type {
+  ExistingDatabase,
+  LatestProposalIndex,
+} from "./use-proposal-revision";
 import {
   BatchGalleryCard,
   type BatchGalleryGroup,
@@ -324,6 +327,12 @@ interface ChatMessageProps {
    * typed reply cannot leave two equally live Apply buttons.
    */
   latestProposalIndex?: LatestProposalIndex;
+  /**
+   * The user's existing databases (ChatPanel). Lets a creation card notice
+   * that its tables are already there — the localStorage applied-flag is
+   * per-origin and per-browser, so it says nothing on a second device.
+   */
+  existingDatabases?: ExistingDatabase[];
   /** Bulk database reads: fold/pin state per part (bulkReadFoldStates). */
   bulkReadFolds?: Map<string, BulkReadFoldState> | null;
   /**
@@ -511,6 +520,7 @@ export const ChatMessage = memo(function ChatMessage({
   isStreaming = false,
   messageIndex,
   latestProposalIndex,
+  existingDatabases,
   foldBoundary = null,
   bulkReadFolds = null,
   sessionUsage = null,
@@ -1592,6 +1602,7 @@ export const ChatMessage = memo(function ChatMessage({
           <OutputDatabaseProposalCard
             key={`output-db-${i}`}
             payload={payload}
+            existingDatabases={existingDatabases}
             superseded={
               messageIndex !== undefined &&
               latestProposalIndex?.outputDatabase !== undefined &&
@@ -1606,6 +1617,7 @@ export const ChatMessage = memo(function ChatMessage({
           <LinkedDatabasesProposalCard
             key={`linked-dbs-${i}`}
             payload={payload}
+            existingDatabases={existingDatabases}
             superseded={
               messageIndex !== undefined &&
               latestProposalIndex?.linkedDatabases !== undefined &&

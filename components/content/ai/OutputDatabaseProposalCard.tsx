@@ -20,11 +20,14 @@ import { toast } from "sonner";
 import { useContentStore } from "@/state/content-store";
 import {
   dispatchProposalApplied,
+  matchExistingTitles,
   useProposalObsolete,
   useProposalRevision,
+  type ExistingDatabase,
 } from "./use-proposal-revision";
 import {
   ModifyProposalButton,
+  ProposalExistsNotice,
   ProposalObsoleteNotice,
   ProposalSupersededNotice,
   ProposalWithdrawnNotice,
@@ -126,10 +129,13 @@ function describeLink(
 export function OutputDatabaseProposalCard({
   payload,
   superseded = false,
+  existingDatabases,
 }: {
   payload: OutputDatabaseProposalPayload;
   /** A later message carries a newer proposal of this kind. */
   superseded?: boolean;
+  /** The user's existing databases, for the already-exists check. */
+  existingDatabases?: ExistingDatabase[];
 }) {
   const [state, setState] = useState<ApplyState>(() =>
     loadAppliedState(payload),
@@ -202,7 +208,14 @@ export function OutputDatabaseProposalCard({
     }
   }, [payload]);
 
-  const guard = useSupersededGuard(superseded, apply);
+  // Already on the server under this name? Then Apply needs a confirm for
+  // the same reason a superseded card does — the risk is a duplicate, not a
+  // wrong design.
+  const existing = matchExistingTitles(
+    [payload.title],
+    existingDatabases ?? []
+  );
+  const guard = useSupersededGuard(superseded || Boolean(existing), apply);
 
   if (obsolete && state.status !== "applied") {
     return <ProposalObsoleteNotice label="database" />;
@@ -316,6 +329,12 @@ export function OutputDatabaseProposalCard({
       )}
 
       {superseded && <ProposalSupersededNotice />}
+      {existing && (
+        <ProposalExistsNotice
+          matches={existing}
+          onOpen={(id) => useContentStore.getState().setSelectedContentId(id)}
+        />
+      )}
 
       <div className="flex items-center gap-2">
         <button

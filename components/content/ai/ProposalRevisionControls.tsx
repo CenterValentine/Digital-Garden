@@ -120,3 +120,43 @@ export function ProposalObsoleteNotice({ label }: { label: string }) {
     </div>
   );
 }
+
+/**
+ * A card whose tables already exist by name.
+ *
+ * Deliberately NOT rendered as "applied": this build cannot tell whether
+ * those tables came from this card, an earlier apply on another device, or
+ * a coincidence of naming. So it reports the fact, links what it found, and
+ * leaves Apply reachable behind a confirmation. Overstating it would hide a
+ * legitimate second table; understating it is how you get duplicates.
+ */
+export function ProposalExistsNotice({
+  matches,
+  onOpen,
+}: {
+  matches: Array<{ id: string; title: string }>;
+  onOpen: (id: string) => void;
+}) {
+  return (
+    <div className="flex items-start gap-1.5 rounded-md border border-amber-400/40 bg-amber-500/[0.06] px-2 py-1.5 text-[11px] text-amber-800 dark:border-amber-400/30 dark:bg-amber-500/[0.08] dark:text-amber-200">
+      <History className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+      <span>
+        {matches.length === 1 ? "A database" : "Databases"} named{" "}
+        {matches.map((m, i) => (
+          <span key={m.id}>
+            {i > 0 && (i === matches.length - 1 ? " and " : ", ")}
+            <button
+              type="button"
+              onClick={() => onOpen(m.id)}
+              className="font-medium underline decoration-amber-500/50 underline-offset-2 hover:decoration-amber-600"
+            >
+              {m.title}
+            </button>
+          </span>
+        ))}{" "}
+        already {matches.length === 1 ? "exists" : "exist"}. Creating again
+        makes a second copy.
+      </span>
+    </div>
+  );
+}

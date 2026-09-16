@@ -333,9 +333,9 @@ export function AddColumnButton({ tableId, columns, onAdd }: AddColumnButtonProp
             <span>
               Free-form
               <span className="block text-[10px] text-muted-foreground">
-                Type values instead of choosing them — comma, space or Enter
-                completes each one. Quote a value to keep its spaces or
-                commas.
+                Type values instead of choosing them — comma, Enter or Tab
+                completes each one. Spaces are part of the value; quote it to
+                include a comma.
               </span>
             </span>
           </label>

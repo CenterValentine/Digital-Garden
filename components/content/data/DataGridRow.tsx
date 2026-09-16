@@ -1431,13 +1431,17 @@ function FreeformTagsPanel({
           value={draft}
           onChange={(e) => {
             const text = e.target.value;
-            // A delimiter keystroke completes the pill in place, so a value
-            // never sits in the input looking half-entered — UNLESS a quote
-            // is open, in which case the delimiter is part of the value the
-            // user is still typing.
+            // The DELIMITER completes a pill in place; space does NOT.
+            //
+            // Space was a terminator at first, copying email "To" fields,
+            // and it made multi-word values require quoting — which the
+            // owner then fought twice in a row (2026-09-16). Most tags ARE
+            // multi-word ("Body Condition Score"), so the common case was
+            // paying for the rare one. Enter and Tab still commit instantly,
+            // so nothing got slower; quoting is now optional and only
+            // matters for a value containing the delimiter itself.
             const delim = column.config.splitOn ?? ",";
-            const terminal = text.endsWith(delim) || text.endsWith(" ");
-            if (terminal && !hasOpenQuote(text)) {
+            if (text.endsWith(delim) && !hasOpenQuote(text)) {
               void flushDraft(text);
               return;
             }
@@ -1466,9 +1470,9 @@ function FreeformTagsPanel({
         />
       </div>
       <p className="mt-1.5 px-0.5 text-[10px] leading-snug text-muted-foreground">
-        Comma, space or Enter completes a value. Quote to keep spaces —
-        <span className="font-mono"> &quot;hello world&quot;</span> is one
-        value.
+        Comma, Enter or Tab completes a value. Spaces are fine —
+        <span className="font-mono"> hello world</span> is one value. Quote
+        to include a comma.
       </p>
     </div>
   );

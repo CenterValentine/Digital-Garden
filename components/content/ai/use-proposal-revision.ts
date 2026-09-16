@@ -237,3 +237,104 @@ export function useProposalObsolete(
   }, [kind, storageKey]);
   return obsolete;
 }
+
+// -- Existence (the server is the truth, not localStorage) ---------------
+//
+// Applied/withdrawn/obsolete state all lived in localStorage, which is
+// per-ORIGIN and per-browser. Two consequences the owner hit while smoke
+// testing (2026-09-16): a second Vercel preview is a different origin, so
+// every card there read as never-applied; and obsolescence, being a
+// session-only CustomEvent, evaporated on reload even on the same origin.
+//
+// The preview part is an artefact, but the underlying hazard is not: the
+// same thing happens on another browser, another device, or after clearing
+// site data. A card offering "Create all" for tables that already exist
+// will create them AGAIN, and propose_linked_databases duplicates a whole
+// set in one transaction.
+//
+// So existence is answered by the server. A card knows the titles it would
+// create; this asks what already exists. It is not a claim that THIS card
+// created them — a same-named table could be coincidence — so the card
+// reports "already exists" and keeps Apply behind a confirmation rather
+// than pretending to be applied.
+
+export interface ExistingDatabase {
+  id: string;
+  title: string;
+}
+
+/**
+ * The user's databases, refreshed whenever the tree is.
+ *
+ * `dg:tree-refresh` already fires when a proposal creates a database, so
+ * the list re-reads itself right after an apply with no extra plumbing —
+ * the card that just created "Sheep" sees "Sheep" exist on the next render,
+ * and so does every sibling card.
+ */
+export function useExistingDatabases(enabled: boolean): ExistingDatabase[] {
+  const [databases, setDatabases] = useState<ExistingDatabase[]>([]);
+
+  useEffect(() => {
+    if (!enabled) return;
+    let cancelled = false;
+
+    async function load() {
+      try {
+        const res = await fetch("/api/content/data", {
+          credentials: "include",
+        });
+        if (!res.ok) return;
+        const json = await res.json();
+        const list = json?.data?.databases;
+        if (cancelled || !Array.isArray(list)) return;
+        setDatabases(
+          list
+            .filter(
+              (d: unknown): d is ExistingDatabase =>
+                typeof (d as ExistingDatabase)?.id === "string" &&
+                typeof (d as ExistingDatabase)?.title === "string"
+            )
+            .map((d) => ({ id: d.id, title: d.title }))
+        );
+      } catch {
+        /* offline or unauthorised: fall back to localStorage-only state,
+           which is the behaviour that shipped before this existed */
+      }
+    }
+
+    void load();
+    function onTreeRefresh() {
+      void load();
+    }
+    window.addEventListener("dg:tree-refresh", onTreeRefresh);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("dg:tree-refresh", onTreeRefresh);
+    };
+  }, [enabled]);
+
+  return databases;
+}
+
+/**
+ * Match proposed titles against what exists, case-insensitively.
+ * Returns the matches only when EVERY title is accounted for: a partially
+ * existing set is not a duplicate, it is a half-built schema the user may
+ * genuinely want to finish.
+ */
+export function matchExistingTitles(
+  titles: string[],
+  databases: ExistingDatabase[]
+): ExistingDatabase[] | null {
+  if (titles.length === 0 || databases.length === 0) return null;
+  const byTitle = new Map(
+    databases.map((d) => [d.title.trim().toLowerCase(), d])
+  );
+  const found: ExistingDatabase[] = [];
+  for (const title of titles) {
+    const hit = byTitle.get(title.trim().toLowerCase());
+    if (!hit) return null;
+    found.push(hit);
+  }
+  return found;
+}

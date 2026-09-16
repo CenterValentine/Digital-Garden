@@ -23,11 +23,14 @@ import { dispatchDataSchemaChanged } from "@/components/content/data/events";
 import { useContentStore } from "@/state/content-store";
 import {
   dispatchProposalApplied,
+  matchExistingTitles,
   useProposalObsolete,
   useProposalRevision,
+  type ExistingDatabase,
 } from "./use-proposal-revision";
 import {
   ModifyProposalButton,
+  ProposalExistsNotice,
   ProposalObsoleteNotice,
   ProposalSupersededNotice,
   ProposalWithdrawnNotice,
@@ -164,10 +167,13 @@ function describeComputed(col: ProposedColumn): string | null {
 export function LinkedDatabasesProposalCard({
   payload,
   superseded = false,
+  existingDatabases,
 }: {
   payload: LinkedDatabasesProposalPayload;
   /** A later message carries a newer proposal of this kind. */
   superseded?: boolean;
+  /** The user's existing databases, for the already-exists check. */
+  existingDatabases?: ExistingDatabase[];
 }) {
   const [state, setState] = useState<ApplyState>(() =>
     loadAppliedState(payload),
@@ -267,7 +273,14 @@ export function LinkedDatabasesProposalCard({
     }
   }, [payload]);
 
-  const guard = useSupersededGuard(superseded, apply);
+  // Only a set that exists IN FULL counts (matchExistingTitles): a
+  // half-present schema is one the user may genuinely want to finish, and
+  // the transaction creates only what is missing.
+  const existing = matchExistingTitles(
+    payload.tables.map((t) => t.title),
+    existingDatabases ?? []
+  );
+  const guard = useSupersededGuard(superseded || Boolean(existing), apply);
 
   if (obsolete && state.status !== "applied") {
     return <ProposalObsoleteNotice label="schema" />;
@@ -437,6 +450,12 @@ export function LinkedDatabasesProposalCard({
       )}
 
       {superseded && <ProposalSupersededNotice />}
+      {existing && (
+        <ProposalExistsNotice
+          matches={existing}
+          onOpen={(id) => useContentStore.getState().setSelectedContentId(id)}
+        />
+      )}
 
       <div className="flex flex-wrap items-center gap-2">
         <button
