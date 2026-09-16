@@ -133,7 +133,7 @@ export function ListView({
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="text-sm text-gray-600">Loading folder contents...</div>
+        <div className="text-sm text-gray-600 dark:text-gray-400">Loading folder contents...</div>
       </div>
     );
   }
@@ -142,8 +142,8 @@ export function ListView({
     return (
       <div className="flex flex-col items-center justify-center h-full text-center px-4">
         <Folder className="h-16 w-16 text-gray-400 mb-4" />
-        <p className="text-sm text-gray-600 mb-2">This folder is empty</p>
-        <p className="text-xs text-gray-500">
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">This folder is empty</p>
+        <p className="text-xs text-gray-500 dark:text-gray-400">
           Add content using the plus button or context menu
         </p>
       </div>
@@ -175,17 +175,17 @@ export function ListView({
                     }
               }
             >
-              <div className={isSelected ? "text-primary" : "text-gray-600"}>
+              <div className={isSelected ? "text-primary" : "text-gray-600 dark:text-gray-400"}>
                 {getIcon(child.contentType)}
               </div>
               <div className="flex-1 min-w-0">
-                <div className={`text-sm font-medium truncate ${isSelected ? "text-primary" : "text-gray-900"}`}>
+                <div className={`text-sm font-medium truncate ${isSelected ? "text-primary" : "text-gray-900 dark:text-gray-100"}`}>
                   {child.title}
                   {displayExtension && (
-                    <span className="text-gray-600">{displayExtension}</span>
+                    <span className="text-gray-600 dark:text-gray-400">{displayExtension}</span>
                   )}
                 </div>
-                <div className="text-xs text-gray-500">
+                <div className="text-xs text-gray-500 dark:text-gray-400">
                   {child.contentType === "folder" ? "Folder" : "Document"}
                 </div>
               </div>

@@ -76,7 +76,7 @@ export function WorkflowViewer({
         {definition && (
           <div className="mt-4 rounded-lg border border-white/10 bg-white/5 p-4">
             <div className="text-sm text-gray-400 mb-2">Workflow Definition</div>
-            <div className="text-xs text-gray-500">
+            <div className="text-xs text-gray-500 dark:text-gray-400">
               Definition keys: {Object.keys(definition).join(", ")}
             </div>
             {enabled && (

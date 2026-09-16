@@ -111,10 +111,10 @@ function SortableCard({
         }}
       >
         <div className="flex items-start justify-between gap-2 mb-2">
-          <h4 className="text-sm font-medium text-gray-900 flex-1">
+          <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100 flex-1">
             {item.title}
             {displayExtension && (
-              <span className="text-gray-600">{displayExtension}</span>
+              <span className="text-gray-600 dark:text-gray-400">{displayExtension}</span>
             )}
           </h4>
           <button
@@ -122,10 +122,10 @@ function SortableCard({
             className="flex-shrink-0 p-1 rounded hover:bg-white/20 transition-colors"
             title="Open in main panel"
           >
-            <ExternalLink className="h-3.5 w-3.5 text-gray-600" />
+            <ExternalLink className="h-3.5 w-3.5 text-gray-600 dark:text-gray-400" />
           </button>
         </div>
-        <p className="text-xs text-gray-600 line-clamp-3">{previewLines}</p>
+        <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-3">{previewLines}</p>
       </div>
     </div>
   );
@@ -402,7 +402,7 @@ export function KanbanView({
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="text-sm text-gray-600">Loading kanban board...</div>
+        <div className="text-sm text-gray-600 dark:text-gray-400">Loading kanban board...</div>
       </div>
     );
   }
@@ -420,9 +420,9 @@ export function KanbanView({
             <DroppableColumn key={column.id} column={column}>
               {/* Column header */}
               <div className="p-4 border-b border-white/10">
-                <h3 className="text-sm font-semibold text-gray-900 flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 flex items-center justify-between">
                   {column.title}
-                  <span className="text-xs text-gray-500 ml-2">
+                  <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
                     {column.items.length}
                   </span>
                 </h3>
@@ -442,7 +442,7 @@ export function KanbanView({
                 {column.items.length === 0 && (
                   <div className="flex flex-col items-center justify-center py-8 text-center">
                     <FileText className="h-12 w-12 text-gray-400 mb-2" />
-                    <p className="text-xs text-gray-500">No cards yet</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">No cards yet</p>
                   </div>
                 )}
               </div>
@@ -451,7 +451,7 @@ export function KanbanView({
               <div className="p-4 border-t border-white/10">
                 <button
                   onClick={() => handleAddCard(column.id)}
-                  className="w-full flex items-center justify-center gap-2 py-2 text-sm text-gray-600 hover:text-gray-900 transition-colors"
+                  className="w-full flex items-center justify-center gap-2 py-2 text-sm text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 transition-colors"
                 >
                   <Plus className="h-4 w-4" />
                   Add Card
@@ -472,6 +472,9 @@ export function KanbanView({
               const preview = activeItem.note?.searchText || "No content";
               const previewLines = preview.split("\n").slice(0, 3).join("\n");
 
+              // Drag preview. Deliberately light in BOTH themes — an opaque
+              // white card reads as "lifted" over any background — so the dark
+              // text below is correct and needs no dark: companion.
               return (
                 <div className="p-3 rounded-lg border border-primary bg-white shadow-lg w-80">
                   <h4 className="text-sm font-medium text-gray-900 mb-2">
