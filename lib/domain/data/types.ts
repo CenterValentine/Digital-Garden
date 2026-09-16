@@ -264,6 +264,20 @@ export interface DataColumnConfig {
    */
   allowDuplicates?: boolean;
   /**
+   * `select` · `multiSelect` — normalise new option labels to Title Case.
+   *
+   * With it OFF, case is significant: typing `how` where `How` exists mints
+   * a SECOND option, because what you typed is what you meant. With it ON,
+   * both collapse to `How`. That is the whole mental model — either case
+   * carries meaning or it is normalised away — and it replaces the silent
+   * case-insensitive reuse that used to title-case a value behind the
+   * user's back (owner, 2026-09-16).
+   *
+   * Only the FIRST letter of each word is touched, so `iPhone` and `macOS`
+   * survive; a rule that lowercased the rest would mangle them.
+   */
+  titleCase?: boolean;
+  /**
    * `multiSelect` — a delimiter that splits a typed or pasted STRING into
    * the list this column stores. A parse hint, never a storage format: the
    * cell still holds `string[]`, and nothing downstream learns about the

@@ -27,6 +27,8 @@ import {
   generateColumnKey,
   generateUniqueColumnKey,
   splitDelimited,
+  titleCaseLabel,
+  optionMatchKey,
   FREEFORM_OPTION_CAP,
   type SelectOption,
   keyAtEnd,
@@ -105,7 +107,8 @@ async function mintFreeformOptions(
     if (relevant.length === 0) continue;
 
     const existing = column.config.options ?? [];
-    const seen = new Set(existing.map((o) => o.label.trim().toLowerCase()));
+    const keyOf = (label: string) => optionMatchKey(label, column.config);
+    const seen = new Set(existing.map((o) => keyOf(o.label)));
     const byId = new Set(existing.map((o) => o.id));
     const minted: SelectOption[] = [];
 
@@ -119,9 +122,10 @@ async function mintFreeformOptions(
       if (!Array.isArray(raw)) continue;
       for (const entry of raw) {
         if (typeof entry !== "string") continue;
-        const label = entry.trim();
-        if (!label || byId.has(label)) continue;
-        const key = label.toLowerCase();
+        const raw = entry.trim();
+        if (!raw || byId.has(raw)) continue;
+        const label = column.config.titleCase ? titleCaseLabel(raw) : raw;
+        const key = keyOf(label);
         if (seen.has(key)) continue;
         seen.add(key);
         minted.push({ id: generateColumnKey(), label: label.slice(0, 120) });

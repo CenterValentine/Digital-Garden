@@ -21,6 +21,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Check, Lock, Plus, Trash2, X } from "lucide-react";
 import { cn } from "@/lib/core/utils";
 import { PanelPortal } from "./PanelPortal";
+import { ToggleSwitch } from "./ToggleSwitch";
 import {
   formatNumberCell,
   generateColumnKey,
@@ -130,6 +131,7 @@ export function AddColumnButton({ tableId, columns, onAdd }: AddColumnButtonProp
   );
   const [freeform, setFreeform] = useState(false);
   const [allowDuplicates, setAllowDuplicates] = useState(false);
+  const [titleCase, setTitleCase] = useState(false);
   const [busy, setBusy] = useState(false);
   const [targetDbId, setTargetDbId] = useState("");
   const [withBacklink, setWithBacklink] = useState(true);
@@ -233,7 +235,10 @@ export function AddColumnButton({ tableId, columns, onAdd }: AddColumnButtonProp
           splitOn: ",",
           options: [],
           ...(allowDuplicates ? { allowDuplicates: true } : {}),
+          ...(titleCase ? { titleCase: true } : {}),
         };
+      else if ((type === "multiSelect" || type === "select") && titleCase)
+        config = { titleCase: true };
       else if (type === "relation") config = { relationTableId: targetDbId };
       else if (type === "lookup")
         config = {
@@ -264,6 +269,7 @@ export function AddColumnButton({ tableId, columns, onAdd }: AddColumnButtonProp
     type,
     freeform,
     allowDuplicates,
+    titleCase,
     targetDbId,
     withBacklink,
     isDerived,
@@ -329,44 +335,36 @@ export function AddColumnButton({ tableId, columns, onAdd }: AddColumnButtonProp
           // dropdown and behaved identically too, because the difference is
           // in how the CELL is edited, not in what the column is (owner,
           // 2026-09-16). Free-form swaps the checklist for a type-and-pill
-          // input — no vocabulary to pick from, just what you type.
-          <label className="mt-2 flex items-start gap-2 text-[11px] text-foreground">
-            <input
-              type="checkbox"
-              checked={freeform}
-              onChange={(e) => setFreeform(e.target.checked)}
-              className="mt-0.5"
-            />
-            <span>
-              Free-form
-              <span className="block text-[10px] text-muted-foreground">
-                Type values instead of choosing them — comma, Enter or Tab
-                completes each one. Everything else is part of the value;
-                wrap in backticks to include a comma.
-              </span>
-            </span>
-          </label>
+          // input. The backtick rule is NOT repeated here — it belongs in
+          // the editor, where it is actionable.
+          <ToggleSwitch
+            checked={freeform}
+            onChange={setFreeform}
+            label="Free-form"
+            hint="Type values instead of picking them."
+          />
         )}
         {type === "multiSelect" && freeform && (
           // Only offered ALONGSIDE free-form: a controlled vocabulary cannot
           // be picked twice, so duplicates there would only ever be a bug.
-          // A jotted list is not a vocabulary, and a repeat in one can be
-          // what the author meant (owner, 2026-09-16).
-          <label className="mt-2 flex items-start gap-2 pl-5 text-[11px] text-foreground">
-            <input
-              type="checkbox"
-              checked={allowDuplicates}
-              onChange={(e) => setAllowDuplicates(e.target.checked)}
-              className="mt-0.5"
-            />
-            <span>
-              Allow repeats
-              <span className="block text-[10px] text-muted-foreground">
-                The same value can appear more than once. Off by default —
-                typing an existing value flashes the one you already have.
-              </span>
-            </span>
-          </label>
+          <ToggleSwitch
+            checked={allowDuplicates}
+            onChange={setAllowDuplicates}
+            label="Allow repeats"
+            hint="The same value can appear more than once."
+            indented
+          />
+        )}
+        {(type === "multiSelect" || type === "select") && (
+          // Applies wherever options are MINTED — typed into a free-form
+          // cell, or added with "+ New option". With it off, case is
+          // significant and `how` beside `How` is a second value.
+          <ToggleSwitch
+            checked={titleCase}
+            onChange={setTitleCase}
+            label="Title Case"
+            hint="Capitalise new values as they are added."
+          />
         )}
         <p className="mt-1.5 text-[10px] leading-snug text-muted-foreground">
           Type is set once. To change it later, add a new column and move the

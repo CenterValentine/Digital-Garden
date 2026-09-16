@@ -39,8 +39,10 @@ import { cn } from "@/lib/core/utils";
 import {
   cellToDisplayText,
   hasOpenFence,
+  optionMatchKey,
   sortStatusOptions,
   splitDelimited,
+  titleCaseLabel,
   type CellValue,
   type ContentRef,
   type DataColumn,
@@ -1380,23 +1382,25 @@ function FreeformTagsPanel({
       if (parts.length === 0) return;
 
       const allowDuplicates = column.config.allowDuplicates === true;
-      const seen = new Set(items.map((i) => i.label.toLowerCase()));
+      const keyOf = (label: string) => optionMatchKey(label, column.config);
+      const seen = new Set(items.map((i) => keyOf(i.label)));
       const fresh: Array<{ id: string; label: string }> = [];
       let repeated: string | null = null;
       for (const part of parts) {
-        const key = part.toLowerCase();
+        const typed = column.config.titleCase ? titleCaseLabel(part) : part;
+        const key = keyOf(typed);
         if (seen.has(key) && !allowDuplicates) {
           repeated = key;
           continue;
         }
         seen.add(key);
         const known = (column.config.options ?? []).find(
-          (o) => o.label.trim().toLowerCase() === key
+          (o) => keyOf(o.label) === key
         );
         fresh.push(
           known
             ? { id: known.id, label: known.label }
-            : { id: part, label: part }
+            : { id: typed, label: typed }
         );
       }
       if (repeated) setDuplicate(repeated);
@@ -1443,12 +1447,12 @@ function FreeformTagsPanel({
             key={`${item.id}-${i}`}
             className={cn(
               "inline-flex max-w-[12rem] items-center gap-1 rounded-full px-2 py-0.5 text-[11px] transition-colors",
-              duplicate === item.label.toLowerCase()
+              duplicate === optionMatchKey(item.label, column.config)
                 ? "bg-amber-500/20 ring-1 ring-amber-500/60"
                 : "bg-muted"
             )}
             title={
-              duplicate === item.label.toLowerCase()
+              duplicate === optionMatchKey(item.label, column.config)
                 ? "Already in this cell"
                 : undefined
             }
@@ -1508,9 +1512,8 @@ function FreeformTagsPanel({
         />
       </div>
       <p className="mt-1.5 px-0.5 text-[10px] leading-snug text-muted-foreground">
-        Comma, Enter or Tab completes a value; spaces, apostrophes and
-        punctuation are part of it. To include a comma, wrap the value in
-        backticks — <span className="font-mono">`Portland, OR`</span>.
+        Comma, Enter or Tab completes a value. For one containing a comma,
+        use <span className="font-mono">`Portland, OR`</span>.
       </p>
     </div>
   );

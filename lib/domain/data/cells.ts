@@ -178,6 +178,50 @@ function encodeOptionIds(raw: unknown, column: DataColumn): EncodeResult {
   return out.length === 0 ? ok(undefined) : ok(out);
 }
 
+// ── Option labels ────────────────────────────────────────────────
+
+/**
+ * Title-case a value, leaving deliberately-cased words alone.
+ *
+ * `body condition` -> `Body Condition`. A word that ALREADY contains a
+ * capital is left untouched, so `iPhone`, `macOS` and `eBay` survive —
+ * uppercasing their first letter is exactly the mangling a title-case
+ * feature must not do, and it is not hypothetical in a tag list of
+ * products or tools.
+ */
+export function titleCaseLabel(label: string): string {
+  return label
+    .split(/(\s+)/)
+    .map((part) =>
+      /\s/.test(part) || /[A-Z]/.test(part)
+        ? part
+        : part.charAt(0).toUpperCase() + part.slice(1)
+    )
+    .join("");
+}
+
+/**
+ * How two option labels are compared for "is this the same value?".
+ *
+ * Case-SENSITIVE when the column preserves case, which is the default for a
+ * free-form list: the user typing `how` next to an existing `How` means two
+ * values, and silently reusing the existing one retitled their input
+ * (owner, 2026-09-16). With `titleCase` on, both normalise first, so they
+ * legitimately collapse.
+ *
+ * Controlled vocabularies stay case-INSENSITIVE: their labels are picked
+ * from a list rather than typed, and the tolerance is what lets a model
+ * write `redis` for an option named `Redis`.
+ */
+export function optionMatchKey(
+  label: string,
+  config: { freeform?: boolean; titleCase?: boolean }
+): string {
+  const trimmed = label.trim();
+  if (config.titleCase) return titleCaseLabel(trimmed);
+  return config.freeform ? trimmed : trimmed.toLowerCase();
+}
+
 // ── Delimited input (config.splitOn) ─────────────────────────────
 
 /** The only quoting character. See splitDelimited for why it is this one. */

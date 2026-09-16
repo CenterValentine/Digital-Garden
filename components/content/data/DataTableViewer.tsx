@@ -48,6 +48,8 @@ import {
   keyForMove,
   pushOp,
   generateColumnKey,
+  optionMatchKey,
+  titleCaseLabel,
   redo as redoStack,
   undo as undoStack,
   type CellEdit,
@@ -1186,10 +1188,15 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
    */
   const createOption = useCallback(
     async (column: DataColumn, label: string) => {
-      const trimmed = label.trim().slice(0, 120);
-      if (!trimmed) return null;
+      const raw = label.trim().slice(0, 120);
+      if (!raw) return null;
+      // Title Case normalises on the way in; otherwise a free-form column
+      // preserves case, so `how` beside `How` is a second option rather
+      // than a silent reuse that retitles what the user typed.
+      const trimmed = column.config.titleCase ? titleCaseLabel(raw) : raw;
+      const key = optionMatchKey(trimmed, column.config);
       const existing = (column.config.options ?? []).find(
-        (o) => o.label.trim().toLowerCase() === trimmed.toLowerCase()
+        (o) => optionMatchKey(o.label, column.config) === key
       );
       if (existing) return existing;
       const option = {
