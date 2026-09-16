@@ -247,6 +247,12 @@ export function LinkedDatabasesProposalCard({
       setState({ status: "applied", tables: created });
       // Retire every OTHER card of this kind: a second apply now
       // duplicates real tables rather than revising them.
+      // A new database is a new NODE, so the file tree has to hear about
+      // it too. dispatchDataSchemaChanged only reaches the grid and the
+      // schema rail — the tree listens for dg:tree-refresh and nothing on
+      // the chat-apply path was firing it, so a database created from chat
+      // stayed invisible until a manual refresh (owner, 2026-09-16).
+      window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
       dispatchProposalApplied("linkedDatabases", storageKey(payload));
       toast.success(
         created.length > 0

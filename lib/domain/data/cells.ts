@@ -181,7 +181,14 @@ function encodeOptionIds(raw: unknown, column: DataColumn): EncodeResult {
  *
  * `Redis, Postgres` → ["Redis", "Postgres"]
  * `"Portland, OR", Seattle` → ["Portland, OR", "Seattle"]
- * `He said ""hi""` → [`He said "hi"`]   (doubled quote escapes a quote)
+ * `'hello world', next` → ["hello world", "next"]
+ * `"He said ""hi"""` → [`He said "hi"`]  (a doubled quote INSIDE a quoted
+ *   field is a literal quote — RFC 4180. A bare `""` in unquoted text opens
+ *   and closes an empty section instead: the same rule, not a special case.)
+ *
+ * Both quote styles are accepted. Single quotes are not RFC, but people type
+ * them, and refusing them would split a value at a space the user thought
+ * they had protected.
  *
  * These are RFC 4180 field semantics, and the doubled-quote escape is the
  * reason this is hand-written rather than a `.split(delimiter)`: the
@@ -198,24 +205,24 @@ export function splitDelimited(raw: string, delimiter: string): string[] {
   const delim = delimiter.length > 0 ? delimiter[0] : ",";
   const out: string[] = [];
   let field = "";
-  let quoted = false;
+  let quote: '"' | "'" | null = null;
   for (let i = 0; i < raw.length; i++) {
     const ch = raw[i];
-    if (quoted) {
-      if (ch === '"') {
-        if (raw[i + 1] === '"') {
-          field += '"';
+    if (quote) {
+      if (ch === quote) {
+        if (raw[i + 1] === quote) {
+          field += quote;
           i++;
         } else {
-          quoted = false;
+          quote = null;
         }
       } else {
         field += ch;
       }
       continue;
     }
-    if (ch === '"') {
-      quoted = true;
+    if (ch === '"' || ch === "'") {
+      quote = ch;
       continue;
     }
     if (ch === delim) {
@@ -227,6 +234,31 @@ export function splitDelimited(raw: string, delimiter: string): string[] {
   }
   out.push(field.trim());
   return out.filter((f) => f.length > 0);
+}
+
+/**
+ * True while `text` sits inside an unclosed quote.
+ *
+ * The type-and-pill editor uses this to know that a delimiter keystroke is
+ * LITERAL rather than terminal: typing `"hello ` must keep accepting input,
+ * because the user is halfway through a value that contains a space. Without
+ * it the pill closed on the space and quoting became unusable (owner,
+ * 2026-09-16).
+ */
+export function hasOpenQuote(text: string): boolean {
+  let quote: '"' | "'" | null = null;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (quote) {
+      if (ch === quote) {
+        if (text[i + 1] === quote) i++;
+        else quote = null;
+      }
+      continue;
+    }
+    if (ch === '"' || ch === "'") quote = ch;
+  }
+  return quote !== null;
 }
 
 // ── Simple validators ────────────────────────────────────────────────────

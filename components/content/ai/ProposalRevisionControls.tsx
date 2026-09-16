@@ -115,8 +115,7 @@ export function ProposalObsoleteNotice({ label }: { label: string }) {
       <History className="h-4 w-4 shrink-0 text-muted-foreground" />
       <span className="text-muted-foreground">
         Another {label} from this conversation was already created — this
-        older proposal is no longer offered. Ask for changes in chat to
-        build on what exists.
+        older proposal is no longer offered.
       </span>
     </div>
   );

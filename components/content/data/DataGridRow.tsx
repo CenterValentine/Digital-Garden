@@ -38,6 +38,7 @@ import {
 import { cn } from "@/lib/core/utils";
 import {
   cellToDisplayText,
+  hasOpenQuote,
   sortStatusOptions,
   splitDelimited,
   type CellValue,
@@ -1322,7 +1323,6 @@ function FreeformTagsPanel({
         : []
   );
   const [draft, setDraft] = useState("");
-  const [busy, setBusy] = useState(false);
 
   const commit = useCallback(
     (next: Array<{ id: string; label: string }>) => {
@@ -1339,13 +1339,17 @@ function FreeformTagsPanel({
   /**
    * Absorb the draft into pills.
    *
-   * New labels are minted through onCreateOption — the SAME path "+ New
-   * option" uses — rather than left as raw text for the server's freeform
-   * net to mint. Both work, but only this one updates the client's copy of
-   * the column, and without that the cell renders a freshly typed pill as
-   * nothing at all (its id resolves against a stale option list) until the
-   * next refetch. The server-side mint stays the net for the AI and any
-   * non-grid writer.
+   * The pill appears FIRST, on the keystroke, and the id is resolved behind
+   * it. Awaiting the mint before rendering put a visible gap between typing
+   * the delimiter and seeing the pill — the text vanished, then came back as
+   * a card (owner, 2026-09-16) — which reads as a stutter in the one
+   * interaction that has to feel immediate.
+   *
+   * A provisional pill carries its LABEL as its id. That is also the
+   * permanent fallback when there is no schema permission to mint with: the
+   * server's freeform pass accepts labels and mints them itself. So the
+   * optimistic state is not a lie waiting to be corrected — it is a valid
+   * value that usually gets upgraded to a real option id.
    */
   const flushDraft = useCallback(
     async (text: string) => {
@@ -1354,34 +1358,53 @@ function FreeformTagsPanel({
       if (parts.length === 0) return;
 
       const seen = new Set(items.map((i) => i.label.toLowerCase()));
-      const next = [...items];
-      setBusy(true);
-      try {
-        for (const part of parts) {
-          const key = part.toLowerCase();
-          if (seen.has(key)) continue;
-          seen.add(key);
-          const known = (column.config.options ?? []).find(
-            (o) => o.label.trim().toLowerCase() === key
-          );
-          if (known) {
-            next.push({ id: known.id, label: known.label });
-            continue;
-          }
-          const created = onCreateOption
-            ? await onCreateOption(column, part)
-            : null;
-          // No schema permission (or the mint failed): fall back to sending
-          // the LABEL, which the server's freeform pass will mint.
-          if (created) next.push({ id: created.id, label: created.label });
-          else next.push({ id: part, label: part });
-        }
-      } finally {
-        setBusy(false);
+      const fresh: Array<{ id: string; label: string }> = [];
+      for (const part of parts) {
+        const key = part.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        const known = (column.config.options ?? []).find(
+          (o) => o.label.trim().toLowerCase() === key
+        );
+        fresh.push(
+          known
+            ? { id: known.id, label: known.label }
+            : { id: part, label: part }
+        );
       }
-      if (next.length !== items.length) commit(next);
+      if (fresh.length === 0) return;
+
+      // Paint immediately, then reconcile.
+      const optimistic = [...items, ...fresh];
+      setItems(optimistic);
+
+      const needMint = fresh.filter((f) => f.id === f.label);
+      if (needMint.length === 0 || !onCreateOption) {
+        commit(optimistic);
+        return;
+      }
+
+      const resolved = new Map<string, string>();
+      for (const item of needMint) {
+        const created = await onCreateOption(column, item.label);
+        if (created) resolved.set(item.label, created.id);
+      }
+      // Rebuild from the LATEST state, not the snapshot we optimistically
+      // rendered: the user may have typed or removed a pill while the mints
+      // were in flight, and clobbering that would lose their edit.
+      setItems((current) => {
+        const next = current.map((i) =>
+          resolved.has(i.label) ? { ...i, id: resolved.get(i.label)! } : i
+        );
+        onCommit(
+          rowId,
+          column.key,
+          next.map((i) => i.id)
+        );
+        return next;
+      });
     },
-    [items, column, onCreateOption, commit]
+    [items, column, onCreateOption, onCommit, rowId, commit]
   );
 
   return (
@@ -1406,13 +1429,15 @@ function FreeformTagsPanel({
         <input
           autoFocus
           value={draft}
-          disabled={busy}
           onChange={(e) => {
             const text = e.target.value;
             // A delimiter keystroke completes the pill in place, so a value
-            // never sits in the input looking half-entered.
+            // never sits in the input looking half-entered — UNLESS a quote
+            // is open, in which case the delimiter is part of the value the
+            // user is still typing.
             const delim = column.config.splitOn ?? ",";
-            if (text.endsWith(delim) || text.endsWith(" ")) {
+            const terminal = text.endsWith(delim) || text.endsWith(" ");
+            if (terminal && !hasOpenQuote(text)) {
               void flushDraft(text);
               return;
             }
@@ -1437,7 +1462,7 @@ function FreeformTagsPanel({
             if (draft.trim()) void flushDraft(draft);
           }}
           placeholder={items.length === 0 ? "Type a value…" : ""}
-          className="min-w-[6rem] flex-1 bg-transparent px-1 py-0.5 text-xs outline-none disabled:opacity-60"
+          className="min-w-[6rem] flex-1 bg-transparent px-1 py-0.5 text-xs outline-none"
         />
       </div>
       <p className="mt-1.5 px-0.5 text-[10px] leading-snug text-muted-foreground">
