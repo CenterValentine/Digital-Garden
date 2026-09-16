@@ -10,6 +10,16 @@ export const ServerWikiLink = Node.create({
     return {
       // Stable ContentNode id of the target — survives renames. See the client
       // WikiLink extension for the full rationale.
+      // Per-link opt-out from context expansion. null = expand (default); only
+      // an explicit opt-out is stored and rendered. See the client WikiLink
+      // extension for the full rationale.
+      expand: {
+        default: null,
+        parseHTML: (element) =>
+          element.getAttribute("data-expand") === "false" ? false : null,
+        renderHTML: (attributes) =>
+          attributes.expand === false ? { "data-expand": "false" } : {},
+      },
       targetId: {
         default: null,
         parseHTML: (element) => element.getAttribute("data-target-id"),

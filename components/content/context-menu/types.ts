@@ -33,6 +33,12 @@ export interface ContextMenuAction {
   divider?: boolean;
   /** Section label shown above this item */
   sectionLabel?: string;
+  /**
+   * Hover explanation, rendered as the item's `title`. For actions whose label
+   * is a NOUN rather than a verb — a toggled property, where "what does this
+   * mean right now" is a fair question the label alone cannot answer.
+   */
+  tooltip?: string;
   /** Inline text input rendered inside the menu item */
   inlineInput?: {
     placeholder?: string;

@@ -126,6 +126,26 @@ export const WikiLink = Node.create<WikiLinkOptions>({
        * Optional by design: absent renders no attribute at all, so pre-existing
        * links serialize byte-identically and the markdown round-trip is unmoved.
        */
+      /**
+       * Per-link opt-out from context expansion.
+       *
+       * `null` (the default) means EXPAND: a read of this document pulls in the
+       * target's `derivedText`. Only an explicit opt-out is stored, and only
+       * then does the attribute render — so every link written before this
+       * existed serializes byte-identically and the markdown round-trip is
+       * unmoved, exactly as `targetId` is handled below.
+       *
+       * This is the "not this mention" control. Its counterpart, "never this
+       * thing", already exists as `AgenticMetadata.contextOptOut` on the target
+       * node — one setting there covers every link pointing at it.
+       */
+      expand: {
+        default: null,
+        parseHTML: (element) =>
+          element.getAttribute("data-expand") === "false" ? false : null,
+        renderHTML: (attributes) =>
+          attributes.expand === false ? { "data-expand": "false" } : {},
+      },
       targetId: {
         default: null,
         parseHTML: (element) => element.getAttribute("data-target-id"),
