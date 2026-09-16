@@ -9,6 +9,7 @@
 "use client";
 
 import { createElement, useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { stableStringify } from "@/lib/core/stable-stringify";
 import type { SaveMeta } from "@/lib/domain/content/save-meta";
 import { usePathname } from "next/navigation";
 import { AlertTriangle } from "lucide-react";
@@ -850,13 +851,32 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
         if (!cancelled && !isPageTemplateTab) {
           const draft = loadConflictDraft(selectedContentId);
           if (draft && bodyHashRef.current) {
-            setConflict({
-              contentId: selectedContentId,
-              mine: draft,
-              theirHash: bodyHashRef.current,
-            });
-            setNoteContent(draft);
-            setOutline(selectedContentId, extractOutline(draft));
+            // A stash IDENTICAL to the server copy has nothing to resolve.
+            // Left in place, it re-raises a conflict on EVERY load of this
+            // document: the view is replaced with the stale draft ("my edits
+            // revert when I come back") and handleSave pauses every save
+            // while a conflict exists ("nothing saves, even after the
+            // debounce") — a silent, permanent, per-document trap, keyed to
+            // whichever document once got a 409. Compare on the same
+            // canonical form the server hashes, and clear it.
+            const serverJson = result.data.note?.tiptapJson ?? null;
+            if (serverJson && stableStringify(draft) === stableStringify(serverJson)) {
+              clearConflictDraft(selectedContentId);
+              clientLogger.info({
+                layer: "ui",
+                event: "save_conflict:stale_draft_cleared",
+                summary: "stashed conflict draft matched the server copy; cleared without raising",
+                attrs: { content_id: selectedContentId },
+              });
+            } else {
+              setConflict({
+                contentId: selectedContentId,
+                mine: draft,
+                theirHash: bodyHashRef.current,
+              });
+              setNoteContent(draft);
+              setOutline(selectedContentId, extractOutline(draft));
+            }
           }
         }
       } catch (err) {
@@ -1049,6 +1069,14 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
       // (not the closure) so a conflict raised after this callback was created
       // still pauses it.
       if (useSaveConflictStore.getState().getConflict(selectedContentId)) {
+        // Never let this be silent again: a paused save with no request and
+        // no log is indistinguishable from "the app is broken".
+        clientLogger.warn({
+          layer: "ui",
+          event: "save:paused_conflict",
+          summary: "save paused — an unresolved conflict is open for this document",
+          attrs: { content_id: selectedContentId },
+        });
         setHasUnsavedChanges(true);
         return;
       }
