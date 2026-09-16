@@ -2517,15 +2517,6 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
           </div>
         ) : null}
 
-        {/* Save-conflict resolution (stale-tab / concurrent-edit overwrite) */}
-        <SaveConflictBanner
-          active={Boolean(activeConflict)}
-          onKeepMine={handleConflictKeepMine}
-          onTakeTheirs={handleConflictTakeTheirs}
-          onOpenTheirs={handleConflictOpenTheirs}
-          theirsPreview={theirsPreview}
-          onCloseTheirs={() => setTheirsPreview(null)}
-        />
 
         {/* Editor — kept MOUNTED (hidden) in source mode so the collab Y.doc
             connection and the live editor instance survive; applySourceMode
@@ -2622,6 +2613,24 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
           !selectedContentId.startsWith("person:") &&
           contentType !== "page-template" &&
           !isEmbedMode && <ContentToolbar contentId={selectedContentId} />}
+
+        {/* Save-conflict resolution (stale-tab / concurrent-edit overwrite).
+            Mounted at the TOP LEVEL, above every layout branch, deliberately.
+            It used to sit inside the note editor's title header, which only the
+            note branch renders — so a conflict raised on a folder/charter body,
+            a database, or any other non-note content had no visible exit: the
+            stashed draft replaced the view on every load and handleSave paused
+            every save, silently and indefinitely ("Career Hunt II",
+            2026-09-15). Whatever can raise a conflict must be able to show its
+            way out, so this renders regardless of content type. */}
+        <SaveConflictBanner
+          active={Boolean(activeConflict)}
+          onKeepMine={handleConflictKeepMine}
+          onTakeTheirs={handleConflictTakeTheirs}
+          onOpenTheirs={handleConflictOpenTheirs}
+          theirsPreview={theirsPreview}
+          onCloseTheirs={() => setTheirsPreview(null)}
+        />
         {isNonNoteContent ? (
           <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
             {notesPanelPosition === "above" && (
