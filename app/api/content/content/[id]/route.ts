@@ -451,6 +451,11 @@ export async function GET(
           // overwrite class. Backwards compatible: clients that ignore the
           // field continue working unchanged.
           bodyHash: hashTiptap(content.notePayload.tiptapJson),
+          // When this body was last written. The conflict comparison shows it
+          // as "they saved 4 min ago" — the fact that most often settles which
+          // version to keep. ContentNode.updatedAt cannot stand in: pure
+          // payload saves deliberately do not bump it.
+          updatedAt: content.notePayload.updatedAt.toISOString(),
         };
       }
       if (content.filePayload) {

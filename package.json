@@ -64,6 +64,7 @@
     "test:e2e:report": "playwright show-report",
     "polling:check": "tsx scripts/validate-polling.ts",
     "conflict-banner:check": "tsx scripts/validate-conflict-banner.ts",
+    "conflict-diff:smoke": "tsx scripts/conflict-diff-smoke.ts",
     "polling:smoke": "tsx scripts/polling-scheduler-smoke.ts && tsx scripts/extension-engagement-smoke.ts && tsx scripts/presence-cadence-smoke.ts"
   },
   "prisma": {
@@ -166,6 +167,7 @@
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "date-fns": "^4.1.0",
+    "diff": "^9.0.0",
     "docx": "^9.5.1",
     "dompurify": "^3.4.7",
     "file-type": "^21.3.0",
