@@ -72,7 +72,7 @@ export function DiagramsNetToolbar({
         </DropdownMenu>
 
         {/* Auto-save status (text) */}
-        <span className="text-xs text-gray-500 hidden md:inline">
+        <span className="text-xs text-gray-500 dark:text-gray-400 hidden md:inline">
           {isSaving && "Saving..."}
           {!isSaving && isModified && "Unsaved changes"}
           {!isSaving && !isModified && "All changes saved"}

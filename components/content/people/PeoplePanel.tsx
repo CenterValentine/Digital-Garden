@@ -1866,7 +1866,7 @@ function RenameDialog({
     <div className="fixed inset-0 z-[210] flex items-center justify-center bg-black/45 px-4">
       <div className="w-full max-w-sm rounded-xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#1a2530] shadow-2xl">
         <div className="border-b border-gray-200 px-4 py-3">
-          <h2 className="text-sm font-semibold text-gray-900">{title}</h2>
+          <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">{title}</h2>
         </div>
         <div className="px-4 py-4">
           <input
@@ -1970,7 +1970,7 @@ function PeopleStateMessage({
   return (
     <div className="flex h-full flex-col items-center justify-center p-6 text-center">
       <div className="mb-4">{icon}</div>
-      <h3 className="mb-2 text-sm font-semibold text-gray-900">{title}</h3>
+      <h3 className="mb-2 text-sm font-semibold text-gray-900 dark:text-gray-100">{title}</h3>
       <p className="max-w-xs text-xs leading-5 text-gray-500">{description}</p>
       {actionLabel && onAction ? (
         <button

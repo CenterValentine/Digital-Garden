@@ -11,7 +11,7 @@
     "dev:collab": "tsx server/hocuspocus/bootstrap.ts",
     "start:collab": "tsx server/hocuspocus/bootstrap.ts",
     "typecheck": "tsc --noEmit",
-    "build": "prisma generate && pnpm build:tokens && tsc --noEmit && pnpm collab:schema:check && pnpm note-edit:check && pnpm markdown:blocks:check && pnpm blockid:hygiene:check && pnpm reference-block:check && pnpm shortcut-mirror:check && pnpm extensions:check && pnpm polling:check && pnpm conflict-banner:check && pnpm charters:check && pnpm output-targets:check && pnpm prompt-cache:check && pnpm ai:diagnostics:check && pnpm model-routing:check && pnpm ai:pricing:check && pnpm inspector:check && pnpm ai:drift:check && pnpm ai:matrix:check && pnpm data:read:check && pnpm lint && next build --turbopack",
+    "build": "prisma generate && pnpm build:tokens && tsc --noEmit && pnpm collab:schema:check && pnpm note-edit:check && pnpm markdown:blocks:check && pnpm blockid:hygiene:check && pnpm reference-block:check && pnpm shortcut-mirror:check && pnpm extensions:check && pnpm polling:check && pnpm conflict-banner:check && pnpm contrast:check && pnpm charters:check && pnpm output-targets:check && pnpm prompt-cache:check && pnpm ai:diagnostics:check && pnpm model-routing:check && pnpm ai:pricing:check && pnpm inspector:check && pnpm ai:drift:check && pnpm ai:matrix:check && pnpm data:read:check && pnpm lint && next build --turbopack",
     "vercel-build": "prisma generate && pnpm build:tokens && NODE_OPTIONS='--max-old-space-size=5120' next build --turbopack",
     "start": "next start",
     "lint": "eslint --max-warnings 151",
@@ -64,6 +64,7 @@
     "test:e2e:report": "playwright show-report",
     "polling:check": "tsx scripts/validate-polling.ts",
     "conflict-banner:check": "tsx scripts/validate-conflict-banner.ts",
+    "contrast:check": "tsx scripts/validate-dark-contrast.ts",
     "conflict-diff:smoke": "tsx scripts/conflict-diff-smoke.ts",
     "polling:smoke": "tsx scripts/polling-scheduler-smoke.ts && tsx scripts/extension-engagement-smoke.ts && tsx scripts/presence-cadence-smoke.ts"
   },

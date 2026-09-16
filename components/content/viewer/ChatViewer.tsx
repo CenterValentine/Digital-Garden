@@ -810,7 +810,7 @@ function ChatViewerInner({
             )}
             {/* Subheader line — stats, with the pinned-content affordance
                 inline to the RIGHT of it (owner, 2026-09-04). */}
-            <div className="relative flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-500">
+            <div className="relative flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
               <span>
               {hasMessages ? (
                 <>
@@ -840,7 +840,7 @@ function ChatViewerInner({
                           <span className="min-w-0 truncate text-gray-600 dark:text-gray-300">
                             {ph.name}
                           </span>
-                          <span className="shrink-0 tabular-nums text-gray-500">
+                          <span className="shrink-0 tabular-nums text-gray-500 dark:text-gray-400">
                             ~{formatTokenCount(ph.tokens)}
                           </span>
                         </span>
@@ -1028,7 +1028,7 @@ function ChatLoadingBody() {
         <div className="h-10 w-3/4 rounded-xl bg-black/10 dark:bg-white/10" />
         <div className="ml-auto h-8 w-1/2 rounded-xl bg-blue-500/20" />
       </div>
-      <p className="text-[10px] uppercase tracking-wider text-gray-500">
+      <p className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400">
         Loading chat…
       </p>
     </div>
@@ -1040,10 +1040,10 @@ function EmptyState({ title }: { title: string }) {
   return (
     <div className="flex h-full flex-col items-center justify-center p-8 text-center">
       <div className="flex h-16 w-16 items-center justify-center rounded-full bg-black/[0.03] dark:bg-white/5 border border-black/10 dark:border-white/10 mb-4">
-        <Bot className="h-8 w-8 text-gray-500" />
+        <Bot className="h-8 w-8 text-gray-500 dark:text-gray-400" />
       </div>
       <h2 className="text-lg font-medium text-gray-700 dark:text-gray-300">{title}</h2>
-      <p className="mt-2 text-sm text-gray-500 max-w-sm">
+      <p className="mt-2 text-sm text-gray-500 dark:text-gray-400 max-w-sm">
         Start a conversation. Messages are automatically saved.
       </p>
     </div>

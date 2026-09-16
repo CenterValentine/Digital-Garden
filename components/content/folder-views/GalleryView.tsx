@@ -181,7 +181,7 @@ export function GalleryView({
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="text-sm text-gray-600">Loading gallery...</div>
+        <div className="text-sm text-gray-600 dark:text-gray-400">Loading gallery...</div>
       </div>
     );
   }
@@ -190,8 +190,8 @@ export function GalleryView({
     return (
       <div className="flex flex-col items-center justify-center h-full text-center px-4">
         <ImageIcon className="h-16 w-16 text-gray-400 mb-4" />
-        <p className="text-sm text-gray-600 mb-2">No media files in this folder</p>
-        <p className="text-xs text-gray-500">
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">No media files in this folder</p>
+        <p className="text-xs text-gray-500 dark:text-gray-400">
           Upload images or videos to see them in gallery view
         </p>
       </div>
