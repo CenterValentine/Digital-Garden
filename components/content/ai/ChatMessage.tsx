@@ -3985,6 +3985,8 @@ const TOOL_ACTION_LABELS: Record<string, [running: string, done: string]> = {
   read_next_chunk: ["Reading further", "Read further"],
   read_previous_chunk: ["Reading the earlier section", "Read the earlier section"],
   apply_diff: ["Editing the document", "Edited the document"],
+  list_document_outline: ["Listing the document's blocks", "Listed the document's blocks"],
+  append_to_document: ["Adding to the document", "Added to the document"],
   replace_document: ["Rewriting the document", "Rewrote the document"],
   insert_image: ["Inserting an image", "Inserted an image"],
   plan: ["Planning the approach", "Planned the approach"],

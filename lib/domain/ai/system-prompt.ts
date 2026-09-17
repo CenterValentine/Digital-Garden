@@ -66,8 +66,9 @@ function editorSection(contentId: string): string {
 ## Document Editing (open document ID: ${contentId})
 You have tools to read and edit the currently open document.
 
-- Always call read_first_chunk before making any edits.
-- Use apply_diff for ALL targeted changes — adding, inserting, appending, or editing content. Adding a sentence or paragraph = apply_diff, not replace_document.
+- Use append_to_document to add content at the END of the document. It needs no prior read — do NOT read the document just to append to it.
+- For any change in the MIDDLE of the document, call read_first_chunk first, then use apply_diff.
+- If the text you want to change appears more than once, call list_document_outline and pass the containing block's handle to apply_diff rather than quoting a longer passage.
 - NEVER use replace_document unless the user explicitly asks to rewrite or overwrite the entire document.
 - Call finish_with_summary when you are done editing.
 - Generated images can be inserted at the user's cursor position.\
