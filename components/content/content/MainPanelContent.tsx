@@ -9,7 +9,10 @@
 "use client";
 
 import { createElement, useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { stableStringify } from "@/lib/core/stable-stringify";
+import {
+  sameProjectedText,
+  sameCanonicalJson,
+} from "@/lib/domain/content/conflict-diff";
 import type { SaveMeta } from "@/lib/domain/content/save-meta";
 import { usePathname } from "next/navigation";
 import { AlertTriangle } from "lucide-react";
@@ -860,16 +863,38 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
             // revert when I come back") and handleSave pauses every save
             // while a conflict exists ("nothing saves, even after the
             // debounce") — a silent, permanent, per-document trap, keyed to
-            // whichever document once got a 409. Compare on the same
-            // canonical form the server hashes, and clear it.
-            const serverJson = result.data.note?.tiptapJson ?? null;
-            if (serverJson && stableStringify(draft) === stableStringify(serverJson)) {
+            // whichever document once got a 409.
+            //
+            // Compare on the PROJECTION the resolver shows, not on canonical
+            // JSON. Canonical JSON cannot close this trap, because the two
+            // sides are not comparable by construction: the stash is raw
+            // editor JSON, while the server copy has been through
+            // `sanitizeTipTapJsonWithExtensions` (content PATCH) or is a Y.doc
+            // snapshot serialized by the collaboration schema (store hook) —
+            // both of which materialize attributes differently for prose that
+            // is word-for-word the same. So the check never fired where it was
+            // needed most, and the resolver opened announcing "the two
+            // versions are identical" over a block it could not explain.
+            //
+            // TRADE-OFF (owner call, 2026-09-17): a stash differing ONLY in
+            // formatting is discarded here. No writing is lost — the prose is
+            // by definition already on the server — and an unresolvable
+            // permanent save-pause is the worse failure. Logged distinctly so
+            // the cost is observable if it ever bites.
+            const serverJson = (result.data.note?.tiptapJson ?? null) as JSONContent | null;
+            if (serverJson && sameProjectedText(draft, serverJson)) {
+              const structuralOnly = !sameCanonicalJson(draft, serverJson);
               clearConflictDraft(selectedContentId);
               clientLogger.info({
                 layer: "ui",
                 event: "save_conflict:stale_draft_cleared",
-                summary: "stashed conflict draft matched the server copy; cleared without raising",
-                attrs: { content_id: selectedContentId },
+                summary: structuralOnly
+                  ? "stashed conflict draft read the same as the server copy (structural difference only); cleared without raising"
+                  : "stashed conflict draft matched the server copy; cleared without raising",
+                attrs: {
+                  content_id: selectedContentId,
+                  structural_only: structuralOnly,
+                },
               });
             } else {
               setConflict({
