@@ -1430,6 +1430,15 @@ export async function POST(request: Request) {
       // so the provider prefix cache re-warms once at run start. Pending
       // approvals mid-run only occur for kept tools (createNote,
       // phase_checkpoint).
+      // What the model is TOLD it has. The `tools` object above stays
+      // complete for the rest of this request: `activeTools` narrows only what
+      // is serialized into the provider payload, while incoming tool calls
+      // resolve against the full object (ai@6 `doParseToolCall`). So an
+      // unadvertised tool costs zero tokens and still executes if the model
+      // reaches for it — which is the recovery path that deleting destroyed.
+      const advertised = new Set(Object.keys(tools));
+      const isAdvertised = (id: string) => advertised.has(id);
+
       if (itemIterationBudget != null) {
         const ITERATION_RUN_TOOLS = new Set([
           // browsing + enumeration
@@ -1446,12 +1455,19 @@ export async function POST(request: Request) {
           "createNote", "updateNote", "renameNote", "getCurrentNote",
           "search_content", "read_folder_context",
           "read_first_chunk", "read_next_chunk", "read_previous_chunk",
+          // Database READS (2026-09-17): a run captures into a database, so it
+          // needs to see what is already there — to dedupe against prior rows,
+          // and to judge items against a standing-context table. Withholding
+          // these sent a production run to `search_content` → `getCurrentNote`
+          // and then blind. The four `propose_*` schema-design tools stay
+          // unadvertised: 3,840 tokens of table-authoring the run cannot use.
+          "query_database", "describe_database",
           // run/plumbing
           "phase_checkpoint", "ask_user", "notify_user",
           "finish_with_summary", "plan",
         ]);
         for (const id of Object.keys(tools)) {
-          if (!ITERATION_RUN_TOOLS.has(id)) delete tools[id];
+          if (!ITERATION_RUN_TOOLS.has(id)) advertised.delete(id);
         }
       }
 
@@ -1485,9 +1501,13 @@ export async function POST(request: Request) {
           ? resolveNativeWebSearchTool(executedProviderId)
           : null;
       const searchEnabled = toolConfig["search_web"]?.enabled !== false;
+      // Native search attaches AFTER the run narrowing above, so it must be
+      // advertised explicitly — otherwise it would sit in `tools` unannounced
+      // and the model would never know it could search.
       if (nativeSearch && searchEnabled) {
         // Big-four: provider-native search (integrated, well-cited).
         (tools as Record<string, unknown>)["search_web"] = nativeSearch;
+        advertised.add("search_web");
       } else if (
         !nativeSearch &&
         searchEnabled &&
@@ -1498,6 +1518,7 @@ export async function POST(request: Request) {
         // the SAME tool name — using the user's BYOK search connection.
         (tools as Record<string, unknown>)["search_web"] =
           createAppWebSearchTool(session.user.id);
+        advertised.add("search_web");
       }
 
       // Resolve attachments for the model: keep file parts the active
@@ -2009,8 +2030,8 @@ export async function POST(request: Request) {
                 referenceContentIds:
                   referenceContext.activeReferenceContentIds,
                 researchToolsAvailable:
-                  "search_web" in tools || "read_page" in tools,
-                referenceToolAvailable: "getCurrentNote" in tools,
+                  isAdvertised("search_web") || isAdvertised("read_page"),
+                referenceToolAvailable: isAdvertised("getCurrentNote"),
               });
               recordCompletedPhaseToolsFromMessages(
                 phaseCheckpointGate,
@@ -2117,8 +2138,8 @@ export async function POST(request: Request) {
                 referenceContentIds:
                   referenceContext.activeReferenceContentIds,
                 researchToolsAvailable:
-                  "search_web" in tools || "read_page" in tools,
-                referenceToolAvailable: "getCurrentNote" in tools,
+                  isAdvertised("search_web") || isAdvertised("read_page"),
+                referenceToolAvailable: isAdvertised("getCurrentNote"),
               });
               recordCompletedPhaseToolsFromMessages(
                 phaseCheckpointGate,
@@ -2157,7 +2178,11 @@ export async function POST(request: Request) {
       // this turn so weaker models cannot search for the playbook that is
       // already loaded. Generic note search remains available for phase work.
       if (attachedCharterResolved || rootedCharterResolved) {
-        delete tools.search_charters;
+        // Un-advertised rather than deleted, per the advertisement model
+        // above: the model stops being offered it (which is the point — the
+        // charter is already loaded), and a stray call from history is a
+        // redundant read rather than a hard error.
+        advertised.delete("search_charters");
         // System context alone proved insufficient for weaker models: the
         // owner smoke trace showed a correctly injected Active Playbook, yet
         // DeepSeek still opened the rooted note first. Put the validated
@@ -2275,7 +2300,7 @@ export async function POST(request: Request) {
             }
           : null;
 
-      const toolsActive = Object.keys(tools).length > 0;
+      const toolsActive = advertised.size > 0;
       const validatedPlaybookId = attachedCharterResolved
         ? explicitPlaybookId
         : rootedCharterResolved
@@ -2285,7 +2310,7 @@ export async function POST(request: Request) {
         providerId: executedVendorId,
         modelId: activeModelId,
         userId: session.user.id,
-        toolNames: Object.keys(tools),
+        toolNames: [...advertised],
         charterId: validatedPlaybookId,
         charterContext,
       });
@@ -2301,12 +2326,12 @@ export async function POST(request: Request) {
             requested_provider: providerId,
             model: activeModelId,
             messages: modelMessages.length,
-            tools: tools ? Object.keys(tools).length : 0,
+            tools: advertised.size,
             // S2 debug surface: which tools actually attached, and whether
             // the native search tool made it in (gateway transports may
             // handle provider-defined tools differently than direct).
-            tool_names: Object.keys(tools).join(","),
-            native_search: "search_web" in tools,
+            tool_names: [...advertised].join(","),
+            native_search: isAdvertised("search_web"),
             executed_provider: executedVendorId,
             prompt_cache_enabled: promptCachePolicy.enabled,
             prompt_cache_scope: promptCachePolicy.scope,
@@ -2393,7 +2418,7 @@ export async function POST(request: Request) {
         reasoningProviderOptions !== undefined,
         itemIterationBudget != null,
       );
-      const activeToolCount = toolsActive ? Object.keys(tools).length : 0;
+      const activeToolCount = advertised.size;
 
       // Turn start — for the generation-duration shown in the assistant avatar
       // tooltip (attached on `finish` in messageMetadata below). Anchored here so
@@ -2418,6 +2443,10 @@ export async function POST(request: Request) {
         model: wrappedModel,
         messages: modelMessages,
         tools: toolsActive ? tools : undefined,
+        // Advertisement, not availability: only these schemas are serialized,
+        // but every tool in `tools` above remains executable. See the
+        // `advertised` set at assembly for why the difference matters.
+        activeTools: toolsActive ? [...advertised] : undefined,
         toolChoice: toolsActive ? "auto" : undefined,
         // Reasoning opt-in for Anthropic + Google (Session 6). Undefined
         // for OpenAI o-series (reasoning is automatic) and non-reasoning
@@ -2479,18 +2508,18 @@ export async function POST(request: Request) {
           };
         },
         system: buildSystemPrompt({
-          hasImageTools: "generate_image" in tools,
-          hasFlashcardTools: "list_decks" in tools,
-          hasWebSearch: "search_web" in tools,
-          hasCheckpointTool: "phase_checkpoint" in tools,
-          hasBrowserReadTool: READ_PAGE_HEADLESS_OR_BROWSER in tools,
-          hasTabLauncher: OPEN_TAB_AND_READ in tools,
-          hasCoBrowseTools: CO_BROWSE_OPEN in tools,
-          hasReadCurrentPage: READ_CURRENT_PAGE in tools,
-          hasResearchTools: "extract_structured" in tools,
-          hasListTabs: LIST_TABS in tools,
-          hasItemIteration: "propose_item_iteration" in tools,
-          hasDatabaseTools: "describe_database" in tools,
+          hasImageTools: isAdvertised("generate_image"),
+          hasFlashcardTools: isAdvertised("list_decks"),
+          hasWebSearch: isAdvertised("search_web"),
+          hasCheckpointTool: isAdvertised("phase_checkpoint"),
+          hasBrowserReadTool: isAdvertised(READ_PAGE_HEADLESS_OR_BROWSER),
+          hasTabLauncher: isAdvertised(OPEN_TAB_AND_READ),
+          hasCoBrowseTools: isAdvertised(CO_BROWSE_OPEN),
+          hasReadCurrentPage: isAdvertised(READ_CURRENT_PAGE),
+          hasResearchTools: isAdvertised("extract_structured"),
+          hasListTabs: isAdvertised(LIST_TABS),
+          hasItemIteration: isAdvertised("propose_item_iteration"),
+          hasDatabaseTools: isAdvertised("describe_database"),
           viewedContentHint,
           // Runtime identity (v3.1): what this turn is ACTUALLY served by,
           // from live routing — so the model self-identifies from ground
