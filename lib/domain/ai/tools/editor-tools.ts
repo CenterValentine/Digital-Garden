@@ -431,7 +431,7 @@ export function createEditorTools(ctx: ToolExecuteContext) {
     // `resolveEditToolCall` in use-conversation-engine.ts.
     apply_diff: tool({
       description:
-        "Apply a targeted text replacement to the open document. Specify the exact text to find and what to replace it with. The match must be unique. Read the document first with read_first_chunk and quote the text EXACTLY as that result shows it — the match is made against the document's rendered text, so markdown syntax and HTML markup are not part of it. The result reports whether the edit actually applied; if it says the text was not found, re-read and try again rather than assuming success.",
+        "Apply a targeted text replacement to the open document. Specify the exact text to find and what to replace it with. The match must be unique within its search scope. Read the document first with read_first_chunk and quote the text EXACTLY as that result shows it — the match is made against the document's rendered text, so markdown syntax and HTML markup are not part of it. If the same wording appears in more than one block, call list_document_outline and pass the containing block's handle to disambiguate. The result reports whether the edit actually applied; if it says the text was not found, re-read and try again rather than assuming success.",
       inputSchema: z.object({
         before: z
           .string()
@@ -442,6 +442,42 @@ export function createEditorTools(ctx: ToolExecuteContext) {
           .describe(
             "The replacement text. Can be empty to delete the matched text. " +
               "PARAGRAPHS: separate them with a BLANK LINE (\\n\\n). A single newline is inserted as plain text and will NOT start a new paragraph — 'one\\ntwo' becomes 'one two' on one line."
+          ),
+        handle: z
+          .string()
+          .optional()
+          .describe(
+            "Optional block handle from list_document_outline, e.g. 'b3#1f4a2b90'. Restricts the search to that one block, so text repeated elsewhere in the document does not make the target ambiguous. If the block has changed since you read the outline the edit is refused — read the outline again rather than retrying the same handle."
+          ),
+      }),
+    }),
+
+    // ─── Gate 4b: List Document Outline (Client-Side) ───────
+    // Also client-executed, for the same reason apply_diff is: handles must be
+    // derived from the representation the edit will be applied against. Minting
+    // them server-side from the DB copy would hand the model addresses that
+    // disagree with the live editor whenever there are unsaved changes.
+    list_document_outline: tool({
+      description:
+        "List every top-level block in the open document with a short handle and a preview of its text. Use this when the text you want to change appears more than once, or when you need to say which block you mean — then pass the handle to apply_diff. Handles are valid only until the document changes; if one is rejected, call this again to get fresh handles.",
+      inputSchema: z.object({}),
+    }),
+
+    // ─── Gate 4c: Append To Document (Client-Side) ──────────
+    // The blind-safe write: no address, so nothing can go stale between the
+    // model's decision and the mutation. This exists so the model stops
+    // expressing "add a paragraph at the end" as an apply_diff anchored on
+    // whatever the last sentence happened to be — a read cycle and a failure
+    // mode bought for nothing.
+    append_to_document: tool({
+      description:
+        "Add new content to the END of the open document. Use this for any pure addition at the end — a closing paragraph, a new section, extra bullet points. You do NOT need to read the document first. Use apply_diff instead when changing or inserting text at a specific place in the middle.",
+      inputSchema: z.object({
+        markdown: z
+          .string()
+          .min(1)
+          .describe(
+            "The content to append, in markdown. Separate paragraphs with a BLANK LINE (\\n\\n). Headings, lists and other markdown structure are parsed normally."
           ),
       }),
     }),

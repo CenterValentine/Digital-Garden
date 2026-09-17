@@ -29,8 +29,13 @@ import { toast } from "sonner";
 import { useEditorInstanceStore } from "@/state/editor-instance-store";
 import {
   AiEditOrchestrator,
+  buildOutline,
   findTextInDoc,
+  formatOutline,
+  handleMissMessage,
   parseEditPayload,
+  resolveHandle,
+  type SearchRange,
 } from "@/lib/domain/editor/ai";
 import { ChatMessage } from "./ChatMessage";
 import {
@@ -676,27 +681,104 @@ export function ChatPanel({
         return {
           applied: false,
           message:
-            "The document is not open in an editor right now, so nothing was changed. Ask the user to open it, or use updateNote to write to it directly.",
+            "The document is not open in an editor right now, so nothing was read or changed. Ask the user to open it, or use updateNote to write to it directly.",
         };
+      }
+
+      // A truthful write receipt, shaped as a note payload so the existing chip
+      // and content-refresh path pick it up. Only emitted AFTER the orchestrator
+      // reports the edit actually landed.
+      const writeReceipt = (editMode: string): string =>
+        JSON.stringify({
+          __notePayload: true,
+          kind: "updated",
+          contentId: contentIdRef.current,
+          title: documentTitle(),
+          editMode,
+          applied: true,
+        });
+
+      // ─── list_document_outline ──────────────────────────────────────────
+      // A read, not an edit: it never touches the orchestrator queue. Handles
+      // are derived here, from the live document, so they describe the same
+      // representation apply_diff will resolve them against.
+      if (request.type === "list_document_outline") {
+        return {
+          // `applied` means "the document changed". A read never changes it.
+          applied: false,
+          message: formatOutline(buildOutline(editor.state.doc)),
+        };
+      }
+
+      // ─── append_to_document ─────────────────────────────────────────────
+      // No address to validate — the insertion point is read at apply time.
+      if (request.type === "append_to_document") {
+        const appendResult = await orchestrator.applyAndWait({
+          __editPayload: true,
+          type: "append_to_document",
+          markdown: request.markdown,
+          documentTitle: documentTitle(),
+          action: `Appended "${request.markdown.slice(0, 50)}"`,
+          toolCallId: request.toolCallId,
+        });
+
+        if (!appendResult.success) {
+          return {
+            applied: false,
+            message: `Nothing was appended: ${appendResult.error ?? "unknown error"}.`,
+          };
+        }
+        return { applied: true, message: writeReceipt("append_to_document") };
+      }
+
+      // ─── apply_diff ─────────────────────────────────────────────────────
+      // Resolve the optional block scope first. A stale handle is refused here
+      // rather than silently widened to a whole-document search, which would
+      // reintroduce the wrong-target edit the handle exists to prevent.
+      let range: SearchRange | undefined;
+      if (request.handle) {
+        const resolved = resolveHandle(editor.state.doc, request.handle);
+        if (!resolved.ok) {
+          return {
+            applied: false,
+            message: handleMissMessage(request.handle, resolved.reason),
+          };
+        }
+        range = { from: resolved.entry.from, to: resolved.entry.to };
       }
 
       // Pre-check in the SAME representation the orchestrator searches, so the
       // model gets a specific reason plus the text it should have quoted.
-      const found = findTextInDoc(editor.state.doc, request.before);
+      const found = findTextInDoc(editor.state.doc, request.before, range);
       if (!found || "count" in found) {
-        const actual = editor.state.doc.textBetween(
-          0,
-          Math.min(editor.state.doc.content.size, 4000),
-          "\n",
-        );
-        const reason =
-          found && "count" in found
-            ? `Found ${found.count} occurrences of that text, so the target is ambiguous. Include more surrounding context.`
-            : "That exact text does not appear in the document. NOTE: matching is against the document's rendered text — markdown syntax (#, **, -) and any HTML markup you saw are not part of it.";
-        return {
-          applied: false,
-          message: `Edit NOT applied. ${reason}\n\nThe document currently reads:\n"""\n${actual}\n"""`,
-        };
+        const doc = editor.state.doc;
+        let reason: string;
+
+        if (found && "count" in found) {
+          // Quote each match with its containing block handle, so the model can
+          // pick one instead of guessing at a longer unique passage.
+          const outline = buildOutline(doc);
+          const options = found.matches
+            .map((m, i) => {
+              const owner = outline.find((e) => m.from >= e.from && m.from < e.to);
+              const context = doc
+                .textBetween(
+                  Math.max(0, m.from - 40),
+                  Math.min(doc.content.size, m.to + 40),
+                  " ",
+                )
+                .trim();
+              return `  ${i + 1}. ${owner ? owner.handle : "?"} — …${context}…`;
+            })
+            .join("\n");
+          reason = `Found ${found.count} occurrences of that text, so the target is ambiguous. Re-run apply_diff with the \`handle\` of the block you mean:\n${options}`;
+        } else {
+          reason = request.handle
+            ? `That exact text does not appear in block ${request.handle}. Call list_document_outline again to see what that block currently contains.`
+            : `That exact text does not appear in the document. NOTE: matching is against the document's rendered text — markdown syntax (#, **, -) and any HTML markup you saw are not part of it.\n\nThe document currently reads:\n"""\n${doc.textBetween(0, Math.min(doc.content.size, 4000), "\n")}\n"""`;
+        }
+
+        return { applied: false, message: `Edit NOT applied. ${reason}` };
       }
 
       const action =
@@ -709,6 +791,7 @@ export function ChatPanel({
         type: "apply_diff",
         before: request.before,
         after: request.after,
+        ...(request.handle ? { handle: request.handle } : {}),
         documentTitle: documentTitle(),
         action,
         toolCallId: request.toolCallId,
@@ -721,19 +804,7 @@ export function ChatPanel({
         };
       }
 
-      // Only NOW is a write receipt truthful. Shaped as a note payload so the
-      // existing chip + content-refresh path pick it up.
-      return {
-        applied: true,
-        message: JSON.stringify({
-          __notePayload: true,
-          kind: "updated",
-          contentId: contentIdRef.current,
-          title: documentTitle(),
-          editMode: "apply_diff",
-          applied: true,
-        }),
-      };
+      return { applied: true, message: writeReceipt("apply_diff") };
     };
     return () => {
       editExecutorRef.current = null;

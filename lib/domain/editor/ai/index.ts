@@ -6,13 +6,27 @@
  * - Edit orchestrator with animation engine
  */
 
-export { findTextInDoc, type TextSearchResult } from "./text-search";
+export {
+  findTextInDoc,
+  type TextSearchResult,
+  type SearchRange,
+  type AmbiguousMatch,
+} from "./text-search";
+export {
+  buildOutline,
+  formatOutline,
+  handleMissMessage,
+  resolveHandle,
+  type HandleResolution,
+  type OutlineEntry,
+} from "./block-handles";
 export {
   AiEditOrchestrator,
   parseEditPayload,
   type ApplyDiffPayload,
   type ReplaceDocumentPayload,
   type InsertImagePayload,
+  type AppendToDocumentPayload,
   type EditPayload,
   type EditResult,
 } from "./edit-orchestrator";
