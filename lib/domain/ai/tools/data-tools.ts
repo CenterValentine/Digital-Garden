@@ -84,6 +84,7 @@ import {
   operatorsForType,
   type CellValue,
   type DataColumn,
+  type DataTable,
   type DataRow,
   type DataView,
   type FilterCondition,
@@ -473,11 +474,220 @@ function serialiseProposedColumn(column: ProposedColumn) {
 }
 
 
+/**
+ * The preamble every row write shares: resolve the database reference,
+ * clear jurisdiction, confirm write access, and refuse query-mode tables.
+ * Extracted so update_row and update_rows cannot answer these four
+ * questions differently.
+ */
+async function openForWrite(
+  ctx: ToolExecuteContext,
+  databaseId: string | undefined
+): Promise<{ databaseId: string; table: DataTable } | { refusal: string }> {
+  const dbRef = await resolveDatabaseRef(ctx, databaseId);
+  if ("refusal" in dbRef) return { refusal: dbRef.refusal };
+  const gate = await resolveJurisdiction(ctx, dbRef.id);
+  if ("refusal" in gate) return { refusal: gate.refusal };
+  if (!canWrite(gate.level)) {
+    return { refusal: "You have read access here but not write — tell the user." };
+  }
+  if (gate.table.mode === "query") {
+    return {
+      refusal:
+        "Query databases project existing notes — edit the note itself, not rows.",
+    };
+  }
+  return { databaseId: dbRef.id, table: gate.table };
+}
+
+/** Cap on rows a single bulk update may touch. Mirrors INSERT_CAP. */
+const UPDATE_ROW_CAP = 25;
+/** Cells one row may change in a single update. */
+const UPDATE_CELL_CAP = 10;
+
+interface RowUpdateInput {
+  rowId: string;
+  cells: Record<string, string | number | boolean | string[] | null>;
+  expect?: Record<string, string | number | boolean | string[] | null>;
+}
+
+/**
+ * Apply cell updates across ONE OR MANY rows.
+ *
+ * `update_row` and `update_rows` are the same operation at different arity,
+ * so they are the same function — `update_row` passes an array of one. The
+ * alternative was a second near-copy of relation resolution, stale-expect
+ * handling, link writing and quest-ledger minting, which is precisely the
+ * parallel-table pattern `ai:drift:check` exists to prevent.
+ *
+ * Atomicity is inherited, not added: `writeCells` is already all-or-nothing
+ * across every CellWrite handed to it, and a CellWrite names its own row. A
+ * twenty-row edit is therefore one transaction and one undo entry, which is
+ * the real reason to prefer it over twenty calls — twenty calls are twenty
+ * independently-failing writes the user must unpick by hand.
+ *
+ * Links stay last and per-row, matching single-row behaviour: a relation
+ * cell REPLACES that column's links for its row, and links are only touched
+ * once every cell write has landed.
+ */
+async function applyRowUpdates(
+  ctx: ToolExecuteContext,
+  databaseId: string,
+  table: DataTable,
+  updates: RowUpdateInput[]
+): Promise<string> {
+  const live = table.columns.filter((c) => !c.deletedAt);
+  const writes: CellWrite[] = [];
+  const relationWrites: Array<{
+    columnId: string;
+    rowId: string;
+    rowIds: string[];
+  }> = [];
+  const errors: string[] = [];
+  const touchedRowIds: string[] = [];
+  const rowLabel = new Map<string, string>();
+
+  for (const update of updates) {
+    const entries = Object.entries(update.cells ?? {});
+    if (entries.length === 0) {
+      errors.push(`${update.rowId}: no cells given.`);
+      continue;
+    }
+    if (entries.length > UPDATE_CELL_CAP) {
+      errors.push(
+        `${update.rowId}: at most ${UPDATE_CELL_CAP} cells per row — split it, or reconsider whether this is really one edit.`
+      );
+      continue;
+    }
+
+    // Handles (plan §4.3): the [ab12cd34] from a read resolves to the row;
+    // an ambiguous or dead handle is a refusal, never a guess.
+    const rowRef = await resolveRowRef(databaseId, update.rowId);
+    if ("refusal" in rowRef) {
+      errors.push(`${update.rowId}: ${rowRef.refusal}`);
+      continue;
+    }
+    const rowId = rowRef.id;
+    touchedRowIds.push(rowId);
+    rowLabel.set(rowId, update.rowId);
+
+    for (const [ref, raw] of entries) {
+      const column = findColumn(live, ref);
+      if (!column) {
+        errors.push(`${update.rowId}: no column named "${ref}".`);
+        continue;
+      }
+      if (column.type === "relation") {
+        const resolved = await resolveRelationCell(
+          column,
+          raw === null || raw === "" ? [] : raw,
+          ctx.userId
+        );
+        if ("error" in resolved) {
+          errors.push(`${update.rowId}: ${resolved.error}`);
+          continue;
+        }
+        relationWrites.push({
+          columnId: column.id,
+          rowId,
+          rowIds: resolved.rowIds,
+        });
+        continue;
+      }
+      const blocked = writeBlockReason(column);
+      if (blocked) {
+        errors.push(`${update.rowId}: ${blocked}`);
+        continue;
+      }
+      // null / "" = clear (empty-is-absent, plan B8c): the key is deleted,
+      // exactly what the grid does.
+      const value =
+        raw === null || raw === ""
+          ? undefined
+          : normalizeCellInput(column, raw);
+      const write: CellWrite = { rowId, columnKey: column.key, value };
+      if (update.expect && ref in update.expect) {
+        const rawExpect = update.expect[ref];
+        write.expect = (
+          rawExpect === null || rawExpect === ""
+            ? undefined
+            : normalizeCellInput(column, rawExpect)
+        ) as CellWrite["expect"];
+        write.hasExpectation = true;
+      }
+      writes.push(write);
+    }
+  }
+
+  if (errors.length > 0) {
+    return `Nothing updated — fix these first:\n${errors.join("\n")}\nColumns here: ${live
+      .map((c) => c.name)
+      .join(", ")}.`;
+  }
+
+  const result = await writeCells(databaseId, live, writes);
+  const stale = result.results.filter((r) => r.status === "stale");
+  if (stale.length > 0) {
+    const details = stale
+      .map((s) => {
+        const col = live.find((c) => c.key === s.columnKey);
+        const current = col
+          ? cellToText(col, s.current) || "(empty)"
+          : String(s.current ?? "(empty)");
+        const who = rowLabel.get(s.rowId) ?? s.rowId;
+        return `${who}: ${col?.name ?? s.columnKey} is now: ${current}`;
+      })
+      .join("; ");
+    return `Not updated — ${stale.length === 1 ? "a row" : `${stale.length} rows`} changed since you read ${updates.length === 1 ? "it" : "them"} (${details}). Nothing changed (all-or-nothing) — re-query and retry with fresh expect values, or ask the user which value should win.`;
+  }
+  const failed = result.results.filter((r) => r.status === "error");
+  if (failed.length > 0) {
+    return `Not updated — validation rejected: ${failed
+      .map((f) => f.message)
+      .join("; ")}. Nothing changed (all-or-nothing).`;
+  }
+
+  // Links last, and only once every cell write succeeded.
+  let added = 0;
+  let removed = 0;
+  for (const link of relationWrites) {
+    const delta = await writeRelationLinks(
+      link.columnId,
+      link.rowId,
+      link.rowIds
+    );
+    added += delta.added;
+    removed += delta.removed;
+  }
+
+  // Hard rule (quests): naming a master-ledger row makes it a quest.
+  const questLedgers = await ensureLedgersForMasterRows(
+    ctx.userId,
+    databaseId,
+    touchedRowIds
+  ).catch(() => 0);
+
+  const rowCount = touchedRowIds.length;
+  const cellPart =
+    writes.length > 0
+      ? `Updated ${writes.length} cell${writes.length === 1 ? "" : "s"} across ${rowCount} row${rowCount === 1 ? "" : "s"}.`
+      : `Updated ${rowCount} row${rowCount === 1 ? "" : "s"}.`;
+  const linkPart =
+    added > 0 || removed > 0
+      ? ` Links: ${added} added, ${removed} removed.`
+      : "";
+  const questPart =
+    questLedgers > 0
+      ? ` ${questLedgers} row${questLedgers === 1 ? " is a quest" : "s are quests"} now — quest ledgers were minted under the charter.`
+      : "";
+  return `${cellPart}${linkPart}${questPart} The user sees the change in the grid and can undo it there.`;
+}
+
 export function createDataTools(ctx: ToolExecuteContext) {
   return {
     describe_database: tool({
       description:
-        "PROFILE an associated database: per column, the fill rate, value counts or ranges, and the token cost of reading it across the table; then three sample rows and AI-digest coverage (~700 tokens). The schema itself (columns, types, options, relations) is ALREADY in your context for every mentioned or open database — do NOT call this to confirm column names or relations; query_database's results also show them. Call it only when deciding which columns are worth a bulk read, or to check digest coverage.",
+        "PROFILE a reachable database: per column, the fill rate, value counts or ranges, and the token cost of reading it across the table; then three sample rows and AI-digest coverage (~700 tokens). The schema itself (columns, types, options, relations) is ALREADY in your context for every mentioned or open database — do NOT call this to confirm column names or relations; query_database's results also show them. Call it only when deciding which columns are worth a bulk read, or to check digest coverage.",
       inputSchema: z.object({
         databaseId: z
           .string()
@@ -511,7 +721,7 @@ export function createDataTools(ctx: ToolExecuteContext) {
 
     query_database: tool({
       description:
-        "Read rows from an associated database, filtered and sorted SERVER-SIDE. Default result = the INDEX TIER: every matching row as `[handle] Title · short cells` (~30 tokens a row; no long text, no mirrored backlinks). The index tier ALREADY includes every select, status, number, date, url and RELATION column (linked titles with handles) — do not name columns to get those; name columns only for long text you need in full, or pass `columns: \"all\"` for every column clipped at 120 chars. Narrow before you widen: `search` (any text in the row), `filters`, `rowIds` (the [handles] from an earlier read), `groupBy` (counts only, ~50 tokens). The mention capsule already lists the columns; call describe_database only for profiles, samples, or digest coverage. Results are sized in tokens against the user's threshold; over it you get the index tier plus the exact price of the full read and how to ask for it (`budget` — the user is asked to approve above their threshold). `lifetime` says how long the rows stay in context: \"turn\" (default) folds at the next user message; \"run\" keeps them for every item of an iteration you are about to propose or are inside (pin the INDEX with digests, not narratives); \"chat\" only when the user asked to keep the table at hand. A pin costs its size on every later turn — if you cannot name the future step that needs the rows, use \"turn\". Filter ops by type: text-likes take is/isNot/contains/notContains/startsWith; numbers and dates is/gt/gte/lt/lte; select/status is/isNot (option label or id); multiSelect/relation-likes hasAny/hasAll/hasNone; every column isEmpty/isNotEmpty. Sorted queries return the top rows (no cursor); unsorted queries return a cursor.",
+        "Read rows from a reachable database, filtered and sorted SERVER-SIDE. Default result = the INDEX TIER: every matching row as `[handle] Title · short cells` (~30 tokens a row; no long text, no mirrored backlinks). The index tier ALREADY includes every select, status, number, date, url and RELATION column (linked titles with handles) — do not name columns to get those; name columns only for long text you need in full, or pass `columns: \"all\"` for every column clipped at 120 chars. Narrow before you widen: `search` (any text in the row), `filters`, `rowIds` (the [handles] from an earlier read), `groupBy` (counts only, ~50 tokens). The mention capsule already lists the columns; call describe_database only for profiles, samples, or digest coverage. REACHABLE means the open or mentioned databases AND every database they link to through a relation column — if a column reads `relation \u2192 Experiences`, you can query Experiences by name right now; never ask the user to @-mention a table this one already links to. Results are sized in tokens against the user's threshold; over it you get the index tier plus the exact price of the full read and how to ask for it (`budget` — the user is asked to approve above their threshold). `lifetime` says how long the rows stay in context: \"turn\" (default) folds at the next user message; \"run\" keeps them for every item of an iteration you are about to propose or are inside (pin the INDEX with digests, not narratives); \"chat\" only when the user asked to keep the table at hand. A pin costs its size on every later turn — if you cannot name the future step that needs the rows, use \"turn\". Filter ops by type: text-likes take is/isNot/contains/notContains/startsWith; numbers and dates is/gt/gte/lt/lte; select/status is/isNot (option label or id); multiSelect/relation-likes hasAny/hasAll/hasNone; every column isEmpty/isNotEmpty. Sorted queries return the top rows (no cursor); unsorted queries return a cursor.",
       // Deliberately LENIENT schema (owner failure report, 2026-08-28): a
       // strict shape fails the whole call before execute with an opaque
       // validation error the model can't learn from. Validation lives in
@@ -959,7 +1169,7 @@ export function createDataTools(ctx: ToolExecuteContext) {
 
     insert_rows: tool({
       description:
-        "Append new rows to an associated database. APPEND-ONLY: cannot modify or delete existing rows. Each row is {columnName: value}; select/status/multiSelect accept option labels; dates are ISO strings; file/contentLink cells take arrays of content ids. A RELATION cell takes the linked rows' titles (or their [handles] from query_database) — one value or an array — and the link is written after the row exists, so you can create a row and link it in the same call; the target row must already exist, and the mirrored column on the other table fills in by itself. Max 25 rows per call; batches over 10 require confirmedByUser: true, which you may set ONLY after the user explicitly approved the batch in conversation. Use dedupeBy with a url column when collecting from the web so re-runs never duplicate rows.",
+        "Append new rows to a reachable database. APPEND-ONLY: cannot modify or delete existing rows. Each row is {columnName: value}; select/status/multiSelect accept option labels; dates are ISO strings; file/contentLink cells take arrays of content ids. A RELATION cell takes the linked rows' titles (or their [handles] from query_database) — one value or an array — and the link is written after the row exists, so you can create a row and link it in the same call; the target row must already exist, and the mirrored column on the other table fills in by itself. Max 25 rows per call; batches over 10 require confirmedByUser: true, which you may set ONLY after the user explicitly approved the batch in conversation. Use dedupeBy with a url column when collecting from the web so re-runs never duplicate rows.",
       inputSchema: z.object({
         databaseId: z
           .string()
@@ -1173,7 +1383,7 @@ export function createDataTools(ctx: ToolExecuteContext) {
 
     update_row: tool({
       description:
-        "Update cells in ONE existing row. Only the columns you pass change — when the user under-specifies, OMIT everything they didn't mention, never guess a value. Pass null to CLEAR a cell, and only when the user asked for it to be blank. Get the rowId from query_database (each result line starts with its [handle]); pass expect with the current values from that same read — a stale expect fails safe instead of overwriting someone's edit, and the result tells you to re-query. All-or-nothing: if any cell is stale or invalid, no cell changes. A RELATION cell takes the linked rows' titles (or their [handles]) and REPLACES that cell's links, exactly like writing any other cell — pass the full set you want, and null to unlink everything; this is also how you link two rows that already exist. Computed columns (lookup, rollup) have no stored value and cannot be written, and this tool cannot create or delete rows. File cells accept ONLY ids of file nodes (uploaded attachments, or files you created with a file tool) — other content belongs in a contentLink cell; to attach something from the user's disk, ask them to upload via the cell's + first.",
+        "Update cells in ONE existing row. For the SAME edit across several rows — one column set on many rows, a status swept, a field backfilled — use update_rows instead: one call is one transaction and one undo entry for the user, where N calls are N independently-failing writes they must unpick by hand. Only the columns you pass change — when the user under-specifies, OMIT everything they didn't mention, never guess a value. Pass null to CLEAR a cell, and only when the user asked for it to be blank. Get the rowId from query_database (each result line starts with its [handle]); pass expect with the current values from that same read — a stale expect fails safe instead of overwriting someone's edit, and the result tells you to re-query. All-or-nothing: if any cell is stale or invalid, no cell changes. A RELATION cell takes the linked rows' titles (or their [handles]) and REPLACES that cell's links, exactly like writing any other cell — pass the full set you want, and null to unlink everything; this is also how you link two rows that already exist. Computed columns (lookup, rollup) have no stored value and cannot be written, and this tool cannot create or delete rows. File cells accept ONLY ids of file nodes (uploaded attachments, or files you created with a file tool) — other content belongs in a contentLink cell; to attach something from the user's disk, ask them to upload via the cell's + first.",
       inputSchema: z.object({
         databaseId: z
           .string()
@@ -1184,8 +1394,7 @@ export function createDataTools(ctx: ToolExecuteContext) {
         rowId: z
           .string()
           .describe("The row to update — the [handle] or id from a query_database result line"),
-        cells: z
-          .record(z.string(), z.union([
+        cells: z.record(z.string(), z.union([
             z.string(),
             z.number(),
             z.boolean(),
@@ -1195,8 +1404,7 @@ export function createDataTools(ctx: ToolExecuteContext) {
           .describe(
             "ONLY the columns to change: {columnName: newValue}. null clears the cell (user-requested blanks only). Option labels ok for select-likes; dates ISO (M/D/YYYY tolerated)."
           ),
-        expect: z
-          .record(z.string(), z.union([
+        expect: z.record(z.string(), z.union([
             z.string(),
             z.number(),
             z.boolean(),
@@ -1210,141 +1418,11 @@ export function createDataTools(ctx: ToolExecuteContext) {
       }),
       execute: async (input) => {
         try {
-          const dbRef = await resolveDatabaseRef(ctx, input.databaseId);
-          if ("refusal" in dbRef) return dbRef.refusal;
-          const gate = await resolveJurisdiction(ctx, dbRef.id);
+          const gate = await openForWrite(ctx, input.databaseId);
           if ("refusal" in gate) return gate.refusal;
-          const databaseId = dbRef.id;
-          const { table, level } = gate;
-          if (!canWrite(level)) {
-            return "You have read access here but not write — tell the user.";
-          }
-          if (table.mode === "query") {
-            return "Query databases project existing notes — edit the note itself, not rows.";
-          }
-          const live = table.columns.filter((c) => !c.deletedAt);
-
-          // Handles (plan §4.3): the [ab12cd34] from a read resolves to the
-          // row; an ambiguous or dead handle is a refusal, never a guess.
-          const rowRef = await resolveRowRef(databaseId, input.rowId);
-          if ("refusal" in rowRef) return `Not updated — ${rowRef.refusal}`;
-          const rowId = rowRef.id;
-
-          const entries = Object.entries(input.cells);
-          if (entries.length === 0) return "No cells given — nothing to change.";
-          if (entries.length > 10) {
-            return "At most 10 cells per update — split it, or reconsider whether this is really one edit.";
-          }
-
-          const writes: CellWrite[] = [];
-          const errors: string[] = [];
-          // Relation cells are written as links after the cell writes land,
-          // so an all-or-nothing cell failure still leaves links untouched.
-          const relationWrites: Array<{ columnId: string; rowIds: string[] }> =
-            [];
-          for (const [ref, raw] of entries) {
-            const column = findColumn(live, ref);
-            if (!column) {
-              errors.push(`No column named "${ref}".`);
-              continue;
-            }
-            if (column.type === "relation") {
-              const resolved = await resolveRelationCell(
-                column,
-                raw === null || raw === "" ? [] : raw,
-                ctx.userId
-              );
-              if ("error" in resolved) {
-                errors.push(resolved.error);
-                continue;
-              }
-              relationWrites.push({
-                columnId: column.id,
-                rowIds: resolved.rowIds,
-              });
-              continue;
-            }
-            const blocked = writeBlockReason(column);
-            if (blocked) {
-              errors.push(blocked);
-              continue;
-            }
-            // null / "" = clear (empty-is-absent, plan B8c): the key is
-            // deleted, exactly what the grid does.
-            const value =
-              raw === null || raw === ""
-                ? undefined
-                : normalizeCellInput(column, raw);
-            const write: CellWrite = {
-              rowId,
-              columnKey: column.key,
-              value,
-            };
-            if (input.expect && ref in input.expect) {
-              const rawExpect = input.expect[ref];
-              write.expect = (
-                rawExpect === null || rawExpect === ""
-                  ? undefined
-                  : normalizeCellInput(column, rawExpect)
-              ) as CellWrite["expect"];
-              write.hasExpectation = true;
-            }
-            writes.push(write);
-          }
-          if (errors.length > 0) {
-            return `Nothing updated — fix these first:\n${errors.join("\n")}\nColumns here: ${live.map((c) => c.name).join(", ")}.`;
-          }
-
-          const result = await writeCells(databaseId, live, writes);
-          const stale = result.results.filter((r) => r.status === "stale");
-          if (stale.length > 0) {
-            const details = stale
-              .map((s) => {
-                const col = live.find((c) => c.key === s.columnKey);
-                const current = col
-                  ? cellToText(col, s.current) || "(empty)"
-                  : String(s.current ?? "(empty)");
-                return `${col?.name ?? s.columnKey} is now: ${current}`;
-              })
-              .join("; ");
-            return `Not updated — the row changed since you read it (${details}). Re-query and retry with fresh expect values, or ask the user which value should win.`;
-          }
-          const failed = result.results.filter((r) => r.status === "error");
-          if (failed.length > 0) {
-            return `Not updated — validation rejected: ${failed
-              .map((f) => f.message)
-              .join("; ")}. Nothing changed (all-or-nothing).`;
-          }
-          // Links last, and only once every cell write succeeded.
-          // A relation cell REPLACES the row's links for that column, the
-          // way writing any other cell replaces its value.
-          let added = 0;
-          let removed = 0;
-          for (const link of relationWrites) {
-            const delta = await writeRelationLinks(
-              link.columnId,
-              rowId,
-              link.rowIds
-            );
-            added += delta.added;
-            removed += delta.removed;
-          }
-
-          // Hard rule (quests): naming a master-ledger row makes it a quest.
-          const questLedgers = await ensureLedgersForMasterRows(
-            ctx.userId,
-            databaseId,
-            [rowId],
-          ).catch(() => 0);
-          const cellPart =
-            writes.length > 0
-              ? `Updated ${writes.length} cell${writes.length === 1 ? "" : "s"} on the row.`
-              : "Updated the row.";
-          const linkPart =
-            added > 0 || removed > 0
-              ? ` Links: ${added} added, ${removed} removed.`
-              : "";
-          return `${cellPart}${linkPart}${questLedgers > 0 ? " The row is a quest now — its quest ledger was minted under the charter." : ""} The user sees the change in the grid and can undo it there.`;
+          return await applyRowUpdates(ctx, gate.databaseId, gate.table, [
+            { rowId: input.rowId, cells: input.cells, expect: input.expect },
+          ]);
         } catch (error) {
           logger.warn({
             layer: "ai",
@@ -1357,6 +1435,91 @@ export function createDataTools(ctx: ToolExecuteContext) {
       },
     }),
 
+    update_rows: tool({
+      description:
+        "Update cells across SEVERAL existing rows in ONE transaction — the tool for sweeping a column, backfilling a field, or applying the same change to a set of rows you just read. Strongly preferred over repeated update_row calls: this is ONE write and ONE undo entry for the user, and it is all-or-nothing across every row, so a single stale or invalid cell changes nothing at all rather than leaving a half-applied sweep. Each entry is {rowId, cells, expect?} with the same semantics as update_row: rowIds are the [handles] from query_database, only the columns you pass change, null clears a cell, expect protects the user's concurrent edits, and a relation cell REPLACES that column's links for its row. Max 25 rows and 10 cells per row; more than 10 rows requires confirmedByUser: true, which you may set ONLY after the user explicitly approved the batch in conversation. Cannot create or delete rows.",
+      inputSchema: z.object({
+        databaseId: z
+          .string()
+          .optional()
+          .describe(
+            "The database's id or exact name; omit in a chat open on the database"
+          ),
+        updates: z
+          .array(
+            z.object({
+              rowId: z
+                .string()
+                .describe("The [handle] or id from a query_database result line"),
+              cells: z.record(z.string(), z.union([
+            z.string(),
+            z.number(),
+            z.boolean(),
+            z.array(z.string()),
+            z.null(),
+          ])).describe(
+                "ONLY the columns to change on this row: {columnName: newValue}."
+              ),
+              expect: z.record(z.string(), z.union([
+            z.string(),
+            z.number(),
+            z.boolean(),
+            z.array(z.string()),
+            z.null(),
+          ])).optional().describe(
+                "Current values you last read for the columns you're changing on this row."
+              ),
+            })
+          )
+          .describe("One entry per row. Rows may change different columns."),
+        confirmedByUser: z
+          .boolean()
+          .optional()
+          .describe(
+            "Required true for more than 10 rows, and only after the user approved the batch in conversation."
+          ),
+      }),
+      execute: async (input) => {
+        try {
+          const updates = input.updates ?? [];
+          if (updates.length === 0) return "No rows given — nothing to change.";
+          if (updates.length > UPDATE_ROW_CAP) {
+            return `At most ${UPDATE_ROW_CAP} rows per call — split the sweep, or narrow it with a filter first.`;
+          }
+          if (updates.length > CONFIRM_THRESHOLD && input.confirmedByUser !== true) {
+            return `That is ${updates.length} rows — ask the user to confirm the sweep in conversation, then call again with confirmedByUser: true. Say which column changes and to what.`;
+          }
+          // One row per rowId: two entries for the same row would make the
+          // later one silently win, and a sweep that quietly drops an edit
+          // is worse than one that refuses.
+          const seen = new Set<string>();
+          for (const u of updates) {
+            const key = u.rowId.trim().toLowerCase();
+            if (seen.has(key)) {
+              return `Row ${u.rowId} appears twice — give each row one entry with all of its cells.`;
+            }
+            seen.add(key);
+          }
+          const gate = await openForWrite(ctx, input.databaseId);
+          if ("refusal" in gate) return gate.refusal;
+          return await applyRowUpdates(
+            ctx,
+            gate.databaseId,
+            gate.table,
+            updates
+          );
+        } catch (error) {
+          logger.warn({
+            layer: "ai",
+            event: "data_tools:update_rows_caught",
+            summary: "update_rows failed",
+            error,
+          });
+          return "Updating the rows failed with an internal error — nothing may have been written; tell the user.";
+        }
+      },
+    }),
+
     // ─── propose_column_options ─────────────────────────────
     // Proposal, not a write: the sentinel renders as an interactive card
     // (ColumnOptionsProposalCard) and the USER's Apply click does the
@@ -1365,7 +1528,7 @@ export function createDataTools(ctx: ToolExecuteContext) {
     // that would fail on apply.
     propose_column_options: tool({
       description:
-        "Propose a set of options (categories) for a select, multi-select, or status column in an associated database. Renders a review card — NOTHING is written until the user clicks Apply, so never claim the options were added. Use when a column has no options yet or the user asks for category suggestions; consider query_database first so proposals reflect the values actually in the table. Once you call this, stop — the card in the chat is the confirmation.",
+        "Propose a set of options (categories) for a select, multi-select, or status column in a reachable database. Renders a review card — NOTHING is written until the user clicks Apply, so never claim the options were added. Use when a column has no options yet or the user asks for category suggestions; consider query_database first so proposals reflect the values actually in the table. Once you call this, stop — the card in the chat is the confirmation.",
       inputSchema: z.object({
         databaseId: z
           .string()
