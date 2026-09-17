@@ -278,15 +278,27 @@ start advertising sections for tools the model cannot see.
 
 ### P2 — `repairToolCall`
 
-Wire `experimental_repairToolCall` on the `streamText` call:
+Wire `experimental_repairToolCall` on the `streamText` call.
 
-- `NoSuchToolError` for a tool that **exists in `tools`** → activate it for subsequent
-  steps and return the call unchanged (it executes now).
-- `NoSuchToolError` for a name that exists nowhere → return `null` (error stands), but
-  the error text names the menu and `summon`.
-- `InvalidToolInputError` → return the schema as a teaching error. For
-  `record_item_result` specifically, recover §1.3: a missing `status` with a `verdict`
-  present is repaired rather than losing the item. **Open decision, §7.**
+**Corrected during build (2026-09-17).** This phase was planned as
+"`NoSuchToolError` for a tool present in `tools` → activate and retry". That case
+cannot occur once P1 lands: `doParseToolCall` resolves against `tools`, so a present
+-but-unadvertised tool never raises — it simply executes. P1 *is* the recovery. What
+remains for repair is the case P1 does not touch:
+
+- **`NoSuchToolError` for a misspelled id (P2a — BUILT).** The namespace mixes
+  conventions — `getCurrentNote` / `createNote` / `updateNote` / `renameNote` are
+  camelCase, the other 61 ids snake_case — so a model settled into one emits the other
+  (`create_note`, `queryDatabase`) and takes a hard failure for a spelling difference.
+  `resolveToolNameAlias()` (`lib/domain/ai/tools/repair.ts`, pure) resolves
+  case/separator variants only. Deliberately **not** fuzzy: `search_database` stays an
+  error, because guessing which tool was meant can run the wrong one. Normalization is
+  a rename; similarity is a guess.
+- **`NoSuchToolError` for a name that exists nowhere** → `null`; the error stands.
+- **`InvalidToolInputError` (P2b — BLOCKED on §7.3).** Recover §1.3: a
+  `record_item_result` missing `status` while carrying a `verdict`. Note repair can
+  only return a *valid call or null* — there is no "teaching error" return, so the
+  choice in §7.3 is genuinely between repairing the call and letting it fail.
 
 ### P3 — Menu + summon
 

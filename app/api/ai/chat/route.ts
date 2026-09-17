@@ -25,9 +25,11 @@ import {
   streamText,
   convertToModelMessages,
   stepCountIs,
+  NoSuchToolError,
   UI_MESSAGE_STREAM_HEADERS,
 } from "ai";
 import type { UIMessage } from "ai";
+import { resolveToolNameAlias } from "@/lib/domain/ai/tools/repair";
 import { isResumableConfigured } from "@/lib/domain/ai/resumable/redis";
 import { getStreamContext } from "@/lib/domain/ai/resumable/context";
 import {
@@ -2448,6 +2450,27 @@ export async function POST(request: Request) {
         // `advertised` set at assembly for why the difference matters.
         activeTools: toolsActive ? [...advertised] : undefined,
         toolChoice: toolsActive ? "auto" : undefined,
+        // Spelling is not a capability question. The id namespace mixes
+        // camelCase (`createNote`) with snake_case (`query_database`), so a
+        // model settled into one convention emits the other and the SDK
+        // answers `NoSuchToolError`. Resolve the rename and let the call
+        // stand; anything beyond case/separators stays an honest error,
+        // because guessing which tool was meant can run the wrong one.
+        experimental_repairToolCall: async ({ toolCall, error }) => {
+          if (!NoSuchToolError.isInstance(error)) return null;
+          const resolved = resolveToolNameAlias(
+            toolCall.toolName,
+            Object.keys(tools),
+          );
+          if (!resolved) return null;
+          logger.info({
+            layer: "ai",
+            event: "tools:name_repaired",
+            summary: "tool call repaired to its real id",
+            attrs: { called: toolCall.toolName, resolved },
+          });
+          return { ...toolCall, toolName: resolved };
+        },
         // Reasoning opt-in for Anthropic + Google (Session 6). Undefined
         // for OpenAI o-series (reasoning is automatic) and non-reasoning
         // chat models.
