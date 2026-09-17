@@ -42,6 +42,7 @@ import {
   preflightCapture,
 } from "@/lib/domain/data/server/capture";
 import { createColumn } from "@/lib/domain/data/server/mutations";
+import { renderDataNodePreview } from "@/lib/domain/data/server/read-preview";
 import {
   closeSitting,
   ensureMasterLedger,
@@ -254,6 +255,24 @@ const AI_CONTENT_TYPE_NAMES: Record<ContentType, string> = {
 
 function describeContentType(type: ContentType): string {
   return AI_CONTENT_TYPE_NAMES[type];
+}
+
+/**
+ * HTML pages and templates share `HtmlPayload`. Prefer the extracted text —
+ * markup is mostly tokens the model does not need — and fall back to the raw
+ * HTML only when no text was extracted.
+ */
+async function renderHtmlPayload(
+  contentId: string,
+  header: string,
+): Promise<string> {
+  const h = await prisma.htmlPayload.findUnique({
+    where: { contentId },
+    select: { html: true, searchText: true, isTemplate: true },
+  });
+  if (!h) return `${header}\n\n(page record missing)`;
+  const text = h.searchText.trim() || h.html;
+  return `${header}${h.isTemplate ? "\nTemplate: yes" : ""}\n\n${text}`;
 }
 
 export function createBaseTools(ctx: ToolExecuteContext) {
@@ -2364,7 +2383,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
 
     getCurrentNote: tool({
       description:
-        "Get the full content of a specific note (or a folder's own notes content) by its ID. Useful for reading context about a note the user is viewing, or a folder's notes when the folder itself is referenced.",
+        "Read ANY content node by its ID — note, folder notes, database, file, link, code, page. Returns the content itself where it is text, and a database's schema plus a row preview where it is a database. Use it for any 'what is in this thing' question; it never refuses a content type, so you never need a specialist tool just to look.",
       inputSchema: z.object({
         contentId: z.string().uuid().describe("The content node ID to read"),
       }),
@@ -2390,41 +2409,153 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         });
 
         if (!content) {
-          return `Note with ID "${contentId}" not found or not accessible.`;
+          return `Content with ID "${contentId}" not found or not accessible.`;
         }
 
-        // Folders can carry a notePayload too (the folder "Notes" editor), so
-        // a folder WITH notes content is readable the same as a note — only a
-        // folder with no notePayload (or a genuinely non-text content type)
-        // is rejected.
-        const isTextBearing =
-          content.contentType === "note" || content.contentType === "folder";
-        if (!isTextBearing || !content.notePayload) {
-          return `Content "${content.title}" is a ${content.contentType}, not readable as text.`;
-        }
-
-        // Render live from tiptapJson — the materialized searchText column
-        // was written by the old extractor for existing notes, and that
-        // extractor dropped every atomic inline node ([[wiki-links]], #tags,
-        // @mentions). Live extraction fixes all notes without a reindex;
-        // searchText stays as the fallback for payloads with no JSON.
-        const liveText = content.notePayload.tiptapJson
-          ? extractSearchTextFromTipTap(
-              content.notePayload.tiptapJson as JSONContent,
-            ).trim()
-          : "";
-        const text =
-          liveText || content.notePayload.searchText || "(empty note)";
         // Summarize-on-write (S5): abstract first, so multi-phase runs can
         // often stop reading here instead of pulling full content into
         // context.
-        const meta = content.notePayload.metadata as
+        const meta = content.notePayload?.metadata as
           | { abstract?: string }
-          | null;
-        const abstractLine = meta?.abstract
-          ? `\nAbstract: ${meta.abstract}\n`
-          : "";
-        return `Title: ${content.title}\nType: ${content.contentType}\nUpdated: ${content.updatedAt.toISOString()}${abstractLine}\nContent:\n${text}`;
+          | null
+          | undefined;
+        const header =
+          `Title: ${content.title}\n` +
+          `Type: ${describeContentType(content.contentType)}\n` +
+          `Updated: ${content.updatedAt.toISOString()}` +
+          (meta?.abstract ? `\nAbstract: ${meta.abstract}` : "");
+
+        // Notes and folders: the folder "Notes" editor writes a notePayload
+        // too, so both render the same way.
+        const renderNoteText = (): string => {
+          if (!content.notePayload) {
+            return content.contentType === "folder"
+              ? `${header}\n\nThis folder has no notes content of its own. Its sources and children are read with read_folder_context.`
+              : `${header}\n\n(empty note)`;
+          }
+          // Render live from tiptapJson — the materialized searchText column
+          // was written by the old extractor for existing notes, and that
+          // extractor dropped every atomic inline node ([[wiki-links]], #tags,
+          // @mentions). Live extraction fixes all notes without a reindex;
+          // searchText stays as the fallback for payloads with no JSON.
+          const liveText = content.notePayload.tiptapJson
+            ? extractSearchTextFromTipTap(
+                content.notePayload.tiptapJson as JSONContent,
+              ).trim()
+            : "";
+          const text =
+            liveText || content.notePayload.searchText || "(empty note)";
+          return `${header}\nContent:\n${text}`;
+        };
+
+        /**
+         * A read NEVER dead-ends (AI-TOOL-SUMMONER-PLAN §1.2, owner direction
+         * 2026-09-17: "every content type is a note technically"). Each branch
+         * either renders the thing or says what it is and names the way in —
+         * the old blanket refusal sent a charter run blind mid-task.
+         *
+         * Exhaustive `Record<ContentType, …>` on purpose: a new content type
+         * must fail the build here rather than silently falling back to a
+         * refusal (the `default:`-hides-gaps lesson).
+         */
+        const renderers: Record<ContentType, () => Promise<string>> = {
+          note: async () => renderNoteText(),
+          folder: async () => renderNoteText(),
+
+          data: async () => {
+            const preview = await renderDataNodePreview(contentId, {
+              viewerId: ctx.userId,
+            });
+            return preview
+              ? `${header}\n\n${preview}`
+              : `${header}\n\nThis database has no schema yet.`;
+          },
+
+          file: async () => {
+            const f = await prisma.filePayload.findUnique({
+              where: { contentId },
+              select: {
+                fileName: true,
+                mimeType: true,
+                fileSize: true,
+                uploadStatus: true,
+                searchText: true,
+              },
+            });
+            if (!f) return `${header}\n\n(file record missing)`;
+            const size = `${Math.round(Number(f.fileSize) / 1024).toLocaleString("en-US")} KB`;
+            const facts = `File: ${f.fileName} · ${f.mimeType} · ${size} · upload ${f.uploadStatus}`;
+            const body = f.searchText.trim()
+              ? `\n\nExtracted text:\n${f.searchText.trim()}`
+              : "\n\nNo extracted text is held for this file. Attach it to the conversation if its contents are needed.";
+            return `${header}\n\n${facts}${body}`;
+          },
+
+          external: async () => {
+            const e = await prisma.externalPayload.findUnique({
+              where: { contentId },
+              select: {
+                url: true,
+                description: true,
+                sourceDomain: true,
+                readingStatus: true,
+              },
+            });
+            if (!e) return `${header}\n\n(link record missing)`;
+            return (
+              `${header}\n\nURL: ${e.url}` +
+              (e.sourceDomain ? `\nDomain: ${e.sourceDomain}` : "") +
+              `\nReading status: ${e.readingStatus}` +
+              (e.description ? `\n\n${e.description}` : "") +
+              "\n\nThis is a saved link, not its page text. Read the page itself with a page-read tool if you need its contents."
+            );
+          },
+
+          code: async () => {
+            const c = await prisma.codePayload.findUnique({
+              where: { contentId },
+              select: { code: true, language: true },
+            });
+            if (!c) return `${header}\n\n(code record missing)`;
+            return `${header}\nLanguage: ${c.language}\n\n${c.code}`;
+          },
+
+          html: async () => renderHtmlPayload(contentId, header),
+          template: async () => renderHtmlPayload(contentId, header),
+
+          visualization: async () => {
+            const v = await prisma.visualizationPayload.findUnique({
+              where: { contentId },
+              select: { engine: true },
+            });
+            return v
+              ? `${header}\n\nDiagram rendered with ${v.engine}. Its source is edited in the diagram editor and is not readable as prose here.`
+              : `${header}\n\n(diagram record missing)`;
+          },
+
+          shortcut: async () => {
+            const s = await prisma.shortcutPayload.findUnique({
+              where: { contentId },
+              select: {
+                targetContentId: true,
+                target: { select: { title: true, contentType: true } },
+              },
+            });
+            if (!s?.targetContentId || !s.target) {
+              return `${header}\n\nThis shortcut points at nothing — its target was deleted.`;
+            }
+            return `${header}\n\nThis is a shortcut to the ${describeContentType(s.target.contentType)} "${s.target.title}". Read the real thing with getCurrentNote on ${s.targetContentId}.`;
+          },
+
+          chat: async () =>
+            `${header}\n\nThis is a saved chat. Its transcript is not readable through this tool.`,
+          hope: async () =>
+            `${header}\n\nThis is a goal. It carries no text body of its own.`,
+          workflow: async () =>
+            `${header}\n\nThis is a workflow. Read its definition with get_workflow.`,
+        };
+
+        return renderers[content.contentType]();
       },
     }),
 
