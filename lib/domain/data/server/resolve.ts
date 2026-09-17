@@ -116,6 +116,120 @@ export async function charterRegistryAuthorizes(
 }
 
 /**
+ * Databases reachable by following RELATION columns out of the ones this
+ * chat can already see.
+ *
+ * The gap this closes (owner report, 2026-09-16): a chat bound to a ledger
+ * whose columns read `relation → Experiences`, `relation → Sources` was
+ * refused access to Experiences and Sources, and told the user to @-mention
+ * them. The schema digest had already NAMED those tables — the model could
+ * see the edge and not walk it. A link that is printed in the context but
+ * refused by the tools is not a boundary, it is a contradiction.
+ *
+ * This is the same consent structure as `charterRegistryAuthorizes`, whose
+ * note applies verbatim: everything reachable here is the SAME user's own
+ * data, still behind `resolveDataTableAccess`. Jurisdiction is a
+ * consent-VISIBILITY structure — what the user has pointed this chat at —
+ * not a cross-principal security boundary. Pointing a chat at a table the
+ * user themselves linked to three others is pointing it at the graph.
+ *
+ * Inbound edges come free: relations are two-sided, so a table that points
+ * AT a visible one has a mirrored backlink column ON the visible one whose
+ * `relationTableId` is the source. Walking forward walks both directions.
+ *
+ * Bounded rather than unbounded: a runaway graph walk would be a quiet
+ * performance cliff on a big vault, and depth past a few hops stops being
+ * something the user plausibly meant by opening this chat.
+ */
+const RELATION_REACH_MAX_HOPS = 4;
+const RELATION_REACH_MAX_TABLES = 64;
+
+export async function relationReachableTableIds(
+  rootIds: string[]
+): Promise<Set<string>> {
+  const seen = new Set<string>(rootIds);
+  let frontier = rootIds.filter(Boolean);
+
+  for (let hop = 0; hop < RELATION_REACH_MAX_HOPS; hop++) {
+    if (frontier.length === 0 || seen.size >= RELATION_REACH_MAX_TABLES) break;
+    const columns = await prisma.dataColumn.findMany({
+      where: {
+        tableId: { in: frontier },
+        type: "relation",
+        deletedAt: null,
+      },
+      select: { config: true },
+    });
+    const next: string[] = [];
+    for (const column of columns) {
+      const config =
+        column.config && typeof column.config === "object"
+          ? (column.config as Record<string, unknown>)
+          : undefined;
+      const target = config?.relationTableId;
+      if (typeof target !== "string" || seen.has(target)) continue;
+      if (seen.size >= RELATION_REACH_MAX_TABLES) break;
+      seen.add(target);
+      next.push(target);
+    }
+    frontier = next;
+  }
+  return seen;
+}
+
+/**
+ * The tables this chat can see WITHOUT following any relation — the roots
+ * of the walk above: the bound table, every @-mentioned one, and the
+ * charter's master ledger.
+ */
+async function jurisdictionRoots(ctx: DataToolContext): Promise<string[]> {
+  const roots = new Set<string>();
+  const bound = await boundTableIdFor(ctx);
+  if (bound) roots.add(bound);
+  if (ctx.boundContentId) roots.add(ctx.boundContentId);
+  if (ctx.contentId) roots.add(ctx.contentId);
+  if (ctx.conversationId) {
+    const assocs = await prisma.conversationAssociation.findMany({
+      where: { conversationId: ctx.conversationId },
+      select: { contentNodeId: true },
+    });
+    for (const a of assocs) roots.add(a.contentNodeId);
+  }
+
+  // Databases created UNDER this chat (outputLocation "under_chat" nests
+  // them with role "referenced" + ownedByNoteId = the chat node). Applying
+  // a proposal writes no ConversationAssociation, so without this the model
+  // cannot read back the table the user just let it create — the one table
+  // it is most certain to want next.
+  const hosts = [ctx.boundContentId, ctx.contentId].filter(
+    (v): v is string => typeof v === "string"
+  );
+  if (hosts.length > 0) {
+    const owned = await prisma.contentNode.findMany({
+      where: {
+        ownedByNoteId: { in: hosts },
+        contentType: "data",
+        deletedAt: null,
+      },
+      select: { id: true },
+    });
+    for (const n of owned) roots.add(n.id);
+  }
+  return [...roots];
+}
+
+/** True when `databaseId` is reachable by relation from this chat's roots. */
+export async function relationGraphAuthorizes(
+  ctx: DataToolContext,
+  databaseId: string
+): Promise<boolean> {
+  const roots = await jurisdictionRoots(ctx);
+  if (roots.length === 0) return false;
+  const reachable = await relationReachableTableIds(roots);
+  return reachable.has(databaseId);
+}
+
+/**
  * Structural jurisdiction: the database must be associated with THIS
  * conversation, and the user must be able to read it. Returns the loaded
  * table or a model-facing refusal string.
@@ -145,10 +259,14 @@ export async function resolveJurisdiction(
       where: { conversationId: ctx.conversationId, contentNodeId: databaseId },
       select: { conversationId: true },
     });
-    if (!assoc && !(await charterRegistryAuthorizes(ctx, databaseId))) {
+    if (
+      !assoc &&
+      !(await charterRegistryAuthorizes(ctx, databaseId)) &&
+      !(await relationGraphAuthorizes(ctx, databaseId))
+    ) {
       return {
         refusal:
-          "That database is not associated with this conversation — tools reach only associated databases by design. Ask the user to @-mention it (or open the chat from the database) first.",
+          "That database is not associated with this conversation — tools reach only associated databases and the ones they link to. Ask the user to @-mention it (or open the chat from the database) first.",
       };
     }
   }
