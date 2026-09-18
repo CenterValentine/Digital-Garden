@@ -1,6 +1,6 @@
 ---
 last_updated: 2026-09-17
-status: planned — build starting (P0)
+status: BUILT — P0-P4 complete on feat/ai-tool-summoner; production smoke pending
 branch: feat/ai-tool-summoner (worktree .claude/worktrees/ai-tool-summoner, from origin/main after PR #242)
 ---
 
@@ -12,8 +12,8 @@ for the duration of an iteration run) with a three-tier model: a small always-on
 instructions that arrive only when a tool is actually selected.
 
 The diet traded capability for window. The summoner buys the window back *without*
-the trade: measured below, a plain chat drops from 31.1k to 4.9k tokens of tool
-schema while every one of the 65 tools stays reachable.
+the trade: measured below, a plain chat drops from 30.6k to 4.0k tokens of tool
+schema while every tool stays reachable.
 
 ---
 
@@ -128,10 +128,19 @@ Heaviest single tools: `insert_block` **5,221** (17% of the entire prefix, alone
 
 | scenario | today | after | delta |
 |---|---:|---:|---|
-| Plain chat (no run, no panel) | 31,149 | **4,892** | −84%, all 65 reachable |
-| Co-browse item run | 9,397 (26 reachable) | **10,122** | +725, **all 65 reachable** |
+| Plain chat (no run, no panel) | 30,603 | **4,048** | −87%, all 64 reachable |
+| Co-browse item run | 9,397 (26 reachable) | **10,191** | +794, **all 64 reachable** |
+| Editor open | 30,603 | 4,653 | −85% |
+| Run + editor | 9,397 | 10,796 | +1,399 |
 
-The run case is the headline: for ~725 extra tokens the diet's entire capability loss
+**Measured after the build (2026-09-17), not predicted.** Plain chat beat the
+forecast (4,048 against ~4,892) because the core set shrank from the proposed
+fourteen to seven: `plan`, `ask_user`, `finish_with_summary` and the three chunk
+readers live in `createEditorTools`, which mounts only when a document is open, so
+they are mode-scoped rather than core. Counts are 64 here against 65 in §2 because
+`update_rows` exists only on the unmerged relational branch.
+
+The run case is the headline: for 794 extra tokens the diet's entire capability loss
 is undone. The plain-chat case is where the window savings live.
 
 ### 2.2 Why the descriptions are the cost
@@ -245,7 +254,11 @@ Otherwise we trade unavailable-tool errors for off-task tool calls.
 Each phase is independently correct and independently revertable. All five ship as
 **one PR** (owner direction, 2026-09-17).
 
-### P0 — Universal `getCurrentNote`
+### P0 — Universal read ✅ BUILT (`9475f9c4`)
+
+Shipped as `read_content` — the rename in the commit below made the old name
+indefensible: it read every content type and took an explicit id, so it was wrong
+about both "current" and "note".
 
 `registry.ts:2365-2410`. A read never dead-ends: it renders the thing, or says what
 the thing is and names the way in.
@@ -265,7 +278,7 @@ Exhaustive `Record<ContentType, …>` dispatch so a new content type fails the b
 rather than silently falling into a refusal (per the recorded
 `reference_icon_switch_default_hides_gaps` lesson).
 
-### P1 — `delete` → `activeTools`
+### P1 — `delete` → `activeTools` ✅ BUILT (`a44f995e`)
 
 `route.ts:1433-1455`. Compute an `advertised: string[]` instead of mutating `tools`;
 pass `activeTools` to `streamText`. Restore `query_database` + `describe_database` to
@@ -276,7 +289,7 @@ Note `hasDatabaseTools` / `hasItemIteration` etc. at `route.ts:2492-2493` key of
 `in tools` — they must be repointed at the advertised set, or the system prompt will
 start advertising sections for tools the model cannot see.
 
-### P2 — `repairToolCall`
+### P2 — Malformed calls resolve themselves ✅ BUILT (`97c4416c`, `35265f4c`)
 
 Wire `experimental_repairToolCall` on the `streamText` call.
 
@@ -300,7 +313,7 @@ remains for repair is the case P1 does not touch:
   only return a *valid call or null* — there is no "teaching error" return, so the
   choice in §7.3 is genuinely between repairing the call and letting it fail.
 
-### P3 — Menu + summon
+### P3 — Menu + summon ✅ BUILT (`de6d7181`)
 
 - `selectWhen: string` added per tool in `metadata.ts` and the four family metadata
   files. Model-facing register, ~15 tokens, distinct from the user-facing
@@ -316,7 +329,8 @@ remains for repair is the case P1 does not touch:
   `selectWhen` resolves to a live tool; core and menu sets are disjoint; no tool is
   unreachable from both. Mutation-test the gate before trusting a first PASS.
 
-### P4 — Retire the diet
+### P4 — Retire the diet ✅ BUILT (`de6d7181`, with P3 — a menu is empty until
+advertisement narrows, so the two could not be smoke-tested apart)
 
 Delete `ITERATION_RUN_TOOLS`. Advertisement becomes core + active-mode contextual +
 summoned. Remove the now-dead `search_web` allowlist entry (it never existed at diet
@@ -345,8 +359,11 @@ time — native search is attached *after*, at `route.ts:1488-1500`).
 
 - `pnpm typecheck` → `pnpm lint` (175 ratchet) → `pnpm build`.
 - `pnpm ai:drift:check` extended per P3, mutation-tested.
-- Measurement harness promoted from the throwaway diagnostic to
-  `scripts/measure-tool-prefix.ts` so §2's table can be re-derived after any change.
+- Measurement harness **NOT built** — §2 and §2.1 were measured with a throwaway
+  Next route plus a one-off script, both deleted. Promoting it to
+  `scripts/measure-tool-prefix.ts` needs the Next runtime (the tool graph has
+  require-cycles plain Node will not load), so it is a real task, not a copy-paste.
+  Backlog it rather than claim it.
 - **Smoke on production** (post-deploy checklist in the PR body — AI-capability work
   smokes on prod, never titled "Pre-merge"):
   1. Chat on a folder: "read the Job Opportunities Library" → `getCurrentNote` returns
