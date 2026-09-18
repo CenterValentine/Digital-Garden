@@ -181,3 +181,82 @@ export function resolveItemStatus(input: {
       'Nothing was recorded: this call had no status, and no verdict, score or captured cells to infer one from. Call record_item_result again for this item with status "done" (analyzed), "unreadable" (could not read the page) or "blocked" (login/captcha stopped you).',
   };
 }
+
+// ── Iteration source ─────────────────────────────────────────────────────
+
+/** Where an iteration run enumerated its items from. */
+export type IterationSource =
+  | "list-page"
+  | "open-tabs"
+  | "urls"
+  | "database-rows";
+
+/**
+ * Resolve `propose_item_iteration.source` from what the model actually wrote.
+ *
+ * It was a strict `z.enum`, so a run described in prose rather than in the
+ * vocabulary — `"open browser tabs (LinkedIn job postings; screened in
+ * place)"` — was rejected along with the 24-item enumeration it carried
+ * (production, 2026-09-18). The enumeration is the expensive part of that
+ * call: it is the output of a browsing pass the model must otherwise redo.
+ *
+ * Matching is on the distinguishing WORD, not the exact token, because the
+ * four sources are mutually exclusive in practice: tabs are not URLs are not
+ * a list page are not table rows.
+ */
+export function resolveIterationSource(
+  source: string | undefined,
+): IterationSource | null {
+  const s = source?.trim().toLowerCase();
+  if (!s) return null;
+  if (/\btabs?\b/.test(s)) return "open-tabs";
+  if (/\b(database|table)[\s-]?rows?\b|\brows?\b/.test(s)) return "database-rows";
+  if (/\blist[\s-]?page\b|\bsearch results?\b|\bresults? page\b/.test(s)) return "list-page";
+  if (/\burls?\b|\blinks?\b/.test(s)) return "urls";
+  return null;
+}
+
+// ── Malformed tool-call JSON ─────────────────────────────────────────────
+
+/** Bare words that are legal JSON values and must not be quoted. */
+const JSON_LITERALS = new Set(["true", "false", "null"]);
+
+/**
+ * Repair tool-call arguments that are not valid JSON, or return `null` when
+ * they parse already or cannot be repaired safely.
+ *
+ * The one failure seen in production (2026-09-18) is an unquoted bare word
+ * where a value belongs — `{"budget": large}` — which kills the parse before
+ * any schema sees it, so no amount of schema leniency can catch it. Quoting
+ * the word is a conservative repair: it cannot change the meaning of a value
+ * that was never valid, and a field whose type then disagrees is still
+ * rejected by its own schema.
+ *
+ * Deliberately narrow. It does not balance brackets, close strings, or strip
+ * trailing commas — a truncated call is genuinely incomplete, and guessing at
+ * its missing half would invent arguments the model never wrote.
+ */
+export function repairToolInputJson(text: string): string | null {
+  try {
+    JSON.parse(text);
+    return null; // already valid — nothing to repair
+  } catch {
+    // fall through
+  }
+
+  const repaired = text.replace(
+    /:(\s*)([A-Za-z_][A-Za-z0-9_-]*)(\s*)([,}\]])/g,
+    (whole, pre: string, word: string, post: string, close: string) =>
+      JSON_LITERALS.has(word.toLowerCase())
+        ? whole
+        : `:${pre}"${word}"${post}${close}`,
+  );
+  if (repaired === text) return null;
+
+  try {
+    JSON.parse(repaired);
+    return repaired;
+  } catch {
+    return null; // still broken — let the real error stand
+  }
+}

@@ -43,7 +43,7 @@ import {
 } from "@/lib/domain/data/server/capture";
 import { createColumn } from "@/lib/domain/data/server/mutations";
 import { renderDataNodePreview } from "@/lib/domain/data/server/read-preview";
-import { resolveItemStatus } from "./repair";
+import { resolveItemStatus, resolveIterationSource } from "./repair";
 import {
   closeSitting,
   ensureMasterLedger,
@@ -591,10 +591,16 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           .min(1)
           .max(400)
           .describe("What each item gets, in one sentence (e.g. \"score fit with the Job Fit charter; document >75% matches\")."),
+        // Lenient string, not an enum (production, 2026-09-18): a run
+        // described in prose — "open browser tabs (LinkedIn postings)" —
+        // was rejected together with the 24-item enumeration it carried,
+        // and that enumeration is a browsing pass the model must otherwise
+        // redo. Resolved in execute, which refuses only when genuinely
+        // ambiguous.
         source: z
-          .enum(["list-page", "open-tabs", "urls", "database-rows"])
+          .string()
           .describe(
-            "Where the items were enumerated from. \"database-rows\" = a stage-2 pass over an existing table: requires captureTo (the table is both source and stamp-back target); omit items — the server enumerates rows itself (optionally narrowed by rowIds).",
+            "Where the items were enumerated from: \"list-page\", \"open-tabs\", \"urls\", or \"database-rows\". \"database-rows\" = a stage-2 pass over an existing table: requires captureTo (the table is both source and stamp-back target); omit items — the server enumerates rows itself (optionally narrowed by rowIds).",
           ),
         items: z
           .array(
@@ -619,11 +625,24 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           .int()
           .min(1)
           .max(200)
+          // Optional in the SCHEMA, required in execute (production,
+          // 2026-09-18): the model sent the cap as `budget`, the word this
+          // harness uses for every other ceiling, and a required `itemCap`
+          // discarded the whole proposal over the name. Execute accepts
+          // either and refuses only when neither is present.
+          .optional()
           // The plan card is approve/reject only — do NOT promise editable
           // fields here (an earlier description claimed the user could raise
           // the cap in the card; they can't, and a denied proposal was the
           // observable result).
           .describe("Max items to process this run. PROPOSE a sensible default (~10-15, up to 200); raise it yourself ONLY when the user explicitly asked for more. If the user wants a different cap after seeing the plan, they will say so — re-propose with their number."),
+        budget: z
+          .number()
+          .int()
+          .min(1)
+          .max(200)
+          .optional()
+          .describe("Alias for itemCap. Prefer itemCap; this exists because the harness calls every other ceiling a budget."),
         batchSize: z
           .number()
           .int()
@@ -700,7 +719,28 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             "NEW quests only: extra ledger columns sculpted to this matter (a scoring task adds its criteria columns; a collection task adds none). The machinery core (Item/Status/Pass/Fit/Qualified/Verdict/…) always exists — never re-declare it. Write their values via questCells on record_item_result. Ignored when continuing an existing quest.",
           ),
       }),
-      execute: async ({ objective, source, items, rowIds, itemCap, batchSize, ledgerLabel, captureTo, quest: questArg, questColumns }) => {
+      execute: async ({ objective, source: sourceArg, items, rowIds, itemCap: itemCapArg, budget: budgetArg, batchSize, ledgerLabel, captureTo, quest: questArg, questColumns }) => {
+        // Resolve the two fields that used to reject the whole proposal
+        // (production, 2026-09-18). Both refusals below are ordinary tool
+        // RESULTS, so the model can re-propose in the same turn with the
+        // enumeration it already has — the expensive part of this call.
+        const source = resolveIterationSource(sourceArg);
+        if (!source) {
+          return {
+            ok: false,
+            refusal: `Could not tell where these items came from: source "${sourceArg}". Re-propose with exactly one of "list-page", "open-tabs", "urls" or "database-rows" — keep the items you already enumerated.`,
+            nextAction: "Re-propose with a valid source. Do NOT start processing items.",
+          };
+        }
+        const itemCap = itemCapArg ?? budgetArg;
+        if (itemCap === undefined) {
+          return {
+            ok: false,
+            refusal:
+              "No item cap given. Re-propose with itemCap set (~10-15 is a sensible default, up to 200) — keep the items you already enumerated.",
+            nextAction: "Re-propose with itemCap. Do NOT start processing items.",
+          };
+        }
         const label = (ledgerLabel ?? objective).trim();
         let ledgerRunKey =
           "iterate:" +

@@ -31,6 +31,7 @@ import {
 import type { UIMessage } from "ai";
 import {
   LEGACY_TOOL_IDS,
+  repairToolInputJson,
   resolveToolNameAlias,
 } from "@/lib/domain/ai/tools/repair";
 import {
@@ -2500,19 +2501,35 @@ export async function POST(request: Request) {
         // stand; anything beyond case/separators stays an honest error,
         // because guessing which tool was meant can run the wrong one.
         experimental_repairToolCall: async ({ toolCall, error }) => {
-          if (!NoSuchToolError.isInstance(error)) return null;
-          const resolved = resolveToolNameAlias(
-            toolCall.toolName,
-            Object.keys(tools),
-          );
-          if (!resolved) return null;
+          if (NoSuchToolError.isInstance(error)) {
+            const resolved = resolveToolNameAlias(
+              toolCall.toolName,
+              Object.keys(tools),
+            );
+            if (!resolved) return null;
+            logger.info({
+              layer: "ai",
+              event: "tools:name_repaired",
+              summary: "tool call repaired to its real id",
+              attrs: { called: toolCall.toolName, resolved },
+            });
+            return { ...toolCall, toolName: resolved };
+          }
+          // Arguments that are not valid JSON die before any schema sees
+          // them, so no amount of schema leniency catches this one: an
+          // unquoted bare word where a value belongs (`{"budget": large}`,
+          // production 2026-09-18) took a whole database read with it.
+          // Quoting it is conservative — a field whose type then disagrees
+          // is still rejected by its own schema.
+          const repairedInput = repairToolInputJson(toolCall.input);
+          if (!repairedInput) return null;
           logger.info({
             layer: "ai",
-            event: "tools:name_repaired",
-            summary: "tool call repaired to its real id",
-            attrs: { called: toolCall.toolName, resolved },
+            event: "tools:input_json_repaired",
+            summary: "unparseable tool arguments repaired",
+            attrs: { tool: toolCall.toolName },
           });
-          return { ...toolCall, toolName: resolved };
+          return { ...toolCall, input: repairedInput };
         },
         // Reasoning opt-in for Anthropic + Google (Session 6). Undefined
         // for OpenAI o-series (reasoning is automatic) and non-reasoning
