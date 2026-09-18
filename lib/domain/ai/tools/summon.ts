@@ -18,7 +18,7 @@
  */
 import { tool } from "ai";
 import { z } from "zod/v4";
-import { resolveSummonNames } from "./menu";
+import { flattenSummonNames, resolveSummonNames } from "./menu";
 
 export const SUMMON_TOOL_ID = "summon";
 
@@ -52,7 +52,9 @@ export function createSummonTool(input: {
         ),
     }),
     execute: async ({ names }) => {
-      const requested = Array.isArray(names) ? names : [names];
+      // Accepts an array, one name, or a JSON-encoded array in the string
+      // slot — see `flattenSummonNames`.
+      const requested = flattenSummonNames(names);
       if (requested.length === 0) {
         return "Nothing summoned — name at least one tool id or family from the menu.";
       }

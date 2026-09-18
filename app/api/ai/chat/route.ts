@@ -31,12 +31,14 @@ import {
 import type { UIMessage } from "ai";
 import {
   LEGACY_TOOL_IDS,
+  countTurnSteps,
   repairToolInputJson,
   resolveToolNameAlias,
 } from "@/lib/domain/ai/tools/repair";
 import {
   CORE_TOOL_IDS,
   MODE_TOOL_IDS,
+  activationsFromHistory,
   buildToolMenu,
   type ToolFamily,
 } from "@/lib/domain/ai/tools/menu";
@@ -1554,6 +1556,19 @@ export async function POST(request: Request) {
       // menu, so the one tool that acts on it is never itself summonable.
       advertised.add(SUMMON_TOOL_ID);
 
+      // Restore this TURN's earlier summons. A turn is not a request: every
+      // client-executed tool (co_browse_*, read_current_page, list_tabs, the
+      // browser readers) submits its result from the browser and opens a new
+      // request, which used to start with an empty activation set. A summon
+      // therefore died at the first browser action, and the model spent the
+      // rest of the turn calling tools whose schemas it could no longer see.
+      for (const id of activationsFromHistory(
+        (body as { messages?: unknown[] }).messages ?? [],
+        registered,
+      )) {
+        activated.add(id);
+      }
+
       // Ordering is the only focus mechanism a menu has. Tool absence used to
       // keep a run on task; discoverability gives that up, so the families the
       // current mode actually touches are read first.
@@ -2443,7 +2458,17 @@ export async function POST(request: Request) {
       // call so stopWhen, the per-segment diagnostics, and the finish-log
       // events all report the SAME cap (self-describing turns). Formula
       // rationale lives on the stopWhen comment below.
-      const stepCap =
+      // Steps this turn has ALREADY spent in earlier requests. A turn is not a
+      // request: every client-executed tool (co_browse_*, read_current_page,
+      // list_tabs, the browser readers) submits its result from the browser,
+      // which opens a new request with a fresh budget. A production turn ran
+      // 21 steps against a cap of 7 that way, including eight identical failing
+      // calls nothing stopped (2026-09-18). Spending the remainder of the cap
+      // rather than the whole cap makes the ceiling mean what it says.
+      const stepsAlreadySpent = countTurnSteps(
+        (body as { messages?: unknown[] }).messages ?? [],
+      );
+      const rawStepCap =
         itemIterationBudget != null
           ? itemIterationBudget * 4 + 8
           : researchPageBudget != null
@@ -2451,6 +2476,11 @@ export async function POST(request: Request) {
             : editableContentId
               ? 8
               : 7;
+      // At least one step, always: a turn that has already spent its budget
+      // must still be able to answer in prose (the final-step reservation
+      // below is what makes that answer honest), never be cut to zero steps
+      // and return an empty message.
+      const stepCap = Math.max(1, rawStepCap - stepsAlreadySpent);
       const stepCapSource: StepCapSource =
         itemIterationBudget != null
           ? "item-iteration"

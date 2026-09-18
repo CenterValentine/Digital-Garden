@@ -101,7 +101,24 @@ export async function attach(tabId) {
     void showBanner(tabId); // idempotent refresh (a reload may have dropped it)
     return { tabId, alreadyAttached: true };
   }
-  await attachDebugger({ tabId }, PROTOCOL_VERSION);
+  try {
+    await attachDebugger({ tabId }, PROTOCOL_VERSION);
+  } catch (error) {
+    // RECLAIM OUR OWN LEAK (owner report 2026-09-18). An MV3 service-worker
+    // eviction, or a session that ended without detaching, leaves the tab
+    // attached while our in-memory `session` is gone — and Chrome then refuses
+    // every future attach with "Another debugger is already attached to the
+    // tab with id: N". A production charter run hit that on eight consecutive
+    // attempts against the same tab id and never recovered.
+    //
+    // `chrome.debugger.detach` can only detach OUR OWN attachment, so this is
+    // safe by construction: it clears a leak we caused, and cannot steal the
+    // tab from real DevTools. If the holder is DevTools, the retry fails the
+    // same way it did before and the error stands — which is honest.
+    if (!/already attached/i.test(error?.message ?? "")) throw error;
+    await detachDebugger({ tabId });
+    await attachDebugger({ tabId }, PROTOCOL_VERSION);
+  }
   session = { tabId, startedAt: Date.now() };
   childSessions.clear();
   persistSessionTab(tabId); // survive MV3 SW eviction / app reload (see ensureSession)
