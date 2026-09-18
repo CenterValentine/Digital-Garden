@@ -271,15 +271,100 @@ export function buildToolMenu(input: {
   );
 }
 
+/**
+ * Flatten a summon argument into plain names.
+ *
+ * Models send this three ways: an array, one name, or — twice in one
+ * production turn (2026-09-18) — a JSON-encoded array in the string slot,
+ * `"[\"web\"]"`. The lenient `array | string` schema accepted that third form
+ * and then treated the whole literal as one tool id, so both summons were
+ * refused and one tool was never obtained. Unwrap it here, where every caller
+ * benefits.
+ */
+export function flattenSummonNames(names: readonly string[] | string): string[] {
+  const raw = Array.isArray(names) ? names : [names];
+  const out: string[] = [];
+  for (const entry of raw) {
+    const trimmed = entry.trim();
+    if (trimmed.startsWith("[")) {
+      try {
+        const parsed: unknown = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) {
+          for (const item of parsed) {
+            if (typeof item === "string" && item.trim()) out.push(item.trim());
+          }
+          continue;
+        }
+      } catch {
+        // Not JSON after all — fall through and treat it as a literal name.
+      }
+    }
+    if (trimmed) out.push(trimmed);
+  }
+  return out;
+}
+
+/**
+ * Re-derive what the CURRENT turn has already summoned, from the transcript.
+ *
+ * A "turn" is one user message plus every assistant step that answers it —
+ * but it is NOT one HTTP request. Client-executed tools (`co_browse_*`,
+ * `read_current_page`, `list_tabs`, the browser readers) submit their results
+ * from the browser, and each submission opens a NEW request. The route's
+ * activation set is per-request, so before this, the first browser action
+ * silently erased every summon that preceded it.
+ *
+ * What that looked like in production (2026-09-18): nine tools summoned at
+ * step 2, a `read_current_page` at step 3, and for the remaining nineteen
+ * steps those tools were unadvertised — still callable, but with no schema in
+ * front of the model. It proposed a 20-item run with `items` as bare strings,
+ * `source` as prose, `budget` instead of `itemCap`, no `url` on any item and
+ * no `captureTo` at all. Every one of those is the signature of a model
+ * writing arguments blind.
+ *
+ * Scanning stops at the last user message: a new user turn is a fresh intent,
+ * and carrying activations forever would defeat the point of a menu.
+ */
+export function activationsFromHistory(
+  messages: readonly unknown[],
+  registered: ReadonlySet<string>,
+): string[] {
+  const activate = new Set<string>();
+
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i] as { role?: string; parts?: unknown };
+    if (m?.role === "user") break; // start of this turn — stop here
+    if (!Array.isArray(m?.parts)) continue;
+    for (const part of m.parts) {
+      const p = part as {
+        type?: string;
+        state?: string;
+        input?: { names?: readonly string[] | string };
+      };
+      if (p?.type !== "tool-summon" || p.state !== "output-available") continue;
+      const names = p.input?.names;
+      if (names === undefined) continue;
+      // Re-resolve rather than parsing the human-readable output: the input is
+      // what the model asked for, and the resolver already knows families,
+      // stringified arrays and what is actually registered this turn.
+      for (const id of resolveSummonNames(names, registered).activate) {
+        activate.add(id);
+      }
+    }
+  }
+
+  return [...activate];
+}
+
 /** Resolve a summon argument — a tool id or a family name — to tool ids. */
 export function resolveSummonNames(
-  names: readonly string[],
+  names: readonly string[] | string,
   registered: ReadonlySet<string>,
 ): { activate: string[]; unknown: string[] } {
   const activate = new Set<string>();
   const unknown: string[] = [];
 
-  for (const raw of names) {
+  for (const raw of flattenSummonNames(names)) {
     const name = raw.trim();
     if (registered.has(name) && TOOL_MENU[name]) {
       activate.add(name);

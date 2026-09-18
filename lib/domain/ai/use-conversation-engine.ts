@@ -47,6 +47,7 @@ import {
   LIST_TABS,
   stripTrackingParams,
 } from "@/lib/domain/ai/tools/co-browse-tools";
+import { countRepeatedFailures } from "@/lib/domain/ai/tools/repair";
 import {
   isCoBrowseAvailable,
   coBrowseOpen,
@@ -2033,6 +2034,28 @@ export function useConversationEngine({
         toolCall.toolName === CO_BROWSE_ACT
       ) {
         const toolName = toolCall.toolName;
+        // LOOP GUARD (owner report 2026-09-18). A blocked tab drew eight
+        // identical co_browse_open calls across ten steps; nothing noticed the
+        // repetition, because each request re-reads a transcript where the
+        // failure is just one more thing that happened. Refuse the third
+        // identical FAILING call and say what else is available — cheaper than
+        // another round trip to the same wall, and it lands as a tool result
+        // the model can act on.
+        const priorFailures = countRepeatedFailures(
+          chat.messages,
+          toolName,
+          toolCall.input,
+        );
+        if (priorFailures >= 2) {
+          chat.addToolResult({
+            tool: toolName,
+            toolCallId: toolCall.toolCallId,
+            output:
+              `Not attempted: this exact ${toolName} call has already failed ${priorFailures} times this turn, so it will fail again. ` +
+              "Change something or change approach — for a blocked tab, `newTab: true` drives a fresh one; otherwise tell the user what is blocking you and what you need from them.",
+          });
+          return;
+        }
         const input = (toolCall.input ?? {}) as {
           url?: string;
           action?: string;
@@ -2060,10 +2083,18 @@ export function useConversationEngine({
               newTab: (input as { newTab?: boolean }).newTab === true,
             });
             if (!opened.ok) {
+              const reason = opened.error ?? "unknown error";
+              // A blocked tab used to report only the obstacle, so the model
+              // reissued the identical call eight times before stumbling on
+              // the way out (production, 2026-09-18). The escape hatch has
+              // always existed — `newTab: true` — so the failure says so.
+              const wayOut = /already attached/i.test(reason)
+                ? " That tab is held by another debugger — most often DevTools being open on it. Do NOT retry this same call: either call co_browse_open again with `newTab: true` to drive a fresh tab instead, or tell the user to close DevTools on that tab and say you will wait."
+                : "";
               chat.addToolResult({
                 tool: toolName,
                 toolCallId: toolCall.toolCallId,
-                output: `Could not start co-browsing: ${opened.error ?? "unknown error"}.`,
+                output: `Could not start co-browsing: ${reason}.${wayOut}`,
               });
               return;
             }

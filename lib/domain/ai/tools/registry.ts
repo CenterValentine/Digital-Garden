@@ -604,10 +604,15 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           ),
         items: z
           .array(
-            z.object({
-              label: z.string().min(1).max(200).describe("Human label — title/company as shown."),
-              url: z.string().max(600).optional().describe("The item's own URL when known (tab URL, link href) — the strongest stable key."),
-            }),
+            z.union([
+              z.object({
+                label: z.string().min(1).max(200).describe("Human label — title/company as shown."),
+                url: z.string().max(600).optional().describe("The item's own URL when known (tab URL, link href) — the strongest stable key."),
+              }),
+              // A bare string is read as {label} (production 2026-09-18: a
+              // 20-item enumeration was rejected wholesale for being strings).
+              z.string().min(1).max(200),
+            ]),
           )
           .min(1)
           .max(250)
@@ -719,7 +724,12 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             "NEW quests only: extra ledger columns sculpted to this matter (a scoring task adds its criteria columns; a collection task adds none). The machinery core (Item/Status/Pass/Fit/Qualified/Verdict/…) always exists — never re-declare it. Write their values via questCells on record_item_result. Ignored when continuing an existing quest.",
           ),
       }),
-      execute: async ({ objective, source: sourceArg, items, rowIds, itemCap: itemCapArg, budget: budgetArg, batchSize, ledgerLabel, captureTo, quest: questArg, questColumns }) => {
+      execute: async ({ objective, source: sourceArg, items: itemsArg, rowIds, itemCap: itemCapArg, budget: budgetArg, batchSize, ledgerLabel, captureTo, quest: questArg, questColumns }) => {
+        // A bare string is the item's label. Normalizing here keeps every
+        // downstream reader (ledger, capture, quest cells) on one shape.
+        const items = itemsArg?.map((entry) =>
+          typeof entry === "string" ? { label: entry } : entry,
+        );
         // Resolve the two fields that used to reject the whole proposal
         // (production, 2026-09-18). Both refusals below are ordinary tool
         // RESULTS, so the model can re-propose in the same turn with the
@@ -739,6 +749,45 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             refusal:
               "No item cap given. Re-propose with itemCap set (~10-15 is a sensible default, up to 200) — keep the items you already enumerated.",
             nextAction: "Re-propose with itemCap. Do NOT start processing items.",
+          };
+        }
+
+        // An enumeration that lost its URLs is a degraded run, not a failed
+        // one, and it degrades SILENTLY: the ledger cannot link to sources, a
+        // second sitting cannot revisit them, and URL dedupe against the
+        // capture table is impossible. Refuse where the URL is definitionally
+        // available — a tab HAS a url, and a "urls" source IS urls — and let a
+        // list-page pass, since an extractor that strips hrefs is a real
+        // condition the model cannot always defeat (production 2026-09-18).
+        const urlIsDefinitional = source === "open-tabs" || source === "urls";
+        if (urlIsDefinitional && items && !items.some((i) => i.url?.trim())) {
+          return {
+            ok: false,
+            refusal: `Every item in a "${source}" run needs its url, and none of these have one. Re-enumerate while the source is still open and include each item's url — without it the ledger cannot link to the source, a follow-up run cannot revisit it, and duplicate rows cannot be detected.`,
+            nextAction: "Re-propose with urls on the items. Do NOT start processing items.",
+          };
+        }
+
+        // A run whose objective says it will write somewhere, but which
+        // declares no capture target, cannot write anywhere: record_item_result
+        // answers `capture ignored — this run has no approved captureTo
+        // config`. In production the user named the destination database in
+        // their own message and the proposal still arrived without it, so the
+        // run would have screened 20 jobs and saved none of them.
+        // The object sits between the verb and the destination ("write ROLES
+        // SCORING 75+ to the Library"), so the gap is bounded rather than
+        // absent. Only "to"/"into" count: bare "in" turns "record the verdict
+        // in one sentence" into a false refusal, and blocking a legitimate
+        // report-only run costs more than missing one capture-less run, which
+        // the user still sees on the approval card.
+        const OBJECTIVE_WRITES_SOMEWHERE =
+          /\b(writ|captur|add|record|log|sav)\w*\b[^.;]{0,80}?\b(to|into)\b/i;
+        if (!captureTo && OBJECTIVE_WRITES_SOMEWHERE.test(objective)) {
+          return {
+            ok: false,
+            refusal:
+              "This objective says the run will write its results somewhere, but no captureTo was given — so nothing would be written. Name the destination database in captureTo and re-propose, or reword the objective if the run is only meant to report.",
+            nextAction: "Re-propose with captureTo. Do NOT start processing items.",
           };
         }
         const label = (ledgerLabel ?? objective).trim();
