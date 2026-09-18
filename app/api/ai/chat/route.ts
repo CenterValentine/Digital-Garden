@@ -76,10 +76,11 @@ import {
   getModelMeta,
 } from "@/lib/domain/ai/providers/catalog";
 import {
+  dedupeRepeatedToolParts,
   stripOpenAIItemReferences,
   stripReasoningForResend,
   supersedeBulkReads,
-  supersedeIterationHistory,
+  supersedePerceptionHistory,
 } from "@/lib/domain/ai/context-diet";
 import { DEFAULT_BULK_READ_THRESHOLD } from "@/lib/domain/ai/tools/data-tools";
 import {
@@ -1613,28 +1614,39 @@ export async function POST(request: Request) {
       // Context diet (S7/S8): both transforms apply ONLY to this
       // model-message path — repairedMessages stays intact for
       // originalMessages/persistence.
-      //   - supersedeIterationHistory: raw perception outputs behind the
-      //     latest batch checkpoint collapse to stubs (the ledger is the
-      //     cross-batch memory); reclaims 128k-window space on long runs.
+      //   - supersedePerceptionHistory: raw perception outputs behind the
+      //     latest distillation point (checkpoint OR findings record) and
+      //     any re-readable read from an earlier turn collapse to stubs —
+      //     the ledger / the reply is the memory. Never gated on an active
+      //     run (AI-CONTEXT-ECONOMICS-PLAN D1: the old boundary switched
+      //     off when a run ended, re-sending 905 kB per request after).
       //   - stripReasoningForResend: reasoning parts are model OUTPUT with
       //     no resend value for non-Anthropic providers, yet
       //     convertToModelMessages forwards them as input verbatim (~100k
       //     chars replayed per request in the measured DeepSeek run).
+      //   - dedupeRepeatedToolParts: a tool call whose id already appeared
+      //     is dropped whole; a call whose input+output are byte-identical
+      //     to an earlier one keeps a pointer stub (plan A2, ~543 kB on the
+      //     evidence thread). Applied AFTER the index-keyed folds so their
+      //     states are computed on the shape the UI sees — this is the only
+      //     pass that removes parts.
       //   - stripOpenAIItemReferences: dead `openai.itemId` pointers replay as
       //     item_reference against an expired server-side store, 400ing every
       //     send in the conversation (#193). Heals transcripts poisoned before
       //     the `store: false` option below existed.
       const resolvedMessages = resolveAttachmentsForModel(
         stripOpenAIItemReferences(
-          stripReasoningForResend(
-            // Bulk database reads fold by lifetime (turn/run/chat) — plan
-            // AI-BULK-ROW-READING §4.6; pinned reads survive, `turn`
-            // reads collapse once a newer user message exists.
-            supersedeBulkReads(
-              supersedeIterationHistory(repairedMessages),
-              { pinnedAllowanceTokens: bulkReadPinnedAllowance },
+          dedupeRepeatedToolParts(
+            stripReasoningForResend(
+              // Bulk database reads fold by lifetime (turn/run/chat) — plan
+              // AI-BULK-ROW-READING §4.6; pinned reads survive, `turn`
+              // reads collapse once a newer user message exists.
+              supersedeBulkReads(
+                supersedePerceptionHistory(repairedMessages),
+                { pinnedAllowanceTokens: bulkReadPinnedAllowance },
+              ),
+              executedVendorId,
             ),
-            executedVendorId,
           ),
         ),
         executedVendorId,

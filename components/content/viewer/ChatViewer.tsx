@@ -18,7 +18,13 @@ import {
   ModelRouteNotices,
 } from "../ai/ModelSwitchDivider";
 import { computeModelRouteDecorations } from "@/lib/domain/ai/model-directive";
-import { bulkReadFoldStates, findIterationFoldBoundary } from "@/lib/domain/ai/context-diet";
+import {
+  bulkReadFoldStates,
+  duplicatePartStates,
+  perceptionFoldStates,
+  supersedeBulkReads,
+  supersedePerceptionHistory,
+} from "@/lib/domain/ai/context-diet";
 import { aggregateSessionUsage } from "@/lib/features/ai-connections/usage/pricing";
 import { ChatControlPanel } from "../ai/ChatControlPanel";
 
@@ -596,15 +602,24 @@ function ChatViewerInner({
     () => computeModelRouteDecorations(messages),
     [messages],
   );
-  // P4c: the active iteration run's fold boundary — parts before it render
-  // collapsed, mirroring exactly what the model-facing assembly stubs.
-  const iterationFoldBoundary = useMemo(
-    () => findIterationFoldBoundary(messages),
+  // P4c: perception / read parts the model no longer sees render collapsed,
+  // mirroring exactly what the model-facing assembly stubs (same map).
+  const perceptionFolds = useMemo(
+    () => perceptionFoldStates(messages),
     [messages],
   );
   // Bulk database reads: folded / pinned per lifetime — the same predicate
   // the model-facing assembly applies (AI-BULK-ROW-READING-PLAN §4.6).
   const bulkReadFolds = useMemo(() => bulkReadFoldStates(messages), [messages]);
+  // Repeated tool parts: computed on the FOLDED shape, as the route does, so
+  // a part the folds already stubbed is never double-labelled here.
+  const duplicateFolds = useMemo(
+    () =>
+      duplicatePartStates(
+        supersedeBulkReads(supersedePerceptionHistory(messages)),
+      ),
+    [messages],
+  );
   // P3 owner ask: cumulative session usage for the avatar popover.
   const sessionUsage = useMemo(
     () => aggregateSessionUsage(messages),
@@ -889,8 +904,9 @@ function ChatViewerInner({
                   <ChatMessage
                     message={message}
                     messageIndex={i}
-                    foldBoundary={iterationFoldBoundary}
-                  bulkReadFolds={bulkReadFolds}
+                    perceptionFolds={perceptionFolds}
+                    duplicateFolds={duplicateFolds}
+                    bulkReadFolds={bulkReadFolds}
                     sessionUsage={sessionUsage}
                     charterAttached={charterAttached}
                     providerId={stamp.providerId}

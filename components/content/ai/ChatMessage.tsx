@@ -107,8 +107,12 @@ import { ReasoningRouter } from "./reasoning/ReasoningRouter";
 import { parseCharterMessageAttachment } from "@/lib/domain/ai/charters/message-binding";
 import {
   bulkReadFoldState,
+  duplicatePartState,
+  perceptionFoldState,
   shouldSupersedePart,
   type BulkReadFoldState,
+  type DuplicatePartState,
+  type PerceptionFoldState,
 } from "@/lib/domain/ai/context-diet";
 import { parseReadHeader } from "@/lib/domain/data/read-format";
 
@@ -321,13 +325,19 @@ interface ChatMessageProps {
   isStreaming?: boolean;
   /**
    * P4c lean context: this message's index in the conversation plus the
-   * active iteration run's fold boundary (from findIterationFoldBoundary).
-   * Perception parts BEFORE the boundary render collapsed — the default
-   * view IS the model's retained view (owner rule: no divergence between
-   * front and back). Expanding is user-only and free.
+   * fold verdicts (perceptionFoldStates) — perception / read parts the
+   * model no longer sees render collapsed, so the default view IS the
+   * model's retained view (owner rule: no divergence between front and
+   * back). Expanding is user-only and free.
    */
   messageIndex?: number;
-  foldBoundary?: { messageIdx: number; partIdx: number } | null;
+  perceptionFolds?: Map<string, PerceptionFoldState> | null;
+  /**
+   * Repeated tool parts (duplicatePartStates): a call the model-facing
+   * assembly dropped as a duplicate, or whose output it replaced with a
+   * pointer to an identical earlier result, renders collapsed likewise.
+   */
+  duplicateFolds?: Map<string, DuplicatePartState> | null;
   /**
    * Last message index carrying a proposal of each kind (ChatPanel memo).
    * A card in an EARLIER message than the latest of its kind renders
@@ -487,10 +497,44 @@ function FoldedBulkReadPart({ part }: { part: unknown }) {
   );
 }
 
-function FoldedPerceptionPart({ part }: { part: unknown }) {
+/** Chip copy per fold verdict — says WHY the model no longer carries it. */
+const FOLD_CHIP_COPY: Record<
+  Exclude<PerceptionFoldState, "kept"> | DuplicatePartState,
+  { label: string; title: string }
+> = {
+  "folded-distilled": {
+    label: "folded at checkpoint — digested into the run records",
+    title:
+      "Folded at batch checkpoint — the model no longer carries this; expanding is free",
+  },
+  "folded-turn": {
+    label: "folded — digested into the reply that followed",
+    title:
+      "Folded after the turn — the model no longer carries this; expanding is free",
+  },
+  "dropped-duplicate-call": {
+    label: "duplicate of an earlier call — not resent",
+    title:
+      "This call already appears earlier in the transcript; the model sees it once",
+  },
+  "identical-output": {
+    label: "identical to an earlier result — nothing changed",
+    title:
+      "Same input and output as an earlier call; the model gets a pointer to that one",
+  },
+};
+
+function FoldedPerceptionPart({
+  part,
+  reason = "folded-distilled",
+}: {
+  part: unknown;
+  reason?: keyof typeof FOLD_CHIP_COPY;
+}) {
   const [expanded, setExpanded] = useState(false);
   const p = part as { type?: string; output?: unknown };
   const toolName = (p.type ?? "tool-").replace(/^tool-/, "");
+  const copy = FOLD_CHIP_COPY[reason];
   const raw = (() => {
     const out = p.output as { value?: unknown } | unknown;
     const v =
@@ -505,13 +549,13 @@ function FoldedPerceptionPart({ part }: { part: unknown }) {
         type="button"
         onClick={() => setExpanded((e) => !e)}
         className="inline-flex items-center gap-1.5 rounded-md border border-black/5 bg-black/[0.02] px-2 py-1 text-[11px] text-gray-500 transition-colors hover:bg-black/[0.05] dark:border-white/5 dark:bg-white/[0.03] dark:text-gray-400 dark:hover:bg-white/[0.06]"
-        title="Folded at batch checkpoint — the model no longer carries this; expanding is free"
+        title={copy.title}
       >
         <ChevronRight
           className={`h-3 w-3 shrink-0 transition-transform ${expanded ? "rotate-90" : ""}`}
         />
         <span>
-          {toolName} · folded at checkpoint — digested into the run records
+          {toolName} · {copy.label}
         </span>
       </button>
       {expanded && (
@@ -529,7 +573,8 @@ export const ChatMessage = memo(function ChatMessage({
   messageIndex,
   latestProposalIndex,
   existingDatabases,
-  foldBoundary = null,
+  perceptionFolds = null,
+  duplicateFolds = null,
   bulkReadFolds = null,
   sessionUsage = null,
   charterAttached,
@@ -1170,19 +1215,24 @@ export const ChatMessage = memo(function ChatMessage({
           if (groupRole?.kind === "card") {
             return <BatchGalleryCard key={i} group={groupRole.group} />;
           }
-          // P4c: perception parts the model no longer sees (folded behind
-          // the latest batch checkpoint) render collapsed — the default
-          // view equals the retained context. Same rule as the server fold
-          // (shouldSupersedePart), same boundary, one implementation.
-          if (
-            foldBoundary != null &&
-            typeof messageIndex === "number" &&
-            (messageIndex < foldBoundary.messageIdx ||
-              (messageIndex === foldBoundary.messageIdx &&
-                i < foldBoundary.partIdx)) &&
-            shouldSupersedePart(part)
-          ) {
-            return <FoldedPerceptionPart key={i} part={part} />;
+          // Parts the model no longer sees render collapsed — the default
+          // view equals the retained context. Same maps as the server fold
+          // (perceptionFoldStates / duplicatePartStates), one implementation.
+          // Duplicates first: a dropped duplicate call is gone from the
+          // model's view entirely, whatever its fold state.
+          const dupState =
+            duplicateFolds && typeof messageIndex === "number"
+              ? duplicatePartState(duplicateFolds, messageIndex, i)
+              : null;
+          if (dupState) {
+            return <FoldedPerceptionPart key={i} part={part} reason={dupState} />;
+          }
+          const foldState =
+            perceptionFolds && typeof messageIndex === "number"
+              ? perceptionFoldState(perceptionFolds, messageIndex, i)
+              : null;
+          if (foldState === "folded-distilled" || foldState === "folded-turn") {
+            return <FoldedPerceptionPart key={i} part={part} reason={foldState} />;
           }
           // Bulk database reads (plan §4.6): a `turn` read behind the
           // latest user message renders folded; pinned reads carry their
