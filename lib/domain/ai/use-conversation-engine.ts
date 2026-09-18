@@ -1726,17 +1726,68 @@ export function useConversationEngine({
    */
   const [charterDetached, setCharterDetached] = useState(false);
 
-  const attachCharter = useCallback((item: SuggestionItem) => {
-    setActiveCharterId(item.id);
-    setActiveCharterTitle(item.label);
-    setCharterDetached(false); // an explicit pick undoes an earlier dismissal
-  }, []);
+  /**
+   * Where the dismissal is remembered.
+   *
+   * Re-binding on reopen is right for a NEW chat — the binding is a property
+   * of what the chat was opened on. It is wrong for an EXISTING one (owner,
+   * 2026-09-18): a detach there is a decision about *that conversation*, and
+   * making the user repeat it every reload is the same inert button in slower
+   * motion. Keyed exactly like the output target, which persists per chat for
+   * the same reason.
+   */
+  const charterDetachedKey = conversationId
+    ? `dg:charter-detached:conv:${conversationId}`
+    : contentId
+      ? `dg:charter-detached:content:${contentId}`
+      : null;
+
+  // Hydrate on key change — ChatPanel stays mounted while the active
+  // conversation switches, so this must reload per chat rather than leak the
+  // previous one's dismissal into the next.
+  useEffect(() => {
+    if (!charterDetachedKey) {
+      setCharterDetached(false);
+      return;
+    }
+    try {
+      setCharterDetached(
+        window.localStorage.getItem(charterDetachedKey) === "1",
+      );
+    } catch {
+      setCharterDetached(false); // private mode / storage disabled
+    }
+  }, [charterDetachedKey]);
+
+  const persistCharterDetached = useCallback(
+    (detached: boolean) => {
+      if (!charterDetachedKey) return;
+      try {
+        if (detached) window.localStorage.setItem(charterDetachedKey, "1");
+        else window.localStorage.removeItem(charterDetachedKey);
+      } catch {
+        // Best-effort: the in-memory state still holds for this session.
+      }
+    },
+    [charterDetachedKey],
+  );
+
+  const attachCharter = useCallback(
+    (item: SuggestionItem) => {
+      setActiveCharterId(item.id);
+      setActiveCharterTitle(item.label);
+      setCharterDetached(false); // an explicit pick undoes an earlier dismissal
+      persistCharterDetached(false);
+    },
+    [persistCharterDetached],
+  );
 
   const detachCharter = useCallback(() => {
     setActiveCharterId(null);
     setActiveCharterTitle(null);
     setCharterDetached(true);
-  }, []);
+    persistCharterDetached(true);
+  }, [persistCharterDetached]);
 
   // BOUND CHARTER (owner directive 2026-09-11): a chat opened ON a charter is
   // attached to it without a /charter pick. The server resolves the binding
