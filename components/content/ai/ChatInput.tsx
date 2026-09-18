@@ -946,28 +946,56 @@ function insertLineBreakAtCaret() {
   placeCaretAfter(br);
 }
 
+/**
+ * Insert pasted text at the caret, reviving `@[Title](id)` tokens as pills.
+ *
+ * The composer's canonical value already IS text plus those tokens, and the
+ * renderer turns them into pills — but only on a full re-render. A paste
+ * inserts DOM directly, so without this a mention copied out of one chat and
+ * pasted into another arrives as literal `@[Job Opportunities Library](4974…)`
+ * characters: still a working reference on send, but unreadable in the
+ * composer and impossible to tell from prose the user typed (owner report,
+ * 2026-09-17).
+ *
+ * Same treatment the wiki-link HTML flavor already gets in `handlePaste` —
+ * this extends it to the plain-text path, which is what a chat-to-chat copy
+ * produces.
+ */
 function insertPlainTextAtCaret(text: string) {
   const sel = window.getSelection();
   if (!sel || sel.rangeCount === 0) return;
   const range = sel.getRangeAt(0);
   range.deleteContents();
-  const lines = text.split("\n");
   let last: Node | null = null;
+
+  const insert = (node: Node) => {
+    range.insertNode(node);
+    range.setStartAfter(node);
+    range.collapse(true);
+    last = node;
+  };
+
+  /** One line's worth of text, with mention tokens promoted to pills. */
+  const insertLine = (line: string) => {
+    const re = new RegExp(MENTION_RE.source, "g");
+    let cursor = 0;
+    let match: RegExpExecArray | null;
+    while ((match = re.exec(line)) !== null) {
+      if (match.index > cursor) {
+        insert(document.createTextNode(line.slice(cursor, match.index)));
+      }
+      insert(makeMentionPill(match[1], match[2]));
+      cursor = match.index + match[0].length;
+    }
+    if (cursor < line.length) {
+      insert(document.createTextNode(line.slice(cursor)));
+    }
+  };
+
+  const lines = text.split("\n");
   for (let i = 0; i < lines.length; i++) {
-    if (i > 0) {
-      const br = document.createElement("br");
-      range.insertNode(br);
-      range.setStartAfter(br);
-      range.collapse(true);
-      last = br;
-    }
-    if (lines[i].length > 0) {
-      const txt = document.createTextNode(lines[i]);
-      range.insertNode(txt);
-      range.setStartAfter(txt);
-      range.collapse(true);
-      last = txt;
-    }
+    if (i > 0) insert(document.createElement("br"));
+    if (lines[i].length > 0) insertLine(lines[i]);
   }
   if (last) placeCaretAfter(last);
 }
