@@ -43,6 +43,7 @@ import {
 } from "@/lib/domain/data/server/capture";
 import { createColumn } from "@/lib/domain/data/server/mutations";
 import { renderDataNodePreview } from "@/lib/domain/data/server/read-preview";
+import { resolveItemStatus } from "./repair";
 import {
   closeSitting,
   ensureMasterLedger,
@@ -1175,9 +1176,16 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           .max(600)
           .optional()
           .describe("The item's source URL (from the approved items list / the page you read). ALWAYS include it when known — the ledger renders it as a clickable link so the page can be revisited."),
+        // Deliberately a lenient string, not an enum (owner report
+        // 2026-09-17): a required enum rejected the WHOLE call before
+        // execute — verdict, score and nine captured cells with it — and the
+        // best-scoring item of a production run was lost to a missing word.
+        // Resolution lives in execute, where the rest of the call can inform
+        // it. Same doctrine as data-tools.ts's read schema.
         status: z
-          .enum(["done", "unreadable", "blocked"])
-          .describe("done = analyzed; unreadable = page could not be read; blocked = an obstacle (login/captcha) stopped this item."),
+          .string()
+          .optional()
+          .describe('"done" = analyzed; "unreadable" = page could not be read; "blocked" = an obstacle (login/captcha) stopped this item.'),
         qualified: z.boolean().optional().describe("Whether the item met the objective's bar (e.g. fit > 75%)."),
         fitPercent: z.number().min(0).max(100).optional().describe("Numeric score when the objective scores items."),
         verdict: z.string().max(1000).optional().describe("One-to-three sentence rationale for this item."),
@@ -1201,7 +1209,24 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             "Quest runs with SCULPTED ledger columns: their values for this item (column name → value). Machinery fields (status/fit/qualified/verdict) are recorded automatically — never repeat them here.",
           ),
       }),
-      execute: async ({ ledgerRunKey, itemKey, itemLabel, url, status, qualified, fitPercent, verdict, artifactTitle, capture, questCells }) => {
+      execute: async ({ ledgerRunKey, itemKey, itemLabel, url, status: statusArg, qualified, fitPercent, verdict, artifactTitle, capture, questCells }) => {
+        // Resolve before anything is written: a recognized word is taken, a
+        // missing one is inferred from the evidence in the same call, and only
+        // a call with neither is sent back — as a RESULT the model can act on
+        // in the next step, never a validation error that ends the call.
+        const resolution = resolveItemStatus({
+          status: statusArg,
+          verdict,
+          fitPercent,
+          qualified,
+          hasCapture: Boolean(capture),
+        });
+        if ("needsStatus" in resolution) {
+          return { ok: false, recorded: null, note: resolution.needsStatus };
+        }
+        const status = resolution.status;
+        const statusNote = resolution.note;
+
         const placement = resolveToolOutputPlacement(ctx);
         // Quest logs are keyed globally (upsertRunLedger "quest:" keys), so a
         // sitting in a chat with no target folder still finds its log. Only
@@ -1357,6 +1382,10 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             ok: true,
             recorded: itemKey,
             status,
+            // An inferred status is reported, never applied silently — the
+            // model (and the transcript) should see that the harness filled
+            // something in, and what it filled in.
+            ...(statusNote ? { statusNote } : {}),
             ledgerNodeId: ledger.contentNodeId,
             ...(capturedRowId
               ? { rowId: capturedRowId, rowStatus: capturedRowStatus }
