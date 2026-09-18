@@ -25,9 +25,24 @@ import {
   streamText,
   convertToModelMessages,
   stepCountIs,
+  NoSuchToolError,
   UI_MESSAGE_STREAM_HEADERS,
 } from "ai";
 import type { UIMessage } from "ai";
+import {
+  LEGACY_TOOL_IDS,
+  resolveToolNameAlias,
+} from "@/lib/domain/ai/tools/repair";
+import {
+  CORE_TOOL_IDS,
+  MODE_TOOL_IDS,
+  buildToolMenu,
+  type ToolFamily,
+} from "@/lib/domain/ai/tools/menu";
+import {
+  SUMMON_TOOL_ID,
+  createSummonTool,
+} from "@/lib/domain/ai/tools/summon";
 import { isResumableConfigured } from "@/lib/domain/ai/resumable/redis";
 import { getStreamContext } from "@/lib/domain/ai/resumable/context";
 import {
@@ -351,7 +366,7 @@ async function resolveCharterReferenceContext(
   const activeReferenceContentIds = Array.from(
     new Set(
       referenceNodes
-        // Folders are capsule-consumed (below), never getCurrentNote-read —
+        // Folders are capsule-consumed (below), never read_content-read —
         // keep them out of the checkpoint gate's reference expectations.
         .filter(
           (node) =>
@@ -373,8 +388,8 @@ async function resolveCharterReferenceContext(
     }
     const isSubCharter = isCharterMetadata(found.notePayload?.metadata);
     return isSubCharter
-      ? `- [[${title}]] (getCurrentNote contentId: ${found.id}) — SUB-CHARTER: has its own standing rules/phases; follow its directives once read`
-      : `- [[${title}]] (getCurrentNote contentId: ${found.id})`;
+      ? `- [[${title}]] (read_content contentId: ${found.id}) — SUB-CHARTER: has its own standing rules/phases; follow its directives once read`
+      : `- [[${title}]] (read_content contentId: ${found.id})`;
   });
 
   // Active-phase folder refs get the full mention treatment (gate +
@@ -399,7 +414,7 @@ async function resolveCharterReferenceContext(
   return {
     manifest:
       "\n\n**Linked extensions** " +
-      "(call getCurrentNote with the contentId below when the current phase needs one — not preloaded):\n" +
+      "(call read_content with the contentId below when the current phase needs one — not preloaded):\n" +
       lines.join("\n") +
       folderCapsules,
     activeReferenceContentIds,
@@ -1331,7 +1346,7 @@ export async function POST(request: Request) {
         conversationId: conversationIdForAssoc ?? undefined,
         targetFolderId,
         // When the user is viewing this conversation in full-page mode the
-        // chat IS the open content. Pass that through so createNote can
+        // chat IS the open content. Pass that through so create_note can
         // default the new note's parent folder to the chat's own parent.
         chatContentId: isChatContent ? contentId : undefined,
         outputOwnerId,
@@ -1395,17 +1410,21 @@ export async function POST(request: Request) {
         string,
         { enabled?: boolean }
       > }).toolConfig ?? {};
-      // Rename compatibility (D2, 2026-09-10): `searchNotes` became
-      // `search_content`. toolConfig is keyed by tool id and defaults to
-      // ENABLED, so a user who had deliberately switched the old finder off
-      // would have had it silently switched back on under the new name.
-      // Carry the old entry forward when the new key is unset; the settings
-      // UI writes the new key from here on, so this fades on first save.
-      if (
-        toolConfig["search_content"] === undefined &&
-        toolConfig["searchNotes"] !== undefined
-      ) {
-        toolConfig["search_content"] = toolConfig["searchNotes"];
+      // Rename compatibility. toolConfig is keyed by tool id and defaults to
+      // ENABLED, so a user who had deliberately switched a tool OFF would have
+      // it silently switched back on under its new name. Carry every legacy
+      // entry forward when the new key is unset; the settings UI writes the new
+      // key from here on, so each fades on first save.
+      //
+      // Was a hand-rolled `searchNotes` special case (D2, 2026-09-10); now
+      // reads the shared rename table, so the next rename cannot forget it.
+      for (const [legacyId, currentId] of Object.entries(LEGACY_TOOL_IDS)) {
+        if (
+          toolConfig[currentId] === undefined &&
+          toolConfig[legacyId] !== undefined
+        ) {
+          toolConfig[currentId] = toolConfig[legacyId];
+        }
       }
       const tools = Object.fromEntries(
         Object.entries(allTools).filter(
@@ -1422,36 +1441,52 @@ export async function POST(request: Request) {
         ),
       );
 
-      // Context diet (S7-C5): during an APPROVED iteration run, narrow the
-      // schema set to the run's working tools. The full ~50-schema prefix
-      // measured ~36k tokens per request; the 128k window (not price) is the
-      // binding constraint on long runs. The set is stable for the whole run
-      // (itemIterationBudget stays non-null until record_iteration_findings),
-      // so the provider prefix cache re-warms once at run start. Pending
-      // approvals mid-run only occur for kept tools (createNote,
-      // phase_checkpoint).
+      // What the model is TOLD it has. The `tools` object above stays
+      // complete for the rest of this request: `activeTools` narrows only what
+      // is serialized into the provider payload, while incoming tool calls
+      // resolve against the full object (ai@6 `doParseToolCall`). So an
+      // unadvertised tool costs zero tokens and still executes if the model
+      // reaches for it — which is the recovery path that deleting destroyed.
+      const advertised = new Set(Object.keys(tools));
+      // Summoned mid-turn. Kept separate from `advertised` so the base set
+      // stays the one the menu is computed against, and so a summon is visible
+      // in diagnostics as something the model asked for rather than something
+      // the turn always had. RATCHET: only ever added to within a turn.
+      const activated = new Set<string>();
+      const isAdvertised = (id: string) =>
+        advertised.has(id) || activated.has(id);
+
+      // ADVERTISEMENT POLICY (AI-TOOL-SUMMONER-PLAN §3). Core tools are always
+      // offered; a mode's tools are offered while that mode is live; everything
+      // else is one `summon` away, listed in the menu at ~15 tokens each.
+      //
+      // This replaces the per-run tool diet, which cut 39 of 65 tools by a
+      // hardcoded allowlist and left them unreachable for a whole 48-step
+      // request. Measured: the full prefix is 31,149 tokens — 24% of a 128k
+      // window, re-sent every step — against ~4.9k in plain chat and ~10.1k in
+      // a co-browse run under this policy, with all 65 still reachable.
+      const modes: string[] = [];
+      if (editableContentId) modes.push("editor");
+      if (coBrowseAvailable) modes.push("browser");
+      if (itemIterationBudget != null) modes.push("runs");
+
+      const offered = new Set<string>(CORE_TOOL_IDS);
+      for (const mode of modes) {
+        for (const id of MODE_TOOL_IDS[mode] ?? []) offered.add(id);
+      }
+      for (const id of Object.keys(tools)) {
+        if (!offered.has(id)) advertised.delete(id);
+      }
+
+      // Predictive activation — the cheapest summon is the one never made.
+      // A run declares what it will touch at approval, so those tools are
+      // advertised BEFORE the turn's first inference: no step spent, and no
+      // mid-turn prefix change to invalidate the cache. This is precisely the
+      // path the 2026-09-17 run needed — it captures into a database, so it
+      // must be able to read that database to dedupe against it.
       if (itemIterationBudget != null) {
-        const ITERATION_RUN_TOOLS = new Set([
-          // browsing + enumeration
-          "co_browse_open", "co_browse_act", "read_current_page", "list_tabs",
-          "read_page_headless_or_browser", "open_tab_and_read", "read_page",
-          "search_web",
-          // the iteration harness itself
-          "propose_item_iteration", "record_item_result",
-          "record_batch_checkpoint", "record_iteration_findings",
-          // mid-run schema grace (D8) — this diet stripped it, so the only
-          // window it exists for never had it (lifecycle audit 2026-09-11)
-          "add_quest_ledger_column",
-          // note output + grounding
-          "createNote", "updateNote", "renameNote", "getCurrentNote",
-          "search_content", "read_folder_context",
-          "read_first_chunk", "read_next_chunk", "read_previous_chunk",
-          // run/plumbing
-          "phase_checkpoint", "ask_user", "notify_user",
-          "finish_with_summary", "plan",
-        ]);
-        for (const id of Object.keys(tools)) {
-          if (!ITERATION_RUN_TOOLS.has(id)) delete tools[id];
+        for (const id of ["query_database", "describe_database"]) {
+          if (id in tools) advertised.add(id);
         }
       }
 
@@ -1485,9 +1520,13 @@ export async function POST(request: Request) {
           ? resolveNativeWebSearchTool(executedProviderId)
           : null;
       const searchEnabled = toolConfig["search_web"]?.enabled !== false;
+      // Native search attaches AFTER the run narrowing above, so it must be
+      // advertised explicitly — otherwise it would sit in `tools` unannounced
+      // and the model would never know it could search.
       if (nativeSearch && searchEnabled) {
         // Big-four: provider-native search (integrated, well-cited).
         (tools as Record<string, unknown>)["search_web"] = nativeSearch;
+        advertised.add("search_web");
       } else if (
         !nativeSearch &&
         searchEnabled &&
@@ -1498,7 +1537,34 @@ export async function POST(request: Request) {
         // the SAME tool name — using the user's BYOK search connection.
         (tools as Record<string, unknown>)["search_web"] =
           createAppWebSearchTool(session.user.id);
+        advertised.add("search_web");
       }
+
+      // ── The summoner (AI-TOOL-SUMMONER-PLAN §3) ────────────────────────
+      // Registered last, so `registered` covers every tool this turn has —
+      // including the conditional browser/editor/search families above.
+      const registered = new Set(Object.keys(tools));
+      (tools as Record<string, unknown>)[SUMMON_TOOL_ID] = createSummonTool({
+        registered,
+        activated,
+        isAdvertised,
+      });
+      // Core by construction: a menu the model cannot act on is worse than no
+      // menu, so the one tool that acts on it is never itself summonable.
+      advertised.add(SUMMON_TOOL_ID);
+
+      // Ordering is the only focus mechanism a menu has. Tool absence used to
+      // keep a run on task; discoverability gives that up, so the families the
+      // current mode actually touches are read first.
+      const leadWith: ToolFamily[] = [];
+      if (itemIterationBudget != null) leadWith.push("runs", "databases", "web");
+      if (coBrowseAvailable) leadWith.push("browser");
+      if (editableContentId) leadWith.push("editor");
+      const toolMenu = buildToolMenu({
+        registered,
+        advertised,
+        leadWith,
+      });
 
       // Resolve attachments for the model: keep file parts the active
       // provider can consume natively (images for vision; PDFs for
@@ -1559,7 +1625,7 @@ export async function POST(request: Request) {
       // EVERY side chat attaches the content it lives under (owner directive
       // 2026-09-11, generalizing the charter rule): the bound content rides
       // as an implicit FIRST mention, so its body / folder capsule / database
-      // digest loads the way an @-mention's does — no getCurrentNote
+      // digest loads the way an @-mention's does — no read_content
       // round-trip. Charters take the charter path instead (progressive
       // disclosure), a chat or workflow is its own subject, and an explicit
       // mention of the same id dedupes. The bound content gets its own slot
@@ -1818,7 +1884,7 @@ export async function POST(request: Request) {
           const availabilityLine =
             enabledDataTools.length === 0
               ? "ALL database tools are DISABLED in the user's settings. Do not attempt to call any of them. If the user asks for database operations, tell them to enable the tools under Settings → AI → AI Tools → Databases."
-              : `Database tools available this turn: ${enabledDataTools.join(", ")}. For reading or changing ROWS AND CELLS, use these — never search_content/getCurrentNote, which describe a database from the OUTSIDE (title, columns) and will mislead you about row data.${
+              : `Database tools available this turn: ${enabledDataTools.join(", ")}. For FILTERED, sorted, or full-column row reads — and for every write — use these. (read_content returns this database's schema plus a short row preview, which is enough to see what is here; it cannot filter, sort, page, or write.)${
                   disabledDataTools.length > 0
                     ? ` DISABLED in the user's settings (never call these; tell the user to enable them under Settings → AI → AI Tools → Databases if needed): ${disabledDataTools.join(", ")}.`
                     : " Disregard any earlier statements in this conversation that they were unavailable; verify current values with query_database instead of trusting prior turns."
@@ -1890,7 +1956,7 @@ export async function POST(request: Request) {
       // Playbook progressive disclosure (AI v3.2 T3): inject standing rules
       // + the ACTIVE PHASE ONLY — never the whole playbook. `[[wiki-link]]`
       // references in that phase surface as a manifest the model traces on
-      // demand via getCurrentNote; sub-playbooks (a linked note OR folder that is
+      // demand via read_content; sub-playbooks (a linked note OR folder that is
       // itself marked as a playbook) are called out so the model follows
       // their own directives rather than treating them as passive reading.
       let charterContext = "";
@@ -1937,7 +2003,7 @@ export async function POST(request: Request) {
           ) {
             attachedCharterResolved = true;
             attachedPlaybookTitle = charterNode.title;
-            // Context diet (S7-C2): getCurrentNote answers this id with a
+            // Context diet (S7-C2): read_content answers this id with a
             // pointer — the body is already injected below.
             toolCtx.activeCharter = {
               contentId: explicitPlaybookId,
@@ -2009,8 +2075,8 @@ export async function POST(request: Request) {
                 referenceContentIds:
                   referenceContext.activeReferenceContentIds,
                 researchToolsAvailable:
-                  "search_web" in tools || "read_page" in tools,
-                referenceToolAvailable: "getCurrentNote" in tools,
+                  isAdvertised("search_web") || isAdvertised("read_page"),
+                referenceToolAvailable: isAdvertised("read_content"),
               });
               recordCompletedPhaseToolsFromMessages(
                 phaseCheckpointGate,
@@ -2117,8 +2183,8 @@ export async function POST(request: Request) {
                 referenceContentIds:
                   referenceContext.activeReferenceContentIds,
                 researchToolsAvailable:
-                  "search_web" in tools || "read_page" in tools,
-                referenceToolAvailable: "getCurrentNote" in tools,
+                  isAdvertised("search_web") || isAdvertised("read_page"),
+                referenceToolAvailable: isAdvertised("read_content"),
               });
               recordCompletedPhaseToolsFromMessages(
                 phaseCheckpointGate,
@@ -2157,7 +2223,11 @@ export async function POST(request: Request) {
       // this turn so weaker models cannot search for the playbook that is
       // already loaded. Generic note search remains available for phase work.
       if (attachedCharterResolved || rootedCharterResolved) {
-        delete tools.search_charters;
+        // Un-advertised rather than deleted, per the advertisement model
+        // above: the model stops being offered it (which is the point — the
+        // charter is already loaded), and a stray call from history is a
+        // redundant read rather than a hard error.
+        advertised.delete("search_charters");
         // System context alone proved insufficient for weaker models: the
         // owner smoke trace showed a correctly injected Active Playbook, yet
         // DeepSeek still opened the rooted note first. Put the validated
@@ -2181,18 +2251,18 @@ export async function POST(request: Request) {
         rootedContentSection = attachedCharterResolved
           ? `\n\nThis chat was opened from **"${rootedContentTitle}"** (a ${rootedContentType ?? "content"}). It is optional working context, NOT the selected charter. The charter attached to the current user message and loaded in "Active Charter" is the procedure to execute. Do not read "${rootedContentTitle}" merely to identify, discover, or understand the charter.` +
             (readable
-              ? ` Read the rooted content with getCurrentNote (contentId: ${contentId}) only when the user's request or the active charter phase actually requires its contents.`
+              ? ` Read the rooted content with read_content (contentId: ${contentId}) only when the user's request or the active charter phase actually requires its contents.`
               : "")
           : rootedCharterResolved
             ? `\n\nThis chat is rooted in **"${rootedContentTitle}"** (a ${rootedContentType ?? "content"}), and the user explicitly asked to execute it as the Active Charter. Its validated instructions are already loaded; do not read or search for another charter.`
             : boundAttachId
               ? `\n\nThis chat is ATTACHED to **"${rootedContentTitle}"** (a ${rootedContentType ?? "content"}) — that is what this conversation is about, and its content is already loaded below under the referenced content (a side chat attaches whatever it lives under). When the user refers to "this file", "this note", "this database", "the current one", etc. without naming it, they mean "${rootedContentTitle}". Do not search for it.` +
                 (readable
-                  ? ` If the loaded content is truncated, getCurrentNote (contentId: ${contentId}) returns the full body.`
+                  ? ` If the loaded content is truncated, read_content (contentId: ${contentId}) returns the full body.`
                   : "")
               : `\n\nThis chat is rooted in **"${rootedContentTitle}"** (a ${rootedContentType ?? "content"}) — that is what this conversation is about. When the user refers to "this file", "this note", "the current one", "this charter", etc. without naming it, they mean "${rootedContentTitle}".` +
                 (readable
-                  ? ` Read its content with getCurrentNote (contentId: ${contentId}) when you need it.`
+                  ? ` Read its content with read_content (contentId: ${contentId}) when you need it.`
                   : "");
       }
 
@@ -2259,7 +2329,7 @@ export async function POST(request: Request) {
           : null;
       // The garden doc the user is actively VIEWING (focused content tab) — the
       // internal twin of currentPage. Lets the model resolve "this note/doc"
-      // without the user naming it, and read it with getCurrentNote(contentId).
+      // without the user naming it, and read it with read_content(contentId).
       const rawViewedContent = body.viewedContent;
       const viewedContentHint =
         rawViewedContent &&
@@ -2275,7 +2345,7 @@ export async function POST(request: Request) {
             }
           : null;
 
-      const toolsActive = Object.keys(tools).length > 0;
+      const toolsActive = advertised.size > 0;
       const validatedPlaybookId = attachedCharterResolved
         ? explicitPlaybookId
         : rootedCharterResolved
@@ -2285,7 +2355,7 @@ export async function POST(request: Request) {
         providerId: executedVendorId,
         modelId: activeModelId,
         userId: session.user.id,
-        toolNames: Object.keys(tools),
+        toolNames: [...advertised],
         charterId: validatedPlaybookId,
         charterContext,
       });
@@ -2301,12 +2371,12 @@ export async function POST(request: Request) {
             requested_provider: providerId,
             model: activeModelId,
             messages: modelMessages.length,
-            tools: tools ? Object.keys(tools).length : 0,
+            tools: advertised.size,
             // S2 debug surface: which tools actually attached, and whether
             // the native search tool made it in (gateway transports may
             // handle provider-defined tools differently than direct).
-            tool_names: Object.keys(tools).join(","),
-            native_search: "search_web" in tools,
+            tool_names: [...advertised].join(","),
+            native_search: isAdvertised("search_web"),
             executed_provider: executedVendorId,
             prompt_cache_enabled: promptCachePolicy.enabled,
             prompt_cache_scope: promptCachePolicy.scope,
@@ -2393,7 +2463,7 @@ export async function POST(request: Request) {
         reasoningProviderOptions !== undefined,
         itemIterationBudget != null,
       );
-      const activeToolCount = toolsActive ? Object.keys(tools).length : 0;
+      const activeToolCount = advertised.size;
 
       // Turn start — for the generation-duration shown in the assistant avatar
       // tooltip (attached on `finish` in messageMetadata below). Anchored here so
@@ -2418,7 +2488,32 @@ export async function POST(request: Request) {
         model: wrappedModel,
         messages: modelMessages,
         tools: toolsActive ? tools : undefined,
+        // Advertisement, not availability: only these schemas are serialized,
+        // but every tool in `tools` above remains executable. See the
+        // `advertised` set at assembly for why the difference matters.
+        activeTools: toolsActive ? [...advertised] : undefined,
         toolChoice: toolsActive ? "auto" : undefined,
+        // Spelling is not a capability question. The id namespace mixes
+        // camelCase (`create_note`) with snake_case (`query_database`), so a
+        // model settled into one convention emits the other and the SDK
+        // answers `NoSuchToolError`. Resolve the rename and let the call
+        // stand; anything beyond case/separators stays an honest error,
+        // because guessing which tool was meant can run the wrong one.
+        experimental_repairToolCall: async ({ toolCall, error }) => {
+          if (!NoSuchToolError.isInstance(error)) return null;
+          const resolved = resolveToolNameAlias(
+            toolCall.toolName,
+            Object.keys(tools),
+          );
+          if (!resolved) return null;
+          logger.info({
+            layer: "ai",
+            event: "tools:name_repaired",
+            summary: "tool call repaired to its real id",
+            attrs: { called: toolCall.toolName, resolved },
+          });
+          return { ...toolCall, toolName: resolved };
+        },
         // Reasoning opt-in for Anthropic + Google (Session 6). Undefined
         // for OpenAI o-series (reasoning is automatic) and non-reasoning
         // chat models.
@@ -2437,7 +2532,7 @@ export async function POST(request: Request) {
         // finish N pages. The page budget is the depth lever; this is the safety
         // ceiling that follows it. Outside a research run, the normal 7/8 cap.
         // Item runs: each item ≈ read + record (+ optional re-read); +8
-        // overhead for list_tabs / propose / roll-up createNote /
+        // overhead for list_tabs / propose / roll-up create_note /
         // record_iteration_findings. The client item budget is the true
         // limiter (soft-stops new items); this ceiling must not cut off
         // before it. Cap value + provenance hoisted above (stepCap /
@@ -2462,9 +2557,18 @@ export async function POST(request: Request) {
         // than the silence this fixes. Telling it the loop is over makes
         // the honest report the only available move.
         prepareStep: ({ stepNumber, messages: stepMessages }) => {
-          if (stepNumber < stepCap - 1) return {};
+          // Summoned tools enter here: `activated` grew during the previous
+          // step's tool execution, and this is the only place a step's
+          // advertised set can be widened. Returned every step (not just when
+          // something was summoned) so the set is stated by one rule rather
+          // than inherited sometimes and overridden others.
+          const stepActiveTools = toolsActive
+            ? [...advertised, ...activated]
+            : undefined;
+          if (stepNumber < stepCap - 1) return { activeTools: stepActiveTools };
           stepsTracker.finalStepReserved = true;
           return {
+            activeTools: stepActiveTools,
             toolChoice: "none" as const,
             messages: [
               ...stepMessages,
@@ -2479,18 +2583,19 @@ export async function POST(request: Request) {
           };
         },
         system: buildSystemPrompt({
-          hasImageTools: "generate_image" in tools,
-          hasFlashcardTools: "list_decks" in tools,
-          hasWebSearch: "search_web" in tools,
-          hasCheckpointTool: "phase_checkpoint" in tools,
-          hasBrowserReadTool: READ_PAGE_HEADLESS_OR_BROWSER in tools,
-          hasTabLauncher: OPEN_TAB_AND_READ in tools,
-          hasCoBrowseTools: CO_BROWSE_OPEN in tools,
-          hasReadCurrentPage: READ_CURRENT_PAGE in tools,
-          hasResearchTools: "extract_structured" in tools,
-          hasListTabs: LIST_TABS in tools,
-          hasItemIteration: "propose_item_iteration" in tools,
-          hasDatabaseTools: "describe_database" in tools,
+          hasImageTools: isAdvertised("generate_image"),
+          hasFlashcardTools: isAdvertised("list_decks"),
+          hasWebSearch: isAdvertised("search_web"),
+          hasCheckpointTool: isAdvertised("phase_checkpoint"),
+          hasBrowserReadTool: isAdvertised(READ_PAGE_HEADLESS_OR_BROWSER),
+          hasTabLauncher: isAdvertised(OPEN_TAB_AND_READ),
+          hasCoBrowseTools: isAdvertised(CO_BROWSE_OPEN),
+          hasReadCurrentPage: isAdvertised(READ_CURRENT_PAGE),
+          hasResearchTools: isAdvertised("extract_structured"),
+          hasListTabs: isAdvertised(LIST_TABS),
+          hasItemIteration: isAdvertised("propose_item_iteration"),
+          hasDatabaseTools: isAdvertised("describe_database"),
+          toolMenu: toolMenu ?? undefined,
           viewedContentHint,
           // Runtime identity (v3.1): what this turn is ACTUALLY served by,
           // from live routing — so the model self-identifies from ground

@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-09-12
+last_updated: 2026-09-17
 ---
 
 # Sprint Backlog
@@ -9,6 +9,23 @@ last_updated: 2026-09-12
 **Sprint Execution Protocol**: Before commencing any sprint, always ask the user for input before planning and executing — there may be additions or modifications.
 
 ---
+
+## Tool summoner — follow-ups (2026-09-17, from `feat/ai-tool-summoner`)
+
+The branch shipped P0-P4 of `AI-TOOL-SUMMONER-PLAN.md`. These were specified in it and deliberately not built.
+
+- [ ] **Measurement harness** (`scripts/measure-tool-prefix.ts`). Every token figure in the plan came from a throwaway Next route plus a one-off script, both deleted, because the tool module graph has require-cycles and ESM/CJS interop that only Next's bundler tolerates. Without it the numbers rot silently — and "core is small" is now a claim the design rests on, so a 2k-token tool added to `CORE_TOOL_IDS` would erase a third of the saving invisibly. Cheap version: a dev-only route behind an env guard plus a thin script that starts dev, fetches it, and prints the table. Expensive version: break the cycles, which would also unblock unit tests over tool definitions.
+- [ ] **`repaired` badge on the collapsed tool chip** when `record_item_result` inferred a status. The `statusNote` is already in the tool result (visible on expand); the badge is disclosure at a glance, per "a silently applied correction reads as a bug".
+- [ ] **Predictive activation named in the run ledger** phase line, so the user can see *why* a tool was available without a summon chip.
+- [ ] **Advertised-tool tokens in the turn accumulator**, so the prefix cost is reported per turn rather than inferred.
+- [ ] *Known ceiling, may be unfixable:* a **name repair cannot surface in the UI**. `repairToolCall` rewrites the call before a tool part exists, so there is no stream hook — the chip shows the corrected name with no trace of the correction. Server-side `tools:name_repaired` logging may be the honest limit.
+- [ ] **Watch for off-task tool calls.** Tool absence used to keep a run focused; a menu gives that up. Mitigated by leading with the active mode's families, but this is the one place the change could plausibly regress behaviour.
+
+## `pg` pool silently falls back to production Neon (2026-09-17)
+
+Found while debugging a local dev failure, unrelated to the branch it surfaced on. `.env.local` carries the Vercel/Neon integration's libpq variables (`PGHOST`, `PGPASSWORD`, `PGDATABASE`, all pointing at Neon), and `lib/database/client.ts:156` builds its pool as `new Pool({ connectionString: databaseUrl })` with no explicit host — while `databaseUrl` has a `|| ""` fallback. `node-postgres` reads `PG*` as defaults, so an unset, empty or unparseable `DATABASE_URL` does not fail: it connects to **production**.
+
+- [ ] Throw on an empty/unparseable `DATABASE_URL` instead of defaulting, or pass an explicit host and `ssl: false` when `LOCAL_POSTGRES=1`. `scripts/check-db-target.ts` already guards the *declared* target; this is the same guard missing one layer down, at the pool.
 
 ## Duplicate relation columns in production (cleanup, 2026-09-13)
 

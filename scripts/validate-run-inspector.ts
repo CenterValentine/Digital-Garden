@@ -123,7 +123,7 @@ check("gpt4o turn 1: denied proposal", () => {
 
 check("gpt4o turn 2: silent-turn suppressed while awaiting approval", () => {
   assert.deepEqual(kindsOf(g4Turn2), ["legacy-metadata"]);
-  assert.equal(g4Turn2.stepCount, 22); // propose + 10×(read, record) + createNote
+  assert.equal(g4Turn2.stepCount, 22); // propose + 10×(read, record) + create_note
   assert.equal(g4Turn2.hasVisibleText, false);
   assert.ok(!kindsOf(g4Turn2).includes("silent-turn"));
 });

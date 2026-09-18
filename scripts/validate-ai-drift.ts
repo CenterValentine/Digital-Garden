@@ -63,6 +63,11 @@ import {
   OPEN_TAB_AND_READ_DESCRIPTION,
 } from "../lib/domain/ai/tools/open-tab-and-read";
 import { buildSystemPrompt } from "../lib/domain/ai/system-prompt";
+import {
+  CORE_TOOL_IDS,
+  MODE_TOOL_IDS,
+  TOOL_MENU,
+} from "../lib/domain/ai/tools/menu";
 
 import {
   AI_PROPOSABLE_COLUMN_TYPES,
@@ -278,7 +283,7 @@ function extractDescription(
 ): string | null {
   const window = source.slice(from, from + 6000);
   // Boundary excludes needsApproval: approval-gated tools declare it BEFORE
-  // their description (createNote, the workflow tools), and it must not
+  // their description (create_note, the workflow tools), and it must not
   // terminate the search early.
   const boundary = window.search(/\b(inputSchema|execute)\s*:/);
   const scope = boundary === -1 ? window : window.slice(0, boundary);
@@ -374,6 +379,47 @@ for (const name of realToolNames) {
     fail(
       "gate3",
       `tool "${name}" is unclassified — add settings metadata (user-configurable) or add it to HARNESS_INTERNAL_TOOL_IDS in lib/domain/ai/tools/metadata.ts`,
+    );
+  }
+}
+
+// Naming convention. The namespace was mixed until 2026-09-17 — four camelCase
+// ids among sixty-one snake_case ones — which cost models a hard
+// `NoSuchToolError` whenever they guessed the majority convention for a
+// minority name. Held here so the next id cannot reintroduce the split.
+const TOOL_ID_PATTERN = /^[a-z][a-z0-9]*(_[a-z0-9]+)*$/;
+for (const name of realToolNames) {
+  if (!TOOL_ID_PATTERN.test(name)) {
+    fail(
+      "gate3",
+      `tool id "${name}" is not snake_case — rename it to match ${TOOL_ID_PATTERN}. Minting rules are in lib/domain/ai/tools/metadata.ts; a rename also needs a LEGACY_TOOL_IDS entry in lib/domain/ai/tools/repair.ts, or old charters and transcripts break quietly.`,
+    );
+  }
+}
+
+// Summon menu coverage. Only core and active-mode tools are advertised in
+// full; every other tool is reachable ONLY through its menu line, so a tool
+// with no entry is a tool the model can never discover — invisible rather than
+// merely unadvertised. The inverse (an entry with no tool) offers the model
+// something that cannot be summoned.
+for (const name of realToolNames) {
+  if (!TOOL_MENU[name]) {
+    fail(
+      "gate3",
+      `tool "${name}" has no TOOL_MENU entry in lib/domain/ai/tools/menu.ts — unadvertised tools are discoverable only through the menu, so this one can never be found`,
+    );
+  }
+}
+for (const id of Object.keys(TOOL_MENU)) {
+  if (!realToolNames.has(id)) {
+    fail("gate3", `TOOL_MENU lists "${id}" but no such tool exists — stale menu entry`);
+  }
+}
+for (const id of [...CORE_TOOL_IDS, ...Object.values(MODE_TOOL_IDS).flat()]) {
+  if (!realToolNames.has(id)) {
+    fail(
+      "gate3",
+      `"${id}" is named in CORE_TOOL_IDS/MODE_TOOL_IDS but no such tool exists — it would be advertised as nothing`,
     );
   }
 }

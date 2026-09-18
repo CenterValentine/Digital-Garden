@@ -42,6 +42,8 @@ import {
   preflightCapture,
 } from "@/lib/domain/data/server/capture";
 import { createColumn } from "@/lib/domain/data/server/mutations";
+import { renderDataNodePreview } from "@/lib/domain/data/server/read-preview";
+import { resolveItemStatus } from "./repair";
 import {
   closeSitting,
   ensureMasterLedger,
@@ -256,6 +258,24 @@ function describeContentType(type: ContentType): string {
   return AI_CONTENT_TYPE_NAMES[type];
 }
 
+/**
+ * HTML pages and templates share `HtmlPayload`. Prefer the extracted text —
+ * markup is mostly tokens the model does not need — and fall back to the raw
+ * HTML only when no text was extracted.
+ */
+async function renderHtmlPayload(
+  contentId: string,
+  header: string,
+): Promise<string> {
+  const h = await prisma.htmlPayload.findUnique({
+    where: { contentId },
+    select: { html: true, searchText: true, isTemplate: true },
+  });
+  if (!h) return `${header}\n\n(page record missing)`;
+  const text = h.searchText.trim() || h.html;
+  return `${header}${h.isTemplate ? "\nTemplate: yes" : ""}\n\n${text}`;
+}
+
 export function createBaseTools(ctx: ToolExecuteContext) {
   // One acquisition budget per request scope: createBaseTools is called per
   // chat turn in the route, so every read_page in a single turn shares this
@@ -370,7 +390,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
       description:
         "Propose a BOUNDED multi-page research run for the user to approve BEFORE reading anything. " +
         "Use this when the user asks to research a topic across multiple pages/sources. The user approves the objective, sources, page budget, and follow depth up front. " +
-        "On approval you receive a per-run page budget (reads refuse once it is spent) and a ledger key. Then read sources, call extract_structured on each, and finish with a synthesis (createNote) + record_research_findings.",
+        "On approval you receive a per-run page budget (reads refuse once it is spent) and a ledger key. Then read sources, call extract_structured on each, and finish with a synthesis (create_note) + record_research_findings.",
       needsApproval: true,
       inputSchema: z.object({
         objective: z
@@ -456,16 +476,16 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           nextAction:
             `APPROVED. You have a per-run budget of ${pageBudget} pages — reads refuse once it is spent, so spend them well (breadth first, depth ${depth}). ` +
             `Read each source, call extract_structured on its content with columns (the user's if named, else inferred from the objective), and accumulate the rows. ` +
-            `When the objective is met OR the budget is spent, synthesize with createNote (a short prose summary + a markdown table of the rows) into the output target, then call record_research_findings with ledgerRunKey "${ledgerRunKey}".`,
+            `When the objective is met OR the budget is spent, synthesize with create_note (a short prose summary + a markdown table of the rows) into the output target, then call record_research_findings with ledgerRunKey "${ledgerRunKey}".`,
         };
       },
     }),
     // Append a research run's outcome to its objective ledger (audit trail).
     // Called AFTER the synthesis note is written. Not user-approved — it is a log
-    // write; the user already approved the synthesis via createNote.
+    // write; the user already approved the synthesis via create_note.
     record_research_findings: tool({
       description:
-        "Record the outcome of a research run in its objective ledger (audit trail). Call AFTER synthesizing (createNote), passing the ledgerRunKey from propose_research_run. " +
+        "Record the outcome of a research run in its objective ledger (audit trail). Call AFTER synthesizing (create_note), passing the ledgerRunKey from propose_research_run. " +
         "Include the pages you read and a short summary of findings so the ledger is a faithful record of the run.",
       inputSchema: z.object({
         ledgerRunKey: z
@@ -1136,7 +1156,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             (effectiveBatchSize
               ? `This run is BATCHED: after every ${effectiveBatchSize} recorded items, pause acquisition and call record_batch_checkpoint (dedupe the batch, note anomalies) BEFORE starting the next item — the harness holds new reads until the checkpoint is recorded. `
               : "") +
-            `The ledger is the checklist; never trust your memory for completeness. When every item is recorded OR the budget is reached, ${questInfo ? `do NOT create a roll-up note (the quest log + quest ledger ARE the record — reuse, never duplicate); close with record_iteration_findings, then link [[${questInfo.questLabel} — Quest Ledger]] in your closing message` : `write the roll-up (createNote: a short prose summary + a markdown table of items/verdicts) and close with record_iteration_findings`}. ` +
+            `The ledger is the checklist; never trust your memory for completeness. When every item is recorded OR the budget is reached, ${questInfo ? `do NOT create a roll-up note (the quest log + quest ledger ARE the record — reuse, never duplicate); close with record_iteration_findings, then link [[${questInfo.questLabel} — Quest Ledger]] in your closing message` : `write the roll-up (create_note: a short prose summary + a markdown table of items/verdicts) and close with record_iteration_findings`}. ` +
             `If a captcha or session end interrupts, stop and tell the user — recorded progress is preserved and the run can resume from the first pending item.`,
         };
       },
@@ -1156,9 +1176,16 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           .max(600)
           .optional()
           .describe("The item's source URL (from the approved items list / the page you read). ALWAYS include it when known — the ledger renders it as a clickable link so the page can be revisited."),
+        // Deliberately a lenient string, not an enum (owner report
+        // 2026-09-17): a required enum rejected the WHOLE call before
+        // execute — verdict, score and nine captured cells with it — and the
+        // best-scoring item of a production run was lost to a missing word.
+        // Resolution lives in execute, where the rest of the call can inform
+        // it. Same doctrine as data-tools.ts's read schema.
         status: z
-          .enum(["done", "unreadable", "blocked"])
-          .describe("done = analyzed; unreadable = page could not be read; blocked = an obstacle (login/captcha) stopped this item."),
+          .string()
+          .optional()
+          .describe('"done" = analyzed; "unreadable" = page could not be read; "blocked" = an obstacle (login/captcha) stopped this item.'),
         qualified: z.boolean().optional().describe("Whether the item met the objective's bar (e.g. fit > 75%)."),
         fitPercent: z.number().min(0).max(100).optional().describe("Numeric score when the objective scores items."),
         verdict: z.string().max(1000).optional().describe("One-to-three sentence rationale for this item."),
@@ -1182,7 +1209,24 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             "Quest runs with SCULPTED ledger columns: their values for this item (column name → value). Machinery fields (status/fit/qualified/verdict) are recorded automatically — never repeat them here.",
           ),
       }),
-      execute: async ({ ledgerRunKey, itemKey, itemLabel, url, status, qualified, fitPercent, verdict, artifactTitle, capture, questCells }) => {
+      execute: async ({ ledgerRunKey, itemKey, itemLabel, url, status: statusArg, qualified, fitPercent, verdict, artifactTitle, capture, questCells }) => {
+        // Resolve before anything is written: a recognized word is taken, a
+        // missing one is inferred from the evidence in the same call, and only
+        // a call with neither is sent back — as a RESULT the model can act on
+        // in the next step, never a validation error that ends the call.
+        const resolution = resolveItemStatus({
+          status: statusArg,
+          verdict,
+          fitPercent,
+          qualified,
+          hasCapture: Boolean(capture),
+        });
+        if ("needsStatus" in resolution) {
+          return { ok: false, recorded: null, note: resolution.needsStatus };
+        }
+        const status = resolution.status;
+        const statusNote = resolution.note;
+
         const placement = resolveToolOutputPlacement(ctx);
         // Quest logs are keyed globally (upsertRunLedger "quest:" keys), so a
         // sitting in a chat with no target folder still finds its log. Only
@@ -1338,6 +1382,10 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             ok: true,
             recorded: itemKey,
             status,
+            // An inferred status is reported, never applied silently — the
+            // model (and the transcript) should see that the harness filled
+            // something in, and what it filled in.
+            ...(statusNote ? { statusNote } : {}),
             ledgerNodeId: ledger.contentNodeId,
             ...(capturedRowId
               ? { rowId: capturedRowId, rowStatus: capturedRowStatus }
@@ -1364,7 +1412,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
               ? "The ledger line is recorded but the row was REJECTED whole (no partial rows). Fix exactly the cells named in captureErrors and call record_item_result AGAIN for this SAME itemKey with corrected capture.cells — then continue to the next item."
               : sittingClosed
                 ? "STOP recording against this closed run. If more items need processing, call propose_item_iteration again (same quest label) — a fresh sitting opens and already-scored items are skipped automatically."
-                : `Recorded. Do NOT stop or ask the user whether to continue — immediately move to the NEXT item now (open/read it, then record it). Only once EVERY item is recorded do you ${questState ? "call record_iteration_findings (NO roll-up note — the quest log + ledger are the record)" : "write the roll-up (createNote) and call record_iteration_findings"}.`,
+                : `Recorded. Do NOT stop or ask the user whether to continue — immediately move to the NEXT item now (open/read it, then record it). Only once EVERY item is recorded do you ${questState ? "call record_iteration_findings (NO roll-up note — the quest log + ledger are the record)" : "write the roll-up (create_note) and call record_iteration_findings"}.`,
           };
         } catch (error) {
           return { ok: false, note: `Ledger write failed (${error instanceof Error ? error.message : "unknown"}). Continue to the next item; reconcile in the roll-up.` };
@@ -1518,7 +1566,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
     // item budget (the engine watches for this result, as with research runs).
     record_iteration_findings: tool({
       description:
-        "Close an iteration run: record the reconciliation (processed / qualified / unreadable counts + summary) in its ledger, passing the ledgerRunKey from propose_item_iteration. Quest-less runs call it AFTER the roll-up note (createNote); quest runs skip the roll-up note entirely (the quest log + ledger are the record).",
+        "Close an iteration run: record the reconciliation (processed / qualified / unreadable counts + summary) in its ledger, passing the ledgerRunKey from propose_item_iteration. Quest-less runs call it AFTER the roll-up note (create_note); quest runs skip the roll-up note entirely (the quest log + ledger are the record).",
       inputSchema: z.object({
         ledgerRunKey: z.string().min(1).describe("The ledgerRunKey from propose_item_iteration."),
         resultSummary: z.string().min(1).max(4000).describe("Short markdown reconciliation: what was processed and what qualified."),
@@ -1888,7 +1936,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
     create_folder: tool({
       description:
         "Find or create a folder by name. Use for charter standing rules like 'place outputs in a folder named after the company under job-search/'. " +
-        "Pass parentId to nest; omit it to use this conversation's target folder. Returns the folder id for use as parentId in createNote/create_docx. " +
+        "Pass parentId to nest; omit it to use this conversation's target folder. Returns the folder id for use as parentId in create_note/create_docx. " +
         "Find-or-create: an existing folder with the same name under the same parent is reused, never duplicated.",
       inputSchema: z.object({
         name: z.string().min(1).max(255).describe("Folder name"),
@@ -1994,7 +2042,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
     }),
     create_docx: tool({
       // Document creation is a mutating action — same HITL gate as
-      // createNote (AI v3 core S4b / A4).
+      // create_note (AI v3 core S4b / A4).
       needsApproval: true,
       description:
         "Create a Word (.docx) document from markdown content and file it in the user's garden. " +
@@ -2157,7 +2205,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
     // exactly this — the finder simply never read it.
     search_content: tool({
       description:
-        "Search everything the user owns — notes, folders, databases, files, and more — by title and indexed content. Returns each hit's TYPE, id, location, and a one-line excerpt, so you can pick the right follow-up tool (a [database] hit goes to describe_database, a [folder] hit to read_folder_context, a [note] hit to getCurrentNote). Search BEFORE guessing an id or a name: one call here beats a chain of failed lookups. Pass an EMPTY query with `types` to LIST what exists — `{query: \"\", types: [\"data\"]}` is how you see the user's databases when you don't know their names. Narrow with `types` only when you know the shape you want; the default covers notes, folders, and databases.",
+        "Search everything the user owns — notes, folders, databases, files, and more — by title and indexed content. Returns each hit's TYPE, id, location, and a one-line excerpt, so you can pick the right follow-up tool (a [database] hit goes to describe_database, a [folder] hit to read_folder_context, a [note] hit to read_content). Search BEFORE guessing an id or a name: one call here beats a chain of failed lookups. Pass an EMPTY query with `types` to LIST what exists — `{query: \"\", types: [\"data\"]}` is how you see the user's databases when you don't know their names. Narrow with `types` only when you know the shape you want; the default covers notes, folders, and databases.",
       inputSchema: z.object({
         query: z
           .string()
@@ -2358,13 +2406,13 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           (p, i) =>
             `${i + 1}. "${p.title}" (id: ${p.id}, ${p.phaseCount} phase${p.phaseCount === 1 ? "" : "s"})${p.description ? `\n   ${p.description}` : ""}`,
         );
-        return `Found ${matches.length} charter${matches.length !== 1 ? "s" : ""}:\n\n${lines.join("\n\n")}\n\nRead the right one with getCurrentNote using its contentId.`;
+        return `Found ${matches.length} charter${matches.length !== 1 ? "s" : ""}:\n\n${lines.join("\n\n")}\n\nRead the right one with read_content using its contentId.`;
       },
     }),
 
-    getCurrentNote: tool({
+    read_content: tool({
       description:
-        "Get the full content of a specific note (or a folder's own notes content) by its ID. Useful for reading context about a note the user is viewing, or a folder's notes when the folder itself is referenced.",
+        "Read ANY content node by its ID — note, folder notes, database, file, link, code, page. Returns the content itself where it is text, and a database's schema plus a row preview where it is a database. Use it for any 'what is in this thing' question; it never refuses a content type, so you never need a specialist tool just to look.",
       inputSchema: z.object({
         contentId: z.string().uuid().describe("The content node ID to read"),
       }),
@@ -2390,45 +2438,157 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         });
 
         if (!content) {
-          return `Note with ID "${contentId}" not found or not accessible.`;
+          return `Content with ID "${contentId}" not found or not accessible.`;
         }
 
-        // Folders can carry a notePayload too (the folder "Notes" editor), so
-        // a folder WITH notes content is readable the same as a note — only a
-        // folder with no notePayload (or a genuinely non-text content type)
-        // is rejected.
-        const isTextBearing =
-          content.contentType === "note" || content.contentType === "folder";
-        if (!isTextBearing || !content.notePayload) {
-          return `Content "${content.title}" is a ${content.contentType}, not readable as text.`;
-        }
-
-        // Render live from tiptapJson — the materialized searchText column
-        // was written by the old extractor for existing notes, and that
-        // extractor dropped every atomic inline node ([[wiki-links]], #tags,
-        // @mentions). Live extraction fixes all notes without a reindex;
-        // searchText stays as the fallback for payloads with no JSON.
-        const liveText = content.notePayload.tiptapJson
-          ? extractSearchTextFromTipTap(
-              content.notePayload.tiptapJson as JSONContent,
-            ).trim()
-          : "";
-        const text =
-          liveText || content.notePayload.searchText || "(empty note)";
         // Summarize-on-write (S5): abstract first, so multi-phase runs can
         // often stop reading here instead of pulling full content into
         // context.
-        const meta = content.notePayload.metadata as
+        const meta = content.notePayload?.metadata as
           | { abstract?: string }
-          | null;
-        const abstractLine = meta?.abstract
-          ? `\nAbstract: ${meta.abstract}\n`
-          : "";
-        return `Title: ${content.title}\nType: ${content.contentType}\nUpdated: ${content.updatedAt.toISOString()}${abstractLine}\nContent:\n${text}`;
+          | null
+          | undefined;
+        const header =
+          `Title: ${content.title}\n` +
+          `Type: ${describeContentType(content.contentType)}\n` +
+          `Updated: ${content.updatedAt.toISOString()}` +
+          (meta?.abstract ? `\nAbstract: ${meta.abstract}` : "");
+
+        // Notes and folders: the folder "Notes" editor writes a notePayload
+        // too, so both render the same way.
+        const renderNoteText = (): string => {
+          if (!content.notePayload) {
+            return content.contentType === "folder"
+              ? `${header}\n\nThis folder has no notes content of its own. Its sources and children are read with read_folder_context.`
+              : `${header}\n\n(empty note)`;
+          }
+          // Render live from tiptapJson — the materialized searchText column
+          // was written by the old extractor for existing notes, and that
+          // extractor dropped every atomic inline node ([[wiki-links]], #tags,
+          // @mentions). Live extraction fixes all notes without a reindex;
+          // searchText stays as the fallback for payloads with no JSON.
+          const liveText = content.notePayload.tiptapJson
+            ? extractSearchTextFromTipTap(
+                content.notePayload.tiptapJson as JSONContent,
+              ).trim()
+            : "";
+          const text =
+            liveText || content.notePayload.searchText || "(empty note)";
+          return `${header}\nContent:\n${text}`;
+        };
+
+        /**
+         * A read NEVER dead-ends (AI-TOOL-SUMMONER-PLAN §1.2, owner direction
+         * 2026-09-17: "every content type is a note technically"). Each branch
+         * either renders the thing or says what it is and names the way in —
+         * the old blanket refusal sent a charter run blind mid-task.
+         *
+         * Exhaustive `Record<ContentType, …>` on purpose: a new content type
+         * must fail the build here rather than silently falling back to a
+         * refusal (the `default:`-hides-gaps lesson).
+         */
+        const renderers: Record<ContentType, () => Promise<string>> = {
+          note: async () => renderNoteText(),
+          folder: async () => renderNoteText(),
+
+          data: async () => {
+            const preview = await renderDataNodePreview(contentId, {
+              viewerId: ctx.userId,
+            });
+            return preview
+              ? `${header}\n\n${preview}`
+              : `${header}\n\nThis database has no schema yet.`;
+          },
+
+          file: async () => {
+            const f = await prisma.filePayload.findUnique({
+              where: { contentId },
+              select: {
+                fileName: true,
+                mimeType: true,
+                fileSize: true,
+                uploadStatus: true,
+                searchText: true,
+              },
+            });
+            if (!f) return `${header}\n\n(file record missing)`;
+            const size = `${Math.round(Number(f.fileSize) / 1024).toLocaleString("en-US")} KB`;
+            const facts = `File: ${f.fileName} · ${f.mimeType} · ${size} · upload ${f.uploadStatus}`;
+            const body = f.searchText.trim()
+              ? `\n\nExtracted text:\n${f.searchText.trim()}`
+              : "\n\nNo extracted text is held for this file. Attach it to the conversation if its contents are needed.";
+            return `${header}\n\n${facts}${body}`;
+          },
+
+          external: async () => {
+            const e = await prisma.externalPayload.findUnique({
+              where: { contentId },
+              select: {
+                url: true,
+                description: true,
+                sourceDomain: true,
+                readingStatus: true,
+              },
+            });
+            if (!e) return `${header}\n\n(link record missing)`;
+            return (
+              `${header}\n\nURL: ${e.url}` +
+              (e.sourceDomain ? `\nDomain: ${e.sourceDomain}` : "") +
+              `\nReading status: ${e.readingStatus}` +
+              (e.description ? `\n\n${e.description}` : "") +
+              "\n\nThis is a saved link, not its page text. Read the page itself with a page-read tool if you need its contents."
+            );
+          },
+
+          code: async () => {
+            const c = await prisma.codePayload.findUnique({
+              where: { contentId },
+              select: { code: true, language: true },
+            });
+            if (!c) return `${header}\n\n(code record missing)`;
+            return `${header}\nLanguage: ${c.language}\n\n${c.code}`;
+          },
+
+          html: async () => renderHtmlPayload(contentId, header),
+          template: async () => renderHtmlPayload(contentId, header),
+
+          visualization: async () => {
+            const v = await prisma.visualizationPayload.findUnique({
+              where: { contentId },
+              select: { engine: true },
+            });
+            return v
+              ? `${header}\n\nDiagram rendered with ${v.engine}. Its source is edited in the diagram editor and is not readable as prose here.`
+              : `${header}\n\n(diagram record missing)`;
+          },
+
+          shortcut: async () => {
+            const s = await prisma.shortcutPayload.findUnique({
+              where: { contentId },
+              select: {
+                targetContentId: true,
+                target: { select: { title: true, contentType: true } },
+              },
+            });
+            if (!s?.targetContentId || !s.target) {
+              return `${header}\n\nThis shortcut points at nothing — its target was deleted.`;
+            }
+            return `${header}\n\nThis is a shortcut to the ${describeContentType(s.target.contentType)} "${s.target.title}". Read the real thing with read_content on ${s.targetContentId}.`;
+          },
+
+          chat: async () =>
+            `${header}\n\nThis is a saved chat. Its transcript is not readable through this tool.`,
+          hope: async () =>
+            `${header}\n\nThis is a goal. It carries no text body of its own.`,
+          workflow: async () =>
+            `${header}\n\nThis is a workflow. Read its definition with get_workflow.`,
+        };
+
+        return renderers[content.contentType]();
       },
     }),
 
-    createNote: tool({
+    create_note: tool({
       // File creation is a mutating action: pause the tool loop for user
       // approval before executing (AI SDK v6 native HITL). The chat surface
       // renders the approval card; execution resumes via
@@ -2437,7 +2597,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
       description:
         "Create a NEW note in the user's Digital Garden. Use this only when the user EXPLICITLY asks for a new file. " +
         "Ambiguous phrasings to watch for: 'update the note in this chat', 'add to this conversation's notes', 'put X in the note' — these do NOT mean 'create a new note'. They typically refer to an existing note. When the phrasing is ambiguous, ASK the user whether to create a new note or update an existing one before calling this tool. " +
-        "If they confirm a new note, this is the right tool. If they name an existing note, use `search_content` to find its id then use `updateNote`. " +
+        "If they confirm a new note, this is the right tool. If they name an existing note, use `search_content` to find its id then use `update_note`. " +
         "Do NOT create output on your own initiative — only when the user asks for it. " +
         "Targeting: omit placement fields to use the configured output-target preset. If the user or active charter gives THIS note a different relative destination, pass `outputLocation` (`under_chat`, `under_content`, or `beside_content`). Pass `parentId` only for a specifically resolved folder UUID. A per-note instruction always overrides the preset. " +
         "HYPERLINKING: to link other garden content inline (notes OR folders), write wiki-links in the markdown — [[Exact Title]] or [[Exact Title|Shown Text]]. They become real clickable links, resolve by title, and a linked FOLDER also feeds its context to the AI when the note is used in chat or as a charter. Use the content's exact title; do not invent URL-style links for internal content.",
@@ -2450,7 +2610,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         abstract: z
           .string()
           // Truncate rather than reject: a slightly-too-long abstract used to
-          // hard-fail the WHOLE createNote call, discarding the note's entire
+          // hard-fail the WHOLE create_note call, discarding the note's entire
           // content (smoke finding). The abstract is a cosmetic summary, so
           // clip it to the limit and keep the note.
           .transform((s) =>
@@ -2627,15 +2787,15 @@ export function createBaseTools(ctx: ToolExecuteContext) {
       },
     }),
 
-    updateNote: tool({
+    update_note: tool({
       description:
         "Update the markdown/TipTap notes attached to a content item. " +
         "WORKS ON ANY CONTENT TYPE: notes (full-page editor), chats (the 'Add notes' panel below the chat), folders, files, externals, etc. — every content type has an optional sidecar NotePayload keyed by its contentId. " +
         "Common phrasings: 'update this conversation's notes', 'add to my Sourdough note', 'put X in the notes for this chat'. " +
         "If the user is chatting in a full-page chat and asks to update 'the note in this chat' or 'this chat's notes', pass the CHAT's contentId here — that updates the notes panel attached to the chat itself, not a separate file. " +
-        "Do NOT use this to create new top-level notes — use `createNote` for that. " +
-        "Do NOT call this on your own initiative — only when the user asks you to write to a note. There is no default between writing-to-a-note and creating new output (createNote/create_docx); pick whichever the user's request actually asks for, and do neither unless they ask. " +
-        "This updates CONTENT ONLY — it never changes the title. Renaming is a separate, explicit action: if the user asks to rename/retitle, use `renameNote`. Do not rename as a side effect of a content update. " +
+        "Do NOT use this to create new top-level notes — use `create_note` for that. " +
+        "Do NOT call this on your own initiative — only when the user asks you to write to a note. There is no default between writing-to-a-note and creating new output (create_note/create_docx); pick whichever the user's request actually asks for, and do neither unless they ask. " +
+        "This updates CONTENT ONLY — it never changes the title. Renaming is a separate, explicit action: if the user asks to rename/retitle, use `rename_note`. Do not rename as a side effect of a content update. " +
         "HYPERLINKING: to link other garden content inline (notes OR folders), write wiki-links in the markdown — [[Exact Title]] or [[Exact Title|Shown Text]]. They become real clickable links, resolve by title, and a linked FOLDER also feeds its context to the AI when the note is used in chat or as a charter. Use the content's exact title; do not invent URL-style links for internal content.",
       inputSchema: z.object({
         contentId: z
@@ -2672,7 +2832,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
       needsApproval: async ({ contentId, mode, content }) =>
         isDestructiveRewrite({ contentId, mode, contentLength: content.length }),
       execute: async ({ contentId, mode, content }) => {
-        // Allow updateNote against ANY content type the user owns —
+        // Allow update_note against ANY content type the user owns —
         // notes, chats (their 'Add notes' sidecar), folders, files, etc.
         // The legacy filter of `contentType: "note"` was the cause of the
         // "you can't update this chat's notes" behavior the user reported.
@@ -2688,8 +2848,8 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           return `Content "${contentId}" not found or deleted. Use search_content to find the right id.`;
         }
 
-        // updateNote is CONTENT-ONLY — it structurally cannot rename. (Renaming
-        // lives in the separate `renameNote` tool.) The former `title` argument
+        // update_note is CONTENT-ONLY — it structurally cannot rename. (Renaming
+        // lives in the separate `rename_note` tool.) The former `title` argument
         // was removed after it caused a silent rename: the model serialized this
         // tool's own "do NOT … rename" guard text into the title field
         // ("/do-not-rename/"). No title param = nothing to bleed in.
@@ -2738,7 +2898,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           __notePayload: true,
           kind: "updated",
           contentId: existing.id,
-          title: existing.title, // unchanged — updateNote never renames
+          title: existing.title, // unchanged — update_note never renames
           wordCount,
           targetKind: existing.contentType,
           // Route + delta make the receipt self-diagnosing. The 2026-08-12 incident
@@ -2768,16 +2928,16 @@ export function createBaseTools(ctx: ToolExecuteContext) {
       },
     }),
 
-    // Explicit, standalone RENAME. Split out from updateNote (2026-08-05): a
+    // Explicit, standalone RENAME. Split out from update_note (2026-08-05): a
     // title argument on a content-update tool let the model rename as a side
-    // effect — and worse, it serialized updateNote's own "do NOT … rename" guard
+    // effect — and worse, it serialized update_note's own "do NOT … rename" guard
     // text into the title ("/do-not-rename/"). Renaming is now its own deliberate
     // action the user must ask for; content updates can't touch the title.
-    renameNote: tool({
+    rename_note: tool({
       description:
         "Rename (retitle) an existing note, chat, folder, or other content the user owns. " +
         "Use ONLY when the user EXPLICITLY asks to rename or retitle something (e.g. 'rename this to X', 'call this note Y'). " +
-        "This changes the TITLE ONLY and never touches content — do not use it as part of a content update (use updateNote for content). Mentioning a topic or theme is NOT a rename request.",
+        "This changes the TITLE ONLY and never touches content — do not use it as part of a content update (use update_note for content). Mentioning a topic or theme is NOT a rename request.",
       inputSchema: z.object({
         contentId: z
           .string()

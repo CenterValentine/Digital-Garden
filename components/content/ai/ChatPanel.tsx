@@ -681,7 +681,7 @@ export function ChatPanel({
         return {
           applied: false,
           message:
-            "The document is not open in an editor right now, so nothing was read or changed. Ask the user to open it, or use updateNote to write to it directly.",
+            "The document is not open in an editor right now, so nothing was read or changed. Ask the user to open it, or use update_note to write to it directly.",
         };
       }
 
