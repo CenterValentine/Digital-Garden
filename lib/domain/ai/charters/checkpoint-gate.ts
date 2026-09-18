@@ -86,7 +86,7 @@ export function recordCompletedPhaseTools(
     }
 
     if (
-      call.toolName === "getCurrentNote" &&
+      call.toolName === "read_content" &&
       call.input &&
       typeof call.input === "object"
     ) {
@@ -182,7 +182,7 @@ export function getPhaseCheckpointGateStatus(
     gate.observedReferenceContentIds.length === 0
   ) {
     missingRequirements.push(
-      "Read at least one linked extension with getCurrentNote.",
+      "Read at least one linked extension with read_content.",
     );
   }
 
@@ -205,7 +205,7 @@ export function renderPhaseCheckpointGateInstruction(
   }
   if (gate.referenceContentIds.length > 0) {
     requirements.push(
-      "read at least one linked extension using `getCurrentNote` and an ID from the manifest",
+      "read at least one linked extension using `read_content` and an ID from the manifest",
     );
   }
 

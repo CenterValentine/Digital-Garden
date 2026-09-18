@@ -952,7 +952,7 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
   }, [selectedContentId, updateContentTab]);
 
   // Targeted notes-only refresh — fired by `use-conversation-engine`'s
-  // onFinish when the AI's updateNote tool writes new note content.
+  // onFinish when the AI's update_note tool writes new note content.
   // Why a separate path from `content-updated`: that listener triggers
   // `refreshTrigger++`, which re-runs `fetchNote`, which resets loading
   // state, re-extracts the outline, syncs the tab title, and reloads

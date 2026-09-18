@@ -1,13 +1,13 @@
 /**
  * Render a `data` node as readable text for the GENERALIST read path.
  *
- * Why this exists (AI-TOOL-SUMMONER-PLAN §1.2): `getCurrentNote` used to
+ * Why this exists (AI-TOOL-SUMMONER-PLAN §1.2): `read_content` used to
  * refuse every content type but `note` and `folder`, so a chat that reached
  * for a database by the ordinary read tool got
  * `"… is a data, not readable as text."` — a dead end, while the machinery to
  * render it sat one directory away. A production charter run (2026-09-17)
  * fell into exactly that hole: denied `query_database` by the run diet, its
- * correct fallback to `getCurrentNote` hit this refusal and the run proceeded
+ * correct fallback to `read_content` hit this refusal and the run proceeded
  * blind.
  *
  * This is a PREVIEW, deliberately: the schema capsule plus a bounded index-tier

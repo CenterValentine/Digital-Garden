@@ -29,7 +29,10 @@ import {
   UI_MESSAGE_STREAM_HEADERS,
 } from "ai";
 import type { UIMessage } from "ai";
-import { resolveToolNameAlias } from "@/lib/domain/ai/tools/repair";
+import {
+  LEGACY_TOOL_IDS,
+  resolveToolNameAlias,
+} from "@/lib/domain/ai/tools/repair";
 import { isResumableConfigured } from "@/lib/domain/ai/resumable/redis";
 import { getStreamContext } from "@/lib/domain/ai/resumable/context";
 import {
@@ -353,7 +356,7 @@ async function resolveCharterReferenceContext(
   const activeReferenceContentIds = Array.from(
     new Set(
       referenceNodes
-        // Folders are capsule-consumed (below), never getCurrentNote-read —
+        // Folders are capsule-consumed (below), never read_content-read —
         // keep them out of the checkpoint gate's reference expectations.
         .filter(
           (node) =>
@@ -375,8 +378,8 @@ async function resolveCharterReferenceContext(
     }
     const isSubCharter = isCharterMetadata(found.notePayload?.metadata);
     return isSubCharter
-      ? `- [[${title}]] (getCurrentNote contentId: ${found.id}) — SUB-CHARTER: has its own standing rules/phases; follow its directives once read`
-      : `- [[${title}]] (getCurrentNote contentId: ${found.id})`;
+      ? `- [[${title}]] (read_content contentId: ${found.id}) — SUB-CHARTER: has its own standing rules/phases; follow its directives once read`
+      : `- [[${title}]] (read_content contentId: ${found.id})`;
   });
 
   // Active-phase folder refs get the full mention treatment (gate +
@@ -401,7 +404,7 @@ async function resolveCharterReferenceContext(
   return {
     manifest:
       "\n\n**Linked extensions** " +
-      "(call getCurrentNote with the contentId below when the current phase needs one — not preloaded):\n" +
+      "(call read_content with the contentId below when the current phase needs one — not preloaded):\n" +
       lines.join("\n") +
       folderCapsules,
     activeReferenceContentIds,
@@ -1333,7 +1336,7 @@ export async function POST(request: Request) {
         conversationId: conversationIdForAssoc ?? undefined,
         targetFolderId,
         // When the user is viewing this conversation in full-page mode the
-        // chat IS the open content. Pass that through so createNote can
+        // chat IS the open content. Pass that through so create_note can
         // default the new note's parent folder to the chat's own parent.
         chatContentId: isChatContent ? contentId : undefined,
         outputOwnerId,
@@ -1397,17 +1400,21 @@ export async function POST(request: Request) {
         string,
         { enabled?: boolean }
       > }).toolConfig ?? {};
-      // Rename compatibility (D2, 2026-09-10): `searchNotes` became
-      // `search_content`. toolConfig is keyed by tool id and defaults to
-      // ENABLED, so a user who had deliberately switched the old finder off
-      // would have had it silently switched back on under the new name.
-      // Carry the old entry forward when the new key is unset; the settings
-      // UI writes the new key from here on, so this fades on first save.
-      if (
-        toolConfig["search_content"] === undefined &&
-        toolConfig["searchNotes"] !== undefined
-      ) {
-        toolConfig["search_content"] = toolConfig["searchNotes"];
+      // Rename compatibility. toolConfig is keyed by tool id and defaults to
+      // ENABLED, so a user who had deliberately switched a tool OFF would have
+      // it silently switched back on under its new name. Carry every legacy
+      // entry forward when the new key is unset; the settings UI writes the new
+      // key from here on, so each fades on first save.
+      //
+      // Was a hand-rolled `searchNotes` special case (D2, 2026-09-10); now
+      // reads the shared rename table, so the next rename cannot forget it.
+      for (const [legacyId, currentId] of Object.entries(LEGACY_TOOL_IDS)) {
+        if (
+          toolConfig[currentId] === undefined &&
+          toolConfig[legacyId] !== undefined
+        ) {
+          toolConfig[currentId] = toolConfig[legacyId];
+        }
       }
       const tools = Object.fromEntries(
         Object.entries(allTools).filter(
@@ -1430,7 +1437,7 @@ export async function POST(request: Request) {
       // binding constraint on long runs. The set is stable for the whole run
       // (itemIterationBudget stays non-null until record_iteration_findings),
       // so the provider prefix cache re-warms once at run start. Pending
-      // approvals mid-run only occur for kept tools (createNote,
+      // approvals mid-run only occur for kept tools (create_note,
       // phase_checkpoint).
       // What the model is TOLD it has. The `tools` object above stays
       // complete for the rest of this request: `activeTools` narrows only what
@@ -1454,13 +1461,13 @@ export async function POST(request: Request) {
           // window it exists for never had it (lifecycle audit 2026-09-11)
           "add_quest_ledger_column",
           // note output + grounding
-          "createNote", "updateNote", "renameNote", "getCurrentNote",
+          "create_note", "update_note", "rename_note", "read_content",
           "search_content", "read_folder_context",
           "read_first_chunk", "read_next_chunk", "read_previous_chunk",
           // Database READS (2026-09-17): a run captures into a database, so it
           // needs to see what is already there — to dedupe against prior rows,
           // and to judge items against a standing-context table. Withholding
-          // these sent a production run to `search_content` → `getCurrentNote`
+          // these sent a production run to `search_content` → `read_content`
           // and then blind. The four `propose_*` schema-design tools stay
           // unadvertised: 3,840 tokens of table-authoring the run cannot use.
           "query_database", "describe_database",
@@ -1582,7 +1589,7 @@ export async function POST(request: Request) {
       // EVERY side chat attaches the content it lives under (owner directive
       // 2026-09-11, generalizing the charter rule): the bound content rides
       // as an implicit FIRST mention, so its body / folder capsule / database
-      // digest loads the way an @-mention's does — no getCurrentNote
+      // digest loads the way an @-mention's does — no read_content
       // round-trip. Charters take the charter path instead (progressive
       // disclosure), a chat or workflow is its own subject, and an explicit
       // mention of the same id dedupes. The bound content gets its own slot
@@ -1841,7 +1848,7 @@ export async function POST(request: Request) {
           const availabilityLine =
             enabledDataTools.length === 0
               ? "ALL database tools are DISABLED in the user's settings. Do not attempt to call any of them. If the user asks for database operations, tell them to enable the tools under Settings → AI → AI Tools → Databases."
-              : `Database tools available this turn: ${enabledDataTools.join(", ")}. For reading or changing ROWS AND CELLS, use these — never search_content/getCurrentNote, which describe a database from the OUTSIDE (title, columns) and will mislead you about row data.${
+              : `Database tools available this turn: ${enabledDataTools.join(", ")}. For FILTERED, sorted, or full-column row reads — and for every write — use these. (read_content returns this database's schema plus a short row preview, which is enough to see what is here; it cannot filter, sort, page, or write.)${
                   disabledDataTools.length > 0
                     ? ` DISABLED in the user's settings (never call these; tell the user to enable them under Settings → AI → AI Tools → Databases if needed): ${disabledDataTools.join(", ")}.`
                     : " Disregard any earlier statements in this conversation that they were unavailable; verify current values with query_database instead of trusting prior turns."
@@ -1913,7 +1920,7 @@ export async function POST(request: Request) {
       // Playbook progressive disclosure (AI v3.2 T3): inject standing rules
       // + the ACTIVE PHASE ONLY — never the whole playbook. `[[wiki-link]]`
       // references in that phase surface as a manifest the model traces on
-      // demand via getCurrentNote; sub-playbooks (a linked note OR folder that is
+      // demand via read_content; sub-playbooks (a linked note OR folder that is
       // itself marked as a playbook) are called out so the model follows
       // their own directives rather than treating them as passive reading.
       let charterContext = "";
@@ -1960,7 +1967,7 @@ export async function POST(request: Request) {
           ) {
             attachedCharterResolved = true;
             attachedPlaybookTitle = charterNode.title;
-            // Context diet (S7-C2): getCurrentNote answers this id with a
+            // Context diet (S7-C2): read_content answers this id with a
             // pointer — the body is already injected below.
             toolCtx.activeCharter = {
               contentId: explicitPlaybookId,
@@ -2033,7 +2040,7 @@ export async function POST(request: Request) {
                   referenceContext.activeReferenceContentIds,
                 researchToolsAvailable:
                   isAdvertised("search_web") || isAdvertised("read_page"),
-                referenceToolAvailable: isAdvertised("getCurrentNote"),
+                referenceToolAvailable: isAdvertised("read_content"),
               });
               recordCompletedPhaseToolsFromMessages(
                 phaseCheckpointGate,
@@ -2141,7 +2148,7 @@ export async function POST(request: Request) {
                   referenceContext.activeReferenceContentIds,
                 researchToolsAvailable:
                   isAdvertised("search_web") || isAdvertised("read_page"),
-                referenceToolAvailable: isAdvertised("getCurrentNote"),
+                referenceToolAvailable: isAdvertised("read_content"),
               });
               recordCompletedPhaseToolsFromMessages(
                 phaseCheckpointGate,
@@ -2208,18 +2215,18 @@ export async function POST(request: Request) {
         rootedContentSection = attachedCharterResolved
           ? `\n\nThis chat was opened from **"${rootedContentTitle}"** (a ${rootedContentType ?? "content"}). It is optional working context, NOT the selected charter. The charter attached to the current user message and loaded in "Active Charter" is the procedure to execute. Do not read "${rootedContentTitle}" merely to identify, discover, or understand the charter.` +
             (readable
-              ? ` Read the rooted content with getCurrentNote (contentId: ${contentId}) only when the user's request or the active charter phase actually requires its contents.`
+              ? ` Read the rooted content with read_content (contentId: ${contentId}) only when the user's request or the active charter phase actually requires its contents.`
               : "")
           : rootedCharterResolved
             ? `\n\nThis chat is rooted in **"${rootedContentTitle}"** (a ${rootedContentType ?? "content"}), and the user explicitly asked to execute it as the Active Charter. Its validated instructions are already loaded; do not read or search for another charter.`
             : boundAttachId
               ? `\n\nThis chat is ATTACHED to **"${rootedContentTitle}"** (a ${rootedContentType ?? "content"}) — that is what this conversation is about, and its content is already loaded below under the referenced content (a side chat attaches whatever it lives under). When the user refers to "this file", "this note", "this database", "the current one", etc. without naming it, they mean "${rootedContentTitle}". Do not search for it.` +
                 (readable
-                  ? ` If the loaded content is truncated, getCurrentNote (contentId: ${contentId}) returns the full body.`
+                  ? ` If the loaded content is truncated, read_content (contentId: ${contentId}) returns the full body.`
                   : "")
               : `\n\nThis chat is rooted in **"${rootedContentTitle}"** (a ${rootedContentType ?? "content"}) — that is what this conversation is about. When the user refers to "this file", "this note", "the current one", "this charter", etc. without naming it, they mean "${rootedContentTitle}".` +
                 (readable
-                  ? ` Read its content with getCurrentNote (contentId: ${contentId}) when you need it.`
+                  ? ` Read its content with read_content (contentId: ${contentId}) when you need it.`
                   : "");
       }
 
@@ -2286,7 +2293,7 @@ export async function POST(request: Request) {
           : null;
       // The garden doc the user is actively VIEWING (focused content tab) — the
       // internal twin of currentPage. Lets the model resolve "this note/doc"
-      // without the user naming it, and read it with getCurrentNote(contentId).
+      // without the user naming it, and read it with read_content(contentId).
       const rawViewedContent = body.viewedContent;
       const viewedContentHint =
         rawViewedContent &&
@@ -2451,7 +2458,7 @@ export async function POST(request: Request) {
         activeTools: toolsActive ? [...advertised] : undefined,
         toolChoice: toolsActive ? "auto" : undefined,
         // Spelling is not a capability question. The id namespace mixes
-        // camelCase (`createNote`) with snake_case (`query_database`), so a
+        // camelCase (`create_note`) with snake_case (`query_database`), so a
         // model settled into one convention emits the other and the SDK
         // answers `NoSuchToolError`. Resolve the rename and let the call
         // stand; anything beyond case/separators stays an honest error,
@@ -2489,7 +2496,7 @@ export async function POST(request: Request) {
         // finish N pages. The page budget is the depth lever; this is the safety
         // ceiling that follows it. Outside a research run, the normal 7/8 cap.
         // Item runs: each item ≈ read + record (+ optional re-read); +8
-        // overhead for list_tabs / propose / roll-up createNote /
+        // overhead for list_tabs / propose / roll-up create_note /
         // record_iteration_findings. The client item budget is the true
         // limiter (soft-stops new items); this ceiling must not cut off
         // before it. Cap value + provenance hoisted above (stepCap /

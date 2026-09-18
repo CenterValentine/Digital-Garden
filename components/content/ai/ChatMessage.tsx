@@ -16,6 +16,7 @@ import { createPortal } from "react-dom";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { common, createLowlight } from "lowlight";
+import { LEGACY_TOOL_IDS } from "@/lib/domain/ai/tools/repair";
 import { AlertTriangle,
   Activity,
   Bot,
@@ -194,6 +195,13 @@ function detectToolPart(part: unknown): DetectedToolPart | null {
 
   if (!toolName) return null;
 
+  // Transcripts recorded before a tool was renamed still carry the old id in
+  // their part type (`tool-getCurrentNote`). Normalize here — the one place
+  // every tool part passes through — so every downstream check (chip labels,
+  // note cards, result parsing) sees the current id and old chats keep
+  // rendering as they always did.
+  toolName = LEGACY_TOOL_IDS[toolName] ?? toolName;
+
   return {
     toolCallId: p.toolCallId as string,
     toolName,
@@ -205,7 +213,7 @@ function detectToolPart(part: unknown): DetectedToolPart | null {
   };
 }
 
-/** Shape of the note payload returned by createNote / updateNote tools. */
+/** Shape of the note payload returned by create_note / update_note tools. */
 interface NotePayload {
   __notePayload: true;
   kind: "created" | "updated";
@@ -1521,7 +1529,7 @@ export const ChatMessage = memo(function ChatMessage({
           <GeneratedAudioCard key={payload.contentId} payload={payload} />
         ))}
 
-        {/* Note cards — clickable link affordance for createNote / updateNote */}
+        {/* Note cards — clickable link affordance for create_note / update_note */}
         {notePayloads.map((payload) => (
           <NotePayloadCard
             key={payload.contentId}
@@ -2711,7 +2719,7 @@ function parseAudioPayload(result: unknown): AudioPayload | null {
   return null;
 }
 
-/** Parse a note payload (createNote / updateNote) from a tool result. */
+/** Parse a note payload (create_note / update_note) from a tool result. */
 function parseNotePayload(result: unknown): NotePayload | null {
   if (result === undefined) return null;
   const str = typeof result === "string" ? result : JSON.stringify(result);
@@ -3187,9 +3195,9 @@ function ApprovalPreview({
 
   // Document tools: render the note/document as it will actually look.
   if (
-    toolName === "createNote" ||
-    toolName === "updateNote" ||
-    toolName === "renameNote" ||
+    toolName === "create_note" ||
+    toolName === "update_note" ||
+    toolName === "rename_note" ||
     toolName === "create_docx"
   ) {
     return <DocumentApprovalPreview toolName={toolName} args={args} str={str} />;
@@ -3723,8 +3731,8 @@ function ToolCallBubble({
         if (phase) return `Phase checkpoint: ${phase}`;
       }
       // Name the note being read (smoke finding: "Read a note" didn't say
-      // WHICH note). The getCurrentNote result is "Title: <title>\n…".
-      if (toolName === "getCurrentNote" && typeof result === "string") {
+      // WHICH note). The read_content result is "Title: <title>\n…".
+      if (toolName === "read_content" && typeof result === "string") {
         const m = result.match(/^Title:\s*(.+)$/m);
         if (m?.[1]?.trim()) {
           return `${isRunning ? "Reading" : "Read"} note: ${m[1].trim()}`;
@@ -3994,10 +4002,10 @@ const TOOL_ACTION_LABELS: Record<string, [running: string, done: string]> = {
   // Retired 2026-09-10 (renamed to search_content); kept so transcripts
   // recorded before the rename still render a verb instead of a raw id.
   searchNotes: ["Searching your notes", "Searched your notes"],
-  getCurrentNote: ["Reading a note", "Read a note"],
-  createNote: ["Creating a note", "Created a note"],
-  updateNote: ["Updating a note", "Updated a note"],
-  renameNote: ["Renaming", "Renamed"],
+  read_content: ["Reading", "Read"],
+  create_note: ["Creating a note", "Created a note"],
+  update_note: ["Updating a note", "Updated a note"],
+  rename_note: ["Renaming", "Renamed"],
   generate_image: ["Generating an image", "Generated an image"],
 };
 
@@ -4136,7 +4144,7 @@ function ContentWriteReceiptCard({
 }
 
 /**
- * Inline card rendered when createNote / updateNote tool returns. Replaces
+ * Inline card rendered when create_note / update_note tool returns. Replaces
  * the raw "Created note (id: …)" string with a clickable affordance that
  * opens the note in the main panel. Compact so it doesn't dominate the
  * assistant turn — Bug C target.

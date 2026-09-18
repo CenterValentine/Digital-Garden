@@ -29,7 +29,7 @@ export function extractSearchTextFromTipTap(json: JSONContent): string {
 
   // Atomic inline nodes carry their human text in ATTRS, not text content —
   // a text-only traversal renders each one as "" and silently drops it.
-  // That blinded getCurrentNote (which serves searchText to the AI) to every
+  // That blinded read_content (which serves searchText to the AI) to every
   // [[wiki-link]] in a note: a playbook's cross-references to its grounding
   // docs vanished from what the model saw (2026-08-08 Rapid Scout run).
   text += atomicInlineText(json);

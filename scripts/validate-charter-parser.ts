@@ -126,7 +126,7 @@ assert.deepEqual(getPhaseCheckpointGateStatus(checkpointGate), {
   ready: false,
   missingRequirements: [
     "Complete at least one web research call with search_web or read_page.",
-    "Read at least one linked extension with getCurrentNote.",
+    "Read at least one linked extension with read_content.",
   ],
 });
 assert.match(
@@ -135,7 +135,7 @@ assert.match(
 );
 assert.match(
   renderPhaseCheckpointGateInstruction(checkpointGate),
-  /getCurrentNote/,
+  /read_content/,
 );
 recordCompletedPhaseTools(
   checkpointGate,
@@ -151,7 +151,7 @@ recordCompletedPhaseTools(
 assert.deepEqual(getPhaseCheckpointGateStatus(checkpointGate), {
   ready: false,
   missingRequirements: [
-    "Read at least one linked extension with getCurrentNote.",
+    "Read at least one linked extension with read_content.",
   ],
 });
 recordCompletedPhaseTools(
@@ -159,7 +159,7 @@ recordCompletedPhaseTools(
   [
     {
       toolCallId: "read-call",
-      toolName: "getCurrentNote",
+      toolName: "read_content",
       input: { contentId: "11111111-1111-4111-8111-111111111111" },
     },
   ],
@@ -192,7 +192,7 @@ recordCompletedPhaseToolsFromMessages(resumedCheckpointGate, [
         output: [],
       },
       {
-        type: "tool-getCurrentNote",
+        type: "tool-read_content",
         toolCallId: "persisted-read",
         state: "output-available",
         input: { contentId: "11111111-1111-4111-8111-111111111111" },

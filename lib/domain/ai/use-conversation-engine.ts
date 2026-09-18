@@ -220,8 +220,8 @@ const MENTION_RE = /@\[([^\]]+)\]\(([^)]+)\)/g;
 /** Default mention search hint copy keyed by tool id. */
 const COMMAND_HINTS: Record<string, string> = {
   search_content: "Search my garden for ",
-  getCurrentNote: "Read the current note",
-  createNote: "Create a new note titled ",
+  read_content: "Read content",
+  create_note: "Create a new note titled ",
 };
 
 /**
@@ -1966,7 +1966,7 @@ export function useConversationEngine({
                 after: input.after ?? "",
               })
             ).message
-          : "No document editor is available in this surface, so the edit was not applied. Ask the user to open the document, or write to it with updateNote instead.";
+          : "No document editor is available in this surface, so the edit was not applied. Ask the user to open the document, or write to it with update_note instead.";
         chat.addToolResult({
           tool: EDIT_TOOL_APPLY_DIFF,
           toolCallId: toolCall.toolCallId,
@@ -2291,7 +2291,7 @@ export function useConversationEngine({
         chat.addToolResult({
           tool: toolName,
           toolCallId: toolCall.toolCallId,
-          output: `Research page budget reached (${run.pageBudget} pages read). Stop reading now — synthesize from what you already have (createNote with a summary + a markdown table), then call record_research_findings.`,
+          output: `Research page budget reached (${run.pageBudget} pages read). Stop reading now — synthesize from what you already have (create_note with a summary + a markdown table), then call record_research_findings.`,
         });
         return;
       }
@@ -2305,7 +2305,7 @@ export function useConversationEngine({
         chat.addToolResult({
           tool: toolName,
           toolCallId: toolCall.toolCallId,
-          output: `Item budget reached (${iteration.itemsRecorded}/${iteration.itemBudget} items recorded). Stop starting new items — write the roll-up now (createNote: summary + a markdown table of items/verdicts), then close with record_iteration_findings.`,
+          output: `Item budget reached (${iteration.itemsRecorded}/${iteration.itemBudget} items recorded). Stop starting new items — write the roll-up now (create_note: summary + a markdown table of items/verdicts), then close with record_iteration_findings.`,
         });
         return;
       }
