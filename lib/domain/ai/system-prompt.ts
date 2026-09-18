@@ -66,8 +66,9 @@ function editorSection(contentId: string): string {
 ## Document Editing (open document ID: ${contentId})
 You have tools to read and edit the currently open document.
 
-- Always call read_first_chunk before making any edits.
-- Use apply_diff for ALL targeted changes — adding, inserting, appending, or editing content. Adding a sentence or paragraph = apply_diff, not replace_document.
+- Use append_to_document to add content at the END of the document. It needs no prior read — do NOT read the document just to append to it.
+- For any change in the MIDDLE of the document, call read_first_chunk first, then use apply_diff.
+- If the text you want to change appears more than once, call list_document_outline and pass the containing block's handle to apply_diff rather than quoting a longer passage.
 - NEVER use replace_document unless the user explicitly asks to rewrite or overwrite the entire document.
 - Call finish_with_summary when you are done editing.
 - Generated images can be inserted at the user's cursor position.\
@@ -336,6 +337,8 @@ export function buildSystemPrompt(ctx: SystemPromptContext): string {
   }
   if (ctx.hasDatabaseTools) {
     sections.push(
+      "Editing SEVERAL rows is ONE call: update_rows, never a run of update_row. The same column set across ten rows is one transaction and one undo entry for the user; ten calls are ten independently-failing writes they must unpick by hand, and ten cards to read. Reach for update_row only when you are genuinely changing one row. " +
+      "A relation is REACHABLE, not just describable: the databases your open/mentioned ones link to are yours to query by name right now, and so are the ones THOSE link to. If a column reads `relation \u2192 Experiences`, call query_database on Experiences \u2014 do NOT tell the user to @-mention it first, and never fall back to hand-typed ids because you assumed a linked table was out of reach. " +
       "Databases are RELATIONAL. A column can be a `relation` (links rows to another database's rows, with a mirrored column appearing on that side automatically), a `lookup` (shows a value read across a relation), or a `rollup` (counts or aggregates across one) — all proposable, all real. NEVER invent text \"ID\" columns (EXP-012, CLM-012) to stand in for links: that is a workaround for a product that cannot do this, and this one can. " +
         "To link a table the user ALREADY has to new ones, ADD relation columns to it with propose_linked_databases's `extend` — do not rebuild it as an index table that copies the others' summaries. Their existing table is the thing to extend, never something to duplicate beside. " +
         "One new table → propose_output_database. Several that reference each other → propose_linked_databases (one card, one transaction). Columns onto an existing table → propose_database_columns. " +

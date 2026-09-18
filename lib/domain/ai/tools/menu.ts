@@ -65,7 +65,8 @@ export const TOOL_MENU: Readonly<Record<string, ToolMenuEntry>> = {
   query_database: { family: "databases", selectWhen: "Read rows — filtered, searched, sorted, counted, or deduped against" },
   describe_database: { family: "databases", selectWhen: "Profile a table: fill rates, value ranges, sample rows, read cost" },
   insert_rows: { family: "databases", selectWhen: "Append new rows to a database" },
-  update_row: { family: "databases", selectWhen: "Change cells in existing rows" },
+  update_row: { family: "databases", selectWhen: "Change cells in ONE row" },
+  update_rows: { family: "databases", selectWhen: "Change cells across SEVERAL rows in one transaction — sweep a column, backfill a field" },
   propose_output_database: { family: "databases", selectWhen: "Propose ONE new table for the user to approve" },
   propose_linked_databases: { family: "databases", selectWhen: "Propose SEVERAL tables that reference each other, in one card" },
   propose_database_columns: { family: "databases", selectWhen: "Propose new columns on a table the user already has" },
@@ -90,8 +91,10 @@ export const TOOL_MENU: Readonly<Record<string, ToolMenuEntry>> = {
   read_first_chunk: { family: "editor", selectWhen: "Start reading a long open document in pieces" },
   read_next_chunk: { family: "editor", selectWhen: "Continue forward through a chunked document" },
   read_previous_chunk: { family: "editor", selectWhen: "Go back through a chunked document" },
-  list_document_blocks: { family: "editor", selectWhen: "See the open document's block structure before editing it" },
-  apply_diff: { family: "editor", selectWhen: "Make a targeted text edit in the open document" },
+  list_document_outline: { family: "editor", selectWhen: "List top-level blocks with handles — use when the text to change appears more than once" },
+  list_document_blocks: { family: "editor", selectWhen: "List rich blocks with their ids and attributes — the read before update_block" },
+  append_to_document: { family: "editor", selectWhen: "Add content to the END of the open document; needs no prior read" },
+  apply_diff: { family: "editor", selectWhen: "Make a targeted text edit in the MIDDLE of the open document" },
   update_block: { family: "editor", selectWhen: "Replace one block's content in the open document" },
   insert_block: { family: "editor", selectWhen: "Insert a rich block — callout, table, columns, accordion, diagram, embed" },
   insert_image: { family: "editor", selectWhen: "Place an image into the open document" },
@@ -162,10 +165,20 @@ export const CORE_TOOL_IDS: readonly string[] = [
  * route only while a run is live.
  */
 export const MODE_TOOL_IDS: Readonly<Record<string, readonly string[]>> = {
+  // Everything the system prompt's editor section NAMES must be advertised, or
+  // the prompt instructs the model to call tools the request withheld — the
+  // failure this branch exists to remove. `insert_block` stays summonable
+  // despite being an editing tool: at 5,221 tokens it is 17% of the entire
+  // prefix on its own, more than this whole mode costs otherwise, and it is
+  // reached for far less often than a diff or an append.
   editor: [
     "read_first_chunk",
     "read_next_chunk",
     "read_previous_chunk",
+    "list_document_outline",
+    "append_to_document",
+    "apply_diff",
+    "replace_document",
     "plan",
     "ask_user",
     "finish_with_summary",

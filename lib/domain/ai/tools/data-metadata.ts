@@ -11,6 +11,7 @@ export const DATA_TOOL_IDS = [
   "describe_database",
   "insert_rows",
   "update_row",
+  "update_rows",
   "propose_column_options",
   "propose_database_columns",
   "propose_output_database",
@@ -26,22 +27,27 @@ export const DATA_TOOL_METADATA: Record<
   query_database: {
     name: "Query Database",
     description:
-      "Read rows from an associated database — filtered, searched, and sized in tokens server-side; whole-table reads above your approval threshold (Settings → AI) pause for your approval with the estimate on the card",
+      "Read rows from a reachable database (one that is open, mentioned, or linked by a relation) — filtered, searched, and sized in tokens server-side; whole-table reads above your approval threshold (Settings → AI) pause for your approval with the estimate on the card",
   },
   describe_database: {
     name: "Describe Database",
     description:
-      "Read an associated database's schema with column profiles (fill rates, vocabularies, ranges, read cost), sample rows, and views",
+      "Read a reachable database's schema with column profiles (fill rates, vocabularies, ranges, read cost), sample rows, and views",
   },
   insert_rows: {
     name: "Insert Database Rows",
     description:
-      "Append new rows to an associated database, linking them to rows in other databases where the schema has relations (append-only — cannot modify or delete existing rows; ≤25 per call, optional dedupe column, batches over 10 require your confirmation)",
+      "Append new rows to a reachable database, linking them to rows in other databases where the schema has relations (append-only — cannot modify or delete existing rows; ≤25 per call, optional dedupe column, batches over 10 require your confirmation)",
   },
   update_row: {
     name: "Update Database Row",
     description:
       "Change cells in ONE existing row, including the rows it links to — only the columns the user named, all-or-nothing, with compare-and-set protection against overwriting concurrent edits; cannot create or delete rows",
+  },
+  update_rows: {
+    name: "Update Database Rows",
+    description:
+      "Change cells across several existing rows in one transaction — sweeping a column or backfilling a field as a single write and a single undo, all-or-nothing across every row, with the same compare-and-set protection as a single-row edit (\u226425 rows per call; more than 10 requires your confirmation; cannot create or delete rows)",
   },
   propose_column_options: {
     name: "Propose Column Options",

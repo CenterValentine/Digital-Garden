@@ -678,16 +678,43 @@ export interface ActiveCharter {
  * server-tool turn stops on a resolved tool at the `stopWhen` step-count limit,
  * which would defeat that bound and risk a runaway loop.
  */
-/** The one client-executed document-edit tool (see editor-tools.ts). */
+/** Client-executed document tools (see editor-tools.ts). */
 export const EDIT_TOOL_APPLY_DIFF = "apply_diff";
+export const EDIT_TOOL_APPEND = "append_to_document";
+export const EDIT_TOOL_OUTLINE = "list_document_outline";
 
-/** A document edit the engine hands to the surface that owns the live editor. */
-export interface ClientEditRequest {
-  type: "apply_diff";
-  toolCallId: string;
-  before: string;
-  after: string;
-}
+/**
+ * Every tool resolved against the live editor rather than on the server.
+ *
+ * The resume predicate below reads this set. A client-executed tool missing from
+ * it resolves but never re-POSTs, so the model stalls mid-turn with a completed
+ * tool call and no continuation.
+ */
+export const CLIENT_EXECUTED_EDIT_TOOLS: readonly string[] = [
+  EDIT_TOOL_APPLY_DIFF,
+  EDIT_TOOL_APPEND,
+  EDIT_TOOL_OUTLINE,
+];
+
+/** A document operation the engine hands to the surface that owns the live editor. */
+export type ClientEditRequest =
+  | {
+      type: "apply_diff";
+      toolCallId: string;
+      before: string;
+      after: string;
+      /** Optional block handle scoping the search (see block-handles.ts). */
+      handle?: string;
+    }
+  | {
+      type: "append_to_document";
+      toolCallId: string;
+      markdown: string;
+    }
+  | {
+      type: "list_document_outline";
+      toolCallId: string;
+    };
 
 /**
  * The honest outcome of a client-executed edit.
@@ -719,7 +746,9 @@ function lastMessageHasResolvedEdit({
   );
   const editParts = message.parts
     .slice(lastStepStart + 1)
-    .filter((part) => part.type === `tool-${EDIT_TOOL_APPLY_DIFF}`) as Array<{
+    .filter((part) =>
+      CLIENT_EXECUTED_EDIT_TOOLS.some((name) => part.type === `tool-${name}`),
+    ) as Array<{
     state?: string;
   }>;
   return (
@@ -1954,21 +1983,42 @@ export function useConversationEngine({
       // outcome. Previously the server returned an edit payload plus a write
       // receipt, so the model and the receipt chip both reported success before the
       // client had tried — and a failure never travelled back at all.
-      if (toolCall.toolName === EDIT_TOOL_APPLY_DIFF) {
-        const input = (toolCall.input ?? {}) as { before?: string; after?: string };
+      if (CLIENT_EXECUTED_EDIT_TOOLS.includes(toolCall.toolName)) {
+        const input = (toolCall.input ?? {}) as {
+          before?: string;
+          after?: string;
+          handle?: string;
+          markdown?: string;
+        };
         const execute = editExecutorRef?.current;
+
+        let request: ClientEditRequest;
+        if (toolCall.toolName === EDIT_TOOL_APPEND) {
+          request = {
+            type: "append_to_document",
+            toolCallId: toolCall.toolCallId,
+            markdown: input.markdown ?? "",
+          };
+        } else if (toolCall.toolName === EDIT_TOOL_OUTLINE) {
+          request = {
+            type: "list_document_outline",
+            toolCallId: toolCall.toolCallId,
+          };
+        } else {
+          request = {
+            type: "apply_diff",
+            toolCallId: toolCall.toolCallId,
+            before: input.before ?? "",
+            after: input.after ?? "",
+            ...(input.handle ? { handle: input.handle } : {}),
+          };
+        }
+
         const output = execute
-          ? (
-              await execute({
-                type: "apply_diff",
-                toolCallId: toolCall.toolCallId,
-                before: input.before ?? "",
-                after: input.after ?? "",
-              })
-            ).message
-          : "No document editor is available in this surface, so the edit was not applied. Ask the user to open the document, or write to it with update_note instead.";
+          ? (await execute(request)).message
+          : "No document editor is available in this surface, so nothing was read or changed. Ask the user to open the document, or write to it with update_note instead.";
         chat.addToolResult({
-          tool: EDIT_TOOL_APPLY_DIFF,
+          tool: toolCall.toolName,
           toolCallId: toolCall.toolCallId,
           output,
         });

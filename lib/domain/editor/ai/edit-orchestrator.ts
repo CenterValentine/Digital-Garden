@@ -24,7 +24,8 @@
 import type { Editor } from "@tiptap/react";
 import type { JSONContent } from "@tiptap/core";
 import { TextSelection } from "@tiptap/pm/state";
-import { findTextInDoc } from "./text-search";
+import { findTextInDoc, type SearchRange } from "./text-search";
+import { handleMissMessage, resolveHandle } from "./block-handles";
 import { markdownToTiptap } from "@/lib/domain/content/markdown";
 import { useBlockStore } from "@/state/block-store";
 
@@ -35,6 +36,12 @@ export interface ApplyDiffPayload {
   type: "apply_diff";
   before: string;
   after: string;
+  /**
+   * Optional block handle from `list_document_outline`, restricting the search
+   * to that block. Resolved against the live document at apply time — a handle
+   * whose fingerprint no longer matches is refused rather than guessed at.
+   */
+  handle?: string;
   documentTitle: string;
   action: string;
   toolCallId?: string;
@@ -84,12 +91,23 @@ export interface UpdateBlockPayload {
   toolCallId?: string;
 }
 
+export interface AppendToDocumentPayload {
+  __editPayload: true;
+  type: "append_to_document";
+  /** Markdown to parse and append after the document's last block. */
+  markdown: string;
+  documentTitle: string;
+  action: string;
+  toolCallId?: string;
+}
+
 export type EditPayload =
   | ApplyDiffPayload
   | ReplaceDocumentPayload
   | InsertImagePayload
   | InsertBlockPayload
-  | UpdateBlockPayload;
+  | UpdateBlockPayload
+  | AppendToDocumentPayload;
 
 export interface EditResult {
   success: boolean;
@@ -193,11 +211,24 @@ const appliedToolCallIds = new Set<string>();
  * calls are genuinely separate. Dedupe by block content (node type + attrs, minus
  * the per-call `blockId`) within a short window, so a redundant duplicate is
  * dropped while a deliberate later re-insert of the same block still works.
+ *
+ * `append_to_document` is covered by the same guard for the same reason: it is
+ * non-idempotent and carries no address, so a duplicated parallel call appends
+ * the same paragraph twice with nothing to detect it downstream.
  */
 const recentBlockInserts = new Map<string, number>();
 const BLOCK_DEDUP_WINDOW_MS = 8000;
 
-function blockContentSignature(payload: InsertBlockPayload): string {
+type DedupablePayload = InsertBlockPayload | AppendToDocumentPayload;
+
+function isDedupable(payload: EditPayload): payload is DedupablePayload {
+  return payload.type === "insert_block" || payload.type === "append_to_document";
+}
+
+function contentSignature(payload: DedupablePayload): string {
+  if (payload.type === "append_to_document") {
+    return `append::${payload.markdown}`;
+  }
   const attrs = { ...((payload.node?.attrs as Record<string, unknown>) ?? {}) };
   delete attrs.blockId; // freshly generated per call — must be excluded
   const canonical = Object.keys(attrs)
@@ -281,8 +312,8 @@ export class AiEditOrchestrator {
     }
     // Content dedupe: drop a redundant identical block from parallel/repeat
     // model tool calls (distinct toolCallIds, same block content).
-    if (payload.type === "insert_block") {
-      const sig = blockContentSignature(payload);
+    if (isDedupable(payload)) {
+      const sig = contentSignature(payload);
       const now = Date.now();
       const last = recentBlockInserts.get(sig);
       if (last !== undefined && now - last < BLOCK_DEDUP_WINDOW_MS) return false;
@@ -384,6 +415,8 @@ export class AiEditOrchestrator {
       result = await this.executeInsertBlock(payload);
     } else if (payload.type === "update_block") {
       result = await this.executeUpdateBlock(payload);
+    } else if (payload.type === "append_to_document") {
+      result = await this.executeAppendToDocument(payload);
     } else {
       return { success: false, action: "Unknown edit type", error: "Unknown payload type" };
     }
@@ -401,14 +434,33 @@ export class AiEditOrchestrator {
       return { success: false, action: payload.action, error: "Editor not available" };
     }
 
+    // Resolve the optional block scope against the CURRENT document. A handle
+    // that no longer matches means the block moved or changed under us, which
+    // must fail loudly — silently falling back to a whole-document search would
+    // reintroduce exactly the wrong-target edit the handle exists to prevent.
+    let range: SearchRange | undefined;
+    if (payload.handle) {
+      const resolved = resolveHandle(editor.state.doc, payload.handle);
+      if (!resolved.ok) {
+        return {
+          success: false,
+          action: payload.action,
+          error: handleMissMessage(payload.handle, resolved.reason),
+        };
+      }
+      range = { from: resolved.entry.from, to: resolved.entry.to };
+    }
+
     // Find the text in the ProseMirror document
-    const searchResult = findTextInDoc(editor.state.doc, payload.before);
+    const searchResult = findTextInDoc(editor.state.doc, payload.before, range);
 
     if (!searchResult) {
       return {
         success: false,
         action: payload.action,
-        error: "Could not locate the text to edit.",
+        error: payload.handle
+          ? `That exact text does not appear in block ${payload.handle}.`
+          : "Could not locate the text to edit.",
       };
     }
 
@@ -622,6 +674,68 @@ export class AiEditOrchestrator {
         success: false,
         action: payload.action,
         error: err instanceof Error ? err.message : "Unknown error during block insertion",
+      };
+    }
+  }
+
+  /**
+   * Append markdown after the document's last block.
+   *
+   * The blind-safe edit: it carries no address, so there is nothing to resolve
+   * and nothing to go stale between the model's decision and the mutation. The
+   * insertion point is read from the live document at apply time, which is why
+   * this needs no read cycle beforehand.
+   */
+  private async executeAppendToDocument(
+    payload: AppendToDocumentPayload
+  ): Promise<EditResult> {
+    const editor = this.getEditor();
+    if (!editor) {
+      return { success: false, action: payload.action, error: "Editor not available" };
+    }
+
+    try {
+      this.lockEditor();
+
+      // Resolved here, not earlier: the end of the document is whatever it is at
+      // the moment we write, even if a collaborator just added to it.
+      const insertPos = editor.state.doc.content.size - 1;
+
+      editor.chain().setTextSelection(insertPos).scrollIntoView().run();
+      if (this.aborted) return { success: false, action: payload.action, error: "Aborted" };
+      await sleep(CURSOR_ARRIVAL_DELAY);
+      if (this.aborted) return { success: false, action: payload.action, error: "Aborted" };
+
+      const endPos = await this.insertStructuredContent(
+        editor,
+        insertPos,
+        payload.markdown
+      );
+
+      if (endPos > insertPos) {
+        this.applyAiHighlight(editor, insertPos, endPos);
+      }
+
+      // Same rationale as executeInsertBlock: an appended atom block would
+      // otherwise resolve to a NodeSelection and yank the right rail to the
+      // Properties panel, off the chat the user is reading.
+      try {
+        editor.commands.setTextSelection(
+          Math.min(endPos, editor.state.doc.content.size - 1)
+        );
+      } catch {
+        /* best-effort selection collapse */
+      }
+      useBlockStore.getState().clearSelection();
+
+      await sleep(SETTLE_DELAY);
+
+      return { success: true, action: payload.action };
+    } catch (err) {
+      return {
+        success: false,
+        action: payload.action,
+        error: err instanceof Error ? err.message : "Unknown error during append",
       };
     }
   }
