@@ -216,6 +216,89 @@ export function resolveIterationSource(
   return null;
 }
 
+// ── Turn accounting ──────────────────────────────────────────────────────
+
+/**
+ * Walk back to the start of the CURRENT turn — the last user message — and
+ * visit every part of the assistant messages that answer it.
+ *
+ * A turn spans several HTTP requests whenever a client-executed tool is
+ * involved, so anything that means "per turn" has to be re-derived from the
+ * transcript. Both callers below do exactly that.
+ */
+function forEachPartThisTurn(
+  messages: readonly unknown[],
+  visit: (part: { type?: string; state?: string; input?: unknown }) => void,
+): void {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i] as { role?: string; parts?: unknown };
+    if (m?.role === "user") break;
+    if (!Array.isArray(m?.parts)) continue;
+    for (const part of m.parts) visit(part as { type?: string; state?: string });
+  }
+}
+
+/**
+ * Steps this turn has already spent, across every request it spans.
+ *
+ * `step-start` is the marker the SDK emits per model call, so counting it is
+ * counting inferences — the thing the cap is meant to ration.
+ */
+export function countTurnSteps(messages: readonly unknown[]): number {
+  let steps = 0;
+  forEachPartThisTurn(messages, (p) => {
+    if (p?.type === "step-start") steps += 1;
+  });
+  return steps;
+}
+
+/** How many times this turn already made this exact call and got this result. */
+export interface RepeatedCall {
+  toolName: string;
+  timesFailed: number;
+}
+
+/**
+ * Identical failing calls already made this turn, keyed by tool + arguments.
+ *
+ * A production turn issued the SAME `co_browse_open` eight times against the
+ * same blocked tab, because nothing anywhere noticed it was repeating a
+ * failure verbatim (2026-09-18). The model is not well placed to notice
+ * either: each request re-reads a transcript in which the failure looks like
+ * one more thing that happened.
+ *
+ * Counts only calls that FAILED — a tool legitimately called twice with the
+ * same arguments (re-reading a page that may have changed) is not a loop.
+ */
+export function countRepeatedFailures(
+  messages: readonly unknown[],
+  toolName: string,
+  input: unknown,
+): number {
+  const key = stableKey(input);
+  let count = 0;
+  forEachPartThisTurn(messages, (p) => {
+    if (p?.type !== `tool-${toolName}`) return;
+    const failed =
+      p.state === "output-error" ||
+      (typeof (p as { output?: unknown }).output === "string" &&
+        /^(could not|failed|error)\b/i.test((p as { output: string }).output));
+    if (!failed) return;
+    if (stableKey(p.input) === key) count += 1;
+  });
+  return count;
+}
+
+/** Key-order-independent identity for a tool call's arguments. */
+function stableKey(value: unknown): string {
+  if (value === null || typeof value !== "object") return JSON.stringify(value) ?? "";
+  if (Array.isArray(value)) return `[${value.map(stableKey).join(",")}]`;
+  const entries = Object.entries(value as Record<string, unknown>)
+    .filter(([, v]) => v !== undefined)
+    .sort(([a], [b]) => a.localeCompare(b));
+  return `{${entries.map(([k, v]) => `${k}:${stableKey(v)}`).join(",")}}`;
+}
+
 // ── Malformed tool-call JSON ─────────────────────────────────────────────
 
 /** Bare words that are legal JSON values and must not be quoted. */
