@@ -1291,6 +1291,9 @@ export function ChatPanel({
         onOpenQuestLedger={(nodeId) =>
           useContentStore.getState().setSelectedContentId(nodeId)
         }
+        onOpenCharter={(nodeId) =>
+          useContentStore.getState().setSelectedContentId(nodeId)
+        }
         onDetachCharter={detachCharter}
         attachments={attachments}
         onAddFiles={addAttachmentFiles}

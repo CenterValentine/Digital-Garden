@@ -259,6 +259,7 @@ function ChatViewerInner({
     folderGates,
     commandItems,
     activeCharter,
+    activeQuest,
     attachCharter,
     detachCharter,
     outputTarget,
@@ -962,6 +963,13 @@ function ChatViewerInner({
         commandItems={commandItems}
         onAttachCharter={attachCharter}
         activeCharter={activeCharter}
+        activeQuest={activeQuest}
+        onOpenQuestLedger={(nodeId) =>
+          useContentStore.getState().setSelectedContentId(nodeId)
+        }
+        onOpenCharter={(nodeId) =>
+          useContentStore.getState().setSelectedContentId(nodeId)
+        }
         onDetachCharter={detachCharter}
         attachments={attachments}
         onAddFiles={addAttachmentFiles}

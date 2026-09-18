@@ -101,6 +101,8 @@ interface ChatInputProps {
   activeQuest?: ActiveQuest | null;
   /** Open the quest's ledger — omit to render the chip as a non-interactive label. */
   onOpenQuestLedger?: (contentId: string) => void;
+  /** Open the attached charter. */
+  onOpenCharter?: (contentId: string) => void;
   /** Detach the active playbook (dismiss the chip). */
   onDetachCharter?: () => void;
   /**
@@ -133,6 +135,7 @@ export function ChatInput({
   activeCharter = null,
   activeQuest = null,
   onOpenQuestLedger,
+  onOpenCharter,
   onDetachCharter,
   footerLeading,
   attachments = [],
@@ -736,14 +739,24 @@ export function ChatInput({
             )}
             {activeCharter && (
             <span className="inline-flex items-center gap-1.5 rounded-md border border-indigo-500/30 bg-indigo-500/10 px-2 py-1 text-[11px] text-indigo-700 dark:text-indigo-300">
-              <ScrollText className="h-3 w-3 shrink-0" />
-              <span className="truncate max-w-[160px]">{activeCharter.title}</span>
-              {activeCharter.phaseCount > 0 && (
-                <span className="text-indigo-500/70 dark:text-indigo-400/70">
-                  · Phase {Math.min(activeCharter.phaseIndex + 1, activeCharter.phaseCount)}/
-                  {activeCharter.phaseCount}
-                </span>
-              )}
+              {/* The label is its own button, a SIBLING of the detach button
+                  rather than its parent — nesting them would be invalid, and
+                  the X would open the charter on its way to dismissing it. */}
+              <button
+                type="button"
+                onClick={() => onOpenCharter?.(activeCharter.id)}
+                title={`Open ${activeCharter.title}`}
+                className="inline-flex items-center gap-1.5 min-w-0 rounded-sm transition-colors hover:text-indigo-900 dark:hover:text-indigo-100"
+              >
+                <ScrollText className="h-3 w-3 shrink-0" />
+                <span className="truncate max-w-[160px]">{activeCharter.title}</span>
+                {activeCharter.phaseCount > 0 && (
+                  <span className="text-indigo-500/70 dark:text-indigo-400/70">
+                    · Phase {Math.min(activeCharter.phaseIndex + 1, activeCharter.phaseCount)}/
+                    {activeCharter.phaseCount}
+                  </span>
+                )}
+              </button>
               <button
                 type="button"
                 onClick={onDetachCharter}
@@ -1076,7 +1089,28 @@ function AttachmentChip({
       ) : (
         <FileText className="h-3.5 w-3.5 shrink-0 text-gray-400" />
       )}
-      <span className="truncate">{name}</span>
+      {/* The thumbnail was openable but the NAME was not, which is the larger
+          target and the one people aim at. Both now open the same thing: a
+          preview for images, the file itself for anything else. Still plain
+          text while uploading or on error, when there is nothing to open. */}
+      {url && status !== "uploading" ? (
+        <button
+          type="button"
+          onClick={() =>
+            isImage
+              ? useImagePreviewStore
+                  .getState()
+                  .open([{ src: url, alt: name, downloadUrl: url }])
+              : window.open(url, "_blank", "noopener,noreferrer")
+          }
+          title={isImage ? "Preview image" : `Open ${name}`}
+          className="min-w-0 truncate rounded-sm text-left transition-colors hover:text-gray-900 dark:hover:text-gray-100"
+        >
+          {name}
+        </button>
+      ) : (
+        <span className="truncate">{name}</span>
+      )}
       <button
         type="button"
         onClick={onRemove}
