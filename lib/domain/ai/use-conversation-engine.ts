@@ -557,6 +557,11 @@ export interface UseConversationEngineResult {
   // ── charters (AI v3.2 T3) ──
   /** The playbook attached to this conversation, or null. */
   activeCharter: ActiveCharter | null;
+  /**
+   * The quest ledger this thread has written items into, or null. Appears once
+   * the first item lands and stays for the rest of the conversation.
+   */
+  activeQuest: ActiveQuest | null;
   /** Attach a playbook — called when ChatInput's `/` selection is a playbook. */
   attachCharter: (item: SuggestionItem) => void;
   /** Detach the active playbook (dismiss the composer chip). */
@@ -668,6 +673,82 @@ export interface ActiveCharter {
   /** Phases completed so far — derived from resolved phase_checkpoint calls. */
   phaseIndex: number;
   phaseCount: number;
+}
+
+/** The quest ledger this thread is writing into (owner request 2026-09-18). */
+export interface ActiveQuest {
+  /** Run key, `quest:<slug>` — stable across the run's requests. */
+  runKey: string;
+  /** Display name from the proposal, falling back to the slug. */
+  title: string;
+  /** The ledger's ContentNode, once a write has returned one. */
+  ledgerNodeId: string | null;
+  /** Items written so far — the reason the pin exists is that this grows. */
+  itemsRecorded: number;
+}
+
+/** Turn a `quest:career-hunt-ii-test-batch` run key into readable words. */
+function questTitleFromRunKey(runKey: string): string {
+  return runKey
+    .replace(/^quest:/, "")
+    .split("-")
+    .filter(Boolean)
+    .map((w) => (w.length > 2 ? w[0].toUpperCase() + w.slice(1) : w))
+    .join(" ");
+}
+
+/**
+ * The quest this thread is actually writing to.
+ *
+ * Derived from the transcript rather than tracked in state, for the same
+ * reason the item-iteration budget is: a run spans several requests, and its
+ * tool calls are the only record that survives all of them.
+ *
+ * Deliberately gated on a WRITE, not on the proposal. A proposed run the user
+ * never approved is not this conversation's quest, and pinning on the proposal
+ * would put a chip on threads that only ever offered to do the work. The pin
+ * appears when the first item lands and stays for the rest of the thread —
+ * the quest is what this conversation has been about from then on.
+ */
+function deriveActiveQuest(messages: UIMessage[]): ActiveQuest | null {
+  let runKey: string | null = null;
+  let title: string | null = null;
+  let ledgerNodeId: string | null = null;
+  let itemsRecorded = 0;
+
+  for (const m of messages) {
+    if (m.role !== "assistant") continue;
+    for (const part of m.parts) {
+      const p = part as {
+        type?: string;
+        state?: string;
+        input?: { ledgerRunKey?: unknown; quest?: unknown };
+        output?: { ok?: boolean; ledgerNodeId?: unknown };
+      };
+      // The proposal carries the human name; remember it even though the pin
+      // itself waits for a write.
+      if (p.type === "tool-propose_item_iteration" && typeof p.input?.quest === "string") {
+        title = p.input.quest;
+      }
+      if (p.type !== "tool-record_item_result" || p.state !== "output-available") continue;
+      const key = p.input?.ledgerRunKey;
+      if (typeof key !== "string" || !key.startsWith("quest:")) continue;
+      if (p.output?.ok === false) continue; // a refused write is not a write
+      runKey = key;
+      itemsRecorded += 1;
+      if (typeof p.output?.ledgerNodeId === "string") {
+        ledgerNodeId = p.output.ledgerNodeId;
+      }
+    }
+  }
+
+  if (!runKey) return null;
+  return {
+    runKey,
+    title: title ?? questTitleFromRunKey(runKey),
+    ledgerNodeId,
+    itemsRecorded,
+  };
 }
 
 /**
@@ -2717,6 +2798,14 @@ export function useConversationEngine({
     };
   }, [effectiveCharterId, effectiveCharterTitle, charters, resolvedPhaseIndex]);
 
+  // The quest this thread writes into. Recomputed from messages so it survives
+  // the request boundaries a run spans, and so reopening the conversation
+  // restores the pin from the transcript rather than from lost state.
+  const activeQuest = useMemo<ActiveQuest | null>(
+    () => deriveActiveQuest(messages),
+    [messages],
+  );
+
   // Stream-time freshness (v3.1 R2): dispatch artifact refresh as tool
   // outputs ARRIVE in the stream, not just at turn end — a playbook turn
   // can run for minutes, and the file tree stayed stale the whole time.
@@ -3422,6 +3511,7 @@ export function useConversationEngine({
     folderGates,
     commandItems,
     activeCharter,
+    activeQuest,
     attachCharter,
     detachCharter,
     outputTarget,
