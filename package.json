@@ -32,6 +32,7 @@
     "data:read:check": "tsx scripts/check-read-format.ts",
     "data:read:measure": "tsx scripts/measure-database-read.ts",
     "ai:matrix": "tsx scripts/generate-ai-capability-matrix.ts",
+    "tools:prefix:measure": "tsx scripts/measure-tool-prefix.ts",
     "ai:matrix:check": "tsx scripts/generate-ai-capability-matrix.ts --check",
     "publishing:schema:check": "tsx scripts/validate-publishing-schema.ts",
     "publishing:audit:defaults": "tsx scripts/audit-publishing-defaults.ts",

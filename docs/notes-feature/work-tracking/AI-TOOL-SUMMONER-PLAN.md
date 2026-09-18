@@ -143,6 +143,23 @@ they are mode-scoped rather than core. Counts are 64 here against 65 in §2 beca
 The run case is the headline: for 794 extra tokens the diet's entire capability loss
 is undone. The plain-chat case is where the window savings live.
 
+### 2.1a Re-measured after PRs #243/#244 merged (2026-09-17)
+
+`pnpm tools:prefix:measure` on `main` at `eeaf9fe8`:
+
+| | tools | tokens |
+|---|---:|---:|
+| Full prefix | 67 | **31,599** |
+| plain chat | 7 advertised + 60 listed | **4,165** (3.3% of 128k) |
+| editor open | 17 + 50 | 5,519 (4.3%) |
+| co-browse run | 19 + 48 | 10,299 (8.0%) |
+| co-browse run + editor | 29 + 38 | 11,653 (9.1%) |
+
+**The harness earned itself on first use.** The full prefix moved 30,603 → 31,599
+— roughly a thousand tokens — because two merges added three tools, and nothing
+in the repo would have said so. That is the drift this instrument exists to
+catch; `insert_block` at 5,221 arrived the same way, without comment.
+
 ### 2.2 Why the descriptions are the cost
 
 Tool descriptions mix two jobs. Identification ("this is the tool that reads database
@@ -359,11 +376,16 @@ time — native search is attached *after*, at `route.ts:1488-1500`).
 
 - `pnpm typecheck` → `pnpm lint` (175 ratchet) → `pnpm build`.
 - `pnpm ai:drift:check` extended per P3, mutation-tested.
-- Measurement harness **NOT built** — §2 and §2.1 were measured with a throwaway
-  Next route plus a one-off script, both deleted. Promoting it to
-  `scripts/measure-tool-prefix.ts` needs the Next runtime (the tool graph has
-  require-cycles plain Node will not load), so it is a real task, not a copy-paste.
-  Backlog it rather than claim it.
+- Measurement harness ✅ **BUILT** — `pnpm tools:prefix:measure` (needs `pnpm dev`
+  running; `--json` for machine output, `--url=` for another port). It reads
+  `GET /api/dev/tool-prefix`, a development-only route, because the tool graph
+  cannot be loaded by plain Node: `server-only` is unresolvable outside Next,
+  TipTap's ESM-only packages break under tsx's CJS loader, and forcing the ESM
+  loader hits `ERR_REQUIRE_CYCLE_MODULE`. **Stubbing the heavy modules was tried
+  and rejected**: `insert_block`'s description is generated from the block
+  registry, which `registerBlock()` populates at import time of each TipTap block
+  extension — stub those and the largest tool in the set measures as a fraction of
+  itself, which is worse than not measuring.
 - **Smoke on production** (post-deploy checklist in the PR body — AI-capability work
   smokes on prod, never titled "Pre-merge"):
   1. Chat on a folder: "read the Job Opportunities Library" → `getCurrentNote` returns
