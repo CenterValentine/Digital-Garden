@@ -4003,6 +4003,7 @@ const TOOL_ACTION_LABELS: Record<string, [running: string, done: string]> = {
   // recorded before the rename still render a verb instead of a raw id.
   searchNotes: ["Searching your notes", "Searched your notes"],
   read_content: ["Reading", "Read"],
+  summon: ["Loading tools", "Loaded tools"],
   create_note: ["Creating a note", "Created a note"],
   update_note: ["Updating a note", "Updated a note"],
   rename_note: ["Renaming", "Renamed"],
