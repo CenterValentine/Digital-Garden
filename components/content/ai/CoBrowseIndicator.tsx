@@ -11,7 +11,11 @@
  */
 
 import { useEffect, useState } from "react";
-import { useCoBrowseStore, markCoBrowseInactive } from "@/state/co-browse-store";
+import {
+  useCoBrowseStore,
+  markCoBrowseInactive,
+  isCoBrowseActive,
+} from "@/state/co-browse-store";
 import { coBrowseDetach, coBrowseReveal } from "@/lib/domain/browser-extension/co-browse";
 import { isAllowedEmbedMessageOrigin } from "@/lib/domain/browser-extension/embed-message-origins";
 
@@ -61,6 +65,27 @@ export function CoBrowseIndicator() {
     }
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
+  }, []);
+
+  // Close the panel with a session running and the attachment used to survive
+  // it — nothing owned teardown, so the tab stayed attached, Chrome kept
+  // telling the user it was being debugged, and the next co-browse on that tab
+  // was refused (owner report 2026-09-18).
+  //
+  // `pagehide`, NOT a React unmount cleanup: this component remounts for
+  // ordinary reasons (view switches, hydration, StrictMode) and tearing down a
+  // live session on those would be worse than the leak. `pagehide` fires only
+  // when the document itself is going away, which is exactly the case where
+  // nobody is left to press Stop.
+  useEffect(() => {
+    function onPageHide() {
+      if (!isCoBrowseActive()) return;
+      // No await: the document is leaving. `keepalive`-style best effort — and
+      // the extension's reclaim-on-attach is the backstop if it does not land.
+      void coBrowseDetach().catch(() => {});
+    }
+    window.addEventListener("pagehide", onPageHide);
+    return () => window.removeEventListener("pagehide", onPageHide);
   }, []);
 
   if (!active) return null;

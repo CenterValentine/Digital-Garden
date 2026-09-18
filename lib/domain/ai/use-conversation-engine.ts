@@ -52,6 +52,7 @@ import {
   isCoBrowseAvailable,
   coBrowseOpen,
   coBrowseSnapshot,
+  coBrowseDetach,
   coBrowseNavigate,
   coBrowseClick,
   coBrowseHover,
@@ -68,6 +69,8 @@ import {
 import { capturePageContent } from "@/lib/domain/browser-extension/panel-bridge";
 import {
   markCoBrowseActive,
+  markCoBrowseInactive,
+  isCoBrowseActive,
   beginCoBrowseWait,
   endCoBrowseWait,
 } from "@/state/co-browse-store";
@@ -2849,6 +2852,23 @@ export function useConversationEngine({
     stopRequest();
     setMessages((current) => stopPendingToolCalls(current));
     clearFollowUps();
+    // Stop means STOP — including the browser (owner report 2026-09-18).
+    // Until now the debugger attachment outlived the conversation that opened
+    // it: only the indicator's own Stop bar ever detached, so a stopped run
+    // left the tab attached, Chrome still telling the user it was being
+    // debugged, and every later co-browse on that tab refused with "another
+    // debugger is already attached".
+    //
+    // Deliberately NOT done at turn end: a charter run spans several turns on
+    // one tab, and tearing down between them would re-open constantly and
+    // discard the user's page state — the thing BIND-FIRST exists to protect.
+    if (isCoBrowseActive()) {
+      markCoBrowseInactive(); // optimistic: drop the bar now
+      void coBrowseDetach().catch(() => {
+        // Best-effort: the tab may already be gone. The extension's own
+        // reclaim-on-attach covers whatever this misses.
+      });
+    }
   }, [stopRequest, setMessages, clearFollowUps]);
 
   // ── per-message provider + model stamping ──
