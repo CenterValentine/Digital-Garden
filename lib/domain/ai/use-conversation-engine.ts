@@ -1710,14 +1710,32 @@ export function useConversationEngine({
     null,
   );
 
+  /**
+   * The user dismissed the charter this chat is BOUND to.
+   *
+   * Needed because clearing the pick is not enough (owner report 2026-09-18:
+   * "detach didn't work in a side chat on the charter itself"). `boundCharter`
+   * below re-derives from `contentId` the moment `activeCharterId` goes null,
+   * so in a side chat opened ON a charter the X cleared the pick and the chip
+   * reappeared in the same render — inert by construction.
+   *
+   * It cannot be expressed as `charterId: null` in the request body either:
+   * null already means "nothing picked", which is what every fresh side chat
+   * sends, and the server binds from contentId in exactly that case. Detached
+   * is a third state and needs its own signal.
+   */
+  const [charterDetached, setCharterDetached] = useState(false);
+
   const attachCharter = useCallback((item: SuggestionItem) => {
     setActiveCharterId(item.id);
     setActiveCharterTitle(item.label);
+    setCharterDetached(false); // an explicit pick undoes an earlier dismissal
   }, []);
 
   const detachCharter = useCallback(() => {
     setActiveCharterId(null);
     setActiveCharterTitle(null);
+    setCharterDetached(true);
   }, []);
 
   // BOUND CHARTER (owner directive 2026-09-11): a chat opened ON a charter is
@@ -1727,10 +1745,10 @@ export function useConversationEngine({
   // what the model got agree. An explicit pick still wins.
   const boundCharter = useMemo(
     () =>
-      !activeCharterId && contentId
+      !activeCharterId && !charterDetached && contentId
         ? (charters.find((c) => c.id === contentId) ?? null)
         : null,
-    [activeCharterId, contentId, charters],
+    [activeCharterId, charterDetached, contentId, charters],
   );
   const effectiveCharterId = activeCharterId ?? boundCharter?.id ?? null;
   const effectiveCharterTitle =
@@ -2849,6 +2867,7 @@ export function useConversationEngine({
       // resumes / internal sends carry the same binding as the turn that
       // started them.
       charterId: effectiveCharterId,
+      charterDetached,
       activePhaseIndex: resolvedPhaseIndex,
       // Output-target chip (WS7): where new content lands by default.
       outputTarget,
@@ -2873,6 +2892,7 @@ export function useConversationEngine({
     providerId,
     modelId,
     effectiveCharterId,
+    charterDetached,
     resolvedPhaseIndex,
     outputTarget,
     modelPinned,
@@ -3317,6 +3337,7 @@ export function useConversationEngine({
           viewedContent: getActiveViewedContentHint(),
           // Attached playbook (AI v3.2 T3).
           charterId: effectiveCharterId,
+          charterDetached,
           activePhaseIndex: resolvedPhaseIndex,
           // Output-target chip (WS7).
           outputTarget,
@@ -3347,6 +3368,7 @@ export function useConversationEngine({
     providerId,
     modelId,
     effectiveCharterId,
+    charterDetached,
     effectiveCharterTitle,
     activeCharter,
     resolvedPhaseIndex,
@@ -3373,6 +3395,7 @@ export function useConversationEngine({
       viewedContent: getActiveViewedContentHint(),
       // Attached playbook (AI v3.2 T3) rides re-runs too, for continuity.
       charterId: effectiveCharterId,
+      charterDetached,
       activePhaseIndex: resolvedPhaseIndex,
       // Output-target chip (WS7).
       outputTarget,
@@ -3386,6 +3409,7 @@ export function useConversationEngine({
       providerId,
       modelId,
       effectiveCharterId,
+      charterDetached,
       resolvedPhaseIndex,
       outputTarget,
       modelPinned,
