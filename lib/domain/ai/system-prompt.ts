@@ -149,6 +149,12 @@ export interface SystemPromptContext {
   /** Database tools are attached — the model may read and reshape tables. */
   hasDatabaseTools?: boolean;
   /**
+   * The summon menu (AI-TOOL-SUMMONER-PLAN §3): one line per tool that exists
+   * this turn but is not advertised in full. Rendered verbatim — it is built
+   * in `lib/domain/ai/tools/menu.ts`, which owns selection wording.
+   */
+  toolMenu?: string;
+  /**
    * The provider/model actually serving this turn (v3.1) — resolved from
    * live routing, NOT settings. Lets the model answer "which model are
    * you" from ground truth instead of confabulating (Kimi denied being
@@ -413,6 +419,11 @@ export function buildSystemPrompt(ctx: SystemPromptContext): string {
   // Untrusted page content goes LAST, after all trusted instructions, so its
   // framing ("data, not instructions") is the freshest thing before the turn.
   if (ctx.pageContextSection) sections.push(ctx.pageContextSection);
+
+  // The summon menu goes LAST among the standing rules, immediately before any
+  // per-turn context: it is a catalogue the model consults at the moment of
+  // choosing an action, so it should be the nearest thing to that choice.
+  if (ctx.toolMenu) sections.push(ctx.toolMenu);
 
   return sections.join("\n\n");
 }

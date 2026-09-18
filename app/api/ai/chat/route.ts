@@ -33,6 +33,16 @@ import {
   LEGACY_TOOL_IDS,
   resolveToolNameAlias,
 } from "@/lib/domain/ai/tools/repair";
+import {
+  CORE_TOOL_IDS,
+  MODE_TOOL_IDS,
+  buildToolMenu,
+  type ToolFamily,
+} from "@/lib/domain/ai/tools/menu";
+import {
+  SUMMON_TOOL_ID,
+  createSummonTool,
+} from "@/lib/domain/ai/tools/summon";
 import { isResumableConfigured } from "@/lib/domain/ai/resumable/redis";
 import { getStreamContext } from "@/lib/domain/ai/resumable/context";
 import {
@@ -1431,14 +1441,6 @@ export async function POST(request: Request) {
         ),
       );
 
-      // Context diet (S7-C5): during an APPROVED iteration run, narrow the
-      // schema set to the run's working tools. The full ~50-schema prefix
-      // measured ~36k tokens per request; the 128k window (not price) is the
-      // binding constraint on long runs. The set is stable for the whole run
-      // (itemIterationBudget stays non-null until record_iteration_findings),
-      // so the provider prefix cache re-warms once at run start. Pending
-      // approvals mid-run only occur for kept tools (create_note,
-      // phase_checkpoint).
       // What the model is TOLD it has. The `tools` object above stays
       // complete for the rest of this request: `activeTools` narrows only what
       // is serialized into the provider payload, while incoming tool calls
@@ -1446,37 +1448,45 @@ export async function POST(request: Request) {
       // unadvertised tool costs zero tokens and still executes if the model
       // reaches for it — which is the recovery path that deleting destroyed.
       const advertised = new Set(Object.keys(tools));
-      const isAdvertised = (id: string) => advertised.has(id);
+      // Summoned mid-turn. Kept separate from `advertised` so the base set
+      // stays the one the menu is computed against, and so a summon is visible
+      // in diagnostics as something the model asked for rather than something
+      // the turn always had. RATCHET: only ever added to within a turn.
+      const activated = new Set<string>();
+      const isAdvertised = (id: string) =>
+        advertised.has(id) || activated.has(id);
 
+      // ADVERTISEMENT POLICY (AI-TOOL-SUMMONER-PLAN §3). Core tools are always
+      // offered; a mode's tools are offered while that mode is live; everything
+      // else is one `summon` away, listed in the menu at ~15 tokens each.
+      //
+      // This replaces the per-run tool diet, which cut 39 of 65 tools by a
+      // hardcoded allowlist and left them unreachable for a whole 48-step
+      // request. Measured: the full prefix is 31,149 tokens — 24% of a 128k
+      // window, re-sent every step — against ~4.9k in plain chat and ~10.1k in
+      // a co-browse run under this policy, with all 65 still reachable.
+      const modes: string[] = [];
+      if (editableContentId) modes.push("editor");
+      if (coBrowseAvailable) modes.push("browser");
+      if (itemIterationBudget != null) modes.push("runs");
+
+      const offered = new Set<string>(CORE_TOOL_IDS);
+      for (const mode of modes) {
+        for (const id of MODE_TOOL_IDS[mode] ?? []) offered.add(id);
+      }
+      for (const id of Object.keys(tools)) {
+        if (!offered.has(id)) advertised.delete(id);
+      }
+
+      // Predictive activation — the cheapest summon is the one never made.
+      // A run declares what it will touch at approval, so those tools are
+      // advertised BEFORE the turn's first inference: no step spent, and no
+      // mid-turn prefix change to invalidate the cache. This is precisely the
+      // path the 2026-09-17 run needed — it captures into a database, so it
+      // must be able to read that database to dedupe against it.
       if (itemIterationBudget != null) {
-        const ITERATION_RUN_TOOLS = new Set([
-          // browsing + enumeration
-          "co_browse_open", "co_browse_act", "read_current_page", "list_tabs",
-          "read_page_headless_or_browser", "open_tab_and_read", "read_page",
-          "search_web",
-          // the iteration harness itself
-          "propose_item_iteration", "record_item_result",
-          "record_batch_checkpoint", "record_iteration_findings",
-          // mid-run schema grace (D8) — this diet stripped it, so the only
-          // window it exists for never had it (lifecycle audit 2026-09-11)
-          "add_quest_ledger_column",
-          // note output + grounding
-          "create_note", "update_note", "rename_note", "read_content",
-          "search_content", "read_folder_context",
-          "read_first_chunk", "read_next_chunk", "read_previous_chunk",
-          // Database READS (2026-09-17): a run captures into a database, so it
-          // needs to see what is already there — to dedupe against prior rows,
-          // and to judge items against a standing-context table. Withholding
-          // these sent a production run to `search_content` → `read_content`
-          // and then blind. The four `propose_*` schema-design tools stay
-          // unadvertised: 3,840 tokens of table-authoring the run cannot use.
-          "query_database", "describe_database",
-          // run/plumbing
-          "phase_checkpoint", "ask_user", "notify_user",
-          "finish_with_summary", "plan",
-        ]);
-        for (const id of Object.keys(tools)) {
-          if (!ITERATION_RUN_TOOLS.has(id)) advertised.delete(id);
+        for (const id of ["query_database", "describe_database"]) {
+          if (id in tools) advertised.add(id);
         }
       }
 
@@ -1529,6 +1539,32 @@ export async function POST(request: Request) {
           createAppWebSearchTool(session.user.id);
         advertised.add("search_web");
       }
+
+      // ── The summoner (AI-TOOL-SUMMONER-PLAN §3) ────────────────────────
+      // Registered last, so `registered` covers every tool this turn has —
+      // including the conditional browser/editor/search families above.
+      const registered = new Set(Object.keys(tools));
+      (tools as Record<string, unknown>)[SUMMON_TOOL_ID] = createSummonTool({
+        registered,
+        activated,
+        isAdvertised,
+      });
+      // Core by construction: a menu the model cannot act on is worse than no
+      // menu, so the one tool that acts on it is never itself summonable.
+      advertised.add(SUMMON_TOOL_ID);
+
+      // Ordering is the only focus mechanism a menu has. Tool absence used to
+      // keep a run on task; discoverability gives that up, so the families the
+      // current mode actually touches are read first.
+      const leadWith: ToolFamily[] = [];
+      if (itemIterationBudget != null) leadWith.push("runs", "databases", "web");
+      if (coBrowseAvailable) leadWith.push("browser");
+      if (editableContentId) leadWith.push("editor");
+      const toolMenu = buildToolMenu({
+        registered,
+        advertised,
+        leadWith,
+      });
 
       // Resolve attachments for the model: keep file parts the active
       // provider can consume natively (images for vision; PDFs for
@@ -2521,9 +2557,18 @@ export async function POST(request: Request) {
         // than the silence this fixes. Telling it the loop is over makes
         // the honest report the only available move.
         prepareStep: ({ stepNumber, messages: stepMessages }) => {
-          if (stepNumber < stepCap - 1) return {};
+          // Summoned tools enter here: `activated` grew during the previous
+          // step's tool execution, and this is the only place a step's
+          // advertised set can be widened. Returned every step (not just when
+          // something was summoned) so the set is stated by one rule rather
+          // than inherited sometimes and overridden others.
+          const stepActiveTools = toolsActive
+            ? [...advertised, ...activated]
+            : undefined;
+          if (stepNumber < stepCap - 1) return { activeTools: stepActiveTools };
           stepsTracker.finalStepReserved = true;
           return {
+            activeTools: stepActiveTools,
             toolChoice: "none" as const,
             messages: [
               ...stepMessages,
@@ -2550,6 +2595,7 @@ export async function POST(request: Request) {
           hasListTabs: isAdvertised(LIST_TABS),
           hasItemIteration: isAdvertised("propose_item_iteration"),
           hasDatabaseTools: isAdvertised("describe_database"),
+          toolMenu: toolMenu ?? undefined,
           viewedContentHint,
           // Runtime identity (v3.1): what this turn is ACTUALLY served by,
           // from live routing — so the model self-identifies from ground
