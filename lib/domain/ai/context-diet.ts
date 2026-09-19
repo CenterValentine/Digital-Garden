@@ -315,6 +315,164 @@ export function supersedePerceptionHistory(messages: UIMessage[]): UIMessage[] {
   });
 }
 
+// ── Write inputs (AI-CONTEXT-ECONOMICS-PLAN B1) ────────────────────────────
+
+/**
+ * Tools whose INPUT has a durable home the moment the call succeeds: the
+ * database, note, or ledger they wrote to. On the evidence thread the model
+ * typed 201 kB into `insert_rows` (8 calls, 25 kB each) — generated text,
+ * the expensive kind — and then re-read it as input on every later step.
+ */
+const WRITE_TOOL_PARTS = new Set([
+  "tool-insert_rows",
+  "tool-update_rows",
+  "tool-update_row",
+  "tool-update_note",
+  "tool-record_item_result",
+]);
+
+/** The run's item list — superseded only once the run has recorded findings. */
+const PROPOSAL_TOOL_PART = "tool-propose_item_iteration";
+
+const WRITE_INPUT_MIN_CHARS = 600;
+
+/** Scalar input fields short enough to keep as addresses (targets, ids, statuses). */
+const WRITE_INPUT_KEEP_MAX_CHARS = 80;
+
+export type WriteInputFoldState = "folded" | "kept";
+
+function isWritePart(part: unknown): part is {
+  type: string;
+  state?: string;
+  input?: unknown;
+  output?: unknown;
+} {
+  if (!part || typeof part !== "object") return false;
+  const p = part as { type?: unknown; state?: unknown };
+  return (
+    typeof p.type === "string" &&
+    (WRITE_TOOL_PARTS.has(p.type) || p.type === PROPOSAL_TOOL_PART) &&
+    p.state === "output-available"
+  );
+}
+
+/** A write that did not succeed keeps its input — the model may need it to retry. */
+function writeSucceeded(output: unknown): boolean {
+  if (output && typeof output === "object") {
+    const o = output as { ok?: unknown; error?: unknown; success?: unknown };
+    if (o.ok === false || o.success === false) return false;
+    if (typeof o.error === "string" && o.error.length > 0) return false;
+  }
+  return true;
+}
+
+/**
+ * Fold verdict for every large, successful write input, keyed
+ * `"messageIdx:partIdx"`. Same two boundaries as perceptionFoldStates —
+ * before the latest distillation point, or in a turn before the latest user
+ * message — because within the current batch the model may still refer to
+ * what it just wrote. `propose_item_iteration` folds only once a
+ * `record_iteration_findings` exists after it (during the run the model
+ * addresses items by that list).
+ */
+export function writeInputFoldStates(
+  messages: UIMessage[],
+): Map<string, WriteInputFoldState> {
+  const out = new Map<string, WriteInputFoldState>();
+  const distilled = findDistillationPoint(messages);
+  let lastUserIdx = -1;
+  let lastFindings: { messageIdx: number; partIdx: number } | null = null;
+  messages.forEach((m, i) => {
+    if (m.role === "user") lastUserIdx = i;
+    if (m.role !== "assistant") return;
+    m.parts.forEach((part, partIdx) => {
+      const p = part as { type?: string; state?: string };
+      if (p.type === "tool-record_iteration_findings" && p.state === "output-available") {
+        lastFindings = { messageIdx: i, partIdx };
+      }
+    });
+  });
+
+  messages.forEach((m, messageIdx) => {
+    if (m.role !== "assistant") return;
+    m.parts.forEach((part, partIdx) => {
+      if (!isWritePart(part)) return;
+      if (JSON.stringify(part.input ?? "").length < WRITE_INPUT_MIN_CHARS) return;
+      if (!writeSucceeded(part.output)) return;
+      const key = `${messageIdx}:${partIdx}`;
+      const before = (
+        point: { messageIdx: number; partIdx: number } | null,
+      ): boolean =>
+        point != null &&
+        (messageIdx < point.messageIdx ||
+          (messageIdx === point.messageIdx && partIdx < point.partIdx));
+      if (part.type === PROPOSAL_TOOL_PART) {
+        out.set(key, before(lastFindings) ? "folded" : "kept");
+        return;
+      }
+      out.set(
+        key,
+        before(distilled) || messageIdx < lastUserIdx ? "folded" : "kept",
+      );
+    });
+  });
+  return out;
+}
+
+/**
+ * The stub keeps the input's ADDRESSES (short scalars — ids, targets,
+ * statuses) and drops its PAYLOAD (rows, cells, prose), so the model can
+ * still say what it wrote where without carrying what it wrote.
+ */
+function supersededWriteInput(toolName: string, input: unknown): Record<string, unknown> {
+  const kept: Record<string, unknown> = {};
+  let rows: number | null = null;
+  if (input && typeof input === "object" && !Array.isArray(input)) {
+    for (const [k, v] of Object.entries(input as Record<string, unknown>)) {
+      if (Array.isArray(v)) {
+        if (k === "rows" || k === "updates" || k === "items") rows = v.length;
+        continue;
+      }
+      if (typeof v === "number" || typeof v === "boolean") kept[k] = v;
+      else if (typeof v === "string" && v.length <= WRITE_INPUT_KEEP_MAX_CHARS) kept[k] = v;
+    }
+  }
+  const what = rows != null ? `${rows} item(s)` : "its content";
+  return {
+    superseded: `[input superseded — this ${toolName} call succeeded and ${what} now live where it wrote them; use query_database / read_content to re-read rather than this input]`,
+    ...kept,
+  };
+}
+
+/**
+ * Model-path fold for write inputs. Historical tool-call `input` is forwarded
+ * verbatim by convertToModelMessages with no schema validation, and the chat
+ * route never validates incoming history — which is why stubbing an INPUT is
+ * safe where stripping an OUTPUT field failed a provider schema (smoke #5).
+ * The output (row ids, receipts) is kept untouched. Same contract as every
+ * transform here: never applied to originalMessages/persistence.
+ */
+export function supersedeWriteInputs(messages: UIMessage[]): UIMessage[] {
+  const states = writeInputFoldStates(messages);
+  if (![...states.values()].some((s) => s === "folded")) return messages;
+
+  return messages.map((m, messageIdx) => {
+    if (m.role !== "assistant") return m;
+    let changed = false;
+    const parts = m.parts.map((part, partIdx) => {
+      if (states.get(`${messageIdx}:${partIdx}`) !== "folded") return part;
+      changed = true;
+      const p = part as { type?: string; input?: unknown };
+      const toolName = (p.type ?? "tool-").replace(/^tool-/, "");
+      return {
+        ...(part as Record<string, unknown>),
+        input: supersededWriteInput(toolName, p.input),
+      } as typeof part;
+    });
+    return changed ? { ...m, parts } : m;
+  });
+}
+
 // ── Repeated tool parts (AI-CONTEXT-ECONOMICS-PLAN A2) ─────────────────────
 
 /** Below this an identical output is cheaper to keep than to perturb the cache over. */

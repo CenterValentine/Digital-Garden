@@ -1,6 +1,6 @@
 ---
 title: AI Context Economics — fold across replies, dedupe, pay for a page once
-status: planned
+status: built — PR A (#250, `feat/context-economics`) and PR B (`feat/payload-economics`, stacked) open 2026-09-18; production smoke pending on both
 created: 2026-09-18
 owner: David Valentine
 evidence: prod conversation 4fbf8b57-3ad8-4379-bf15-c839d8fd0cbe ("Job Charter and Quest Ledger")
@@ -134,7 +134,9 @@ Once a write tool returns `ok`, its input has a durable home. Behind the **same 
 
 Also superseded, **after `record_iteration_findings` only**: the `propose_item_iteration` input (the item list, 8.9 kB per proposal). During the run the model addresses items by it; once the findings record exists, the ledger holds them.
 
-Not before the boundary: within the current batch the model may still refer to what it just wrote.
+Not before the boundary: within the current batch the model may still refer to what it just wrote. A write whose output reports failure (`ok: false`, `error`) keeps its input — the model may need it to retry. The stub keeps the input's **addresses** (short scalars: ids, targets, statuses) and drops its **payload** (rows, cells, prose), so "what did I write where" survives without "what I wrote".
+
+**No UI change for B1, deliberately.** The parity rule ("the default view equals the retained context") is about what is *collapsed*. A write tool's bubble already leads with its receipt — the output, which the model keeps — and shows the raw input only on expand; the model's stub keeps the same addresses the bubble's summary line shows. Nothing the model lost is on screen by default.
 
 **Reclaims:** ~324 kB — and this is the pattern that would have cost most on Claude/OpenAI, because it is *generated* text being replayed.
 

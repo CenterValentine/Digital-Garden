@@ -39,7 +39,10 @@ import {
   findDistillationPoint,
   perceptionFoldStates,
   supersedePerceptionHistory,
+  supersedeWriteInputs,
+  writeInputFoldStates,
 } from "../lib/domain/ai/context-diet";
+import { coBrowsePageIdentity } from "../lib/domain/ai/co-browse-page-identity";
 
 const errors: string[] = [];
 function assert(cond: unknown, msg: string): void {
@@ -269,6 +272,108 @@ const isStub = (v: unknown, word: string): boolean =>
   );
 }
 
+// ── Gate 6: write inputs are superseded by their writes (PR B1) ─────────────
+
+{
+  const rows = Array.from({ length: 6 }, (_, i) => ({
+    Company: `Co ${i}`,
+    "Role Summary": big(`summary-${i}`, 200),
+  }));
+  const insert = (id: string, output: unknown = { ok: true, rowIds: ["r1"] }) =>
+    tool("insert_rows", { id, input: { databaseId: "db-1", rows }, output });
+  const msgs = [
+    user(),
+    assistant([
+      insert("w1"), // 1:0 — earlier turn → folded
+      insert("w2", { ok: false }), // 1:1 — failed (ok:false alone) → kept
+      tool("record_item_result", { id: "w3", input: { itemId: "i1", status: "qualified", verdict: big("v", 700) } }), // 1:2 → folded
+      insert("w2e", { error: "schema mismatch" }), // 1:3 — failed (error alone) → kept
+    ]),
+    user("next"),
+    assistant([
+      insert("w4"), // 3:0 — live turn, but a checkpoint follows → folded
+      checkpoint(), // 3:1
+      insert("w5"), // 3:2 — after the distillation point → kept
+    ]),
+  ];
+  const states = writeInputFoldStates(msgs);
+  assert(states.get("1:0") === "folded", "G6: a successful write input in an earlier turn folds");
+  assert(!states.has("1:1"), "G6: a write reporting ok:false keeps its input (the model may retry)");
+  assert(!states.has("1:3"), "G6: a write reporting an error string keeps its input");
+  assert(states.get("1:2") === "folded", "G6: record_item_result input folds by turn");
+  // Turn rule in isolation: no distillation point anywhere in the transcript.
+  const turnOnly = [user(), assistant([insert("w7")]), user("next"), assistant([])];
+  assert(
+    writeInputFoldStates(turnOnly).get("1:0") === "folded",
+    "G6: a successful write in an earlier turn folds even with no checkpoint or findings anywhere",
+  );
+  assert(states.get("3:0") === "folded", "G6: a write before a checkpoint in the live turn folds (the checkpoint digested it)");
+  assert(states.get("3:2") === "kept", "G6: a write after the latest distillation point is kept");
+  const liveOnly = [user(), assistant([insert("w6")])];
+  assert(
+    writeInputFoldStates(liveOnly).get("1:0") === "kept",
+    "G6: a write in the live turn with no distillation point is kept",
+  );
+
+  const folded = supersedeWriteInputs(msgs);
+  const stubbed = folded[1].parts[0] as { input: Record<string, unknown>; output: unknown };
+  assert(
+    typeof stubbed.input.superseded === "string" && stubbed.input.superseded.includes("insert_rows"),
+    "G6: the stub names the tool",
+  );
+  assert(stubbed.input.databaseId === "db-1", "G6: the stub keeps short scalar addresses (databaseId)");
+  assert(!("rows" in stubbed.input), "G6: the stub drops the payload (rows)");
+  assert(
+    (stubbed.input.superseded as string).includes("6 item(s)"),
+    "G6: the stub reports how many items were written",
+  );
+  assert(
+    JSON.stringify(stubbed.output) === JSON.stringify((msgs[1].parts[0] as { output: unknown }).output),
+    "G6: the OUTPUT (row ids / receipt) is untouched",
+  );
+  assert(
+    JSON.stringify((folded[1].parts[1] as { input: unknown }).input) ===
+      JSON.stringify((msgs[1].parts[1] as { input: unknown }).input),
+    "G6: the failed write's input is byte-identical",
+  );
+
+  // Small inputs are never worth it.
+  const small = [user(), assistant([tool("update_row", { input: { rowId: "r", cells: { Fit: 1 } } })]), user("n"), assistant([])];
+  assert(!writeInputFoldStates(small).has("1:0"), "G6: inputs under the min-chars guard are ignored");
+
+  // propose_item_iteration folds only once findings exist after it.
+  const items = Array.from({ length: 12 }, (_, i) => ({ title: `Item ${i}`, url: `https://x/${i}`, note: big("n", 60) }));
+  const proposal = () => tool("propose_item_iteration", { input: { items, source: "page" }, output: { ok: true } });
+  const duringRun = [user(), assistant([proposal(), checkpoint()]), user("n"), assistant([])];
+  assert(
+    writeInputFoldStates(duringRun).get("1:0") === "kept",
+    "G6: the proposal's item list is kept while the run has no findings — even across a turn",
+  );
+  const afterRun = [user(), assistant([proposal(), checkpoint(), findings()])];
+  assert(
+    writeInputFoldStates(afterRun).get("1:0") === "folded",
+    "G6: the proposal's item list folds once record_iteration_findings exists",
+  );
+}
+
+// ── Gate 7: co-browse page identity ignores state (PR B2) ───────────────────
+
+{
+  const a = coBrowsePageIdentity("https://www.linkedin.com/jobs/search-results/?currentJobId=1&keywords=x");
+  const b = coBrowsePageIdentity("https://www.linkedin.com/jobs/search-results/?currentJobId=2&keywords=x#top");
+  assert(a === b, "G7: a query-string / hash change is the same document");
+  assert(a === "https://www.linkedin.com/jobs/search-results/", "G7: identity is origin + pathname");
+  assert(
+    coBrowsePageIdentity("https://www.linkedin.com/jobs/view/123/") !== a,
+    "G7: a path change is a new document",
+  );
+  assert(
+    coBrowsePageIdentity("https://a.example/p") !== coBrowsePageIdentity("https://b.example/p"),
+    "G7: a different origin is a new document",
+  );
+  assert(coBrowsePageIdentity("about:blank?x=1") === "about:blank", "G7: non-URL input still drops state textually");
+}
+
 // ── Gate 5: the route applies both ──────────────────────────────────────────
 
 {
@@ -281,6 +386,12 @@ const isStub = (v: unknown, word: string): boolean =>
   const block = routeSrc.slice(anchor, anchor + 1200);
   assert(block.includes("supersedePerceptionHistory("), "G5: the chat route must apply supersedePerceptionHistory in the model-message assembly");
   assert(block.includes("dedupeRepeatedToolParts("), "G5: the chat route must apply dedupeRepeatedToolParts in the model-message assembly");
+  assert(block.includes("supersedeWriteInputs("), "G5: the chat route must apply supersedeWriteInputs in the model-message assembly");
+  const engineSrc = readFileSync(path.join(process.cwd(), "lib/domain/ai/use-conversation-engine.ts"), "utf8");
+  assert(
+    engineSrc.includes("coBrowsePageIdentity(base.url) !== coBrowsePageIdentity(url)"),
+    "G5: coBrowseSnapshotOrDelta must keyframe on page IDENTITY (origin+path), not the full URL",
+  );
   assert(
     block.indexOf("dedupeRepeatedToolParts(") < block.indexOf("supersedePerceptionHistory("),
     "G5: dedupe must wrap (run after) the index-keyed folds — it is the only pass that removes parts",
@@ -294,4 +405,4 @@ if (errors.length > 0) {
   for (const e of errors) console.error(`  ${e}\n`);
   process.exit(1);
 }
-console.log("✓ context:diet:check — fold-on-distillation, fold-on-turn, dedupe, purity, route wiring");
+console.log("✓ context:diet:check — fold-on-distillation, fold-on-turn, dedupe, write inputs, page identity, purity, route wiring");
