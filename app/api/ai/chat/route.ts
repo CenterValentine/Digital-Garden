@@ -498,7 +498,16 @@ export async function POST(request: Request) {
       // machinery binds, but the model still runs only when asked. Resolved
       // ONCE here; the routing resolver and the context block both read it,
       // which keeps the two derivations mirrored as required.
+      // `charterDetached` is the user having dismissed the chip in a chat that
+      // is bound to this charter by virtue of being opened ON it. Without it
+      // the dismissal could not be expressed: `charterId: null` already means
+      // "nothing picked", which is what every fresh side chat sends and
+      // exactly the case this binding exists to serve. Hiding the chip alone
+      // would have been a lie — the model would still have been handed the
+      // charter (owner report 2026-09-18).
+      const charterDetached = body.charterDetached === true;
       const boundCharterId =
+        !charterDetached &&
         typeof body.charterId !== "string" &&
         contentId &&
         (await isCharterNodeId(session.user.id, contentId))

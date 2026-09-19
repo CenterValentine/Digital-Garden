@@ -52,6 +52,7 @@ import {
   isCoBrowseAvailable,
   coBrowseOpen,
   coBrowseSnapshot,
+  coBrowseDetach,
   coBrowseNavigate,
   coBrowseClick,
   coBrowseHover,
@@ -68,6 +69,8 @@ import {
 import { capturePageContent } from "@/lib/domain/browser-extension/panel-bridge";
 import {
   markCoBrowseActive,
+  markCoBrowseInactive,
+  isCoBrowseActive,
   beginCoBrowseWait,
   endCoBrowseWait,
 } from "@/state/co-browse-store";
@@ -554,6 +557,11 @@ export interface UseConversationEngineResult {
   // ── charters (AI v3.2 T3) ──
   /** The playbook attached to this conversation, or null. */
   activeCharter: ActiveCharter | null;
+  /**
+   * The quest ledger this thread has written items into, or null. Appears once
+   * the first item lands and stays for the rest of the conversation.
+   */
+  activeQuest: ActiveQuest | null;
   /** Attach a playbook — called when ChatInput's `/` selection is a playbook. */
   attachCharter: (item: SuggestionItem) => void;
   /** Detach the active playbook (dismiss the composer chip). */
@@ -665,6 +673,82 @@ export interface ActiveCharter {
   /** Phases completed so far — derived from resolved phase_checkpoint calls. */
   phaseIndex: number;
   phaseCount: number;
+}
+
+/** The quest ledger this thread is writing into (owner request 2026-09-18). */
+export interface ActiveQuest {
+  /** Run key, `quest:<slug>` — stable across the run's requests. */
+  runKey: string;
+  /** Display name from the proposal, falling back to the slug. */
+  title: string;
+  /** The ledger's ContentNode, once a write has returned one. */
+  ledgerNodeId: string | null;
+  /** Items written so far — the reason the pin exists is that this grows. */
+  itemsRecorded: number;
+}
+
+/** Turn a `quest:career-hunt-ii-test-batch` run key into readable words. */
+function questTitleFromRunKey(runKey: string): string {
+  return runKey
+    .replace(/^quest:/, "")
+    .split("-")
+    .filter(Boolean)
+    .map((w) => (w.length > 2 ? w[0].toUpperCase() + w.slice(1) : w))
+    .join(" ");
+}
+
+/**
+ * The quest this thread is actually writing to.
+ *
+ * Derived from the transcript rather than tracked in state, for the same
+ * reason the item-iteration budget is: a run spans several requests, and its
+ * tool calls are the only record that survives all of them.
+ *
+ * Deliberately gated on a WRITE, not on the proposal. A proposed run the user
+ * never approved is not this conversation's quest, and pinning on the proposal
+ * would put a chip on threads that only ever offered to do the work. The pin
+ * appears when the first item lands and stays for the rest of the thread —
+ * the quest is what this conversation has been about from then on.
+ */
+function deriveActiveQuest(messages: UIMessage[]): ActiveQuest | null {
+  let runKey: string | null = null;
+  let title: string | null = null;
+  let ledgerNodeId: string | null = null;
+  let itemsRecorded = 0;
+
+  for (const m of messages) {
+    if (m.role !== "assistant") continue;
+    for (const part of m.parts) {
+      const p = part as {
+        type?: string;
+        state?: string;
+        input?: { ledgerRunKey?: unknown; quest?: unknown };
+        output?: { ok?: boolean; ledgerNodeId?: unknown };
+      };
+      // The proposal carries the human name; remember it even though the pin
+      // itself waits for a write.
+      if (p.type === "tool-propose_item_iteration" && typeof p.input?.quest === "string") {
+        title = p.input.quest;
+      }
+      if (p.type !== "tool-record_item_result" || p.state !== "output-available") continue;
+      const key = p.input?.ledgerRunKey;
+      if (typeof key !== "string" || !key.startsWith("quest:")) continue;
+      if (p.output?.ok === false) continue; // a refused write is not a write
+      runKey = key;
+      itemsRecorded += 1;
+      if (typeof p.output?.ledgerNodeId === "string") {
+        ledgerNodeId = p.output.ledgerNodeId;
+      }
+    }
+  }
+
+  if (!runKey) return null;
+  return {
+    runKey,
+    title: title ?? questTitleFromRunKey(runKey),
+    ledgerNodeId,
+    itemsRecorded,
+  };
 }
 
 /**
@@ -1626,15 +1710,84 @@ export function useConversationEngine({
     null,
   );
 
-  const attachCharter = useCallback((item: SuggestionItem) => {
-    setActiveCharterId(item.id);
-    setActiveCharterTitle(item.label);
-  }, []);
+  /**
+   * The user dismissed the charter this chat is BOUND to.
+   *
+   * Needed because clearing the pick is not enough (owner report 2026-09-18:
+   * "detach didn't work in a side chat on the charter itself"). `boundCharter`
+   * below re-derives from `contentId` the moment `activeCharterId` goes null,
+   * so in a side chat opened ON a charter the X cleared the pick and the chip
+   * reappeared in the same render — inert by construction.
+   *
+   * It cannot be expressed as `charterId: null` in the request body either:
+   * null already means "nothing picked", which is what every fresh side chat
+   * sends, and the server binds from contentId in exactly that case. Detached
+   * is a third state and needs its own signal.
+   */
+  const [charterDetached, setCharterDetached] = useState(false);
+
+  /**
+   * Where the dismissal is remembered.
+   *
+   * Re-binding on reopen is right for a NEW chat — the binding is a property
+   * of what the chat was opened on. It is wrong for an EXISTING one (owner,
+   * 2026-09-18): a detach there is a decision about *that conversation*, and
+   * making the user repeat it every reload is the same inert button in slower
+   * motion. Keyed exactly like the output target, which persists per chat for
+   * the same reason.
+   */
+  const charterDetachedKey = conversationId
+    ? `dg:charter-detached:conv:${conversationId}`
+    : contentId
+      ? `dg:charter-detached:content:${contentId}`
+      : null;
+
+  // Hydrate on key change — ChatPanel stays mounted while the active
+  // conversation switches, so this must reload per chat rather than leak the
+  // previous one's dismissal into the next.
+  useEffect(() => {
+    if (!charterDetachedKey) {
+      setCharterDetached(false);
+      return;
+    }
+    try {
+      setCharterDetached(
+        window.localStorage.getItem(charterDetachedKey) === "1",
+      );
+    } catch {
+      setCharterDetached(false); // private mode / storage disabled
+    }
+  }, [charterDetachedKey]);
+
+  const persistCharterDetached = useCallback(
+    (detached: boolean) => {
+      if (!charterDetachedKey) return;
+      try {
+        if (detached) window.localStorage.setItem(charterDetachedKey, "1");
+        else window.localStorage.removeItem(charterDetachedKey);
+      } catch {
+        // Best-effort: the in-memory state still holds for this session.
+      }
+    },
+    [charterDetachedKey],
+  );
+
+  const attachCharter = useCallback(
+    (item: SuggestionItem) => {
+      setActiveCharterId(item.id);
+      setActiveCharterTitle(item.label);
+      setCharterDetached(false); // an explicit pick undoes an earlier dismissal
+      persistCharterDetached(false);
+    },
+    [persistCharterDetached],
+  );
 
   const detachCharter = useCallback(() => {
     setActiveCharterId(null);
     setActiveCharterTitle(null);
-  }, []);
+    setCharterDetached(true);
+    persistCharterDetached(true);
+  }, [persistCharterDetached]);
 
   // BOUND CHARTER (owner directive 2026-09-11): a chat opened ON a charter is
   // attached to it without a /charter pick. The server resolves the binding
@@ -1643,10 +1796,10 @@ export function useConversationEngine({
   // what the model got agree. An explicit pick still wins.
   const boundCharter = useMemo(
     () =>
-      !activeCharterId && contentId
+      !activeCharterId && !charterDetached && contentId
         ? (charters.find((c) => c.id === contentId) ?? null)
         : null,
-    [activeCharterId, contentId, charters],
+    [activeCharterId, charterDetached, contentId, charters],
   );
   const effectiveCharterId = activeCharterId ?? boundCharter?.id ?? null;
   const effectiveCharterTitle =
@@ -2714,6 +2867,14 @@ export function useConversationEngine({
     };
   }, [effectiveCharterId, effectiveCharterTitle, charters, resolvedPhaseIndex]);
 
+  // The quest this thread writes into. Recomputed from messages so it survives
+  // the request boundaries a run spans, and so reopening the conversation
+  // restores the pin from the transcript rather than from lost state.
+  const activeQuest = useMemo<ActiveQuest | null>(
+    () => deriveActiveQuest(messages),
+    [messages],
+  );
+
   // Stream-time freshness (v3.1 R2): dispatch artifact refresh as tool
   // outputs ARRIVE in the stream, not just at turn end — a playbook turn
   // can run for minutes, and the file tree stayed stale the whole time.
@@ -2757,6 +2918,7 @@ export function useConversationEngine({
       // resumes / internal sends carry the same binding as the turn that
       // started them.
       charterId: effectiveCharterId,
+      charterDetached,
       activePhaseIndex: resolvedPhaseIndex,
       // Output-target chip (WS7): where new content lands by default.
       outputTarget,
@@ -2781,6 +2943,7 @@ export function useConversationEngine({
     providerId,
     modelId,
     effectiveCharterId,
+    charterDetached,
     resolvedPhaseIndex,
     outputTarget,
     modelPinned,
@@ -2849,6 +3012,23 @@ export function useConversationEngine({
     stopRequest();
     setMessages((current) => stopPendingToolCalls(current));
     clearFollowUps();
+    // Stop means STOP — including the browser (owner report 2026-09-18).
+    // Until now the debugger attachment outlived the conversation that opened
+    // it: only the indicator's own Stop bar ever detached, so a stopped run
+    // left the tab attached, Chrome still telling the user it was being
+    // debugged, and every later co-browse on that tab refused with "another
+    // debugger is already attached".
+    //
+    // Deliberately NOT done at turn end: a charter run spans several turns on
+    // one tab, and tearing down between them would re-open constantly and
+    // discard the user's page state — the thing BIND-FIRST exists to protect.
+    if (isCoBrowseActive()) {
+      markCoBrowseInactive(); // optimistic: drop the bar now
+      void coBrowseDetach().catch(() => {
+        // Best-effort: the tab may already be gone. The extension's own
+        // reclaim-on-attach covers whatever this misses.
+      });
+    }
   }, [stopRequest, setMessages, clearFollowUps]);
 
   // ── per-message provider + model stamping ──
@@ -3208,6 +3388,7 @@ export function useConversationEngine({
           viewedContent: getActiveViewedContentHint(),
           // Attached playbook (AI v3.2 T3).
           charterId: effectiveCharterId,
+          charterDetached,
           activePhaseIndex: resolvedPhaseIndex,
           // Output-target chip (WS7).
           outputTarget,
@@ -3238,6 +3419,7 @@ export function useConversationEngine({
     providerId,
     modelId,
     effectiveCharterId,
+    charterDetached,
     effectiveCharterTitle,
     activeCharter,
     resolvedPhaseIndex,
@@ -3264,6 +3446,7 @@ export function useConversationEngine({
       viewedContent: getActiveViewedContentHint(),
       // Attached playbook (AI v3.2 T3) rides re-runs too, for continuity.
       charterId: effectiveCharterId,
+      charterDetached,
       activePhaseIndex: resolvedPhaseIndex,
       // Output-target chip (WS7).
       outputTarget,
@@ -3277,6 +3460,7 @@ export function useConversationEngine({
       providerId,
       modelId,
       effectiveCharterId,
+      charterDetached,
       resolvedPhaseIndex,
       outputTarget,
       modelPinned,
@@ -3402,6 +3586,7 @@ export function useConversationEngine({
     folderGates,
     commandItems,
     activeCharter,
+    activeQuest,
     attachCharter,
     detachCharter,
     outputTarget,

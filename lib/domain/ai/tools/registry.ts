@@ -1259,7 +1259,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
       inputSchema: z.object({
         ledgerRunKey: z.string().min(1).describe("The ledgerRunKey from propose_item_iteration."),
         itemKey: z.string().min(1).max(600).describe("The item's key from the approved run's items list."),
-        itemLabel: z.string().max(200).optional().describe("The item's label (for the ledger line)."),
+        itemLabel: z.string().optional().describe("The item's label (for the ledger line)."),
         url: z
           .string()
           .max(600)
@@ -1277,8 +1277,15 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           .describe('"done" = analyzed; "unreadable" = page could not be read; "blocked" = an obstacle (login/captcha) stopped this item.'),
         qualified: z.boolean().optional().describe("Whether the item met the objective's bar (e.g. fit > 75%)."),
         fitPercent: z.number().min(0).max(100).optional().describe("Numeric score when the objective scores items."),
-        verdict: z.string().max(1000).optional().describe("One-to-three sentence rationale for this item."),
-        artifactTitle: z.string().max(200).optional().describe("Title of any per-item note you created."),
+        // No `.max()` on the prose fields (production 2026-09-18): a verdict
+        // of 1,043 characters failed `max(1000)` and took the whole call with
+        // it — a correct item, scored 88/100 and qualified, plus its capture
+        // row carrying the full job description. Losing an analyzed item
+        // because its SUMMARY ran long is the worst trade in this tool. They
+        // are clipped in execute instead, where over-length is a formatting
+        // detail rather than a fatal one.
+        verdict: z.string().optional().describe("One-to-three sentence rationale for this item (clipped at 1000 characters)."),
+        artifactTitle: z.string().optional().describe("Title of any per-item note you created."),
         capture: z
           .object({
             cells: z
@@ -1298,7 +1305,17 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             "Quest runs with SCULPTED ledger columns: their values for this item (column name → value). Machinery fields (status/fit/qualified/verdict) are recorded automatically — never repeat them here.",
           ),
       }),
-      execute: async ({ ledgerRunKey, itemKey, itemLabel, url, status: statusArg, qualified, fitPercent, verdict, artifactTitle, capture, questCells }) => {
+      execute: async ({ ledgerRunKey, itemKey, itemLabel: itemLabelArg, url, status: statusArg, qualified, fitPercent, verdict: verdictArg, artifactTitle: artifactTitleArg, capture, questCells }) => {
+        // Clip the prose. These used to be `.max()` on the schema, where an
+        // over-long verdict rejected the entire call — see the schema comment.
+        const clip = (text: string | undefined, max: number) =>
+          text !== undefined && text.length > max
+            ? `${text.slice(0, max - 1).trimEnd()}…`
+            : text;
+        const verdict = clip(verdictArg, 1000);
+        const itemLabel = clip(itemLabelArg, 200);
+        const artifactTitle = clip(artifactTitleArg, 200);
+
         // Resolve before anything is written: a recognized word is taken, a
         // missing one is inferred from the evidence in the same call, and only
         // a call with neither is sent back — as a RESULT the model can act on

@@ -26,7 +26,7 @@ import {
   type KeyboardEvent,
   type FormEvent,
 } from "react";
-import { ArrowUp, Square, Mic, Paperclip, X, FileText, Loader2, ScrollText } from "lucide-react";
+import { ArrowUp, Square, Mic, Paperclip, X, FileText, Loader2, ScrollText, ListChecks } from "lucide-react";
 import { useDrop } from "react-dnd";
 import { cn } from "@/lib/core/utils";
 import {
@@ -37,6 +37,7 @@ import type { ChatStatus } from "ai";
 import type {
   ChatAttachment,
   ActiveCharter,
+  ActiveQuest,
 } from "@/lib/domain/ai/use-conversation-engine";
 import { useTreeDragStore } from "@/state/tree-drag-store";
 import { useImagePreviewStore } from "@/state/image-preview-store";
@@ -96,6 +97,12 @@ interface ChatInputProps {
   onResolveMention?: (item: SuggestionItem) => Promise<SuggestionItem | null>;
   /** The playbook currently attached to this conversation, if any. */
   activeCharter?: ActiveCharter | null;
+  /** The quest ledger this thread has written into (pinned once items land). */
+  activeQuest?: ActiveQuest | null;
+  /** Open the quest's ledger — omit to render the chip as a non-interactive label. */
+  onOpenQuestLedger?: (contentId: string) => void;
+  /** Open the attached charter. */
+  onOpenCharter?: (contentId: string) => void;
   /** Detach the active playbook (dismiss the chip). */
   onDetachCharter?: () => void;
   /**
@@ -126,6 +133,9 @@ export function ChatInput({
   onMentionInserted,
   onResolveMention,
   activeCharter = null,
+  activeQuest = null,
+  onOpenQuestLedger,
+  onOpenCharter,
   onDetachCharter,
   footerLeading,
   attachments = [],
@@ -696,18 +706,57 @@ export function ChatInput({
           />
         )}
 
-        {/* Active charter chip (AI v3.2 T3; charter vocabulary P0a) */}
-        {activeCharter && (
+        {/* Active charter chip (AI v3.2 T3; charter vocabulary P0a), and the
+            quest this thread is writing into. The quest chip has no dismiss:
+            the charter is a CHOICE the user can revoke, while the quest is a
+            FACT about what this conversation has already written — hiding it
+            would not unwrite the rows. Clicking opens the ledger. */}
+        {(activeCharter || activeQuest) && (
           <div className="flex flex-wrap gap-1.5 px-2.5 pt-2.5">
-            <span className="inline-flex items-center gap-1.5 rounded-md border border-indigo-500/30 bg-indigo-500/10 px-2 py-1 text-[11px] text-indigo-700 dark:text-indigo-300">
-              <ScrollText className="h-3 w-3 shrink-0" />
-              <span className="truncate max-w-[160px]">{activeCharter.title}</span>
-              {activeCharter.phaseCount > 0 && (
-                <span className="text-indigo-500/70 dark:text-indigo-400/70">
-                  · Phase {Math.min(activeCharter.phaseIndex + 1, activeCharter.phaseCount)}/
-                  {activeCharter.phaseCount}
+            {activeQuest && (
+              <button
+                type="button"
+                onClick={() =>
+                  activeQuest.ledgerNodeId
+                    ? onOpenQuestLedger?.(activeQuest.ledgerNodeId)
+                    : undefined
+                }
+                disabled={!activeQuest.ledgerNodeId}
+                title={
+                  activeQuest.ledgerNodeId
+                    ? `Open the ${activeQuest.title} ledger`
+                    : activeQuest.title
+                }
+                className="inline-flex items-center gap-1.5 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-[11px] text-emerald-700 transition-colors enabled:hover:bg-emerald-500/20 dark:text-emerald-300"
+              >
+                <ListChecks className="h-3 w-3 shrink-0" />
+                <span className="truncate max-w-[160px]">{activeQuest.title}</span>
+                <span className="text-emerald-600/70 dark:text-emerald-400/70">
+                  · {activeQuest.itemsRecorded}{" "}
+                  {activeQuest.itemsRecorded === 1 ? "item" : "items"}
                 </span>
-              )}
+              </button>
+            )}
+            {activeCharter && (
+            <span className="inline-flex items-center gap-1.5 rounded-md border border-indigo-500/30 bg-indigo-500/10 px-2 py-1 text-[11px] text-indigo-700 dark:text-indigo-300">
+              {/* The label is its own button, a SIBLING of the detach button
+                  rather than its parent — nesting them would be invalid, and
+                  the X would open the charter on its way to dismissing it. */}
+              <button
+                type="button"
+                onClick={() => onOpenCharter?.(activeCharter.id)}
+                title={`Open ${activeCharter.title}`}
+                className="inline-flex items-center gap-1.5 min-w-0 rounded-sm transition-colors hover:text-indigo-900 dark:hover:text-indigo-100"
+              >
+                <ScrollText className="h-3 w-3 shrink-0" />
+                <span className="truncate max-w-[160px]">{activeCharter.title}</span>
+                {activeCharter.phaseCount > 0 && (
+                  <span className="text-indigo-500/70 dark:text-indigo-400/70">
+                    · Phase {Math.min(activeCharter.phaseIndex + 1, activeCharter.phaseCount)}/
+                    {activeCharter.phaseCount}
+                  </span>
+                )}
+              </button>
               <button
                 type="button"
                 onClick={onDetachCharter}
@@ -717,6 +766,7 @@ export function ChatInput({
                 <X className="h-3 w-3" />
               </button>
             </span>
+            )}
           </div>
         )}
 
@@ -1039,7 +1089,28 @@ function AttachmentChip({
       ) : (
         <FileText className="h-3.5 w-3.5 shrink-0 text-gray-400" />
       )}
-      <span className="truncate">{name}</span>
+      {/* The thumbnail was openable but the NAME was not, which is the larger
+          target and the one people aim at. Both now open the same thing: a
+          preview for images, the file itself for anything else. Still plain
+          text while uploading or on error, when there is nothing to open. */}
+      {url && status !== "uploading" ? (
+        <button
+          type="button"
+          onClick={() =>
+            isImage
+              ? useImagePreviewStore
+                  .getState()
+                  .open([{ src: url, alt: name, downloadUrl: url }])
+              : window.open(url, "_blank", "noopener,noreferrer")
+          }
+          title={isImage ? "Preview image" : `Open ${name}`}
+          className="min-w-0 truncate rounded-sm text-left transition-colors hover:text-gray-900 dark:hover:text-gray-100"
+        >
+          {name}
+        </button>
+      ) : (
+        <span className="truncate">{name}</span>
+      )}
       <button
         type="button"
         onClick={onRemove}

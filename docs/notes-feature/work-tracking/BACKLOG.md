@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-09-17
+last_updated: 2026-09-18
 ---
 
 # Sprint Backlog
@@ -26,6 +26,21 @@ The branch shipped P0-P4 of `AI-TOOL-SUMMONER-PLAN.md`. These were specified in 
 Found while debugging a local dev failure, unrelated to the branch it surfaced on. `.env.local` carries the Vercel/Neon integration's libpq variables (`PGHOST`, `PGPASSWORD`, `PGDATABASE`, all pointing at Neon), and `lib/database/client.ts:156` builds its pool as `new Pool({ connectionString: databaseUrl })` with no explicit host — while `databaseUrl` has a `|| ""` fallback. `node-postgres` reads `PG*` as defaults, so an unset, empty or unparseable `DATABASE_URL` does not fail: it connects to **production**.
 
 - [ ] Throw on an empty/unparseable `DATABASE_URL` instead of defaulting, or pass an explicit host and `ssl: false` when `LOCAL_POSTGRES=1`. `scripts/check-db-target.ts` already guards the *declared* target; this is the same guard missing one layer down, at the pool.
+
+## Charter detach is per-device — needs a migration to follow the conversation (2026-09-18)
+
+**Requires a schema change.** `prisma/` is owner-protected, so this ships as a reviewable migration handoff (canonical SQL via `prisma migrate diff` + create-and-commit steps), not an agent-run `migrate dev`.
+
+Shipped in PR #249: dismissing the charter chip in a chat bound to that charter now actually detaches — the chip stays hidden AND the server stops binding it (`charterDetached` on the request body, honored where `boundCharterId` resolves). The dismissal persists per chat in `localStorage`, keyed `dg:charter-detached:conv:<id>` / `:content:<id>`, matching where the output target already lives.
+
+That makes it **per device**. The same conversation opened on another machine re-binds the charter, because the decision lives in the browser rather than on the conversation. Owner accepted this for now (2026-09-18) with the fix tracked here.
+
+- [ ] Add a nullable `charterDetached Boolean?` (or a broader `charterBinding` enum, if a third state ever appears) to `Conversation` — it sits beside `activeContextId` / `targetFolderId`, which are the same shape of per-conversation preference.
+- [ ] Chat route reads it when resolving `boundCharterId`, so the detach holds for a conversation regardless of which device opens it.
+- [ ] Engine writes it through the conversation API instead of `localStorage`; keep reading the old key once as a migration path so an existing dismissal is not silently undone on first load.
+- [ ] Transient chats (no `conversationId`) have no row to write to — they keep the `localStorage` path, which is correct: there is no conversation for the preference to belong to yet.
+
+Worth pairing with any other `Conversation` column that comes up, rather than spending a migration on one boolean.
 
 ## Duplicate relation columns in production (cleanup, 2026-09-13)
 

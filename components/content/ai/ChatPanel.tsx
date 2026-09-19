@@ -231,6 +231,7 @@ export function ChatPanel({
     folderGates,
     commandItems,
     activeCharter,
+    activeQuest,
     attachCharter,
     detachCharter,
     outputTarget,
@@ -1286,6 +1287,13 @@ export function ChatPanel({
         commandItems={commandItems}
         onAttachCharter={attachCharter}
         activeCharter={activeCharter}
+        activeQuest={activeQuest}
+        onOpenQuestLedger={(nodeId) =>
+          useContentStore.getState().setSelectedContentId(nodeId)
+        }
+        onOpenCharter={(nodeId) =>
+          useContentStore.getState().setSelectedContentId(nodeId)
+        }
         onDetachCharter={detachCharter}
         attachments={attachments}
         onAddFiles={addAttachmentFiles}
