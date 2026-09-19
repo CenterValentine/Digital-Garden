@@ -397,8 +397,15 @@ export function writeInputFoldStates(
     if (m.role !== "assistant") return;
     m.parts.forEach((part, partIdx) => {
       if (!isWritePart(part)) return;
-      if (JSON.stringify(part.input ?? "").length < WRITE_INPUT_MIN_CHARS) return;
+      const inputLength = JSON.stringify(part.input ?? "").length;
+      if (inputLength < WRITE_INPUT_MIN_CHARS) return;
       if (!writeSucceeded(part.output)) return;
+      // A fold must SHRINK. The stub keeps every short scalar, so an input
+      // made of many short fields and no payload can come out longer than
+      // it went in — leave those alone rather than grow the context.
+      const toolName = part.type.replace(/^tool-/, "");
+      const stubLength = JSON.stringify(supersededWriteInput(toolName, part.input)).length;
+      if (stubLength >= inputLength) return;
       const key = `${messageIdx}:${partIdx}`;
       const before = (
         point: { messageIdx: number; partIdx: number } | null,

@@ -341,6 +341,30 @@ const isStub = (v: unknown, word: string): boolean =>
   const small = [user(), assistant([tool("update_row", { input: { rowId: "r", cells: { Fit: 1 } } })]), user("n"), assistant([])];
   assert(!writeInputFoldStates(small).has("1:0"), "G6: inputs under the min-chars guard are ignored");
 
+  // A fold must shrink: an input of many short scalars (over the min-chars
+  // guard, but every field is an "address" the stub would keep) stays.
+  const scalarHeavy: Record<string, string> = {};
+  for (let i = 0; i < 14; i++) scalarHeavy[`field${i}`] = `${i}-` + "s".repeat(60);
+  const wide = [
+    user(),
+    assistant([tool("update_row", { input: scalarHeavy, output: { ok: true } })]),
+    user("n"),
+    assistant([]),
+  ];
+  assert(
+    JSON.stringify(scalarHeavy).length >= 600 && !writeInputFoldStates(wide).has("1:0"),
+    "G6: an input whose stub would be longer than the input is left alone",
+  );
+  // …and the invariant holds for every part the transform does fold.
+  for (const [mi, m] of folded.entries()) {
+    for (const [pi, part] of m.parts.entries()) {
+      if (states.get(`${mi}:${pi}`) !== "folded") continue;
+      const before = JSON.stringify((msgs[mi].parts[pi] as { input: unknown }).input).length;
+      const after = JSON.stringify((part as { input: unknown }).input).length;
+      assert(after < before, `G6: folded write ${mi}:${pi} must shrink (${before} → ${after})`);
+    }
+  }
+
   // propose_item_iteration folds only once findings exist after it.
   const items = Array.from({ length: 12 }, (_, i) => ({ title: `Item ${i}`, url: `https://x/${i}`, note: big("n", 60) }));
   const proposal = () => tool("propose_item_iteration", { input: { items, source: "page" }, output: { ok: true } });
