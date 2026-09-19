@@ -40,6 +40,7 @@ import {
 } from "@/lib/domain/browser-extension/acquire-url";
 import { READ_PAGE_HEADLESS_OR_BROWSER } from "@/lib/domain/ai/tools/read-page-in-browser";
 import { OPEN_TAB_AND_READ } from "@/lib/domain/ai/tools/open-tab-and-read";
+import { coBrowsePageIdentity } from "@/lib/domain/ai/co-browse-page-identity";
 import {
   CO_BROWSE_OPEN,
   CO_BROWSE_ACT,
@@ -1097,10 +1098,14 @@ function coBrowseSnapshotOrDelta(
   const url = snap.data.url ?? "";
   const elements = shapeCoBrowseElements(snap.data.nodes ?? []);
   const base = coBrowseDeltaBase;
+  // Same DOCUMENT, not same URL: a query-string change (`?currentJobId=` on
+  // every LinkedIn card click) is state within the page, and forcing a
+  // keyframe on it made 55 of 65 results full snapshots. The churn ratio
+  // below still keyframes when a same-path change really replaced the page.
   const mustKeyframe =
     mode === "full" ||
     !base ||
-    base.url !== url ||
+    coBrowsePageIdentity(base.url) !== coBrowsePageIdentity(url) ||
     base.actsSinceKeyframe >= DELTA_KEYFRAME_EVERY;
   if (mustKeyframe) {
     setCoBrowseDeltaBase(url, elements, 0);

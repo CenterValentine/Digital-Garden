@@ -120,8 +120,8 @@ model's own words were 2% of them**. Tool parts *are* the input context.
 | Observability | **Token meter** — per-phase/route token accounting surfaced in chat |
 | Pay for a page once (§1b.9) | **`perceptionFoldStates`** (`context-diet.ts`) — raw perception behind the latest checkpoint *or* findings record, and any re-readable read from an earlier turn, resends as a stub; the UI collapses the same parts (one map, two consumers) |
 | Dedupe before you discard (§1b.12) | **`dedupeRepeatedToolParts`** — a repeated `toolCallId` is dropped whole; identical type+input+output gets a pointer stub |
-| Confirmed write supersedes its input (§1b.13) | **planned, PR B** — `insert_rows` / `update_rows` / `record_item_result` inputs stub behind the same boundaries |
-| Deltas by default (§1b.11) | **planned, PR B** — `coBrowseSnapshotOrDelta` keyframes on origin+path, not the full URL |
+| Confirmed write supersedes its input (§1b.13) | **`supersedeWriteInputs`** — a successful `insert_rows` / `update_rows` / `update_row` / `update_note` / `record_item_result` behind the same boundaries keeps its addresses (short scalars) and drops its payload; failed writes keep their input; the proposal's item list folds only after findings |
+| Deltas by default (§1b.11) | **`coBrowsePageIdentity`** — `coBrowseSnapshotOrDelta` keyframes on origin + pathname; a query-string change stays a delta, the churn ratio still forces a keyframe when the page really replaced itself |
 
 ---
 
@@ -143,7 +143,8 @@ Legend: ✅ shipped · 🟡 in T3 · ⏳ deferred → **AI 3.7 "resource governa
 | Sub-agent isolation for sub-playbooks | Context | ⏳ | T4 |
 | Per-run fold (perception → stub at distillation / turn) | Context | ✅ | `context-diet.ts` `perceptionFoldStates` — **905 kB** reclaimed on the evidence thread; gate `pnpm context:diet:check` |
 | Content-addressed dedupe of tool parts | Context | ✅ | `context-diet.ts` `dedupeRepeatedToolParts` — **~543 kB**; same gate |
-| Write-input supersession · delta-by-default snapshots | Context | 🟡 | AI-CONTEXT-ECONOMICS-PLAN PR B |
+| Write-input supersession | Context | ✅ | `context-diet.ts` `supersedeWriteInputs` — **~324 kB** on the evidence thread; same gate |
+| Delta-by-default snapshots (page identity = origin + path) | Context | ✅ | `co-browse-page-identity.ts` + `coBrowseSnapshotOrDelta` — 55/65 full snapshots → expected ~10/65; same gate |
 | Per-run compaction/summarization (fallback under the folds) | Context | ⏳ | sized after PR B — a threshold tuned against a 60%-waste transcript bakes the waste in |
 | Self-critique / no-progress loop guards | Termination | ✅ | repeat-failure loop stop (PR #248); `nth` ambiguity refusal (`actions.js`) |
 | Difficulty-based effort allocation | Effort | ✅ | `mechanicalRun → reasoningEffort: "low"` during item iteration (`route.ts` `buildProviderOptions`) |
