@@ -41,6 +41,33 @@ Related: [AI-V3.2-T3-PLAYBOOKS-PLAN.md](../../work-tracking/AI-V3.2-T3-PLAYBOOKS
 8. **Observability is a control, not a report.** You cannot manage what you cannot
    see. Surface token/step/cost so both the user and the model can steer.
 
+### 1b. Payload economics (added 2026-09-18)
+
+Principles 1–8 govern *how much work* the agent does. These govern *how big each
+exchange is* — the dimension the evidence thread behind
+[AI-CONTEXT-ECONOMICS-PLAN.md](../../work-tracking/AI-CONTEXT-ECONOMICS-PLAN.md)
+showed was unguarded: a 5-turn charter run re-sent 21.9M tokens, and **the
+model's own words were 2% of them**. Tool parts *are* the input context.
+
+9. **Pay for a page once.** A perception result is paid for when first read;
+   every later appearance must be a pointer. Fold on **distillation** (a
+   checkpoint, a findings record, a reply) — never on run state. A run ending
+   is the moment its raw data is *most* disposable, not the moment to stop
+   folding it.
+10. **A tool with a >100× output/input ratio needs a compaction story before it
+    ships.** `co_browse_act` is 89 bytes in, 13 kB out; 65 of those was 42% of a
+    conversation.
+11. **Deltas by default, keyframes by exception.** An unchanged page must never
+    cost a full snapshot. Page identity is origin + path; a query string is
+    state, not a document.
+12. **Dedupe before you discard.** Byte-identical content is the one thing that
+    is always safe to collapse — the model already has it. It is also the only
+    transform that never perturbs the prefix cache, because it is deterministic.
+13. **A confirmed write supersedes its own input.** Once `insert_rows` returns
+    `ok`, the database is the durable home; the 25 kB the model typed was
+    scaffolding. (Generated text replayed as input is the pattern that costs
+    most on vendors with expensive output tokens.)
+
 ---
 
 ## 2. The four mechanism families
@@ -91,6 +118,10 @@ Related: [AI-V3.2-T3-PLAYBOOKS-PLAN.md](../../work-tracking/AI-V3.2-T3-PLAYBOOKS
 | Hierarchical planning | **Sub-playbooks** — a `[[ref]]` that is itself `metadata.playbook`; can be *authored* by one phase and *consumed* by a later one (`createNote` + `withPlaybookMetadata`) |
 | Sub-task outputs | **`create_folder` + `createNote` / `create_docx`** — sub-playbook artifacts filed in the run folder |
 | Observability | **Token meter** — per-phase/route token accounting surfaced in chat |
+| Pay for a page once (§1b.9) | **`perceptionFoldStates`** (`context-diet.ts`) — raw perception behind the latest checkpoint *or* findings record, and any re-readable read from an earlier turn, resends as a stub; the UI collapses the same parts (one map, two consumers) |
+| Dedupe before you discard (§1b.12) | **`dedupeRepeatedToolParts`** — a repeated `toolCallId` is dropped whole; identical type+input+output gets a pointer stub |
+| Confirmed write supersedes its input (§1b.13) | **planned, PR B** — `insert_rows` / `update_rows` / `record_item_result` inputs stub behind the same boundaries |
+| Deltas by default (§1b.11) | **planned, PR B** — `coBrowseSnapshotOrDelta` keyframes on origin+path, not the full URL |
 
 ---
 
@@ -108,11 +139,14 @@ Legend: ✅ shipped · 🟡 in T3 · ⏳ deferred → **AI 3.7 "resource governa
 | Progressive disclosure (per-phase injection) | Context | 🟡 | `route.ts` playbook injection |
 | Definition-of-done per phase (`**Done when:**`) | Termination | 🟡 | SKILL.md format + system prompt |
 | Sub-playbook awareness in reference manifest | Decomposition | 🟡 | P4 manifest (`isPlaybookMetadata`) |
-| Enforced token/step budgets (decrement + stop) | Termination | ⏳ | T4 |
+| Enforced token/step budgets (decrement + stop) | Termination | ✅ | `route.ts` step cap, turn-scoped (PR #248) |
 | Sub-agent isolation for sub-playbooks | Context | ⏳ | T4 |
-| Per-run compaction/summarization | Context | ⏳ | T4 |
-| Self-critique / no-progress loop guards | Termination | ⏳ | T4 |
-| Difficulty-based effort allocation | Effort | ⏳ | T4 |
+| Per-run fold (perception → stub at distillation / turn) | Context | ✅ | `context-diet.ts` `perceptionFoldStates` — **905 kB** reclaimed on the evidence thread; gate `pnpm context:diet:check` |
+| Content-addressed dedupe of tool parts | Context | ✅ | `context-diet.ts` `dedupeRepeatedToolParts` — **~543 kB**; same gate |
+| Write-input supersession · delta-by-default snapshots | Context | 🟡 | AI-CONTEXT-ECONOMICS-PLAN PR B |
+| Per-run compaction/summarization (fallback under the folds) | Context | ⏳ | sized after PR B — a threshold tuned against a 60%-waste transcript bakes the waste in |
+| Self-critique / no-progress loop guards | Termination | ✅ | repeat-failure loop stop (PR #248); `nth` ambiguity refusal (`actions.js`) |
+| Difficulty-based effort allocation | Effort | ✅ | `mechanicalRun → reasoningEffort: "low"` during item iteration (`route.ts` `buildProviderOptions`) |
 
 ---
 

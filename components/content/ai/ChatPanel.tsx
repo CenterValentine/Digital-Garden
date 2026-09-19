@@ -44,7 +44,13 @@ import {
 } from "./ModelSwitchDivider";
 import { ChatControlPanel } from "./ChatControlPanel";
 import { computeModelRouteDecorations } from "@/lib/domain/ai/model-directive";
-import { bulkReadFoldStates, findIterationFoldBoundary } from "@/lib/domain/ai/context-diet";
+import {
+  bulkReadFoldStates,
+  duplicatePartStates,
+  perceptionFoldStates,
+  supersedeBulkReads,
+  supersedePerceptionHistory,
+} from "@/lib/domain/ai/context-diet";
 import { aggregateSessionUsage } from "@/lib/features/ai-connections/usage/pricing";
 import { REVERT_SNAPSHOT_KEY } from "@/lib/domain/ai/compact-tool-outputs";
 import { deriveTargetSeed } from "@/lib/domain/ai/output-target";
@@ -1077,13 +1083,24 @@ export function ChatPanel({
     latestProposalIndex.outputDatabase !== undefined;
   const existingDatabases = useExistingDatabases(hasDatabaseProposal);
 
-  const iterationFoldBoundary = useMemo(
-    () => findIterationFoldBoundary(messages),
+  // Perception / read parts the model no longer sees render collapsed —
+  // the same map the model-facing assembly stubs from.
+  const perceptionFolds = useMemo(
+    () => perceptionFoldStates(messages),
     [messages],
   );
   // Bulk database reads: folded / pinned per lifetime — the same predicate
   // the model-facing assembly applies (AI-BULK-ROW-READING-PLAN §4.6).
   const bulkReadFolds = useMemo(() => bulkReadFoldStates(messages), [messages]);
+  // Repeated tool parts: computed on the FOLDED shape, as the route does, so
+  // a part the folds already stubbed is never double-labelled here.
+  const duplicateFolds = useMemo(
+    () =>
+      duplicatePartStates(
+        supersedeBulkReads(supersedePerceptionHistory(messages)),
+      ),
+    [messages],
+  );
   // P3 owner ask: cumulative session usage for the avatar popover — each
   // turn's numbers read in context of the whole chat.
   const sessionUsage = useMemo(
@@ -1210,7 +1227,8 @@ export function ChatPanel({
                 <ChatMessage
                   message={message}
                   messageIndex={i}
-                  foldBoundary={iterationFoldBoundary}
+                  perceptionFolds={perceptionFolds}
+                  duplicateFolds={duplicateFolds}
                   latestProposalIndex={latestProposalIndex}
                   existingDatabases={existingDatabases}
                   bulkReadFolds={bulkReadFolds}

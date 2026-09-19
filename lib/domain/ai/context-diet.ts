@@ -132,11 +132,26 @@ const PERCEPTION_TOOL_PARTS = new Set([
   "tool-list_tabs",
 ]);
 
+/**
+ * Re-readable content whose value ends with the reply that used it — folded
+ * by the TURN rule only (a charter read is not raw perception distilled into
+ * a ledger, so the distillation rule never touches it). The evidence thread
+ * behind AI-CONTEXT-ECONOMICS-PLAN read the same charter node four times.
+ */
+const TURN_FOLD_TOOL_PARTS = new Set([
+  ...PERCEPTION_TOOL_PARTS,
+  "tool-read_content",
+  "tool-search_content",
+]);
+
 /** Below this, stubbing saves nothing worth the cache perturbation. */
 const SUPERSEDE_MIN_CHARS = 600;
 
 const SUPERSEDED_STUB =
   "[superseded at batch checkpoint — this raw page data was already digested into recorded item results and the run ledger; rely on those records, and re-read the source URL if an item truly needs revisiting]";
+
+const TURN_FOLDED_STUB = (toolName: string) =>
+  `[folded — this ${toolName} result from an earlier turn was digested into the reply that followed; call the tool again if a later step truly needs it]`;
 
 /**
  * During an ACTIVE batched iteration run, stub raw perception outputs that
@@ -153,52 +168,45 @@ const SUPERSEDED_STUB =
  * 25-item run finish at all.
  */
 /**
- * The fold boundary of the ACTIVE batched iteration run: the position of the
- * latest record_batch_checkpoint, or null when no run is active / no
- * checkpoint exists. EXPORTED so the chat UI collapses exactly the parts the
- * model no longer sees (P4c, owner rule: no divergence between front and
- * back — one boundary implementation, two consumers).
+ * The latest DISTILLATION point in the transcript: the position of the most
+ * recent record_batch_checkpoint or record_iteration_findings, or null when
+ * neither has happened. Either one means "the raw perception before me has
+ * been digested into the ledger".
+ *
+ * Deliberately NOT gated on an active run (AI-CONTEXT-ECONOMICS-PLAN D1).
+ * The previous boundary returned `runActive ? lastCheckpoint : null`, so a
+ * successful record_iteration_findings — the moment a run's raw page data
+ * became MOST disposable — switched the fold off for the rest of the
+ * conversation. Measured on the evidence thread: the working set was ~86k
+ * tokens right after a checkpoint and ~326k on the first request after the
+ * run ended, with 905 kB of foldable perception re-sent on every request
+ * from then on. A later propose_item_iteration never lowers this point:
+ * a new run does not un-digest the old one.
  */
-export function findIterationFoldBoundary(
+export function findDistillationPoint(
   messages: UIMessage[],
 ): { messageIdx: number; partIdx: number } | null {
-  let runActive = false;
-  let lastCheckpoint: { messageIdx: number; partIdx: number } | null = null;
+  let latest: { messageIdx: number; partIdx: number } | null = null;
   messages.forEach((m, messageIdx) => {
     if (m.role !== "assistant") return;
     m.parts.forEach((part, partIdx) => {
-      const p = part as { type?: string; state?: string; output?: unknown };
+      const p = part as { type?: string; state?: string };
       if (
-        p.type === "tool-propose_item_iteration" &&
+        (p.type === "tool-record_batch_checkpoint" ||
+          p.type === "tool-record_iteration_findings") &&
         p.state === "output-available"
       ) {
-        const out = p.output as { ok?: boolean } | undefined;
-        if (out?.ok) {
-          runActive = true;
-          lastCheckpoint = null; // never bleed a previous run's boundary in
-        }
-      } else if (
-        p.type === "tool-record_batch_checkpoint" &&
-        p.state === "output-available" &&
-        runActive
-      ) {
-        lastCheckpoint = { messageIdx, partIdx };
-      } else if (
-        p.type === "tool-record_iteration_findings" &&
-        p.state === "output-available"
-      ) {
-        runActive = false;
-        lastCheckpoint = null;
+        latest = { messageIdx, partIdx };
       }
     });
   });
-  return runActive ? lastCheckpoint : null;
+  return latest;
 }
 
 /**
- * Would the model-facing assembly stub this part behind the fold boundary?
- * Shared by supersedeIterationHistory and the UI collapse (same rule, same
- * min-chars guard).
+ * Is this part raw perception the distillation rule may stub? Shared by the
+ * model-facing fold, the UI collapse, and the batch-gallery grouping in
+ * ChatMessage (same rule, same min-chars guard).
  */
 export function shouldSupersedePart(part: unknown): boolean {
   const p = part as { type?: string; state?: string; output?: unknown };
@@ -207,26 +215,231 @@ export function shouldSupersedePart(part: unknown): boolean {
   return JSON.stringify(p.output ?? "").length >= SUPERSEDE_MIN_CHARS;
 }
 
-export function supersedeIterationHistory(messages: UIMessage[]): UIMessage[] {
-  const boundary = findIterationFoldBoundary(messages);
-  if (!boundary) return messages;
+/** Is this part re-readable content the turn rule may stub? */
+function isTurnFoldable(part: unknown): boolean {
+  const p = part as { type?: string; state?: string; output?: unknown };
+  if (!p.type || !TURN_FOLD_TOOL_PARTS.has(p.type)) return false;
+  if (p.state !== "output-available") return false;
+  return JSON.stringify(p.output ?? "").length >= SUPERSEDE_MIN_CHARS;
+}
+
+export type PerceptionFoldState = "folded-distilled" | "folded-turn" | "kept";
+
+/**
+ * Fold verdict for every foldable perception / read part, keyed
+ * `"messageIdx:partIdx"` — ONE implementation for the model-facing fold and
+ * the UI collapse (owner rule: no divergence between front and back). Same
+ * shape as bulkReadFoldStates.
+ *
+ * A part is folded when EITHER rule holds:
+ *  - **distillation**: raw perception (PERCEPTION_TOOL_PARTS) that precedes
+ *    the latest checkpoint / findings record — the ledger now holds what it
+ *    meant. Applies inside the live message too (the current batch, after
+ *    the latest distillation point, always keeps full vision).
+ *  - **turn**: any TURN_FOLD_TOOL_PARTS result in an assistant message
+ *    before the latest user message — the reply that followed IS a
+ *    distillation. Same `turn` lifetime bulk reads use (plan §4.6a).
+ *
+ * Reclaims on the evidence thread: 905 kB (D1).
+ */
+export function perceptionFoldStates(
+  messages: UIMessage[],
+): Map<string, PerceptionFoldState> {
+  const out = new Map<string, PerceptionFoldState>();
+  const distilled = findDistillationPoint(messages);
+  let lastUserIdx = -1;
+  messages.forEach((m, i) => {
+    if (m.role === "user") lastUserIdx = i;
+  });
+
+  messages.forEach((m, messageIdx) => {
+    if (m.role !== "assistant") return;
+    m.parts.forEach((part, partIdx) => {
+      if (!isTurnFoldable(part)) return;
+      const key = `${messageIdx}:${partIdx}`;
+      const beforeDistillation =
+        distilled != null &&
+        (messageIdx < distilled.messageIdx ||
+          (messageIdx === distilled.messageIdx &&
+            partIdx < distilled.partIdx));
+      if (beforeDistillation && shouldSupersedePart(part)) {
+        out.set(key, "folded-distilled");
+      } else if (messageIdx < lastUserIdx) {
+        out.set(key, "folded-turn");
+      } else {
+        out.set(key, "kept");
+      }
+    });
+  });
+  return out;
+}
+
+/** The UI's question for one part. */
+export function perceptionFoldState(
+  states: Map<string, PerceptionFoldState>,
+  messageIdx: number,
+  partIdx: number,
+): PerceptionFoldState | null {
+  return states.get(`${messageIdx}:${partIdx}`) ?? null;
+}
+
+/**
+ * Model-path fold for perception and re-readable reads. Same contract as
+ * every transform here: NEVER applied to originalMessages/persistence; the
+ * transcript keeps every byte, and the UI renders the same parts collapsed.
+ */
+export function supersedePerceptionHistory(messages: UIMessage[]): UIMessage[] {
+  const states = perceptionFoldStates(messages);
+  if (![...states.values()].some((s) => s !== "kept")) return messages;
 
   return messages.map((m, messageIdx) => {
-    if (m.role !== "assistant" || messageIdx > boundary.messageIdx) return m;
+    if (m.role !== "assistant") return m;
     let changed = false;
     const parts = m.parts.map((part, partIdx) => {
-      if (
-        messageIdx === boundary.messageIdx &&
-        partIdx >= boundary.partIdx
-      ) {
-        return part;
-      }
-      if (!shouldSupersedePart(part)) return part;
+      const state = states.get(`${messageIdx}:${partIdx}`);
+      if (state !== "folded-distilled" && state !== "folded-turn") return part;
       changed = true;
+      const toolName = ((part as { type?: string }).type ?? "tool-").replace(
+        /^tool-/,
+        "",
+      );
       return {
         ...(part as Record<string, unknown>),
-        output: SUPERSEDED_STUB,
+        output:
+          state === "folded-distilled"
+            ? SUPERSEDED_STUB
+            : TURN_FOLDED_STUB(toolName),
       } as typeof part;
+    });
+    return changed ? { ...m, parts } : m;
+  });
+}
+
+// ── Repeated tool parts (AI-CONTEXT-ECONOMICS-PLAN A2) ─────────────────────
+
+/** Below this an identical output is cheaper to keep than to perturb the cache over. */
+const DEDUPE_MIN_CHARS = 600;
+
+const DUPLICATE_OUTPUT_STUB = (toolName: string) =>
+  `[identical to an earlier ${toolName} result with the same input — nothing changed; that earlier result is still in context]`;
+
+export type DuplicatePartState = "dropped-duplicate-call" | "identical-output";
+
+function isToolPart(part: unknown): part is {
+  type: string;
+  toolCallId?: string;
+  state?: string;
+  input?: unknown;
+  output?: unknown;
+} {
+  if (!part || typeof part !== "object") return false;
+  const type = (part as { type?: unknown }).type;
+  return (
+    typeof type === "string" && (type.startsWith("tool-") || type === "dynamic-tool")
+  );
+}
+
+/**
+ * Content-addressed duplicate verdicts, keyed `"messageIdx:partIdx"` — one
+ * implementation for the model-facing pass and the UI collapse. First
+ * occurrence always wins; only `output-available` parts are ever candidates,
+ * so a call still awaiting its result (the live continuation / approval
+ * path) is never touched.
+ *
+ * Two duplicate shapes, measured on the evidence thread:
+ *  - **dropped-duplicate-call** — the same `toolCallId` already appeared in
+ *    an earlier message. Continuations that re-persist a turn stored the
+ *    same 25 parts in four messages (433 kB). Duplicate ids are malformed
+ *    history; the later copy is removed WHOLE, call and result together, so
+ *    tool_use/tool_result pairing stays intact by absence — the rule
+ *    compactToolOutputs already relies on.
+ *  - **identical-output** — a different call whose type + input + output are
+ *    byte-identical to an earlier one (110 kB of repeated page snapshots).
+ *    The provider still needs a result for this call, so the OUTPUT becomes
+ *    a pointer stub. On the newest part this is the most useful stub of all:
+ *    "nothing changed" is exactly what the model needs to hear after an
+ *    action that did nothing.
+ *
+ * Provably absence-safe — the exact bytes are earlier in context. And
+ * deterministic: the same history always folds the same way, so unlike a
+ * checkpoint boundary this never shifts the prefix cache.
+ *
+ * Never touches `reasoning` (Anthropic signed thinking must be resent
+ * verbatim), `text`, `step-start` or `data-*` parts — only tool parts.
+ */
+export function duplicatePartStates(
+  messages: UIMessage[],
+): Map<string, DuplicatePartState> {
+  const out = new Map<string, DuplicatePartState>();
+  const seenIds = new Set<string>();
+  const seenContent = new Set<string>();
+  messages.forEach((m, messageIdx) => {
+    if (m.role !== "assistant") return;
+    m.parts.forEach((part, partIdx) => {
+      if (!isToolPart(part) || part.state !== "output-available") return;
+      const key = `${messageIdx}:${partIdx}`;
+      if (typeof part.toolCallId === "string" && part.toolCallId.length > 0) {
+        if (seenIds.has(part.toolCallId)) {
+          out.set(key, "dropped-duplicate-call");
+          return;
+        }
+        seenIds.add(part.toolCallId);
+      }
+      const outputText = JSON.stringify(part.output ?? "");
+      if (outputText.length < DEDUPE_MIN_CHARS) return;
+      const contentKey = `${part.type} ${JSON.stringify(part.input ?? null)} ${outputText}`;
+      if (seenContent.has(contentKey)) {
+        out.set(key, "identical-output");
+        return;
+      }
+      seenContent.add(contentKey);
+    });
+  });
+  return out;
+}
+
+/** The UI's question for one part. */
+export function duplicatePartState(
+  states: Map<string, DuplicatePartState>,
+  messageIdx: number,
+  partIdx: number,
+): DuplicatePartState | null {
+  return states.get(`${messageIdx}:${partIdx}`) ?? null;
+}
+
+/**
+ * Model-path dedupe. Apply AFTER the fold transforms so their index-keyed
+ * states are computed on the same message shape the UI sees; this pass is
+ * the only one that removes parts. Same contract: never applied to
+ * originalMessages/persistence.
+ */
+export function dedupeRepeatedToolParts(messages: UIMessage[]): UIMessage[] {
+  const states = duplicatePartStates(messages);
+  if (states.size === 0) return messages;
+
+  return messages.map((m, messageIdx) => {
+    if (m.role !== "assistant") return m;
+    let changed = false;
+    const parts: UIMessage["parts"] = [];
+    m.parts.forEach((part, partIdx) => {
+      const state = states.get(`${messageIdx}:${partIdx}`);
+      if (state === "dropped-duplicate-call") {
+        changed = true;
+        return;
+      }
+      if (state === "identical-output") {
+        changed = true;
+        const toolName = ((part as { type?: string }).type ?? "tool-").replace(
+          /^tool-/,
+          "",
+        );
+        parts.push({
+          ...(part as Record<string, unknown>),
+          output: DUPLICATE_OUTPUT_STUB(toolName),
+        } as typeof part);
+        return;
+      }
+      parts.push(part);
     });
     return changed ? { ...m, parts } : m;
   });

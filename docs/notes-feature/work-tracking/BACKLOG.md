@@ -10,6 +10,15 @@ last_updated: 2026-09-18
 
 ---
 
+## Context economics — follow-ups (2026-09-18, from `feat/context-economics`)
+
+PR A of `AI-CONTEXT-ECONOMICS-PLAN.md` shipped the fold-on-distillation/turn and the tool-part dedupe. Left deliberately:
+
+- [ ] **PR B — pay for a page once, at the source.** Write-input supersession (`insert_rows` / `update_rows` / `record_item_result` / `propose_item_iteration` inputs stub behind the same boundaries, ~324 kB on the evidence thread) and delta-by-default co-browse snapshots (`coBrowseSnapshotOrDelta` keyframes on origin+path, not the full URL — LinkedIn's `?currentJobId=` made 55 of 65 results full snapshots, 417 kB of unchanged chrome). Plan §2.
+- [ ] **Continuations after a reload persist as new rows.** `use-conversation-binding.ts` keys its PATCH-vs-POST decision on refs that a reload resets, so a turn continued after Stop + refresh lands as one row per continuation, each carrying the whole prefix (the evidence thread stored 144 kB of unique parts as 577 kB) and the turn's full `usage` — the session cost estimate counts such a turn once per row. Fix at write time in `appendMessage` (update the latest assistant row when the incoming parts share its leading `toolCallId` sequence), or carry the row's uuid into the continuation so the route's `isUuid` branch extends it; the latter touches the approval-resume path and needs a prod resume smoke. Plan §3.
+- [ ] **Compaction / summarisation as the fallback layer** under the folds — sized only after PR B, against a clean transcript.
+- [ ] **`scripts/pg-read.sh` dies silently when `DATABASE_URL_READONLY` is absent** — `set -e` kills it on the failing `grep` before its own "not set" message prints, and it resolves `.env.local` relative to the script's checkout, so a worktree copy of the script needs the worktree's `.env.local` to carry the variable (this worktree's is commented out). Print the message before the grep can fail.
+
 ## Tool summoner — follow-ups (2026-09-17, from `feat/ai-tool-summoner`)
 
 The branch shipped P0-P4 of `AI-TOOL-SUMMONER-PLAN.md`. These were specified in it and deliberately not built.
