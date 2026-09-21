@@ -162,6 +162,42 @@ that is neither fails the build.
 continuation is the client predicate described in §2 step 6. If a turn ends at the
 step cap with a *server* tool resolved, that is a deliberate stop, not a bug.
 
+### Tool input contracts — the principles (2026-09-21)
+
+The AI SDK validates a tool's Zod schema **before** `execute`. A miss at that layer
+is fatal to the whole call and returns a raw issue list that echoes the entire
+input — it never reaches code that could have understood it. Prod `fa475acc`:
+four `propose_item_iteration` calls in a row died on four *shape* misses (a string
+where an object was expected; `databaseId` for `database`; `columns: []`; 21
+columns against `.max(20)`) while every payload named the right database, items
+and columns. Half the turn's step budget, and "nothing recorded". These principles
+exist so that class cannot recur; drift **gate 7** enforces the first one.
+
+1. **Schemas describe shape; execute judges.** A run-loop tool's `inputSchema`
+   carries field names, primitive types, `.optional()`, `.describe()`, and unions
+   of shapes the model has actually sent — never `.enum()`, `.min()`, `.max()`,
+   `.int()`, `.regex()`, `.refine()`, or required keys inside a nested object.
+   Vocabularies resolve, bounds clamp, nested objects normalize — in execute.
+2. **A miss costs one step, never the enumeration.** When execute genuinely cannot
+   proceed it returns a *result* — `ok: false`, a `refusal` saying what was received
+   and what is accepted, a `nextAction` — that the model fixes in one call. It never
+   throws, and it never asks the model to re-do the expensive part.
+3. **Same concept, same key, everywhere.** The sibling tools say `databaseId`; a
+   nested `database` was the harness's inconsistency, and the model's "wrong" guess
+   was the consistent one. Accept every key the model has used for a concept, and
+   mint new ones to match their siblings.
+4. **Bounds live where the limit lives.** "≤ 20 columns" was arbitrary from the
+   model's side; the *table* knows which names are columns, so the preflight
+   answers "these four aren't" — a real fact instead of a number.
+5. **A refusal teaches.** Received value, accepted values, the fix. A raw Zod dump
+   is none of those.
+
+The rule is stated in full at the top of `lib/domain/ai/tools/iteration-proposal.ts`
+(the proposal's pure contract, also loaded by `pnpm proposal:shape:check`, whose
+fixtures are the four production payloads). Companion doctrine for read tools:
+`data-tools.ts` ("validation lives in execute, where every miss returns a teaching
+message"); for `record_item_result`, the status-resolution comment in the registry.
+
 **Two agentic harnesses** compose over these tools, both using the **run ledger**
 (a markdown note, `run-ledger.ts` — loop state lives in the ledger + message parts,
 never in model memory):
@@ -248,6 +284,13 @@ shows a **MISSING** marker if the scan disagrees.
 settings metadata or `HARNESS_INTERNAL_TOOL_IDS`. Gate 3 fails until you decide.
 If prompt text or another tool's description references it by name, gate 4 keeps
 those references honest — and catches the rename-but-forgot-the-prose case.
+
+**Add or change a run-loop tool's input schema** → keep it describe-only (§5 "Tool
+input contracts"); put vocabularies, bounds and nested-shape normalization in
+execute, answering a miss with a teaching result. Gate 7 fails the build on any
+`.enum()` / `.min()` / `.max()` / refinement in `propose_item_iteration`,
+`record_*` or `add_quest_ledger_column`; `proposal:shape:check` proves the
+production payloads still reach execute.
 
 **Change the system prompt** → `prompt-cache:check` pins cache-key behavior;
 gate 4 re-validates tool-name references; remember section order is part of the

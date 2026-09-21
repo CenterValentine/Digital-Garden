@@ -150,8 +150,58 @@ const SUPERSEDE_MIN_CHARS = 600;
 const SUPERSEDED_STUB =
   "[superseded at batch checkpoint — this raw page data was already digested into recorded item results and the run ledger; rely on those records, and re-read the source URL if an item truly needs revisiting]";
 
-const TURN_FOLDED_STUB = (toolName: string) =>
-  `[folded — this ${toolName} result from an earlier turn was digested into the reply that followed; call the tool again if a later step truly needs it]`;
+const TURN_FOLDED_STUB = (toolName: string, header: string | null) =>
+  `[folded — this ${toolName} result from an earlier turn was digested into the reply that followed; call the tool again if a later step truly needs it]` +
+  (header ? `\n${header}` : "");
+
+/** The retained header may not itself be worth a re-read's tokens. */
+const RETAINED_HEADER_MAX_CHARS = 1500;
+
+/**
+ * What a folded read keeps: its HEADER — title, type, and for a database the
+ * column list — never its body. Round 2 of AI-CONTEXT-ECONOMICS (2026-09-21):
+ * after PR A folded turn 1's reads, turn 2 re-read both ledgers and the
+ * Library — five reads, most of an 8-step budget — because it needed the
+ * COLUMN NAMES for captureTo and the stub said "call the tool again". The
+ * fold had traded tokens for steps. A header is a few hundred bytes and is
+ * exactly what a later step asks of an earlier read.
+ *
+ * read_content renders `Title:` / `Type:` / `Updated:` then a digest whose
+ * `Columns:` block lists `- Name (type) — description` lines; that block is
+ * kept whole (descriptions included — they are the load-bearing context for
+ * capture columns). Anything else keeps its first four lines.
+ */
+export function retainedReadHeader(output: unknown): string | null {
+  if (typeof output !== "string") return null;
+  const lines = output.split("\n");
+  const columnsAt = lines.findIndex((l) => l.trim() === "Columns:");
+  let kept: string[];
+  if (columnsAt >= 0) {
+    let end = columnsAt + 1;
+    while (end < lines.length && /^\s*- /.test(lines[end])) end += 1;
+    // Title/type lines above plus the column block — skip the prose in between.
+    const head = lines.slice(0, Math.min(columnsAt, 3)).filter((l) => /^(Title|Type|Updated):/.test(l));
+    kept = [...head, ...lines.slice(columnsAt, end)];
+  } else {
+    kept = lines.slice(0, 4);
+  }
+  const header = kept.join("\n").trim();
+  if (!header) return null;
+  return header.length > RETAINED_HEADER_MAX_CHARS
+    ? `${header.slice(0, RETAINED_HEADER_MAX_CHARS - 1).trimEnd()}…`
+    : header;
+}
+
+/**
+ * A query_database result's column header: the header-once TSV line that
+ * follows the summary line. Kept by the bulk-read fold for the same reason
+ * as above — column names are what a later step needs from a folded read.
+ */
+export function retainedQueryColumns(output: unknown): string | null {
+  if (typeof output !== "string") return null;
+  const second = output.split("\n", 2)[1] ?? "";
+  return second.includes("\t") ? second.trim() : null;
+}
 
 /**
  * During an ACTIVE batched iteration run, stub raw perception outputs that
@@ -308,7 +358,10 @@ export function supersedePerceptionHistory(messages: UIMessage[]): UIMessage[] {
         output:
           state === "folded-distilled"
             ? SUPERSEDED_STUB
-            : TURN_FOLDED_STUB(toolName),
+            : TURN_FOLDED_STUB(
+                toolName,
+                retainedReadHeader((part as { output?: unknown }).output),
+              ),
       } as typeof part;
     });
     return changed ? { ...m, parts } : m;
@@ -619,8 +672,14 @@ const BULK_READ_MIN_CHARS = 600;
 /** Pinned (`chat`) reads may hold at most this much, newest first. */
 export const DEFAULT_PINNED_ALLOWANCE_TOKENS = 12_000;
 
-const BULK_READ_STUB = (table: string, rows: number, tokens: number) =>
-  `[superseded — this database read (${rows} rows of "${table}", ~${Math.round(tokens / 100) / 10}k tokens) was digested into the reply that followed; call query_database again if a later step truly needs the rows]`;
+const BULK_READ_STUB = (
+  table: string,
+  rows: number,
+  tokens: number,
+  columns: string | null,
+) =>
+  `[superseded — this database read (${rows} rows of "${table}", ~${Math.round(tokens / 100) / 10}k tokens) was digested into the reply that followed; call query_database again if a later step truly needs the rows]` +
+  (columns ? `\ncolumns: ${columns.split("\t").join(" · ")}` : "");
 
 export type BulkReadFoldState = "kept" | "pinned-run" | "pinned-chat" | "folded";
 
@@ -775,6 +834,7 @@ export function supersedeBulkReads(
           header?.table ?? "database",
           header?.rows ?? 0,
           header?.tokens ?? Math.ceil(text.length / 4),
+          retainedQueryColumns(text),
         ),
       } as typeof part;
     });

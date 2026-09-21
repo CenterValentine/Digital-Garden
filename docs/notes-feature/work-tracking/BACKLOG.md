@@ -10,6 +10,12 @@ last_updated: 2026-09-18
 
 ---
 
+## Proposal shape leniency — follow-ups (2026-09-21, from `feat/proposal-shape-leniency`)
+
+- [ ] **Stitch hrefs onto label-only items.** When a proposal's items are bare strings (no url) and the turn's last `co_browse_act collect` returned cards with hrefs, the harness could attach each matching card's href at proposal time — url-tier keys instead of label-tier, dedupe against the capture table possible. The model had the hrefs in prod `fa475acc` and sent strings anyway.
+- [ ] **Extend the describe-only rule beyond the run loop.** Gate 7 covers the five run-loop tools. `propose_database_columns` / `propose_linked_databases` / the flashcard proposal tools still carry schema refinements; each should get the same treatment (resolvers + teaching refusals) and join the gate's list.
+- [ ] **Step-chain fold attribution.** The chain shows `−N` where context shrank; naming *which* transform folded it (turn / distillation / dedupe / write input) needs the route to stamp per-step fold stats into the segment.
+
 ## Context economics — follow-ups (2026-09-18, from `feat/context-economics`)
 
 PR A of `AI-CONTEXT-ECONOMICS-PLAN.md` shipped the fold-on-distillation/turn and the tool-part dedupe. Left deliberately:
