@@ -81,6 +81,7 @@ import {
   stripReasoningForResend,
   supersedeBulkReads,
   supersedePerceptionHistory,
+  supersedeWriteInputs,
 } from "@/lib/domain/ai/context-diet";
 import { DEFAULT_BULK_READ_THRESHOLD } from "@/lib/domain/ai/tools/data-tools";
 import {
@@ -1620,6 +1621,11 @@ export async function POST(request: Request) {
       //     the ledger / the reply is the memory. Never gated on an active
       //     run (AI-CONTEXT-ECONOMICS-PLAN D1: the old boundary switched
       //     off when a run ended, re-sending 905 kB per request after).
+      //   - supersedeWriteInputs: a successful insert_rows / update_rows /
+      //     record_item_result behind the same boundaries keeps its
+      //     addresses and drops its payload — the database or ledger is the
+      //     durable home (plan B1, ~324 kB of generated text on the
+      //     evidence thread). Outputs untouched.
       //   - stripReasoningForResend: reasoning parts are model OUTPUT with
       //     no resend value for non-Anthropic providers, yet
       //     convertToModelMessages forwards them as input verbatim (~100k
@@ -1642,7 +1648,7 @@ export async function POST(request: Request) {
               // AI-BULK-ROW-READING §4.6; pinned reads survive, `turn`
               // reads collapse once a newer user message exists.
               supersedeBulkReads(
-                supersedePerceptionHistory(repairedMessages),
+                supersedeWriteInputs(supersedePerceptionHistory(repairedMessages)),
                 { pinnedAllowanceTokens: bulkReadPinnedAllowance },
               ),
               executedVendorId,
