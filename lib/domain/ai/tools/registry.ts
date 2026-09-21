@@ -45,6 +45,17 @@ import { createColumn } from "@/lib/domain/data/server/mutations";
 import { renderDataNodePreview } from "@/lib/domain/data/server/read-preview";
 import { resolveItemStatus, resolveIterationSource } from "./repair";
 import {
+  ITERATION_PROPOSAL_INPUT,
+  PROPOSAL_BOUNDS,
+  QUEST_COLUMN_TYPES,
+  clampInt,
+  clipText,
+  normalizeProposalItems,
+  resolveCaptureTarget,
+  resolveQuestColumnType,
+  resolveQuestColumns,
+} from "./iteration-proposal";
+import {
   closeSitting,
   ensureMasterLedger,
   ensureOutputRelation,
@@ -585,151 +596,35 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         "Enumerate FIRST, then propose with the item list. On approval you receive an item budget, a ledger checklist (one row per item), and stable item keys. Process items IN ORDER, one at a time, recording EVERY item with record_item_result; finish with record_iteration_findings (quest-less runs also write a roll-up note first — quest runs never do). " +
         "Skip this tool for a single item — just run the analysis directly.",
       needsApproval: true,
-      inputSchema: z.object({
-        objective: z
-          .string()
-          .min(1)
-          .max(400)
-          .describe("What each item gets, in one sentence (e.g. \"score fit with the Job Fit charter; document >75% matches\")."),
-        // Lenient string, not an enum (production, 2026-09-18): a run
-        // described in prose — "open browser tabs (LinkedIn postings)" —
-        // was rejected together with the 24-item enumeration it carried,
-        // and that enumeration is a browsing pass the model must otherwise
-        // redo. Resolved in execute, which refuses only when genuinely
-        // ambiguous.
-        source: z
-          .string()
-          .describe(
-            "Where the items were enumerated from: \"list-page\", \"open-tabs\", \"urls\", or \"database-rows\". \"database-rows\" = a stage-2 pass over an existing table: requires captureTo (the table is both source and stamp-back target); omit items — the server enumerates rows itself (optionally narrowed by rowIds).",
-          ),
-        items: z
-          .array(
-            z.union([
-              z.object({
-                label: z.string().min(1).max(200).describe("Human label — title/company as shown."),
-                url: z.string().max(600).optional().describe("The item's own URL when known (tab URL, link href) — the strongest stable key."),
-              }),
-              // A bare string is read as {label} (production 2026-09-18: a
-              // 20-item enumeration was rejected wholesale for being strings).
-              z.string().min(1).max(200),
-            ]),
-          )
-          .min(1)
-          .max(250)
-          .optional()
-          .describe("The enumerated items, in processing order. REQUIRED for every source except \"database-rows\" (where the server enumerates)."),
-        rowIds: z
-          .array(z.string().min(1).max(80))
-          .max(200)
-          .optional()
-          .describe(
-            "database-rows only: iterate exactly these rows, in this order ([handles] or ids from query_database). Omit to iterate the whole table in grid order (capped by itemCap).",
-          ),
-        itemCap: z
-          .number()
-          .int()
-          .min(1)
-          .max(200)
-          // Optional in the SCHEMA, required in execute (production,
-          // 2026-09-18): the model sent the cap as `budget`, the word this
-          // harness uses for every other ceiling, and a required `itemCap`
-          // discarded the whole proposal over the name. Execute accepts
-          // either and refuses only when neither is present.
-          .optional()
-          // The plan card is approve/reject only — do NOT promise editable
-          // fields here (an earlier description claimed the user could raise
-          // the cap in the card; they can't, and a denied proposal was the
-          // observable result).
-          .describe("Max items to process this run. PROPOSE a sensible default (~10-15, up to 200); raise it yourself ONLY when the user explicitly asked for more. If the user wants a different cap after seeing the plan, they will say so — re-propose with their number."),
-        budget: z
-          .number()
-          .int()
-          .min(1)
-          .max(200)
-          .optional()
-          .describe("Alias for itemCap. Prefer itemCap; this exists because the harness calls every other ceiling a budget."),
-        batchSize: z
-          .number()
-          .int()
-          .min(2)
-          .max(50)
-          .optional()
-          .describe(
-            "Optional batch cadence: checkpoint the run every N items (dedupe the batch, record a batch checkpoint in the ledger) before starting the next batch. Omit when one batch covers the whole run. RECOMMEND 10 or fewer — larger batches raise drift and context risk; go higher only when the user asks for it.",
-          ),
-        ledgerLabel: z
-          .string()
-          .max(120)
-          .optional()
-          .describe("Short label for the run's ledger; omit to derive from the objective."),
-        captureTo: z
-          .object({
-            database: z
-              .string()
-              .min(1)
-              .max(200)
-              .describe(
-                "Target database — its id (from the mention capsule) or exact name.",
-              ),
-            admission: z
-              .enum(["all", "qualified", "custom"])
-              .describe(
-                "Which recorded items get rows: all done items, only qualified ones, or custom (the user's stated rule — pass cells only for items meeting it).",
-              ),
-            admissionNote: z
-              .string()
-              .max(300)
-              .optional()
-              .describe("One line stating a custom admission rule (shown on the card and in the ledger)."),
-            columns: z
-              .array(z.string().min(1).max(120))
-              .min(1)
-              .max(20)
-              .describe("Column NAMES this run will write per admitted item."),
-            dedupeColumn: z
-              .string()
-              .max(120)
-              .optional()
-              .describe(
-                "Column holding each item's stable identity; defaults to the table's first url column.",
-              ),
-          })
-          .optional()
-          .describe(
-            "Capture admitted items as DATABASE ROWS in addition to the ledger. Declare it when the user asked for results in a database — approving this card is the user's consent to write there, and each admitted item's record_item_result must then include capture.cells.",
-          ),
-        quest: z
-          .string()
-          .min(1)
-          .max(120)
-          .optional()
-          .describe(
-            "The ongoing MATTER this run belongs to (continue-or-create): pass the quest's name when the user mentions a past matter to continue (\"my job hunt\") — the same quest across sittings shares one ledger and skips already-scored items. Omit for a brand-new matter (a quest is then created from the run's label).",
-          ),
-        questColumns: z
-          .array(
-            z.object({
-              name: z.string().min(1).max(60),
-              type: z.enum(["text", "longText", "number", "url", "date", "checkbox"]),
-              description: z
-                .string()
-                .min(8)
-                .max(300)
-                .describe("What goes in it — same load-bearing context as every capture column."),
-            }),
-          )
-          .max(8)
-          .optional()
-          .describe(
-            "NEW quests only: extra ledger columns sculpted to this matter (a scoring task adds its criteria columns; a collection task adds none). The machinery core (Item/Status/Pass/Fit/Qualified/Verdict/…) always exists — never re-declare it. Write their values via questCells on record_item_result. Ignored when continuing an existing quest.",
-          ),
-      }),
-      execute: async ({ objective, source: sourceArg, items: itemsArg, rowIds, itemCap: itemCapArg, budget: budgetArg, batchSize, ledgerLabel, captureTo, quest: questArg, questColumns }) => {
-        // A bare string is the item's label. Normalizing here keeps every
-        // downstream reader (ledger, capture, quest cells) on one shape.
-        const items = itemsArg?.map((entry) =>
-          typeof entry === "string" ? { label: entry } : entry,
-        );
+      // THE RULE — schemas describe shape; execute judges. The contract is
+      // the pure module (also loaded by `pnpm proposal:shape:check`, whose
+      // fixtures are the four payloads that died at this schema in prod
+      // fa475acc, 2026-09-21); drift gate 7 fails the build if a `.enum()` /
+      // `.min()` / `.max()` creeps back into any run-loop tool. Every
+      // judgement the old schema made — source vocabulary, item shape, caps,
+      // captureTo's keys and admission words, column count, quest column
+      // types — is made below, and a miss comes back as a RESULT the model
+      // fixes in one step instead of a rejection that ends the call.
+      inputSchema: ITERATION_PROPOSAL_INPUT,
+      execute: async ({ objective: objectiveArg, source: sourceArg, items: itemsArg, rowIds: rowIdsArg, itemCap: itemCapArg, budget: budgetArg, batchSize: batchSizeArg, ledgerLabel: ledgerLabelArg, captureTo: captureToArg, quest: questArg, questColumns: questColumnsArg }) => {
+        // ── Shape → meaning (iteration-proposal.ts resolvers) ────────────
+        const objective = clipText(objectiveArg, 400) ?? "";
+        if (!objective) {
+          return {
+            ok: false,
+            refusal: "No objective given. Say in one sentence what each item gets (e.g. \"score fit with the Job Fit charter; document >75% matches\") and re-propose — keep the items you already enumerated.",
+            nextAction: "Re-propose with an objective. Do NOT start processing items.",
+          };
+        }
+        // Every item shape the model has sent → { label, url? }; over-long
+        // labels/urls are clipped, label-less entries skipped (reported below).
+        const itemsNorm = normalizeProposalItems(itemsArg);
+        const items = itemsNorm.items;
+        const rowIds = rowIdsArg
+          ?.map((r) => r.trim())
+          .filter((r) => r.length > 0)
+          .slice(0, PROPOSAL_BOUNDS.rowIds);
+        const ledgerLabel = clipText(ledgerLabelArg, 120);
         // Resolve the two fields that used to reject the whole proposal
         // (production, 2026-09-18). Both refusals below are ordinary tool
         // RESULTS, so the model can re-propose in the same turn with the
@@ -738,12 +633,12 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         if (!source) {
           return {
             ok: false,
-            refusal: `Could not tell where these items came from: source "${sourceArg}". Re-propose with exactly one of "list-page", "open-tabs", "urls" or "database-rows" — keep the items you already enumerated.`,
+            refusal: `Could not tell where these items came from: source "${sourceArg ?? ""}". Re-propose with exactly one of "list-page", "open-tabs", "urls" or "database-rows" — keep the items you already enumerated.`,
             nextAction: "Re-propose with a valid source. Do NOT start processing items.",
           };
         }
-        const itemCap = itemCapArg ?? budgetArg;
-        if (itemCap === undefined) {
+        const itemCapRaw = itemCapArg ?? budgetArg;
+        if (itemCapRaw === undefined) {
           return {
             ok: false,
             refusal:
@@ -751,6 +646,41 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             nextAction: "Re-propose with itemCap. Do NOT start processing items.",
           };
         }
+        const itemCap = clampInt(itemCapRaw, PROPOSAL_BOUNDS.itemCap.min, PROPOSAL_BOUNDS.itemCap.max, PROPOSAL_BOUNDS.itemCap.max);
+        // A cadence below 2 is no cadence; above the bound is clamped.
+        const batchSize =
+          typeof batchSizeArg === "number" && Number.isFinite(batchSizeArg) && batchSizeArg >= PROPOSAL_BOUNDS.batchSize.min
+            ? clampInt(batchSizeArg, PROPOSAL_BOUNDS.batchSize.min, PROPOSAL_BOUNDS.batchSize.max, PROPOSAL_BOUNDS.batchSize.max)
+            : undefined;
+        // captureTo in every shape seen (bare id, databaseId, comma columns,
+        // admission by meaning) → one target, or a refusal naming the fix.
+        const captureRes = resolveCaptureTarget(captureToArg);
+        if (captureRes && !captureRes.ok) {
+          return {
+            ok: false,
+            refusal: captureRes.refusal ?? "captureTo could not be read.",
+            nextAction: "Re-propose with captureTo fixed as the refusal says. Do NOT start processing items.",
+          };
+        }
+        const captureTo = captureRes?.target;
+        const questRes = resolveQuestColumns(questColumnsArg);
+        if (!questRes.ok) {
+          return {
+            ok: false,
+            refusal: questRes.refusal ?? "questColumns could not be read.",
+            nextAction: "Re-propose with questColumns fixed as the refusal says. Do NOT start processing items.",
+          };
+        }
+        const questColumns = questRes.columns;
+        // Everything the resolvers silently read differently from what was
+        // sent rides the result, so a normalization is never invisible.
+        const shapeNotes = [
+          ...(captureRes?.notes ?? []),
+          ...questRes.notes,
+          ...(itemsNorm.dropped > 0 ? [`${itemsNorm.dropped} item(s) had no label under any key and were skipped`] : []),
+          ...(itemsNorm.clipped ? [`items clipped to the first ${PROPOSAL_BOUNDS.items}`] : []),
+          ...(itemCap !== itemCapRaw ? [`itemCap ${itemCapRaw} clamped to ${itemCap}`] : []),
+        ];
 
         // An enumeration that lost its URLs is a degraded run, not a failed
         // one, and it degrades SILENTLY: the ledger cannot link to sources, a
@@ -839,6 +769,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             database: captureTo.database,
             admission: captureTo.admission,
             admissionNote: captureTo.admissionNote,
+            // Empty = every writable column (the preflight expands it).
             columnNames: captureTo.columns,
             dedupeColumnName: captureTo.dedupeColumn,
           });
@@ -1193,6 +1124,10 @@ export function createBaseTools(ctx: ToolExecuteContext) {
                   'BEFORE item 1, read each standingContext database ONCE with query_database (lifetime: "run"; tier index → default columns; "index with digests" → digests: true; "full" → columns: "all"; apply the listed columns/filter). Judge every item against those rows; write matches as relation cells with the [handles]. Do not re-read per item.',
               }
             : {}),
+          // What the resolvers read differently from what was sent — a
+          // normalization is never invisible (silent correctness reads as a
+          // bug), and the ledger line below quotes these too.
+          ...(shapeNotes.length > 0 ? { shapeNotes } : {}),
           ...(captureCfg
             ? {
                 capture: {
@@ -1257,12 +1192,13 @@ export function createBaseTools(ctx: ToolExecuteContext) {
       description:
         "Record ONE item's outcome in the iteration ledger. Call after finishing EACH item of an approved propose_item_iteration run — including items you could NOT read (status unreadable/blocked). Never skip an item silently. ALWAYS pass the item's `url` so the ledger links to the source page (the user can click through, and a follow-up run can revisit it).",
       inputSchema: z.object({
-        ledgerRunKey: z.string().min(1).describe("The ledgerRunKey from propose_item_iteration."),
-        itemKey: z.string().min(1).max(600).describe("The item's key from the approved run's items list."),
+        // Describe-only schema (drift gate 7; the rule in
+        // iteration-proposal.ts): bounds are clipped/clamped in execute.
+        ledgerRunKey: z.string().describe("The ledgerRunKey from propose_item_iteration."),
+        itemKey: z.string().describe("The item's key from the approved run's items list."),
         itemLabel: z.string().optional().describe("The item's label (for the ledger line)."),
         url: z
           .string()
-          .max(600)
           .optional()
           .describe("The item's source URL (from the approved items list / the page you read). ALWAYS include it when known — the ledger renders it as a clickable link so the page can be revisited."),
         // Deliberately a lenient string, not an enum (owner report
@@ -1276,7 +1212,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           .optional()
           .describe('"done" = analyzed; "unreadable" = page could not be read; "blocked" = an obstacle (login/captcha) stopped this item.'),
         qualified: z.boolean().optional().describe("Whether the item met the objective's bar (e.g. fit > 75%)."),
-        fitPercent: z.number().min(0).max(100).optional().describe("Numeric score when the objective scores items."),
+        fitPercent: z.number().optional().describe("Numeric score 0–100 when the objective scores items."),
         // No `.max()` on the prose fields (production 2026-09-18): a verdict
         // of 1,043 characters failed `max(1000)` and took the whole call with
         // it — a correct item, scored 88/100 and qualified, plus its capture
@@ -1305,7 +1241,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             "Quest runs with SCULPTED ledger columns: their values for this item (column name → value). Machinery fields (status/fit/qualified/verdict) are recorded automatically — never repeat them here.",
           ),
       }),
-      execute: async ({ ledgerRunKey, itemKey, itemLabel: itemLabelArg, url, status: statusArg, qualified, fitPercent, verdict: verdictArg, artifactTitle: artifactTitleArg, capture, questCells }) => {
+      execute: async ({ ledgerRunKey: ledgerRunKeyArg, itemKey: itemKeyArg, itemLabel: itemLabelArg, url: urlArg, status: statusArg, qualified, fitPercent: fitPercentArg, verdict: verdictArg, artifactTitle: artifactTitleArg, capture, questCells }) => {
         // Clip the prose. These used to be `.max()` on the schema, where an
         // over-long verdict rejected the entire call — see the schema comment.
         const clip = (text: string | undefined, max: number) =>
@@ -1315,6 +1251,22 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         const verdict = clip(verdictArg, 1000);
         const itemLabel = clip(itemLabelArg, 200);
         const artifactTitle = clip(artifactTitleArg, 200);
+        // Bounds that were schema refinements (gate 7): keys must be present,
+        // the url is clipped, the score is clamped to 0–100.
+        const ledgerRunKey = ledgerRunKeyArg.trim();
+        const itemKey = clip(itemKeyArg.trim(), 600) ?? "";
+        if (!ledgerRunKey || !itemKey) {
+          return {
+            ok: false,
+            recorded: null,
+            note: "record_item_result needs both ledgerRunKey (from the approved proposal) and itemKey (from its items list). Re-record this item with both.",
+          };
+        }
+        const url = clip(urlArg, 600);
+        const fitPercent =
+          typeof fitPercentArg === "number" && Number.isFinite(fitPercentArg)
+            ? Math.min(100, Math.max(0, fitPercentArg))
+            : undefined;
 
         // Resolve before anything is written: a recognized word is taken, a
         // missing one is inferred from the evidence in the same call, and only
@@ -1534,18 +1486,29 @@ export function createBaseTools(ctx: ToolExecuteContext) {
     record_batch_checkpoint: tool({
       description:
         "Record a BATCH checkpoint in the iteration ledger. Call it when an approved batched run (propose_item_iteration with batchSize) has recorded a full batch since the last checkpoint — the harness holds new item reads until this is written. Summarize the batch (counts, qualified so far, duplicates merged, anomalies), then continue IMMEDIATELY with the next item. Skip it after the FINAL batch — the roll-up + record_iteration_findings close the run.",
+      // Describe-only schema (drift gate 7): bounds clamp in execute.
       inputSchema: z.object({
-        ledgerRunKey: z.string().min(1).describe("The ledgerRunKey from propose_item_iteration."),
-        batchNumber: z.number().int().min(1).describe("1-based index of the batch just completed."),
-        itemsRecordedSoFar: z.number().int().min(1).describe("Total items recorded so far in this run (across all batches)."),
-        batchSummary: z.string().min(1).max(2000).describe("Short markdown reconciliation of THIS batch: what was covered, counts, qualified so far, anomalies."),
+        ledgerRunKey: z.string().describe("The ledgerRunKey from propose_item_iteration."),
+        batchNumber: z.number().describe("1-based index of the batch just completed."),
+        itemsRecordedSoFar: z.number().describe("Total items recorded so far in this run (across all batches)."),
+        batchSummary: z.string().describe("Short markdown reconciliation of THIS batch: what was covered, counts, qualified so far, anomalies (clipped at 2000 characters)."),
         duplicatesMerged: z
           .array(z.string())
-          .max(40)
           .optional()
           .describe("Labels/keys identified as duplicates (within this batch or against earlier batches)."),
       }),
-      execute: async ({ ledgerRunKey, batchNumber, itemsRecordedSoFar, batchSummary, duplicatesMerged }) => {
+      execute: async ({ ledgerRunKey: ledgerRunKeyArg, batchNumber: batchNumberArg, itemsRecordedSoFar: itemsRecordedSoFarArg, batchSummary: batchSummaryArg, duplicatesMerged: duplicatesMergedArg }) => {
+        const ledgerRunKey = ledgerRunKeyArg.trim();
+        const batchSummary = clipText(batchSummaryArg, 2000) ?? "";
+        if (!ledgerRunKey || !batchSummary) {
+          return {
+            ok: false,
+            note: "record_batch_checkpoint needs the ledgerRunKey and a batchSummary. Re-record the checkpoint with both, then continue with the next item.",
+          };
+        }
+        const batchNumber = clampInt(batchNumberArg, 1, 10_000, 1);
+        const itemsRecordedSoFar = clampInt(itemsRecordedSoFarArg, 0, 100_000, 0);
+        const duplicatesMerged = duplicatesMergedArg?.slice(0, 40);
         const placement = resolveToolOutputPlacement(ctx);
         if (!placement.parentId && !placement.ownedByNoteId) {
           // Still ok:true — this result is the client gate's re-open marker,
@@ -1597,18 +1560,32 @@ export function createBaseTools(ctx: ToolExecuteContext) {
     add_quest_ledger_column: tool({
       description:
         "Mid-run schema grace (quest LEDGER only): add ONE column to the active quest's ledger when the matter turns out to need a field it lacks (a criterion that emerged from the pages). Never for output/capture tables — those change via propose_column_options or the user. One column per call; the addition is logged in the quest log. After adding, write its value for later items via questCells on record_item_result.",
+      // Describe-only schema (drift gate 7): the type vocabulary resolves in
+      // execute by meaning, with a refusal that names the accepted words.
       inputSchema: z.object({
-        ledgerRunKey: z.string().min(1).describe("The ledgerRunKey of the ACTIVE quest run."),
-        name: z.string().min(1).max(60).describe("The new column's name."),
-        type: z.enum(["text", "longText", "number", "url", "date", "checkbox"]),
+        ledgerRunKey: z.string().describe("The ledgerRunKey of the ACTIVE quest run."),
+        name: z.string().describe("The new column's name."),
+        type: z.string().describe('One of "text", "longText", "number", "url", "date", "checkbox".'),
         description: z
           .string()
-          .min(8)
-          .max(300)
           .describe("What goes in it — same load-bearing context as every capture column."),
-        reason: z.string().min(1).max(200).describe("One line: why this emerged mid-run (logged in the quest log)."),
+        reason: z.string().describe("One line: why this emerged mid-run (logged in the quest log)."),
       }),
-      execute: async ({ ledgerRunKey, name, type, description, reason }) => {
+      execute: async ({ ledgerRunKey: ledgerRunKeyArg, name: nameArg, type: typeArg, description: descriptionArg, reason: reasonArg }) => {
+        const ledgerRunKey = ledgerRunKeyArg.trim();
+        const name = clipText(nameArg, 60) ?? "";
+        const description = clipText(descriptionArg, 300) ?? "";
+        const reason = clipText(reasonArg, 200) ?? "";
+        if (!ledgerRunKey || !name) {
+          return { ok: false, note: "add_quest_ledger_column needs the active run's ledgerRunKey and a column name." };
+        }
+        const type = resolveQuestColumnType(typeArg);
+        if (!type) {
+          return {
+            ok: false,
+            note: `Column type "${typeArg}" is not one I can map. Use one of ${QUEST_COLUMN_TYPES.map((t) => `"${t}"`).join(", ")}.`,
+          };
+        }
         const placement = resolveToolOutputPlacement(ctx);
         const runState = await readRunLedgerCaptureConfig(
           ctx.userId,
@@ -1673,18 +1650,33 @@ export function createBaseTools(ctx: ToolExecuteContext) {
     record_iteration_findings: tool({
       description:
         "Close an iteration run: record the reconciliation (processed / qualified / unreadable counts + summary) in its ledger, passing the ledgerRunKey from propose_item_iteration. Quest-less runs call it AFTER the roll-up note (create_note); quest runs skip the roll-up note entirely (the quest log + ledger are the record).",
+      // Describe-only schema (drift gate 7): bounds clamp in execute.
       inputSchema: z.object({
-        ledgerRunKey: z.string().min(1).describe("The ledgerRunKey from propose_item_iteration."),
-        resultSummary: z.string().min(1).max(4000).describe("Short markdown reconciliation: what was processed and what qualified."),
-        processedCount: z.number().int().min(0).describe("Items actually processed (recorded)."),
-        qualifiedCount: z.number().int().min(0).optional().describe("Items that met the bar."),
-        unreadableItems: z.array(z.string()).max(60).optional().describe("Keys/labels of items that could not be read or were blocked."),
-        rollupTitle: z.string().max(200).optional().describe("Title of the roll-up note, recorded as the run's artifact."),
-        rowsWritten: z.number().int().min(0).optional().describe("Capture runs: rows CREATED in the target database this run."),
-        rowsUpdated: z.number().int().min(0).optional().describe("Capture runs: existing rows UPDATED (re-encountered identities)."),
-        rowsFailed: z.number().int().min(0).optional().describe("Capture runs: items whose row was rejected and never landed."),
+        ledgerRunKey: z.string().describe("The ledgerRunKey from propose_item_iteration."),
+        resultSummary: z.string().describe("Short markdown reconciliation: what was processed and what qualified (clipped at 4000 characters)."),
+        processedCount: z.number().describe("Items actually processed (recorded)."),
+        qualifiedCount: z.number().optional().describe("Items that met the bar."),
+        unreadableItems: z.array(z.string()).optional().describe("Keys/labels of items that could not be read or were blocked."),
+        rollupTitle: z.string().optional().describe("Title of the roll-up note, recorded as the run's artifact."),
+        rowsWritten: z.number().optional().describe("Capture runs: rows CREATED in the target database this run."),
+        rowsUpdated: z.number().optional().describe("Capture runs: existing rows UPDATED (re-encountered identities)."),
+        rowsFailed: z.number().optional().describe("Capture runs: items whose row was rejected and never landed."),
       }),
-      execute: async ({ ledgerRunKey, resultSummary, processedCount, qualifiedCount, unreadableItems, rollupTitle, rowsWritten, rowsUpdated, rowsFailed }) => {
+      execute: async ({ ledgerRunKey: ledgerRunKeyArg, resultSummary: resultSummaryArg, processedCount: processedCountArg, qualifiedCount: qualifiedCountArg, unreadableItems: unreadableItemsArg, rollupTitle: rollupTitleArg, rowsWritten: rowsWrittenArg, rowsUpdated: rowsUpdatedArg, rowsFailed: rowsFailedArg }) => {
+        const ledgerRunKey = ledgerRunKeyArg.trim();
+        const resultSummary = clipText(resultSummaryArg, 4000) ?? "";
+        if (!ledgerRunKey || !resultSummary) {
+          return { ok: false, note: "record_iteration_findings needs the ledgerRunKey and a resultSummary. Re-record the close with both." };
+        }
+        const count = (v: number | undefined): number | undefined =>
+          typeof v === "number" && Number.isFinite(v) ? Math.max(0, Math.round(v)) : undefined;
+        const processedCount = count(processedCountArg) ?? 0;
+        const qualifiedCount = count(qualifiedCountArg);
+        const rowsWritten = count(rowsWrittenArg);
+        const rowsUpdated = count(rowsUpdatedArg);
+        const rowsFailed = count(rowsFailedArg);
+        const unreadableItems = unreadableItemsArg?.slice(0, 60);
+        const rollupTitle = clipText(rollupTitleArg, 200);
         const placement = resolveToolOutputPlacement(ctx);
         if (!placement.parentId && !placement.ownedByNoteId) {
           return { ok: false, note: "No target folder set, so no ledger was written. The roll-up note still landed." };

@@ -23,7 +23,9 @@ pnpm lint             # ESLint with --max-warnings 175 ratchet (fails if count g
 pnpm build:tokens     # Regenerate CSS variables from design tokens
 pnpm db:seed          # Seed database with test ContentNode data
 pnpm collab:schema:check  # CI gate: validate collaboration schema covers all editor extensions
-pnpm ai:drift:check   # CI gate: AI parallel-table drift (provider catalog ↔ connection templates ↔ type unions ↔ settings enum; tool inventory ↔ settings metadata; prompt tool references; adapter branches)
+pnpm ai:drift:check   # CI gate: AI parallel-table drift (provider catalog ↔ connection templates ↔ type unions ↔ settings enum; tool inventory ↔ settings metadata; prompt tool references; adapter branches; run-loop schemas describe-only)
+pnpm context:diet:check  # CI gate: the model-facing transcript folds (distillation/turn), dedupe, write-input supersession, header retention — fixture transcripts, mutation-tested
+pnpm proposal:shape:check  # CI gate: the propose_item_iteration payloads that died in prod parse and resolve by meaning (lib/domain/ai/tools/iteration-proposal.ts — "schemas describe shape; execute judges")
 pnpm ai:matrix        # Regenerate docs/notes-feature/core/AI-CAPABILITY-MATRIX.md from the real provider/model tables
 pnpm ai:matrix:check  # CI gate: the committed capability matrix matches the code (run ai:matrix after model/provider changes)
 pnpm publishing:schema:check  # CI gate: validate every publishing block has Server* variant + correct registerBlock type

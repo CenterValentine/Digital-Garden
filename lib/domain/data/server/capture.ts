@@ -132,7 +132,13 @@ export async function preflightCapture(
   const descriptionsMissing: string[] = [];
   const emptyVocabColumns: string[] = [];
 
-  for (const name of input.columnNames) {
+  // No names = every writable column (round 2, 2026-09-21: `columns: []`
+  // failed a `.min(1)` and cost a step). An auto-selected column that cannot
+  // be captured is simply skipped; a NAMED one that cannot is still refused,
+  // because the model asked for it by name and should hear why.
+  const autoSelected = input.columnNames.length === 0;
+  const requested = autoSelected ? live.map((c) => c.name) : input.columnNames;
+  for (const name of requested) {
     const column = findColumn(live, name);
     if (!column) {
       return refuse(
@@ -150,6 +156,7 @@ export async function preflightCapture(
         ? `${column.name} is a relation — a capture run cannot fill links. Capture the target's name into a text column, or link the rows afterwards with update_row.`
         : writeBlockReason(column);
     if (blocked) {
+      if (autoSelected) continue;
       return refuse(
         `${blocked} Remove "${column.name}" from captureTo and re-propose.`,
       );
@@ -171,6 +178,11 @@ export async function preflightCapture(
       }
     }
     if (!column.description) descriptionsMissing.push(column.name);
+  }
+  if (resolved.length === 0) {
+    return refuse(
+      `"${table.title}" has no column a capture run can write (every column is a relation or otherwise blocked). Add a text/url/number column to it, or capture elsewhere, and re-propose.`,
+    );
   }
 
   // Dedupe column: explicit name, else the first url column on the table.

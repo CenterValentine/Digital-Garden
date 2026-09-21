@@ -2736,6 +2736,10 @@ export async function POST(request: Request) {
                   : null,
               tools: (step.toolCalls ?? []).map((call) => call.toolName),
               outputTokens: stepUsage?.outputTokens ?? null,
+              // Per-step context (not the segment sum) — the number the
+              // chat meter's step chain shows. See TurnStepSummary.
+              inputTokens: stepUsage?.inputTokens ?? null,
+              cachedInputTokens: stepUsage?.cachedInputTokens ?? null,
             });
           } else {
             stepsTracker.truncated += 1;

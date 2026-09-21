@@ -38,6 +38,7 @@ import {
   duplicatePartStates,
   findDistillationPoint,
   perceptionFoldStates,
+  supersedeBulkReads,
   supersedePerceptionHistory,
   supersedeWriteInputs,
   writeInputFoldStates,
@@ -169,6 +170,35 @@ const isStub = (v: unknown, word: string): boolean =>
     "G2: the turn stub names the tool so the model knows what to re-call",
   );
 
+  // The turn stub KEEPS the header — title, type, the column list — so a
+  // later step that needs column names does not re-read (round 2: turn 2
+  // re-read both ledgers because the stub said "call the tool again").
+  const dbRead =
+    "Title: Job Opportunities Library\nType: database\nUpdated: 2026-09-18T20:47:04.860Z\n\n# Job Opportunities Library (database, inline) [id: 49746038]\nA curated pipeline of openings.\nSize: tens of rows\n\nColumns:\n- Location (text) — The stated geographic location.\n- Posting URL (url) — The directly observed URL; the dedupe key.\n- Role Title (text) — As posted.\n\n" +
+    big("rows", 900);
+  const withHeader = [
+    user(),
+    assistant([tool("read_content", { output: dbRead })]),
+    user("next"),
+    assistant([]),
+  ];
+  const stubbed = outputOf(supersedePerceptionHistory(withHeader)[1], 0);
+  assert(
+    isStub(stubbed, "folded") && isStub(stubbed, "Type: database") && isStub(stubbed, "- Posting URL (url)") && isStub(stubbed, "- Role Title (text)"),
+    "G2: a folded database read keeps its Columns block (names AND types) in the stub",
+  );
+  assert(
+    !isStub(stubbed, "A curated pipeline") && !isStub(stubbed, "rows:"),
+    "G2: the stub drops the prose and the row body",
+  );
+  assert(
+    typeof stubbed === "string" && stubbed.length < 700,
+    `G2: the retained header stays small (got ${typeof stubbed === "string" ? stubbed.length : "?"} chars)`,
+  );
+  const noteRead = "Title: My note\nType: note\nUpdated: 2026-09-18\n\n" + big("body", 900);
+  const noteStub = outputOf(supersedePerceptionHistory([user(), assistant([tool("read_content", { output: noteRead })]), user("n"), assistant([])])[1], 0);
+  assert(isStub(noteStub, "Title: My note") && !isStub(noteStub, "body:"), "G2: a folded note read keeps its title lines only");
+
   // read_content never folds by DISTILLATION — a charter read is not raw perception.
   const readBeforeCheckpoint = [
     user(),
@@ -270,6 +300,27 @@ const isStub = (v: unknown, word: string): boolean =>
     JSON.stringify(twice) === JSON.stringify(once),
     "G4: applying the transforms twice must equal applying them once (cache stability)",
   );
+}
+
+// ── Gate 2b: a folded bulk read keeps its column header ─────────────────────
+
+{
+  const queryOut =
+    'query_database "Quest Ledger" · 32 of 32 rows · 4 columns · ~2.2k tokens · lifetime: turn\n' +
+    "id\tItem\tStatus\tFit\n" +
+    Array.from({ length: 30 }, (_, i) => `r${i}\tJob ${i}\tdone\t${50 + i}`).join("\n");
+  const msgs = [
+    user(),
+    assistant([tool("query_database", { output: queryOut })]),
+    user("next"),
+    assistant([]),
+  ];
+  const folded = outputOf(supersedeBulkReads(msgs)[1], 0);
+  assert(
+    isStub(folded, "superseded") && isStub(folded, "columns: id · Item · Status · Fit"),
+    "G2b: a folded query_database result keeps its column header line",
+  );
+  assert(!isStub(folded, "Job 7"), "G2b: the rows themselves are gone");
 }
 
 // ── Gate 6: write inputs are superseded by their writes (PR B1) ─────────────

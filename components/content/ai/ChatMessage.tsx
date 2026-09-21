@@ -114,6 +114,10 @@ import {
   type DuplicatePartState,
   type PerceptionFoldState,
 } from "@/lib/domain/ai/context-diet";
+import {
+  readTurnSegment,
+  type TurnStepSummary,
+} from "@/lib/domain/ai/turn-diagnostics";
 import { parseReadHeader } from "@/lib/domain/data/read-format";
 
 /** "~32 tokens" under a thousand, "~6.1k tokens" above (chips, cards). */
@@ -2432,6 +2436,90 @@ function extractCostDisplay(
       : undefined;
 }
 
+/**
+ * The turn's steps across every request, in order, from the persisted
+ * segment ledger — the ONLY source the step chain renders from. No live
+ * estimate, no client-side count: a number in the chain is a number the
+ * provider billed (`metadata.segments[].steps[].inputTokens`). Rows
+ * persisted before per-step context existed carry `inputTokens: null` and
+ * render without a context figure rather than with a guess.
+ */
+type StepChainRow = TurnStepSummary & { request: number };
+
+function extractStepChain(
+  metadata: Record<string, unknown> | undefined,
+): StepChainRow[] {
+  const segments = (metadata as { segments?: unknown } | undefined)?.segments;
+  if (!Array.isArray(segments)) return [];
+  const rows: StepChainRow[] = [];
+  segments.forEach((raw, i) => {
+    const seg = readTurnSegment(raw);
+    if (!seg) return;
+    for (const step of seg.steps) rows.push({ ...step, request: i + 1 });
+  });
+  return rows;
+}
+
+/** Compact token figure for the chain: 48,512 → "48.5k". */
+function formatTokensShort(n: number): string {
+  return n >= 1000 ? `${(n / 1000).toFixed(n >= 10_000 ? 0 : 1)}k` : String(n);
+}
+
+/**
+ * The expandable step chain. Each row: request·step, the tools it called,
+ * the context it read, what it wrote, its cache hit — and a fold marker
+ * whenever the context is SMALLER than the previous step's, so a drop in
+ * the meter is legible as the fold working rather than as a glitch.
+ */
+function StepChain({ steps }: { steps: StepChainRow[] }) {
+  return (
+    <div className="mt-1 max-h-56 overflow-auto border-t border-black/10 dark:border-white/10 pt-1">
+      <div className="mb-0.5 text-[9px] uppercase tracking-wide text-gray-400 dark:text-gray-500">
+        steps · context read per step
+      </div>
+      {steps.map((s, i) => {
+        const prev = i > 0 ? steps[i - 1].inputTokens : null;
+        const folded =
+          s.inputTokens != null && prev != null && s.inputTokens < prev
+            ? prev - s.inputTokens
+            : null;
+        const cachePct =
+          s.inputTokens != null && s.inputTokens > 0 && s.cachedInputTokens != null
+            ? Math.round((100 * s.cachedInputTokens) / s.inputTokens)
+            : null;
+        return (
+          <div
+            key={i}
+            className="flex items-baseline gap-1.5 whitespace-nowrap py-px text-[10px] leading-snug"
+          >
+            <span className="w-8 shrink-0 tabular-nums text-gray-400 dark:text-gray-500">
+              {s.request}.{i + 1}
+            </span>
+            <span className="min-w-0 flex-1 truncate text-gray-600 dark:text-gray-300">
+              {s.tools.length > 0 ? s.tools.join(", ") : s.finishReason === "stop" ? "reply" : "—"}
+            </span>
+            <span className="shrink-0 tabular-nums text-gray-700 dark:text-gray-200">
+              {s.inputTokens != null ? formatTokensShort(s.inputTokens) : "·"}
+            </span>
+            <span className="w-9 shrink-0 text-right tabular-nums text-gray-400 dark:text-gray-500">
+              {s.outputTokens != null ? `+${formatTokensShort(s.outputTokens)}` : ""}
+            </span>
+            <span className="w-8 shrink-0 text-right tabular-nums text-gray-400 dark:text-gray-500">
+              {cachePct != null ? `${cachePct}%` : ""}
+            </span>
+            <span className="w-12 shrink-0 text-right tabular-nums text-emerald-600 dark:text-emerald-400">
+              {folded != null ? `−${formatTokensShort(folded)}` : ""}
+            </span>
+          </div>
+        );
+      })}
+      <div className="mt-0.5 text-[9px] text-gray-400 dark:text-gray-500">
+        context · +output · cache hit · folded
+      </div>
+    </div>
+  );
+}
+
 /** Human duration: "0.8s", "12s", "1m 05s". */
 function formatDuration(ms: number): string {
   const totalSec = ms / 1000;
@@ -2472,6 +2560,17 @@ function AssistantAvatar({
   const tooltipRef = useRef<HTMLDivElement | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [portalReady, setPortalReady] = useState(false);
+  // Click pins the card open with the step chain expanded (owner design,
+  // 2026-09-21): hover is a glance — provider, model, the headline numbers
+  // and a one-line hint; click is the inspection surface. While pinned the
+  // card ignores mouse-leave and closes on a second click or Escape.
+  const [pinned, setPinned] = useState(false);
+  // Mirrored into a ref for the mouse-leave handler (stable identity, reads
+  // the latest value) — written in an effect, never during render.
+  const pinnedRef = useRef(false);
+  useEffect(() => {
+    pinnedRef.current = pinned;
+  }, [pinned]);
 
   const theme = getProviderTheme(providerId, useResolvedTheme());
   const provider = PROVIDER_CATALOG.find((p) => p.id === providerId);
@@ -2484,6 +2583,26 @@ function AssistantAvatar({
     () => extractCostDisplay(metadata, providerId, modelId),
     [metadata, providerId, modelId],
   );
+  const steps = useMemo(() => extractStepChain(metadata), [metadata]);
+  // The headline: the LATEST step's context — what the model read on its
+  // last call — never the segment sum (a two-step request reports 2× the
+  // context) and never the turn total (which only ever grows).
+  const latestContext = useMemo(() => {
+    for (let i = steps.length - 1; i >= 0; i--) {
+      const v = steps[i].inputTokens;
+      if (v != null) return v;
+    }
+    return null;
+  }, [steps]);
+
+  useEffect(() => {
+    if (!pinned) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setPinned(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [pinned]);
 
   useEffect(() => {
     // One-shot SSR/hydration boundary marker so we only render the
@@ -2514,8 +2633,25 @@ function AssistantAvatar({
 
   const handleLeave = useCallback(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
+    if (pinnedRef.current) return;
     setTooltipAnchor(null);
     setTooltipPosition(null);
+  }, []);
+
+  const handleClick = useCallback(() => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    if (pinnedRef.current) {
+      setPinned(false);
+      setTooltipAnchor(null);
+      setTooltipPosition(null);
+      return;
+    }
+    const rect = anchorRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    setPinned(true);
+    // Re-anchor so the positioning pass re-measures the (taller) pinned card.
+    setTooltipPosition(null);
+    setTooltipAnchor({ top: rect.top, bottom: rect.bottom, left: rect.left });
   }, []);
 
   // Two-phase measure-then-position, the same shape ContextMenu uses
@@ -2575,9 +2711,15 @@ function AssistantAvatar({
       className="shrink-0"
       onMouseEnter={handleEnter}
       onMouseLeave={handleLeave}
+      onClick={handleClick}
+      role="button"
+      tabIndex={0}
+      aria-expanded={pinned}
+      aria-label="Turn usage — click for the step chain"
+      title={pinned ? undefined : "click for steps"}
     >
       <div
-        className="flex h-7 w-7 items-center justify-center rounded-full"
+        className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-full"
         style={{
           background: theme.bubbleTint,
           color: theme.brandColor,
@@ -2606,7 +2748,7 @@ function AssistantAvatar({
                     visibility: "hidden" as const,
                   }),
             }}
-            className="pointer-events-none whitespace-nowrap rounded-md border border-black/10 bg-white text-gray-700 dark:border-white/10 dark:bg-[#1a1a1a] dark:text-gray-200 px-2.5 py-1.5 text-[10px] shadow-xl"
+            className={`${pinned ? "pointer-events-auto min-w-[20rem]" : "pointer-events-none"} whitespace-nowrap rounded-md border border-black/10 bg-white text-gray-700 dark:border-white/10 dark:bg-[#1a1a1a] dark:text-gray-200 px-2.5 py-1.5 text-[10px] shadow-xl`}
           >
             <div className="flex items-center gap-1.5">
               <span
@@ -2618,6 +2760,21 @@ function AssistantAvatar({
             {modelName && (
               <div className="mt-0.5 text-gray-500 dark:text-gray-400">
                 {modelName}
+              </div>
+            )}
+            {/* Headline: the latest step's CONTEXT — what the model last
+                read — from the persisted step ledger. The turn total below
+                stays for cost; this is the number to watch for leanness. */}
+            {latestContext != null && (
+              <div className="mt-1 border-t border-black/10 dark:border-white/10 pt-1 text-gray-500">
+                <span className="text-gray-500">context</span>{" "}
+                <span className="tabular-nums text-gray-700 dark:text-gray-300">
+                  {latestContext.toLocaleString()}
+                </span>
+                <span className="text-gray-400 dark:text-gray-500">
+                  {" "}
+                  · latest step{steps.length > 1 ? ` of ${steps.length}` : ""}
+                </span>
               </div>
             )}
             {usage && (usage.inputTokens != null || usage.outputTokens != null) && (
@@ -2717,6 +2874,18 @@ function AssistantAvatar({
                     )}
                   </span>
                 )}
+              </div>
+            )}
+            {/* Hover: a one-line hint that there is more. Click: the chain. */}
+            {steps.length > 0 && !pinned && (
+              <div className="mt-1 border-t border-black/10 dark:border-white/10 pt-1 text-gray-400 dark:text-gray-500">
+                click for steps ({steps.length})
+              </div>
+            )}
+            {pinned && steps.length > 0 && <StepChain steps={steps} />}
+            {pinned && (
+              <div className="mt-1 text-[9px] text-gray-400 dark:text-gray-500">
+                click the avatar or press Esc to close
               </div>
             )}
           </div>,
@@ -3408,9 +3577,15 @@ function ApprovalPreviewRest({
   // renders first-class (database chip + admission rule), never buried in
   // raw JSON while the generic fields show.
   if (toolName === "propose_item_iteration") {
+    // The schema accepts a bare string as an item's label (registry: "a
+    // 20-item enumeration was rejected wholesale for being strings"), so the
+    // card must read strings too — prod 2026-09-21 rendered 24 real job
+    // titles as the word "item" because only objects were expected here.
     const items = Array.isArray(a.items)
-      ? (a.items as Array<{ label?: string; url?: string }>)
+      ? (a.items as Array<string | { label?: string; url?: string; title?: string; href?: string }>)
       : [];
+    const itemText = (it: (typeof items)[number]): string =>
+      typeof it === "string" ? it : (it.label ?? it.title ?? it.url ?? it.href ?? "item");
     const capture = (
       typeof a.captureTo === "object" && a.captureTo !== null
         ? a.captureTo
@@ -3483,7 +3658,7 @@ function ApprovalPreviewRest({
                   {idx + 1}.
                 </span>
                 <span className="truncate text-gray-700 dark:text-gray-200">
-                  {it.label ?? it.url ?? "item"}
+                  {itemText(it)}
                 </span>
               </div>
             ))}

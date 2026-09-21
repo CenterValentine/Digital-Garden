@@ -71,6 +71,15 @@ export interface TurnStepSummary {
   finishReason: string | null;
   tools: string[];
   outputTokens: number | null;
+  /**
+   * The context this step was billed for — what the model actually read.
+   * Recorded per step (AI-CONTEXT-ECONOMICS round 2, 2026-09-21) because
+   * the segment's `usage.inputTokens` SUMS its steps: a two-step request
+   * reported 97k while each step read ~48k, and the chat meter showed the
+   * sum as if it were the context. Null on rows persisted before this field.
+   */
+  inputTokens: number | null;
+  cachedInputTokens: number | null;
 }
 
 export interface TurnSegmentUsage {
@@ -316,6 +325,8 @@ export function readTurnSegment(raw: unknown): TurnSegment | null {
               ? st.tools.filter((t): t is string => typeof t === "string")
               : [],
             outputTokens: numOrNull(st.outputTokens),
+            inputTokens: numOrNull(st.inputTokens),
+            cachedInputTokens: numOrNull(st.cachedInputTokens),
           },
         ];
       })
