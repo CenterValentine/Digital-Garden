@@ -553,6 +553,25 @@ export function ChatInput({
     [],
   );
 
+  // Copy/cut put the canonical `@[Title](id)` on the clipboard so a mention
+  // survives the round trip (see selectionToCanonical). Cut then deletes the
+  // selection through the browser and re-serializes via handleInput.
+  const handleCopyOrCut = useCallback(
+    (e: React.ClipboardEvent<HTMLDivElement>) => {
+      const root = editorRef.current;
+      if (!root) return;
+      const canonical = selectionToCanonical(root);
+      if (canonical == null) return;
+      e.clipboardData.setData("text/plain", canonical);
+      e.preventDefault();
+      if (e.type === "cut") {
+        document.execCommand("delete");
+        handleInput();
+      }
+    },
+    [handleInput],
+  );
+
   const handlePaste = useCallback(
     (e: React.ClipboardEvent<HTMLDivElement>) => {
       // OS-file paste → attachment intake.
@@ -714,28 +733,45 @@ export function ChatInput({
         {(activeCharter || activeQuest) && (
           <div className="flex flex-wrap gap-1.5 px-2.5 pt-2.5">
             {activeQuest && (
-              <button
-                type="button"
-                onClick={() =>
-                  activeQuest.ledgerNodeId
-                    ? onOpenQuestLedger?.(activeQuest.ledgerNodeId)
-                    : undefined
-                }
-                disabled={!activeQuest.ledgerNodeId}
-                title={
-                  activeQuest.ledgerNodeId
-                    ? `Open the ${activeQuest.title} ledger`
-                    : activeQuest.title
-                }
-                className="inline-flex items-center gap-1.5 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-[11px] text-emerald-700 transition-colors enabled:hover:bg-emerald-500/20 dark:text-emerald-300"
-              >
-                <ListChecks className="h-3 w-3 shrink-0" />
-                <span className="truncate max-w-[160px]">{activeQuest.title}</span>
-                <span className="text-emerald-600/70 dark:text-emerald-400/70">
-                  · {activeQuest.itemsRecorded}{" "}
-                  {activeQuest.itemsRecorded === 1 ? "item" : "items"}
-                </span>
-              </button>
+              // The pin opens the quest's ROW database (owner, 2026-09-22 —
+              // it used to open the long log note); the log stays one
+              // click away on its own small affordance.
+              <span className="inline-flex items-stretch rounded-md border border-emerald-500/30 bg-emerald-500/10 text-[11px] text-emerald-700 dark:text-emerald-300">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const target = activeQuest.questLedgerNodeId ?? activeQuest.ledgerNodeId;
+                    if (target) onOpenQuestLedger?.(target);
+                  }}
+                  disabled={!activeQuest.questLedgerNodeId && !activeQuest.ledgerNodeId}
+                  title={
+                    activeQuest.questLedgerNodeId
+                      ? `Open the ${activeQuest.title} quest ledger (rows)`
+                      : activeQuest.ledgerNodeId
+                        ? `Open the ${activeQuest.title} quest log`
+                        : activeQuest.title
+                  }
+                  className="inline-flex items-center gap-1.5 rounded-l-md px-2 py-1 transition-colors enabled:hover:bg-emerald-500/20"
+                >
+                  <ListChecks className="h-3 w-3 shrink-0" />
+                  <span className="truncate max-w-[160px]">{activeQuest.title}</span>
+                  <span className="text-emerald-600/70 dark:text-emerald-400/70">
+                    · {activeQuest.itemsRecorded}{" "}
+                    {activeQuest.itemsRecorded === 1 ? "item" : "items"}
+                  </span>
+                </button>
+                {activeQuest.questLedgerNodeId && activeQuest.ledgerNodeId && (
+                  <button
+                    type="button"
+                    onClick={() => onOpenQuestLedger?.(activeQuest.ledgerNodeId!)}
+                    title={`Open the ${activeQuest.title} quest log (narrative)`}
+                    aria-label="Open the quest log"
+                    className="inline-flex items-center rounded-r-md border-l border-emerald-500/30 px-1.5 text-emerald-600/70 transition-colors hover:bg-emerald-500/20 dark:text-emerald-400/70"
+                  >
+                    log
+                  </button>
+                )}
+              </span>
             )}
             {activeCharter && (
             <span className="inline-flex items-center gap-1.5 rounded-md border border-indigo-500/30 bg-indigo-500/10 px-2 py-1 text-[11px] text-indigo-700 dark:text-indigo-300">
@@ -798,6 +834,8 @@ export function ChatInput({
           onInput={handleInput}
           onKeyDown={handleKeyDown}
           onPaste={handlePaste}
+          onCopy={handleCopyOrCut}
+          onCut={handleCopyOrCut}
           onClick={handleEditorClick}
           data-placeholder={placeholder}
           className={cn(
@@ -887,6 +925,26 @@ export function ChatInput({
 }
 
 // ───────────────────────── DOM helpers ─────────────────────────
+
+/**
+ * Copy/cut the SELECTION as canonical text (owner, 2026-09-22): the browser
+ * copies a pill's visible label, so pasting a copied mention gave back the
+ * file name and lost the reference. Serializing the selected fragment with
+ * the same walker the submit path uses puts `@[Title](id)` on the clipboard,
+ * and the paste handler already revives that form as a pill — so a mention
+ * now round-trips within the composer, across chats, and across tabs.
+ * Plain text only; the fragment is serialized, never the whole editor.
+ */
+export function selectionToCanonical(root: HTMLElement): string | null {
+  const selection = typeof window !== "undefined" ? window.getSelection() : null;
+  if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return null;
+  const range = selection.getRangeAt(0);
+  if (!root.contains(range.commonAncestorContainer)) return null;
+  const fragment = range.cloneContents();
+  const holder = document.createElement("div");
+  holder.appendChild(fragment);
+  return serializeDom(holder);
+}
 
 /** Walk the editor root and produce the canonical `@[Title](id)` string. */
 function serializeDom(root: HTMLElement): string {

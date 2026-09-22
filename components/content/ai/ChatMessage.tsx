@@ -1136,6 +1136,12 @@ export const ChatMessage = memo(function ChatMessage({
         "group flex gap-3 px-4 py-3",
         isUser && "flex-row-reverse"
       )}
+      onCopy={(e) => {
+        const text = serializeSelectionForCopy(e.currentTarget);
+        if (text == null) return;
+        e.clipboardData.setData("text/plain", text);
+        e.preventDefault();
+      }}
     >
       {/* Avatar */}
       {isUser ? (
@@ -1969,12 +1975,107 @@ function MessageActionButton({
 
 const MENTION_PATTERN = /@\[([^\]]+)\]\(([^)]+)\)/g;
 
+/**
+ * `[[Title]]` / `[[Title|Display]]` as the model writes it — copied from the
+ * run ledger's wiki-link convention, where nothing in chat rendered it
+ * (owner, 2026-09-22: the closing summary showed literal brackets). Resolved
+ * by TITLE on click, since the model has no id when it writes this form.
+ */
+const WIKI_LINK_PATTERN = /\[\[([^\]|]+?)(?:\|([^\]]+?))?\]\]/g;
+
 /** Pre-process @[Title](id) mentions into markdown-safe placeholders */
 function preprocessMentions(text: string): string {
-  return text.replace(
-    MENTION_PATTERN,
-    (_, title, id) => `[@@${title}](mention:${id})`
+  return text
+    .replace(MENTION_PATTERN, (_, title, id) => `[@@${title}](mention:${id})`)
+    .replace(
+      WIKI_LINK_PATTERN,
+      (_, title: string, display?: string) =>
+        `[@@${(display ?? title).trim()}](wiki:${encodeURIComponent(title.trim())})`,
+    );
+}
+
+/**
+ * A `[[Title]]` pill: looks like a mention, resolves on click by searching
+ * the user's content for that exact title (case-insensitive), preferring a
+ * database when several match — the model writes these for ledgers.
+ */
+function WikiPill({ title }: { title: string }) {
+  const [busy, setBusy] = useState(false);
+  const open = useCallback(async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const res = await fetch(
+        `/api/content/search?query=${encodeURIComponent(title)}&caseSensitive=false`,
+        { credentials: "include" },
+      );
+      const body = (await res.json()) as {
+        data?: { items?: Array<{ id: string; title: string; contentType?: string }> };
+      };
+      const items = body.data?.items ?? [];
+      const wanted = title.trim().toLowerCase();
+      const exact = items.filter((i) => i.title.trim().toLowerCase() === wanted);
+      const pick =
+        exact.find((i) => i.contentType === "data") ?? exact[0] ?? items[0] ?? null;
+      if (pick) useContentStore.getState().setSelectedContentId(pick.id);
+      else toast.error(`No content titled "${title}"`);
+    } catch {
+      toast.error(`Could not look up "${title}"`);
+    } finally {
+      setBusy(false);
+    }
+  }, [busy, title]);
+  return (
+    <button
+      type="button"
+      onClick={() => void open()}
+      data-mention="true"
+      data-label={title}
+      data-wiki="true"
+      title={`Open "${title}"`}
+      className="inline-flex items-center gap-0.5 rounded bg-blue-500/15 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300 px-1.5 py-0.5 text-xs font-medium hover:bg-blue-500/25 dark:hover:bg-blue-500/30 transition-colors cursor-pointer disabled:opacity-60"
+      disabled={busy}
+    >
+      {title}
+    </button>
   );
+}
+
+/**
+ * Copy from a message bubble keeps mentions as `@[Title](id)` — the same
+ * canonical form the composer pastes back into a pill (owner, 2026-09-22).
+ * A `[[wiki]]` pill has no id and copies as `[[Title]]`.
+ */
+function serializeSelectionForCopy(root: HTMLElement): string | null {
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return null;
+  const range = selection.getRangeAt(0);
+  if (!root.contains(range.commonAncestorContainer)) return null;
+  const holder = document.createElement("div");
+  holder.appendChild(range.cloneContents());
+  let out = "";
+  const walk = (node: Node) => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      out += node.nodeValue ?? "";
+      return;
+    }
+    if (node.nodeType !== Node.ELEMENT_NODE) return;
+    const el = node as HTMLElement;
+    if (el.dataset.mention) {
+      const label = el.dataset.label ?? el.textContent ?? "";
+      out += el.dataset.wiki ? `[[${label}]]` : `@[${label}](${el.dataset.id ?? ""})`;
+      return;
+    }
+    if (el.tagName === "BR") {
+      out += "\n";
+      return;
+    }
+    const block = /^(P|DIV|LI|H[1-6]|PRE|TR)$/.test(el.tagName);
+    for (const child of Array.from(el.childNodes)) walk(child);
+    if (block && !out.endsWith("\n")) out += "\n";
+  };
+  for (const child of Array.from(holder.childNodes)) walk(child);
+  return out.replace(/\n+$/, "");
 }
 
 /**
@@ -2144,6 +2245,10 @@ const themeNeutralMarkdownComponents: Components = {
       const contentId = href.slice(8);
       const title = String(children ?? "").replace(/^@@/, "");
       return <MentionPill title={title} contentId={contentId} />;
+    }
+    if (href?.startsWith("wiki:")) {
+      const title = decodeURIComponent(href.slice(5));
+      return <WikiPill title={title} />;
     }
     return (
       <a
@@ -2449,10 +2554,19 @@ type StepChainRow = TurnStepSummary & { request: number };
 function extractStepChain(
   metadata: Record<string, unknown> | undefined,
 ): StepChainRow[] {
-  const segments = (metadata as { segments?: unknown } | undefined)?.segments;
-  if (!Array.isArray(segments)) return [];
+  const m = metadata as { segments?: unknown; segment?: unknown } | undefined;
+  // A LIVE message carries this request's record as `segment` (singular,
+  // from the route's finish part); the accumulated `segments[]` exists once
+  // the binding hook has folded the turn. Read both — the persisted list
+  // first, then the live record if it is not already in it — so the chain
+  // opens during the turn, not only after a reload (owner, 2026-09-22).
+  const list: unknown[] = Array.isArray(m?.segments) ? [...m.segments] : [];
+  const live = readTurnSegment(m?.segment);
+  if (live && !list.some((raw) => readTurnSegment(raw)?.startedAt === live.startedAt)) {
+    list.push(m?.segment);
+  }
   const rows: StepChainRow[] = [];
-  segments.forEach((raw, i) => {
+  list.forEach((raw, i) => {
     const seg = readTurnSegment(raw);
     if (!seg) return;
     for (const step of seg.steps) rows.push({ ...step, request: i + 1 });
@@ -2903,6 +3017,11 @@ function MentionPill({ title, contentId }: { title: string; contentId: string })
       onClick={() => {
         useContentStore.getState().setSelectedContentId(contentId);
       }}
+      // Same data contract as the composer's pills, so a copy from a bubble
+      // serializes to `@[Title](id)` (serializeSelectionForCopy).
+      data-mention="true"
+      data-label={title}
+      data-id={contentId}
       className="inline-flex items-center gap-0.5 rounded bg-blue-500/15 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300 px-1.5 py-0.5 text-xs font-medium hover:bg-blue-500/25 dark:hover:bg-blue-500/30 transition-colors cursor-pointer"
     >
       @{title}

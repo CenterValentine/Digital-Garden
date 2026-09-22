@@ -544,6 +544,29 @@ export function useConversationBinding({
               Array.isArray(effectiveParts) ? effectiveParts : [],
             )
           : requestMetadata;
+      // Write the FOLDED metadata back into message state so the avatar
+      // meter's step chain grows during the turn (owner, 2026-09-22): the
+      // SDK deep-merges each request's `segment` over the last, so without
+      // this the accumulated `segments[]` exists only in the DB row until a
+      // reload. Guarded on a real change so persist → setMessages cannot
+      // loop (the parts signature above already dedupes the persist).
+      if (m.role === "assistant" && turnMetadata) {
+        const merged = turnMetadata as { segments?: unknown[] };
+        const current = requestMetadata as { segments?: unknown[] } | undefined;
+        if (
+          Array.isArray(merged.segments) &&
+          merged.segments.length > (current?.segments?.length ?? 0)
+        ) {
+          const id = m.id;
+          type Msg = { id: string; metadata?: unknown };
+          (setMessages as (updater: (prev: Msg[]) => Msg[]) => void)(
+            (prev) =>
+              prev.map((msg) =>
+                msg.id === id ? { ...msg, metadata: turnMetadata } : msg,
+              ),
+          );
+        }
+      }
       if (savedIdsRef.current.has(m.id)) {
         // Continuation persistence (S4): an approval resume EXTENDS a
         // saved assistant message (resolved approval state + new parts).
@@ -668,7 +691,7 @@ export function useConversationBinding({
         }
       })();
     }
-  }, [conversationId, messages, getMessageStamp, providerId, modelId, onTitleChanged, pendingUserPartsRef]);
+  }, [conversationId, messages, getMessageStamp, providerId, modelId, onTitleChanged, pendingUserPartsRef, setMessages]);
 
   // Only claim the engine's persist ref when actually bound to a
   // conversation. In transient/unbound mode the caller (e.g. ChatViewer
