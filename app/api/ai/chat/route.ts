@@ -82,7 +82,14 @@ import {
   supersedeBulkReads,
   supersedePerceptionHistory,
   supersedeWriteInputs,
+  teachDeniedApprovals,
 } from "@/lib/domain/ai/context-diet";
+import {
+  computeIterationStepCap,
+  reservedTailSize,
+  reservedTailTools,
+  stepsRemainingNotice,
+} from "@/lib/domain/ai/tools/iteration-proposal";
 import { DEFAULT_BULK_READ_THRESHOLD } from "@/lib/domain/ai/tools/data-tools";
 import {
   MAX_STEP_SUMMARIES,
@@ -586,6 +593,12 @@ export async function POST(request: Request) {
       // record_iteration_findings) raises the step cap so the loop has room to
       // process ALL its items in the run. Without this the default 7/8-step cap
       // ends the turn after ~1 item, even though the client item budget allows N.
+      // The approved run's declared DELIVERABLES and per-item step override
+      // ride the same proposal result as its item budget (plan §6b): the
+      // step cap is sized from them, and prepareStep reserves the turn's
+      // last steps for them.
+      let itemIterationDeliverables: string[] = [];
+      let itemIterationStepsPerItem: number | undefined;
       let itemIterationBudget = ((): number | null => {
         const msgs = (body as { messages?: unknown }).messages;
         if (!Array.isArray(msgs)) return null;
@@ -597,7 +610,12 @@ export async function POST(request: Request) {
             const p = part as {
               type?: string;
               state?: string;
-              output?: { ok?: boolean; itemBudget?: number };
+              output?: {
+                ok?: boolean;
+                itemBudget?: number;
+                deliverables?: unknown;
+                stepsPerItem?: unknown;
+              };
             };
             if (
               p.type === "tool-propose_item_iteration" &&
@@ -609,12 +627,21 @@ export async function POST(request: Request) {
               // here would silently guillotine a large run at ~item 40.
               if (p.output?.ok && typeof b === "number" && Number.isFinite(b) && b > 0) {
                 budget = Math.min(Math.floor(b), 200);
+                itemIterationDeliverables = Array.isArray(p.output.deliverables)
+                  ? p.output.deliverables.filter((d): d is string => typeof d === "string")
+                  : [];
+                itemIterationStepsPerItem =
+                  typeof p.output.stepsPerItem === "number" && Number.isFinite(p.output.stepsPerItem)
+                    ? p.output.stepsPerItem
+                    : undefined;
               }
             } else if (
               p.type === "tool-record_iteration_findings" &&
               p.state === "output-available"
             ) {
               budget = null; // run closed → back to default caps
+              itemIterationDeliverables = [];
+              itemIterationStepsPerItem = undefined;
             }
           }
         }
@@ -1328,6 +1355,8 @@ export async function POST(request: Request) {
         summaries: [] as TurnStepSummary[],
         /** Set by prepareStep when the final step was forced text-only (D1). */
         finalStepReserved: false,
+        /** Steps prepareStep narrowed to the run's deliverable tail (plan §6b). */
+        tailReservedSteps: 0,
       };
       // Playbook validation happens below, after the tool registry is built.
       // Tool closures retain this array reference, so trusted directives
@@ -1642,6 +1671,9 @@ export async function POST(request: Request) {
       //     the `store: false` option below existed.
       const resolvedMessages = resolveAttachmentsForModel(
         stripOpenAIItemReferences(
+          // A denied approval without a client reason reads as a bare
+          // "Tool execution denied." — teach instead (plan §6b.4).
+          teachDeniedApprovals(
           dedupeRepeatedToolParts(
             stripReasoningForResend(
               // Bulk database reads fold by lifetime (turn/run/chat) — plan
@@ -1653,6 +1685,7 @@ export async function POST(request: Request) {
               ),
               executedVendorId,
             ),
+          ),
           ),
         ),
         executedVendorId,
@@ -2495,9 +2528,17 @@ export async function POST(request: Request) {
       const stepsAlreadySpent = countTurnSteps(
         (body as { messages?: unknown[] }).messages ?? [],
       );
+      // Item runs: `items × (research + deliverables + record) + overhead`
+      // (iteration-proposal.ts). With no deliverables this is the old
+      // `items × 4 + 8`; a fulfilment run declaring create_docx + update_row
+      // gets 6 per item instead of 4 — the two steps its tail actually needs.
       const rawStepCap =
         itemIterationBudget != null
-          ? itemIterationBudget * 4 + 8
+          ? computeIterationStepCap({
+              itemBudget: itemIterationBudget,
+              deliverables: itemIterationDeliverables,
+              stepsPerItem: itemIterationStepsPerItem,
+            })
           : researchPageBudget != null
             ? researchPageBudget * 2 + 4
             : editableContentId
@@ -2639,7 +2680,38 @@ export async function POST(request: Request) {
           const stepActiveTools = toolsActive
             ? [...advertised, ...activated]
             : undefined;
-          if (stepNumber < stepCap - 1) return { activeTools: stepActiveTools };
+          if (stepNumber < stepCap - 1) {
+            if (itemIterationBudget == null) return { activeTools: stepActiveTools };
+            // DELIVERABLE-TAIL RESERVATION (plan §6b, prod 5e5b739d): the
+            // final-step rule generalised. The last `tail` steps of an item
+            // run keep only the run's deliverables + record + close tools
+            // callable, so research physically cannot consume them — and
+            // every step tells the model where it stands, since a budget it
+            // cannot see is a budget it cannot plan against.
+            const remaining = stepCap - stepNumber;
+            const tail = reservedTailSize(itemIterationDeliverables);
+            const inTail = remaining <= tail + 1; // +1: the text-only last step
+            const tailTools = reservedTailTools(itemIterationDeliverables);
+            const narrowed =
+              inTail && stepActiveTools
+                ? stepActiveTools.filter((t) => tailTools.includes(t))
+                : stepActiveTools;
+            if (inTail) stepsTracker.tailReservedSteps += 1;
+            return {
+              activeTools: narrowed,
+              messages: [
+                ...stepMessages,
+                {
+                  role: "user" as const,
+                  content: stepsRemainingNotice({
+                    stepNumber,
+                    stepCap,
+                    deliverables: itemIterationDeliverables,
+                  }),
+                },
+              ],
+            };
+          }
           stepsTracker.finalStepReserved = true;
           return {
             activeTools: stepActiveTools,

@@ -194,7 +194,7 @@ Two production runs after #253 deployed. No new plan doc: the designs below were
 | `@[file]` mentions paste as plain names | Copy takes a pill's `textContent`; nothing serialized the selection | Composer `copy`/`cut` serialize the selected fragment with the submit walker (`@[Title](id)`); message bubbles do the same via `data-mention` on their pills; paste already revives the form |
 | "Is the resume write path intact?" | It is: `create_docx` → file node id → `update_row` into the Library's `Resumes` file column | No change |
 
-### 6b. Held for one harness PR — reserve the deliverable tail (design settled, not built)
+### 6b. Reserve the deliverable tail — PR `feat/reserve-the-tail` (#256, built)
 
 Evidence: conversation `5e5b739d` — a one-item *fulfilment* charter (research → resume → `create_docx` → `update_row` → `record_item_result` → findings) under the *screening* cap `items × 4 + 8` = 12 steps: 17 read calls, zero writes, `finalStepReserved` forced a report. Surface-independent (PWA vs extension changes nothing; every needed tool is server-side).
 

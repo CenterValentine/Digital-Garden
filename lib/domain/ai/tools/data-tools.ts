@@ -509,6 +509,8 @@ interface RowUpdateInput {
   rowId: string;
   cells: Record<string, string | number | boolean | string[] | null>;
   expect?: Record<string, string | number | boolean | string[] | null>;
+  /** Column names whose cells MERGE (union / token-append) instead of replace. */
+  merge?: string[];
 }
 
 /**
@@ -606,6 +608,16 @@ async function applyRowUpdates(
           ? undefined
           : normalizeCellInput(column, raw);
       const write: CellWrite = { rowId, columnKey: column.key, value };
+      // Merge (owner scenario 2026-09-21): an alias/keyword column must
+      // ACCUMULATE — "GTM" + "Revenue Ops" → "GTM, Revenue Ops" — without a
+      // read step and without a second writer racing the first.
+      if (update.merge?.some((n) => n.trim().toLowerCase() === ref.trim().toLowerCase() || n.trim().toLowerCase() === column.name.toLowerCase())) {
+        if (value === undefined) {
+          errors.push(`${update.rowId}: "${column.name}" is listed in merge but its value is empty — nothing to merge.`);
+          continue;
+        }
+        write.merge = true;
+      }
       if (update.expect && ref in update.expect) {
         const rawExpect = update.expect[ref];
         write.expect = (
@@ -1404,6 +1416,12 @@ export function createDataTools(ctx: ToolExecuteContext) {
           .describe(
             "ONLY the columns to change: {columnName: newValue}. null clears the cell (user-requested blanks only). Option labels ok for select-likes; dates ISO (M/D/YYYY tolerated)."
           ),
+        merge: z
+          .array(z.string())
+          .optional()
+          .describe(
+            "Column names (from cells) to MERGE into rather than replace: a list column gains the values (union), a text/longText column gains the phrases it does not already contain (\"GTM\" + \"Revenue Ops\" → \"GTM, Revenue Ops\"). Use for alias / keyword / wording columns that accumulate across runs. No read needed; safe against another writer.",
+          ),
         expect: z.record(z.string(), z.union([
             z.string(),
             z.number(),
@@ -1421,7 +1439,7 @@ export function createDataTools(ctx: ToolExecuteContext) {
           const gate = await openForWrite(ctx, input.databaseId);
           if ("refusal" in gate) return gate.refusal;
           return await applyRowUpdates(ctx, gate.databaseId, gate.table, [
-            { rowId: input.rowId, cells: input.cells, expect: input.expect },
+            { rowId: input.rowId, cells: input.cells, expect: input.expect, merge: input.merge },
           ]);
         } catch (error) {
           logger.warn({
@@ -1460,6 +1478,10 @@ export function createDataTools(ctx: ToolExecuteContext) {
           ])).describe(
                 "ONLY the columns to change on this row: {columnName: newValue}."
               ),
+              merge: z
+                .array(z.string())
+                .optional()
+                .describe("Column names (from cells) to MERGE into rather than replace — see update_row."),
               expect: z.record(z.string(), z.union([
             z.string(),
             z.number(),

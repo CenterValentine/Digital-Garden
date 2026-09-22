@@ -140,6 +140,8 @@ Legend: ✅ shipped · 🟡 in T3 · ⏳ deferred → **AI 3.7 "resource governa
 | Definition-of-done per phase (`**Done when:**`) | Termination | 🟡 | SKILL.md format + system prompt |
 | Sub-playbook awareness in reference manifest | Decomposition | 🟡 | P4 manifest (`isPlaybookMetadata`) |
 | Enforced token/step budgets (decrement + stop) | Termination | ✅ | `route.ts` step cap, turn-scoped (PR #248) |
+| **Reserved deliverable tail + visible remaining steps** (a budget the model cannot see is one it cannot plan against; a run's writes are knowable at approval, so hold the last steps for them) | Termination / Effort | ✅ | `propose_item_iteration.deliverables` → `computeIterationStepCap` (`items × (research + tail) + overhead`); `prepareStep` narrows `activeTools` to the tail and appends a remaining-steps notice each step (`iteration-proposal.ts`, `route.ts`); gated by `proposal:shape:check` + `context:diet:check`. Evidence: prod `5e5b739d` — 12 steps, 17 reads, 0 writes |
+| **Gaps are data** (one evidence search, then a placeholder + `record_item_result.gaps[]`; never a second search, never an invented value) | Effort | ✅ | prompt run rules + `record_item_result.gaps` → ledger line |
 | Sub-agent isolation for sub-playbooks | Context | ⏳ | T4 |
 | Per-run fold (perception → stub at distillation / turn) | Context | ✅ | `context-diet.ts` `perceptionFoldStates` — **905 kB** reclaimed on the evidence thread; gate `pnpm context:diet:check` |
 | Content-addressed dedupe of tool parts | Context | ✅ | `context-diet.ts` `dedupeRepeatedToolParts` — **~543 kB**; same gate |
