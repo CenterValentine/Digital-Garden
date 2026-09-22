@@ -180,6 +180,30 @@ One sentence telling the model that folded/superseded stubs are pointers, not lo
 
 ---
 
+## 6. Round 3 (2026-09-22) — what the meter and the runs showed next
+
+Two production runs after #253 deployed. No new plan doc: the designs below were settled in conversation and this section is their home.
+
+### 6a. Run-UX affordances — PR `feat/run-ux-affordances` (built)
+
+| Owner report | Cause | Fix |
+|---|---|---|
+| Meter click "isn't launching" | The live message carries `metadata.segment` (this request, from the finish part); `segments[]` exists only after the binding hook folds the turn — so the chain was empty until reload | `extractStepChain` reads the persisted list and the live record; the binding hook writes the folded metadata back into message state after each request |
+| `[[Quest Ledger]]` shown literally | The model copies the run ledger's wiki-link style; chat rendered only `@[Title](id)` | `record_iteration_findings.next` hands the model both references in mention form with ids; the renderer treats `[[Title]]` as a title-resolving pill (search, exact title, database preferred) |
+| Quest not attaching; pin opens the long log | `deriveActiveQuest` used `ledgerNodeId` (the log NOTE); the quest DATABASE id was never emitted or associated | `propose_item_iteration` emits `questLedgerNodeId` and auto-associates the database; the pin opens the database with a `log` affordance beside it |
+| `@[file]` mentions paste as plain names | Copy takes a pill's `textContent`; nothing serialized the selection | Composer `copy`/`cut` serialize the selected fragment with the submit walker (`@[Title](id)`); message bubbles do the same via `data-mention` on their pills; paste already revives the form |
+| "Is the resume write path intact?" | It is: `create_docx` → file node id → `update_row` into the Library's `Resumes` file column | No change |
+
+### 6b. Held for one harness PR — reserve the deliverable tail (design settled, not built)
+
+Evidence: conversation `5e5b739d` — a one-item *fulfilment* charter (research → resume → `create_docx` → `update_row` → `record_item_result` → findings) under the *screening* cap `items × 4 + 8` = 12 steps: 17 read calls, zero writes, `finalStepReserved` forced a report. Surface-independent (PWA vs extension changes nothing; every needed tool is server-side).
+
+1. `propose_item_iteration.deliverables` — the write tools each item must end with; cap = `items × (researchAllowance + tail) + overhead`; `prepareStep` narrows `activeTools` to the deliverables when remaining steps equal the tail (the `finalStepReserved` mechanism generalised).
+2. A remaining-steps line appended per step ("Steps: 5 of 12 remaining · 4 reserved for …"), at the end of the messages so the prefix cache stays warm.
+3. Gaps are data: a fact not found after ONE evidence search becomes a placeholder in the artifact and `record_item_result.gaps[]`; never a second search.
+4. A denied read approval returns as a result ("read denied; use a smaller budget / narrower columns") instead of ending the turn.
+5. `merge` mode for cell writes (`update_row` / `update_rows` / `capture.cells`): union for list columns, delimiter-append with token dedupe for text — computed at commit, so alias-style columns accumulate across runs without a read step or a race.
+
 ## 5. Principles → AGENTIC-RESOURCE-DISCIPLINE §1b (draft text)
 
 9. **Pay for a page once.** A perception result is paid for when it is first read; every later appearance must be a pointer. Fold on distillation (a checkpoint, a findings record, a reply) — never on run state.

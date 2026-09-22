@@ -1078,6 +1078,17 @@ export function createBaseTools(ctx: ToolExecuteContext) {
                 ledgerNodeId,
                 "tool-call",
               ).catch(() => null);
+              // The quest's row database attaches too — it is where the
+              // items land, and a later turn's reads reach it without a
+              // summon (owner, 2026-09-22: "that is what I want attaching").
+              if (questInfo) {
+                void addAutoAssociation(
+                  ctx.userId,
+                  ctx.conversationId,
+                  questInfo.questLedgerId,
+                  "tool-call",
+                ).catch(() => null);
+              }
             }
           } catch {
             // Ledger is best-effort — the run can still proceed without it.
@@ -1094,6 +1105,11 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           items: normalized,
           ...(questInfo
             ? {
+                // The quest's ROW database — the thing the user means by
+                // "the quest" (owner, 2026-09-22: the pin opened the long
+                // log note; the database never attached). The client pins
+                // and auto-associates from this id.
+                questLedgerNodeId: questInfo.questLedgerId,
                 quest: {
                   label: questInfo.questLabel,
                   continued: questContinued,
@@ -1752,7 +1768,11 @@ export function createBaseTools(ctx: ToolExecuteContext) {
                   // the roll-up note and never mentioned where the ROWS
                   // live — users went looking for "the database" and found
                   // only notes. Name the ledger.
-                  next: `In your closing summary, tell the user the item rows live in the "${questState.questLabel} — Quest Ledger" database (every item, one row each) and the narrative lives in the quest log note — do NOT create any additional note.`,
+                  // Mention syntax, ids included (owner, 2026-09-22): the
+                  // model had been copying the ledger's [[wiki-link]] style
+                  // into chat, where nothing renders it. @[Title](id) is
+                  // the chat's pill, so hand it the exact string to use.
+                  next: `In your closing summary, tell the user the item rows live in @[${questState.questLabel} — Quest Ledger](${questState.questLedgerId}) (every item, one row each) and the narrative lives in the quest log note @[${questState.questLabel} — Quest Log](${ledger.contentNodeId}) — write those two references exactly as given (they render as links) and do NOT create any additional note.`,
                 }
               : {}),
           };
