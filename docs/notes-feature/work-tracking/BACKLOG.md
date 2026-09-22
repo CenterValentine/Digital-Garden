@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-09-18
+last_updated: 2026-09-21
 ---
 
 # Sprint Backlog
@@ -9,6 +9,13 @@ last_updated: 2026-09-18
 **Sprint Execution Protocol**: Before commencing any sprint, always ask the user for input before planning and executing — there may be additions or modifications.
 
 ---
+
+## Move tab to workplace / workbench — follow-ups (2026-09-21, from `feat/move-tab-to-workspace`)
+
+- [ ] **`service.ts` is unreachable from `tsx` scripts.** The workplaces service imports `generateSlug` from the content barrel, which loads the TipTap server extensions, and `@tiptap/extension-code-block-lowlight`'s CJS build fails default-export interop against the nested code-block package under plain Node. `workspace-tab-move-smoke.ts` therefore covers `membership.ts` only; the `getWorkspace` tabs include + `contentMeta` naming of membership-only ids is typecheck- and browser-covered. Either import `generateSlug` from its own module in `service.ts` or give the barrel a Prisma-free, editor-free slug entry point.
+- [ ] **Move into a deeper-layer workbench folder before it exists.** The tab menu fetches each view workplace's root-layer folder list; folders at nesting depth 2–3 are destinations only once materialized (they then come from the store). The selector's scoped-tree fetch (`/api/content/content/tree?viewRootContentId=`) answers every layer in one call if deeper unmaterialized moves are wanted.
+- [ ] **Multi-tab move.** The menu moves the right-clicked tab only. A "Move N selected tabs" needs a tab-strip multi-selection that does not exist yet.
+- [ ] **Extension side-panel closes never reach membership (pre-existing).** `closeWorkspaceTab` (`DELETE /tabs`) has no client caller and ext:* surfaces persist additively, so a close in the panel never removes the R1 row. Not introduced here — the move deletes its source row server-side precisely so it is complete on those surfaces — but traced while wiring this.
 
 ## Proposal shape leniency — follow-ups (2026-09-21, from `feat/proposal-shape-leniency`)
 

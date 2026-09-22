@@ -76,6 +76,26 @@ interface WorkspaceState {
     parentWorkspaceId: string,
     folderContentId: string,
   ) => Promise<ContentWorkspaceResponse>;
+  /**
+   * Materialize-or-reuse a workbench row WITHOUT activating it — for
+   * operations that name a bench as a destination (move a tab there) while
+   * the user stays where they are. `openWorkbench` is this plus activation.
+   */
+  ensureWorkbench: (
+    parentWorkspaceId: string,
+    folderContentId: string,
+  ) => Promise<ContentWorkspaceResponse>;
+  /**
+   * Move one open tab out of the ACTIVE workspace into `targetWorkspaceId` —
+   * a workspace or a workbench. R1 membership moves server-side in one
+   * transaction; the local tab closes on success and the target is refreshed
+   * in the list so a later switch lands the tab without a refetch. Rejects
+   * when there is no active workspace or the target is the active one.
+   */
+  moveTabToWorkspace: (
+    targetWorkspaceId: string,
+    tab: { id: string; contentId: string; title: string },
+  ) => Promise<void>;
   updateWorkspace: (
     workspaceId: string,
     updates: {
@@ -118,6 +138,33 @@ interface WorkspaceState {
   ) => Promise<void>;
   resetWorkspaces: () => Promise<void>;
   receiveRefreshedWorkspaces: (workspaces: ContentWorkspaceResponse[]) => void;
+}
+
+/**
+ * Pane → affinity hint for a membership write (mirrors the server's
+ * `affinityForPane`, which lives beside Prisma and can't be imported here).
+ */
+function affinityForPane(paneId: WorkspacePaneId) {
+  return {
+    h: paneId.endsWith("left") ? "left" : "right",
+    v: paneId.startsWith("top") ? "top" : "bottom",
+  };
+}
+
+/**
+ * Which ownership claim, if any, should follow a tab out of `source`.
+ *
+ * Policy: only a claim the source ALREADY holds on this exact content moves;
+ * a folder-scoped (recursive) claim that merely covers the content stays put,
+ * because moving it would drag every sibling's ownership along with one tab.
+ */
+function claimToCarry(
+  source: ContentWorkspaceResponse | null,
+  contentId: string,
+) {
+  return (
+    source?.items.find((item) => item.contentId === contentId) ?? null
+  );
 }
 
 let isBypassingWorkspaceGuard = false;
@@ -998,6 +1045,18 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   },
 
   openWorkbench: async (parentWorkspaceId, folderContentId) => {
+    const workspace = await get().ensureWorkbench(
+      parentWorkspaceId,
+      folderContentId,
+    );
+    await get().activateWorkspace(workspace.id);
+    return (
+      get().workspaces.find((candidate) => candidate.id === workspace.id) ??
+      workspace
+    );
+  },
+
+  ensureWorkbench: async (parentWorkspaceId, folderContentId) => {
     // Reuse an already-known active workbench row without a round-trip.
     const existing = get().workspaces.find(
       (candidate) =>
@@ -1005,10 +1064,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         candidate.viewRootContentId === folderContentId &&
         candidate.status === "active",
     );
-    if (existing) {
-      await get().activateWorkspace(existing.id);
-      return existing;
-    }
+    if (existing) return existing;
     const response = await fetchWorkspaceMutation(
       `/api/content/workspaces/${parentWorkspaceId}/workbenches`,
       {
@@ -1031,11 +1087,87 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       ]),
     }));
     notifyMutation();
-    await get().activateWorkspace(workspace.id);
-    return (
-      get().workspaces.find((candidate) => candidate.id === workspace.id) ??
-      workspace
+    return workspace;
+  },
+
+  moveTabToWorkspace: async (targetWorkspaceId, tab) => {
+    const sourceWorkspaceId = get().activeWorkspaceId;
+    if (!sourceWorkspaceId) {
+      throw new Error("No active workplace to move the tab from");
+    }
+    if (sourceWorkspaceId === targetWorkspaceId) {
+      throw new Error("The tab is already in that workplace");
+    }
+    const targetName =
+      getWorkspace(get().workspaces, targetWorkspaceId)?.name ?? "workplace";
+
+    // Placement hint (spec §4): the pane the tab leaves is the best guess for
+    // where the target should land it when its layout has that ordinal.
+    const panes = useContentStore.getState().panes;
+    const paneId = (Object.keys(panes) as WorkspacePaneId[]).find((id) =>
+      panes[id].tabIds.includes(tab.id),
     );
+
+    const response = await fetchWorkspaceMutation(
+      `/api/content/workspaces/${targetWorkspaceId}/tabs/move`,
+      {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contentId: tab.contentId,
+          fromWorkspaceId: sourceWorkspaceId,
+          affinity: paneId ? affinityForPane(paneId) : undefined,
+        }),
+      },
+    );
+    const { workspace: target } = await parseResponse<{
+      workspace: ContentWorkspaceResponse;
+    }>(response, "Failed to move tab");
+
+    // The tab is the target's now. Closing it here records a close intent and
+    // lets the debounced persist write the source snapshot without it — the
+    // source membership row is already gone server-side, so that reconcile
+    // is a no-op there rather than a second write.
+    useContentStore.getState().closeContentTabs([tab.contentId]);
+    set((state) => ({
+      workspaces: state.workspaces.map((candidate) =>
+        candidate.id === target.id ? target : candidate,
+      ),
+    }));
+
+    // Ownership travels with the tab only when the source already held it.
+    // A move never MINTS a claim: that is what "Share permanently" and the
+    // settings dialog are for, and silently claiming on the user's behalf is
+    // how conflicts appear in workplaces they never assigned anything to.
+    const claim = claimToCarry(
+      getWorkspace(get().workspaces, sourceWorkspaceId),
+      tab.contentId,
+    );
+    if (claim) {
+      try {
+        await get().assignContentToWorkspace(targetWorkspaceId, tab.contentId, {
+          assignmentType: claim.assignmentType,
+          scope: claim.scope,
+          expiresAt: claim.expiresAt,
+          moveFromWorkspaceId: sourceWorkspaceId,
+        });
+      } catch (error) {
+        toast.warning("Tab moved, but its workplace claim stayed behind", {
+          description: error instanceof Error ? error.message : undefined,
+        });
+      }
+    }
+
+    notifyMutation();
+    toast.success(`Moved "${tab.title || "Untitled"}" to ${targetName}`, {
+      action: {
+        label: "Go there",
+        onClick: () => {
+          void get().activateWorkspace(targetWorkspaceId);
+        },
+      },
+    });
   },
 
   createWorkspace: async (name) => {

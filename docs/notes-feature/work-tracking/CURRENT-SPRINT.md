@@ -9,6 +9,20 @@ last_updated: 2026-05-13
 
 # Current Sprint Addendum
 
+## September 21, 2026 — Move tab to workplace / workbench
+
+**Tree**: worktree `.claude/worktrees/move-tab-to-workspace`, branch `feat/move-tab-to-workspace` (PR pending)
+**Status**: typecheck / lint / full build green; `pnpm workspace:tab-move:smoke` (new, DB-backed) green; owner browser smoke pending. No migration, no TipTap schema change → no Hocuspocus redeploy.
+
+### Shipped
+- **Real tab move** (`POST /api/content/workspaces/[id]/tabs/move`, `moveWorkspaceTab` in `membership.ts`): R1 membership upserted in the target and deleted from the source in one transaction; only the target's `updatedAt` bumps (the source is the mover's active workplace — bumping it would 409 their own next save).
+- **Menu** (`WorkplacesTabMenuSection`): "Move tab to" lists top-level workplaces with their workbenches indented, the current workplace's own benches included; unmaterialized root-layer folders are fetched from the workbenches route on open and materialized on click via the new `ensureWorkbench` store action. "Share permanently" now lists top-level workplaces only.
+- **Store** (`moveTabToWorkspace`): posts the move with the leaving pane's affinity hint, closes the local tab, replaces the target's list entry from the response, carries an existing claim (never mints one), toasts with "Go there".
+- **Read path**: `getWorkspace` includes membership; `contentMeta` names membership-only ids so the moved tab arrives titled.
+
+### Smoke script (owner)
+Right-click a tab → "Move tab to" lists the other workplaces, each with its workbenches indented; the current workplace shows as "current" with only its benches clickable → pick a sibling workplace → the tab closes here and a toast says "Moved … to X" with "Go there" → Go there → the tab is open in X, titled, in the top-left pane → from a view workplace, move a tab into a subfolder that has NEVER been opened as a bench → the bench materializes (it now appears in the selector's dwell submenu) and holds the tab → from that bench, move the tab back to the parent workplace → with a second browser window sitting on the target workplace, move a tab into it → the tab appears there within the background refresh cadence and neither window shows a conflict dialog → move a tab whose content the source workplace had claimed (via Share permanently or the settings dialog) → the claim follows (settings dialog lists it under the target) → move a tab from a two-pane layout's right pane → it lands per the target's own layout (top-left when the target has no right ordinal) → right-click on a workplace with no other workplaces and no benches → "Create another workplace first."
+
 ## August 14, 2026 — Note Window block + clipboard round-trip fixes
 
 **Tree**: main working tree (no branch yet — owner decides branch/PR)

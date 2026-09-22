@@ -24,6 +24,7 @@ import {
 import {
   openWorkspaceTab,
   closeWorkspaceTab,
+  moveWorkspaceTab,
   syncMembershipFromSurfaceSnapshot,
 } from "./membership";
 import { upsertLayoutRecord, listLayoutRecords } from "./layout-records";
@@ -460,6 +461,95 @@ export async function handleOpenWorkspaceTab(
       return errorResponse(error, "Failed to open workspace tab");
     }
   });
+}
+
+/**
+ * POST /tabs/move = relocate one open tab from `fromWorkspaceId` into this
+ * workspace (R1 membership on both sides, one transaction). Responds with the
+ * TARGET workspace's fresh read (membership + updatedAt) so the client can
+ * replace its list entry without a second round-trip.
+ */
+export async function handleMoveWorkspaceTab(
+  request: NextRequest,
+  { params }: { params: WorkspaceParams }
+) {
+  return withRouteTrace(
+    request,
+    { route: "/api/content/workspaces/[id]/tabs/move" },
+    async () => {
+      try {
+        const session = await requireAuth();
+        const { id } = await params;
+        const body = (await request.json().catch(() => ({}))) as {
+          contentId?: unknown;
+          fromWorkspaceId?: unknown;
+          affinity?: unknown;
+        };
+        if (typeof body.contentId !== "string" || !body.contentId) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: { code: "BAD_REQUEST", message: "contentId is required" },
+            },
+            { status: 400 }
+          );
+        }
+        if (typeof body.fromWorkspaceId !== "string" || !body.fromWorkspaceId) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: {
+                code: "BAD_REQUEST",
+                message: "fromWorkspaceId is required",
+              },
+            },
+            { status: 400 }
+          );
+        }
+        if (body.fromWorkspaceId === id) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: {
+                code: "BAD_REQUEST",
+                message: "The tab is already in that workspace",
+              },
+            },
+            { status: 400 }
+          );
+        }
+        const tab = await moveWorkspaceTab(
+          session.user.id,
+          id,
+          body.contentId,
+          body.fromWorkspaceId,
+          body.affinity
+        );
+        if (!tab) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: {
+                code: "NOT_FOUND",
+                message: "Workspace or content not found",
+              },
+            },
+            { status: 404 }
+          );
+        }
+        const workspace = await getWorkspace(session.user.id, id);
+        return NextResponse.json({ success: true, data: { tab, workspace } });
+      } catch (error) {
+        logger.error({
+          layer: "content",
+          event: "workspaces_tab_move:caught",
+          summary: "POST caught",
+          error,
+        });
+        return errorResponse(error, "Failed to move workspace tab");
+      }
+    }
+  );
 }
 
 /**
