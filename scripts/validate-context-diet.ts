@@ -41,6 +41,7 @@ import {
   supersedeBulkReads,
   supersedePerceptionHistory,
   supersedeWriteInputs,
+  teachDeniedApprovals,
   writeInputFoldStates,
 } from "../lib/domain/ai/context-diet";
 import { coBrowsePageIdentity } from "../lib/domain/ai/co-browse-page-identity";
@@ -449,6 +450,29 @@ const isStub = (v: unknown, word: string): boolean =>
   assert(coBrowsePageIdentity("about:blank?x=1") === "about:blank", "G7: non-URL input still drops state textually");
 }
 
+// ── Gate 8: a denied approval teaches (plan §6b.4) ──────────────────────────
+
+{
+  const denied = {
+    type: "tool-query_database",
+    toolCallId: "d1",
+    state: "output-denied",
+    input: { budget: 20000 },
+    approval: { id: "a1", approved: false },
+  };
+  const withReason = { ...denied, toolCallId: "d2", approval: { id: "a2", approved: false, reason: "not now" } };
+  const other = { type: "tool-create_docx", toolCallId: "d3", state: "output-denied", input: {}, approval: { id: "a3", approved: false } };
+  const msgs = [user(), assistant([denied, withReason, other, act(big("ok"))])];
+  const taught = teachDeniedApprovals(msgs);
+  const reasonOf = (i: number) => ((taught[1].parts[i] as { approval?: { reason?: string } }).approval?.reason ?? "");
+  assert(/smaller read|lower budget/.test(reasonOf(0)) && /Do NOT re-request/.test(reasonOf(0)), "a denied query_database gets the smaller-read teaching reason");
+  assert(reasonOf(1) === "not now", "a client-supplied reason is kept verbatim");
+  assert(/declined this create_docx call/.test(reasonOf(2)) && /Do NOT repeat/.test(reasonOf(2)), "any other denied tool gets the generic teaching reason naming the tool");
+  assert((taught[1].parts[0] as { state: string }).state === "output-denied", "the part's state is untouched — only what the model reads changes");
+  assert(taught[1].parts[3] === msgs[1].parts[3], "non-denied parts are the same objects");
+  assert(JSON.stringify(msgs[1].parts[0]) === JSON.stringify(denied), "the input is not mutated (persistence path)");
+}
+
 // ── Gate 5: the route applies both ──────────────────────────────────────────
 
 {
@@ -462,6 +486,11 @@ const isStub = (v: unknown, word: string): boolean =>
   assert(block.includes("supersedePerceptionHistory("), "G5: the chat route must apply supersedePerceptionHistory in the model-message assembly");
   assert(block.includes("dedupeRepeatedToolParts("), "G5: the chat route must apply dedupeRepeatedToolParts in the model-message assembly");
   assert(block.includes("supersedeWriteInputs("), "G5: the chat route must apply supersedeWriteInputs in the model-message assembly");
+  assert(block.includes("teachDeniedApprovals("), "G5: the chat route must apply teachDeniedApprovals in the model-message assembly");
+  assert(
+    routeSrc.includes("reservedTailTools(itemIterationDeliverables)") && routeSrc.includes("stepsRemainingNotice({"),
+    "G5: prepareStep must reserve the deliverable tail and append the remaining-steps notice (plan §6b)",
+  );
   const engineSrc = readFileSync(path.join(process.cwd(), "lib/domain/ai/use-conversation-engine.ts"), "utf8");
   assert(
     engineSrc.includes("coBrowsePageIdentity(base.url) !== coBrowsePageIdentity(url)"),

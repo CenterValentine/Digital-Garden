@@ -18,14 +18,23 @@
 import {
   ITERATION_PROPOSAL_INPUT,
   PROPOSAL_BOUNDS,
+  RESEARCH_ALLOWANCE_PER_ITEM,
+  RUN_OVERHEAD_STEPS,
   clampInt,
+  computeIterationStepCap,
   normalizeProposalItems,
+  reservedTailSize,
+  reservedTailTools,
   resolveAdmission,
   resolveCaptureTarget,
   resolveColumnNames,
+  resolveDeliverables,
   resolveQuestColumnType,
   resolveQuestColumns,
+  stepsPerItemFor,
+  stepsRemainingNotice,
 } from "../lib/domain/ai/tools/iteration-proposal";
+import { mergeCellValue } from "../lib/domain/data/cell-merge";
 
 const errors: string[] = [];
 function assert(cond: unknown, msg: string): void {
@@ -172,6 +181,66 @@ for (const { name, payload } of attempts) {
   assert(!qbad.ok && /"potato"/.test(qbad.refusal ?? "") && /"checkbox"/.test(qbad.refusal ?? ""), "an unknown quest column type refuses and lists the accepted types");
 }
 
+// ── Deliverables and the step budget (plan §6b) ─────────────────────────────
+
+{
+  // The SeatGeek run: one item, fulfilment charter, under the screening cap.
+  const screening = computeIterationStepCap({ itemBudget: 1, deliverables: [] });
+  assert(screening === 1 * 4 + RUN_OVERHEAD_STEPS, `no deliverables → the old screening formula (got ${screening})`);
+  assert(stepsPerItemFor([]) === RESEARCH_ALLOWANCE_PER_ITEM + 1, "no deliverables → research + record per item");
+  const fulfil = resolveDeliverables(["create_docx", "update_row"]);
+  assert(fulfil.deliverables.join(",") === "create_docx,update_row" && fulfil.unknown.length === 0, "known deliverables resolve in order");
+  const cap = computeIterationStepCap({ itemBudget: 1, deliverables: fulfil.deliverables });
+  assert(cap === (RESEARCH_ALLOWANCE_PER_ITEM + 2 + 1) + RUN_OVERHEAD_STEPS, `two deliverables add two steps per item (got ${cap})`);
+  assert(reservedTailSize(fulfil.deliverables) === 4, "tail = deliverables + record + close");
+  const tail = reservedTailTools(fulfil.deliverables);
+  assert(
+    tail.includes("create_docx") && tail.includes("update_row") && tail.includes("record_item_result") && tail.includes("record_iteration_findings") && !tail.includes("search_web"),
+    "the reserved tail keeps the deliverables and the record/close tools, nothing else",
+  );
+
+  // Aliases and unknowns: the model's words, never a rejection.
+  const loose = resolveDeliverables("resume, row, potato");
+  assert(loose.deliverables.join(",") === "create_docx,update_row" && loose.unknown.join(",") === "potato", "aliases resolve; unknown names are reported, not fatal");
+  assert(resolveDeliverables(undefined).deliverables.length === 0, "no deliverables → empty");
+  assert(resolveDeliverables(["record_item_result"]).deliverables.length === 0 && resolveDeliverables(["record_item_result"]).unknown.length === 1, "record_item_result is implicit — declaring it is reported as unknown, not doubled");
+
+  // Overrides clamp.
+  assert(stepsPerItemFor([], 50) === PROPOSAL_BOUNDS.stepsPerItem.max && stepsPerItemFor([], 1) === PROPOSAL_BOUNDS.stepsPerItem.min, "stepsPerItem override clamps to its bounds");
+  assert(computeIterationStepCap({ itemBudget: 999, deliverables: [] }) === 200 * 4 + RUN_OVERHEAD_STEPS, "item budget clamps at 200");
+
+  // The notice says where the turn stands and, once in the tail, that research is over.
+  const early = stepsRemainingNotice({ stepNumber: 2, stepCap: 14, deliverables: fulfil.deliverables });
+  assert(/12 of 14 remaining/.test(early) && /last 4 are reserved/.test(early) && /create_docx/.test(early), "early notice: remaining count and the reserved tail");
+  const late = stepsRemainingNotice({ stepNumber: 11, stepCap: 14, deliverables: fulfil.deliverables });
+  assert(/3 of 14 remaining/.test(late) && /RESERVED/.test(late) && /only create_docx, update_row, record_item_result, record_iteration_findings are available/.test(late), "in-tail notice: research is over, only the tail tools remain");
+
+  // captureTo.mergeColumns resolves and is folded into columns.
+  const merge = resolveCaptureTarget({ database: DB, columns: ["Role Title"], mergeColumns: "Aliases and Job Wording" });
+  assert(merge?.ok && merge.target?.mergeColumns.join("|") === "Aliases and Job Wording" && merge.target?.columns.includes("Aliases and Job Wording"), "mergeColumns resolve and join the capture columns");
+  const noMerge = resolveCaptureTarget({ database: DB });
+  assert(noMerge?.ok && noMerge.target?.mergeColumns.length === 0, "no mergeColumns → empty list");
+}
+
+// ── Cell merge (cell-merge.ts) ──────────────────────────────────────────────
+
+{
+  const text = { type: "text", name: "Aliases and Job Wording" } as const;
+  const r1 = mergeCellValue(text, "GTM", "Revenue Ops");
+  assert("value" in r1 && r1.value === "GTM, Revenue Ops", `text merge appends with a comma (got ${JSON.stringify(r1)})`);
+  const r2 = mergeCellValue(text, "GTM, Revenue Ops", "gtm");
+  assert("value" in r2 && r2.value === "GTM, Revenue Ops", "merging a value already present (case-insensitive) is a no-op");
+  const r3 = mergeCellValue(text, undefined, "GTM");
+  assert("value" in r3 && r3.value === "GTM", "merging into an empty cell writes the value");
+  const r4 = mergeCellValue({ type: "longText", name: "Notes" }, "one\ntwo", "three, two");
+  assert("value" in r4 && r4.value === "one\ntwo\nthree", "longText keeps the cell's own delimiter and dedupes tokens");
+  const list = { type: "multiSelect", name: "Tags" } as const;
+  const r5 = mergeCellValue(list, ["opt_a"], ["opt_b", "opt_a"]);
+  assert("value" in r5 && Array.isArray(r5.value) && r5.value.join(",") === "opt_a,opt_b", "list merge is a union by id, order preserved");
+  const r6 = mergeCellValue({ type: "number", name: "Fit" }, 5, 6);
+  assert("error" in r6 && /number/.test(r6.error), "merge refuses non-mergeable types with the reason");
+}
+
 // ── Report ──────────────────────────────────────────────────────────────────
 
 if (errors.length > 0) {
@@ -179,4 +248,4 @@ if (errors.length > 0) {
   for (const e of errors) console.error(`  ${e}\n`);
   process.exit(1);
 }
-console.log(`✓ proposal:shape:check — ${attempts.length} production payloads parse; captureTo, admission, items, bounds and quest columns resolve by meaning`);
+console.log(`✓ proposal:shape:check — ${attempts.length} production payloads parse; captureTo, admission, items, bounds, quest columns, deliverables and the step budget resolve by meaning; cell merge unions and appends`);

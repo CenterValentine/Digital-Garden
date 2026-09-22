@@ -224,11 +224,21 @@ never in model memory):
 | Plain chat | 7 | Default bound on tool loops |
 | Editable document open | 8 | One extra step for the edit round-trip |
 | Approved research run | `pageBudget × 2 + 4` (budget ≤ 40) | Read + extract per page + overhead |
-| Approved item iteration | `itemBudget × 4 + 8` (budget ≤ 200) | Read + record (+ re-read) per item + proposal/roll-up overhead; the client item budget is the true limiter — this ceiling must not cut off before it |
+| Approved item iteration | `itemBudget × (3 + deliverables + 1) + 8` (budget ≤ 200; `stepsPerItem` may override, 2–20) | Three research steps, one per declared **deliverable** (`create_docx`, `update_row`, …), one `record_item_result` per item, plus proposal/close overhead. With no deliverables this is the old `× 4 + 8`. `computeIterationStepCap` in `iteration-proposal.ts` |
 
 Budgets are recomputed server-side each request by rescanning `body.messages` for
 approved proposal parts (and reset when the closing record appears) — the server
 never trusts a client-claimed number.
+
+**The reserved tail (2026-09-22, prod `5e5b739d`).** A one-item *fulfilment* run
+(research → resume → `create_docx` → `update_row` → record → close) under the
+screening cap spent all 12 steps on reads and closed with a report. Two rules now
+hold inside an item run: `prepareStep` narrows `activeTools` to the run's
+deliverables + `record_item_result` + `record_iteration_findings` for the turn's
+last `deliverables + 2` steps (the final-step text reservation generalised — research
+cannot consume the writes), and every step appends a one-line harness notice with
+the steps remaining and what the tail is for. The model never again learns the
+budget at the step it runs out.
 
 ---
 

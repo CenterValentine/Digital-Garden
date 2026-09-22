@@ -67,6 +67,8 @@ export interface CapturePreflightInput {
   columnNames: string[];
   /** Optional dedupe column name; defaults to the first url-type column. */
   dedupeColumnName?: string;
+  /** Capture columns to MERGE into rather than replace (text / longText / list only). */
+  mergeColumnNames?: string[];
 }
 
 /**
@@ -185,6 +187,28 @@ export async function preflightCapture(
     );
   }
 
+  // Merge columns: each must be a resolved capture column of a mergeable type.
+  const mergeColumns: string[] = [];
+  for (const name of input.mergeColumnNames ?? []) {
+    const column = findColumn(live, name);
+    if (!column) {
+      return refuse(
+        `mergeColumns names "${name}", which is not a column of "${table.title}". Columns here: ${live.map((c) => c.name).join(", ")}.`,
+      );
+    }
+    if (!resolved.some((c) => c.key === column.key)) {
+      return refuse(
+        `mergeColumns names "${column.name}", but it is not one of the capture columns — add it to captureTo.columns as well.`,
+      );
+    }
+    if (column.type !== "text" && column.type !== "longText" && column.type !== "multiSelect") {
+      return refuse(
+        `"${column.name}" is a ${column.type} column — merge applies to text, longText and list columns only. Remove it from mergeColumns.`,
+      );
+    }
+    mergeColumns.push(column.name);
+  }
+
   // Dedupe column: explicit name, else the first url column on the table.
   let dedupeColumn: DataColumn | undefined;
   if (input.dedupeColumnName) {
@@ -224,6 +248,7 @@ export async function preflightCapture(
       ...(dedupeColumn
         ? { dedupeColumnKey: dedupeColumn.key, dedupeColumnName: dedupeColumn.name }
         : {}),
+      ...(mergeColumns.length > 0 ? { mergeColumns } : {}),
     },
     optionVocab,
     descriptionsMissing,
@@ -398,11 +423,19 @@ export async function captureUpsertRow(input: {
     existingRowId = existing?.id;
   }
 
+  // Merge columns accumulate across runs (cell-merge.ts) — only meaningful
+  // on an EXISTING row; a fresh row has nothing to merge into.
+  const mergeKeys = new Set(
+    (config.mergeColumns ?? [])
+      .map((name) => findColumn(live, name)?.key)
+      .filter((k): k is string => typeof k === "string"),
+  );
   if (existingRowId) {
     const writes: CellWrite[] = prepared.writes.map((w) => ({
       rowId: existingRowId,
       columnKey: w.columnKey,
       value: w.value as CellWrite["value"],
+      ...(mergeKeys.has(w.columnKey) ? { merge: true } : {}),
     }));
     const result = await writeCells(config.tableId, live, writes);
     if (!result.ok) {
