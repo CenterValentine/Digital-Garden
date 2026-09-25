@@ -21,7 +21,13 @@ last_updated: 2026-05-13
 - **Gate**: `pnpm private:content:check` — two halves, wired into `build`: `scripts/validate-private-content.ts` (predicate + seam scan, mutation-tested) and `scripts/validate-private-content-editor.ts` (a REAL TipTap editor under jsdom: Cmd+/ both shapes and their reversal, the `%%text%%` input rule via `handleTextInput`, `%%` + Enter open/close incl. the trailing-node reuse, strip ≡ visible text).
 - **CSS**: `.ProseMirror .private-text` / `.private-block` (muted, dotted underline / dashed left rule, `%%` chrome via pseudo-elements, dark companions); `.public-prose [data-private] { display: none }` as the belt-and-braces net.
 
+### Also in this release train (same branch, 2026-09-25)
+- **Paste into a code block always lands** (owner report: long pastes into a ``` block landed nothing or one line). Root cause: the editor's own `handlePaste` in `MarkdownEditor.tsx` runs before TipTap's code-block-aware handler and, when the text looked like markdown (`#` comments, `-` lines, backticks…), either replaced the literal paste with block nodes a `codeBlock` (`content: text*`) cannot hold ("Always format" on) or offered a toast whose "convert" undid the good paste. Fix: bail out of that handler whenever `$from.parent.type.spec.code` — ProseMirror's default then inserts one text node with every line kept. The context-menu "Paste as Markdown" inserts literal text inside a code block for the same reason.
+- **Slash menu uses Lucide icons** instead of 60 mixed emoji/glyphs: `SlashCommand.icon` is now `LucideIcon | string` (string kept for extension authors), all 72 built-in commands + the calendar extension's two mapped to icons, rendered at 18px in the menu's existing gold accent.
+
 ### Smoke checklist (owner)
+- [ ] Inside a ``` code block, paste a multi-line snippet containing `#` comment lines and `-` bullets → every line lands verbatim, no toast. Also via right-click → Paste as Markdown.
+- [ ] Type `/` → every row shows a line icon (no emoji); `/calendar` rows too.
 - [ ] Select words inside a paragraph → Cmd+/ → muted `%%…%%` run; Cmd+/ again with the caret inside → plain text.
 - [ ] Caret on a paragraph → Cmd+/ → dashed private block with the "%% private — hidden…" label; Cmd+/ inside → unwrapped.
 - [ ] Type `%%secret%%` → converts on the closing `%%`. Type `%%` + Enter → block opens; `%%` + Enter inside → block closes with the caret in a fresh paragraph after it.
