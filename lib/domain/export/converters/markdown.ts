@@ -245,10 +245,19 @@ export class MarkdownConverter implements DocumentConverter {
               const href = mark.attrs?.href || "";
               text = `[${text}](${href})`;
             }
+            // Private (commented-out) text exports as an Obsidian comment —
+            // the file is the author's, so the comment travels with it.
+            if (mark.type === "privateText") text = `%%${text}%%`;
           }
         }
 
         return text;
+      }
+
+      case "privateBlock": {
+        // Obsidian multi-line comment: `%%` fence lines around the body.
+        const body = this.serializeChildren(node, settings);
+        return body ? `%%\n${body}\n%%` : "";
       }
 
       case "codeBlock": {

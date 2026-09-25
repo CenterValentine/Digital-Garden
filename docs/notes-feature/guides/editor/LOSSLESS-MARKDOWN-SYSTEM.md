@@ -170,6 +170,19 @@ they're *derived* from heading text (`lib/domain/content/heading-ids.ts`), so
 they never appear in markdown at all — a round-trip regenerates them.
 Derivable state needs no syntax; only stored state does.
 
+**Variant — an inline MARK with its own syntax (the private-text lesson):** the
+codec registry is consulted per top-level *block*, so a mark cannot own a
+`toMarkdown`. Serialize it with a turndown rule keyed on the mark's rendered
+element (`dgPrivateText`: `span[data-private=text]` → `%%content%%`) and
+register a codec whose `toMarkdown` returns `null` and whose `reTag` rewrites
+the literal syntax back into that element — applied to the whole HTML, so keep
+it out of `<pre>`/`<code>` (see `outsideCode`) where the same characters are
+content. Literal syntax in ordinary prose re-parses as the mark, fails
+self-verify, and fences: lossless, just opaque, and the gate asserts it. A
+block that must ALSO work when nested inside another container needs the same
+turndown rule (`dgPrivateBlock`) beside its codec, since only top-level blocks
+reach the codec path; its `reTag` must be unanchored.
+
 ### 5b. The extension-symmetry prerequisite (the callout lesson)
 
 A codec (or Tier-2 HTML) can only round-trip if the block's **own

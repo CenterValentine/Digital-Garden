@@ -35,6 +35,7 @@ import {
   handleMissMessage,
   parseEditPayload,
   resolveHandle,
+  visibleTextBetween,
   type SearchRange,
 } from "@/lib/domain/editor/ai";
 import { ChatMessage } from "./ChatMessage";
@@ -768,13 +769,14 @@ export function ChatPanel({
           const options = found.matches
             .map((m, i) => {
               const owner = outline.find((e) => m.from >= e.from && m.from < e.to);
-              const context = doc
-                .textBetween(
-                  Math.max(0, m.from - 40),
-                  Math.min(doc.content.size, m.to + 40),
-                  " ",
-                )
-                .trim();
+              // Visible text only — private (commented-out) content next to
+              // a match must not ride along into the model's context.
+              const context = visibleTextBetween(
+                doc,
+                Math.max(0, m.from - 40),
+                Math.min(doc.content.size, m.to + 40),
+                " ",
+              ).trim();
               return `  ${i + 1}. ${owner ? owner.handle : "?"} — …${context}…`;
             })
             .join("\n");
@@ -782,7 +784,7 @@ export function ChatPanel({
         } else {
           reason = request.handle
             ? `That exact text does not appear in block ${request.handle}. Call list_document_outline again to see what that block currently contains.`
-            : `That exact text does not appear in the document. NOTE: matching is against the document's rendered text — markdown syntax (#, **, -) and any HTML markup you saw are not part of it.\n\nThe document currently reads:\n"""\n${doc.textBetween(0, Math.min(doc.content.size, 4000), "\n")}\n"""`;
+            : `That exact text does not appear in the document. NOTE: matching is against the document's rendered text — markdown syntax (#, **, -) and any HTML markup you saw are not part of it.\n\nThe document currently reads:\n"""\n${visibleTextBetween(doc, 0, Math.min(doc.content.size, 4000), "\n")}\n"""`;
         }
 
         return { applied: false, message: `Edit NOT applied. ${reason}` };

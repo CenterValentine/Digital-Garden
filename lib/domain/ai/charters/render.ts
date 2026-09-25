@@ -29,6 +29,16 @@ import {
   tiptapToMarkdownRich,
   type HtmlBridge,
 } from "@/lib/domain/content/markdown-serialize";
+import { stripPrivateContent } from "@/lib/domain/content/private-content";
+
+/**
+ * Charter bodies land in the SYSTEM PROMPT, so private (commented-out) content
+ * is stripped before either renderer sees the nodes. Both paths share this so
+ * the plain fallback can never leak what the rich path hid.
+ */
+function withoutPrivate(nodes: JSONContent[]): JSONContent[] {
+  return stripPrivateContent({ type: "doc", content: nodes }).content ?? [];
+}
 
 // ── Wiki-link preservation ───────────────────────────────────────────────────
 // ServerWikiLink renders as `<span data-type="wiki-link" data-target-title=…>`,
@@ -80,12 +90,13 @@ export function renderCharterSection(
   bridge?: HtmlBridge,
 ): string {
   if (!nodes.length) return "";
+  const visible = withoutPrivate(nodes);
   try {
-    const doc: JSONContent = { type: "doc", content: nodes.map(flattenWikiLinks) };
+    const doc: JSONContent = { type: "doc", content: visible.map(flattenWikiLinks) };
     return restoreWikiLinks(tiptapToMarkdownRich(doc, extensions, bridge)).trim();
   } catch {
     // Never let a serializer edge case blank out a phase — degrade to plain text.
-    return renderCharterSectionPlain(nodes);
+    return renderCharterSectionPlain(visible);
   }
 }
 
@@ -161,7 +172,7 @@ function renderBlock(node: JSONContent, listDepth = 0): string {
  * when the model needs those).
  */
 export function renderCharterSectionPlain(nodes: JSONContent[]): string {
-  return nodes
+  return withoutPrivate(nodes)
     .map((n) => renderBlock(n))
     .filter((s) => s.trim().length > 0)
     .join("\n\n");

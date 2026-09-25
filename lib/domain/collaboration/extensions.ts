@@ -38,6 +38,7 @@ import { ServerNoteWindow } from "@/lib/domain/editor/extensions/blocks/note-win
 import { ServerAudioEmbed } from "@/lib/domain/editor/extensions/blocks/audio-embed";
 import { ServerFlashcardSelect } from "@/lib/domain/editor/extensions/flashcard-select";
 import { ServerClozeDeletion } from "@/lib/domain/editor/extensions/cloze-deletion";
+import { ServerPrivateBlock, ServerPrivateText } from "@/lib/domain/editor/extensions/private-content";
 import { ServerTimestamp } from "@/lib/domain/editor/extensions/blocks/timestamp";
 import {
   ServerDailySummary,
@@ -117,6 +118,8 @@ export function getCollaborationServerExtensions(): Extensions {
     ServerAudioEmbed,
     ServerFlashcardSelect,
     ServerClozeDeletion,
+    ServerPrivateText,
+    ServerPrivateBlock,
     ServerTimestamp,
     ServerDailySummary,
     ServerWeeklySummary,

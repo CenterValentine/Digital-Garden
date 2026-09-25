@@ -9,6 +9,28 @@ last_updated: 2026-05-13
 
 # Current Sprint Addendum
 
+## September 25, 2026 — Private content (comment out prose)
+
+**Tree**: worktree `.claude/worktrees/private-text`, branch `feat/private-text` (off `origin/main` at `e171048f`)
+**Status**: typecheck / lint 151 (0 errors) / collab:schema / markdown:blocks (+6 fixtures, +2 pretty assertions) / private:content:check (new, mutation-tested) / full build green; **owner browser smoke pending**. **⚠ Hocuspocus redeploy required post-merge** (schema 1.18.0: new mark `privateText` + node `privateBlock` — an un-redeployed collab server rewrites them to `unsupportedInline` / `unsupportedBlock`).
+
+### Shipped
+- **`privateText` mark + `privateBlock` node** (`lib/domain/editor/extensions/private-content.ts`, Server twins registered in `extensions-server.ts` + `collaboration/extensions.ts`). Cmd+/ `togglePrivate`: in-paragraph selection → mark; bare cursor / cross-block selection → block wrap; inside either → reverse (whole run via `extendEmptyMarkRange`, whole block via `liftTarget`). `%%text%%` markInputRule; `%%` + Enter opens / closes a block; `/private`; EyeOff toolbelt button (`private` tool, order 45).
+- **One predicate, explicit at each seam** — `stripPrivateContent` (pure JSON, `lib/domain/content/private-content.ts`): `extractSearchTextFromTipTap` (covers the `searchText` column on every write path + `read_content`), `chunkDocument`, `resolveNote`, `renderCharterSection` / `Plain`, `TipTapContent`. Live-ProseMirror twins `visibleTextOf` / `visibleTextBetween` (`lib/domain/editor/ai/visible-text.ts`) for `buildOutline` previews and ChatPanel's ambiguity context + "document currently reads" dump. NOT in `tiptapToMarkdown` (source view must show it).
+- **Lossless markdown**: `privateBlock` codec (`%%` fence, blank-line padded, unanchored reTag) + reTag-only `privateText` codec; `dgPrivateText` / `dgPrivateBlock` turndown rules; code segments excluded from the inline reTag. Export markdown converter emits `%%…%%` / `%%` fences.
+- **Gate**: `pnpm private:content:check` — two halves, wired into `build`: `scripts/validate-private-content.ts` (predicate + seam scan, mutation-tested) and `scripts/validate-private-content-editor.ts` (a REAL TipTap editor under jsdom: Cmd+/ both shapes and their reversal, the `%%text%%` input rule via `handleTextInput`, `%%` + Enter open/close incl. the trailing-node reuse, strip ≡ visible text).
+- **CSS**: `.ProseMirror .private-text` / `.private-block` (muted, dotted underline / dashed left rule, `%%` chrome via pseudo-elements, dark companions); `.public-prose [data-private] { display: none }` as the belt-and-braces net.
+
+### Smoke checklist (owner)
+- [ ] Select words inside a paragraph → Cmd+/ → muted `%%…%%` run; Cmd+/ again with the caret inside → plain text.
+- [ ] Caret on a paragraph → Cmd+/ → dashed private block with the "%% private — hidden…" label; Cmd+/ inside → unwrapped.
+- [ ] Type `%%secret%%` → converts on the closing `%%`. Type `%%` + Enter → block opens; `%%` + Enter inside → block closes with the caret in a fresh paragraph after it.
+- [ ] `/private` and the EyeOff toolbelt button behave like Cmd+/.
+- [ ] Source view (markdown toggle) shows `%%secret%%` and the `%%` fence lines; toggling back restores both shapes.
+- [ ] AI chat bound to the note: `read_content` / "read the document" never quotes private text; `list_document_outline` shows "(no text)" for a private block.
+- [ ] Publish the note → private text and block absent from the public page.
+- [ ] Global search for a private-only word finds nothing after the note saves.
+
 ## August 14, 2026 — Note Window block + clipboard round-trip fixes
 
 **Tree**: main working tree (no branch yet — owner decides branch/PR)

@@ -11,6 +11,7 @@
 import "server-only";
 import type { JSONContent } from "@tiptap/core";
 import { tiptapToMarkdown } from "@/lib/domain/content/markdown";
+import { stripPrivateContent } from "@/lib/domain/content/private-content";
 
 /** Default chunk size in characters (~2000 fits comfortably in tool output) */
 const DEFAULT_CHUNK_SIZE = 2000;
@@ -34,12 +35,15 @@ export interface ChunkResult {
 /**
  * Convert TipTap JSON to markdown and split into chunks.
  * Returns all chunks at once — the read tools select by index.
+ *
+ * Private (commented-out) content is stripped before serialisation: this is
+ * the model's read path, and private text must never reach it.
  */
 export function chunkDocument(
   tiptapJson: JSONContent,
   chunkSize: number = DEFAULT_CHUNK_SIZE
 ): string[] {
-  const markdown = tiptapToMarkdown(tiptapJson);
+  const markdown = tiptapToMarkdown(stripPrivateContent(tiptapJson));
   if (!markdown.trim()) return ["(empty document)"];
   return splitIntoParagraphChunks(markdown, chunkSize);
 }

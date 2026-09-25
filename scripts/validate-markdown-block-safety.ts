@@ -103,6 +103,15 @@ const constructs: Array<{ name: string; doc: JSONContent }> = [
   // In-document heading link (wikiLink.headingSlug) inside a paragraph.
   { name: "wikiLink + headingSlug", doc: doc(p([t("see "), { type: "wikiLink", attrs: { targetTitle: "Setup", headingSlug: "setup" } }])) },
   { name: "table", doc: doc({ type: "table", content: [{ type: "tableRow", content: [tc("A"), tc("B")] }, { type: "tableRow", content: [tc("1"), tc("2")] }] }) },
+  // Private (commented-out) content: the inline mark alone, nested in other
+  // marks, a block, a block nested inside a blockquote, and the pathological
+  // literal `%%x%%` in ordinary prose (must stay lossless — it fences).
+  { name: "private text", doc: doc(p([t("keep "), tm("secret", ["privateText"]), t(" end")])) },
+  { name: "private text + bold", doc: doc(p([tm("both", ["bold", "privateText"])])) },
+  { name: "private block", doc: doc({ type: "privateBlock", content: [p([t("hidden")]), p([t("more")])] }) },
+  { name: "private block in blockquote", doc: doc({ type: "blockquote", content: [{ type: "privateBlock", content: [p([t("q-hidden")])] }] }) },
+  { name: "literal %%x%% text", doc: doc(p([t("a %%b%% c")])) },
+  { name: "literal %% in code block", doc: doc({ type: "codeBlock", content: [t("%%{init: {}}%%")] }) },
 ];
 for (const c of constructs) {
   try {
@@ -167,6 +176,18 @@ console.log("\n  ── custom-block codecs (pretty markdown, not base64) ──
   if (!r.ok) fail("callout codec — LOSSY");
   else if (r.md.includes("DGBLOCKv1:") || !r.md.includes("> [!")) fail(`callout codec — expected "> [!" markdown, got ${r.md.slice(0, 40)}`);
   else pass("callout → > [!warning] markdown");
+}
+// Private content: Obsidian comment syntax on the way out, never a fence.
+{
+  const r = lossless(doc({ type: "privateBlock", content: [p([t("hidden")])] }));
+  if (!r.ok) fail("privateBlock codec — LOSSY");
+  else if (r.fenced || !/^%%\n\nhidden\n\n%%$/.test(r.md.trim())) fail(`privateBlock codec — expected %% fence lines, got ${JSON.stringify(r.md.slice(0, 40))}`);
+  else pass("privateBlock → %% … %% markdown");
+
+  const inline = lossless(doc(p([t("keep "), tm("secret", ["privateText"]), t(" end")])));
+  if (!inline.ok) fail("privateText mark — LOSSY");
+  else if (inline.fenced || !inline.md.includes("%%secret%%")) fail(`privateText mark — expected %%secret%%, got ${JSON.stringify(inline.md.slice(0, 40))}`);
+  else pass("privateText → %%secret%% markdown");
 }
 
 // ── 2d. Tables (regression: every TipTap table used to leak as raw HTML) ─────

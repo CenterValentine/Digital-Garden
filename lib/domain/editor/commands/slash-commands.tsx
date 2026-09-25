@@ -116,6 +116,15 @@ export function getSlashCommands(): SlashCommand[] {
       aliases: ["h3"],
     },
     {
+      title: "Private",
+      description: "Comment out this block — hidden from AI, publishing and search",
+      icon: "%%",
+      command: ({ editor, range }) => {
+        editor.chain().focus().deleteRange(range).setPrivateBlock().run();
+      },
+      aliases: ["comment", "hidden", "%%", "commented"],
+    },
+    {
       title: "Table",
       description: "Insert a 3×3 table with header row",
       icon: "⊞",

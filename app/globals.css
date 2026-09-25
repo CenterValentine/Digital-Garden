@@ -1629,6 +1629,70 @@ body.flashcard-select-cursor * {
   color: rgb(252, 211, 77);
 }
 
+/* ────────────────────────────────────────────────────────────────────────
+ * Private content — commented-out prose (privateText mark, privateBlock node)
+ *
+ * The aesthetic is a code editor's comment: recolored, never boxed or hidden,
+ * still fully editable. The `%%` delimiters are drawn as CSS chrome so the
+ * typed syntax stays visible and self-teaching while the document holds only
+ * the meaning (the markdown codec emits the real characters on the way out).
+ * Scoped to .ProseMirror: the public page strips private JSON before it
+ * renders, and the belt-and-braces rule below hides anything that slips.
+ * ──────────────────────────────────────────────────────────────────────── */
+.ProseMirror .private-text {
+  color: rgb(113, 113, 122);
+  text-decoration: underline dotted rgba(113, 113, 122, 0.55);
+  text-underline-offset: 0.18em;
+}
+.ProseMirror .private-text::before,
+.ProseMirror .private-text::after {
+  content: "%%";
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.72em;
+  color: rgba(113, 113, 122, 0.7);
+  margin: 0 0.12em;
+  user-select: none;
+}
+.ProseMirror .private-block {
+  color: rgb(113, 113, 122);
+  border-left: 2px dashed rgba(113, 113, 122, 0.55);
+  padding-left: 0.85rem;
+  margin: 0.5rem 0;
+}
+.ProseMirror .private-block::before,
+.ProseMirror .private-block::after {
+  content: "%%";
+  display: block;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.72em;
+  line-height: 1.6;
+  color: rgba(113, 113, 122, 0.7);
+  user-select: none;
+}
+.ProseMirror .private-block::before {
+  content: "%% private — hidden from AI, publishing and search";
+}
+.dark .ProseMirror .private-text,
+.dark .ProseMirror .private-block {
+  color: rgb(140, 140, 150);
+}
+.dark .ProseMirror .private-text {
+  text-decoration-color: rgba(140, 140, 150, 0.55);
+}
+.dark .ProseMirror .private-block {
+  border-left-color: rgba(140, 140, 150, 0.5);
+}
+.dark .ProseMirror .private-text::before,
+.dark .ProseMirror .private-text::after,
+.dark .ProseMirror .private-block::before,
+.dark .ProseMirror .private-block::after {
+  color: rgba(140, 140, 150, 0.7);
+}
+/* Never on a public page — the JSON strip is the real guard; this is the net. */
+.public-prose [data-private] {
+  display: none;
+}
+
 /* Sprint 41: Chat outline scroll-to flash animation */
 @keyframes chat-outline-flash {
   0% { background-color: rgba(255, 215, 0, 0.15); }
