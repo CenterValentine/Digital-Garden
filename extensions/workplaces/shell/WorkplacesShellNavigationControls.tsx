@@ -1,14 +1,14 @@
 "use client";
 
 import { WorkspaceSelector } from "@/extensions/workplaces/components/WorkspaceSelector";
-import { WorkspaceTabDropTarget } from "./WorkspaceTabDropTarget";
+import { WorkspaceDropTarget } from "./WorkspaceDropTarget";
 
 export function WorkplacesShellNavigationControls() {
   return (
     <>
-      <WorkspaceTabDropTarget>
+      <WorkspaceDropTarget>
         <WorkspaceSelector />
-      </WorkspaceTabDropTarget>
+      </WorkspaceDropTarget>
       <div className="h-4 w-px bg-black/10 dark:bg-white/10" />
     </>
   );

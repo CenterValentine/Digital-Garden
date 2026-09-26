@@ -179,6 +179,27 @@ async function main() {
         ?.contentId,
       content.id,
     );
+
+    console.log("\nopenWorkspaceTab (content sent from the tree)");
+    const beforeOpen = await stamps();
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    const opened = await openWorkspaceTab(ownerId, source.id, content.id);
+    check("returns the row", opened?.contentId, content.id);
+    check(
+      "bumps the target updatedAt so other surfaces pick the tab up",
+      (await stamps()).source.getTime() > beforeOpen.source.getTime(),
+      true,
+    );
+    check(
+      "the opened workspace now holds the row",
+      (await listWorkspaceTabs(ownerId, source.id))?.map((t) => t.contentId),
+      [content.id],
+    );
+    check(
+      "the other workspace keeps its copy — open is not a move",
+      (await listWorkspaceTabs(ownerId, target.id))?.map((t) => t.contentId),
+      [content.id],
+    );
   } finally {
     await prisma.contentWorkspace.deleteMany({
       where: { id: { in: [source.id, target.id] } },

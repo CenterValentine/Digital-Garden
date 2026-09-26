@@ -440,13 +440,13 @@ export async function handleOpenWorkspaceTab(
           { status: 400 }
         );
       }
-      const data = await openWorkspaceTab(
+      const tab = await openWorkspaceTab(
         session.user.id,
         id,
         body.contentId,
         body.affinity
       );
-      if (!data) {
+      if (!tab) {
         return NextResponse.json(
           {
             success: false,
@@ -455,7 +455,10 @@ export async function handleOpenWorkspaceTab(
           { status: 404 }
         );
       }
-      return NextResponse.json({ success: true, data });
+      // Same shape as /tabs/move: the target's fresh read rides along so the
+      // client can replace its list entry (membership + contentMeta) at once.
+      const workspace = await getWorkspace(session.user.id, id);
+      return NextResponse.json({ success: true, data: { tab, workspace } });
     } catch (error) {
       logger.error({ layer: "content", event: "workspaces_tab_open:caught", summary: "POST caught", error });
       return errorResponse(error, "Failed to open workspace tab");

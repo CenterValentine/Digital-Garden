@@ -74,11 +74,23 @@ export async function openWorkspaceTab(
   if (!content) return null;
 
   const { h, v } = normalizeAffinity(affinity);
-  return prisma.contentWorkspaceTab.upsert({
-    where: { workspaceId_contentId: { workspaceId, contentId } },
-    create: { workspaceId, contentId, affinityH: h, affinityV: v },
-    update: { affinityH: h, affinityV: v },
-  });
+  // Bump the workspace's updatedAt alongside the row: other surfaces holding
+  // this workspace open reconcile on it (poll or 409-adopt) and the tab
+  // appears there. Callers whose ACTIVE workspace is the target open the tab
+  // locally instead of calling this — their own next save carries
+  // baseUpdatedAt and would 409 on the bump (see moveWorkspaceTab).
+  const [tab] = await prisma.$transaction([
+    prisma.contentWorkspaceTab.upsert({
+      where: { workspaceId_contentId: { workspaceId, contentId } },
+      create: { workspaceId, contentId, affinityH: h, affinityV: v },
+      update: { affinityH: h, affinityV: v },
+    }),
+    prisma.contentWorkspace.update({
+      where: { id: workspaceId },
+      data: { updatedAt: new Date() },
+    }),
+  ]);
+  return tab;
 }
 
 /**

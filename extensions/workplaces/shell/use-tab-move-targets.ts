@@ -88,7 +88,16 @@ function collectBenchTargets(
  * workplace while `enabled` is true (menu / panel open) — a folder needs no
  * bench row yet to be a destination; the move materializes it.
  */
-export function useTabMoveTargets(enabled: boolean) {
+export function useTabMoveTargets(
+  enabled: boolean,
+  /**
+   * `excludeActive` (default true) drops the active bench from its parent's
+   * list — a tab cannot move to where it already is. Content SENT from the
+   * tree can land in the active bench, so that caller passes false.
+   */
+  options: { excludeActive?: boolean } = {},
+) {
+  const excludeActive = options.excludeActive ?? true;
   const workspaces = useWorkspaceStore((state) => state.workspaces);
   const activeWorkspaceId = useWorkspaceStore((state) => state.activeWorkspaceId);
 
@@ -149,9 +158,11 @@ export function useTabMoveTargets(enabled: boolean) {
           workspace,
           workspaces,
           foldersByParent[workspace.id],
-        ).filter((bench) => bench.workbenchId !== activeWorkspaceId),
+        ).filter(
+          (bench) => !excludeActive || bench.workbenchId !== activeWorkspaceId,
+        ),
       })),
-    [activeWorkspaceId, foldersByParent, topLevelWorkspaces, workspaces],
+    [activeWorkspaceId, excludeActive, foldersByParent, topLevelWorkspaces, workspaces],
   );
 
   const hasAnyTarget = groups.some(

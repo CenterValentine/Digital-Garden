@@ -98,6 +98,17 @@ interface WorkspaceState {
     /** `openTarget`: also switch to the target once the tab is there. */
     options?: { openTarget?: boolean },
   ) => Promise<void>;
+  /**
+   * Open content as tabs in `targetWorkspaceId` (a workplace or bench)
+   * without leaving the active one — a file dragged onto the workplaces
+   * affordance. Targeting the ACTIVE workplace is an ordinary open through
+   * the workplace guard. `openTarget` switches there afterwards.
+   */
+  sendContentToWorkspace: (
+    targetWorkspaceId: string,
+    items: Array<{ id: string; title: string; contentType: string | null }>,
+    options?: { openTarget?: boolean },
+  ) => Promise<void>;
   updateWorkspace: (
     workspaceId: string,
     updates: {
@@ -1170,6 +1181,66 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       return;
     }
     toast.success(`Moved "${tab.title || "Untitled"}" to ${targetName}`, {
+      action: {
+        label: "Go there",
+        onClick: () => {
+          void get().activateWorkspace(targetWorkspaceId);
+        },
+      },
+    });
+  },
+
+  sendContentToWorkspace: async (targetWorkspaceId, items, options = {}) => {
+    if (items.length === 0) return;
+    const label =
+      items.length === 1
+        ? `"${items[0].title || "Untitled"}"`
+        : `${items.length} items`;
+    const targetName =
+      getWorkspace(get().workspaces, targetWorkspaceId)?.name ?? "workplace";
+
+    // Already here: open normally, through the workplace guard (claims,
+    // conflicts, borrow prompts all apply). Membership follows via persist.
+    if (targetWorkspaceId === get().activeWorkspaceId) {
+      for (const item of items) {
+        await get().requestOpenContent(item.id);
+      }
+      return;
+    }
+
+    let target: ContentWorkspaceResponse | null = null;
+    for (const item of items) {
+      const response = await fetchWorkspaceMutation(
+        `/api/content/workspaces/${targetWorkspaceId}/tabs`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ contentId: item.id }),
+        },
+      );
+      const data = await parseResponse<{ workspace: ContentWorkspaceResponse }>(
+        response,
+        "Failed to send to workplace",
+      );
+      target = data.workspace;
+    }
+    if (target) {
+      const fresh = target;
+      set((state) => ({
+        workspaces: state.workspaces.map((candidate) =>
+          candidate.id === fresh.id ? fresh : candidate,
+        ),
+      }));
+    }
+    notifyMutation();
+
+    if (options.openTarget) {
+      await get().activateWorkspace(targetWorkspaceId);
+      toast.success(`Opened ${label} in ${targetName}`);
+      return;
+    }
+    toast.success(`Sent ${label} to ${targetName}`, {
       action: {
         label: "Go there",
         onClick: () => {
