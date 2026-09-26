@@ -33,6 +33,9 @@ last_updated: 2026-05-13
 
 ### Smoke checklist (owner)
 - [ ] Side chat on a note with a `%%…%%` run: ask "does this document contain <the private phrase>" → the model says no / cannot find it.
+- [ ] Caret at the end of a `%%…%%` run, type → text stays inside; press → once (caret does not move), type → text is outside.
+- [ ] After stepping out, Backspace → the run is uncommented (text kept). Caret just before a run, Delete → same.
+- [ ] Caret at the start of the paragraph right after a private block, Backspace → the block is uncommented and the paragraph is NOT pulled into it.
 - [ ] Side chat header → copy-link button on the FIRST click → "Chat link copied" toast and the link is on the clipboard.
 - [ ] Inside a ``` code block, paste a multi-line snippet containing `#` comment lines and `-` bullets → every line lands verbatim, no toast. Also via right-click → Paste as Markdown.
 - [ ] Type `/` → every row shows a line icon (no emoji); `/calendar` rows too.

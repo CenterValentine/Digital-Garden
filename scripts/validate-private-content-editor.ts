@@ -123,6 +123,41 @@ async function main() {
   enter();
   check("mid-document close → fresh paragraph between the block and the next one", text() === "<p>a</p><div data-private=\"block\" class=\"private-block\"><p>b</p></div><p></p><p>c</p>", text());
 
+  // 7c. Boundaries — inner and outer edges (owner report, 2026-09-26).
+  const key = (k: string) => editor.view.someProp("handleKeyDown", (f) => f(editor.view, new dom.window.KeyboardEvent("keydown", { key: k, code: k })));
+  editor.commands.setContent("<p>keep <span data-private=\"text\">hush</span></p>");
+  editor.commands.setTextSelection(10); // trailing edge of "hush"
+  typeText("!");
+  check("typing at the trailing edge stays INSIDE the run", /<span data-private="text" class="private-text">hush!<\/span><\/p>$/.test(text()), text());
+  key("ArrowRight");
+  typeText("x");
+  check("ArrowRight at the edge steps out; the next character is outside", /<span data-private="text" class="private-text">hush!<\/span>x<\/p>$/.test(text()), text());
+
+  // Step out, then Backspace immediately: that is the outer trailing edge.
+  // (A plain single-character Backspace is native browser behaviour that
+  // jsdom cannot perform, so the scenario starts from a fresh document.)
+  editor.commands.setContent("<p>keep <span data-private=\"text\">hush</span></p>");
+  editor.commands.setTextSelection(10);
+  key("ArrowRight");
+  key("Backspace");
+  check("Backspace on the outer trailing edge uncomments the run, text kept", /^<p>keep hush<\/p>/.test(text()), text());
+
+  editor.commands.setContent("<p>keep <span data-private=\"text\">hush</span> end</p>");
+  editor.commands.setTextSelection(6); // leading edge, outside by ProseMirror's rule
+  key("Delete");
+  check("Delete on the outer leading edge uncomments the run, text kept", text() === "<p>keep hush end</p>", text());
+
+  editor.commands.setContent("<p>a</p><div data-private=\"block\"><p>b</p><p>c</p></div><h2>What</h2>");
+  editor.commands.setTextSelection(12); // start of "What" (p=3, block=8 → h2 opens at 11)
+  key("Backspace");
+  check("Backspace at the start of the paragraph after a block uncomments the block (nothing adopted)", /^<p>a<\/p><p>b<\/p><p>c<\/p><h2>What<\/h2>/.test(text()), text());
+  check("…caret stays at the start of that paragraph", editor.state.selection.$from.parent.textContent === "What" && editor.state.selection.$from.parentOffset === 0);
+
+  editor.commands.setContent("<p>a</p><div data-private=\"block\"><p>b</p><p>c</p></div><p>d</p>");
+  editor.commands.setTextSelection(5); // start of "b", the block's first child
+  key("Backspace");
+  check("Backspace at the start of the block's first paragraph uncomments the whole block", text() === "<p>a</p><p>b</p><p>c</p><p>d</p>", text());
+
   // 8. Stripping and visible text agree on a document with both shapes.
   editor.commands.setContent("<p>keep <span data-private=\"text\">hush</span> end</p><div data-private=\"block\"><p>inside</p></div><p>tail</p>");
   const stripped = stripPrivateContent(editor.getJSON());

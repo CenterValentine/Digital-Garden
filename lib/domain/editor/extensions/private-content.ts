@@ -31,7 +31,7 @@
  */
 
 import { Mark, Node, markInputRule, mergeAttributes } from "@tiptap/core";
-import type { ResolvedPos } from "@tiptap/pm/model";
+import type { Mark as PMMark, ResolvedPos } from "@tiptap/pm/model";
 import { TextSelection, type Transaction } from "@tiptap/pm/state";
 import { liftTarget } from "@tiptap/pm/transform";
 import {
@@ -119,10 +119,45 @@ const privateTextRender = (HTMLAttributes: Record<string, unknown>) =>
     0,
   ] as const;
 
+/**
+ * The contiguous run of private text touching `$pos` on the given side, as a
+ * document range — or null when that side is not private text.
+ */
+function privateRunRange($pos: ResolvedPos, side: "before" | "after"): { from: number; to: number } | null {
+  const parent = $pos.parent;
+  const index = $pos.index();
+  const anchorIndex = side === "before" ? index - 1 : index;
+  const anchor = parent.maybeChild(anchorIndex);
+  if (!anchor || !anchor.isText || !anchor.marks.some(isPrivateMark)) return null;
+  let startIndex = anchorIndex;
+  while (startIndex > 0 && parent.child(startIndex - 1).isText && parent.child(startIndex - 1).marks.some(isPrivateMark)) {
+    startIndex -= 1;
+  }
+  let endIndex = anchorIndex;
+  while (endIndex + 1 < parent.childCount && parent.child(endIndex + 1).isText && parent.child(endIndex + 1).marks.some(isPrivateMark)) {
+    endIndex += 1;
+  }
+  let from = $pos.start();
+  for (let i = 0; i < startIndex; i += 1) from += parent.child(i).nodeSize;
+  let to = from;
+  for (let i = startIndex; i <= endIndex; i += 1) to += parent.child(i).nodeSize;
+  return { from, to };
+}
+
+/** Would text typed at this cursor carry the private mark? */
+function typingIsPrivate(state: { storedMarks: readonly PMMark[] | null; selection: { $from: ResolvedPos } }): boolean {
+  const marks = state.storedMarks ?? state.selection.$from.marks();
+  return marks.some(isPrivateMark);
+}
+
 export const PrivateText = Mark.create({
   name: PRIVATE_TEXT_MARK,
-  // A comment has a definite end: typing at its boundary is ordinary text.
-  inclusive: false,
+  // Typing at the trailing edge CONTINUES the comment (a caret that was
+  // inside stays inside), the way a code comment keeps going until you leave
+  // it. Leaving is explicit: ArrowRight at the edge steps out without moving.
+  // The leading edge is the opposite by ProseMirror's own rule: text typed
+  // just before a run is outside it.
+  inclusive: true,
 
   parseHTML() {
     return privateTextParse();
@@ -130,6 +165,44 @@ export const PrivateText = Mark.create({
 
   renderHTML({ HTMLAttributes }) {
     return [...privateTextRender(HTMLAttributes)];
+  },
+
+  addKeyboardShortcuts() {
+    return {
+      // Trailing edge, caret inside → step OUT (no movement). The next
+      // ArrowRight moves normally; the next typed character is plain text.
+      ArrowRight: () => {
+        const { state, view } = this.editor;
+        const { $from, empty } = state.selection;
+        if (!empty || !typingIsPrivate(state)) return false;
+        if (!privateRunRange($from, "before") || privateRunRange($from, "after")) return false;
+        const marks = (state.storedMarks ?? $from.marks()).filter((m) => !isPrivateMark(m));
+        view.dispatch(state.tr.setStoredMarks(marks));
+        return true;
+      },
+      // Backspace on the OUTER trailing edge deletes the closing `%%`: the
+      // run is uncommented, its text stays. (Inside the edge, Backspace
+      // deletes a character as usual.)
+      Backspace: () => {
+        const { state, view } = this.editor;
+        const { $from, empty } = state.selection;
+        if (!empty || typingIsPrivate(state)) return false;
+        const run = privateRunRange($from, "before");
+        if (!run || $from.pos !== run.to) return false;
+        view.dispatch(state.tr.removeMark(run.from, run.to, this.type));
+        return true;
+      },
+      // Delete on the OUTER leading edge deletes the opening `%%` likewise.
+      Delete: () => {
+        const { state, view } = this.editor;
+        const { $from, empty } = state.selection;
+        if (!empty || typingIsPrivate(state)) return false;
+        const run = privateRunRange($from, "after");
+        if (!run || $from.pos !== run.from) return false;
+        view.dispatch(state.tr.removeMark(run.from, run.to, this.type));
+        return true;
+      },
+    };
   },
 
   addInputRules() {
@@ -164,7 +237,7 @@ export const PrivateText = Mark.create({
 
 export const ServerPrivateText = Mark.create({
   name: PRIVATE_TEXT_MARK,
-  inclusive: false,
+  inclusive: true,
 
   parseHTML() {
     return privateTextParse();
@@ -251,6 +324,48 @@ export const PrivateBlock = Node.create({
   addKeyboardShortcuts() {
     return {
       "Mod-/": () => this.editor.commands.togglePrivate(),
+
+      // The block's delimiters behave like deletable lines. Backspace at the
+      // very start of the paragraph right AFTER a private block deletes its
+      // closing `%%` — the block is uncommented, nothing gets adopted into it
+      // (ProseMirror's default would merge that paragraph into the block).
+      // Backspace at the start of the block's FIRST paragraph deletes the
+      // opening `%%` with the same result.
+      Backspace: () => {
+        const { state } = this.editor;
+        const { $from, empty } = state.selection;
+        if (!empty || $from.parentOffset !== 0 || !$from.parent.isTextblock) return false;
+
+        const depth = privateBlockDepth($from);
+        if (depth !== null) {
+          if ($from.index(depth) !== 0) return false;
+          return this.editor
+            .chain()
+            .command(({ tr, dispatch }) => {
+              if (!dispatch) return true;
+              return liftWholePrivateBlock(tr, tr.selection.$from, depth);
+            })
+            .run();
+        }
+
+        const $before = state.doc.resolve($from.before());
+        const previous = $before.nodeBefore;
+        if (!previous || previous.type.name !== PRIVATE_BLOCK_NODE) return false;
+        return this.editor
+          .chain()
+          .command(({ tr, dispatch }) => {
+            if (!dispatch) return true;
+            // A position just inside the previous block's last child.
+            const $inside = tr.doc.resolve($before.pos - 2);
+            const d = privateBlockDepth($inside);
+            if (d === null) return false;
+            const caret = tr.selection.from;
+            const ok = liftWholePrivateBlock(tr, $inside, d);
+            if (ok) tr.setSelection(TextSelection.create(tr.doc, tr.mapping.map(caret)));
+            return ok;
+          })
+          .run();
+      },
 
       // The typed block form. A paragraph containing exactly `%%` + Enter
       // opens a private block (outside one) or closes it (inside one),

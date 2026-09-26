@@ -17,6 +17,15 @@
 | `/private` (aliases `comment`, `hidden`, `%%`) | block |
 | EyeOff button in the selection toolbelt | same decision as Cmd+/ |
 
+**Edges behave like deletable delimiters.** Typing at the end of a run
+continues the run; ArrowRight at that edge steps out without moving, and the
+next character is plain. Backspace on the outer trailing edge, or Delete on
+the outer leading edge, deletes the "`%%`" and uncomments the run with its
+text intact. For a block, Backspace at the start of the paragraph right after
+it deletes the closing line and uncomments the block (nothing gets adopted
+into it), and Backspace at the start of its first paragraph does the same
+from the opening line.
+
 The aesthetic is a code editor's comment: muted color, dotted underline for
 the inline run, a dashed left rule and a small label for the block. Nothing is
 boxed, collapsed or hidden — the point of commented-out code is that you still
