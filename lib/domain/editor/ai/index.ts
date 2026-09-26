@@ -20,6 +20,7 @@ export {
   type HandleResolution,
   type OutlineEntry,
 } from "./block-handles";
+export { visibleTextBetween, visibleTextOf } from "./visible-text";
 export {
   AiEditOrchestrator,
   parseEditPayload,

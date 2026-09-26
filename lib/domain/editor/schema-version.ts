@@ -81,7 +81,7 @@
  * See: docs/notes-feature/TIPTAP-SCHEMA-EVOLUTION-GUIDE.md
  */
 
-export const TIPTAP_SCHEMA_VERSION = "1.17.0";
+export const TIPTAP_SCHEMA_VERSION = "1.18.0";
 
 export interface SchemaVersion {
   version: string;
@@ -109,6 +109,31 @@ export interface SchemaChange {
  * 4. Run tests: pnpm test lib/domain/export
  */
 export const SCHEMA_HISTORY: SchemaVersion[] = [
+  {
+    version: "1.18.0",
+    date: "2026-09-25",
+    changes: [
+      {
+        type: "add",
+        target: "mark",
+        name: "privateText",
+        description:
+          "Private (commented-out) inline text. Stays in the document for the author, stripped by stripPrivateContent at every AI, public-render and search-index seam. No attrs. Typed as `%%text%%` (Obsidian comment syntax), toggled with Cmd+/ on an in-paragraph selection; round-trips through markdown as `%%text%%`. Rendered faithfully (span[data-private=text]) on every surface — hiding is a JSON strip, never a blank render. ⚠ Hocuspocus redeploy required after merge.",
+        breaking: false,
+        migrationsAvailable: [],
+      },
+      {
+        type: "add",
+        target: "node",
+        name: "privateBlock",
+        description:
+          "Private (commented-out) block wrapper, content block+. Same stripping contract as privateText. Typed as `%%` + Enter (opens) / `%%` + Enter inside (closes), toggled with Cmd+/ on a bare cursor or multi-block selection, or via /private; round-trips as a `%%` … `%%` fence via the privateBlock codec. ⚠ Hocuspocus redeploy required after merge.",
+        breaking: false,
+        migrationsAvailable: [],
+      },
+    ],
+    migrationsRequired: false,
+  },
   {
     version: "1.16.0",
     date: "2026-08-23",
@@ -663,6 +688,7 @@ export function getCurrentSchemaSnapshot() {
       "flashcardEmbed",
       "noteWindow",
       "audioEmbed",
+      "privateBlock",
       "unsupportedBlock",
       "unsupportedInline",
     ],
@@ -676,6 +702,7 @@ export function getCurrentSchemaSnapshot() {
       "aiHighlight",
       "flashcardSelect",
       "clozeDeletion",
+      "privateText",
     ],
     extensions: [
       "StarterKit",
@@ -717,6 +744,8 @@ export function getCurrentSchemaSnapshot() {
       "AudioEmbed",
       "FlashcardSelect",
       "ClozeDeletion",
+      "PrivateText",
+      "PrivateBlock",
       "UnsupportedBlock",
       "UnsupportedInline",
     ],

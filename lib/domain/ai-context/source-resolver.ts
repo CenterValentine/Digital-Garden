@@ -13,6 +13,7 @@
 import type { JSONContent } from "@tiptap/core";
 import { prisma } from "@/lib/database/client";
 import { tiptapToMarkdown } from "@/lib/domain/content/markdown";
+import { stripPrivateContent } from "@/lib/domain/content/private-content";
 import type {
   ResolvedSourceContent,
   ResolverNodeRef,
@@ -133,10 +134,13 @@ async function resolveNote(
 
   // Markdown preserves headings/lists/links — better structure for the model
   // than flat search text. Fall back to searchText if serialization yields
-  // nothing (e.g. a doc of only unsupported blocks).
+  // nothing (e.g. a doc of only unsupported blocks). Private (commented-out)
+  // content is stripped first; searchText is already written stripped.
   let text = "";
   try {
-    text = tiptapToMarkdown(payload.tiptapJson as unknown as JSONContent);
+    text = tiptapToMarkdown(
+      stripPrivateContent(payload.tiptapJson as unknown as JSONContent),
+    );
   } catch {
     text = "";
   }

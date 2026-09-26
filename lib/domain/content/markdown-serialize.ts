@@ -142,6 +142,21 @@ export function createTurndown(
       node.nodeName === "INPUT" && node.getAttribute("type") === "checkbox",
     replacement: () => "",
   });
+  // Private (commented-out) content → Obsidian comment syntax. The inline mark
+  // becomes `%%text%%`; a private block nested inside another container becomes
+  // the `%%` … `%%` fence (top-level private blocks take the codec path, which
+  // emits the identical shape). Parsed back by the private codecs' reTag in
+  // markdown-block-codecs.ts.
+  td.addRule("dgPrivateText", {
+    filter: (node) =>
+      node.nodeName === "SPAN" && node.getAttribute("data-private") === "text",
+    replacement: (content) => `%%${content}%%`,
+  });
+  td.addRule("dgPrivateBlock", {
+    filter: (node) =>
+      node.nodeName === "DIV" && node.getAttribute("data-private") === "block",
+    replacement: (content) => `\n\n%%\n\n${content.trim()}\n\n%%\n\n`,
+  });
   // TipTap tables need our own rules — the GFM plugin's don't fit its HTML:
   //   • it only converts a table whose first row is a heading row, and that test
   //     (isFirstTbody) demands <tbody> be the table's FIRST child. TipTap always

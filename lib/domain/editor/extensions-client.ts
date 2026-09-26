@@ -74,6 +74,7 @@ import { BlockIdPasteHygiene } from "./extensions/block-id-paste-hygiene";
 import { AudioEmbed } from "./extensions/blocks/audio-embed-client";
 import { FlashcardSelect } from "./extensions/flashcard-select";
 import { ClozeDeletion } from "./extensions/cloze-deletion";
+import { PrivateBlock, PrivateText } from "./extensions/private-content";
 import {
   UnsupportedBlock,
   UnsupportedInline,
@@ -347,6 +348,10 @@ export function getEditorExtensions(options?: EditorExtensionsOptions): Extensio
     AudioEmbed,
     FlashcardSelect,
     ClozeDeletion,
+    // Private content — comment out prose (Cmd+/, %%…%%, /private). Stripped
+    // at every AI / public / search seam by stripPrivateContent.
+    PrivateText,
+    PrivateBlock,
     UnsupportedBlock,
     UnsupportedInline,
     ...getExtensionClientEditorExtensions(),

@@ -9,6 +9,45 @@ last_updated: 2026-05-13
 
 # Current Sprint Addendum
 
+## September 25, 2026 — Private content (comment out prose)
+
+**Tree**: worktree `.claude/worktrees/private-text`, branch `feat/private-text` (off `origin/main` at `e171048f`)
+**Status**: typecheck / lint 151 (0 errors) / collab:schema / markdown:blocks (+6 fixtures, +2 pretty assertions) / private:content:check (new, mutation-tested) / full build green; **owner browser smoke pending**. **⚠ Hocuspocus redeploy required post-merge** (schema 1.18.0: new mark `privateText` + node `privateBlock` — an un-redeployed collab server rewrites them to `unsupportedInline` / `unsupportedBlock`).
+
+### Shipped
+- **`privateText` mark + `privateBlock` node** (`lib/domain/editor/extensions/private-content.ts`, Server twins registered in `extensions-server.ts` + `collaboration/extensions.ts`). Cmd+/ `togglePrivate`: in-paragraph selection → mark; bare cursor / cross-block selection → block wrap; inside either → reverse (whole run via `extendEmptyMarkRange`, whole block via `liftTarget`). `%%text%%` markInputRule; `%%` + Enter opens / closes a block; `/private`; EyeOff toolbelt button (`private` tool, order 45).
+- **One predicate, explicit at each seam** — `stripPrivateContent` (pure JSON, `lib/domain/content/private-content.ts`): `extractSearchTextFromTipTap` (covers the `searchText` column on every write path + `read_content`), `chunkDocument`, `resolveNote`, `renderCharterSection` / `Plain`, `TipTapContent`. Live-ProseMirror twins `visibleTextOf` / `visibleTextBetween` (`lib/domain/editor/ai/visible-text.ts`) for `buildOutline` previews and ChatPanel's ambiguity context + "document currently reads" dump. NOT in `tiptapToMarkdown` (source view must show it).
+- **Lossless markdown**: `privateBlock` codec (`%%` fence, blank-line padded, unanchored reTag) + reTag-only `privateText` codec; `dgPrivateText` / `dgPrivateBlock` turndown rules; code segments excluded from the inline reTag. Export markdown converter emits `%%…%%` / `%%` fences.
+- **Gate**: `pnpm private:content:check` — two halves, wired into `build`: `scripts/validate-private-content.ts` (predicate + seam scan, mutation-tested) and `scripts/validate-private-content-editor.ts` (a REAL TipTap editor under jsdom: Cmd+/ both shapes and their reversal, the `%%text%%` input rule via `handleTextInput`, `%%` + Enter open/close incl. the trailing-node reuse, strip ≡ visible text).
+- **CSS**: `.ProseMirror .private-text` / `.private-block` (muted, dotted underline / dashed left rule, `%%` chrome via pseudo-elements, dark companions); `.public-prose [data-private] { display: none }` as the belt-and-braces net.
+
+### Also in this release train (same branch, 2026-09-25)
+- **Paste into a code block always lands** (owner report: long pastes into a ``` block landed nothing or one line). Root cause: the editor's own `handlePaste` in `MarkdownEditor.tsx` runs before TipTap's code-block-aware handler and, when the text looked like markdown (`#` comments, `-` lines, backticks…), either replaced the literal paste with block nodes a `codeBlock` (`content: text*`) cannot hold ("Always format" on) or offered a toast whose "convert" undid the good paste. Fix: bail out of that handler whenever `$from.parent.type.spec.code` — ProseMirror's default then inserts one text node with every line kept. The context-menu "Paste as Markdown" inserts literal text inside a code block for the same reason.
+- **Slash menu uses Lucide icons** instead of 60 mixed emoji/glyphs: `SlashCommand.icon` is now `LucideIcon | string` (string kept for extension authors), all 72 built-in commands + the calendar extension's two mapped to icons, rendered at 18px in the menu's existing gold accent.
+
+### First owner smoke (2026-09-26) — findings + fixes
+- **Leak found:** a side chat asked "does this document have the phrase …" and the model quoted a `%%…%%` run. Path: the side chat attaches its bound note as an implicit first mention (`app/api/ai/chat/route.ts`), rendered from the materialized `searchText` column, which predated the strip. **Fix:** derive live via `extractSearchTextFromTipTap` (same rule `read_content` already followed). **Also closed** from the same sweep: `findTextInDoc` (apply_diff could match/edit private text and its match COUNT confirmed existence), charter phase titles (`headingText`), inject-media `blockPreview`, `list_document_blocks`, the browser-extension note read's markdown flavour. Six seams added to `private:content:check`. Left as documented edges: `read_current_page` DOM capture of the app's own page (extension content script), stale AI-derived metadata.
+- **Search "toggling" observation:** consistent with the `searchText` column lagging the editor by one collaborative save — the column is written stripped on every save path, so a result that shows right after un-marking disappears on the next save after re-marking. Not a second code path.
+- **Side-chat copy-link first click** (separate regression, owner report): the clipboard write ran after an `await`ed ensure-node POST; on the first click that POST creates the node and the click's user activation expires, so the browser refuses the write; the second click's POST is a no-op and squeaks in. Fixed by handing `ClipboardItem` a pending value (write stays inside the gesture) + caching the node id per conversation.
+- **Local sign-in outage** during the smoke: the dev server's inherited shell env forced TLS on the localhost Postgres (`Error opening a TLS connection: The server does not support SSL connections`); a restart from a clean shell fixed it. Both dev and collab servers now run detached from this worktree.
+
+### Smoke checklist (owner)
+- [ ] Side chat on a note with a `%%…%%` run: ask "does this document contain <the private phrase>" → the model says no / cannot find it.
+- [ ] Caret at the end of a `%%…%%` run, type → text stays inside; press → once (caret does not move), type → text is outside.
+- [ ] After stepping out, Backspace → the run is uncommented (text kept). Caret just before a run, Delete → same.
+- [ ] Caret at the start of the paragraph right after a private block, Backspace → the block is uncommented and the paragraph is NOT pulled into it.
+- [ ] Side chat header → copy-link button on the FIRST click → "Chat link copied" toast and the link is on the clipboard.
+- [ ] Inside a ``` code block, paste a multi-line snippet containing `#` comment lines and `-` bullets → every line lands verbatim, no toast. Also via right-click → Paste as Markdown.
+- [ ] Type `/` → every row shows a line icon (no emoji); `/calendar` rows too.
+- [ ] Select words inside a paragraph → Cmd+/ → muted `%%…%%` run; Cmd+/ again with the caret inside → plain text.
+- [ ] Caret on a paragraph → Cmd+/ → dashed private block with the "%% private — hidden…" label; Cmd+/ inside → unwrapped.
+- [ ] Type `%%secret%%` → converts on the closing `%%`. Type `%%` + Enter → block opens; `%%` + Enter inside → block closes with the caret in a fresh paragraph after it.
+- [ ] `/private` and the EyeOff toolbelt button behave like Cmd+/.
+- [ ] Source view (markdown toggle) shows `%%secret%%` and the `%%` fence lines; toggling back restores both shapes.
+- [ ] AI chat bound to the note: `read_content` / "read the document" never quotes private text; `list_document_outline` shows "(no text)" for a private block.
+- [ ] Publish the note → private text and block absent from the public page.
+- [ ] Global search for a private-only word finds nothing after the note saves.
+
 ## August 14, 2026 — Note Window block + clipboard round-trip fixes
 
 **Tree**: main working tree (no branch yet — owner decides branch/PR)

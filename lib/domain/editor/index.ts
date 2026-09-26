@@ -50,6 +50,12 @@ export {
   type ResolvedWikiLinkTarget,
 } from "./wiki-link-resolve";
 export { Callout } from "./extensions/callout";
+export {
+  PrivateText,
+  PrivateBlock,
+  ServerPrivateText,
+  ServerPrivateBlock,
+} from "./extensions/private-content";
 export { Tag } from "./extensions/tag";
 export { TaskListInputRule } from "./extensions/task-list";
 export { BulletListBackspace } from "./extensions/bullet-list";
