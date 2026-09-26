@@ -95,6 +95,8 @@ interface WorkspaceState {
   moveTabToWorkspace: (
     targetWorkspaceId: string,
     tab: { id: string; contentId: string; title: string },
+    /** `openTarget`: also switch to the target once the tab is there. */
+    options?: { openTarget?: boolean },
   ) => Promise<void>;
   updateWorkspace: (
     workspaceId: string,
@@ -1090,7 +1092,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     return workspace;
   },
 
-  moveTabToWorkspace: async (targetWorkspaceId, tab) => {
+  moveTabToWorkspace: async (targetWorkspaceId, tab, options = {}) => {
     const sourceWorkspaceId = get().activeWorkspaceId;
     if (!sourceWorkspaceId) {
       throw new Error("No active workplace to move the tab from");
@@ -1160,6 +1162,13 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     }
 
     notifyMutation();
+    if (options.openTarget) {
+      // The user held the drag: follow the tab. The switch itself is the
+      // acknowledgement — no toast action to offer what just happened.
+      await get().activateWorkspace(targetWorkspaceId);
+      toast.success(`Moved "${tab.title || "Untitled"}" to ${targetName}`);
+      return;
+    }
     toast.success(`Moved "${tab.title || "Untitled"}" to ${targetName}`, {
       action: {
         label: "Go there",

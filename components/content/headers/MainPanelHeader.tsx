@@ -17,6 +17,7 @@ import {
 } from "@/state/content-store";
 import { useWorkspaceStore } from "@/state/workspace-store";
 import { useTreeDragStore } from "@/state/tree-drag-store";
+import { TAB_DRAG_MIME, useTabDragStore } from "@/state/tab-drag-store";
 import {
   collectPaneAttachedTabs,
   getEffectiveTabFilters,
@@ -810,9 +811,23 @@ export function MainPanelHeader({
                 onDragStart={(event) => {
                   event.dataTransfer.effectAllowed = "move";
                   event.dataTransfer.setData("text/plain", tab.id);
+                  event.dataTransfer.setData(TAB_DRAG_MIME, tab.id);
+                  // Targets outside this pane subtree (the workplaces
+                  // affordance) read the drag from the store, not from
+                  // dataTransfer, which is opaque until the drop.
+                  useTabDragStore.getState().setDraggingTab({
+                    id: tab.id,
+                    contentId: tab.contentId,
+                    title: tab.title,
+                    contentType: tab.contentType,
+                    paneId,
+                  });
                   onTabDragStart(tab.id, paneId);
                 }}
-                onDragEnd={onTabDragEnd}
+                onDragEnd={() => {
+                  useTabDragStore.getState().setDraggingTab(null);
+                  onTabDragEnd();
+                }}
                 onDragOver={(event) => {
                   if (!draggedTabId || draggedTabId === tab.id) return;
                   event.preventDefault();
