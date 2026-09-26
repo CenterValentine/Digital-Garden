@@ -198,6 +198,8 @@ const lastAppliedUpdatedAt: Record<string, string> = {};
 const lastAppliedSnapshotJson: Record<string, string> = {};
 let onMutationBroadcast: (() => void) | null = null;
 const WORKSPACE_MUTATION_TIMEOUT_MS = 12_000;
+/** How long a move/send toast offers Undo — matches the clear-tabs control. */
+const UNDO_TOAST_MS = 10_000;
 export function registerMutationBroadcast(fn: () => void) {
   onMutationBroadcast = fn;
 }
@@ -1157,6 +1159,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       getWorkspace(get().workspaces, sourceWorkspaceId),
       tab.contentId,
     );
+    let claimCarried = false;
     if (claim) {
       try {
         await get().assignContentToWorkspace(targetWorkspaceId, tab.contentId, {
@@ -1165,6 +1168,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
           expiresAt: claim.expiresAt,
           moveFromWorkspaceId: sourceWorkspaceId,
         });
+        claimCarried = true;
       } catch (error) {
         toast.warning("Tab moved, but its workplace claim stayed behind", {
           description: error instanceof Error ? error.message : undefined,
@@ -1173,20 +1177,99 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     }
 
     notifyMutation();
-    if (options.openTarget) {
-      // The user held the drag: follow the tab. The switch itself is the
-      // acknowledgement — no toast action to offer what just happened.
+    const switched = Boolean(options.openTarget);
+    if (switched) {
+      // The user held the drag: follow the tab.
       await get().activateWorkspace(targetWorkspaceId);
-      toast.success(`Moved "${tab.title || "Untitled"}" to ${targetName}`);
-      return;
     }
-    toast.success(`Moved "${tab.title || "Untitled"}" to ${targetName}`, {
+
+    const title = tab.title || "Untitled";
+    // Undo reverses every half of the move: membership back to the source,
+    // the carried claim back, and the switch if there was one.
+    const undo = async () => {
+      try {
+        const back = await fetchWorkspaceMutation(
+          `/api/content/workspaces/${sourceWorkspaceId}/tabs/move`,
+          {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contentId: tab.contentId,
+              fromWorkspaceId: targetWorkspaceId,
+              affinity: paneId ? affinityForPane(paneId) : undefined,
+            }),
+          },
+        );
+        const { workspace: restored } = await parseResponse<{
+          workspace: ContentWorkspaceResponse;
+        }>(back, "Failed to undo the move");
+        set((state) => ({
+          workspaces: state.workspaces.map((candidate) =>
+            candidate.id === restored.id
+              ? restored
+              : candidate.id === targetWorkspaceId
+                ? {
+                    ...candidate,
+                    membershipContentIds: (
+                      candidate.membershipContentIds ?? []
+                    ).filter((id) => id !== tab.contentId),
+                  }
+                : candidate,
+          ),
+        }));
+        if (claimCarried && claim) {
+          await get().assignContentToWorkspace(sourceWorkspaceId, tab.contentId, {
+            assignmentType: claim.assignmentType,
+            scope: claim.scope,
+            expiresAt: claim.expiresAt,
+            moveFromWorkspaceId: targetWorkspaceId,
+          });
+        }
+        if (get().activeWorkspaceId === sourceWorkspaceId) {
+          // The source is on screen. The move back bumped its revision;
+          // adopt it as this window's base (as a 409-adopt would) so the
+          // reopen's save cannot conflict with the undo itself, then put the
+          // tab back in the pane it left.
+          lastAppliedUpdatedAt[sourceWorkspaceId] = restored.updatedAt;
+          directOpenContent(tab.contentId, paneId ? { paneId } : {});
+        } else {
+          // The user followed the tab: close it where it is (the switch-away
+          // save carries the close) and go back — the source restores the
+          // tab from membership. A user who moved on to a THIRD workplace
+          // inside the undo window leaves the target's blob listing the tab
+          // until that workplace next saves; accepted for a 10 s window.
+          useContentStore.getState().closeContentTabs([tab.contentId]);
+          await get().activateWorkspace(sourceWorkspaceId);
+        }
+        notifyMutation();
+        toast.success(`Moved "${title}" back`);
+      } catch (error) {
+        toast.error(
+          error instanceof Error ? error.message : "Failed to undo the move",
+        );
+      }
+    };
+
+    toast.success(`Moved "${title}" to ${targetName}`, {
+      duration: UNDO_TOAST_MS,
       action: {
-        label: "Go there",
+        label: "Undo",
         onClick: () => {
-          void get().activateWorkspace(targetWorkspaceId);
+          void undo();
         },
       },
+      // "Go there" only when the drop did not already take the user there.
+      ...(switched
+        ? {}
+        : {
+            cancel: {
+              label: "Go there",
+              onClick: () => {
+                void get().activateWorkspace(targetWorkspaceId);
+              },
+            },
+          }),
     });
   },
 
@@ -1199,12 +1282,25 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const targetName =
       getWorkspace(get().workspaces, targetWorkspaceId)?.name ?? "workplace";
 
+    const ids = items.map((item) => item.id);
+    const previousActiveId = get().activeWorkspaceId;
+
     // Already here: open normally, through the workplace guard (claims,
-    // conflicts, borrow prompts all apply). Membership follows via persist.
-    if (targetWorkspaceId === get().activeWorkspaceId) {
+    // conflicts, borrow prompts all apply). Membership follows via persist,
+    // and so does the undo — a plain local close.
+    if (targetWorkspaceId === previousActiveId) {
       for (const item of items) {
         await get().requestOpenContent(item.id);
       }
+      toast.success(`Opened ${label}`, {
+        duration: UNDO_TOAST_MS,
+        action: {
+          label: "Undo",
+          onClick: () => {
+            useContentStore.getState().closeContentTabs(ids);
+          },
+        },
+      });
       return;
     }
 
@@ -1235,19 +1331,75 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     }
     notifyMutation();
 
-    if (options.openTarget) {
+    const switched = Boolean(options.openTarget);
+    if (switched) {
       await get().activateWorkspace(targetWorkspaceId);
-      toast.success(`Opened ${label} in ${targetName}`);
-      return;
     }
-    toast.success(`Sent ${label} to ${targetName}`, {
-      action: {
-        label: "Go there",
-        onClick: () => {
-          void get().activateWorkspace(targetWorkspaceId);
+
+    const undo = async () => {
+      try {
+        if (get().activeWorkspaceId === targetWorkspaceId) {
+          // On screen: a local close, carried by the next save — or by the
+          // switch-away save when we take the user back.
+          useContentStore.getState().closeContentTabs(ids);
+          if (
+            switched &&
+            previousActiveId &&
+            previousActiveId !== targetWorkspaceId
+          ) {
+            await get().activateWorkspace(previousActiveId);
+          }
+        } else {
+          for (const id of ids) {
+            const response = await fetchWorkspaceMutation(
+              `/api/content/workspaces/${targetWorkspaceId}/tabs?contentId=${encodeURIComponent(id)}`,
+              { method: "DELETE", credentials: "include" },
+            );
+            await parseResponse<unknown>(response, "Failed to undo");
+          }
+          const removed = new Set(ids);
+          set((state) => ({
+            workspaces: state.workspaces.map((candidate) =>
+              candidate.id === targetWorkspaceId
+                ? {
+                    ...candidate,
+                    membershipContentIds: (
+                      candidate.membershipContentIds ?? []
+                    ).filter((id) => !removed.has(id)),
+                  }
+                : candidate,
+            ),
+          }));
+        }
+        notifyMutation();
+        toast.success(`Closed ${label} in ${targetName}`);
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Failed to undo");
+      }
+    };
+
+    toast.success(
+      switched ? `Opened ${label} in ${targetName}` : `Sent ${label} to ${targetName}`,
+      {
+        duration: UNDO_TOAST_MS,
+        action: {
+          label: "Undo",
+          onClick: () => {
+            void undo();
+          },
         },
+        ...(switched
+          ? {}
+          : {
+              cancel: {
+                label: "Go there",
+                onClick: () => {
+                  void get().activateWorkspace(targetWorkspaceId);
+                },
+              },
+            }),
       },
-    });
+    );
   },
 
   createWorkspace: async (name) => {

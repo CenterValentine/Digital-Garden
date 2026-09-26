@@ -43,6 +43,80 @@ function canHostBenches(workspace: ContentWorkspaceResponse) {
 }
 
 /**
+ * Root-layer bench folders per parent, kept across menu/panel opens.
+ *
+ * A drop panel that fills in while the pointer is already over it moves the
+ * destination under the cursor — rows arriving late pushed the list down
+ * mid-drag (owner report, 2026-09-26). So lists are fetched when a DRAG
+ * STARTS (`usePrefetchTabMoveTargets`), consumers seed from this cache
+ * synchronously, and a refresh only re-renders rows that actually changed.
+ * Stale entries are still shown while a refresh is in flight.
+ */
+const BENCH_FOLDER_CACHE_TTL_MS = 60_000;
+const benchFolderCache = new Map<
+  string,
+  { folders: WorkbenchFolderOption[]; fetchedAt: number }
+>();
+const benchFolderInFlight = new Map<string, Promise<WorkbenchFolderOption[]>>();
+
+function fetchBenchFolders(parentId: string) {
+  const inFlight = benchFolderInFlight.get(parentId);
+  if (inFlight) return inFlight;
+  const request = fetch(`/api/content/workspaces/${parentId}/workbenches`, {
+    credentials: "include",
+  })
+    .then(async (response) => {
+      const result = (await response.json()) as ApiResponse<
+        WorkbenchFolderOption[]
+      >;
+      return response.ok && result.success && result.data ? result.data : [];
+    })
+    .catch((): WorkbenchFolderOption[] => [])
+    .then((folders) => {
+      benchFolderCache.set(parentId, { folders, fetchedAt: Date.now() });
+      return folders;
+    })
+    .finally(() => {
+      benchFolderInFlight.delete(parentId);
+    });
+  benchFolderInFlight.set(parentId, request);
+  return request;
+}
+
+function isFresh(parentId: string) {
+  const entry = benchFolderCache.get(parentId);
+  return entry !== undefined && Date.now() - entry.fetchedAt < BENCH_FOLDER_CACHE_TTL_MS;
+}
+
+function benchHostKey(workspaces: ContentWorkspaceResponse[]) {
+  return workspaces
+    .filter(
+      (workspace) =>
+        workspace.parentWorkspaceId === null &&
+        workspace.status === "active" &&
+        canHostBenches(workspace),
+    )
+    .map((workspace) => workspace.id)
+    .join(",");
+}
+
+/**
+ * Warm the bench-folder cache while a drag is in progress, before any panel
+ * opens — the 150 ms trigger dwell plus travel time usually covers the
+ * round-trip, so the panel opens complete.
+ */
+export function usePrefetchTabMoveTargets(active: boolean) {
+  const workspaces = useWorkspaceStore((state) => state.workspaces);
+  const hostKey = benchHostKey(workspaces);
+  useEffect(() => {
+    if (!active || !hostKey) return;
+    for (const parentId of hostKey.split(",")) {
+      if (!isFresh(parentId)) void fetchBenchFolders(parentId);
+    }
+  }, [active, hostKey]);
+}
+
+/**
  * Bench destinations for one parent: the fetched root-layer folders (visible
  * ones, which may not be materialized yet) unioned with every bench row the
  * store already knows under that parent — deeper-layer benches only exist in
@@ -80,13 +154,23 @@ function collectBenchTargets(
   return [...byFolder.values()];
 }
 
+function snapshotFromCache(hostKey: string) {
+  const snapshot: Record<string, WorkbenchFolderOption[]> = {};
+  if (!hostKey) return snapshot;
+  for (const parentId of hostKey.split(",")) {
+    const entry = benchFolderCache.get(parentId);
+    if (entry) snapshot[parentId] = entry.folders;
+  }
+  return snapshot;
+}
+
 /**
  * Destinations a tab in the active workplace can move to, grouped by
  * top-level workplace with benches beneath. Shared by the tab context menu
  * and the drag-and-drop panel so both list the same targets in the same
- * order. Root-layer bench folders are fetched per bench-capable view
- * workplace while `enabled` is true (menu / panel open) — a folder needs no
- * bench row yet to be a destination; the move materializes it.
+ * order. Seeds from the bench-folder cache synchronously and refreshes stale
+ * parents while `enabled` (menu / panel open) — a folder needs no bench row
+ * yet to be a destination; the move materializes it.
  */
 export function useTabMoveTargets(
   enabled: boolean,
@@ -112,38 +196,31 @@ export function useTabMoveTargets(
     [workspaces],
   );
 
+  const hostKey = benchHostKey(workspaces);
   const [foldersByParent, setFoldersByParent] = useState<
     Record<string, WorkbenchFolderOption[]>
-  >({});
-  const benchHostKey = topLevelWorkspaces
-    .filter(canHostBenches)
-    .map((workspace) => workspace.id)
-    .join(",");
+  >(() => snapshotFromCache(hostKey));
   useEffect(() => {
-    if (!enabled || !benchHostKey) return;
+    if (!enabled || !hostKey) return;
     let cancelled = false;
-    for (const parentId of benchHostKey.split(",")) {
-      fetch(`/api/content/workspaces/${parentId}/workbenches`, {
-        credentials: "include",
-      })
-        .then(async (response) => {
-          const result = (await response.json()) as ApiResponse<
-            WorkbenchFolderOption[]
-          >;
-          return response.ok && result.success && result.data
-            ? result.data
-            : [];
-        })
-        .catch((): WorkbenchFolderOption[] => [])
-        .then((folders) => {
-          if (cancelled) return;
-          setFoldersByParent((current) => ({ ...current, [parentId]: folders }));
-        });
+    for (const parentId of hostKey.split(",")) {
+      const request = isFresh(parentId)
+        ? Promise.resolve(benchFolderCache.get(parentId)?.folders ?? [])
+        : fetchBenchFolders(parentId);
+      void request.then((folders) => {
+        if (cancelled) return;
+        setFoldersByParent((current) =>
+          // Identity check: an unchanged list must not re-render rows.
+          current[parentId] === folders
+            ? current
+            : { ...current, [parentId]: folders },
+        );
+      });
     }
     return () => {
       cancelled = true;
     };
-  }, [benchHostKey, enabled]);
+  }, [enabled, hostKey]);
 
   // Only the exact active row is excluded: from a bench, its parent
   // workplace is still a destination (moving out of the bench).

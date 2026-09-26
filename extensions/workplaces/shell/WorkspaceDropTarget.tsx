@@ -20,7 +20,11 @@ import {
   type DraggingTreeNode,
 } from "@/state/tree-drag-store";
 import { useWorkspaceStore } from "@/extensions/workplaces/state/workspace-store";
-import { useTabMoveTargets, type BenchTarget } from "./use-tab-move-targets";
+import {
+  usePrefetchTabMoveTargets,
+  useTabMoveTargets,
+  type BenchTarget,
+} from "./use-tab-move-targets";
 
 /**
  * Drag a tab — or a file-tree node — onto the workplaces affordance and a
@@ -106,6 +110,10 @@ export function WorkspaceDropTarget({ children }: { children: ReactNode }) {
     if (draggingNode) return { kind: "content", nodes: draggingNodes };
     return null;
   }, [draggingNode, draggingNodes, draggingTab]);
+
+  // Fetch bench folders the moment a drag starts, not when the panel opens:
+  // rows arriving under an already-hovering pointer shift the destinations.
+  usePrefetchTabMoveTargets(payload !== null);
 
   const triggerRef = useRef<HTMLDivElement | null>(null);
   const [open, setOpen] = useState(false);

@@ -24,6 +24,7 @@
 import { prisma } from "../lib/database/client";
 import {
   openWorkspaceTab,
+  closeWorkspaceTab,
   moveWorkspaceTab,
   listWorkspaceTabs,
 } from "../extensions/workplaces/server/membership";
@@ -199,6 +200,32 @@ async function main() {
       "the other workspace keeps its copy — open is not a move",
       (await listWorkspaceTabs(ownerId, target.id))?.map((t) => t.contentId),
       [content.id],
+    );
+
+    console.log("\ncloseWorkspaceTab (undo of a send)");
+    const beforeClose = await stamps();
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    check(
+      "removes the row",
+      (await closeWorkspaceTab(ownerId, source.id, content.id))?.count,
+      1,
+    );
+    check(
+      "bumps the workspace updatedAt so other surfaces drop the tab",
+      (await stamps()).source.getTime() > beforeClose.source.getTime(),
+      true,
+    );
+    const beforeNoop = await stamps();
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    check(
+      "closing an absent row is a success with count 0",
+      (await closeWorkspaceTab(ownerId, source.id, content.id))?.count,
+      0,
+    );
+    check(
+      "…and does not bump the revision",
+      (await stamps()).source.getTime() === beforeNoop.source.getTime(),
+      true,
     );
   } finally {
     await prisma.contentWorkspace.deleteMany({

@@ -106,9 +106,19 @@ export async function closeWorkspaceTab(
   const workspace = await findOwnedActiveWorkspace(ownerId, workspaceId);
   if (!workspace) return null;
 
-  return prisma.contentWorkspaceTab.deleteMany({
+  const result = await prisma.contentWorkspaceTab.deleteMany({
     where: { workspaceId, contentId },
   });
+  // Same rule as open: a membership change other surfaces must see bumps
+  // the workspace revision. Callers on this workspace close locally instead
+  // (their snapshot save carries it), so the bump never 409s the caller.
+  if (result.count > 0) {
+    await prisma.contentWorkspace.update({
+      where: { id: workspaceId },
+      data: { updatedAt: new Date() },
+    });
+  }
+  return result;
 }
 
 /**
