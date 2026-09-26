@@ -9,6 +9,35 @@ last_updated: 2026-05-13
 
 # Current Sprint Addendum
 
+## September 21, 2026 — Move tab to workplace / workbench
+
+**Tree**: worktree `.claude/worktrees/move-tab-to-workspace`, branch `feat/move-tab-to-workspace` (PR pending)
+**Status**: typecheck / lint / full build green; `pnpm workspace:tab-move:smoke` (new, DB-backed) green; owner browser smoke pending. No migration, no TipTap schema change → no Hocuspocus redeploy.
+
+### Shipped
+- **Real tab move** (`POST /api/content/workspaces/[id]/tabs/move`, `moveWorkspaceTab` in `membership.ts`): R1 membership upserted in the target and deleted from the source in one transaction; only the target's `updatedAt` bumps (the source is the mover's active workplace — bumping it would 409 their own next save).
+- **Menu** (`WorkplacesTabMenuSection`): "Move tab to" lists top-level workplaces with their workbenches indented, the current workplace's own benches included; unmaterialized root-layer folders are fetched from the workbenches route on open and materialized on click via the new `ensureWorkbench` store action. "Share permanently" now lists top-level workplaces only.
+- **Store** (`moveTabToWorkspace`): posts the move with the leaving pane's affinity hint, closes the local tab, replaces the target's list entry from the response, carries an existing claim (never mints one), toasts with "Go there".
+- **Read path**: `getWorkspace` includes membership; `contentMeta` names membership-only ids so the moved tab arrives titled.
+
+### Addendum (2026-09-25) — drag a tab onto the workplaces affordance
+- **`WorkspaceTabDropTarget`** wraps `WorkspaceSelector` in the shell nav: a tab dragged over the trigger opens (after 150 ms) a drop-only panel with the same grouped destinations as the context menu (`useTabMoveTargets`, shared). Drop = move, stay put. Hold one row 2 s → bar fills, "Opens here" pill → drop also switches there. Moving rows restarts the hold. Panel closes 300 ms after `dragover` stops reaching trigger or panel.
+- **`state/tab-drag-store.ts`** bridges the strip's drag (set/cleared in `MainPanelHeader`, plus `application/x-dg-tab` mime) to targets outside the pane subtree.
+- **`moveTabToWorkspace(…, { openTarget })`** activates the target after the move and omits the "Go there" toast action.
+- **Files (same panel, `WorkspaceDropTarget`)**: a tree node or multi-selection dragged onto the affordance → "Send … to" panel; drop = `sendContentToWorkspace` → `POST /tabs` per item (now bumps target `updatedAt`, returns the workspace read); the current workplace / active bench are droppable for content (guarded open when active); hold 2 s follows. Tree drags are react-dnd → hover native, drop via `useDrop` (the HTML5 backend forces `dropEffect="none"` elsewhere).
+
+- **Round-1 fix + Undo (2026-09-26)**: bench folder lists prefetch at drag start and seed from a 60 s cache (`usePrefetchTabMoveTargets`) so the panel no longer shifts under the pointer. Every move/send toast carries **Undo** for 10 s: tab move → membership back + claim back + reopen in the original pane (or close where followed and switch back); send → `DELETE /tabs` per item (now bumps the revision) or local close. "Go there" is the toast's secondary button.
+
+### Drag-and-drop smoke (owner)
+**Undo:** drop a tab on another workplace → toast shows **Undo** and **Go there** → Undo → the tab is back in the same pane, no conflict dialog, and the target no longer lists it → hold-drop (followed) → Undo → tab closes there, you are back in the source with the tab open → send a file → Undo → the target no longer has it → drop a file on the current workplace → Undo → it closes here.
+**Shift:** drag a tab over the selector after a page load → the panel opens with every view workplace's folders already listed; nothing moves under the pointer while hovering.
+**Files:** drag a file from the tree over the selector → panel opens with "Send … to", the current workplace listed as a droppable row → drop on another workplace → opens there as a tab, you stay, toast "Sent … to X" with "Go there" → hold 2 s → "Opens here" → drop → file opens there AND you land there → drop on the current workplace's row → it just opens here → drag a multi-selection → "Send N items to" → all open in the target → second window on the target → tab appears within the refresh cadence, no conflict dialog.
+**Tabs:**
+Drag a tab over the workplaces selector → the panel opens beneath it listing other workplaces with benches indented, the current one labelled "current" with only its benches → drag away from both → closes within ~300 ms → release the drag elsewhere → closes → drop on a workplace row quickly → tab closes here, toast with "Go there", you stay → hover a row → thin bar fills across it over 2 s → "Opens here" pill → drop → tab moves AND you land in that workplace, toast without "Go there" → hover a row ~1.5 s then move to another → bar restarts from zero, no pill until 2 s there → drop on a never-opened bench folder → bench materializes and holds the tab → reorder a workplace inside the real dropdown → unaffected → drag a file-tree node over the selector → panel does NOT open → after any drop the pane reshape overlays are gone.
+
+### Smoke script (owner)
+Right-click a tab → "Move tab to" lists the other workplaces, each with its workbenches indented; the current workplace shows as "current" with only its benches clickable → pick a sibling workplace → the tab closes here and a toast says "Moved … to X" with "Go there" → Go there → the tab is open in X, titled, in the top-left pane → from a view workplace, move a tab into a subfolder that has NEVER been opened as a bench → the bench materializes (it now appears in the selector's dwell submenu) and holds the tab → from that bench, move the tab back to the parent workplace → with a second browser window sitting on the target workplace, move a tab into it → the tab appears there within the background refresh cadence and neither window shows a conflict dialog → move a tab whose content the source workplace had claimed (via Share permanently or the settings dialog) → the claim follows (settings dialog lists it under the target) → move a tab from a two-pane layout's right pane → it lands per the target's own layout (top-left when the target has no right ordinal) → right-click on a workplace with no other workplaces and no benches → "Create another workplace first."
+
 ## August 14, 2026 — Note Window block + clipboard round-trip fixes
 
 **Tree**: main working tree (no branch yet — owner decides branch/PR)
