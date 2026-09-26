@@ -1037,19 +1037,41 @@ export function ChatPanel({
   // exists (same endpoint the full-view button uses), then copy its
   // ?content= URL — WITHOUT navigating. The link reopens the chat in the
   // full-page viewer.
+  //
+  // Why the write is handed a PROMISE: the first click used to fail and the
+  // second succeed (owner report, 2026-09-26). A clipboard write must happen
+  // inside the click's user activation; on the first click the ensure-node
+  // POST is slow (it creates the node) and the activation has expired by the
+  // time `writeText` runs, so the browser refuses. On the second click the
+  // POST is a fast no-op and the write squeaks in. `ClipboardItem` accepts a
+  // pending value, which keeps the write synchronous with the gesture; the
+  // resolved node id is also cached so later clicks skip the round trip.
+  const chatLinkNodeIdRef = useRef<{ conversationId: string; nodeId: string } | null>(null);
   const handleCopyChatLink = useCallback(async () => {
     if (!conversationId) return;
+    const resolveLink = async (): Promise<string> => {
+      const cached = chatLinkNodeIdRef.current;
+      let nodeId = cached?.conversationId === conversationId ? cached.nodeId : undefined;
+      if (!nodeId) {
+        const res = await fetch(
+          `/api/conversations/${encodeURIComponent(conversationId)}/open-in-page`,
+          { method: "POST", credentials: "include" },
+        );
+        if (!res.ok) throw new Error("Could not create the chat link");
+        const body = await res.json();
+        nodeId = (body?.data?.contentNodeId as string | undefined) ?? undefined;
+        if (!nodeId) throw new Error("Could not create the chat link");
+        chatLinkNodeIdRef.current = { conversationId, nodeId };
+      }
+      return `${window.location.origin}/content?content=${encodeURIComponent(nodeId)}`;
+    };
     try {
-      const res = await fetch(
-        `/api/conversations/${encodeURIComponent(conversationId)}/open-in-page`,
-        { method: "POST", credentials: "include" },
-      );
-      if (!res.ok) throw new Error("Could not create the chat link");
-      const body = await res.json();
-      const nodeId: string | undefined = body?.data?.contentNodeId;
-      if (!nodeId) throw new Error("Could not create the chat link");
-      const link = `${window.location.origin}/content?content=${encodeURIComponent(nodeId)}`;
-      await navigator.clipboard.writeText(link);
+      if (typeof ClipboardItem !== "undefined" && typeof navigator.clipboard?.write === "function") {
+        const pending = resolveLink().then((link) => new Blob([link], { type: "text/plain" }));
+        await navigator.clipboard.write([new ClipboardItem({ "text/plain": pending })]);
+      } else {
+        await navigator.clipboard.writeText(await resolveLink());
+      }
       toast.success("Chat link copied");
     } catch (e) {
       toast.error(

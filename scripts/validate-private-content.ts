@@ -82,6 +82,14 @@ const SEAMS: Array<[string, RegExp]> = [
   ["components/public/TipTapContent.tsx", /stripPrivateContent\(/],
   ["lib/domain/editor/ai/block-handles.ts", /visibleTextOf\(/],
   ["components/content/ai/ChatPanel.tsx", /visibleTextBetween\(/],
+  // Found by the first owner smoke (2026-09-26): a side chat attaches its
+  // bound note as an implicit mention rendered from the materialized column.
+  ["app/api/ai/chat/route.ts", /extractSearchTextFromTipTap\(/],
+  ["lib/domain/editor/ai/text-search.ts", /PRIVATE_TEXT_MARK/],
+  ["lib/domain/ai/charters/parse.ts", /PRIVATE_TEXT_MARK/],
+  ["app/api/ai/inject-media/route.ts", /stripPrivateContent\(/],
+  ["lib/domain/ai/tools/editor-tools.ts", /stripPrivateContent\(/],
+  ["lib/domain/browser-extension/service.ts", /stripPrivateContent\(/],
 ];
 for (const [file, pattern] of SEAMS) {
   const source = readFileSync(resolve(process.cwd(), file), "utf8");
@@ -98,4 +106,4 @@ if (failures > 0) {
   console.error(`\nprivate:content:check — ${failures} check(s) failed.\n`);
   process.exit(1);
 }
-console.log("private:content:check — OK (predicate, searchText, 7 seams, source view untouched)");
+console.log(`private:content:check — OK (predicate, searchText, ${SEAMS.length} seams, source view untouched)`);

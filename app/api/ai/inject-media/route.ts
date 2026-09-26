@@ -21,6 +21,7 @@ import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import { prisma } from "@/lib/database/client";
 import type { Prisma } from "@/lib/database/generated/prisma";
 import type { JSONContent } from "@tiptap/core";
+import { stripPrivateContent } from "@/lib/domain/content/private-content";
 import { extractSearchTextFromTipTap } from "@/lib/domain/content";
 
 interface InjectMedia {
@@ -74,12 +75,17 @@ function isBlankDoc(doc: JSONContent | null): boolean {
   );
 }
 
-/** Short text preview of a top-level block, for the placement prompt. */
+/**
+ * Short text preview of a top-level block, for the placement prompt. Private
+ * (commented-out) content is stripped first — this preview reaches a model.
+ */
 function blockPreview(block: JSONContent): string {
   const collect = (n: JSONContent): string =>
     (typeof n.text === "string" ? n.text : "") +
     (Array.isArray(n.content) ? n.content.map(collect).join("") : "");
-  return collect(block).replace(/\s+/g, " ").trim().slice(0, 80);
+  const visible = stripPrivateContent({ type: "doc", content: [block] }).content?.[0];
+  if (!visible) return "(private)";
+  return collect(visible).replace(/\s+/g, " ").trim().slice(0, 80);
 }
 
 /** Ask the model where to drop the media + an optional caption. */

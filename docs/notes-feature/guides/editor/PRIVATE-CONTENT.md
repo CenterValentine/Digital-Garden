@@ -55,6 +55,17 @@ seam that turns note JSON into reader-facing text:
 | public page | `TipTapContent` (`components/public/TipTapContent.tsx`) |
 | client outline previews | `buildOutline` via `visibleTextOf` (`lib/domain/editor/ai/visible-text.ts`) |
 | apply_diff context + dump | `visibleTextBetween` in `ChatPanel.tsx` |
+| side chat's bound note (implicit mention) | chat route mention sections re-derive via `extractSearchTextFromTipTap`, never the stored column |
+| apply_diff matching | `findTextInDoc` skips private text and blocks (a match would confirm the text exists) |
+| charter phase titles | `headingText` in `charters/parse.ts` skips the mark |
+| inject-media placement prompt | `blockPreview` strips first |
+| `list_document_blocks` | walks the stripped document |
+| browser-extension note read | the `markdown` flavour is stripped (the JSON stays whole for editing) |
+
+The first owner smoke found the bound-note seam: the side chat attaches the
+note it lives under as an implicit mention, and that path rendered the stored
+`searchText` column, which can predate the strip. Rule learned: **a seam must
+never trust a materialized column**; derive from the JSON at read time.
 
 The client-side editing tools work on the live ProseMirror node rather than
 JSON, hence the `visibleText*` twins with the same rule.
@@ -107,3 +118,9 @@ scenario there when you change the toggle, the input rule, or the Enter form.
   address them, which is the intent.
 - Hocuspocus must be redeployed after a merge that adds these node types; an
   older collab server rewrites them to `unsupportedInline` / `unsupportedBlock`.
+- `read_current_page` in the browser side panel captures the rendered DOM of
+  whatever tab is open. If that tab is this app showing the note, the private
+  spans are in the DOM and will be read. Fix belongs in the extension's
+  content-script capture (exclude `[data-private]`), not here.
+- AI-derived metadata (`derivedText`, `oneLiner`) generated before a passage
+  was marked private keeps the old summary until the node regenerates.

@@ -15,6 +15,7 @@
  */
 
 import type { JSONContent } from "@tiptap/core";
+import { PRIVATE_TEXT_MARK } from "@/lib/domain/content/private-content";
 
 export interface CharterReference {
   /** The linked note's title (wikiLink `targetTitle`). */
@@ -51,6 +52,9 @@ export interface ParsedCharter {
 function headingText(node: JSONContent): string {
   let text = "";
   const walk = (n: JSONContent) => {
+    // Phase titles land verbatim in the system prompt, so a private
+    // (commented-out) run inside a heading must not become part of the title.
+    if (n.marks?.some((m) => m.type === PRIVATE_TEXT_MARK)) return;
     if (typeof n.text === "string") text += n.text;
     for (const child of n.content ?? []) walk(child);
   };

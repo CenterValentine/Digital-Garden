@@ -37,6 +37,7 @@ import { z } from "zod/v4";
 import { prisma } from "@/lib/database/client";
 import { chunkDocument, getChunk, formatChunkOutput } from "./chunking";
 import type { JSONContent } from "@tiptap/core";
+import { stripPrivateContent } from "@/lib/domain/content/private-content";
 import { getContentWriteReceiptEnvelope } from "@/lib/domain/ai/content-write-receipts.server";
 import type { ToolExecuteContext } from "./types";
 import type { Extensions } from "@tiptap/core";
@@ -639,7 +640,11 @@ export function createEditorTools(ctx: ToolExecuteContext) {
       execute: async () => {
         const result = await loadNote();
         if ("error" in result) return result.error;
-        const doc = result.payload.tiptapJson as unknown as JSONContent;
+        // Blocks inside a private (commented-out) block are not listed: the
+        // model must not learn they exist, let alone address them.
+        const doc = stripPrivateContent(
+          result.payload.tiptapJson as unknown as JSONContent,
+        );
         const blocks = findBlocksInDoc(doc);
         if (blocks.length === 0) {
           return "This note has no rich blocks yet. Use insert_block to add one.";
