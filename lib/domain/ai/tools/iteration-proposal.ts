@@ -68,7 +68,133 @@ export const PROPOSAL_BOUNDS = {
   labelChars: 200,
   urlChars: 600,
   questColumns: 8,
+  stepsPerItem: { min: 2, max: 20 },
 } as const;
+
+// ── Deliverables and the step budget (AI-CONTEXT-ECONOMICS-PLAN §6b) ────────
+
+/**
+ * The write tools a run may declare as each item's DELIVERABLES — the tail
+ * of tool calls every item must end with, after research. Prod 5e5b739d
+ * (2026-09-22): a one-item fulfilment charter (research → resume →
+ * create_docx → update_row → record → close) ran under the screening budget
+ * `items × 4 + 8` = 12 steps and spent all twelve on reads; nothing had
+ * reserved the five write steps its charter required, and the model was
+ * never told how many steps remained. Declaring the tail makes the cap fit
+ * the work and lets the harness hold the last steps for it.
+ */
+export const DELIVERABLE_TOOLS = [
+  "create_docx",
+  "create_note",
+  "update_note",
+  "append_to_document",
+  "update_row",
+  "update_rows",
+  "insert_rows",
+  "create_folder",
+] as const;
+export type DeliverableTool = (typeof DELIVERABLE_TOOLS)[number];
+
+/** Steps of research the budget allows per item before its deliverables. */
+export const RESEARCH_ALLOWANCE_PER_ITEM = 3;
+/** Setup + close: summon, enumerate, propose, findings, final reply. */
+export const RUN_OVERHEAD_STEPS = 8;
+/** Tools always in the reserved tail (per item, then the run's close). */
+export const TAIL_ALWAYS = ["record_item_result", "record_iteration_findings", "summon"] as const;
+
+const DELIVERABLE_ALIASES: Record<string, DeliverableTool> = {
+  docx: "create_docx",
+  document: "create_docx",
+  resume: "create_docx",
+  word: "create_docx",
+  note: "create_note",
+  "roll-up": "create_note",
+  rollup: "create_note",
+  append: "append_to_document",
+  row: "update_row",
+  "update-row": "update_row",
+  rows: "update_rows",
+  insert: "insert_rows",
+  folder: "create_folder",
+};
+
+/** Deliverable names as the model may write them → known write tools. Unknown names are reported, never fatal. */
+export function resolveDeliverables(
+  raw: string[] | string | undefined,
+): { deliverables: DeliverableTool[]; unknown: string[] } {
+  const list = Array.isArray(raw) ? raw : typeof raw === "string" ? raw.split(/[,\n;]/) : [];
+  const out: DeliverableTool[] = [];
+  const unknown: string[] = [];
+  for (const entry of list) {
+    const s = String(entry ?? "").trim();
+    if (!s) continue;
+    const norm = s.toLowerCase().replace(/[\s_]+/g, "_");
+    const direct = (DELIVERABLE_TOOLS as readonly string[]).includes(norm) ? (norm as DeliverableTool) : undefined;
+    const alias = DELIVERABLE_ALIASES[s.toLowerCase().replace(/[\s_]+/g, "-")];
+    const tool = direct ?? alias;
+    if (!tool) {
+      unknown.push(s);
+      continue;
+    }
+    if (!out.includes(tool)) out.push(tool);
+  }
+  return { deliverables: out, unknown };
+}
+
+/**
+ * Steps per item: research allowance + the item's tail (deliverables +
+ * record_item_result). With no deliverables this is 4 — exactly the old
+ * screening formula — so screening runs are unchanged.
+ */
+export function stepsPerItemFor(deliverables: readonly string[], override?: number): number {
+  const derived = RESEARCH_ALLOWANCE_PER_ITEM + deliverables.length + 1;
+  return clampInt(
+    override ?? derived,
+    PROPOSAL_BOUNDS.stepsPerItem.min,
+    PROPOSAL_BOUNDS.stepsPerItem.max,
+    derived,
+  );
+}
+
+/** The turn's step cap for an approved run. `items × perItem + overhead`, capped at 200 items. */
+export function computeIterationStepCap(input: {
+  itemBudget: number;
+  deliverables: readonly string[];
+  stepsPerItem?: number;
+}): number {
+  const items = clampInt(input.itemBudget, 1, 200, 1);
+  return items * stepsPerItemFor(input.deliverables, input.stepsPerItem) + RUN_OVERHEAD_STEPS;
+}
+
+/** The tools the reserved tail keeps callable: the deliverables plus the record/close tools. */
+export function reservedTailTools(deliverables: readonly string[]): string[] {
+  return [...new Set([...deliverables, ...TAIL_ALWAYS])];
+}
+
+/** How many of the turn's last steps are held for the tail: deliverables + record + close. */
+export function reservedTailSize(deliverables: readonly string[]): number {
+  return deliverables.length + 2;
+}
+
+/**
+ * The per-step budget line the harness appends (model-path only, at the END
+ * of the messages so the prefix cache stays warm). One sentence: where the
+ * turn stands and what the last steps are for.
+ */
+export function stepsRemainingNotice(input: {
+  stepNumber: number;
+  stepCap: number;
+  deliverables: readonly string[];
+}): string {
+  const remaining = Math.max(0, input.stepCap - input.stepNumber);
+  const tail = reservedTailSize(input.deliverables);
+  const tools = reservedTailTools(input.deliverables).filter((t) => t !== "summon");
+  const reservedNote =
+    remaining <= tail
+      ? `The remaining steps are RESERVED for the deliverables — only ${tools.join(", ")} are available now; produce the artifacts with what you have, record any gap, and close.`
+      : `The last ${tail} are reserved for ${tools.join(", ")} — plan research to finish before then.`;
+  return `[Harness notice — not from the user. Steps: ${remaining} of ${input.stepCap} remaining in this turn. ${reservedNote}]`;
+}
 
 // ── The schema ───────────────────────────────────────────────────────────────
 
@@ -135,6 +261,12 @@ const captureTarget = z.union([
       .optional()
       .describe("Column holding each item's stable identity; defaults to the table's first url column."),
     dedupeColumnName: z.string().optional(),
+    mergeColumns: z
+      .union([z.array(z.string()), z.string()])
+      .optional()
+      .describe(
+        "Capture columns that ACCUMULATE across runs instead of being replaced — alias / keyword / wording columns (text, longText or list). A re-encountered row keeps what it had and gains what this run adds.",
+      ),
   }),
 ]);
 
@@ -182,6 +314,18 @@ export const ITERATION_PROPOSAL_INPUT = z.object({
     .string()
     .optional()
     .describe("Short label for the run's ledger; omit to derive from the objective."),
+  deliverables: z
+    .union([z.array(z.string()), z.string()])
+    .optional()
+    .describe(
+      'The WRITE tools each item must end with, after its research — e.g. ["create_docx", "update_row"] for "draft a resume and attach it to the row". Omit for a screening run (read → record). The harness sizes the step budget from this and RESERVES the last steps of each turn for these tools, so research can never consume them.',
+    ),
+  stepsPerItem: z
+    .number()
+    .optional()
+    .describe(
+      "Override the steps budgeted per item (2–20). Default: 3 research steps + one per deliverable + the record. Raise it only when the charter's per-item work is genuinely deeper.",
+    ),
   captureTo: captureTarget
     .optional()
     .describe(
@@ -284,6 +428,8 @@ export interface ResolvedCaptureTarget {
   /** Empty = every writable column of the table (the preflight expands it). */
   columns: string[];
   dedupeColumn?: string;
+  /** Columns that merge across runs (validated by the preflight). */
+  mergeColumns: string[];
 }
 
 /**
@@ -359,7 +505,7 @@ export function resolveCaptureTarget(
     if (!database) return null;
     return {
       ok: true,
-      target: { database, admission: "all", columns: [] },
+      target: { database, admission: "all", columns: [], mergeColumns: [] },
       notes: ["captureTo given as a bare database — admission \"all\", every writable column"],
     };
   }
@@ -382,6 +528,15 @@ export function resolveCaptureTarget(
   if (admission.note) notes.push(admission.note);
   const columns = resolveColumnNames(raw.columns);
   if (columns.length === 0) notes.push("no columns named — every writable column of the table");
+  const mergeColumns = resolveColumnNames(raw.mergeColumns);
+  // A merge column is a capture column; naming it only in mergeColumns is
+  // read as "capture it, and merge it" rather than refused.
+  for (const name of mergeColumns) {
+    if (columns.length > 0 && !columns.some((c) => c.toLowerCase() === name.toLowerCase())) {
+      columns.push(name);
+      notes.push(`"${name}" added to captureTo.columns because it is a merge column`);
+    }
+  }
   const dedupeColumn = clipText(raw.dedupeColumn ?? raw.dedupeColumnName, 120);
   const admissionNote = clipText(raw.admissionNote, 300);
   return {
@@ -392,6 +547,7 @@ export function resolveCaptureTarget(
       ...(admissionNote ? { admissionNote } : {}),
       columns,
       ...(dedupeColumn ? { dedupeColumn } : {}),
+      mergeColumns,
     },
     notes,
   };

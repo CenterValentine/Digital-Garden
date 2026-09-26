@@ -45,15 +45,20 @@ import { createColumn } from "@/lib/domain/data/server/mutations";
 import { renderDataNodePreview } from "@/lib/domain/data/server/read-preview";
 import { resolveItemStatus, resolveIterationSource } from "./repair";
 import {
+  DELIVERABLE_TOOLS,
   ITERATION_PROPOSAL_INPUT,
   PROPOSAL_BOUNDS,
   QUEST_COLUMN_TYPES,
+  RESEARCH_ALLOWANCE_PER_ITEM,
   clampInt,
   clipText,
   normalizeProposalItems,
+  reservedTailSize,
   resolveCaptureTarget,
+  resolveDeliverables,
   resolveQuestColumnType,
   resolveQuestColumns,
+  stepsPerItemFor,
 } from "./iteration-proposal";
 import {
   closeSitting,
@@ -606,7 +611,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
       // types — is made below, and a miss comes back as a RESULT the model
       // fixes in one step instead of a rejection that ends the call.
       inputSchema: ITERATION_PROPOSAL_INPUT,
-      execute: async ({ objective: objectiveArg, source: sourceArg, items: itemsArg, rowIds: rowIdsArg, itemCap: itemCapArg, budget: budgetArg, batchSize: batchSizeArg, ledgerLabel: ledgerLabelArg, captureTo: captureToArg, quest: questArg, questColumns: questColumnsArg }) => {
+      execute: async ({ objective: objectiveArg, source: sourceArg, items: itemsArg, rowIds: rowIdsArg, itemCap: itemCapArg, budget: budgetArg, batchSize: batchSizeArg, ledgerLabel: ledgerLabelArg, captureTo: captureToArg, quest: questArg, questColumns: questColumnsArg, deliverables: deliverablesArg, stepsPerItem: stepsPerItemArg }) => {
         // ── Shape → meaning (iteration-proposal.ts resolvers) ────────────
         const objective = clipText(objectiveArg, 400) ?? "";
         if (!objective) {
@@ -672,11 +677,22 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           };
         }
         const questColumns = questRes.columns;
+        // Deliverables (plan §6b): the write tools each item ends with. The
+        // route sizes the step cap from them and reserves the turn's tail.
+        const deliverablesRes = resolveDeliverables(deliverablesArg);
+        const deliverables = deliverablesRes.deliverables;
+        const stepsPerItem =
+          typeof stepsPerItemArg === "number" && Number.isFinite(stepsPerItemArg)
+            ? stepsPerItemFor(deliverables, stepsPerItemArg)
+            : undefined;
         // Everything the resolvers silently read differently from what was
         // sent rides the result, so a normalization is never invisible.
         const shapeNotes = [
           ...(captureRes?.notes ?? []),
           ...questRes.notes,
+          ...(deliverablesRes.unknown.length > 0
+            ? [`deliverables not recognized and dropped: ${deliverablesRes.unknown.join(", ")} (known: ${DELIVERABLE_TOOLS.join(", ")})`]
+            : []),
           ...(itemsNorm.dropped > 0 ? [`${itemsNorm.dropped} item(s) had no label under any key and were skipped`] : []),
           ...(itemsNorm.clipped ? [`items clipped to the first ${PROPOSAL_BOUNDS.items}`] : []),
           ...(itemCap !== itemCapRaw ? [`itemCap ${itemCapRaw} clamped to ${itemCap}`] : []),
@@ -772,6 +788,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             // Empty = every writable column (the preflight expands it).
             columnNames: captureTo.columns,
             dedupeColumnName: captureTo.dedupeColumn,
+            mergeColumnNames: captureTo.mergeColumns,
           });
           if (!capture.ok) {
             return {
@@ -1078,6 +1095,17 @@ export function createBaseTools(ctx: ToolExecuteContext) {
                 ledgerNodeId,
                 "tool-call",
               ).catch(() => null);
+              // The quest's row database attaches too — it is where the
+              // items land, and a later turn's reads reach it without a
+              // summon (owner, 2026-09-22: "that is what I want attaching").
+              if (questInfo) {
+                void addAutoAssociation(
+                  ctx.userId,
+                  ctx.conversationId,
+                  questInfo.questLedgerId,
+                  "tool-call",
+                ).catch(() => null);
+              }
             }
           } catch {
             // Ledger is best-effort — the run can still proceed without it.
@@ -1091,9 +1119,26 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           source,
           itemBudget,
           batchSize: effectiveBatchSize,
+          // The route reads these from history to size and reserve the
+          // step budget (plan §6b); the notice on every step names them.
+          deliverables,
+          ...(stepsPerItem != null ? { stepsPerItem } : {}),
+          stepBudget: {
+            perItem: stepsPerItemFor(deliverables, stepsPerItem),
+            reservedTail: reservedTailSize(deliverables),
+            note:
+              deliverables.length > 0
+                ? `Each item: ~${RESEARCH_ALLOWANCE_PER_ITEM} research steps, then ${deliverables.join(" → ")} → record_item_result. The harness reserves each turn's last ${reservedTailSize(deliverables)} steps for those tools.`
+                : "Screening budget: read → record per item. Declare `deliverables` if each item must end in artifacts (a document, a row update).",
+          },
           items: normalized,
           ...(questInfo
             ? {
+                // The quest's ROW database — the thing the user means by
+                // "the quest" (owner, 2026-09-22: the pin opened the long
+                // log note; the database never attached). The client pins
+                // and auto-associates from this id.
+                questLedgerNodeId: questInfo.questLedgerId,
                 quest: {
                   label: questInfo.questLabel,
                   continued: questContinued,
@@ -1240,8 +1285,20 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           .describe(
             "Quest runs with SCULPTED ledger columns: their values for this item (column name → value). Machinery fields (status/fit/qualified/verdict) are recorded automatically — never repeat them here.",
           ),
+        gaps: z
+          .array(z.string())
+          .optional()
+          .describe(
+            "GAPS ARE DATA: facts this item needed that ONE evidence search did not find (\"Education/degree — not in evidence\"). Put a placeholder in the artifact, list the gap here, and move on — never a second search, never an invented value. Recorded in the ledger so the user can fill them.",
+          ),
       }),
-      execute: async ({ ledgerRunKey: ledgerRunKeyArg, itemKey: itemKeyArg, itemLabel: itemLabelArg, url: urlArg, status: statusArg, qualified, fitPercent: fitPercentArg, verdict: verdictArg, artifactTitle: artifactTitleArg, capture, questCells }) => {
+      execute: async ({ ledgerRunKey: ledgerRunKeyArg, itemKey: itemKeyArg, itemLabel: itemLabelArg, url: urlArg, status: statusArg, qualified, fitPercent: fitPercentArg, verdict: verdictArg, artifactTitle: artifactTitleArg, capture, questCells, gaps: gapsArg }) => {
+        // Gaps are data (plan §6b.3): clipped, bounded, recorded — never a
+        // reason to keep searching.
+        const gaps = (gapsArg ?? [])
+          .map((g) => (typeof g === "string" ? g.trim().slice(0, 200) : ""))
+          .filter((g) => g.length > 0)
+          .slice(0, 20);
         // Clip the prose. These used to be `.max()` on the schema, where an
         // over-long verdict rejected the entire call — see the schema comment.
         const clip = (text: string | undefined, max: number) =>
@@ -1423,7 +1480,10 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           (qualified === true ? " · **qualified**" : qualified === false ? " · not qualified" : "") +
           (captureNote ? ` · ${captureNote}` : "") +
           (questWriteNote ? ` · ⚠ ${questWriteNote}` : "") +
-          (verdict ? `\n\n${verdict}` : "");
+          (verdict ? `\n\n${verdict}` : "") +
+          (gaps.length > 0
+            ? `\n\n**Gaps (not in evidence — confirm):**\n${gaps.map((g) => `- ${g}`).join("\n")}`
+            : "");
         try {
           const ledger = await upsertRunLedger(
             ctx.userId,
@@ -1444,6 +1504,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             // model (and the transcript) should see that the harness filled
             // something in, and what it filled in.
             ...(statusNote ? { statusNote } : {}),
+            ...(gaps.length > 0 ? { gaps } : {}),
             ledgerNodeId: ledger.contentNodeId,
             ...(capturedRowId
               ? { rowId: capturedRowId, rowStatus: capturedRowStatus }
@@ -1752,7 +1813,11 @@ export function createBaseTools(ctx: ToolExecuteContext) {
                   // the roll-up note and never mentioned where the ROWS
                   // live — users went looking for "the database" and found
                   // only notes. Name the ledger.
-                  next: `In your closing summary, tell the user the item rows live in the "${questState.questLabel} — Quest Ledger" database (every item, one row each) and the narrative lives in the quest log note — do NOT create any additional note.`,
+                  // Mention syntax, ids included (owner, 2026-09-22): the
+                  // model had been copying the ledger's [[wiki-link]] style
+                  // into chat, where nothing renders it. @[Title](id) is
+                  // the chat's pill, so hand it the exact string to use.
+                  next: `In your closing summary, tell the user the item rows live in @[${questState.questLabel} — Quest Ledger](${questState.questLedgerId}) (every item, one row each) and the narrative lives in the quest log note @[${questState.questLabel} — Quest Log](${ledger.contentNodeId}) — write those two references exactly as given (they render as links) and do NOT create any additional note.`,
                 }
               : {}),
           };

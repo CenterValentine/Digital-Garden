@@ -126,6 +126,12 @@ export interface CaptureConfig {
   dedupeColumnKey?: string;
   dedupeColumnName?: string;
   /**
+   * Capture columns written by MERGE (cell-merge.ts) rather than replace —
+   * alias/keyword columns that accumulate across runs. Names, as the model
+   * speaks them; resolved against `columns` at write time.
+   */
+  mergeColumns?: string[];
+  /**
    * P3 `source: "database-rows"`: item keys ARE row ids of this table —
    * capture writes stamp back to the row by id (update-only, never create)
    * instead of upserting by the dedupe identity.

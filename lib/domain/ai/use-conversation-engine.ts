@@ -682,8 +682,14 @@ export interface ActiveQuest {
   runKey: string;
   /** Display name from the proposal, falling back to the slug. */
   title: string;
-  /** The ledger's ContentNode, once a write has returned one. */
+  /** The quest LOG note's ContentNode, once a write has returned one. */
   ledgerNodeId: string | null;
+  /**
+   * The quest's ROW database — what the user means by "the quest". Read
+   * from the proposal (and the findings) result; the pin opens this when
+   * it is known and falls back to the log note.
+   */
+  questLedgerNodeId: string | null;
   /** Items written so far — the reason the pin exists is that this grows. */
   itemsRecorded: number;
 }
@@ -715,6 +721,7 @@ function deriveActiveQuest(messages: UIMessage[]): ActiveQuest | null {
   let runKey: string | null = null;
   let title: string | null = null;
   let ledgerNodeId: string | null = null;
+  let questLedgerNodeId: string | null = null;
   let itemsRecorded = 0;
 
   for (const m of messages) {
@@ -724,12 +731,21 @@ function deriveActiveQuest(messages: UIMessage[]): ActiveQuest | null {
         type?: string;
         state?: string;
         input?: { ledgerRunKey?: unknown; quest?: unknown };
-        output?: { ok?: boolean; ledgerNodeId?: unknown };
+        output?: { ok?: boolean; ledgerNodeId?: unknown; questLedgerNodeId?: unknown };
       };
-      // The proposal carries the human name; remember it even though the pin
-      // itself waits for a write.
-      if (p.type === "tool-propose_item_iteration" && typeof p.input?.quest === "string") {
-        title = p.input.quest;
+      // The proposal carries the human name and the quest DATABASE id;
+      // remember both even though the pin itself waits for a write.
+      if (p.type === "tool-propose_item_iteration") {
+        if (typeof p.input?.quest === "string") title = p.input.quest;
+        if (typeof p.output?.questLedgerNodeId === "string") {
+          questLedgerNodeId = p.output.questLedgerNodeId;
+        }
+      }
+      if (
+        p.type === "tool-record_iteration_findings" &&
+        typeof p.output?.questLedgerNodeId === "string"
+      ) {
+        questLedgerNodeId = p.output.questLedgerNodeId;
       }
       if (p.type !== "tool-record_item_result" || p.state !== "output-available") continue;
       const key = p.input?.ledgerRunKey;
@@ -748,6 +764,7 @@ function deriveActiveQuest(messages: UIMessage[]): ActiveQuest | null {
     runKey,
     title: title ?? questTitleFromRunKey(runKey),
     ledgerNodeId,
+    questLedgerNodeId,
     itemsRecorded,
   };
 }

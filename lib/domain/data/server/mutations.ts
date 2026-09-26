@@ -41,6 +41,7 @@ import {
 // Not re-exported from the barrel (capture-core is capture-path code), but
 // pure and client-safe — it is the label/delimiter tolerance seam.
 import { translateOptionValue } from "@/lib/domain/data/capture-core";
+import { mergeCellValue } from "@/lib/domain/data/cell-merge";
 
 // ── Results ──────────────────────────────────────────────────────────────
 
@@ -62,6 +63,12 @@ export interface CellWrite {
   expect?: CellValue | undefined;
   /** Set when `expect` is a meaningful `undefined` rather than "not checking". */
   hasExpectation?: boolean;
+  /**
+   * MERGE into the current value instead of replacing it (cell-merge.ts):
+   * union for list columns, token-append for text. Computed against the row
+   * as it is inside this transaction — no read step, no race, idempotent.
+   */
+  merge?: boolean;
 }
 
 // ── Cells ────────────────────────────────────────────────────────────────
@@ -236,11 +243,22 @@ export async function writeCells(
       // pass 0 and then fail the strict encoder anyway. Applied narrowly to
       // multiSelect rather than normalizing every type, so the grid's
       // existing strictness elsewhere is unchanged.
-      const value =
+      const translated =
         column.type === "multiSelect" &&
         (column.config.freeform || column.config.splitOn)
           ? translateOptionValue(column, write.value)
           : write.value;
+      // Merge AFTER label translation (so list merges compare option ids)
+      // and BEFORE encoding (so the union is validated like any value).
+      let value: unknown = translated;
+      if (write.merge) {
+        const merged = mergeCellValue(column, current[write.columnKey], translated);
+        if ("error" in merged) {
+          results.push({ status: "error", rowId: write.rowId, message: merged.error });
+          continue;
+        }
+        value = merged.value;
+      }
 
       const encoded = encodeCell(column, value);
       if (isEncodeError(encoded)) {

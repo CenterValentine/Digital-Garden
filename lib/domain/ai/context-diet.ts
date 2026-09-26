@@ -533,6 +533,50 @@ export function supersedeWriteInputs(messages: UIMessage[]): UIMessage[] {
   });
 }
 
+// ── Denied approvals teach (AI-CONTEXT-ECONOMICS-PLAN §6b.4) ───────────────
+
+/**
+ * What the model reads for a denied approval. convertToModelMessages
+ * forwards `approval.reason` when the client set one and otherwise the bare
+ * "Tool execution denied." — which tells the model nothing about what to do
+ * next. Prod 5e5b739d (2026-09-22): a 20k-token read was denied (the owner
+ * wanted a charter edit in context first), the model re-asked the same read,
+ * and the turn ended with four steps unused.
+ */
+export function deniedApprovalReason(toolName: string): string {
+  if (toolName === "query_database") {
+    return "The user declined this read at that size. Do NOT re-request it as is. Continue with what you already have, or request a much smaller read (a lower budget, fewer columns, a search or rowIds) that needs no approval.";
+  }
+  return `The user declined this ${toolName} call. Do NOT repeat the same call. Continue without it if you can; otherwise ask the user, in one line, what they would prefer instead.`;
+}
+
+/**
+ * Model-path only: give every denied approval that carries no reason a
+ * teaching one, keyed by tool. The part's state and the transcript are
+ * untouched — only what the model is told changes.
+ */
+export function teachDeniedApprovals(messages: UIMessage[]): UIMessage[] {
+  return messages.map((m) => {
+    if (m.role !== "assistant") return m;
+    let changed = false;
+    const parts = m.parts.map((part) => {
+      const p = part as {
+        type?: string;
+        state?: string;
+        approval?: { reason?: unknown } & Record<string, unknown>;
+      };
+      if (!p.type?.startsWith("tool-") || p.state !== "output-denied") return part;
+      if (typeof p.approval?.reason === "string" && p.approval.reason.trim()) return part;
+      changed = true;
+      return {
+        ...(part as Record<string, unknown>),
+        approval: { ...(p.approval ?? {}), reason: deniedApprovalReason(p.type.replace(/^tool-/, "")) },
+      } as typeof part;
+    });
+    return changed ? { ...m, parts } : m;
+  });
+}
+
 // ── Repeated tool parts (AI-CONTEXT-ECONOMICS-PLAN A2) ─────────────────────
 
 /** Below this an identical output is cheaper to keep than to perturb the cache over. */
