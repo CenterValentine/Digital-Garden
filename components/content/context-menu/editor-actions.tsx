@@ -859,6 +859,12 @@ export const editorActionProvider: ContextMenuActionProvider = (ctx) => {
         return;
       }
       if (!text) return;
+      // Inside a code block the clipboard is code, not markdown: insert it
+      // literally (a code block cannot hold the block nodes parsing yields).
+      if (editor.state.selection.$from.parent.type.spec.code) {
+        editor.view.dispatch(editor.state.tr.insertText(text.replace(/\r\n?/g, "\n")));
+        return;
+      }
       const parsed = markdownPasteToTiptap(text).content ?? [];
       if (parsed.length === 0) return;
       editor.chain().focus().insertContent(parsed).run();

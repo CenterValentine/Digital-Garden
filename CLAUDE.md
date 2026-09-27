@@ -26,6 +26,7 @@ pnpm collab:schema:check  # CI gate: validate collaboration schema covers all ed
 pnpm ai:drift:check   # CI gate: AI parallel-table drift (provider catalog ↔ connection templates ↔ type unions ↔ settings enum; tool inventory ↔ settings metadata; prompt tool references; adapter branches; run-loop schemas describe-only)
 pnpm context:diet:check  # CI gate: the model-facing transcript folds (distillation/turn), dedupe, write-input supersession, header retention — fixture transcripts, mutation-tested
 pnpm proposal:shape:check  # CI gate: the propose_item_iteration payloads that died in prod parse and resolve by meaning (lib/domain/ai/tools/iteration-proposal.ts — "schemas describe shape; execute judges")
+pnpm private:content:check  # CI gate: private (commented-out) content — stripPrivateContent predicate + every AI/public/search seam calls it; the source-view serializer does not
 pnpm ai:matrix        # Regenerate docs/notes-feature/core/AI-CAPABILITY-MATRIX.md from the real provider/model tables
 pnpm ai:matrix:check  # CI gate: the committed capability matrix matches the code (run ai:matrix after model/provider changes)
 pnpm publishing:schema:check  # CI gate: validate every publishing block has Server* variant + correct registerBlock type
@@ -293,6 +294,7 @@ All stores in `state/`. Pattern: `create<T>()(persist((set, get) => ({...}), { n
 - `callout.ts` — Obsidian `> [!type] Title` syntax, 6 types (note, tip, warning, danger, info, success)
 - `tag.ts` — Inline atomic node with `tagId`, `tagName`, `slug`, `color`. Renders as colored pill.
 - `inline-timestamp.ts` — Clickable inline date/time with popover picker; `ServerInlineTimestamp` for server use
+- `private-content.ts` — **Comment out prose**: `privateText` mark + `privateBlock` node, Cmd+/ toggle, `%%…%%` Obsidian syntax, `/private`. Content stays for the author and is stripped from every other reader by ONE predicate, `stripPrivateContent` (`lib/domain/content/private-content.ts`), called explicitly at each egress seam (search column, AI reads, mentions, charter bodies, public render, client outline). Never strip inside `tiptapToMarkdown` — the source view must show it. `pnpm private:content:check` pins the seam list. Guide: [docs/notes-feature/guides/editor/PRIVATE-CONTENT.md](docs/notes-feature/guides/editor/PRIVATE-CONTENT.md)
 - `blocks/` — Custom block nodes (SectionHeader, CardPanel, Accordion, Tabs, Columns, DailySummary, WeeklySummary, ExcalidrawBlock, MermaidBlock, etc.)
 - `commands/slash-commands.tsx` — `/` menu for quick insertion
 

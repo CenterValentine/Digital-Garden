@@ -54,6 +54,7 @@ import {
   getActiveStreamId,
 } from "@/lib/domain/ai/resumable/association";
 import type { JSONContent } from "@tiptap/core";
+import { extractSearchTextFromTipTap } from "@/lib/domain/content/search-text";
 import { requireAuth } from "@/lib/infrastructure/auth";
 import { getUserSettings } from "@/lib/features/settings";
 import { getChatContextBody } from "@/lib/features/chat-contexts";
@@ -1891,8 +1892,20 @@ export async function POST(request: Request) {
             if (folderSection) return folderSection;
             const dataSection = dataSections.get(node.id);
             if (dataSection) return dataSection;
+            // Derive live from the JSON, never trust the materialized column:
+            // it may predate the private-content strip (or the atomic-inline
+            // fix) — the same reason read_content re-derives. A note whose
+            // author just commented out a passage must not have that passage
+            // ride into the prompt as its own implicit mention.
+            const live = node.notePayload?.tiptapJson
+              ? extractSearchTextFromTipTap(
+                  node.notePayload.tiptapJson as JSONContent,
+                ).trim()
+              : "";
             const text =
-              node.notePayload?.searchText || "(no text content available)";
+              live ||
+              node.notePayload?.searchText ||
+              "(no text content available)";
             const props = rowPropSections.get(node.id);
             return `### ${node.title}\n${props ? `${props}\n\n` : ""}${text.slice(0, 2000)}`;
           });

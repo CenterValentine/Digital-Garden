@@ -10,6 +10,10 @@
  */
 
 import type { Node as PMNode } from "@tiptap/pm/model";
+import {
+  PRIVATE_BLOCK_NODE,
+  PRIVATE_TEXT_MARK,
+} from "@/lib/domain/content/private-content";
 
 export interface TextSearchResult {
   /** Start position in document (ProseMirror offset) */
@@ -59,8 +63,20 @@ export function findTextInDoc(
   // ProseMirror document position.
   const textRuns: Array<{ text: string; pmOffset: number }> = [];
 
-  const collect = (node: PMNode, pos: number) => {
+  // Positions inside a private block are skipped wholesale.
+  let skipUntil = -1;
+
+  const collect = (node: PMNode, pos: number): boolean | void => {
+    if (pos < skipUntil) return false;
+    // Private (commented-out) content is invisible to the model, so it must
+    // be unmatchable too: a hit here would both confirm the text exists and
+    // let apply_diff rewrite it. Same rule as visible-text.ts.
+    if (node.type.name === PRIVATE_BLOCK_NODE) {
+      skipUntil = pos + node.nodeSize;
+      return false;
+    }
     if (!node.isText || !node.text) return;
+    if (node.marks.some((m) => m.type.name === PRIVATE_TEXT_MARK)) return;
     // nodesBetween yields nodes that merely OVERLAP the range, so a text node
     // straddling the boundary would otherwise leak neighbouring blocks' text
     // into the flat string and let a scoped match escape its block.

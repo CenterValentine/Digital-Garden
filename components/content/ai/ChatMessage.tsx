@@ -893,6 +893,13 @@ export const ChatMessage = memo(function ChatMessage({
     };
   }, [message.parts]);
 
+  // Sibling-aware chip text: receipts in one message that share a title
+  // prefix show their distinguishing tail (siblingReceiptLabels).
+  const writeReceiptLabels = useMemo(
+    () => siblingReceiptLabels(writeReceipts.map((w) => w.receipt.title)),
+    [writeReceipts],
+  );
+
   // §5 batch gallery (owner shape 2026-09-03): group each RECORDED batch
   // into ONE card — an item gallery with per-item raw expansion. Anchors
   // are durable, not the live fold boundary (owner smoke 2026-09-03: the
@@ -1608,6 +1615,7 @@ export const ChatMessage = memo(function ChatMessage({
               <ContentWriteReceiptCard
                 key={`${toolCallId}-${receipt.contentId}-${index}`}
                 receipt={receipt}
+                label={writeReceiptLabels[index]}
                 midRunPaneOpen={midRunPaneOpen}
               />
             ))}
@@ -4380,11 +4388,48 @@ function toolActionLabel(toolName: string, isRunning: boolean): string {
  * The second line names the effective tree container after persistence, so
  * referenced outputs and folder-targeted outputs are distinguishable.
  */
+/** Title separators after which sibling titles tend to diverge. */
+const TITLE_SEPARATORS = [" — ", " – ", ": ", " - ", " · "];
+
+/**
+ * Chip labels for a group of receipts in ONE message. When every title shares
+ * a prefix that ends at a separator, the chip shows the distinguishing TAIL
+ * with a leading ellipsis; otherwise the full title.
+ *
+ * Owner report 2026-09-25: a run created "SeatGeek Technical Architect —
+ * Positioning…", "… — Tailored Resume Draft" and "… — Employer Research
+ * Update"; the 220px chip truncated all three at the shared prefix, so one
+ * item's three artifacts read as the same file three times. The full title
+ * stays in the tooltip.
+ */
+export function siblingReceiptLabels(titles: string[]): string[] {
+  if (titles.length < 2) return titles;
+  const first = titles[0];
+  let common = 0;
+  while (common < first.length && titles.every((t) => t[common] === first[common])) common += 1;
+  const shared = first.slice(0, common);
+  // Cut back to the last separator inside the shared prefix; no separator →
+  // the titles only happen to start alike, and the full title is clearer.
+  let cut = -1;
+  for (const sep of TITLE_SEPARATORS) {
+    const at = shared.lastIndexOf(sep);
+    if (at > 0) cut = Math.max(cut, at + sep.length);
+  }
+  if (cut <= 0) return titles;
+  return titles.map((t) => {
+    const tail = t.slice(cut).trim();
+    return tail ? `…${tail}` : t;
+  });
+}
+
 function ContentWriteReceiptCard({
   receipt,
+  label,
   midRunPaneOpen = false,
 }: {
   receipt: ContentWriteReceipt;
+  /** Sibling-aware chip text (siblingReceiptLabels); the tooltip keeps the full title. */
+  label?: string;
   midRunPaneOpen?: boolean;
 }) {
   const selectedContentId = useContentStore((s) => s.selectedContentId);
@@ -4472,7 +4517,7 @@ function ContentWriteReceiptCard({
             ate the panel). The operation + location moved to the tooltip;
             the icon + green tone already signal "AI wrote this". */}
         <span className="truncate font-medium text-gray-800 group-hover:text-emerald-800 dark:text-gray-100 dark:group-hover:text-emerald-300">
-          {receipt.title}
+          {label ?? receipt.title}
         </span>
       </button>
       {menuPos && (

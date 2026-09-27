@@ -600,6 +600,17 @@ export function MarkdownEditor({
           return true;
         }
 
+        // Inside a code block, EVERYTHING pasted is code. ProseMirror's own
+        // paste path already does the right thing there (one text node, every
+        // line kept), but this handler runs first — and the image-URL and
+        // markdown branches below used to hijack it: "Always format" replaced
+        // the literal paste with block nodes a code block cannot hold (nothing
+        // or one line landed), and the toast's "convert" undid the good paste.
+        // Bail before either branch so the default literal paste proceeds.
+        if (view.state.selection.$from.parent.type.spec.code) {
+          return false;
+        }
+
         // Check for image URL paste
         const text = event.clipboardData?.getData("text/plain");
         if (text && isImageUrl(text)) {
