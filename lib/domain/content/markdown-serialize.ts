@@ -428,11 +428,43 @@ export function tiptapToMarkdownRich(
   bridge: HtmlBridge = defaultBridge,
 ): string {
   if (!doc || !Array.isArray(doc.content) || doc.content.length === 0) return "";
-  return doc.content
-    .map((block) => serializeBlock(block, extensions, bridge))
-    .filter((seg) => seg.length > 0)
-    .join("\n\n");
+  const blocks = doc.content;
+  const segments = blocks.map((block) => serializeBlock(block, extensions, bridge));
+  let out = "";
+  let prevType: string | undefined;
+  for (let i = 0; i < blocks.length; i++) {
+    const seg = segments[i];
+    if (seg.length === 0) continue;
+    const type = blocks[i].type;
+    if (out.length > 0) {
+      out +=
+        prevType && LIST_TYPES.has(prevType) && type && LIST_TYPES.has(type)
+          ? `\n\n${LIST_SEPARATOR}\n\n`
+          : "\n\n";
+    }
+    out += seg;
+    prevType = type;
+  }
+  return out;
 }
+
+const LIST_TYPES = new Set(["bulletList", "orderedList", "taskList"]);
+
+/**
+ * Keeps two adjacent lists two lists.
+ *
+ * Each block round-trips alone — the self-verify proves that — but the
+ * join is not verified, and markdown has no way to end a list except by
+ * starting a non-list block: `1. a` + blank line + `2. b` is ONE list to
+ * marked (as is `- a` / `- b`, and a bullet list followed by a task list,
+ * which shares its marker). Two adjacent same-marker lists therefore
+ * merged on the way back — a top-level lossless hole, found while giving
+ * the accordion a codec (a real note had an ordered list starting at 2
+ * directly after one starting at 1). An HTML comment is a CommonMark
+ * type-2 block: it ends the first list, marked passes it through, and the
+ * DOM parser drops comment nodes, so nothing reaches the document.
+ */
+const LIST_SEPARATOR = "<!-- -->";
 
 // ── Parse: markdown → TipTap ─────────────────────────────────────────────────
 
