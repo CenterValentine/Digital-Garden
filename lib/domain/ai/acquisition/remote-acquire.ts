@@ -16,7 +16,11 @@
  * local policy, but the server never trusts a client that says "allowed."
  */
 
-import { extractReadableContent } from "./extract";
+import {
+  CHROME_ONLY_NOTE,
+  extractReadableContent,
+  looksLikeNavigationChrome,
+} from "./extract";
 import { hydrateExternalPayload } from "./hydrate";
 import { evaluateAcquirePolicy } from "./policy";
 import type {
@@ -76,6 +80,7 @@ export async function finalizeRemoteAcquire(
   let publishedAt: string | undefined;
   let body: string;
   let quality: ExtractionQuality;
+  let contentNote: string | undefined;
 
   if (material.mode === "sw-fetch") {
     if (!isNonEmpty(material.rawHtml)) {
@@ -89,6 +94,7 @@ export async function finalizeRemoteAcquire(
     publishedAt = extracted.publishedTime;
     body = extracted.content;
     quality = extracted.quality;
+    contentNote = extracted.contentNote;
   } else {
     const ex = material.extracted;
     if (!ex || !isNonEmpty(ex.content)) {
@@ -102,6 +108,11 @@ export async function finalizeRemoteAcquire(
     // The reader reports "empty" for no-article pages; treat anything but a
     // clean article as "raw" so consumers don't over-trust the extraction.
     quality = ex.quality === "readable" ? "readable" : "raw";
+    // The extension's reader can pick a sidebar too (P7).
+    if (looksLikeNavigationChrome(body)) {
+      quality = "raw";
+      contentNote = CHROME_ONLY_NOTE;
+    }
   }
 
   const truncated = body.length > REMOTE_MAX_CONTENT_CHARS;
@@ -129,6 +140,7 @@ export async function finalizeRemoteAcquire(
     extraction: quality,
     tokenEstimate: Math.ceil(content.length / 4),
     truncated,
+    ...(contentNote ? { contentNote } : {}),
   };
 
   // Garden-as-corpus caching, fire-and-forget by contract (same as P1).

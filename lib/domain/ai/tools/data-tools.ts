@@ -45,6 +45,8 @@ import {
   GROUPABLE_TYPES,
   READ_LIFETIMES,
   allBulkColumns,
+  cellDisplayValue,
+  columnProfile,
   formatRows,
   groupCountsLine,
   indexTierColumns,
@@ -548,6 +550,8 @@ async function applyRowUpdates(
   const errors: string[] = [];
   const touchedRowIds: string[] = [];
   const rowLabel = new Map<string, string>();
+  // P5: a coercion the normalizer applied is reported, never silent.
+  const normalizations: string[] = [];
 
   for (const update of updates) {
     const entries = Object.entries(update.cells ?? {});
@@ -607,6 +611,11 @@ async function applyRowUpdates(
         raw === null || raw === ""
           ? undefined
           : normalizeCellInput(column, raw);
+      if (typeof raw === "string" && Array.isArray(value)) {
+        normalizations.push(
+          `${column.name} wrapped as a ${value.length === 1 ? "one-item" : `${value.length}-item`} list`,
+        );
+      }
       const write: CellWrite = { rowId, columnKey: column.key, value };
       // Merge (owner scenario 2026-09-21): an alias/keyword column must
       // ACCUMULATE — "GTM" + "Revenue Ops" → "GTM, Revenue Ops" — without a
@@ -692,7 +701,9 @@ async function applyRowUpdates(
     questLedgers > 0
       ? ` ${questLedgers} row${questLedgers === 1 ? " is a quest" : "s are quests"} now — quest ledgers were minted under the charter.`
       : "";
-  return `${cellPart}${linkPart}${questPart} The user sees the change in the grid and can undo it there.`;
+  const normalizedPart =
+    normalizations.length > 0 ? ` (normalized: ${normalizations.join("; ")})` : "";
+  return `${cellPart}${normalizedPart}${linkPart}${questPart} The user sees the change in the grid and can undo it there.`;
 }
 
 export function createDataTools(ctx: ToolExecuteContext) {
@@ -1030,7 +1041,58 @@ export function createDataTools(ctx: ToolExecuteContext) {
           const budget = Math.min(requestedBudget ?? threshold, ceiling);
           const approved = requestedBudget !== null && requestedBudget > threshold;
 
+          // P8: `columns: "all"` is a preview only when nothing says the
+          // caller wants the cells whole. A budget or rowIds says exactly
+          // that (prod 2026-09-27: a one-row "all" read with budget 5000
+          // came back at ~377 tokens, every long cell clipped, and cost a
+          // second call). The over-budget ladder below still clips a read
+          // that does not fit.
+          if (selection === "all" && (rowIds || requestedBudget !== null)) {
+            for (const c of shown) fullColumns.add(c.id);
+          }
+
           const footers: string[] = [];
+          // P9: zero rows teach the column instead of ending the thought.
+          // The model guessed `Interest Level is 0` on a 6–9 column and got
+          // a bare header back; the second call was a sort it could have
+          // made first had the range been in front of it. Only on the empty
+          // path, over a bounded unfiltered sample.
+          if (rows.length === 0 && conditions.length > 0) {
+            try {
+              const sample = await loadRowPage({
+                tableId: databaseId,
+                view: { filters: { op: "and", children: [] }, sorts: [] } as unknown as DataView,
+                columns: live,
+                cursor: null,
+                limit: MAX_LIMIT,
+                viewerId: ctx.userId,
+              });
+              const lines: string[] = [];
+              const seenCols = new Set<string>();
+              for (const cond of conditions) {
+                const column = live.find((c) => c.id === cond.columnId);
+                if (!column || seenCols.has(column.id)) continue;
+                seenCols.add(column.id);
+                const profile = columnProfile(sample.rows, column);
+                if (profile.min !== undefined && profile.filled > 0) {
+                  lines.push(
+                    `${column.name} holds ${profile.min} … ${profile.max} (${profile.filled} of ${profile.total} rows filled${sample.total > sample.rows.length ? ", sampled" : ""})`,
+                  );
+                } else if (profile.counts && profile.counts.length > 0) {
+                  lines.push(
+                    `${column.name} values with rows: ${profile.counts.map(([l, n]) => `${l} (${n})`).join(", ")}`,
+                  );
+                } else if (profile.filled === 0) {
+                  lines.push(`${column.name} is empty in every row`);
+                }
+              }
+              if (lines.length > 0) {
+                footers.push(`[0 rows matched. ${lines.join(" · ")}. Adjust the filter to these values, or sort by the column instead.]`);
+              }
+            } catch {
+              // Teaching footer only — never fails the read.
+            }
+          }
           // Named columns: say what else is here, so the model never
           // spends a describe_database call re-learning names it could
           // have read off the capsule (prod smoke 2026-09-15: one filtered
@@ -1090,6 +1152,23 @@ export function createDataTools(ctx: ToolExecuteContext) {
             }
           }
           footers.unshift(...digestFooters);
+
+          // P8: when the preview clip actually bit, say so and say the way
+          // out — the header alone reads like a full result.
+          if (selection === "all" && fullColumns.size === 0) {
+            const clipped = rows.some((r) =>
+              shown.some(
+                (c) =>
+                  c.type !== "relation" &&
+                  cellDisplayValue(r, c).length > BULK_CLIP_CHARS,
+              ),
+            );
+            if (clipped) {
+              footers.push(
+                `[Cells clipped at ${BULK_CLIP_CHARS} chars (columns: "all" is a preview) — name the columns you need, or pass rowIds or a budget, for full text.]`,
+              );
+            }
+          }
 
           const full = formatRows({ rows, columns: shown, live, render, suffixByRow });
           const emit = (

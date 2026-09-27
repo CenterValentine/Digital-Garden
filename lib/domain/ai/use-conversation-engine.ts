@@ -110,6 +110,7 @@ import {
   type FolderContextMentionData,
 } from "@/lib/domain/ai-context/mention-part";
 import { stopPendingToolCalls } from "@/lib/domain/ai/repair-dangling-tools";
+import { normalizeItemUrl } from "@/lib/domain/ai/tools/iteration-proposal";
 import { getContentWriteRefreshTargets } from "@/lib/domain/ai/content-write-receipts";
 
 export type { OutputTarget } from "@/lib/domain/ai/output-target";
@@ -1232,12 +1233,20 @@ function deriveActiveItemIteration(
   batchSize: number | null;
   /** itemsRecorded value at the last record_batch_checkpoint (0 = none yet). */
   itemsAtLastCheckpoint: number;
+  /**
+   * The approved items' URLs, normalized (P6). A read of one of THESE is an
+   * item; any other read during the run is research and must not be told
+   * to "record this as an unreadable item" (prod 2026-09-27: a 403 on
+   * seatgeek.com/about was answered with exactly that).
+   */
+  itemUrls: Set<string>;
 } | null {
   let active: {
     itemBudget: number;
     itemsRecorded: number;
     batchSize: number | null;
     itemsAtLastCheckpoint: number;
+    itemUrls: Set<string>;
   } | null = null;
   for (const m of messages) {
     if (m.role !== "assistant") continue;
@@ -1248,9 +1257,20 @@ function deriveActiveItemIteration(
         p.state === "output-available"
       ) {
         const out = p.output as
-          | { ok?: boolean; itemBudget?: number; batchSize?: number | null }
+          | {
+              ok?: boolean;
+              itemBudget?: number;
+              batchSize?: number | null;
+              items?: Array<{ url?: unknown }>;
+            }
           | undefined;
         if (out?.ok && typeof out.itemBudget === "number" && out.itemBudget > 0) {
+          const itemUrls = new Set<string>();
+          for (const item of Array.isArray(out.items) ? out.items : []) {
+            if (typeof item?.url === "string" && item.url.trim()) {
+              itemUrls.add(normalizeItemUrl(item.url));
+            }
+          }
           active = {
             itemBudget: out.itemBudget,
             itemsRecorded: 0,
@@ -1259,6 +1279,7 @@ function deriveActiveItemIteration(
                 ? out.batchSize
                 : null,
             itemsAtLastCheckpoint: 0,
+            itemUrls,
           };
         }
       } else if (
@@ -2557,6 +2578,15 @@ export function useConversationEngine({
       // read tools only (a read is how the NEXT item starts) so mid-item acting
       // is never broken. Fail-open: no active iteration → path skipped entirely.
       const iteration = deriveActiveItemIteration(chat.messages);
+      // P6: an item read is a read of one of the APPROVED items; every other
+      // read during a run (employer research, a guide) is not an item and
+      // gets research guidance instead of "record it unreadable". A run
+      // whose items carry no URLs (label-keyed) keeps the old behaviour —
+      // there is nothing to compare against.
+      const isItemRead =
+        !!iteration &&
+        (iteration.itemUrls.size === 0 ||
+          iteration.itemUrls.has(normalizeItemUrl(url)));
       if (iteration && iteration.itemsRecorded >= iteration.itemBudget) {
         chat.addToolResult({
           tool: toolName,
@@ -2604,7 +2634,8 @@ export function useConversationEngine({
         let escalationNote: string | undefined;
         if (isBrowserRead && !researchRunRef.current) {
           const currentLen = outcome.content?.content?.trim().length ?? 0;
-          if (!outcome.ok || currentLen < 800) {
+          // Navigation chrome (P7) is thin whatever its length.
+          if (!outcome.ok || currentLen < 800 || outcome.content?.contentNote) {
             const launched = await launchTabAndRead(url);
             const launchedLen = launched.content?.content?.trim().length ?? 0;
             if (launched.ok && launchedLen > currentLen) {
@@ -2633,10 +2664,12 @@ export function useConversationEngine({
           // it and the ledger under-counts (observed live: a 190-char page dropped
           // from a 10-item run). Structural backstop to the prompt's "record every
           // attempt" rule.
-          const thin = (c.content?.trim().length ?? 0) < 500;
+          const thin = (c.content?.trim().length ?? 0) < 500 || !!c.contentNote;
           const iterationNote =
             iteration && thin
-              ? "This page has no substantial job description (near-empty). It is still an attempted item — call record_item_result with status=unreadable and a one-line reason BEFORE reading the next tab. Do not skip it."
+              ? isItemRead
+                ? "This page has no substantial job description (near-empty or navigation only). It is still an attempted item — call record_item_result with status=unreadable and a one-line reason BEFORE reading the next tab. Do not skip it."
+                : "This page has no substantial content (near-empty or navigation only). It is NOT one of the run's items — do not record it as one; note the gap and continue. If it was employer research, search_web (when available) can find official sources."
               : undefined;
           chat.addToolResult({
             tool: toolName,
@@ -2653,6 +2686,9 @@ export function useConversationEngine({
               // The escalation summary (if any) — the model relays it so the user
               // sees the steps (normal read → visible-tab open) it actually took.
               ...(escalationNote ? { escalationNote } : {}),
+              // P7: the body is a link list, not the article — say so, in
+              // its own field, so the model never reads a menu as content.
+              ...(c.contentNote ? { contentNote: c.contentNote } : {}),
               ...(iterationNote ? { iterationNote } : {}),
             },
           });
@@ -2666,8 +2702,12 @@ export function useConversationEngine({
                 : `Could not read the page: ${outcome.reason ?? "unknown error"}.${escalationNote ? ` ${escalationNote}` : ""}`) +
               // A failed read during an iteration is still an attempted item —
               // record it, don't silently skip (keeps the ledger complete).
+              // A failed RESEARCH read is not an item (P6): say what it is
+              // and what to do instead.
               (iteration
-                ? " This is an attempted iteration item — call record_item_result with status=unreadable (or blocked) for it before moving to the next tab."
+                ? isItemRead
+                  ? " This is an attempted iteration item — call record_item_result with status=unreadable (or blocked) for it before moving to the next tab."
+                  : " This URL is NOT one of the run's items — do not record it as one. If it was research (an employer page, a guide), record what is missing as a gap on the current item and continue; search_web (when available) can find official sources when a page is blocked."
                 : ""),
           });
         }

@@ -358,11 +358,16 @@ async function resolveCharterReferenceContext(
   const uniqueTitles = Array.from(
     new Set(references.map((reference) => reference.targetTitle)),
   );
+  // Databases resolve too (ITERATION-RUN-HARNESS-FIXES P1): a charter that
+  // says "look at everything in [[Career Evidence Library]]" used to get
+  // "not found in your notes" back — true of notes, false of the vault —
+  // and the tools then refused the table. Now the manifest names the tool
+  // and the id, and jurisdiction admits it (resolve.ts).
   const referenceNodes = await prisma.contentNode.findMany({
     where: {
       ownerId: userId,
       title: { in: uniqueTitles },
-      contentType: { in: ["note", "folder"] },
+      contentType: { in: ["note", "folder", "data"] },
       deletedAt: null,
     },
     select: {
@@ -379,18 +384,24 @@ async function resolveCharterReferenceContext(
   const activeReferenceContentIds = Array.from(
     new Set(
       referenceNodes
-        // Folders are capsule-consumed (below), never read_content-read —
-        // keep them out of the checkpoint gate's reference expectations.
+        // Folders are capsule-consumed (below) and databases are
+        // query_database-read — never read_content-read; keep both out of
+        // the checkpoint gate's reference expectations.
         .filter(
           (node) =>
-            activeTitles.has(node.title) && node.contentType !== "folder",
+            activeTitles.has(node.title) &&
+            node.contentType !== "folder" &&
+            node.contentType !== "data",
         )
         .map((node) => node.id),
     ),
   );
   const lines = uniqueTitles.map((title) => {
     const found = byTitle.get(title);
-    if (!found) return `- [[${title}]] — not found in your notes`;
+    if (!found) return `- [[${title}]] — not found in your notes or databases`;
+    if (found.contentType === "data") {
+      return `- [[${title}]] — DATABASE (query_database databaseId: ${found.id}; reachable in this charter's runs without a mention)`;
+    }
     if (found.contentType === "folder") {
       // Folder refs behave like chat folder mentions (capsule-plan
       // follow-up): active-phase folders get their capsule injected below;
@@ -2130,6 +2141,22 @@ export async function POST(request: Request) {
               placeholderCount > 0
                 ? `\n\n**Unfilled template:** ${placeholderCount} phase heading${placeholderCount === 1 ? " is" : "s are"} still the starter placeholder ("[name the first phase]"). Tell the user before running anything, and never execute a placeholder phase — ask them to rename or delete it.`
                 : "";
+            // P12: a note that repeats itself is loaded ONCE and said so —
+            // the copies would otherwise read as phases (and cost their
+            // tokens on every turn).
+            const duplicateCopies = parsed.duplicatePhasesCollapsed ?? 0;
+            const duplicateNote =
+              duplicateCopies > 0
+                ? `\n\n**Duplicated note:** this charter's note repeats identical content ${duplicateCopies + 1} times (${duplicateCopies} duplicate ${duplicateCopies === 1 ? "copy" : "copies"} collapsed — likely a sync glitch). Only ONE copy is loaded; the copies are NOT extra phases. Mention it to the user once so they can clean the note.`
+                : "";
+            if (duplicateCopies > 0) {
+              logger.warn({
+                layer: "ai",
+                event: "charter:duplicate_content_collapsed",
+                summary: `charter note repeats its content ${duplicateCopies + 1}×; one copy loaded`,
+                attrs: { charterId: explicitPlaybookId, copies: duplicateCopies + 1 },
+              });
+            }
             if (parsed.phases.length > 0) {
               const rawIndex =
                 typeof body.activePhaseIndex === "number" ? body.activePhaseIndex : 0;
@@ -2143,8 +2170,9 @@ export async function POST(request: Request) {
               );
 
               // Reference manifest: title-resolve every [[link]] in the
-              // standing rules + active phase (wiki-links carry no id — see
-              // lib/domain/editor/extensions/wiki-link.ts).
+              // standing rules + active phase (a hand-typed wiki-link
+              // carries only its title; picker-made ones also carry
+              // `targetId` — see lib/domain/editor/extensions/wiki-link.ts).
               const allRefs = [
                 ...parsed.standingRules.references,
                 ...phase.references,
@@ -2197,7 +2225,8 @@ export async function POST(request: Request) {
                   : "") +
                 `**Current phase (the ONLY phase detail loaded):**\n${phaseText}${referenceContext.manifest}` +
                 ledgerNote +
-                placeholderNote;
+                placeholderNote +
+                duplicateNote;
             } else {
               // A valid marked playbook can be empty. Keep its explicit
               // identity in context instead of silently falling through to

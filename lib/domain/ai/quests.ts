@@ -238,6 +238,12 @@ export interface QuestInfo {
   itemBudget: number;
   batchSize: number | null;
   sittingClosed?: boolean;
+  /**
+   * ISO stamp of the proposal that opened this sitting (ITERATION-RUN-
+   * HARNESS-FIXES P11) — so the next sitting can say WHEN an unclosed
+   * predecessor was opened. Absent on sittings stamped before 2026-09-27.
+   */
+  openedAt?: string;
   masterCols: Record<string, string>;
   ledgerCols: Record<string, string>;
   /** v2: the ledger's "Quest" relation column id (ledger row → master row). */
