@@ -275,7 +275,12 @@ export function formatWorkspace(
     workspace.items.map((item) => [item.contentId, item.content]),
   );
   const contentMeta: Record<string, { title: string; contentType: string }> = {};
-  for (const id of collectPaneContentIds(normalizedState)) {
+  // Membership-only ids (tabs moved in, or opened by a surface that doesn't
+  // write the blob) are part of the open-tab set too — name them, or they
+  // paint as "Loading…" on arrival.
+  const openIds = collectPaneContentIds(normalizedState);
+  for (const tab of workspace.tabs ?? []) openIds.add(tab.contentId);
+  for (const id of openIds) {
     const fromItem = itemContentById.get(id);
     const title = fromItem?.title ?? contentLookup?.get(id)?.title;
     const contentType =
@@ -456,6 +461,7 @@ async function buildContentLookup(
     for (const id of collectPaneContentIds(normalizeWorkspaceState(workspace))) {
       ids.add(id);
     }
+    for (const tab of workspace.tabs ?? []) ids.add(tab.contentId);
   }
   for (const id of covered) ids.delete(id);
   if (ids.size === 0) return new Map();
@@ -557,6 +563,12 @@ export async function getWorkspace(ownerId: string, workspaceId: string) {
         orderBy: { updatedAt: "desc" },
       },
       viewRoot: { select: { id: true, title: true } },
+      // R1 membership on the single read too: a mutation response that
+      // replaces a list entry must not drop the tab SET the list carried.
+      tabs: {
+        where: { content: { ownerId, deletedAt: null } },
+        select: { contentId: true },
+      },
     },
   });
 
