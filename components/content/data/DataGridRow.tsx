@@ -263,9 +263,18 @@ interface DataGridRowProps {
   editColumnKey: string | null;
   /** Column key currently selected (ring + ⌘C source) in THIS row, if any. */
   selectedColumnKey: string | null;
-  onToggleSelect: (rowId: string) => void;
+  /**
+   * Column keys of THIS row inside the multi-cell selection (drag, ⇧-click
+   * range, ⌘-click adds) — null when none. A new Set only for rows whose
+   * membership changed, so the memo'd rows outside the range stay put.
+   */
+  rangeColumnKeys: ReadonlySet<string> | null;
+  /** `shiftKey` extends the checkbox selection from the last toggled row. */
+  onToggleSelect: (rowId: string, shiftKey?: boolean) => void;
   onCommitCell: (rowId: string, columnKey: string, value: unknown) => void;
-  onSelectCell: (rowId: string, columnKey: string) => void;
+  onSelectCell: (rowId: string, columnKey: string, mods?: CellSelectMods) => void;
+  /** Mouse entered a cell — the parent extends a drag selection to it. */
+  onHoverCell: (rowId: string, columnKey: string) => void;
   /** Open this row in the peek panel — optionally focused on one column,
    * which auto-opens that relation's link picker (no second click). */
   onOpenRow: (rowId: string, focusColumnId?: string) => void;
@@ -289,9 +298,11 @@ function DataGridRowImpl({
   editable,
   editColumnKey,
   selectedColumnKey,
+  rangeColumnKeys,
   onToggleSelect,
   onCommitCell,
   onSelectCell,
+  onHoverCell,
   onOpenRow,
   onOpenContent,
   onAdvance,
@@ -309,7 +320,14 @@ function DataGridRowImpl({
         <input
           type="checkbox"
           checked={selected}
-          onChange={() => onToggleSelect(row.id)}
+          // The change event carries the click's modifiers via nativeEvent —
+          // ⇧-click selects the range from the last toggled row.
+          onChange={(e) =>
+            onToggleSelect(
+              row.id,
+              (e.nativeEvent as MouseEvent | undefined)?.shiftKey === true
+            )
+          }
           aria-label="Select row"
           className="h-3.5 w-3.5 accent-current"
         />
@@ -351,8 +369,10 @@ function DataGridRowImpl({
             editable={editable}
             forceEdit={forceEdit}
             cellSelected={selectedColumnKey === column.key}
+            inRange={rangeColumnKeys?.has(column.key) ?? false}
             onCommit={onCommitCell}
             onSelect={onSelectCell}
+            onHover={onHoverCell}
             onOpenRow={onOpenRow}
             onOpenContent={onOpenContent}
             onAdvance={onAdvance}
@@ -397,12 +417,21 @@ interface DataCellProps {
   editable: boolean;
   forceEdit: boolean;
   cellSelected: boolean;
+  /** Inside the multi-cell selection (tinted; ⌘C copies the block). */
+  inRange: boolean;
   onCommit: (rowId: string, columnKey: string, value: unknown) => void;
-  onSelect: (rowId: string, columnKey: string) => void;
+  onSelect: (rowId: string, columnKey: string, mods?: CellSelectMods) => void;
+  onHover: (rowId: string, columnKey: string) => void;
   onOpenRow: (rowId: string, focusColumnId?: string) => void;
   onOpenContent: (ref: ContentRef) => void;
   onAdvance: (rowId: string, columnKey: string, dir: 1 | -1) => void;
   onEditEnd: () => void;
+}
+
+/** Modifier keys on a cell mousedown — ⇧ extends the range, ⌘/Ctrl adds a cell. */
+export interface CellSelectMods {
+  shift: boolean;
+  meta: boolean;
 }
 
 function DataCell({
@@ -420,14 +449,30 @@ function DataCell({
   editable,
   forceEdit,
   cellSelected,
+  inRange,
   onCommit,
   onSelect,
+  onHover,
   onOpenRow,
   onOpenContent,
   onAdvance,
   onEditEnd,
 }: DataCellProps) {
   const canInlineEdit = editable && INLINE_EDITABLE_TYPES.has(column.type);
+
+  // Selection happens on MOUSEDOWN (with modifiers) so a drag that starts
+  // here extends through the cells the pointer enters; a plain click still
+  // selects exactly as before. Spread onto every cell wrapper.
+  const selectHandlers = {
+    onMouseDown: (e: React.MouseEvent) => {
+      if (e.button !== 0) return;
+      onSelect(rowId, column.key, {
+        shift: e.shiftKey,
+        meta: e.metaKey || e.ctrlKey,
+      });
+    },
+    onMouseEnter: () => onHover(rowId, column.key),
+  };
 
   /**
    * The draft exists ONLY while editing; `null` = view mode. Seeded from
@@ -492,10 +537,11 @@ function DataCell({
       <div
         className={cn(
           "flex shrink-0 items-center border-r border-border/40 px-3",
-          cellSelected && "ring-1 ring-inset ring-primary"
+          cellSelected && "ring-1 ring-inset ring-primary",
+          inRange && "bg-primary/10"
         )}
         style={{ width }}
-        onClick={() => onSelect(rowId, column.key)}
+        {...selectHandlers}
       >
         {displayMode === "text" ? (
           <button
@@ -572,10 +618,11 @@ function DataCell({
         className={cn(
           "flex shrink-0 items-center gap-1 overflow-hidden border-r border-border/40 px-2 text-xs",
           cellSelected && "ring-1 ring-inset ring-primary",
+          inRange && "bg-primary/10",
           editable && "cursor-pointer"
         )}
         style={{ width }}
-        onClick={() => onSelect(rowId, column.key)}
+        {...selectHandlers}
         onDoubleClick={editable ? () => onOpenRow(rowId) : undefined}
         title={editable ? "Double-click to link rows" : undefined}
       >
@@ -651,10 +698,11 @@ function DataCell({
         className={cn(
           "flex shrink-0 items-center gap-1 overflow-hidden border-r border-border/40 px-2 text-xs",
           cellSelected && "ring-1 ring-inset ring-primary",
+          inRange && "bg-primary/10",
           fileDragOver && "bg-primary/10 ring-2 ring-inset ring-primary/60"
         )}
         style={{ width }}
-        onClick={() => onSelect(rowId, column.key)}
+        {...selectHandlers}
         // OS-file drags only (dragHasFiles) — the app's own column/board
         // drags carry text data and never light this up.
         onDragOver={
@@ -811,10 +859,11 @@ function DataCell({
       <div
         className={cn(
           "flex shrink-0 items-center overflow-hidden border-r border-border/40 px-2 text-xs",
-          cellSelected && "ring-1 ring-inset ring-primary"
+          cellSelected && "ring-1 ring-inset ring-primary",
+          inRange && "bg-primary/10"
         )}
         style={{ width }}
-        onClick={() => onSelect(rowId, column.key)}
+        {...selectHandlers}
         onDoubleClick={editable ? () => onOpenRow(rowId, column.id) : undefined}
         title={editable ? "Double-click to assign" : undefined}
       >
@@ -857,10 +906,11 @@ function DataCell({
         className={cn(
           "flex shrink-0 items-center overflow-hidden border-r border-border/40 px-3 text-xs text-muted-foreground",
           column.type === "rollup" && "justify-end font-mono tabular-nums",
-          cellSelected && "ring-1 ring-inset ring-primary"
+          cellSelected && "ring-1 ring-inset ring-primary",
+          inRange && "bg-primary/10"
         )}
         style={{ width }}
-        onClick={() => onSelect(rowId, column.key)}
+        {...selectHandlers}
         title={text || undefined}
       >
         <span className="truncate">{text}</span>
@@ -888,10 +938,11 @@ function DataCell({
         className={cn(
           "flex shrink-0 items-center gap-1 overflow-hidden border-r border-border/40 px-2 text-xs",
           editable && "cursor-pointer",
-          cellSelected && "ring-1 ring-inset ring-primary"
+          cellSelected && "ring-1 ring-inset ring-primary",
+          inRange && "bg-primary/10"
         )}
         style={{ width }}
-        onClick={() => onSelect(rowId, column.key)}
+        {...selectHandlers}
         onDoubleClick={editable ? () => setOptionsOpen(true) : undefined}
         title={display || (editable ? "Double-click to choose" : undefined)}
       >
@@ -1140,11 +1191,13 @@ function DataCell({
         "flex shrink-0 items-center overflow-hidden border-r border-border/40 px-3 text-xs",
         canInlineEdit && "cursor-text",
         column.type === "number" && "justify-end font-mono tabular-nums",
-        cellSelected && "ring-1 ring-inset ring-primary"
+        cellSelected && "ring-1 ring-inset ring-primary",
+          inRange && "bg-primary/10"
       )}
       style={{ width }}
-      onClick={() => {
-        onSelect(rowId, column.key);
+      {...selectHandlers}
+      onClick={(e) => {
+        // Selection already happened on mousedown (selectHandlers).
         // First click on an EMPTY editable cell goes straight to editing —
         // there is nothing to select-and-look-at, so the extra step was pure
         // friction (owner, 2026-08-27). Populated cells keep click=select /
@@ -1152,6 +1205,8 @@ function DataCell({
         // CONSTRUCTION: Tab moves selection through the window keydown
         // handler, which never routes through this click handler, so
         // tabbing across blank cells still only selects (Enter edits).
+        // A modified click is a range/add gesture, never an edit.
+        if (e.shiftKey || e.metaKey || e.ctrlKey) return;
         if (canInlineEdit && !isSelectLike && value === undefined) {
           onEditEnd();
           beginEdit();

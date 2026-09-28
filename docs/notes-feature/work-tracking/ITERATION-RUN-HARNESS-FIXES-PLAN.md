@@ -123,3 +123,16 @@ Each fix names its mechanism, where it lands, and how it is proven. Harness over
 4. Read a LinkedIn posting anonymously → result carries `contentNote`.
 5. Open the *Apply for a job* charter chat → context says the note repeats 4× (until the note is cleaned).
 6. Message metadata after a multi-request turn shows one segment per request.
+
+## 7. Second run (2026-09-28, after PR #261 deployed) — what held, what did not
+
+Prod conversation `ecf1d0e5` (chat `3826d0c4`, *Exploring Low-Interest Job Opportunities*, `gpt-5.6-terra`, 07:25–07:29 UTC, three minutes after the merge; the server responses carry the new text, so the deploy was live).
+
+**Held (P1–P13 visible in the transcript):** the Career Evidence Library was read by id in one call (P1 — the manifest now prints the id); `columns: "all"` + `rowIds` returned ~2.2k tokens of full cells instead of ~377 clipped (P8); the 403 on seatgeek.com/about was answered "NOT one of the run's items … search_web can find official sources" (P6); one row write through `capture.cells`, `Resumes` sent as a list, no `update_row` (P3/P5); the docx was overwritten in place (`overwritten: true`); the closing links carry the real titles (P10); the resume names doxy.me, quantified claims (250,000 duplicates, $100,000 monthly, 120,000 users) and its own gaps; one canonical gap row landed in the Experience Gaps Library with a relation to the opportunity; the status moved to Qualified (the previous run had pushed it back to Research Queue).
+
+**Did not hold:**
+- **F14 requestCount doubled** — 4 requests reported as 8 (segments 4, durations sum to `durationMs`). The live-continuation branch (P13) priced and appended correctly but still read `requestCount` from the inherited stamp: 1, 2, 4, 8. Fix: a live request counts as one. Fixture extended to three requests.
+- **F15 the phase checkpoint counted only `search_web` and `read_page`** as research; the model's `read_page_headless_or_browser` attempt (the tool the `web` family hands it) was invisible, the checkpoint was rejected as "no research", and four steps went to garden searches and a summon that could never satisfy it. Fix: `RESEARCH_TOOLS` in `checkpoint-gate.ts` includes the browser reader and `open_tab_and_read`; the messages name it.
+- **F16 a `search` miss taught nothing** (P9 covered filters only): `search: "ticketing"` on a one-row table returned a bare header and the next call re-read the table. Fix: the zero-row footer also fires for a search and names the table's size (and its rows when ≤ 3).
+- **Model, not harness:** `search_web` was available (summon said so twice) and never called; the closing message then claimed the checkpoint "requires a successful search_web … and the available read was blocked", which was untrue. The opening `summon` pulled four whole families (23 tools) so every step carried their schemas: 702k input tokens and $1.22 for one item versus 344k and $0.05 on the first run (part of that is `gpt-5.6-terra` pricing). A summon result that priced its own cost per step would let the model see the trade.
+- **Client stale after deploy:** the message's `data-charter` part still said `phaseCount: 4` (the page was loaded before the deploy; the server context collapsed the copies). The charter note itself still holds four copies.

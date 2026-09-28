@@ -279,10 +279,20 @@ function rawRequest(n: number, inputTokens: number): Record<string, unknown> {
     assert(cMerged === null || cMerged === c1, "P13: unpriced model — the fold stays consistent");
   }
 
+  // A third request: the inherited stamp now says requestCount 2, and a
+  // live request must still count as ONE (prod 2026-09-28: 1, 2, 4, 8).
+  const r3 = rawRequest(3, 4000);
+  const m3 = deepMerge(t2, r3);
+  const t3 = mergeTurnUsageMetadata(accum, "m", m3, []) as Record<string, unknown>;
+  assert(t3.requestCount === 3, `P13: a third live request counts as one (got ${t3.requestCount})`);
+  assert(Array.isArray(t3.segments) && t3.segments.length === 3, `P13: three segments after three requests (got ${Array.isArray(t3.segments) ? t3.segments.length : "none"})`);
+  const usage3 = t3.usage as { inputTokens?: number } | undefined;
+  assert(usage3?.inputTokens === 7000, `P13: usage sums across three requests (got ${usage3?.inputTokens})`);
+
   // A reload-seeded blob (stamped, NO raw segment) still restores wholesale.
-  const seeded = mergeTurnUsageMetadata(new Map(), "m", t2, []) as Record<string, unknown>;
-  assert(Array.isArray(seeded.segments) && seeded.segments.length === 2, "P13: a persisted blob seeds its segments wholesale");
-  assert(seeded.requestCount === 2, "P13: a persisted blob keeps its requestCount");
+  const seeded = mergeTurnUsageMetadata(new Map(), "m", t3, []) as Record<string, unknown>;
+  assert(Array.isArray(seeded.segments) && seeded.segments.length === 3, "P13: a persisted blob seeds its segments wholesale");
+  assert(seeded.requestCount === 3, "P13: a persisted blob keeps its requestCount");
 }
 
 // ── Report ──────────────────────────────────────────────────────────────────

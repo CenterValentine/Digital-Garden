@@ -539,6 +539,10 @@ export function mergeTurnUsageMetadata(
     request.persistedCostBreakdown = undefined;
     request.persistedCostVersion = undefined;
     request.persistedUnpriced = undefined;
+    // A live request is ONE request, whatever `requestCount` the inherited
+    // stamp carries (prod ecf1d0e5, 2026-09-28: 4 requests reported as 8 —
+    // each continuation added the running total back: 1, 2, 4, 8).
+    request.requestCount = 1;
   }
   if (entry.lastRequestSig !== sig) {
     entry.inputTokens += request.inputTokens;
