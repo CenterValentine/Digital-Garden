@@ -45,6 +45,7 @@ import {
 import {
   SUMMON_TOOL_ID,
   createSummonTool,
+  estimateToolSchemaTokens,
 } from "@/lib/domain/ai/tools/summon";
 import { isResumableConfigured } from "@/lib/domain/ai/resumable/redis";
 import { getStreamContext } from "@/lib/domain/ai/resumable/context";
@@ -238,6 +239,13 @@ import { effectiveCapabilities } from "@/lib/domain/ai/features/capabilities";
 import { prisma } from "@/lib/database/client";
 import type { Prisma } from "@/lib/database/generated/prisma";
 import { logger, spanPayload, startSpan, withRouteTrace, withSpan } from "@/lib/core/logger";
+import {
+  excerptAt,
+  findPrefixDivergence,
+  fingerprintPrompt,
+  serializePromptForDiag,
+  type PrefixFingerprint,
+} from "@/lib/domain/ai/prompt-prefix-diag";
 import { readRunLedgerCaptureConfig } from "@/lib/domain/ai/run-ledger";
 import { MASTER_LEDGER_META_KEY, parseQuestInfo } from "@/lib/domain/ai/quests";
 import { after } from "next/server";
@@ -286,6 +294,12 @@ import {
 } from "@/lib/domain/ai/charters/output-directives";
 
 const ROUTE_PATH = "/api/ai/chat";
+
+/** Last fingerprinted prompt per conversation for the opt-in prefix diagnostic (bounded). */
+const promptPrefixDiagState = new Map<
+  string,
+  { fingerprint: PrefixFingerprint; serialized: string; requestStartedAt: string }
+>();
 
 /**
  * Gate + capsule for ONE folder reference — a chat mention pill, a playbook
@@ -1330,7 +1344,17 @@ export async function POST(request: Request) {
       // step's usage; phase_checkpoint stamps the running total into the
       // Run Ledger. Input/output split added by cost metering so ledger
       // stamps can carry a $ estimate (totals alone can't be priced).
-      const runTokenCounter = { total: 0, input: 0, output: 0, cachedInput: 0 };
+      const runTokenCounter = {
+        total: 0,
+        input: 0,
+        output: 0,
+        cachedInput: 0,
+        maxStepInput: 0,
+        maxStepCachedInput: 0,
+      };
+      // Captured from the streamText call below so the prefix diagnostic in
+      // prepareStep can fingerprint what the provider actually sees.
+      let systemPromptForDiag = "";
       // Turn-cumulative usage (BACKLOG 2026-09-04): an approval continuation
       // is a NEW request whose accumulator starts at zero, but the turn's
       // earlier segments ride back in on the trailing assistant message's
@@ -1603,6 +1627,8 @@ export async function POST(request: Request) {
         registered,
         activated,
         isAdvertised,
+        schemaTokensFor: (id) =>
+          estimateToolSchemaTokens((tools as Record<string, unknown>)[id]),
       });
       // Core by construction: a menu the model cannot act on is worse than no
       // menu, so the one tool that acts on it is never itself summonable.
@@ -2722,6 +2748,59 @@ export async function POST(request: Request) {
           const stepActiveTools = toolsActive
             ? [...advertised, ...activated]
             : undefined;
+          // Prompt-prefix diagnostic (ITERATION-RUN-HARNESS-FIXES §8), opt-in
+          // via AI_PROMPT_PREFIX_DIAG=1: names the first chunk where this
+          // step's prompt stops matching the previous one — the provider
+          // cache matches only that far. Prod ecf1d0e5 froze at 27k tokens.
+          if (process.env.AI_PROMPT_PREFIX_DIAG === "1") {
+            try {
+              const serialized = serializePromptForDiag({
+                system: systemPromptForDiag,
+                toolNames: stepActiveTools ?? Object.keys(tools),
+                messages: stepMessages,
+              });
+              const fingerprint = fingerprintPrompt(serialized);
+              const diagKey = conversationIdForAssoc ?? contentId ?? "anon";
+              const prev = promptPrefixDiagState.get(diagKey);
+              if (prev) {
+                const divergence = findPrefixDivergence(prev.fingerprint, fingerprint);
+                logger.info({
+                  layer: "ai",
+                  event: "ai:prompt_prefix",
+                  summary: divergence
+                    ? `prompt prefix diverges after ~${divergence.sharedTokensApprox} tokens (chunk ${divergence.chunkIndex})`
+                    : "prompt prefix stable — grew or unchanged",
+                  attrs: {
+                    conversation_id: diagKey,
+                    step: stepNumber,
+                    request_started_at: new Date(turnStartMs).toISOString(),
+                    prev_request_started_at: prev.requestStartedAt,
+                    same_request: prev.requestStartedAt === new Date(turnStartMs).toISOString(),
+                    prompt_chars: serialized.length,
+                    prev_prompt_chars: prev.serialized.length,
+                    ...(divergence
+                      ? {
+                          offset: divergence.offset,
+                          prev_excerpt: excerptAt(prev.serialized, divergence.offset),
+                          curr_excerpt: excerptAt(serialized, divergence.offset),
+                        }
+                      : {}),
+                  },
+                });
+              }
+              promptPrefixDiagState.set(diagKey, {
+                fingerprint,
+                serialized,
+                requestStartedAt: new Date(turnStartMs).toISOString(),
+              });
+              if (promptPrefixDiagState.size > 20) {
+                const oldest = promptPrefixDiagState.keys().next().value;
+                if (oldest !== undefined) promptPrefixDiagState.delete(oldest);
+              }
+            } catch {
+              // Diagnostic only — never touches the step.
+            }
+          }
           if (stepNumber < stepCap - 1) {
             if (itemIterationBudget == null) return { activeTools: stepActiveTools };
             // DELIVERABLE-TAIL RESERVATION (plan §6b, prod 5e5b739d): the
@@ -2770,7 +2849,7 @@ export async function POST(request: Request) {
             ],
           };
         },
-        system: buildSystemPrompt({
+        system: (systemPromptForDiag = buildSystemPrompt({
           hasImageTools: isAdvertised("generate_image"),
           hasFlashcardTools: isAdvertised("list_decks"),
           hasWebSearch: isAdvertised("search_web"),
@@ -2813,7 +2892,7 @@ export async function POST(request: Request) {
             renderPhaseCheckpointGateInstruction(phaseCheckpointGate),
           pageContextSection,
           currentPageHint,
-        }),
+        })),
         onStepFinish: (step) => {
           // Tokens-per-phase accumulator (v3.1 R5) — cheap, never throws.
           const stepUsage = (
@@ -2830,6 +2909,10 @@ export async function POST(request: Request) {
           runTokenCounter.input += stepUsage?.inputTokens ?? 0;
           runTokenCounter.output += stepUsage?.outputTokens ?? 0;
           runTokenCounter.cachedInput += stepUsage?.cachedInputTokens ?? 0;
+          if ((stepUsage?.inputTokens ?? 0) > runTokenCounter.maxStepInput) {
+            runTokenCounter.maxStepInput = stepUsage?.inputTokens ?? 0;
+            runTokenCounter.maxStepCachedInput = stepUsage?.cachedInputTokens ?? 0;
+          }
           const cacheCreation = (
             step as {
               providerMetadata?: {

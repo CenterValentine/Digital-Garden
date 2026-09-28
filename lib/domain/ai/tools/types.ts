@@ -58,6 +58,9 @@ export interface ToolExecuteContext {
     input?: number;
     output?: number;
     cachedInput?: number;
+    /** Largest single step's prompt — decides the long-context tier. */
+    maxStepInput?: number;
+    maxStepCachedInput?: number;
   };
   /**
    * Usage from the turn's EARLIER segments (approval continuations start a

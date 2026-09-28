@@ -231,7 +231,18 @@ function estimateRunCostUsd(ctx: ToolExecuteContext): number | undefined {
   const cachedInputTokens = (tokens?.cachedInput ?? 0) + (prior?.cachedInput ?? 0);
   if (!model || inputTokens + outputTokens <= 0) return undefined;
   const cost = computeTurnCost(
-    { inputTokens, outputTokens, cachedInputTokens },
+    {
+      inputTokens,
+      outputTokens,
+      cachedInputTokens,
+      // Tier per call, never per summed run (pricing.ts `maxStepInputTokens`).
+      ...(tokens?.maxStepInput
+        ? {
+            maxStepInputTokens: tokens.maxStepInput,
+            maxStepCachedInputTokens: tokens.maxStepCachedInput ?? 0,
+          }
+        : {}),
+    },
     model.modelId,
     model.vendorId,
   );
