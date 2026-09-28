@@ -136,3 +136,19 @@ Prod conversation `ecf1d0e5` (chat `3826d0c4`, *Exploring Low-Interest Job Oppor
 - **F16 a `search` miss taught nothing** (P9 covered filters only): `search: "ticketing"` on a one-row table returned a bare header and the next call re-read the table. Fix: the zero-row footer also fires for a search and names the table's size (and its rows when ≤ 3).
 - **Model, not harness:** `search_web` was available (summon said so twice) and never called; the closing message then claimed the checkpoint "requires a successful search_web … and the available read was blocked", which was untrue. The opening `summon` pulled four whole families (23 tools) so every step carried their schemas: 702k input tokens and $1.22 for one item versus 344k and $0.05 on the first run (part of that is `gpt-5.6-terra` pricing). A summon result that priced its own cost per step would let the model see the trade.
 - **Client stale after deploy:** the message's `data-charter` part still said `phaseCount: 4` (the page was loaded before the deploy; the server context collapsed the copies). The charter note itself still holds four copies.
+
+## 8. What the second run cost, and why (2026-09-28)
+
+The meter read **$1.22** for `ecf1d0e5`; the same usage at base rates is **$0.82**. The step log (`metadata.segments[].steps[]`, per-step `inputTokens`/`cachedInputTokens`) explains both numbers.
+
+| Driver | Tokens | At base rates | Status |
+|---|---|---|---|
+| **F17 Long-context tier applied to a request's SUM.** `computeTurnCost` compared the nine-step request's summed prompt (369k) to terra's 272k threshold; no step exceeded 46k. | — | +$0.40 phantom | **Fixed:** `UsageLike.maxStepInputTokens` / `maxStepCachedInputTokens`; the fold and the ledger stamp pass the largest step; tiers are per call. Fixtures in `ai:pricing:check` and `run-harness:check`. |
+| **F18 Cached prefix froze at 27,133 tokens** for eleven consecutive steps while the prompt grew 39k → 46k. Everything past that offset was re-sent uncached on every step. | ~203k uncached | $0.37 | **Diagnostic shipped** (`AI_PROMPT_PREFIX_DIAG=1` → `ai:prompt_prefix` log line naming the first divergent 2k-char chunk with excerpts of both sides, per step and across requests). Cause not yet identified from code: `store: false`, item references stripped, the notice is appended at the END, the fold runs once per request — none of these explain a fixed-offset break. One run with the flag on names it. |
+| **F19 Every HTTP request started cold** (steps 1, 4, 6, 18: zero cached) although the 23k system+tools prefix had been sent 30–90 s earlier. | ~112k | $0.20 | Same diagnostic (it compares a request's first step against the previous request's last). |
+| **F20 Four wasted steps** (rejected checkpoint → two garden searches → summon). | ~84k uncached | $0.13 | Three removed by #262 (checkpoint gate); the fourth is the model not calling an available `search_web`. |
+| **F21 Four families summoned at once** — 23 schemas, ~10.3k tokens on every step. | ~185k (mostly cached) | $0.10 | **Reported:** the summon result now prices what it activated ("≈N tokens of schema now ride on EVERY remaining step; summon only the tools this run will call"). `estimateToolSchemaTokens` sizes description + JSON schema. |
+| Reads retained for the run (evidence library 4.3k, row 2.2k, notes 2.5k, guidance 1.1k, describe 1k) | ~12k/step | cheap once cached | Nothing to do until F18 lands. |
+| Output incl. 1,890 reasoning tokens | 5,947 | $0.07 | — |
+
+**Projected, same model:** $0.82 → $0.69 (#262) → $0.36 (F18) → $0.19 (F19) → ~$0.15 (F21). A 2.5× pricier model after those lands near $0.45. The better "spend more" lever is reasoning effort: the route ran with no reasoning config, and the wasted steps were judgment failures; 20k reasoning tokens on terra is $0.24.

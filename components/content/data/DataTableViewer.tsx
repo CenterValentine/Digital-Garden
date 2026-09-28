@@ -37,6 +37,7 @@ import {
 import { cn } from "@/lib/core/utils";
 import {
   cellToText,
+  NON_STORING_COLUMN_TYPES,
   COLUMN_WIDTH_MAX,
   COLUMN_WIDTH_MIN,
   columnWidthMin,
@@ -1654,11 +1655,70 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
         setSelectedCell(null);
         setRangeFocus(null);
         setExtraCells(new Set());
+      } else if ((e.key === "Delete" || e.key === "Backspace") && canEditData) {
+        // Clear the selected cell or block (owner ask, 2026-09-28) — one
+        // batched CAS write, one undo entry. Computed and derived columns
+        // have nothing to clear; already-empty cells are skipped so the
+        // op (and its undo) is exactly the cells that changed.
+        e.preventDefault();
+        const targets: Array<{ rowId: string; columnKey: string }> = rangeByRow
+          ? [...rangeByRow.entries()].flatMap(([rowId, keys]) =>
+              [...keys].map((columnKey) => ({ rowId, columnKey }))
+            )
+          : [selectedCell];
+        const edits: CellEdit[] = [];
+        for (const t of targets) {
+          const column = columns.find((c) => c.key === t.columnKey);
+          const row = state.rows.find((r) => r.id === t.rowId);
+          if (!column || !row) continue;
+          if (NON_STORING_COLUMN_TYPES.includes(column.type)) continue;
+          const before = row.data[column.key];
+          if (before === undefined || before === "" || (Array.isArray(before) && before.length === 0)) continue;
+          edits.push({ rowId: row.id, columnKey: column.key, before, after: undefined });
+        }
+        if (edits.length === 0) {
+          setNotice("Nothing to clear");
+          return;
+        }
+        void (async () => {
+          const result = await sendWrites(edits, true);
+          if (!result.ok) {
+            setNotice(result.stale ? "Not cleared — a cell changed since you read it" : (result.message ?? "Could not clear"));
+            return;
+          }
+          const op: UndoOp = { kind: "setCells", edits, label: "" };
+          setStack((s) => pushOp(s, { ...op, label: `cleared ${edits.length} cell${edits.length === 1 ? "" : "s"}` }, clientId, Date.now()));
+          setNotice(`Cleared ${edits.length} cell${edits.length === 1 ? "" : "s"} · ⌘Z to undo`);
+          await load(state.view?.id ?? null);
+        })();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [selectedCell, editTarget, columns, state.rows, canEditData, commitCell]);
+  }, [selectedCell, editTarget, columns, state.rows, canEditData, commitCell, rangeByRow, sendWrites, load, clientId, state.view]);
+
+  // Delete / Backspace with rows CHECKED and no cell selected deletes the
+  // rows — the keyboard's "Delete N" button, undoable the same way.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Delete" && e.key !== "Backspace") return;
+      if (selectedCell || editTarget || selectedRows.size === 0) return;
+      const t = e.target as HTMLElement | null;
+      if (
+        t &&
+        (t.tagName === "INPUT" ||
+          t.tagName === "TEXTAREA" ||
+          t.tagName === "SELECT" ||
+          t.isContentEditable)
+      ) {
+        return;
+      }
+      e.preventDefault();
+      void deleteSelected();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selectedCell, editTarget, selectedRows, deleteSelected]);
 
   // ⌘C on a selected cell copies its display text — labels for selects,
   // never option ids. Skipped inside inputs and when the browser has a real

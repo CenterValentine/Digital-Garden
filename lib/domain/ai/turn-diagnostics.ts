@@ -589,6 +589,21 @@ export function mergeTurnUsageMetadata(
         : typeof route.providerId === "string"
           ? route.providerId
           : undefined;
+      // The tier is per API call: hand the calculator the request's largest
+      // step (the segment log carries per-step prompts) so a nine-step
+      // request is never priced as one 369k prompt.
+      const stepsForTier = readTurnSegment(
+        (incoming as { segment?: unknown } | undefined)?.segment,
+      )?.steps;
+      let maxStepInputTokens = 0;
+      let maxStepCachedInputTokens = 0;
+      for (const step of stepsForTier ?? []) {
+        const input = step.inputTokens ?? 0;
+        if (input > maxStepInputTokens) {
+          maxStepInputTokens = input;
+          maxStepCachedInputTokens = step.cachedInputTokens ?? 0;
+        }
+      }
       const cost = modelId
         ? computeTurnCost(
             {
@@ -596,6 +611,9 @@ export function mergeTurnUsageMetadata(
               outputTokens: request.outputTokens,
               cachedInputTokens: request.cachedInputTokens,
               cacheWriteTokens: request.cacheWriteTokens,
+              ...(maxStepInputTokens > 0
+                ? { maxStepInputTokens, maxStepCachedInputTokens }
+                : {}),
             },
             modelId,
             vendor,

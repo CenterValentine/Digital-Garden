@@ -305,3 +305,75 @@ if (errors.length > 0) {
 console.log(
   "✓ run-harness:check — charter duplicates collapse; charter references resolve id-first; chrome is recognized by shape; capture keeps same-sitting writes and reads nested or flat; update_row leaves deliverables under capture; item URLs normalize; live continuations fold as requests",
 );
+
+// ── §8 — cost metering and the prefix diagnostic ─────────────────────────────
+
+import { computeTurnCost } from "../lib/features/ai-connections/usage/pricing";
+import {
+  fingerprintPrompt,
+  findPrefixDivergence,
+  serializePromptForDiag,
+  PREFIX_CHUNK_CHARS,
+} from "../lib/domain/ai/prompt-prefix-diag";
+
+{
+  // The fold hands the calculator the request's largest STEP: nine steps
+  // summing to 369k with no step above 46k bill at base rates (prod
+  // ecf1d0e5: the meter said $1.22 for an $0.82 turn).
+  const steps = [42020, 43091, 43465, 44938, 45338, 45737, 45914, 29474, 29581].map((inputTokens, i) => ({
+    tools: ["x"],
+    finishReason: i === 8 ? "stop" : "tool-calls",
+    outputTokens: 300,
+    inputTokens,
+    cachedInputTokens: i < 7 ? 27133 : i === 7 ? 0 : 10630,
+  }));
+  const raw = {
+    modelRoute: { source: "default", providerId: "openai", modelId: "gpt-5.6-terra" },
+    usage: { inputTokens: 369558, outputTokens: 2806, totalTokens: 372364, reasoningTokens: 0, cachedInputTokens: 200561 },
+    durationMs: 51690,
+    finishReason: "stop",
+    segment: {
+      startedAt: "2026-09-28T07:28:03.656Z",
+      steps,
+      usage: { inputTokens: 369558, outputTokens: 2806, totalTokens: 372364 },
+      stepCap: 13,
+      capSource: "editable",
+      stepsUsed: 9,
+      durationMs: 51690,
+      finishReason: "stop",
+    },
+  };
+  const folded = mergeTurnUsageMetadata(new Map(), "m", raw, []) as Record<string, unknown>;
+  const cost = (folded.cost as { usd?: number } | undefined)?.usd ?? null;
+  const expected = ((369558 - 200561) * 2 + 200561 * 0.2 + 2806 * 12) / 1_000_000;
+  assert(
+    cost !== null && Math.abs(cost - expected) < 1e-6,
+    `§8: a multi-step request is priced at base rates when no step crosses the tier (got ${cost}, expected ${expected.toFixed(4)})`,
+  );
+  const direct = computeTurnCost(
+    { inputTokens: 369558, outputTokens: 2806, cachedInputTokens: 200561 },
+    "gpt-5.6-terra",
+    "openai",
+  );
+  assert(direct !== null && direct.usd > expected * 1.5, "§8 fixture sanity: without the step figure the sum still trips the tier");
+}
+
+{
+  // The diagnostic names the chunk where a prompt stops matching.
+  const base = "x".repeat(PREFIX_CHUNK_CHARS * 5);
+  const grown = fingerprintPrompt(base + "y".repeat(PREFIX_CHUNK_CHARS));
+  assert(findPrefixDivergence(fingerprintPrompt(base), grown) === null, "§8: a prompt that only grew is cache-friendly (no divergence)");
+  const changedMiddle = base.slice(0, PREFIX_CHUNK_CHARS * 2 + 10) + "Z" + base.slice(PREFIX_CHUNK_CHARS * 2 + 11);
+  const div = findPrefixDivergence(fingerprintPrompt(base), fingerprintPrompt(changedMiddle));
+  assert(div?.chunkIndex === 2 && div.offset === PREFIX_CHUNK_CHARS * 2, `§8: a mid-prompt change is located at its chunk (got ${JSON.stringify(div)})`);
+  const s1 = serializePromptForDiag({ system: "S", toolNames: ["a", "b"], messages: [{ role: "user", content: "hi" }] });
+  const s2 = serializePromptForDiag({ system: "S", toolNames: ["b", "a"], messages: [{ role: "user", content: "hi" }] });
+  assert(s1 !== s2, "§8: tool order is part of the fingerprint (it is part of the provider prefix)");
+}
+
+if (errors.length > 0) {
+  console.error(`\n✖ run-harness:check (§8) failed — ${errors.length} problem(s):\n`);
+  for (const e of errors) console.error(`  ${e}\n`);
+  process.exit(1);
+}
+console.log("✓ run-harness:check §8 — per-step long-context tier; prefix diagnostic locates a mid-prompt change");

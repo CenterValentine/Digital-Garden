@@ -183,6 +183,41 @@ const approx = (actual: number, expected: number, label: string) => {
   );
 }
 
+// A multi-step request whose SUM crosses 272K but whose largest step does
+// not bills at base rates — tiers are per call (prod ecf1d0e5, 2026-09-28:
+// nine steps, 369K summed, 46K largest, priced at tier → $1.22 for $0.82).
+{
+  const c = computeTurnCost(
+    {
+      inputTokens: 300_000,
+      cachedInputTokens: 100_000,
+      outputTokens: 1_000,
+      maxStepInputTokens: 46_000,
+      maxStepCachedInputTokens: 27_000,
+    },
+    "gpt-5.6-terra",
+    "openai",
+  );
+  assert.ok(c, "multi-step fixture priced");
+  approx(
+    c.usd,
+    (200_000 * 2 + 100_000 * 0.2 + 1_000 * 12) / 1_000_000,
+    "openai: a multi-step request keys the tier off its largest step, not the sum",
+  );
+  // And a step that itself crosses the line still tiers.
+  const big = computeTurnCost(
+    { inputTokens: 300_000, outputTokens: 1_000, maxStepInputTokens: 280_000 },
+    "gpt-5.6-terra",
+    "openai",
+  );
+  assert.ok(big, "big-step fixture priced");
+  approx(
+    big.usd,
+    (300_000 * 4 + 1_000 * 18) / 1_000_000,
+    "openai: a single step above 272K bills at the tier",
+  );
+}
+
 // DeepSeek hit/miss: input = total prompt, cached = hits at the hit rate,
 // misses at the miss rate.
 {

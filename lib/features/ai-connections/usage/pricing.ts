@@ -297,6 +297,17 @@ export interface UsageLike {
   cachedInputTokens?: number;
   /** Cache writes (Anthropic providerMetadata; OpenAI gpt-5.6 unavailable via SDK usage — undercount accepted). */
   cacheWriteTokens?: number;
+  /**
+   * The largest SINGLE API call's prompt inside this usage, split the same
+   * way as `inputTokens`/`cachedInputTokens` (per-step figures from the
+   * segment log). Long-context tiers are billed per call, so when a request
+   * folds several steps this is what decides the tier — not the sum. Prod
+   * ecf1d0e5 (2026-09-28): a nine-step request summed to 369k and was priced
+   * at terra's >272k tier although no step exceeded 46k; the meter read
+   * $1.22 for an $0.82 turn. Absent → the sum decides (single-call usage).
+   */
+  maxStepInputTokens?: number;
+  maxStepCachedInputTokens?: number;
 }
 
 export interface TurnCostBreakdown {
@@ -341,12 +352,21 @@ export function computeTurnCost(
   const cached = Math.max(0, Math.min(usage.cachedInputTokens ?? 0, input * 2));
   const cacheWrite = Math.max(0, usage.cacheWriteTokens ?? 0);
 
-  // Long-context tier keys off the request's total prompt size.
+  // Long-context tier keys off ONE API call's prompt size. A request that
+  // folded several steps supplies its largest step; otherwise the usage IS
+  // one call and its total decides.
   const totalPrompt = inputIncludesCached(providerId)
     ? input
     : input + cached + cacheWrite;
+  const maxStep =
+    typeof usage.maxStepInputTokens === "number" && usage.maxStepInputTokens > 0
+      ? inputIncludesCached(providerId)
+        ? usage.maxStepInputTokens
+        : usage.maxStepInputTokens + Math.max(0, usage.maxStepCachedInputTokens ?? 0)
+      : null;
+  const tierPrompt = maxStep !== null ? Math.min(maxStep, totalPrompt) : totalPrompt;
   const tier =
-    base.longContext && totalPrompt > base.longContext.thresholdTokens
+    base.longContext && tierPrompt > base.longContext.thresholdTokens
       ? base.longContext
       : null;
   const rates = {
