@@ -707,6 +707,20 @@ function withoutComments(source: string): string {
         `${name} carries \`.${m[1]}(\` in its input schema — run-loop schemas describe shape; resolve or clamp this in execute and answer a miss with a teaching result (see iteration-proposal.ts)`,
       );
     }
+    // Nested objects are the other half of the rule ("required keys inside
+    // a nested object"). Prod 23fd28d6 (2026-09-27): record_item_result's
+    // `capture: z.object({ cells: z.record() })` rejected a flat
+    // `{ Column: value }` map at the schema — nine correct cells lost to a
+    // nesting level — and this gate did not see it because it scanned for
+    // refinements only. One `.object(` per run-loop schema: the top level.
+    // Anything the model may nest is a `z.record(...)` normalized in execute.
+    const nestedObjects = [...schemaBlock.matchAll(/\.object\(/g)].length - 1;
+    if (nestedObjects > 0) {
+      fail(
+        "gate7",
+        `${name} nests ${nestedObjects} z.object(...) inside its input schema — a nested object's keys are required at the schema layer; make it z.record(z.string(), z.unknown()) and normalize the shape in execute (see normalizeCaptureArg in iteration-proposal.ts)`,
+      );
+    }
   }
   // The proposal's contract lives in the pure module so the check script can
   // load it; the registry must use that one, and it must obey the same rule.

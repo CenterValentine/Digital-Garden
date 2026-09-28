@@ -22,6 +22,13 @@ export interface CharterReference {
   targetTitle: string;
   /** Optional display alias (`[[Title|Alias]]`). */
   displayText?: string;
+  /**
+   * The link's stable ContentNode id when the wikiLink node carries one
+   * (`targetId`, healed on click / set by the picker). Hand-typed and
+   * AI-written links have only the title. Kept so jurisdiction can resolve
+   * a charter-named database id-first (ITERATION-RUN-HARNESS-FIXES P1).
+   */
+  targetId?: string;
 }
 
 export interface CharterSection {
@@ -47,6 +54,15 @@ export interface ParsedCharter {
   phases: CharterSection[];
   /** The heading level that delimits phases (shallowest top-level heading), or null. */
   phaseLevel: number | null;
+  /**
+   * Phases dropped because the note repeated its own content verbatim
+   * (ITERATION-RUN-HARNESS-FIXES P12). Prod 2026-09-27: a charter note held
+   * four identical copies of itself (a reconnect duplication), which this
+   * parser read as a FOUR-phase charter — a checkpoint would have replayed
+   * the whole workflow four times. The copies collapse to one and the count
+   * rides here so the context can say so (silent correctness reads as a bug).
+   */
+  duplicatePhasesCollapsed?: number;
 }
 
 function headingText(node: JSONContent): string {
@@ -66,14 +82,29 @@ function headingText(node: JSONContent): string {
 export function collectReferences(nodes: JSONContent[]): CharterReference[] {
   const refs: CharterReference[] = [];
   const seen = new Set<string>();
-  const addReference = (target: string, display?: string) => {
+  const addReference = (target: string, display?: string, id?: string) => {
     const targetTitle = target.trim();
     const displayText = display?.trim() || undefined;
+    const targetId = id?.trim() || undefined;
     if (!targetTitle) return;
     const key = `${targetTitle}|${displayText ?? ""}`;
-    if (seen.has(key)) return;
+    if (seen.has(key)) {
+      // A later occurrence may carry the id the first one lacked (the
+      // picker sets it; a hand-typed link does not) — keep the strongest.
+      if (targetId) {
+        const prior = refs.find(
+          (r) => r.targetTitle === targetTitle && (r.displayText ?? "") === (displayText ?? ""),
+        );
+        if (prior && !prior.targetId) prior.targetId = targetId;
+      }
+      return;
+    }
     seen.add(key);
-    refs.push(displayText ? { targetTitle, displayText } : { targetTitle });
+    refs.push({
+      targetTitle,
+      ...(displayText ? { displayText } : {}),
+      ...(targetId ? { targetId } : {}),
+    });
   };
   const walk = (node: JSONContent) => {
     if (node.type === "wikiLink") {
@@ -83,6 +114,7 @@ export function collectReferences(nodes: JSONContent[]): CharterReference[] {
           typeof node.attrs?.displayText === "string"
             ? node.attrs.displayText
             : undefined,
+          typeof node.attrs?.targetId === "string" ? node.attrs.targetId : undefined,
         );
       }
     }
@@ -225,8 +257,100 @@ function parseMarkdownLikePlaybook(nodes: JSONContent[]): ParsedCharter | null {
   return { standingRules, phases, phaseLevel };
 }
 
+/**
+ * Pick the database ids a charter's `[[references]]` name (ITERATION-RUN-
+ * HARNESS-FIXES P1). Pure over the reference list + the user's data nodes
+ * so the gate can pin the order: an id the link carries wins; a bare title
+ * resolves only when exactly ONE database has it (case-insensitive) — an
+ * ambiguous title grants nothing rather than guessing. The Prisma half
+ * (loading the charter and the candidate nodes) lives in
+ * lib/domain/data/server/resolve.ts.
+ */
+export function resolveCharterReferencedTables(
+  references: CharterReference[],
+  dataNodes: Array<{ id: string; title: string }>,
+): string[] {
+  const byId = new Map(dataNodes.map((n) => [n.id, n]));
+  const byTitle = new Map<string, Array<{ id: string; title: string }>>();
+  for (const n of dataNodes) {
+    const key = n.title.trim().toLowerCase();
+    byTitle.set(key, [...(byTitle.get(key) ?? []), n]);
+  }
+  const out: string[] = [];
+  const add = (id: string) => {
+    if (!out.includes(id)) out.push(id);
+  };
+  for (const ref of references) {
+    if (ref.targetId && byId.has(ref.targetId)) {
+      add(ref.targetId);
+      continue;
+    }
+    const matches = byTitle.get(ref.targetTitle.trim().toLowerCase()) ?? [];
+    if (matches.length === 1) add(matches[0].id);
+  }
+  return out;
+}
+
+/**
+ * A phase's identity for duplicate detection: its title plus its content,
+ * byte-for-byte. Two phases that merely SHARE a title are different phases
+ * (a charter may legitimately have "Review" twice with different bodies).
+ */
+function phaseFingerprint(phase: CharterSection): string {
+  return `${phase.title}\u0000${JSON.stringify(phase.content)}`;
+}
+
+/**
+ * Collapse a note that repeats its own content verbatim (P12). Two shapes
+ * are recognized: the whole phase list is one block repeated k times
+ * (the document was pasted/duplicated under a top-level heading, so every
+ * copy is a phase), and consecutive identical phases. Anything else — a
+ * repeated title with a different body, a non-periodic repeat — is left
+ * alone: the author may mean it.
+ */
+export function collapseRepeatedPhases(phases: CharterSection[]): {
+  phases: CharterSection[];
+  collapsed: number;
+} {
+  const n = phases.length;
+  if (n < 2) return { phases, collapsed: 0 };
+  const prints = phases.map(phaseFingerprint);
+  // Periodic repeat: the smallest period whose blocks all match.
+  for (let period = 1; period <= n / 2; period++) {
+    if (n % period !== 0) continue;
+    let periodic = true;
+    for (let i = period; i < n && periodic; i++) {
+      if (prints[i] !== prints[i - period]) periodic = false;
+    }
+    if (periodic) {
+      return { phases: phases.slice(0, period), collapsed: n - period };
+    }
+  }
+  // Consecutive identical phases (a partial paste).
+  const kept: CharterSection[] = [];
+  let collapsed = 0;
+  for (let i = 0; i < n; i++) {
+    if (i > 0 && prints[i] === prints[i - 1]) {
+      collapsed++;
+      continue;
+    }
+    kept.push(phases[i]);
+  }
+  return { phases: kept, collapsed };
+}
+
 /** Split a playbook note's TipTap JSON into standing rules + phases. */
 export function parseCharter(doc: JSONContent): ParsedCharter {
+  const parsed = parseCharterSections(doc);
+  const { phases, collapsed } = collapseRepeatedPhases(parsed.phases);
+  return {
+    ...parsed,
+    phases,
+    ...(collapsed > 0 ? { duplicatePhasesCollapsed: collapsed } : {}),
+  };
+}
+
+function parseCharterSections(doc: JSONContent): ParsedCharter {
   const top = doc?.content ?? [];
 
   // Phases are delimited by the SHALLOWEST top-level heading level present, so

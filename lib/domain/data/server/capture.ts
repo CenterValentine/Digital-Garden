@@ -36,6 +36,7 @@ import {
 } from "@/lib/domain/data/server/resolve";
 import {
   findColumn,
+  partitionCaptureWrites,
   prepareCaptureCells,
   writeBlockReason,
   type CaptureConfig,
@@ -335,6 +336,11 @@ export interface CaptureUpsertResult {
   status: "created" | "updated" | "rejected";
   rowId?: string;
   errors?: string[];
+  /**
+   * Column NAMES kept because the row was already written this sitting
+   * (P3) — reported, never silent.
+   */
+  keptCells?: string[];
 }
 
 /**
@@ -355,6 +361,12 @@ export async function captureUpsertRow(input: {
    * (creating would fork the identity the run enumerated from).
    */
   rowId?: string;
+  /**
+   * P3: a row written at or after this moment (by update_row, or the user
+   * in the grid) keeps its non-empty cells; capture fills only the empty
+   * ones. The proposal's `approvedAt` is what callers pass.
+   */
+  keepFilledSince?: Date | string;
 }): Promise<CaptureUpsertResult> {
   const { userId, config } = input;
 
@@ -395,11 +407,12 @@ export async function captureUpsertRow(input: {
   }
 
   let existingRowId: string | undefined;
+  let existingRow: { data: unknown; updatedAt: Date } | null = null;
   if (input.rowId) {
     // Row-keyed: verify the row is still live, then update in place.
     const row = await prisma.dataRow.findFirst({
       where: { id: input.rowId, tableId: config.tableId, deletedAt: null },
-      select: { id: true },
+      select: { id: true, data: true, updatedAt: true },
     });
     if (!row) {
       return {
@@ -410,6 +423,7 @@ export async function captureUpsertRow(input: {
       };
     }
     existingRowId = row.id;
+    existingRow = row;
   } else if (config.dedupeColumnKey && dedupeValue) {
     // Dedupe lookup: exact JSON match on the stored (trimmed) value.
     const existing = await prisma.dataRow.findFirst({
@@ -418,9 +432,10 @@ export async function captureUpsertRow(input: {
         deletedAt: null,
         data: { path: [config.dedupeColumnKey], equals: dedupeValue },
       },
-      select: { id: true },
+      select: { id: true, data: true, updatedAt: true },
     });
     existingRowId = existing?.id;
+    existingRow = existing ?? null;
   }
 
   // Merge columns accumulate across runs (cell-merge.ts) — only meaningful
@@ -431,7 +446,25 @@ export async function captureUpsertRow(input: {
       .filter((k): k is string => typeof k === "string"),
   );
   if (existingRowId) {
-    const writes: CellWrite[] = prepared.writes.map((w) => ({
+    // P3: never clobber a same-sitting write. Merge columns are exempt —
+    // merging IS the accumulate-safe write.
+    const partition = partitionCaptureWrites({
+      writes: prepared.writes.filter((w) => !mergeKeys.has(w.columnKey)),
+      current: (existingRow?.data ?? {}) as Record<string, unknown>,
+      rowUpdatedAt: existingRow?.updatedAt,
+      keepFilledSince: input.keepFilledSince,
+    });
+    const landing = [
+      ...partition.writes,
+      ...prepared.writes.filter((w) => mergeKeys.has(w.columnKey)),
+    ];
+    const keptCells = partition.kept.map(
+      (key) => live.find((c) => c.key === key)?.name ?? key,
+    );
+    if (landing.length === 0) {
+      return { status: "updated", rowId: existingRowId, keptCells };
+    }
+    const writes: CellWrite[] = landing.map((w) => ({
       rowId: existingRowId,
       columnKey: w.columnKey,
       value: w.value as CellWrite["value"],
@@ -446,7 +479,11 @@ export async function captureUpsertRow(input: {
           .map((r) => (r.status === "error" ? r.message : "")),
       };
     }
-    return { status: "updated", rowId: existingRowId };
+    return {
+      status: "updated",
+      rowId: existingRowId,
+      ...(keptCells.length > 0 ? { keptCells } : {}),
+    };
   }
 
   const [rowId] = await createRows(config.tableId, live, 1, userId);

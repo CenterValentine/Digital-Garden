@@ -518,7 +518,28 @@ export function mergeTurnUsageMetadata(
   // seed path folds persisted rows back in on load) — its segments restore
   // wholesale and must never re-append. Raw per-request SDK blobs never
   // carry the stamp; their `segment` record appends (deduped by startedAt).
-  const isMergedBlob = typeof incoming?.diagnosticsVersion === "number";
+  //
+  // EXCEPT a live continuation (ITERATION-RUN-HARNESS-FIXES P13, prod
+  // 23fd28d6 2026-09-27: 1 segment recorded for a 6-request turn). The
+  // binding hook writes the folded blob back into message state after
+  // request 1 so the avatar meter grows; the SDK then deep-merges request
+  // 2's raw metadata OVER that stamped blob. The result carries BOTH the
+  // stamp and a fresh `segment` — a live request wearing a merged blob's
+  // coat. The `segment` key is the tell: the fold strips it from every
+  // blob it returns, so a stamped blob that still has one was just
+  // produced by the SDK. Treat it as raw: append its segment and price
+  // its own usage (the persisted `cost` beside it is request 1's, already
+  // counted — re-adding it doubled the dollars per request).
+  const hasRawSegment =
+    incoming?.segment !== undefined && incoming?.segment !== null;
+  const isMergedBlob =
+    typeof incoming?.diagnosticsVersion === "number" && !hasRawSegment;
+  if (!isMergedBlob) {
+    request.persistedCostUsd = undefined;
+    request.persistedCostBreakdown = undefined;
+    request.persistedCostVersion = undefined;
+    request.persistedUnpriced = undefined;
+  }
   if (entry.lastRequestSig !== sig) {
     entry.inputTokens += request.inputTokens;
     entry.outputTokens += request.outputTokens;

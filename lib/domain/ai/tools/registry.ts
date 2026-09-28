@@ -55,7 +55,9 @@ import {
   normalizeProposalItems,
   reservedTailSize,
   resolveCaptureTarget,
+  normalizeCaptureArg,
   resolveDeliverables,
+  stripCaptureDeliverables,
   resolveQuestColumnType,
   resolveQuestColumns,
   stepsPerItemFor,
@@ -70,6 +72,7 @@ import {
   questSeenKeys,
   recordQuestItem,
   setQuestLog,
+  sittingRecordedCount,
   tableColumnKeys,
   type QuestInfo,
 } from "@/lib/domain/ai/quests";
@@ -680,11 +683,14 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         // Deliverables (plan §6b): the write tools each item ends with. The
         // route sizes the step cap from them and reserves the turn's tail.
         const deliverablesRes = resolveDeliverables(deliverablesArg);
-        const deliverables = deliverablesRes.deliverables;
-        const stepsPerItem =
+        // Narrowed again below once the capture target is known (P3): with
+        // capture on, the row write IS capture.cells.
+        let deliverables = deliverablesRes.deliverables;
+        const stepsPerItemFrom = (list: readonly string[]) =>
           typeof stepsPerItemArg === "number" && Number.isFinite(stepsPerItemArg)
-            ? stepsPerItemFor(deliverables, stepsPerItemArg)
+            ? stepsPerItemFor(list, stepsPerItemArg)
             : undefined;
+        let stepsPerItem = stepsPerItemFrom(deliverables);
         // Everything the resolvers silently read differently from what was
         // sent rides the result, so a normalization is never invisible.
         const shapeNotes = [
@@ -811,11 +817,27 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         // config presence IS the "preflight passed" signal below. rowKeyed
         // rides the stamped config so record_item_result knows item keys
         // are row ids (P3 stamp-back).
+        // `approvedAt` (P3): the moment from which a same-sitting write on a
+        // captured row is protected from the closing capture.
+        const approvedAt = new Date().toISOString();
         const captureCfg = capture?.config
           ? rowSourced
-            ? { ...capture.config, rowKeyed: true }
-            : capture.config
+            ? { ...capture.config, rowKeyed: true, approvedAt }
+            : { ...capture.config, approvedAt }
           : null;
+        // P3: one write path. With capture on, update_row/update_rows are
+        // not deliverables — capture.cells on record_item_result lands the
+        // row, and a second write of the same cells would overwrite it.
+        if (captureCfg) {
+          const narrowed = stripCaptureDeliverables(deliverables, true);
+          if (narrowed.stripped.length > 0) {
+            deliverables = narrowed.deliverables;
+            stepsPerItem = stepsPerItemFrom(deliverables);
+            shapeNotes.push(
+              `${narrowed.stripped.join(", ")} dropped from deliverables — CAPTURE IS ON, so capture.cells on record_item_result IS the row write for the capture columns; do NOT also call ${narrowed.stripped.join("/")} for them (a second write of the same cells overwrites the first).`,
+            );
+          }
+        }
         const captureVocab = capture?.optionVocab ?? {};
         const captureDescMissing = capture?.descriptionsMissing ?? [];
         const captureEmptyVocab = capture?.emptyVocabColumns ?? [];
@@ -987,6 +1009,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
                 ).catch(() => []);
                 questInfo = {
                   sittingId: crypto.randomUUID(),
+                  openedAt: approvedAt,
                   masterId: master.masterId,
                   questRowId: ensured.questRowId,
                   questLedgerId: ensured.questLedgerId,
@@ -1034,6 +1057,43 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         // lookup in upsertRunLedger so every sitting adopts the same note.
         const ledgerParentId = questInfo ? questHomeFolderId : placement.parentId;
         const ledgerOwnerId = questInfo ? undefined : placement.ownedByNoteId;
+        // P11: a continued quest whose previous sitting never closed is
+        // said so — in the result and in the log — instead of being
+        // silently superseded (prod 2026-09-27: a 09-22 plan with no item
+        // and no reconciliation sat above the new plan, unremarked).
+        let priorSitting:
+          | { openedAt: string | null; itemsRecorded: number; closed: false }
+          | null = null;
+        if (questInfo && questContinued) {
+          try {
+            const priorState = await readRunLedgerCaptureConfig(
+              ctx.userId,
+              ledgerParentId,
+              { runKey: ledgerRunKey, ownerContentId: ledgerOwnerId },
+            );
+            const prior = parseQuestInfo(priorState?.questInfo);
+            if (prior && prior.sittingId !== questInfo.sittingId && !prior.sittingClosed) {
+              priorSitting = {
+                openedAt: prior.openedAt ?? null,
+                itemsRecorded: await sittingRecordedCount(prior).catch(() => 0),
+                closed: false,
+              };
+            }
+          } catch {
+            // Best-effort context; never blocks the proposal.
+          }
+        }
+        const priorSittingLine = priorSitting
+          ? `\n\n**Previous sitting** (opened ${priorSitting.openedAt ? priorSitting.openedAt.replace("T", " ").slice(0, 16) : "date unknown"}) recorded ${priorSitting.itemsRecorded} item${priorSitting.itemsRecorded === 1 ? "" : "s"} and never closed — superseded by this sitting.`
+          : "";
+        // Real titles for the closing references (P10): the quest ledger
+        // is renamable, and the log note is titled by buildRunLedgerTitle.
+        const questLedgerTitle = questInfo
+          ? ((await prisma.contentNode
+              .findFirst({ where: { id: questInfo.questLedgerId, deletedAt: null }, select: { title: true } })
+              .then((n) => n?.title)
+              .catch(() => undefined)) ?? `${questInfo.questLabel} — Quest Ledger`)
+          : null;
         if (questInfo || placement.parentId || placement.ownedByNoteId) {
           try {
             const ledger = await upsertRunLedger(
@@ -1050,6 +1110,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
                   (questInfo
                     ? `\n\n**Quest:** ${questInfo.questLabel} (${questContinued ? "continued" : "new"} · sitting stamped)`
                     : "") +
+                  priorSittingLine +
                   (captureCfg
                     ? `\n\n**Capture:** → "${captureCfg.tableTitle}" · admission ${captureCfg.admission}` +
                       (captureCfg.admissionNote
@@ -1143,6 +1204,12 @@ export function createBaseTools(ctx: ToolExecuteContext) {
                   label: questInfo.questLabel,
                   continued: questContinued,
                   alreadyScoredKeys: [...alreadyScored],
+                  ...(priorSitting
+                    ? {
+                        priorSitting,
+                        priorSittingNote: `The previous sitting of this quest${priorSitting.openedAt ? ` (opened ${priorSitting.openedAt.slice(0, 10)})` : ""} recorded ${priorSitting.itemsRecorded} item${priorSitting.itemsRecorded === 1 ? "" : "s"} and was never closed; this sitting supersedes it. Mention that to the user in your closing summary.`,
+                      }
+                    : {}),
                 },
               }
             : {}),
@@ -1225,7 +1292,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             (effectiveBatchSize
               ? `This run is BATCHED: after every ${effectiveBatchSize} recorded items, pause acquisition and call record_batch_checkpoint (dedupe the batch, note anomalies) BEFORE starting the next item — the harness holds new reads until the checkpoint is recorded. `
               : "") +
-            `The ledger is the checklist; never trust your memory for completeness. When every item is recorded OR the budget is reached, ${questInfo ? `do NOT create a roll-up note (the quest log + quest ledger ARE the record — reuse, never duplicate); close with record_iteration_findings, then link [[${questInfo.questLabel} — Quest Ledger]] in your closing message` : `write the roll-up (create_note: a short prose summary + a markdown table of items/verdicts) and close with record_iteration_findings`}. ` +
+            `The ledger is the checklist; never trust your memory for completeness. When every item is recorded OR the budget is reached, ${questInfo ? `do NOT create a roll-up note (the quest log + quest ledger ARE the record — reuse, never duplicate); close with record_iteration_findings, then link @[${questLedgerTitle}](${questInfo.questLedgerId}) in your closing message (that @[…](id) form renders as a pill; never write [[wiki-links]] in chat)` : `write the roll-up (create_note: a short prose summary + a markdown table of items/verdicts) and close with record_iteration_findings`}. ` +
             `If a captcha or session end interrupts, stop and tell the user — recorded progress is preserved and the run can resume from the first pending item.`,
         };
       },
@@ -1267,17 +1334,14 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         // detail rather than a fatal one.
         verdict: z.string().optional().describe("One-to-three sentence rationale for this item (clipped at 1000 characters)."),
         artifactTitle: z.string().optional().describe("Title of any per-item note you created."),
+        // A plain record, not a nested object (gate 7's second half): the
+        // model has sent both `{ cells: { Column: value } }` and the flat
+        // `{ Column: value }`; `normalizeCaptureArg` reads either in execute.
         capture: z
-          .object({
-            cells: z
-              .record(z.string(), z.unknown())
-              .describe(
-                "Column NAME → value for THIS item's database row. Select/status accept option labels; dates ISO; numbers plain.",
-              ),
-          })
+          .record(z.string(), z.unknown())
           .optional()
           .describe(
-            "Land this item as a database row — ONLY when the approved run declared captureTo AND this item meets its admission rule. The row upserts by the item's identity: a re-run updates, never duplicates.",
+            "Land this item as a database row — ONLY when the approved run declared captureTo AND this item meets its admission rule. Shape: { cells: { \"Column NAME\": value } } (a flat { \"Column NAME\": value } map is read the same way). Select/status accept option labels; dates ISO; numbers plain. The row upserts by the item's identity: a re-run updates, never duplicates.",
           ),
         questCells: z
           .record(z.string(), z.unknown())
@@ -1292,7 +1356,12 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             "GAPS ARE DATA: facts this item needed that ONE evidence search did not find (\"Education/degree — not in evidence\"). Put a placeholder in the artifact, list the gap here, and move on — never a second search, never an invented value. Recorded in the ledger so the user can fill them.",
           ),
       }),
-      execute: async ({ ledgerRunKey: ledgerRunKeyArg, itemKey: itemKeyArg, itemLabel: itemLabelArg, url: urlArg, status: statusArg, qualified, fitPercent: fitPercentArg, verdict: verdictArg, artifactTitle: artifactTitleArg, capture, questCells, gaps: gapsArg }) => {
+      execute: async ({ ledgerRunKey: ledgerRunKeyArg, itemKey: itemKeyArg, itemLabel: itemLabelArg, url: urlArg, status: statusArg, qualified, fitPercent: fitPercentArg, verdict: verdictArg, artifactTitle: artifactTitleArg, capture: captureArg, questCells, gaps: gapsArg }) => {
+        // P4: either nesting the model sends is read; a normalization is
+        // reported, never silent.
+        const captureNorm = normalizeCaptureArg(captureArg);
+        const capture = captureNorm.cells ? { cells: captureNorm.cells } : undefined;
+        const shapeNotes: string[] = captureNorm.note ? [captureNorm.note] : [];
         // Gaps are data (plan §6b.3): clipped, bounded, recorded — never a
         // reason to keep searching.
         const gaps = (gapsArg ?? [])
@@ -1398,6 +1467,9 @@ export function createBaseTools(ctx: ToolExecuteContext) {
               config,
               cells: capture.cells,
               ...(rowKeyedRun ? { rowId: itemKey } : { dedupeValue }),
+              // P3: a same-sitting write (update_row, the grid) is never
+              // clobbered by the closing capture.
+              ...(config.approvedAt ? { keepFilledSince: config.approvedAt } : {}),
             });
             if (res.status === "rejected") {
               captureErrors = res.errors;
@@ -1405,7 +1477,12 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             } else {
               capturedRowId = res.rowId;
               capturedRowStatus = res.status;
-              captureNote = `row ${res.status} in "${config.tableTitle}"`;
+              const kept = res.keptCells ?? [];
+              captureNote =
+                `row ${res.status} in "${config.tableTitle}"` +
+                (kept.length > 0
+                  ? ` (${kept.length} cell${kept.length === 1 ? "" : "s"} kept — ${kept.join(", ")} already written this sitting; capture fills only empty cells after a same-sitting write, so the fuller first write stands)`
+                  : "");
             }
           }
         }
@@ -1504,10 +1581,15 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             // model (and the transcript) should see that the harness filled
             // something in, and what it filled in.
             ...(statusNote ? { statusNote } : {}),
+            ...(shapeNotes.length > 0 ? { shapeNotes } : {}),
             ...(gaps.length > 0 ? { gaps } : {}),
             ledgerNodeId: ledger.contentNodeId,
             ...(capturedRowId
-              ? { rowId: capturedRowId, rowStatus: capturedRowStatus }
+              ? {
+                  rowId: capturedRowId,
+                  rowStatus: capturedRowStatus,
+                  ...(captureNote.includes("kept") ? { captureNote } : {}),
+                }
               : {}),
             ...(captureErrors ? { captureErrors } : {}),
             ...(captureNote && !capturedRowId && !captureErrors
@@ -1531,7 +1613,11 @@ export function createBaseTools(ctx: ToolExecuteContext) {
               ? "The ledger line is recorded but the row was REJECTED whole (no partial rows). Fix exactly the cells named in captureErrors and call record_item_result AGAIN for this SAME itemKey with corrected capture.cells — then continue to the next item."
               : sittingClosed
                 ? "STOP recording against this closed run. If more items need processing, call propose_item_iteration again (same quest label) — a fresh sitting opens and already-scored items are skipped automatically."
-                : `Recorded. Do NOT stop or ask the user whether to continue — immediately move to the NEXT item now (open/read it, then record it). Only once EVERY item is recorded do you ${questState ? "call record_iteration_findings (NO roll-up note — the quest log + ledger are the record)" : "write the roll-up (create_note) and call record_iteration_findings"}.`,
+                : status === "blocked"
+                  // P2: a blocked item is the one place the loop may stop —
+                  // the old directive said "move on" even after a captcha.
+                  ? `Recorded as blocked. If the obstacle is a captcha, a login wall, a session end, or a charter-named INPUT the tools refused (a database or note to @-mention), STOP here and tell the user exactly what is needed — recorded progress is preserved and the run resumes from the first pending item. For any other obstacle, move to the NEXT item now. ${questState ? "Close with record_iteration_findings only once every item is recorded or the run is stopped." : ""}`
+                  : `Recorded. Do NOT stop or ask the user whether to continue — immediately move to the NEXT item now (open/read it, then record it). Only once EVERY item is recorded do you ${questState ? "call record_iteration_findings (NO roll-up note — the quest log + ledger are the record)" : "write the roll-up (create_note) and call record_iteration_findings"}.`,
           };
         } catch (error) {
           return { ok: false, note: `Ledger write failed (${error instanceof Error ? error.message : "unknown"}). Continue to the next item; reconcile in the roll-up.` };
@@ -1803,6 +1889,27 @@ export function createBaseTools(ctx: ToolExecuteContext) {
               "tool-call",
             ).catch(() => null);
           }
+          // P10: the labels are the nodes' REAL titles (prod 2026-09-27:
+          // the model was handed "… — Quest Log" for a note titled "Run
+          // Ledger — … · Indigo Reef"; the id resolved, the label lied).
+          const titles = questState
+            ? await prisma.contentNode
+                .findMany({
+                  where: {
+                    id: { in: [questState.questLedgerId, ledger.contentNodeId] },
+                    deletedAt: null,
+                  },
+                  select: { id: true, title: true },
+                })
+                .then((rows) => new Map(rows.map((r) => [r.id, r.title])))
+                .catch(() => new Map<string, string>())
+            : new Map<string, string>();
+          const questLedgerLabel = questState
+            ? (titles.get(questState.questLedgerId) ?? `${questState.questLabel} — Quest Ledger`)
+            : "";
+          const questLogLabel = questState
+            ? (titles.get(ledger.contentNodeId) ?? `${questState.questLabel} — Quest Log`)
+            : "";
           return {
             ok: true,
             ledgerNodeId: ledger.contentNodeId,
@@ -1817,7 +1924,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
                   // model had been copying the ledger's [[wiki-link]] style
                   // into chat, where nothing renders it. @[Title](id) is
                   // the chat's pill, so hand it the exact string to use.
-                  next: `In your closing summary, tell the user the item rows live in @[${questState.questLabel} — Quest Ledger](${questState.questLedgerId}) (every item, one row each) and the narrative lives in the quest log note @[${questState.questLabel} — Quest Log](${ledger.contentNodeId}) — write those two references exactly as given (they render as links) and do NOT create any additional note.`,
+                  next: `In your closing summary, tell the user the item rows live in @[${questLedgerLabel}](${questState.questLedgerId}) (every item, one row each) and the narrative lives in the quest log note @[${questLogLabel}](${ledger.contentNodeId}) — write those two references exactly as given (they render as links) and do NOT create any additional note.`,
                 }
               : {}),
           };

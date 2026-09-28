@@ -178,6 +178,11 @@ exist so that class cannot recur; drift **gate 7** enforces the first one.
    of shapes the model has actually sent — never `.enum()`, `.min()`, `.max()`,
    `.int()`, `.regex()`, `.refine()`, or required keys inside a nested object.
    Vocabularies resolve, bounds clamp, nested objects normalize — in execute.
+   Gate 7 checks both halves: refinements, and any `z.object(` nested inside a
+   run-loop schema (prod `23fd28d6`, 2026-09-27: `capture: z.object({ cells })`
+   rejected a flat `{ Column: value }` map that was semantically complete; it is
+   now a `z.record` read by `normalizeCaptureArg` either way —
+   `ITERATION-RUN-HARNESS-FIXES-PLAN.md` P4).
 2. **A miss costs one step, never the enumeration.** When execute genuinely cannot
    proceed it returns a *result* — `ok: false`, a `refusal` saying what was received
    and what is accepted, a `nextAction` — that the model fixes in one call. It never

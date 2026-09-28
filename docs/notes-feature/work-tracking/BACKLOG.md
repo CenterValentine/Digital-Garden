@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-09-21
+last_updated: 2026-09-27
 ---
 
 # Sprint Backlog
@@ -9,6 +9,14 @@ last_updated: 2026-09-21
 **Sprint Execution Protocol**: Before commencing any sprint, always ask the user for input before planning and executing — there may be additions or modifications.
 
 ---
+
+## Iteration run harness — follow-ups (2026-09-27, from `feat/charter-run-harness`; plan `ITERATION-RUN-HARNESS-FIXES-PLAN.md`)
+
+- [ ] **Clean the *Apply for a job* charter note in production.** It holds four identical copies of its content (66 KB TipTap, last modified 2026-09-27 22:19 UTC, after the evaluated run). The parser now collapses the copies and the charter context says so, but the note itself still costs four copies to load in the editor and to sync. Hand-fix: delete three copies in the editor.
+- [ ] **Charter-named databases and private content.** `charterReferencedTableIds` reads the charter's wiki-links without running `stripPrivateContent`; a link inside a commented-out run still grants reach. Reach is not disclosure, so this was left as-is — revisit if the private-content seam list wants jurisdiction on it.
+- [ ] **Status-column regressions during a rows pass.** The evaluated run moved a Qualified opportunity back to Research Queue on its own judgment. Deliberately not guarded in the harness (D6) — the charter's wording owns pipeline state. If it recurs, the cheapest guard is a capture rule "a status column only moves forward within its group order unless the charter says otherwise".
+- [ ] **`durationMs` on turn metadata is server time only.** It sums per-request server durations and excludes client-executed tools (browser reads, `create_docx`); a five-minute turn reports ~72 s. Not wrong, but unlabelled — rename or add `wallClockMs` from the first request's `startedAt` to the last request's finish.
+- [ ] **Extension-side chrome detection.** `looksLikeNavigationChrome` runs server-side (P1/P2 material) and on the session-tab result; the extension's own reader could apply it before hydration settles and retry once with a longer settle when the body is chrome.
 
 ## Move tab to workplace / workbench — follow-ups (2026-09-21, from `feat/move-tab-to-workspace`)
 

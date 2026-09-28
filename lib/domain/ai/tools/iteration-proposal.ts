@@ -142,6 +142,89 @@ export function resolveDeliverables(
 }
 
 /**
+ * The deliverables that ARE the capture write. With captureTo declared,
+ * `capture.cells` on record_item_result lands the row; a separate
+ * update_row for the same cells is a second write of the same data, and
+ * the later one wins (ITERATION-RUN-HARNESS-FIXES P3, prod 2026-09-27:
+ * update_row wrote nine cells, the closing capture rewrote eight of them
+ * shorter). One set of cells, one code path.
+ */
+export const CAPTURE_WRITE_TOOLS: readonly DeliverableTool[] = ["update_row", "update_rows"];
+
+/** Drop the row-write deliverables when capture is on; report what was dropped. */
+export function stripCaptureDeliverables(
+  deliverables: readonly DeliverableTool[],
+  captureOn: boolean,
+): { deliverables: DeliverableTool[]; stripped: DeliverableTool[] } {
+  if (!captureOn) return { deliverables: [...deliverables], stripped: [] };
+  const stripped = deliverables.filter((d) => CAPTURE_WRITE_TOOLS.includes(d));
+  return {
+    deliverables: deliverables.filter((d) => !CAPTURE_WRITE_TOOLS.includes(d)),
+    stripped,
+  };
+}
+
+/**
+ * URL identity for "is this read one of the run's items?" (P6): host
+ * lowercased, no `www.`, no hash, no trailing slash. A tracking-parameter
+ * difference still matches nothing — that is the conservative side (a
+ * non-item read gets research guidance, never a false "record it").
+ */
+export function normalizeItemUrl(url: string): string {
+  try {
+    const u = new URL(url.trim());
+    const host = u.host.toLowerCase().replace(/^www\./, "");
+    const path = u.pathname.replace(/\/+$/, "");
+    return `${host}${path}${u.search}`;
+  } catch {
+    return url.trim().toLowerCase().replace(/#.*$/, "").replace(/\/+$/, "");
+  }
+}
+
+/** Keys a flat `capture` object may carry that are NOT column names. */
+const CAPTURE_META_KEYS = new Set([
+  "cells",
+  "admission",
+  "database",
+  "databaseId",
+  "table",
+  "tableId",
+  "rowId",
+  "dedupeValue",
+]);
+
+/**
+ * `record_item_result.capture` as the model may send it (P4): the
+ * documented `{ cells: { Column: value } }`, or the flat `{ Column: value }`
+ * map that died at the schema in prod 2026-09-27 ("capture.cells expected
+ * record, received undefined" — nine correct cells lost to a nesting
+ * level). The schema is a plain record; this reads either shape and says
+ * which it read. Returns `cells: null` when there is nothing to write.
+ */
+export function normalizeCaptureArg(raw: unknown): {
+  cells: Record<string, unknown> | null;
+  note?: string;
+} {
+  if (raw === null || raw === undefined) return { cells: null };
+  if (typeof raw !== "object" || Array.isArray(raw)) {
+    return { cells: null, note: "capture ignored — expected an object of column → value" };
+  }
+  const obj = raw as Record<string, unknown>;
+  const nested = obj.cells;
+  if (nested && typeof nested === "object" && !Array.isArray(nested)) {
+    const cells = nested as Record<string, unknown>;
+    return Object.keys(cells).length > 0 ? { cells } : { cells: null };
+  }
+  const flat: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (CAPTURE_META_KEYS.has(k)) continue;
+    flat[k] = v;
+  }
+  if (Object.keys(flat).length === 0) return { cells: null };
+  return { cells: flat, note: "capture was sent flat (column → value) — read as capture.cells" };
+}
+
+/**
  * Steps per item: research allowance + the item's tail (deliverables +
  * record_item_result). With no deliverables this is 4 — exactly the old
  * screening formula — so screening runs are unchanged.
