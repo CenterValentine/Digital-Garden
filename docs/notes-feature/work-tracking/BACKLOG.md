@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-09-27
+last_updated: 2026-09-28
 ---
 
 # Sprint Backlog
@@ -9,6 +9,16 @@ last_updated: 2026-09-27
 **Sprint Execution Protocol**: Before commencing any sprint, always ask the user for input before planning and executing — there may be additions or modifications.
 
 ---
+
+## Scriptures integration — proposed (2026-09-28, plan `SCRIPTURES-INTEGRATION-PLAN.md`)
+
+LDS standard works as a shared read-only corpus (seeded from the public-domain `bcbooks/scriptures-json` at a pinned SHA), with study living in the user's own notes. Blocked on owner answers to the plan's §9 open questions (shared corpus tables; talk-clipping vs site terms).
+
+- [ ] **P0 Corpus** — shared `Scripture*` tables + migration, pinned seed script cross-checked against `beandog/lds-scriptures`, read API.
+- [ ] **P1 Read & cite** — `extensions/scriptures/`, reference parser (evaluate `scripture-guide` first), `scriptureRef` inline node, reader viewer, `ScriptureCitation` index.
+- [ ] **P2 Study** — `scriptureQuote` block, "Add study note" into a user-chosen folder (lazy), Citations sidebar tab, scripture search scope.
+- [ ] **P3 Mark & memorize** — offset-anchored highlights (`ScriptureAnnotation`), flashcard "Memorize".
+- [ ] **P4 Talks & AI** — user-initiated talk clipping (never bundled), footnote → citation parsing, Talks database, AI `read_scripture` grounding tools.
 
 ## Iteration run harness — follow-ups (2026-09-27, from `feat/charter-run-harness`; plan `ITERATION-RUN-HARNESS-FIXES-PLAN.md`)
 
