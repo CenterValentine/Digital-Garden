@@ -31,6 +31,14 @@ export interface PhaseCheckpointGateStatus {
   missingRequirements: string[];
 }
 
+/** Tool names that satisfy a phase's "do web research" requirement. */
+export const RESEARCH_TOOLS: ReadonlySet<string> = new Set([
+  "search_web",
+  "read_page",
+  "read_page_headless_or_browser",
+  "open_tab_and_read",
+]);
+
 const RESEARCH_DIRECTIVE =
   /\b(?:research|web resources?|search (?:the )?web|current sources?|source-backed|evidence-backed)\b/i;
 
@@ -81,7 +89,12 @@ export function recordCompletedPhaseTools(
   for (const call of toolCalls) {
     if (!completedIds.has(call.toolCallId)) continue;
 
-    if (call.toolName === "search_web" || call.toolName === "read_page") {
+    // Every web-research tool counts, not only the two the message names:
+    // the browser reader is the one the `web` family hands the model (prod
+    // ecf1d0e5, 2026-09-28: a read_page_headless_or_browser attempt was
+    // ignored, the checkpoint was rejected as "no research", and four steps
+    // went to garden searches that could never satisfy it).
+    if (RESEARCH_TOOLS.has(call.toolName)) {
       gate.observedResearch = true;
     }
 
@@ -174,7 +187,7 @@ export function getPhaseCheckpointGateStatus(
   const missingRequirements: string[] = [];
   if (gate.requiresResearch && !gate.observedResearch) {
     missingRequirements.push(
-      "Complete at least one web research call with search_web or read_page.",
+      "Complete at least one web research call (search_web, read_page, or read_page_headless_or_browser).",
     );
   }
   if (
@@ -200,7 +213,7 @@ export function renderPhaseCheckpointGateInstruction(
   const requirements: string[] = [];
   if (gate.requiresResearch) {
     requirements.push(
-      "complete at least one `search_web` or `read_page` call",
+      "complete at least one `search_web`, `read_page`, or `read_page_headless_or_browser` call",
     );
   }
   if (gate.referenceContentIds.length > 0) {

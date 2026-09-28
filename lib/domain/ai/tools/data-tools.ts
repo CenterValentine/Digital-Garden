@@ -83,6 +83,7 @@ import {
   AI_PROPOSABLE_COLUMN_TYPES,
   ROLLUP_FNS,
   cellToText,
+  deriveRowTitle,
   operatorsForType,
   type CellValue,
   type DataColumn,
@@ -1057,7 +1058,8 @@ export function createDataTools(ctx: ToolExecuteContext) {
           // a bare header back; the second call was a sort it could have
           // made first had the range been in front of it. Only on the empty
           // path, over a bounded unfiltered sample.
-          if (rows.length === 0 && conditions.length > 0) {
+          const searchTerm = typeof input.search === "string" ? input.search.trim() : "";
+          if (rows.length === 0 && (conditions.length > 0 || searchTerm)) {
             try {
               const sample = await loadRowPage({
                 tableId: databaseId,
@@ -1068,6 +1070,14 @@ export function createDataTools(ctx: ToolExecuteContext) {
                 viewerId: ctx.userId,
               });
               const lines: string[] = [];
+              // A search miss teaches the table's size (prod ecf1d0e5,
+              // 2026-09-28: `search: "ticketing"` on a one-row table came
+              // back as a bare header; the next call re-read the table).
+              if (searchTerm) {
+                lines.push(
+                  `search "${searchTerm}" matched no row (the table holds ${sample.total} row${sample.total === 1 ? "" : "s"}${sample.total > 0 && sample.total <= 3 ? `: ${sample.rows.map((r) => deriveRowTitle(live, r.data) || "Untitled").join(", ")}` : ""})`,
+                );
+              }
               const seenCols = new Set<string>();
               for (const cond of conditions) {
                 const column = live.find((c) => c.id === cond.columnId);

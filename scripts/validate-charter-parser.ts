@@ -125,7 +125,7 @@ configurePhaseCheckpointGate(checkpointGate, {
 assert.deepEqual(getPhaseCheckpointGateStatus(checkpointGate), {
   ready: false,
   missingRequirements: [
-    "Complete at least one web research call with search_web or read_page.",
+    "Complete at least one web research call (search_web, read_page, or read_page_headless_or_browser).",
     "Read at least one linked extension with read_content.",
   ],
 });
@@ -137,16 +137,19 @@ assert.match(
   renderPhaseCheckpointGateInstruction(checkpointGate),
   /read_content/,
 );
+// The browser reader satisfies the research requirement like search_web
+// does (prod ecf1d0e5, 2026-09-28: it was ignored and the checkpoint was
+// rejected as "no research" after a real read attempt).
 recordCompletedPhaseTools(
   checkpointGate,
   [
     {
-      toolCallId: "search-call",
-      toolName: "search_web",
-      input: { query: "Acme employer research" },
+      toolCallId: "browser-read-call",
+      toolName: "read_page_headless_or_browser",
+      input: { url: "https://acme.example/about" },
     },
   ],
-  [{ toolCallId: "search-call" }],
+  [{ toolCallId: "browser-read-call" }],
 );
 assert.deepEqual(getPhaseCheckpointGateStatus(checkpointGate), {
   ready: false,
@@ -154,6 +157,19 @@ assert.deepEqual(getPhaseCheckpointGateStatus(checkpointGate), {
     "Read at least one linked extension with read_content.",
   ],
 });
+// A garden search is NOT web research.
+const gardenOnlyGate = createPhaseCheckpointGate();
+configurePhaseCheckpointGate(gardenOnlyGate, {
+  phaseTitle: "Phase 1: Understand the employer",
+  phaseText: "Research as needed using web resources.",
+  referenceContentIds: [],
+});
+recordCompletedPhaseTools(
+  gardenOnlyGate,
+  [{ toolCallId: "garden-call", toolName: "search_content", input: { query: "Acme" } }],
+  [{ toolCallId: "garden-call" }],
+);
+assert.equal(getPhaseCheckpointGateStatus(gardenOnlyGate).ready, false);
 recordCompletedPhaseTools(
   checkpointGate,
   [
