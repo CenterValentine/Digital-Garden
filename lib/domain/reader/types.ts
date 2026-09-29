@@ -131,6 +131,15 @@ export interface BookSourceInfo {
   readable: boolean;
   /** User-added catalog (deletable). */
   custom?: boolean;
+  /** Feed URL for OPDS presets (used to add a logged-in copy). */
+  feedUrl?: string;
+  /** The feed refuses anonymous access — opening it asks for a login instead. */
+  requiresLogin?: {
+    usernameLabel: string;
+    passwordLabel?: string;
+    hint: string;
+    signupUrl?: string;
+  };
   homepage?: string;
 }
 

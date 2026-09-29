@@ -37,7 +37,15 @@ async function errorDetail(response: Response): Promise<string> {
     } catch {
       // not JSON
     }
-    return text.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 200);
+    // HTML error page: its <title> is the only readable part; never echo markup.
+    if (/<(!doctype|html|head|body)\b/i.test(text)) {
+      return (text.match(/<title[^>]*>([^<]*)<\/title>/i)?.[1] ?? "").replace(/\s+/g, " ").trim().slice(0, 160);
+    }
+    return text
+      .replace(/<[^>]*>?/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 200);
   } catch {
     return "";
   }

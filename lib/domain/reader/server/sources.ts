@@ -32,6 +32,7 @@ const OPDS_ACCEPT =
 // ── Presets ────────────────────────────────────────────────────────────────
 
 interface OpdsPreset {
+  requiresLogin?: BookSourceInfo["requiresLogin"];
   id: string;
   label: string;
   description: string;
@@ -55,10 +56,16 @@ const OPDS_PRESETS: OpdsPreset[] = [
     id: "opds:preset:standard-ebooks",
     label: "Standard Ebooks",
     description:
-      "Carefully produced public-domain classics. The full catalog feed needs a Patrons Circle login — add it as a custom catalog with your credentials.",
+      "Carefully produced public-domain classics. Their catalog feed is for Patrons Circle members (the books themselves are free).",
     url: "https://standardebooks.org/feeds/opds",
     homepage: "https://standardebooks.org",
     license: "public-domain",
+    requiresLogin: {
+      usernameLabel: "Patrons Circle email",
+      passwordLabel: "Password (usually blank)",
+      hint: "Standard Ebooks gates its catalog feeds to Patrons Circle members, who sign in with their email address. Open-source projects can also ask them for access.",
+      signupUrl: "https://standardebooks.org/donate#patrons-circle",
+    },
   },
 ];
 
@@ -125,6 +132,8 @@ const BUILT_IN_SOURCES: BookSourceInfo[] = [
     browsable: true,
     readable: true,
     homepage: preset.homepage,
+    feedUrl: preset.url,
+    requiresLogin: preset.requiresLogin,
   })),
 ];
 
@@ -149,7 +158,13 @@ export async function listBookSources(ownerId: string): Promise<BookSourceInfo[]
   } catch {
     // Reader tables not migrated yet — built-in sources still work.
   }
-  return [...BUILT_IN_SOURCES, ...custom];
+  // Once a login-gated preset has been added with credentials, the logged-in
+  // copy replaces the anonymous preset tile.
+  const customUrls = new Set(custom.map((source) => source.homepage));
+  const builtIns = BUILT_IN_SOURCES.filter(
+    (source) => !(source.requiresLogin && source.feedUrl && customUrls.has(source.feedUrl))
+  );
+  return [...builtIns, ...custom];
 }
 
 // ── OPDS ───────────────────────────────────────────────────────────────────
@@ -199,7 +214,21 @@ async function fetchOpdsPage(
   source: ResolvedOpds,
   url: string
 ): Promise<CatalogPage> {
-  const result = await readerFetch(url, { accept: OPDS_ACCEPT, headers: source.headers });
+  let result;
+  try {
+    result = await readerFetch(url, { accept: OPDS_ACCEPT, headers: source.headers });
+  } catch (error) {
+    if (error instanceof ReaderFetchError && error.upstreamStatus === 401) {
+      throw new ReaderFetchError(
+        Object.keys(source.headers).length
+          ? "The catalog rejected the saved login — remove it and add it again with the right username and password."
+          : "This catalog needs a login — add it under “Add your library” with your username and password.",
+        401,
+        401
+      );
+    }
+    throw error;
+  }
   const page = parseOpdsFeed(
     result.body.toString("utf8"),
     result.contentType,

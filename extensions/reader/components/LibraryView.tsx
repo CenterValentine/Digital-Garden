@@ -386,8 +386,15 @@ function Catalogs({
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({ url: "", name: "", username: "", password: "" });
   const [adding, setAdding] = useState(false);
+  const [loginFor, setLoginFor] = useState<BookSourceInfo | null>(null);
+  const [login, setLogin] = useState({ username: "", password: "" });
+  const [signingIn, setSigningIn] = useState(false);
 
   const open = async (source: BookSourceInfo, href?: string, title?: string) => {
+    if (!href && source.requiresLogin && !source.custom) {
+      setLoginFor(source);
+      return;
+    }
     setLoading(true);
     try {
       const page = await readerApi.browse(source.id, href);
@@ -471,6 +478,11 @@ function Catalogs({
             <button type="button" onClick={() => void open(catalog)} className="flex-1 text-left">
               <span className="text-sm font-semibold">{catalog.label}</span>
               <span className="block text-xs text-muted-foreground line-clamp-2">{catalog.description}</span>
+              {catalog.requiresLogin && !catalog.custom && (
+                <span className="mt-1 inline-block rounded bg-amber-500/10 px-1.5 text-[11px] text-amber-700 dark:text-amber-300">
+                  Sign-in required
+                </span>
+              )}
             </button>
             {catalog.custom && (
               <button
@@ -488,6 +500,86 @@ function Catalogs({
           </li>
         ))}
       </ul>
+
+      {loginFor?.requiresLogin && (
+        <form
+          className="space-y-2 rounded-lg border border-primary/40 p-3"
+          onSubmit={async (event) => {
+            event.preventDefault();
+            if (!loginFor.feedUrl) return;
+            setSigningIn(true);
+            try {
+              await readerApi.addCatalog({
+                url: loginFor.feedUrl,
+                name: loginFor.label,
+                username: login.username.trim(),
+                password: login.password || undefined,
+              });
+              toast.success(`${loginFor.label} connected`);
+              setLoginFor(null);
+              setLogin({ username: "", password: "" });
+              onChanged();
+            } catch (error) {
+              toast.error(error instanceof Error ? error.message : "Sign-in failed");
+            } finally {
+              setSigningIn(false);
+            }
+          }}
+        >
+          <h3 className="text-sm font-semibold">Sign in to {loginFor.label}</h3>
+          <p className="text-xs text-muted-foreground">
+            {loginFor.requiresLogin.hint}
+            {loginFor.requiresLogin.signupUrl && (
+              <>
+                {" "}
+                <a
+                  href={loginFor.requiresLogin.signupUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-primary hover:underline"
+                >
+                  Learn more
+                </a>
+              </>
+            )}
+          </p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <input
+              required
+              autoFocus
+              autoComplete="username"
+              placeholder={loginFor.requiresLogin.usernameLabel}
+              value={login.username}
+              onChange={(event) => setLogin({ ...login, username: event.target.value })}
+              className="h-8 rounded border border-black/10 bg-transparent px-2 text-xs dark:border-white/10"
+            />
+            <input
+              type="password"
+              autoComplete="current-password"
+              placeholder={loginFor.requiresLogin.passwordLabel ?? "Password"}
+              value={login.password}
+              onChange={(event) => setLogin({ ...login, password: event.target.value })}
+              className="h-8 rounded border border-black/10 bg-transparent px-2 text-xs dark:border-white/10"
+            />
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="submit"
+              disabled={signingIn || !login.username.trim()}
+              className="h-8 rounded bg-primary px-3 text-xs font-medium text-primary-foreground disabled:opacity-50"
+            >
+              {signingIn ? "Checking…" : "Sign in"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setLoginFor(null)}
+              className="h-8 rounded px-3 text-xs text-muted-foreground"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
 
       <form
         className="space-y-2 rounded-lg border border-black/10 p-3 dark:border-white/10"
