@@ -317,3 +317,21 @@ hosts were unreachable from the build sandbox, so every source needs a live smok
 - [ ] Upload an Adobe-DRM EPUB → opening it shows the DRM message, no crash.
 - [ ] Import a real `My Clippings.txt`; re-import → all skipped. Readwise sync; Hardcover status sync.
 - [ ] Disable the Reader extension → the Reader menu entry disappears and EPUBs fall back to the file viewer.
+
+### Added 2026-09-29 (after first owner smoke)
+
+- **Book details panel** — cover/title click in Find books, Catalogs and My books;
+  `/api/reader/details` enriches on demand (source record → Open Library → Google
+  Books with a key), longest description wins and names its source; cached;
+  library books back-filled. Reader toolbar: *About this book*.
+- **Bookshelf in the + menu** — `+ → Reader → Books` lists your books; picking one
+  drops a **shortcut** in the target folder (explicit folder, else the tree
+  selection's folder) and opens it (`POST /api/reader/shelf`). The book file never
+  moves. `ExtensionRuntime.createMenuItems` may now be a builder.
+- **AI book context** — `lib/domain/reader/server/ai-capsule.ts`: an open, bound or
+  @mentioned e-book gives the chat its metadata, reading position, description and
+  the user's highlights/notes; `read_content` on an e-book returns that capsule plus
+  a 24k-char excerpt (was the whole text, uncapped).
+- Fixes from the smoke: Gutenberg search results, Wikisource `page=`, non-zip
+  downloads, duplicate result keys / stale responses, OAPEN title-less records,
+  Standard Ebooks sign-in, readable upstream errors.
