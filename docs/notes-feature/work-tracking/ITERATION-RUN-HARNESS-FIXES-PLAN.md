@@ -194,22 +194,23 @@ The meter read **$1.22** for `ecf1d0e5`; the same usage at base rates is **$0.82
 
 ### L1 — name the break (one flagged run)
 
-- **L1a — build before the run: the wire tap.** When the flag is on, the `openai` adapter passes a `fetch` wrapper to `createOpenAI` (`providers/registry.ts`).
-  - It parses the JSON body and fingerprints `tools` and `instructions` separately, and each `input[]` item separately.
-  - It logs `ai:prompt_wire` with the index and type of the first item that differs from the previous call in the same conversation, plus short excerpts of both sides.
-  - It never logs the API key; the body excerpt is the prompt, which the owner already sees.
-  - Without L1a, a "stable" result from the SDK-level diagnostic would need a second run.
-- **The run (owner):**
-  1. Merge L1a.
-  2. In Vercel, set Production `AI_PROMPT_PREFIX_DIAG=1` and **redeploy**. An env change reaches new deployments only.
-  3. Start a new chat with gpt-6-sol and *Apply for a job* attached, asking for one *different* low-interest job, so the Clay artifacts are not duplicated. It must include:
+- **L1a — the wire tap (BUILT, `feat/run-cache-levers`).**
+  - When the flag is on, every OpenAI provider in `providers/registry.ts` gets a `fetch` wrapper (`prompt-wire-tap.ts`).
+  - The wrapper fingerprints the outgoing body in provider order: `prompt_cache_key` → model → tools → instructions → each `input[]` item.
+  - It logs `ai:prompt_wire` naming the first part that stopped extending the previous call of the same conversation. For an input item it gives the index and kind (`function_call_output`, `reasoning`, `message:user`, …), with excerpts of both sides at the first differing character.
+  - A replaced trailing item (the per-step notice) is not a divergence.
+  - The pure helpers `fingerprintWireBody` and `findWireDivergence` are pinned by `run-harness:check` §10. Two mutations were caught: dropping the trailing-notice rule, and dropping the cache-key check.
+  - **Second suspect, for F19's cold request starts:** `buildPromptCachePolicy` derives `prompt_cache_key` from the *advertised* tool set and a digest of the charter context. Either can change between requests, which reroutes the call to a cold cache. The tap reports a changed key as `part: cacheKey` before anything else.
+- **The run (owner), in order:**
+  1. Merge the PR carrying L1a and let Vercel deploy it.
+  2. In Vercel → Settings → Environment Variables, add `AI_PROMPT_PREFIX_DIAG` = `1` for Production, then redeploy. An env change reaches new deployments only.
+  3. Start a NEW chat on gpt-6-sol with *Apply for a job* attached, and ask for one *different* low-interest job, so the Clay artifacts are not duplicated. Approve the proposal and let it run to the end; answer any approval promptly (a long gap adds noise, not signal). This shape covers what is needed:
      - a proposal approval (the suspected boundary);
      - three or more steps after it inside one request;
-     - at least one browser read (a request boundary).
-     The de65f6bb prompt meets all three.
-  4. Within Vercel's runtime-log retention, filter `ai:prompt_prefix` and `ai:prompt_wire` and export the lines.
-  5. Unset the flag and redeploy.
-- **Caveat:** the diagnostic keeps its state in instance memory. Within-request comparisons are reliable. Cross-request ones appear only when Fluid Compute reuses the instance, which it usually does.
+     - a browser read (a request boundary).
+  4. In Vercel → Logs, filter `ai:prompt_wire` (and `ai:prompt_prefix`) for the run's time window and export the lines, or paste them into the chat. Runtime logs are kept only briefly, so do this the same day.
+  5. Remove the variable and redeploy.
+- **Caveat:** both diagnostics keep their state in instance memory. Within-request comparisons are reliable; cross-request ones appear when Fluid Compute reuses the instance, which it usually does.
 - **Expected:** the run names the element; the fix follows from it. This run would have cost $1.35 → ~$0.56.
 
 ### L2 — keep the tool list constant for the turn

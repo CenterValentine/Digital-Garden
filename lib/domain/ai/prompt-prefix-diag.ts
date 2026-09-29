@@ -96,3 +96,135 @@ export function excerptAt(serialized: string, offset: number, width = 160): stri
   const start = Math.max(0, offset - Math.floor(width / 4));
   return serialized.slice(start, start + width).replace(/\s+/g, " ");
 }
+
+// ── Wire level (plan §10 L1a) ────────────────────────────────────────────────
+//
+// The fingerprint above sees the SDK's message array. The provider cache sees
+// the HTTP body the provider package builds from it — approval parts,
+// reasoning items and provider-executed search calls are shaped THERE, and a
+// divergence introduced in that conversion is invisible one layer up. These
+// helpers fingerprint the body itself, part by part, in provider order:
+// routing key → model → tools → instructions → input items.
+
+export type WirePart = "cacheKey" | "model" | "tools" | "instructions" | "input";
+
+export interface WireItemFingerprint {
+  /** `message:<role>`, or the item's own `type` (function_call, reasoning, …). */
+  kind: string;
+  hash: string;
+  /** The item serialized — kept so a divergence can be excerpted precisely. */
+  json: string;
+}
+
+export interface WireFingerprint {
+  cacheKey: string | null;
+  model: string | null;
+  tools: string;
+  instructions: string;
+  items: WireItemFingerprint[];
+  /** Stable per conversation: the first user item's hash (null when none). */
+  conversationKey: string | null;
+}
+
+export interface WireDivergence {
+  part: WirePart;
+  /** Index of the first differing input item (part === "input"). */
+  index?: number;
+  kindBefore?: string;
+  kindAfter?: string;
+  /** Input items shared before the divergence. */
+  sharedItems: number;
+  prevExcerpt: string;
+  currExcerpt: string;
+}
+
+function itemKind(item: unknown): string {
+  if (!item || typeof item !== "object") return typeof item;
+  const rec = item as Record<string, unknown>;
+  if (typeof rec.type === "string" && rec.type !== "message") return rec.type;
+  return `message:${typeof rec.role === "string" ? rec.role : "?"}`;
+}
+
+/** Fingerprint a Responses (`input`) or Chat Completions (`messages`) body. */
+export function fingerprintWireBody(body: unknown): WireFingerprint | null {
+  if (!body || typeof body !== "object") return null;
+  const rec = body as Record<string, unknown>;
+  const rawItems = Array.isArray(rec.input)
+    ? rec.input
+    : Array.isArray(rec.messages)
+      ? rec.messages
+      : null;
+  if (!rawItems) return null;
+  const items = rawItems.map((item) => {
+    const json = JSON.stringify(item) ?? "";
+    return { kind: itemKind(item), hash: hash(json), json };
+  });
+  const firstUser = items.find((i) => i.kind === "message:user");
+  return {
+    cacheKey: typeof rec.prompt_cache_key === "string" ? rec.prompt_cache_key : null,
+    model: typeof rec.model === "string" ? rec.model : null,
+    tools: hash(JSON.stringify(rec.tools ?? null)),
+    instructions: hash(JSON.stringify(rec.instructions ?? null)),
+    items,
+    conversationKey: firstUser ? firstUser.hash : null,
+  };
+}
+
+/** Excerpt both sides at the first character where two strings differ. */
+function excerptPair(a: string, b: string, width = 180): [string, string] {
+  let i = 0;
+  const n = Math.min(a.length, b.length);
+  while (i < n && a[i] === b[i]) i++;
+  const start = Math.max(0, i - 40);
+  const cut = (s: string) => s.slice(start, start + width).replace(/\s+/g, " ");
+  return [cut(a), cut(b)];
+}
+
+/**
+ * The first part where `current` stops extending `previous`; null when the
+ * new body is the old one plus appended input items (the cache-friendly
+ * shape). A trailing item that CHANGED counts as a divergence only when it is
+ * not the last item of `previous` — the per-step notice is appended at the
+ * end and legitimately differs step to step.
+ */
+export function findWireDivergence(
+  previous: WireFingerprint,
+  current: WireFingerprint,
+): WireDivergence | null {
+  const scalar = (part: WirePart, a: string | null, b: string | null): WireDivergence | null =>
+    a === b ? null : { part, sharedItems: 0, prevExcerpt: String(a), currExcerpt: String(b) };
+  const head =
+    scalar("cacheKey", previous.cacheKey, current.cacheKey) ??
+    scalar("model", previous.model, current.model) ??
+    scalar("tools", previous.tools, current.tools) ??
+    scalar("instructions", previous.instructions, current.instructions);
+  if (head) return head;
+
+  const n = Math.min(previous.items.length, current.items.length);
+  for (let i = 0; i < n; i++) {
+    if (previous.items[i].hash === current.items[i].hash) continue;
+    if (i === previous.items.length - 1) return null; // the replaced trailing notice
+    const [prevExcerpt, currExcerpt] = excerptPair(previous.items[i].json, current.items[i].json);
+    return {
+      part: "input",
+      index: i,
+      kindBefore: previous.items[i].kind,
+      kindAfter: current.items[i].kind,
+      sharedItems: i,
+      prevExcerpt,
+      currExcerpt,
+    };
+  }
+  if (current.items.length < previous.items.length) {
+    return {
+      part: "input",
+      index: n,
+      kindBefore: previous.items[n]?.kind,
+      kindAfter: undefined,
+      sharedItems: n,
+      prevExcerpt: previous.items[n]?.json.slice(0, 180) ?? "",
+      currExcerpt: "(input ended — items were removed)",
+    };
+  }
+  return null;
+}

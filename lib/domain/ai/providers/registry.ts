@@ -22,6 +22,7 @@ import type {
   ConnectionWithKey,
 } from "@/lib/features/ai-connections/types";
 import { isGatewayEnabled, resolveChatModelViaGateway } from "./gateway";
+import { promptWireTapOptions } from "../prompt-wire-tap";
 
 /**
  * Thrown when a chat request reaches the resolver with no usable
@@ -71,7 +72,8 @@ export async function resolveChatModelFromConnection(
     }
     case "openai": {
       const { createOpenAI } = await import("@ai-sdk/openai");
-      return createOpenAI({ apiKey: connection.apiKey })(modelId);
+      // `promptWireTapOptions()` is `{}` unless AI_PROMPT_PREFIX_DIAG=1 (§10 L1a).
+      return createOpenAI({ apiKey: connection.apiKey, ...promptWireTapOptions() })(modelId);
     }
     case "google": {
       const { createGoogleGenerativeAI } = await import("@ai-sdk/google");
@@ -118,6 +120,7 @@ export async function resolveChatModelFromConnection(
       return createOpenAI({
         apiKey: connection.apiKey,
         baseURL: connection.baseURL,
+        ...promptWireTapOptions(),
       }).chat(modelId);
     }
     default:
@@ -173,7 +176,7 @@ export async function resolveChatModel(
     }
     case "openai": {
       const { createOpenAI } = await import("@ai-sdk/openai");
-      return createOpenAI({ apiKey: config.apiKey })(mapping.modelString);
+      return createOpenAI({ apiKey: config.apiKey, ...promptWireTapOptions() })(mapping.modelString);
     }
     case "google": {
       const { createGoogleGenerativeAI } = await import("@ai-sdk/google");
