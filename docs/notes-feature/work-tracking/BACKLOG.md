@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-09-28
+last_updated: 2026-09-29
 ---
 
 # Sprint Backlog
@@ -10,7 +10,17 @@ last_updated: 2026-09-28
 
 ---
 
-## Scriptures integration — proposed (2026-09-28, plan `SCRIPTURES-INTEGRATION-PLAN.md`)
+## E-reader — proposed (2026-09-29, plan `EREADER-PLAN.md`)
+
++ → Reader → [Scriptures, Books]. One reader shell (foliate-js for EPUB/PDF, a corpus renderer for scriptures), one annotation store keyed by Readium Locators, and a library of book-source adapters (OPDS, Gutendex, Open Library, upload). Books are file nodes in a user-chosen library folder. Blocked on owner answers to the plan's §10.
+
+- [ ] **R0 Read an uploaded book** — `createMenuItems` extension field, `extensions/reader/`, EPUB MIME + DRM gate, foliate-js viewer, `ReadingProgress`.
+- [ ] **R1 Mark it up** — `ReaderAnnotation`, selection toolbar, annotations tab, `readerLink` node, send to note.
+- [ ] **R2 Library** — OPDS / Gutendex / Open Library adapters, library dialog, acquire into folder, `BookMeta` + covers.
+- [ ] **R3 Scriptures in the reader** — scriptures plan P0/P1 feed a corpus source sharing the annotation store.
+- [ ] **R4 Bring in the rest** — Kindle clippings + Readwise, Hardcover, Libby link, highlights → database, flashcards, AI tools.
+
+## Scriptures integration — parked (reader moved to `EREADER-PLAN.md`) (2026-09-28, plan `SCRIPTURES-INTEGRATION-PLAN.md`)
 
 LDS standard works as a shared read-only corpus (seeded from the public-domain `bcbooks/scriptures-json` at a pinned SHA), with study living in the user's own notes. Blocked on owner answers to the plan's §9 open questions (shared corpus tables; talk-clipping vs site terms).
 

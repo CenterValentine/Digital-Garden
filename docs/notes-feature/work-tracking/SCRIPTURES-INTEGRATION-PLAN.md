@@ -1,5 +1,5 @@
 ---
-status: proposed — design only, nothing built. Needs owner decisions on the Open Questions (§9) before P0.
+status: parked 2026-09-29 — the scripture *reader* and highlight store (§4.4, §5.1) moved into EREADER-PLAN.md (scriptures become a reader source, phase R3). Corpus, references, citation index, study notes and talks remain here.
 created: 2026-09-28
 depends_on: none (P0 needs an owner-run migration: shared corpus tables)
 ---
