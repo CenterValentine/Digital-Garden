@@ -225,7 +225,7 @@ async function main() {
     assert.deepEqual(book.authors, ["Jane Austen"]);
     assert.equal(book.license, "public-domain");
     assert.equal(book.acquisitions[0].href, "https://www.gutenberg.org/ebooks/1342.epub3.images");
-    assert.equal(book.coverUrl, "https://www.gutenberg.org/cache/epub/1342/pg1342.cover.small.jpg");
+    assert.equal(book.coverUrl, "https://www.gutenberg.org/cache/epub/1342/pg1342.cover.medium.jpg");
     assert.deepEqual(page.navigation.map((nav) => nav.title), ["Sort Alphabetically by Title"]);
     assert.ok(page.nextHref?.includes("start_index=26"));
   });

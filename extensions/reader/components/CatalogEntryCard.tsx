@@ -37,18 +37,20 @@ export function CatalogEntryCard({ entry, onAdd }: CatalogEntryCardProps) {
     .filter(({ acquisition }) => FORMAT_LABELS[acquisition.type.split(";")[0]]);
   const [format, setFormat] = useState(readable[0]?.index ?? 0);
   const [busy, setBusy] = useState(false);
+  const [coverFailed, setCoverFailed] = useState(false);
   const paidOnly = entry.acquisitions.length > 0 && readable.length === 0;
 
   return (
     <article className="flex gap-3 rounded-lg border border-black/10 p-3 dark:border-white/10">
       <div className="h-28 w-20 shrink-0 overflow-hidden rounded bg-black/5 dark:bg-white/5">
-        {entry.coverUrl ? (
+        {entry.coverUrl && !coverFailed ? (
           // eslint-disable-next-line @next/next/no-img-element -- remote catalog covers, arbitrary hosts
           <img
             src={entry.coverUrl}
             alt=""
             loading="lazy"
             referrerPolicy="no-referrer"
+            onError={() => setCoverFailed(true)}
             className="h-full w-full object-cover"
           />
         ) : (

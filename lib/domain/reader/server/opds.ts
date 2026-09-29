@@ -400,7 +400,9 @@ export function expandGutenbergResults(page: CatalogPage): CatalogPage {
       id,
       title: nav.title,
       authors: nav.summary ? [nav.summary] : [],
-      coverUrl: nav.coverUrl ?? `https://www.gutenberg.org/cache/epub/${id}/pg${id}.cover.medium.jpg`,
+      // The search feed's thumbnail is a generic book icon when a title has no
+      // cover; the cache URL is the real cover (the card falls back on 404).
+      coverUrl: `https://www.gutenberg.org/cache/epub/${id}/pg${id}.cover.medium.jpg`,
       license: "public-domain",
       acquisitions: [
         { href: `https://www.gutenberg.org/ebooks/${id}.epub3.images`, type: "application/epub+zip", rel: "open-access" },

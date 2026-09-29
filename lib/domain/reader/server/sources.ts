@@ -405,8 +405,9 @@ async function searchWikisource(query: string, page?: string): Promise<CatalogPa
 // ── OAPEN (DSpace REST) ────────────────────────────────────────────────────
 
 interface OapenItem {
+  type?: string;
   handle: string;
-  name: string;
+  name?: string;
   metadata?: Array<{ key: string; value: string }>;
   bitstreams?: Array<{
     name: string;
@@ -427,7 +428,7 @@ function oapenEntry(item: OapenItem): CatalogEntry {
   );
   return {
     id: item.handle,
-    title: meta("dc.title")[0] ?? item.name,
+    title: meta("dc.title")[0] ?? item.name ?? "",
     authors: [...meta("dc.contributor.author"), ...meta("dc.contributor.editor")],
     summary: meta("dc.description.abstract")[0],
     language: meta("dc.language")[0],
@@ -452,7 +453,12 @@ async function searchOapen(query: string, page?: string): Promise<CatalogPage> {
   );
   return {
     sourceId: "oapen",
-    entries: items.map(oapenEntry),
+    // The search also returns collections/communities and title-less records;
+    // only real items with a title are books.
+    entries: items
+      .filter((item) => !item.type || item.type === "item")
+      .map(oapenEntry)
+      .filter((entry) => entry.title.trim().length > 0),
     navigation: [],
     nextHref: items.length === 20 ? String(offset + 20) : undefined,
   };
