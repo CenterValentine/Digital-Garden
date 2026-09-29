@@ -1,5 +1,5 @@
 ---
-status: proposed — design only, nothing built. Needs owner answers to §10 before R0.
+status: building — R0, R1, R2 and the R4 imports/integrations built 2026-09-29 on `claude/inspiring-franklin-2g7h8l` (see §11). Owner must apply the staged reader migration. R3 (Scriptures) and Research are menu stubs.
 created: 2026-09-29
 supersedes_in_part: SCRIPTURES-INTEGRATION-PLAN.md §4.4 and §5.1 (the scripture reader and its highlight store move here; the corpus, references and citation index stay there)
 ---
@@ -273,3 +273,47 @@ to a spot.
 6. **Per-user storage of public-domain books:** each user gets their own copy
    (proposed; it's simple and dedupe already runs per upload), or a shared cache
    keyed by source + checksum?
+
+## 11. Implementation log (2026-09-29)
+
+Built on `claude/inspiring-franklin-2g7h8l`. Defaults taken for §10: (1) a book is a
+`file` node + `BookMeta`; (2) `Books/` at the root, created on first acquire as a
+gallery folder — or the folder the "+" menu was opened on; (3) home-network catalogs
+must be exposed (tunnel) — private addresses are refused; (4) Standard Ebooks is a
+preset over its public feed, and a Patrons Circle login can be added as a custom
+catalog; (5) Libby via OverDrive's public search link, no API credentials; (6) each
+user gets their own copy (checksum dedupe per user).
+
+| Piece | Where |
+|---|---|
+| "+"/Add menu contributions, virtual content ids, `mimeType` viewer match | `lib/extensions/types.ts`, `client-registry.tsx`, `new-content-menu.tsx`, `MainPanelContent.tsx` |
+| Extension (manifest, runtime, menu: Books · Scriptures (stub) · Research (stub)) | `extensions/reader/` |
+| Reader (foliate-js, sanitizer, highlights/notes/bookmarks, TOC, typography, progress) | `extensions/reader/components/BookReader.tsx`, `lib/sanitize.ts` |
+| Library tab (My books · Find · Catalogs · Import · Connections) | `extensions/reader/components/LibraryView.tsx` |
+| Sources (Gutendex, Open Library, Wikisource, OAPEN, Google Books, OPDS presets + custom) | `lib/domain/reader/server/sources.ts`, `opds.ts` |
+| SSRF-guarded fetch (per-hop DNS + redirect validation, caps) | `lib/domain/reader/server/http.ts` |
+| Acquire, DRM gate, EPUB metadata/searchText, lazy BookMeta | `library.ts`, `epub.ts` |
+| Progress, annotations, send-to-note | `annotations.ts` |
+| Kindle clippings, Readwise, Hardcover, Google Books key | `lib/domain/reader/kindle-clippings.ts`, `server/integrations.ts` |
+| Routes | `app/api/reader/*` |
+| Gate | `pnpm reader:check` (`scripts/validate-reader.ts`) |
+| Schema (staged — owner applies) | `work-tracking/reader-schema-additions.prisma`, `reader-migration.sql`; `lib/domain/reader/db.ts` answers 503 until applied |
+
+**Not yet:** `readerLink` inline TipTap node (send-to-note uses an ordinary link to
+`/content?content=<id>&readerLoc=<cfi>` for now — no schema change); Annotations as
+a right-sidebar tool-surface tab (it is an in-reader panel today); PDF in the reader
+(PDF keeps the iframe viewer); speed-reader EPUB source; highlights → database;
+flashcard "Memorize"; AI tools; a CSP for `/content` (the sanitizer is the current
+defence); Hardcover GraphQL field names are from its public docs and unverified live;
+hosts were unreachable from the build sandbox, so every source needs a live smoke.
+
+### Smoke checklist
+- [ ] Apply the staged migration; `pnpm dev`; + → Reader → Books opens the Library tab.
+- [ ] Find → Project Gutenberg "Pride and Prejudice" → Add → `Books/` appears with the EPUB; Read opens it.
+- [ ] Select text → highlight (color) → reload → highlight is still drawn; progress resumes.
+- [ ] Highlight → Send to note → "<Title> — Notes" beside the book with the quote + working link back.
+- [ ] Open Library, Wikisource, OAPEN, Google Books searches return results; a lendable Open Library title shows "Borrow on Open Library" only.
+- [ ] Catalogs → Gutenberg browse → navigate → Add; add a custom Calibre/Kavita/Komga OPDS URL (tunnelled).
+- [ ] Upload an Adobe-DRM EPUB → opening it shows the DRM message, no crash.
+- [ ] Import a real `My Clippings.txt`; re-import → all skipped. Readwise sync; Hardcover status sync.
+- [ ] Disable the Reader extension → the Reader menu entry disappears and EPUBs fall back to the file viewer.

@@ -1,0 +1,122 @@
+/**
+ * Typed client for /api/reader/*. Every call throws ReaderApiError with the
+ * server's message (and code — READER_NOT_MIGRATED, DRM_PROTECTED, …).
+ */
+
+import type {
+  AcquireResult,
+  BookMetaDto,
+  BookSourceInfo,
+  CatalogEntry,
+  CatalogPage,
+  HighlightImportSummary,
+  ReaderAnnotationDto,
+  ReaderAnnotationKind,
+  ReaderConnectionDto,
+  ReaderConnectionProvider,
+  ReaderLocator,
+  ReadingProgressDto,
+  ReadingStatus,
+} from "@/lib/domain/reader/types";
+
+export class ReaderApiError extends Error {
+  constructor(
+    message: string,
+    readonly code: string,
+    readonly status: number
+  ) {
+    super(message);
+  }
+}
+
+async function call<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(path, { credentials: "include", ...init });
+  const body = (await response.json().catch(() => null)) as
+    | { success: true; data: T }
+    | { success: false; error: { code: string; message: string } }
+    | null;
+  if (!body || body.success !== true || !response.ok) {
+    const error = body && body.success === false ? body.error : null;
+    throw new ReaderApiError(
+      error?.message ?? `Request failed (${response.status})`,
+      error?.code ?? "HTTP_ERROR",
+      response.status
+    );
+  }
+  return (body as { success: true; data: T }).data;
+}
+
+const json = (method: string, data: unknown): RequestInit => ({
+  method,
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify(data),
+});
+
+export const readerApi = {
+  sources: () =>
+    call<{ sources: BookSourceInfo[]; tablesReady: boolean }>("/api/reader/sources"),
+  addCatalog: (input: { url: string; name?: string; username?: string; password?: string }) =>
+    call<{ source: BookSourceInfo }>("/api/reader/sources", json("POST", input)),
+  deleteCatalog: (id: string) =>
+    call<{ deleted: true }>(`/api/reader/sources?id=${encodeURIComponent(id)}`, { method: "DELETE" }),
+  search: (source: string, q: string, page?: string) => {
+    const params = new URLSearchParams({ source, q });
+    if (page) params.set("page", page);
+    return call<CatalogPage>(`/api/reader/search?${params.toString()}`);
+  },
+  browse: (source: string, href?: string) => {
+    const params = new URLSearchParams({ source });
+    if (href) params.set("href", href);
+    return call<CatalogPage>(`/api/reader/browse?${params.toString()}`);
+  },
+  acquire: (input: {
+    sourceId: string;
+    entry: CatalogEntry;
+    acquisitionIndex?: number;
+    parentId?: string | null;
+  }) => call<AcquireResult>("/api/reader/acquire", json("POST", input)),
+  books: () => call<{ books: BookMetaDto[] }>("/api/reader/books"),
+  book: (contentId: string) =>
+    call<{ meta: BookMetaDto; progress: ReadingProgressDto | null; drmMessage: string | null }>(
+      `/api/reader/books/${contentId}`
+    ),
+  setStatus: (contentId: string, readingStatus: ReadingStatus | null) =>
+    call<{ syncedToHardcover: boolean }>(`/api/reader/books/${contentId}`, json("PATCH", { readingStatus })),
+  saveProgress: (targetKey: string, locator: ReaderLocator, percent: number) =>
+    call<{ progress: ReadingProgressDto }>("/api/reader/progress", json("PUT", { targetKey, locator, percent })),
+  annotations: (targetKey: string) =>
+    call<{ annotations: ReaderAnnotationDto[] }>(
+      `/api/reader/annotations?targetKey=${encodeURIComponent(targetKey)}`
+    ),
+  createAnnotation: (input: {
+    targetKey: string;
+    kind: ReaderAnnotationKind;
+    locator: ReaderLocator;
+    color?: string | null;
+    body?: string | null;
+  }) => call<{ annotation: ReaderAnnotationDto }>("/api/reader/annotations", json("POST", input)),
+  updateAnnotation: (id: string, input: { color?: string | null; body?: string | null }) =>
+    call<{ annotation: ReaderAnnotationDto }>(`/api/reader/annotations/${id}`, json("PATCH", input)),
+  deleteAnnotation: (id: string) =>
+    call<{ deleted: true }>(`/api/reader/annotations/${id}`, { method: "DELETE" }),
+  sendToNote: (id: string) =>
+    call<{ noteContentId: string; created: boolean }>(
+      `/api/reader/annotations/${id}/send-to-note`,
+      { method: "POST" }
+    ),
+  connections: () => call<{ connections: ReaderConnectionDto[] }>("/api/reader/connections"),
+  saveConnection: (provider: ReaderConnectionProvider, token: string) =>
+    call<{ connection: ReaderConnectionDto }>(
+      `/api/reader/connections/${provider}`,
+      json("PUT", { token })
+    ),
+  deleteConnection: (provider: ReaderConnectionProvider) =>
+    call<{ deleted: true }>(`/api/reader/connections/${provider}`, { method: "DELETE" }),
+  importKindle: (file: File) => {
+    const form = new FormData();
+    form.set("file", file);
+    return call<HighlightImportSummary>("/api/reader/import/kindle", { method: "POST", body: form });
+  },
+  importReadwise: () =>
+    call<HighlightImportSummary>("/api/reader/import/readwise", { method: "POST" }),
+};

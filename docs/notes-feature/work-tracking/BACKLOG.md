@@ -14,11 +14,13 @@ last_updated: 2026-09-29
 
 + → Reader → [Scriptures, Books]. One reader shell (foliate-js for EPUB/PDF, a corpus renderer for scriptures), one annotation store keyed by Readium Locators, and a library of book-source adapters (OPDS, Gutendex, Open Library, upload). Books are file nodes in a user-chosen library folder. Blocked on owner answers to the plan's §10.
 
-- [ ] **R0 Read an uploaded book** — `createMenuItems` extension field, `extensions/reader/`, EPUB MIME + DRM gate, foliate-js viewer, `ReadingProgress`.
-- [ ] **R1 Mark it up** — `ReaderAnnotation`, selection toolbar, annotations tab, `readerLink` node, send to note.
-- [ ] **R2 Library** — OPDS / Gutendex / Open Library adapters, library dialog, acquire into folder, `BookMeta` + covers.
+- [x] **R0 Read an uploaded book** (built 2026-09-29; migration staged) — `createMenuItems` extension field, `extensions/reader/`, EPUB MIME + DRM gate, foliate-js viewer, `ReadingProgress`.
+- [x] **R1 Mark it up** (built 2026-09-29) — `ReaderAnnotation`, selection toolbar, in-reader annotations panel, send to note. *Still open:* `readerLink` TipTap node, right-sidebar tab.
+- [x] **R2 Library** (built 2026-09-29; + Wikisource, OAPEN, Google Books, Standard Ebooks preset) — OPDS / Gutendex / Open Library adapters, library dialog, acquire into folder, `BookMeta` + covers.
 - [ ] **R3 Scriptures in the reader** — scriptures plan P0/P1 feed a corpus source sharing the annotation store.
-- [ ] **R4 Bring in the rest** — Kindle clippings + Readwise, Hardcover, Libby link, highlights → database, flashcards, AI tools.
+- [ ] **R4 Bring in the rest** — ~~Kindle clippings + Readwise, Hardcover, Libby link~~ (built 2026-09-29); highlights → database, flashcards, AI tools, speed-reader EPUB, PDF in reader.
+- [ ] **Research (reader stub)** — third reader source after Scriptures: open-access papers (arXiv, PubMed Central, OpenAlex/Unpaywall, Semantic Scholar) through the same shell + annotation store.
+- [ ] **CSP for /content** — foliate-js wants a script-blocking CSP; the reader sanitizer is the interim defence.
 
 ## Scriptures integration — parked (reader moved to `EREADER-PLAN.md`) (2026-09-28, plan `SCRIPTURES-INTEGRATION-PLAN.md`)
 

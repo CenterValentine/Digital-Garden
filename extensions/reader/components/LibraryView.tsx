@@ -1,0 +1,580 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
+import {
+  AlertTriangle,
+  BookOpen,
+  ChevronLeft,
+  FolderOpen,
+  Loader2,
+  Plus,
+  Search,
+  Trash2,
+} from "lucide-react";
+import { useContentStore } from "@/state/content-store";
+import type {
+  BookMetaDto,
+  BookSourceInfo,
+  CatalogEntry,
+  CatalogPage,
+} from "@/lib/domain/reader/types";
+import { readerApi } from "../lib/api";
+import { useReaderSession } from "../state/reader-store";
+import { CatalogEntryCard } from "./CatalogEntryCard";
+import { ConnectionsPanel, ImportPanel } from "./IntegrationsPanel";
+
+type LibraryTab = "books" | "find" | "catalogs" | "import" | "connections";
+
+const TABS: Array<{ id: LibraryTab; label: string }> = [
+  { id: "books", label: "My books" },
+  { id: "find", label: "Find books" },
+  { id: "catalogs", label: "Catalogs" },
+  { id: "import", label: "Import highlights" },
+  { id: "connections", label: "Connections" },
+];
+
+const STATUS_LABELS: Record<string, string> = {
+  want: "Want to read",
+  reading: "Reading",
+  finished: "Finished",
+};
+
+function openBook(contentId: string, title: string) {
+  useContentStore.getState().setSelectedContentId(contentId, {
+    title,
+    contentType: "file",
+    pin: true,
+  });
+}
+
+function useAcquire() {
+  const parentId = useReaderSession((state) => state.libraryTargetParentId);
+  return useCallback(
+    async (sourceId: string, entry: CatalogEntry, acquisitionIndex: number) => {
+      try {
+        const result = await readerApi.acquire({ sourceId, entry, acquisitionIndex, parentId });
+        window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
+        toast.success(result.duplicate ? "Already in your library" : "Added to your library", {
+          description: entry.title,
+          action: { label: "Read", onClick: () => openBook(result.contentId, entry.title) },
+        });
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Could not add this book");
+      }
+    },
+    [parentId]
+  );
+}
+
+function ResultsList({
+  page,
+  sourceId,
+  onMore,
+  loadingMore,
+  onNavigate,
+}: {
+  page: CatalogPage;
+  sourceId: string;
+  onMore?: () => void;
+  loadingMore?: boolean;
+  onNavigate?: (href: string, title: string) => void;
+}) {
+  const acquire = useAcquire();
+  return (
+    <div className="space-y-3">
+      {page.navigation.length > 0 && onNavigate && (
+        <ul className="grid gap-1 sm:grid-cols-2">
+          {page.navigation.map((nav) => (
+            <li key={nav.href}>
+              <button
+                type="button"
+                onClick={() => onNavigate(nav.href, nav.title)}
+                className="flex w-full items-start gap-2 rounded border border-black/10 p-2 text-left text-sm hover:bg-black/5 dark:border-white/10 dark:hover:bg-white/5"
+              >
+                <FolderOpen className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                <span>
+                  <span className="font-medium">{nav.title}</span>
+                  {nav.summary && (
+                    <span className="block text-xs text-muted-foreground line-clamp-1">{nav.summary}</span>
+                  )}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {page.entries.length > 0 && (
+        <div className="grid gap-3 lg:grid-cols-2">
+          {page.entries.map((entry) => (
+            <CatalogEntryCard
+              key={`${entry.id}-${entry.title}`}
+              entry={entry}
+              onAdd={(target, index) => acquire(sourceId, target, index)}
+            />
+          ))}
+        </div>
+      )}
+      {page.entries.length === 0 && page.navigation.length === 0 && (
+        <p className="text-sm text-muted-foreground">Nothing here.</p>
+      )}
+      {page.nextHref && onMore && (
+        <button
+          type="button"
+          onClick={onMore}
+          disabled={loadingMore}
+          className="h-8 rounded border border-black/10 px-3 text-xs dark:border-white/10"
+        >
+          {loadingMore ? "Loading…" : "Load more"}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function MyBooks({ onFind }: { onFind: () => void }) {
+  const [books, setBooks] = useState<BookMetaDto[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    readerApi
+      .books()
+      .then((data) => !cancelled && setBooks(data.books))
+      .catch((caught: unknown) => {
+        if (cancelled) return;
+        setError(caught instanceof Error ? caught.message : "Could not load your books");
+        setBooks([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (!books) return <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />;
+  if (error) return <p className="text-sm text-muted-foreground">{error}</p>;
+  if (books.length === 0) {
+    return (
+      <div className="rounded-lg border border-dashed border-black/15 p-6 text-center dark:border-white/15">
+        <BookOpen className="mx-auto h-8 w-8 text-muted-foreground" />
+        <p className="mt-2 text-sm">No books yet.</p>
+        <p className="text-xs text-muted-foreground">
+          Find a free book, connect your OPDS library, or upload an EPUB into any folder — EPUBs open
+          here automatically.
+        </p>
+        <button
+          type="button"
+          onClick={onFind}
+          className="mt-3 h-8 rounded bg-primary px-3 text-xs font-medium text-primary-foreground"
+        >
+          Find books
+        </button>
+      </div>
+    );
+  }
+  return (
+    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+      {books.map((book) => (
+        <button
+          key={book.contentId}
+          type="button"
+          onClick={() => openBook(book.contentId, book.title)}
+          className="group flex flex-col gap-1 text-left"
+        >
+          <div className="aspect-[2/3] overflow-hidden rounded-md bg-black/5 shadow-sm transition group-hover:shadow-md dark:bg-white/5">
+            {book.coverUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element -- remote catalog covers, arbitrary hosts
+              <img
+                src={book.coverUrl}
+                alt=""
+                loading="lazy"
+                referrerPolicy="no-referrer"
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <div className="flex h-full flex-col items-center justify-center gap-2 p-3 text-center">
+                <BookOpen className="h-6 w-6 text-muted-foreground" />
+                <span className="line-clamp-3 text-xs font-medium">{book.title}</span>
+              </div>
+            )}
+          </div>
+          <span className="line-clamp-2 text-xs font-medium">{book.title}</span>
+          {book.authors.length > 0 && (
+            <span className="truncate text-[11px] text-muted-foreground">{book.authors.join(", ")}</span>
+          )}
+          {book.readingStatus && (
+            <span className="text-[11px] text-primary">{STATUS_LABELS[book.readingStatus]}</span>
+          )}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function FindBooks({ sources }: { sources: BookSourceInfo[] }) {
+  const searchable = useMemo(() => sources.filter((source) => source.searchable), [sources]);
+  const [sourceId, setSourceId] = useState("gutendex");
+  const [query, setQuery] = useState("");
+  const [page, setPage] = useState<CatalogPage | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const source = searchable.find((candidate) => candidate.id === sourceId);
+
+  const run = async () => {
+    if (!query.trim()) return;
+    setLoading(true);
+    try {
+      setPage(await readerApi.search(sourceId, query));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Search failed");
+      setPage(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const more = async () => {
+    if (!page?.nextHref) return;
+    setLoadingMore(true);
+    try {
+      const next = await readerApi.search(sourceId, query, page.nextHref);
+      setPage({
+        ...next,
+        entries: [...page.entries, ...next.entries],
+        navigation: page.navigation,
+      });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not load more");
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <form
+        className="flex flex-wrap gap-2"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void run();
+        }}
+      >
+        <select
+          aria-label="Source"
+          value={sourceId}
+          onChange={(event) => {
+            setSourceId(event.target.value);
+            setPage(null);
+          }}
+          className="h-9 rounded border border-black/10 bg-transparent px-2 text-sm dark:border-white/10"
+        >
+          {searchable.map((candidate) => (
+            <option key={candidate.id} value={candidate.id}>
+              {candidate.label}
+            </option>
+          ))}
+        </select>
+        <div className="relative min-w-[220px] flex-1">
+          <Search className="pointer-events-none absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Title, author or subject"
+            className="h-9 w-full rounded border border-black/10 bg-transparent pl-8 pr-2 text-sm dark:border-white/10"
+          />
+        </div>
+        <button
+          type="submit"
+          disabled={loading || !query.trim()}
+          className="h-9 rounded bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-50"
+        >
+          {loading ? "Searching…" : "Search"}
+        </button>
+      </form>
+      {source && <p className="text-xs text-muted-foreground">{source.description}</p>}
+      {page && (
+        <>
+          {page.total !== undefined && (
+            <p className="text-xs text-muted-foreground">{page.total.toLocaleString()} results</p>
+          )}
+          <ResultsList page={page} sourceId={sourceId} onMore={more} loadingMore={loadingMore} />
+        </>
+      )}
+    </div>
+  );
+}
+
+interface BrowseFrame {
+  title: string;
+  href?: string;
+  page: CatalogPage;
+}
+
+function Catalogs({
+  sources,
+  onChanged,
+}: {
+  sources: BookSourceInfo[];
+  onChanged: () => void;
+}) {
+  const catalogs = sources.filter((source) => source.browsable);
+  const [active, setActive] = useState<BookSourceInfo | null>(null);
+  const [stack, setStack] = useState<BrowseFrame[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [form, setForm] = useState({ url: "", name: "", username: "", password: "" });
+  const [adding, setAdding] = useState(false);
+
+  const open = async (source: BookSourceInfo, href?: string, title?: string) => {
+    setLoading(true);
+    try {
+      const page = await readerApi.browse(source.id, href);
+      setActive(source);
+      setStack((current) => [
+        ...(href ? current : []),
+        { title: title ?? page.title ?? source.label, href, page },
+      ]);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not open the catalog");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (active && stack.length > 0) {
+    const frame = stack[stack.length - 1];
+    return (
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-center gap-1 text-sm">
+          <button
+            type="button"
+            onClick={() => {
+              if (stack.length > 1) setStack(stack.slice(0, -1));
+              else {
+                setActive(null);
+                setStack([]);
+              }
+            }}
+            className="inline-flex items-center gap-1 rounded px-1 text-muted-foreground hover:text-foreground"
+          >
+            <ChevronLeft className="h-4 w-4" /> Back
+          </button>
+          <span className="text-muted-foreground">{active.label}</span>
+          {stack.slice(1).map((item) => (
+            <span key={item.href} className="text-muted-foreground">
+              / {item.title}
+            </span>
+          ))}
+        </div>
+        {loading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+        <ResultsList
+          page={frame.page}
+          sourceId={active.id}
+          onNavigate={(href, title) => void open(active, href, title)}
+          onMore={
+            frame.page.nextHref
+              ? async () => {
+                  try {
+                    const next = await readerApi.browse(active.id, frame.page.nextHref);
+                    setStack([
+                      ...stack.slice(0, -1),
+                      {
+                        ...frame,
+                        page: {
+                          ...next,
+                          entries: [...frame.page.entries, ...next.entries],
+                          navigation: [...frame.page.navigation, ...next.navigation],
+                        },
+                      },
+                    ]);
+                  } catch (error) {
+                    toast.error(error instanceof Error ? error.message : "Could not load more");
+                  }
+                }
+              : undefined
+          }
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      <ul className="grid gap-2 sm:grid-cols-2">
+        {catalogs.map((catalog) => (
+          <li
+            key={catalog.id}
+            className="flex items-start justify-between gap-2 rounded-lg border border-black/10 p-3 dark:border-white/10"
+          >
+            <button type="button" onClick={() => void open(catalog)} className="flex-1 text-left">
+              <span className="text-sm font-semibold">{catalog.label}</span>
+              <span className="block text-xs text-muted-foreground line-clamp-2">{catalog.description}</span>
+            </button>
+            {catalog.custom && (
+              <button
+                type="button"
+                aria-label={`Remove ${catalog.label}`}
+                onClick={async () => {
+                  await readerApi.deleteCatalog(catalog.id);
+                  onChanged();
+                }}
+                className="text-muted-foreground hover:text-red-500"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            )}
+          </li>
+        ))}
+      </ul>
+
+      <form
+        className="space-y-2 rounded-lg border border-black/10 p-3 dark:border-white/10"
+        onSubmit={async (event) => {
+          event.preventDefault();
+          setAdding(true);
+          try {
+            await readerApi.addCatalog({
+              url: form.url.trim(),
+              name: form.name.trim() || undefined,
+              username: form.username || undefined,
+              password: form.password || undefined,
+            });
+            setForm({ url: "", name: "", username: "", password: "" });
+            toast.success("Catalog added");
+            onChanged();
+          } catch (error) {
+            toast.error(error instanceof Error ? error.message : "Could not add the catalog");
+          } finally {
+            setAdding(false);
+          }
+        }}
+      >
+        <h3 className="flex items-center gap-1 text-sm font-semibold">
+          <Plus className="h-4 w-4" /> Add your library (OPDS)
+        </h3>
+        <p className="text-xs text-muted-foreground">
+          Calibre content server: <code>https://your-host/opds</code> · Kavita:{" "}
+          <code>…/api/opds/&lt;api-key&gt;</code> · Komga: <code>…/opds/v2/catalog</code> · any OPDS
+          feed. A server on your home network must be reachable from the internet (e.g. Tailscale
+          Funnel or Cloudflare Tunnel) — private addresses are blocked.
+        </p>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <input
+            required
+            type="url"
+            placeholder="Catalog URL"
+            value={form.url}
+            onChange={(event) => setForm({ ...form, url: event.target.value })}
+            className="h-8 rounded border border-black/10 bg-transparent px-2 text-xs dark:border-white/10 sm:col-span-2"
+          />
+          <input
+            placeholder="Name (optional)"
+            value={form.name}
+            onChange={(event) => setForm({ ...form, name: event.target.value })}
+            className="h-8 rounded border border-black/10 bg-transparent px-2 text-xs dark:border-white/10 sm:col-span-2"
+          />
+          <input
+            placeholder="Username (optional)"
+            autoComplete="off"
+            value={form.username}
+            onChange={(event) => setForm({ ...form, username: event.target.value })}
+            className="h-8 rounded border border-black/10 bg-transparent px-2 text-xs dark:border-white/10"
+          />
+          <input
+            type="password"
+            placeholder="Password (optional)"
+            autoComplete="new-password"
+            value={form.password}
+            onChange={(event) => setForm({ ...form, password: event.target.value })}
+            className="h-8 rounded border border-black/10 bg-transparent px-2 text-xs dark:border-white/10"
+          />
+        </div>
+        <button
+          type="submit"
+          disabled={adding || !form.url}
+          className="h-8 rounded bg-primary px-3 text-xs font-medium text-primary-foreground disabled:opacity-50"
+        >
+          {adding ? "Checking feed…" : "Add catalog"}
+        </button>
+      </form>
+    </div>
+  );
+}
+
+export function LibraryView() {
+  const [tab, setTab] = useState<LibraryTab>("books");
+  const [sources, setSources] = useState<BookSourceInfo[]>([]);
+  const [tablesReady, setTablesReady] = useState(true);
+  const targetParentId = useReaderSession((state) => state.libraryTargetParentId);
+
+  const [sourcesVersion, setSourcesVersion] = useState(0);
+  const reloadSources = useCallback(() => setSourcesVersion((version) => version + 1), []);
+
+  useEffect(() => {
+    let cancelled = false;
+    readerApi
+      .sources()
+      .then((data) => {
+        if (cancelled) return;
+        setSources(data.sources);
+        setTablesReady(data.tablesReady);
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          toast.error(error instanceof Error ? error.message : "Could not load book sources");
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [sourcesVersion]);
+
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      <header className="border-b border-black/10 px-6 pb-2 pt-5 dark:border-white/10">
+        <h1 className="flex items-center gap-2 text-lg font-semibold">
+          <BookOpen className="h-5 w-5" /> Library
+        </h1>
+        <p className="text-xs text-muted-foreground">
+          Books you add land in {targetParentId ? "the folder you chose" : "your Books folder"} as
+          ordinary files — read and mark them up here.
+        </p>
+        <nav className="mt-3 flex flex-wrap gap-1" role="tablist">
+          {TABS.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              role="tab"
+              aria-selected={tab === item.id}
+              onClick={() => setTab(item.id)}
+              className={`rounded-md px-3 py-1.5 text-xs font-medium ${
+                tab === item.id
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-black/5 dark:hover:bg-white/5"
+              }`}
+            >
+              {item.label}
+            </button>
+          ))}
+        </nav>
+      </header>
+      {!tablesReady && (
+        <div className="mx-6 mt-3 flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+          <span>
+            The reader&apos;s database tables haven&apos;t been migrated yet, so saving books, progress and
+            highlights is unavailable. Apply{" "}
+            <code>docs/notes-feature/work-tracking/reader-schema-additions.prisma</code> and run the
+            reader migration.
+          </span>
+        </div>
+      )}
+      <div className="min-h-0 flex-1 overflow-auto px-6 py-4">
+        {tab === "books" && <MyBooks onFind={() => setTab("find")} />}
+        {tab === "find" && <FindBooks sources={sources} />}
+        {tab === "catalogs" && <Catalogs sources={sources} onChanged={reloadSources} />}
+        {tab === "import" && <ImportPanel />}
+        {tab === "connections" && <ConnectionsPanel />}
+      </div>
+    </div>
+  );
+}

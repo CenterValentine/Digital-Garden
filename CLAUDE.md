@@ -26,6 +26,7 @@ pnpm collab:schema:check  # CI gate: validate collaboration schema covers all ed
 pnpm ai:drift:check   # CI gate: AI parallel-table drift (provider catalog ↔ connection templates ↔ type unions ↔ settings enum; tool inventory ↔ settings metadata; prompt tool references; adapter branches; run-loop schemas describe-only)
 pnpm context:diet:check  # CI gate: the model-facing transcript folds (distillation/turn), dedupe, write-input supersession, header retention — fixture transcripts, mutation-tested
 pnpm proposal:shape:check  # CI gate: the propose_item_iteration payloads that died in prod parse and resolve by meaning (lib/domain/ai/tools/iteration-proposal.ts — "schemas describe shape; execute judges")
+pnpm reader:check     # Reader gate: OPDS 1/2 parsing, EPUB DRM detection + metadata, Kindle clippings — fixture-based, no network (scripts/validate-reader.ts)
 pnpm private:content:check  # CI gate: private (commented-out) content — stripPrivateContent predicate + every AI/public/search seam calls it; the source-view serializer does not
 pnpm ai:matrix        # Regenerate docs/notes-feature/core/AI-CAPABILITY-MATRIX.md from the real provider/model tables
 pnpm ai:matrix:check  # CI gate: the committed capability matrix matches the code (run ai:matrix after model/provider changes)
@@ -231,7 +232,7 @@ First-party feature modules with clear ownership boundaries. Each extension live
 - `server/` — Services, types, route handlers
 - `state/` — Extension-local Zustand stores
 
-**Active extensions:** `daily-notes`, `flashcards`, `people`, `workplaces`, `calendar`, `publishing`, `speed-reader`, `browser-bookmarks`
+**Active extensions:** `daily-notes`, `flashcards`, `people`, `workplaces`, `calendar`, `publishing`, `speed-reader`, `browser-bookmarks`, `reader` (e-reader + book library — `docs/notes-feature/work-tracking/EREADER-PLAN.md`)
 
 **Key rules:**
 - Disabled extensions disappear through registry filters — never add direct conditionals in shared UI

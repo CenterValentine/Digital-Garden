@@ -257,7 +257,8 @@ async function importHighlights(
     const contentId = index.get(normalizeBookTitle(book.title));
     if (!contentId) {
       summary.unmatchedBooks.push(book.title);
-      await appendHighlightsNote(ownerId, book, fresh.filter((h) => h.kind !== "bookmark"), sourceLabel);
+      const quotable = fresh.filter((highlight) => highlight.kind !== "bookmark" && highlight.text);
+      if (quotable.length) await appendHighlightsNote(ownerId, book, quotable, sourceLabel);
     }
     // Always record the annotation rows (idempotency ledger). Unmatched books
     // get a `import:` target key so a later library match can adopt them.
@@ -274,7 +275,7 @@ async function importHighlights(
         data: {
           ownerId,
           targetKey,
-          kind: highlight.kind === "note" && !highlight.text ? "note" : highlight.kind,
+          kind: highlight.kind,
           locator,
           color: highlight.color ?? "yellow",
           body: highlight.note ?? null,
