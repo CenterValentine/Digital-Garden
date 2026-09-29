@@ -427,3 +427,37 @@ if (errors.length > 0) {
   process.exit(1);
 }
 console.log("✓ run-harness:check write-args — the document body is read under any sibling key; a miss teaches");
+
+// ── Unsupported parameters — known families, and the net under the list ──────
+
+import { resolveModelTemperature, modelRejectsTemperature } from "../lib/domain/ai/model-constraints";
+import { parseUnsupportedParameter, withoutParameter } from "../lib/domain/ai/middleware/unsupported-parameter";
+
+{
+  assert(resolveModelTemperature("gpt-6-astra", 0.7) === undefined, "constraints: gpt-6-astra sends no temperature (prod 2026-09-29)");
+  assert(resolveModelTemperature("openai/gpt-6", 0.7) === undefined, "constraints: namespaced gpt-6 sends no temperature");
+  assert(resolveModelTemperature("o3-mini", 0.7) === undefined, "constraints: o-series sends no temperature");
+  assert(resolveModelTemperature("kimi-k2.6", 0.7) === 1, "constraints: Kimi thinking line is fixed at 1");
+  assert(resolveModelTemperature("gpt-5.6-terra", 0.7) === 0.7, "constraints: gpt-5.6 keeps the user's setting");
+  assert(resolveModelTemperature("gpt-4o", 0.2) === 0.2, "constraints: an unconstrained model is untouched");
+  assert(modelRejectsTemperature("gpt-6-astra") && !modelRejectsTemperature("gpt-5.6-luna"), "constraints: the reject predicate matches the resolver");
+
+  const openai = new Error("Unsupported parameter: 'temperature' is not supported with this model.");
+  assert(parseUnsupportedParameter(openai) === "temperature", "middleware: OpenAI's message names the SDK key");
+  assert(parseUnsupportedParameter(new Error("Unsupported parameter: 'top_p' is not supported with this model.")) === "topP", "middleware: provider names map to SDK keys");
+  assert(parseUnsupportedParameter(new Error("Unsupported parameter: 'max_tokens' is not supported with this model. Use 'max_completion_tokens' instead.")) === "maxOutputTokens", "middleware: max_tokens maps to maxOutputTokens");
+  assert(parseUnsupportedParameter(new Error("Rate limit reached for gpt-6-astra")) === null, "middleware: an unrelated error is not a parameter refusal");
+  assert(parseUnsupportedParameter(new Error("Unsupported parameter: 'banana' is not supported")) === null, "middleware: an unknown parameter name is not retried blindly");
+  const stripped = withoutParameter(
+    { temperature: 0.7, maxOutputTokens: 4000, prompt: [] } as Record<string, unknown>,
+    "temperature",
+  );
+  assert(stripped.temperature === undefined && !Object.keys(stripped).includes("temperature") && stripped.maxOutputTokens === 4000, "middleware: the named parameter is removed, the rest kept");
+}
+
+if (errors.length > 0) {
+  console.error(`\n✖ run-harness:check (unsupported parameters) failed — ${errors.length} problem(s):\n`);
+  for (const e of errors) console.error(`  ${e}\n`);
+  process.exit(1);
+}
+console.log("✓ run-harness:check unsupported parameters — gpt-6 / o-series send no temperature; a provider's refusal names the key to retry without");

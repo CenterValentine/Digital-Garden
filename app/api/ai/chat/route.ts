@@ -210,6 +210,7 @@ import type {
 } from "@/lib/features/ai-connections";
 import {
   applyMiddleware,
+  unsupportedParameterMiddleware,
   defaultSettingsMiddleware,
   rateLimitRetryMiddleware,
 } from "@/lib/domain/ai/middleware";
@@ -1025,10 +1026,11 @@ export async function POST(request: Request) {
           ? "gateway"
           : "direct";
 
-      // Fixed-temperature models (v3.1 R4): reasoning/thinking models
-      // (OpenAI o-series, Moonshot Kimi thinking line) reject any
-      // temperature but 1 with a 4xx. Clamp before it reaches the
-      // middleware AND the streamText call — both send temperature.
+      // Constrained-temperature models (v3.1 R4): Kimi's thinking line
+      // accepts only 1; OpenAI's o-series and gpt-6 family reject the
+      // parameter outright (`undefined` = not sent). Resolved before it
+      // reaches the middleware; unknown models that refuse are caught by
+      // unsupportedParameterMiddleware below.
       const effectiveTemperature = resolveModelTemperature(
         activeModelId,
         temperature,
@@ -1079,6 +1081,11 @@ export async function POST(request: Request) {
                 apiKey,
               });
           return applyMiddleware(model, [
+            // Innermost (wraps the raw provider model): when a model
+            // rejects a parameter by name, retry once without it and
+            // remember — the maintained constraint list is always one
+            // release behind (prod 2026-09-29, gpt-6-astra vs temperature).
+            unsupportedParameterMiddleware(),
             defaultSettingsMiddleware({
               temperature: effectiveTemperature,
               maxTokens,
