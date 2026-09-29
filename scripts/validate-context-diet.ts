@@ -487,9 +487,18 @@ const isStub = (v: unknown, word: string): boolean =>
   assert(block.includes("dedupeRepeatedToolParts("), "G5: the chat route must apply dedupeRepeatedToolParts in the model-message assembly");
   assert(block.includes("supersedeWriteInputs("), "G5: the chat route must apply supersedeWriteInputs in the model-message assembly");
   assert(block.includes("teachDeniedApprovals("), "G5: the chat route must apply teachDeniedApprovals in the model-message assembly");
+  // The tail is reserved for item runs AND charter turns (ITERATION-RUN-
+  // HARNESS-FIXES §9): one `tailDeliverables` feeds the size, the tool list
+  // and the notice; a continuation opens with a floor, not the remainder.
   assert(
-    routeSrc.includes("reservedTailTools(itemIterationDeliverables)") && routeSrc.includes("stepsRemainingNotice({"),
-    "G5: prepareStep must reserve the deliverable tail and append the remaining-steps notice (plan §6b)",
+    /reservedTailTools\(\s*tailDeliverables/.test(routeSrc) &&
+      routeSrc.includes("reservedTailSize(tailDeliverables)") &&
+      routeSrc.includes("if (!tailDeliverables) return") &&
+      routeSrc.includes("stepsRemainingNotice({") &&
+      routeSrc.includes("tailTools: tailToolsForTurn") &&
+      routeSrc.includes("CHARTER_TURN_DELIVERABLES") &&
+      routeSrc.includes("continuationStepCap({"),
+    "G5: prepareStep must reserve the deliverable tail (item runs AND charter turns) from tailDeliverables, append the remaining-steps notice naming the tail tools, and size continuations with continuationStepCap (plan §6b, §9)",
   );
   const engineSrc = readFileSync(path.join(process.cwd(), "lib/domain/ai/use-conversation-engine.ts"), "utf8");
   assert(
