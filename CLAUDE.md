@@ -43,6 +43,8 @@ npx prisma db push    # Push schema changes in dev (no migration file)
 npx prisma studio     # Database GUI (http://localhost:5555)
 ```
 
+**Worktrees live in `.claude/worktrees/<name>` — always.** Every git worktree for this repo is created inside the repo at `.claude/worktrees/<short-name>` (e.g. `git worktree add .claude/worktrees/reader <branch>`), never as a sibling directory (`../Digital-Garden-foo`) or anywhere else. When giving the owner worktree commands, use this path. Copy `.env.local` into the new worktree, and run `pnpm dev` and `pnpm dev:collab` from inside it (Hocuspocus loads that checkout's schema).
+
 **Primary verification is still manual** — `pnpm build` must pass, then smoke-test in browser. The Playwright harness adds visual regression coverage but only for signed-out routes today (auth fixture pending).
 
 **Build pipeline:** `prisma generate` → `pnpm build:tokens` (style-dictionary) → `tsc --noEmit` → `pnpm collab:schema:check` → `pnpm lint` → `next build --turbopack`.
