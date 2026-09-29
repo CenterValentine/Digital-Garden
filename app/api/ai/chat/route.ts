@@ -210,6 +210,7 @@ import type {
 } from "@/lib/features/ai-connections";
 import {
   applyMiddleware,
+  unsupportedParameterMiddleware,
   defaultSettingsMiddleware,
   rateLimitRetryMiddleware,
 } from "@/lib/domain/ai/middleware";
@@ -294,6 +295,24 @@ import {
 } from "@/lib/domain/ai/charters/output-directives";
 
 const ROUTE_PATH = "/api/ai/chat";
+
+/**
+ * The first @-mentioned node that is a charter (marked note/folder), or
+ * null. Bounded to the mention cap; one metadata read per candidate.
+ */
+async function firstCharterMention(
+  userId: string,
+  mentioned: unknown,
+): Promise<string | null> {
+  if (!Array.isArray(mentioned)) return null;
+  const ids = mentioned
+    .filter((id): id is string => typeof id === "string" && id.length > 0)
+    .slice(0, 6);
+  for (const id of ids) {
+    if (await isCharterNodeId(userId, id)) return id;
+  }
+  return null;
+}
 
 /** Last fingerprinted prompt per conversation for the opt-in prefix diagnostic (bounded). */
 const promptPrefixDiagState = new Map<
@@ -541,13 +560,23 @@ export async function POST(request: Request) {
       // would have been a lie — the model would still have been handed the
       // charter (owner report 2026-09-18).
       const charterDetached = body.charterDetached === true;
+      // A charter the user @-MENTIONS is the charter (prod 6d0b0e30,
+      // 2026-09-29: "fulfil the charter's instructions … @[Apply for a job]"
+      // reached the model as a plain note — no charter context, no charter
+      // reach, and the model read the charter with read_content). Only when
+      // nothing else names one: the picker and the binding still win, and a
+      // dismissed chip stays dismissed.
+      const mentionedCharterId =
+        typeof body.charterId !== "string"
+          ? await firstCharterMention(session.user.id, body.mentionedContentIds)
+          : null;
       const boundCharterId =
         !charterDetached &&
         typeof body.charterId !== "string" &&
         contentId &&
         (await isCharterNodeId(session.user.id, contentId))
           ? contentId
-          : null;
+          : mentionedCharterId;
       const routingExplicitCharterId =
         typeof body.charterId === "string" ? body.charterId : boundCharterId;
       const routingRootedCharterId =
@@ -997,10 +1026,11 @@ export async function POST(request: Request) {
           ? "gateway"
           : "direct";
 
-      // Fixed-temperature models (v3.1 R4): reasoning/thinking models
-      // (OpenAI o-series, Moonshot Kimi thinking line) reject any
-      // temperature but 1 with a 4xx. Clamp before it reaches the
-      // middleware AND the streamText call — both send temperature.
+      // Constrained-temperature models (v3.1 R4): Kimi's thinking line
+      // accepts only 1; OpenAI's o-series and gpt-6 family reject the
+      // parameter outright (`undefined` = not sent). Resolved before it
+      // reaches the middleware; unknown models that refuse are caught by
+      // unsupportedParameterMiddleware below.
       const effectiveTemperature = resolveModelTemperature(
         activeModelId,
         temperature,
@@ -1051,6 +1081,11 @@ export async function POST(request: Request) {
                 apiKey,
               });
           return applyMiddleware(model, [
+            // Innermost (wraps the raw provider model): when a model
+            // rejects a parameter by name, retry once without it and
+            // remember — the maintained constraint list is always one
+            // release behind (prod 2026-09-29, gpt-6-astra vs temperature).
+            unsupportedParameterMiddleware(),
             defaultSettingsMiddleware({
               temperature: effectiveTemperature,
               maxTokens,
@@ -1752,9 +1787,22 @@ export async function POST(request: Request) {
         contentId !== routingRootedCharterId
           ? contentId
           : null;
+      // A mentioned charter is loaded as the charter (standing rules +
+      // phase), not as a mention capsule too — once, not twice.
       const requestedMentionIds: string[] = Array.isArray(body.mentionedContentIds)
-        ? body.mentionedContentIds.filter((id: unknown): id is string => typeof id === "string")
+        ? body.mentionedContentIds.filter(
+            (id: unknown): id is string =>
+              typeof id === "string" && id !== mentionedCharterId,
+          )
         : [];
+      if (conversationIdForAssoc && mentionedCharterId) {
+        void addAutoAssociation(
+          session.user.id,
+          conversationIdForAssoc,
+          mentionedCharterId,
+          "mention",
+        ).catch(() => null);
+      }
       const mentionedContentIds: string[] = boundAttachId
         ? [boundAttachId, ...requestedMentionIds.filter((id) => id !== boundAttachId)]
         : requestedMentionIds;
@@ -2243,7 +2291,7 @@ export async function POST(request: Request) {
               );
               charterContext =
                 `\n\n## Active Charter: "${charterNode.title}"\n` +
-                `This charter is ALREADY ATTACHED and loaded below — when the user asks to run "this charter" (or a bare "run it"/"go"), THIS is it. Do not search notes or read anything else to find it; act on the content already provided here.\n` +
+                `This charter is ALREADY ATTACHED${explicitPlaybookId === mentionedCharterId ? " (the user @-mentioned it)" : ""} and loaded below — when the user asks to run "this charter" (or a bare "run it"/"go"), THIS is it. Do not search notes or read anything else to find it; act on the content already provided here.\n` +
                 `Phase ${phaseIndex + 1} of ${parsed.phases.length}: "${phase.title}"\n\n` +
                 `**Phases:**\n${phaseToc}\n\n` +
                 (standingText
