@@ -78,6 +78,12 @@ export const readerApi = {
     parentId?: string | null;
   }) => call<AcquireResult>("/api/reader/acquire", json("POST", input)),
   books: () => call<{ books: BookMetaDto[] }>("/api/reader/books"),
+  placeOnShelf: (input: { contentId: string; parentId: string | null; selectedId: string | null }) =>
+    call<{
+      folderId: string | null;
+      shortcutId: string | null;
+      outcome: "created" | "exists" | "home" | "opened";
+    }>("/api/reader/shelf", json("POST", input)),
   details: (query: BookDetailsQuery) => {
     const params = new URLSearchParams();
     for (const [key, value] of Object.entries(query)) {

@@ -20,6 +20,7 @@ import type {
   CatalogPage,
 } from "@/lib/domain/reader/types";
 import { readerApi } from "../lib/api";
+import { notifyBooksChanged } from "../state/bookshelf-store";
 import { useReaderSession } from "../state/reader-store";
 import {
   BookDetailsPanel,
@@ -77,6 +78,7 @@ function useAcquire() {
       try {
         const result = await readerApi.acquire({ sourceId, entry, acquisitionIndex, parentId });
         window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
+        notifyBooksChanged();
         toast.success(result.duplicate ? "Already in your library" : "Added to your library", {
           description: entry.title,
           action: { label: "Read", onClick: () => openBook(result.contentId, entry.title) },
@@ -178,6 +180,8 @@ function ResultsList({
 }
 
 function MyBooks({ onFind }: { onFind: () => void }) {
+  const targetParentId = useReaderSession((state) => state.libraryTargetParentId);
+  const [placing, setPlacing] = useState(false);
   const [books, setBooks] = useState<BookMetaDto[] | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -284,6 +288,39 @@ function MyBooks({ onFind }: { onFind: () => void }) {
             contentId: selectedBook.contentId,
           }}
           onRead={() => openBook(selectedBook.contentId, selectedBook.title)}
+          extraActions={
+            targetParentId ? (
+              <button
+                type="button"
+                disabled={placing}
+                onClick={async () => {
+                  setPlacing(true);
+                  try {
+                    const result = await readerApi.placeOnShelf({
+                      contentId: selectedBook.contentId,
+                      parentId: targetParentId,
+                      selectedId: null,
+                    });
+                    window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
+                    toast.success(
+                      result.outcome === "created"
+                        ? "Shortcut added to the folder"
+                        : result.outcome === "exists"
+                          ? "That folder already has a shortcut to this book"
+                          : "The book already lives in that folder"
+                    );
+                  } catch (error) {
+                    toast.error(error instanceof Error ? error.message : "Could not add the shortcut");
+                  } finally {
+                    setPlacing(false);
+                  }
+                }}
+                className="inline-flex h-8 items-center rounded border border-black/10 px-3 text-xs dark:border-white/10"
+              >
+                Add shortcut to folder
+              </button>
+            ) : null
+          }
           onClose={() => setSelectedId(null)}
         />
       )}

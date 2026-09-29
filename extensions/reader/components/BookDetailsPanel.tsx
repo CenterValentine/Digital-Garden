@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   BookOpen,
   Download,
@@ -40,6 +40,8 @@ interface BookDetailsPanelProps {
   onAdd?: (entry: CatalogEntry, acquisitionIndex: number) => Promise<void>;
   /** Library book → offer Read. */
   onRead?: () => void;
+  /** Extra buttons beside Read/Add (e.g. "Add shortcut here"). */
+  extraActions?: ReactNode;
   className?: string;
 }
 
@@ -56,6 +58,7 @@ export function BookDetailsPanel({
   entry,
   onAdd,
   onRead,
+  extraActions,
   className,
 }: BookDetailsPanelProps) {
   const [details, setDetails] = useState<BookDetails | null>(null);
@@ -147,6 +150,7 @@ export function BookDetailsPanel({
               <BookOpen className="h-3.5 w-3.5" /> Read
             </button>
           )}
+          {extraActions}
           {entry && onAdd && readable.length > 0 && (
             <button
               type="button"

@@ -132,7 +132,8 @@ export interface ExtensionRuntime {
     input: ExtensionContentViewerMatch
   ) => boolean;
   rightSidebarPanel?: ComponentType;
-  createMenuItems?: ExtensionCreateMenuItem[];
+  /** Static items, or a builder read each time the menu opens (dynamic lists). */
+  createMenuItems?: ExtensionCreateMenuItem[] | (() => ExtensionCreateMenuItem[]);
   virtualContent?: ExtensionVirtualContent[];
   shellNavigationControls?: ComponentType<ExtensionShellNavigationProps>[];
   shellNavigationTrailingControls?: ComponentType<ExtensionShellNavigationProps>[];

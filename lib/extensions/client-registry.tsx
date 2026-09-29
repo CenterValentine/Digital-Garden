@@ -179,9 +179,10 @@ export function useExtensionContentViewer(
  * activation store snapshot) so the plain menu builders can call it.
  */
 export function getExtensionCreateMenuItems(): ExtensionCreateMenuItem[] {
-  return getClientEnabledExtensionRuntimes().flatMap(
-    (runtime) => runtime.createMenuItems ?? []
-  );
+  return getClientEnabledExtensionRuntimes().flatMap((runtime) => {
+    const items = runtime.createMenuItems;
+    return typeof items === "function" ? items() : items ?? [];
+  });
 }
 
 /**
