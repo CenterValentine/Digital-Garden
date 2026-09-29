@@ -2796,9 +2796,25 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             const preview = await renderDataNodePreview(contentId, {
               viewerId: ctx.userId,
             });
+            // Reading a database ATTACHES it (prod 6d0b0e30, 2026-09-29: the
+            // model read the Career Evidence Library here after
+            // describe_database had refused it, then concluded its linked
+            // tables were unreachable without trying — they were reachable
+            // from this moment on). Say so, in the result, every time.
+            let attachedNote = "";
+            if (ctx.conversationId) {
+              await addAutoAssociation(
+                ctx.userId,
+                ctx.conversationId,
+                contentId,
+                "tool-call",
+              ).catch(() => null);
+              attachedNote =
+                "\n\n[This database is now attached to this chat: describe_database and query_database reach it, and every table it links by relation column.]";
+            }
             return preview
-              ? `${header}\n\n${preview}`
-              : `${header}\n\nThis database has no schema yet.`;
+              ? `${header}\n\n${preview}${attachedNote}`
+              : `${header}\n\nThis database has no schema yet.${attachedNote}`;
           },
 
           file: async () => {
