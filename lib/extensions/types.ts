@@ -88,6 +88,34 @@ export interface ExtensionShellTabMenuSectionProps {
 export interface ExtensionContentViewerMatch {
   selectedContentId: string | null;
   contentType: string | null;
+  /** File payload MIME type when `contentType === "file"`, else null. */
+  mimeType?: string | null;
+}
+
+/**
+ * An entry an extension contributes to the shared "+" / Add menu. Rendered
+ * after the built-in content types; a disabled extension contributes nothing
+ * (registry filter), so shared menu code never checks extension ids.
+ */
+export interface ExtensionCreateMenuItem {
+  id: string;
+  label: string;
+  /** Resolved through lib/extensions/icons.tsx. */
+  iconName: string;
+  title?: string;
+  disabled?: boolean;
+  onSelect?: (context: { parentId: string | null }) => void;
+  submenu?: ExtensionCreateMenuItem[];
+}
+
+/**
+ * A synthetic content id namespace owned by an extension (e.g. `reader:`).
+ * MainPanelContent skips the ContentNode fetch for ids with this prefix and
+ * hands the tab straight to the extension's content viewer with `contentType`.
+ */
+export interface ExtensionVirtualContent {
+  prefix: string;
+  contentType: string;
 }
 
 export interface ExtensionContentViewerProps
@@ -104,6 +132,8 @@ export interface ExtensionRuntime {
     input: ExtensionContentViewerMatch
   ) => boolean;
   rightSidebarPanel?: ComponentType;
+  createMenuItems?: ExtensionCreateMenuItem[];
+  virtualContent?: ExtensionVirtualContent[];
   shellNavigationControls?: ComponentType<ExtensionShellNavigationProps>[];
   shellNavigationTrailingControls?: ComponentType<ExtensionShellNavigationProps>[];
   shellControllers?: ComponentType[];

@@ -15,6 +15,7 @@ import { useExtensionActivationStore } from "@/state/extension-activation-store"
 import type {
   ExtensionActionNavItem,
   ExtensionContentViewerMatch,
+  ExtensionCreateMenuItem,
   ExtensionContentViewerProps,
   ExtensionNavItem,
   ExtensionHeaderNavActionProps,
@@ -171,6 +172,32 @@ export function useExtensionContentViewer(
       )?.contentViewer,
     [input, runtimes]
   );
+}
+
+/**
+ * "+" menu contributions from enabled extensions. Non-hook (reads the
+ * activation store snapshot) so the plain menu builders can call it.
+ */
+export function getExtensionCreateMenuItems(): ExtensionCreateMenuItem[] {
+  return getClientEnabledExtensionRuntimes().flatMap(
+    (runtime) => runtime.createMenuItems ?? []
+  );
+}
+
+/**
+ * Resolve a synthetic content id (e.g. `reader:library`) to the content type
+ * its owning enabled extension declared. Null for ordinary ContentNode ids.
+ */
+export function resolveExtensionVirtualContentType(
+  contentId: string
+): string | null {
+  for (const runtime of getClientEnabledExtensionRuntimes()) {
+    const match = runtime.virtualContent?.find((entry) =>
+      contentId.startsWith(entry.prefix)
+    );
+    if (match) return match.contentType;
+  }
+  return null;
 }
 
 export function useExtensionRightSidebarPanel(
