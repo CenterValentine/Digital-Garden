@@ -14,6 +14,7 @@
 import assert from "node:assert/strict";
 import JSZip from "jszip";
 import {
+  expandGutenbergResults,
   fillSearchTemplate,
   parseOpdsFeed,
   parseOpenSearchTemplate,
@@ -86,6 +87,27 @@ const OPDS2_FEED = JSON.stringify({
     },
   ],
 });
+
+// Shape of https://www.gutenberg.org/ebooks/search.opds/?query=… — one
+// navigation entry per book, no acquisition links (the bug the owner hit).
+const GUTENBERG_SEARCH = `<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <id>https://www.gutenberg.org/ebooks/search.opds/?query=pride</id>
+  <title>Books: pride</title>
+  <link rel="next" type="application/atom+xml;profile=opds-catalog" href="/ebooks/search.opds/?query=pride&amp;start_index=26"/>
+  <entry>
+    <title>Pride and Prejudice</title>
+    <content type="text">Jane Austen</content>
+    <id>https://www.gutenberg.org/ebooks/1342.opds</id>
+    <link type="application/atom+xml;profile=opds-catalog" rel="subsection" href="/ebooks/1342.opds"/>
+    <link type="image/jpeg" rel="http://opds-spec.org/image/thumbnail" href="/cache/epub/1342/pg1342.cover.small.jpg"/>
+  </entry>
+  <entry>
+    <title>Sort Alphabetically by Title</title>
+    <id>https://www.gutenberg.org/ebooks/search.opds/?query=pride&amp;sort_order=title</id>
+    <link type="application/atom+xml;profile=opds-catalog" rel="http://opds-spec.org/sort/new" href="/ebooks/search.opds/?query=pride&amp;sort_order=title"/>
+  </entry>
+</feed>`;
 
 const OPENSEARCH = `<?xml version="1.0"?>
 <OpenSearchDescription xmlns="http://a9.com/-/spec/opensearch/1.1/">
@@ -191,6 +213,21 @@ async function main() {
     assert.equal(page.navigation[0].href, "https://ex.org/new.json");
     assert.equal(page.nextHref, "https://ex.org/cat/page2.json");
     assert.equal(page.searchTemplate, "https://ex.org/search{?query}");
+  });
+
+  await check("Gutenberg search: per-book navigation entries become readable books", () => {
+    const parsed = parseOpdsFeed(GUTENBERG_SEARCH, "application/atom+xml", "https://www.gutenberg.org/ebooks/search.opds/?query=pride", "opds:preset:gutenberg");
+    assert.equal(parsed.entries.length, 0, "raw feed has no acquisition entries");
+    const page = expandGutenbergResults(parsed);
+    assert.equal(page.entries.length, 1);
+    const [book] = page.entries;
+    assert.equal(book.title, "Pride and Prejudice");
+    assert.deepEqual(book.authors, ["Jane Austen"]);
+    assert.equal(book.license, "public-domain");
+    assert.equal(book.acquisitions[0].href, "https://www.gutenberg.org/ebooks/1342.epub3.images");
+    assert.equal(book.coverUrl, "https://www.gutenberg.org/cache/epub/1342/pg1342.cover.small.jpg");
+    assert.deepEqual(page.navigation.map((nav) => nav.title), ["Sort Alphabetically by Title"]);
+    assert.ok(page.nextHref?.includes("start_index=26"));
   });
 
   await check("OpenSearch description → Atom template; template filling", () => {

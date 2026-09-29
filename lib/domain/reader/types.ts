@@ -164,6 +164,8 @@ export interface CatalogNavLink {
   title: string;
   href: string;
   summary?: string;
+  /** Thumbnail advertised on the navigation entry (Gutenberg search results carry one). */
+  coverUrl?: string;
 }
 
 export interface CatalogPage {

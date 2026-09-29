@@ -35,6 +35,13 @@ const EXTENSION_BY_MIME: Record<string, string> = {
   [READER_MIME_TYPES.cbz]: "cbz",
 };
 
+const ZIP_FORMATS = new Set<string>([READER_MIME_TYPES.epub, READER_MIME_TYPES.cbz]);
+
+/** EPUB / CBZ are zip containers — "PK\x03\x04". HTML error pages aren't. */
+function isZip(buffer: Buffer): boolean {
+  return buffer.length > 4 && buffer[0] === 0x50 && buffer[1] === 0x4b && buffer[2] === 0x03 && buffer[3] === 0x04;
+}
+
 export class ReaderDrmError extends Error {
   readonly status = 422;
 }
@@ -203,6 +210,13 @@ export async function acquireBook(input: AcquireInput): Promise<AcquireResult> {
         throw new ReaderFetchError(`Unsupported format (${download.contentType || "unknown"})`, 415);
       }
 
+      if (ZIP_FORMATS.has(mimeType) && !isZip(download.body)) {
+        throw new ReaderFetchError(
+          `${new URL(download.url).hostname} returned a web page instead of the book file`,
+          502
+        );
+      }
+
       let inspection: EpubInspection | null = null;
       if (mimeType === READER_MIME_TYPES.epub) {
         inspection = await inspectEpub(download.body);
@@ -319,8 +333,9 @@ export async function getOrCreateBookMeta(
     );
     const url = await storage.generateDownloadUrl(node.filePayload.storageKey, 600);
     const response = await fetch(url);
-    if (response.ok) {
-      inspection = await inspectEpub(Buffer.from(await response.arrayBuffer()));
+    const bytes = response.ok ? Buffer.from(await response.arrayBuffer()) : null;
+    if (bytes && isZip(bytes)) {
+      inspection = await inspectEpub(bytes);
       if (inspection.drm) {
         return {
           meta: fallbackMeta(contentId, node.title),

@@ -16,9 +16,30 @@ import { validateExternalUrl } from "@/lib/domain/content/external-validation";
 export class ReaderFetchError extends Error {
   constructor(
     message: string,
-    readonly status = 502
+    readonly status = 502,
+    /** HTTP status the upstream source answered with, when there was one. */
+    readonly upstreamStatus?: number
   ) {
     super(message);
+  }
+}
+
+/** First readable line(s) of an error body — JSON `detail`/`error`/`message` or text. */
+async function errorDetail(response: Response): Promise<string> {
+  try {
+    const text = (await response.text()).slice(0, 2000);
+    try {
+      const json = JSON.parse(text) as Record<string, unknown>;
+      const candidate = json.detail ?? json.error ?? json.message;
+      if (candidate) {
+        return (typeof candidate === "string" ? candidate : JSON.stringify(candidate)).slice(0, 300);
+      }
+    } catch {
+      // not JSON
+    }
+    return text.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 200);
+  } catch {
+    return "";
   }
 }
 
@@ -133,9 +154,11 @@ export async function readerFetch(
         continue;
       }
       if (!response.ok) {
+        const detail = await errorDetail(response);
         throw new ReaderFetchError(
-          `${url.hostname} answered ${response.status}`,
-          response.status === 401 || response.status === 403 ? 401 : 502
+          `${url.hostname} answered ${response.status}${detail ? `: ${detail}` : ""}`,
+          response.status === 401 || response.status === 403 ? 401 : 502,
+          response.status
         );
       }
       const body = await readCapped(response, options.maxBytes ?? MAX_FEED_BYTES);

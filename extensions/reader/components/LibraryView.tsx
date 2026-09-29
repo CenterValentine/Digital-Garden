@@ -34,6 +34,8 @@ const TABS: Array<{ id: LibraryTab; label: string }> = [
   { id: "connections", label: "Connections" },
 ];
 
+const DEFAULT_SOURCE_ID = "opds:preset:gutenberg";
+
 const STATUS_LABELS: Record<string, string> = {
   want: "Want to read",
   reading: "Reading",
@@ -116,7 +118,10 @@ function ResultsList({
         </div>
       )}
       {page.entries.length === 0 && page.navigation.length === 0 && (
-        <p className="text-sm text-muted-foreground">Nothing here.</p>
+        <p className="text-sm text-muted-foreground">
+          No books found. Try a specific title or author — very common words like &quot;the&quot; are
+          ignored by most catalogs.
+        </p>
       )}
       {page.nextHref && onMore && (
         <button
@@ -212,8 +217,15 @@ function MyBooks({ onFind }: { onFind: () => void }) {
 }
 
 function FindBooks({ sources }: { sources: BookSourceInfo[] }) {
-  const searchable = useMemo(() => sources.filter((source) => source.searchable), [sources]);
-  const [sourceId, setSourceId] = useState("gutendex");
+  // Gutenberg's own catalog first: fast and reliable (Gutendex is a slower mirror).
+  const searchable = useMemo(
+    () =>
+      sources
+        .filter((source) => source.searchable)
+        .sort((a, b) => Number(b.id === DEFAULT_SOURCE_ID) - Number(a.id === DEFAULT_SOURCE_ID)),
+    [sources]
+  );
+  const [sourceId, setSourceId] = useState(DEFAULT_SOURCE_ID);
   const [query, setQuery] = useState("");
   const [page, setPage] = useState<CatalogPage | null>(null);
   const [loading, setLoading] = useState(false);
@@ -297,7 +309,26 @@ function FindBooks({ sources }: { sources: BookSourceInfo[] }) {
           {page.total !== undefined && (
             <p className="text-xs text-muted-foreground">{page.total.toLocaleString()} results</p>
           )}
-          <ResultsList page={page} sourceId={sourceId} onMore={more} loadingMore={loadingMore} />
+          <ResultsList
+            page={page}
+            sourceId={sourceId}
+            onMore={more}
+            loadingMore={loadingMore}
+            onNavigate={
+              sourceId.startsWith("opds:")
+                ? async (href) => {
+                    setLoading(true);
+                    try {
+                      setPage(await readerApi.browse(sourceId, href));
+                    } catch (error) {
+                      toast.error(error instanceof Error ? error.message : "Could not open that entry");
+                    } finally {
+                      setLoading(false);
+                    }
+                  }
+                : undefined
+            }
+          />
         </>
       )}
     </div>

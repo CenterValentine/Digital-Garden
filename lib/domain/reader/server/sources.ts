@@ -14,10 +14,12 @@ import type {
   BookLicense,
   BookSourceInfo,
   CatalogEntry,
+  CatalogNavLink,
   CatalogPage,
 } from "../types";
 import { ReaderFetchError, readerFetch, readerFetchJson } from "./http";
 import {
+  expandGutenbergResults,
   fillSearchTemplate,
   isReadableType,
   parseOpdsFeed,
@@ -42,8 +44,8 @@ interface OpdsPreset {
 const OPDS_PRESETS: OpdsPreset[] = [
   {
     id: "opds:preset:gutenberg",
-    label: "Project Gutenberg (catalog)",
-    description: "Browse Gutenberg's OPDS catalog — 75,000+ public-domain books.",
+    label: "Project Gutenberg",
+    description: "75,000+ public-domain books, searched through Gutenberg's own catalog.",
     url: "https://www.gutenberg.org/ebooks.opds/",
     searchTemplate: "https://www.gutenberg.org/ebooks/search.opds/?query={searchTerms}",
     homepage: "https://www.gutenberg.org",
@@ -64,8 +66,9 @@ const BUILT_IN_SOURCES: BookSourceInfo[] = [
   {
     id: "gutendex",
     kind: "gutendex",
-    label: "Project Gutenberg",
-    description: "Search 75,000+ public-domain books (via Gutendex).",
+    label: "Gutendex (Gutenberg, slower)",
+    description:
+      "Gutenberg through the community Gutendex API — richer summaries, but its public server is often slow.",
     searchable: true,
     browsable: false,
     readable: true,
@@ -209,6 +212,36 @@ async function fetchOpdsPage(
   return page;
 }
 
+/**
+ * Some catalogs answer a search with navigation entries that each lead to a
+ * one-book feed. Open the first few so search shows books, not folders.
+ */
+async function expandNavigationResults(
+  source: ResolvedOpds,
+  page: CatalogPage
+): Promise<CatalogPage> {
+  if (page.entries.length > 0 || page.navigation.length === 0) return page;
+  const targets = page.navigation.slice(0, 12);
+  const settled = await Promise.allSettled(
+    targets.map((nav) => fetchOpdsPage(source, nav.href))
+  );
+  const entries: CatalogEntry[] = [];
+  const unresolved: CatalogNavLink[] = [];
+  settled.forEach((result, index) => {
+    const found =
+      result.status === "fulfilled"
+        ? result.value.entries.find((entry) => entry.acquisitions.length > 0)
+        : undefined;
+    if (found) entries.push({ ...found, coverUrl: found.coverUrl ?? targets[index].coverUrl });
+    else unresolved.push(targets[index]);
+  });
+  return {
+    ...page,
+    entries,
+    navigation: [...unresolved, ...page.navigation.slice(12)],
+  };
+}
+
 async function opdsSearchTemplate(source: ResolvedOpds): Promise<string | undefined> {
   if (source.searchTemplate) return source.searchTemplate;
   const root = await fetchOpdsPage(source, source.rootUrl);
@@ -264,7 +297,7 @@ async function searchGutendex(query: string, page?: string): Promise<CatalogPage
     count: number;
     next: string | null;
     results: GutendexBook[];
-  }>(url);
+  }>(url, { timeoutMs: 45_000 });
   return {
     sourceId: "gutendex",
     entries: data.results.map(gutendexEntry),
@@ -355,7 +388,7 @@ async function searchWikisource(query: string, page?: string): Promise<CatalogPa
       language: "en",
       acquisitions: [
         {
-          href: `https://ws-export.wmcloud.org/?lang=en&format=epub-3&title=${encodeURIComponent(result.title)}`,
+          href: `https://ws-export.wmcloud.org/?lang=en&format=epub-3&page=${encodeURIComponent(result.title)}`,
           type: "application/epub+zip",
           rel: "open-access",
         },
@@ -466,9 +499,23 @@ async function searchGoogleBooks(
 ): Promise<CatalogPage> {
   const start = page ? Number(page) || 0 : 0;
   const key = await googleBooksKey(ownerId);
-  const data = await readerFetchJson<{ totalItems: number; items?: GoogleVolume[] }>(
-    `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=20&startIndex=${start}${key ? `&key=${encodeURIComponent(key)}` : ""}`
-  );
+  let data: { totalItems: number; items?: GoogleVolume[] };
+  try {
+    data = await readerFetchJson<{ totalItems: number; items?: GoogleVolume[] }>(
+      `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=20&startIndex=${start}${key ? `&key=${encodeURIComponent(key)}` : ""}`
+    );
+  } catch (error) {
+    if (error instanceof ReaderFetchError && error.upstreamStatus === 429) {
+      throw new ReaderFetchError(
+        key
+          ? "Google Books daily quota reached for your API key — try again later."
+          : "Google Books is rate-limiting searches without an API key. Add a free key under Library → Connections → Google Books.",
+        429,
+        429
+      );
+    }
+    throw error;
+  }
   const entries = (data.items ?? []).map<CatalogEntry>((volume) => {
     const info = volume.volumeInfo;
     const access = volume.accessInfo ?? {};
@@ -524,15 +571,18 @@ export async function searchSource(
   }
   if (sourceId.startsWith("opds:")) {
     const source = await resolveOpds(sourceId, ownerId);
+    let result: CatalogPage;
     if (page) {
       assertSameOrigin(page, source.rootUrl);
-      return fetchOpdsPage(source, page);
+      result = await fetchOpdsPage(source, page);
+    } else {
+      const template = await opdsSearchTemplate(source);
+      if (!template) {
+        throw new ReaderFetchError("This catalog does not support search — browse it instead", 400);
+      }
+      result = await fetchOpdsPage(source, fillSearchTemplate(template, query));
     }
-    const template = await opdsSearchTemplate(source);
-    if (!template) {
-      throw new ReaderFetchError("This catalog does not support search — browse it instead", 400);
-    }
-    return fetchOpdsPage(source, fillSearchTemplate(template, query));
+    return expandNavigationResults(source, expandGutenbergResults(result));
   }
   throw new ReaderFetchError("Unknown source", 404);
 }
@@ -547,7 +597,7 @@ export async function browseSource(
   }
   const source = await resolveOpds(sourceId, ownerId);
   if (href) assertSameOrigin(href, source.rootUrl);
-  return fetchOpdsPage(source, href ?? source.rootUrl);
+  return expandGutenbergResults(await fetchOpdsPage(source, href ?? source.rootUrl));
 }
 
 /** Download hosts each built-in source may hand us files from. */

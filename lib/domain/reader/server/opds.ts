@@ -155,10 +155,12 @@ function parseAtom(body: string, base: string, sourceId: string): CatalogPage {
     if (acquisitions.length === 0 && isNavigationEntry(links)) {
       const target = links.find((link) => link.type.includes("application/atom+xml"));
       if (target?.href) {
+        const thumbnail = links.find((link) => IMAGE_RELS.has(link.rel));
         navigation.push({
           title,
           href: resolve(target.href, base),
           summary: text(entry.content) ?? text(entry.summary),
+          coverUrl: thumbnail?.href ? resolve(thumbnail.href, base) : undefined,
         });
       }
       continue;
@@ -378,4 +380,36 @@ export function fillSearchTemplate(template: string, query: string): string {
     .replace(/\{count\??\}/g, "20")
     .replace(/\{[^}]+\?\}/g, "")
     .replace(/\{[^}]+\}/g, "");
+}
+
+/**
+ * Gutenberg's OPDS search answers with one *navigation* entry per book
+ * (`/ebooks/<id>.opds`), not acquisition entries. Its download URLs are stable,
+ * so map those straight to readable entries instead of a fetch per book.
+ */
+export function expandGutenbergResults(page: CatalogPage): CatalogPage {
+  const books: CatalogEntry[] = [];
+  const rest: CatalogNavLink[] = [];
+  for (const nav of page.navigation) {
+    const id = nav.href.match(/gutenberg\.org\/ebooks\/(\d+)\.opds\/?$/)?.[1];
+    if (!id) {
+      rest.push(nav);
+      continue;
+    }
+    books.push({
+      id,
+      title: nav.title,
+      authors: nav.summary ? [nav.summary] : [],
+      coverUrl: nav.coverUrl ?? `https://www.gutenberg.org/cache/epub/${id}/pg${id}.cover.medium.jpg`,
+      license: "public-domain",
+      acquisitions: [
+        { href: `https://www.gutenberg.org/ebooks/${id}.epub3.images`, type: "application/epub+zip", rel: "open-access" },
+        { href: `https://www.gutenberg.org/ebooks/${id}.epub.noimages`, type: "application/epub+zip", rel: "open-access" },
+        { href: `https://www.gutenberg.org/ebooks/${id}.kf8.images`, type: "application/vnd.amazon.ebook", rel: "open-access" },
+      ],
+      externalUrl: `https://www.gutenberg.org/ebooks/${id}`,
+      externalLabel: "Project Gutenberg",
+    });
+  }
+  return { ...page, entries: [...page.entries, ...books], navigation: rest };
 }
