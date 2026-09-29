@@ -98,12 +98,33 @@ export const MODEL_PRICING: Record<string, ModelPrice> = {
   "claude-sonnet-3-5": { inputPer1M: 3, outputPer1M: 15, asOf: "2026-Q2", note: "legacy" },
   "claude-haiku-3-5": { inputPer1M: 0.8, outputPer1M: 4, asOf: "2026-Q2", note: "legacy" },
 
-  // ── OpenAI (verified 2026-08-08; cache writes bill only on gpt-5.6;
-  //    long-context tier >272K input — threshold corroborated-secondary) ─
+  // ── OpenAI gpt-6 (verified 2026-09-29 against developers.openai.com/api/
+  //    docs/pricing; launched 2026-09-22/23 at half the gpt-5.6 rates;
+  //    cache reads 0.1× input; cache writes 1.25× input as on gpt-5.6;
+  //    long-context tier >272K input — the whole call bills at tier rates) ─
+  "gpt-6-astra": {
+    inputPer1M: 10, outputPer1M: 50, cachedInputPer1M: 1, cacheWritePer1M: 12.5,
+    longContext: { thresholdTokens: 272_000, inputPer1M: 20, outputPer1M: 75, cachedInputPer1M: 2, cacheWritePer1M: 25 },
+    asOf: "2026-09-29",
+  },
+  "gpt-6-sol": {
+    inputPer1M: 2, outputPer1M: 10, cachedInputPer1M: 0.2, cacheWritePer1M: 2.5,
+    longContext: { thresholdTokens: 272_000, inputPer1M: 4, outputPer1M: 15, cachedInputPer1M: 0.4, cacheWritePer1M: 5 },
+    asOf: "2026-09-29",
+  },
+  "gpt-6-luna": {
+    inputPer1M: 0.1, outputPer1M: 0.5, cachedInputPer1M: 0.01, cacheWritePer1M: 0.125,
+    longContext: { thresholdTokens: 272_000, inputPer1M: 0.2, outputPer1M: 0.75, cachedInputPer1M: 0.02, cacheWritePer1M: 0.25 },
+    asOf: "2026-09-29",
+  },
+
+  // ── OpenAI gpt-5.6 and earlier (verified 2026-08-08; gpt-5.6-sol
+  //    re-verified 2026-09-29 — cut from 5/30 to 4/20 at the gpt-6 launch;
+  //    cache writes bill only on gpt-5.6; long-context tier >272K input) ─
   "gpt-5.6-sol": {
-    inputPer1M: 5, outputPer1M: 30, cachedInputPer1M: 0.5, cacheWritePer1M: 6.25,
-    longContext: { thresholdTokens: 272_000, inputPer1M: 10, outputPer1M: 45, cachedInputPer1M: 1, cacheWritePer1M: 12.5 },
-    asOf: "2026-08-08",
+    inputPer1M: 4, outputPer1M: 20, cachedInputPer1M: 0.4, cacheWritePer1M: 5,
+    longContext: { thresholdTokens: 272_000, inputPer1M: 8, outputPer1M: 30, cachedInputPer1M: 0.8, cacheWritePer1M: 10 },
+    asOf: "2026-09-29",
   },
   "gpt-5.6-terra": {
     inputPer1M: 2, outputPer1M: 12, cachedInputPer1M: 0.2, cacheWritePer1M: 2.5,
@@ -205,6 +226,9 @@ export const PRICING_PREFIX_RULES: Array<{ prefix: string; use: string }> = [
   { prefix: "gemini-3.5-flash", use: "gemini-3.5-flash" },
   { prefix: "gemini-2.5-flash", use: "gemini-2.5-flash" },
   { prefix: "gemini-2.5-pro", use: "gemini-2.5-pro" },
+  { prefix: "gpt-6-astra", use: "gpt-6-astra" },
+  { prefix: "gpt-6-luna", use: "gpt-6-luna" },
+  { prefix: "gpt-6-sol", use: "gpt-6-sol" },
   { prefix: "gpt-5.6-terra", use: "gpt-5.6-terra" },
   { prefix: "gpt-5.6-luna", use: "gpt-5.6-luna" },
   { prefix: "gpt-5.6-sol", use: "gpt-5.6-sol" },
