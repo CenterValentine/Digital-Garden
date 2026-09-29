@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   AlertTriangle,
@@ -41,6 +41,21 @@ const STATUS_LABELS: Record<string, string> = {
   reading: "Reading",
   finished: "Finished",
 };
+
+/** Sources (Google Books especially) repeat a volume within and across pages. */
+function entryKey(entry: CatalogEntry): string {
+  return `${entry.id}\u0000${entry.title}`;
+}
+
+function uniqueEntries(entries: CatalogEntry[]): CatalogEntry[] {
+  const seen = new Set<string>();
+  return entries.filter((entry) => {
+    const key = entryKey(entry);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
 
 function openBook(contentId: string, title: string) {
   useContentStore.getState().setSelectedContentId(contentId, {
@@ -108,9 +123,9 @@ function ResultsList({
       )}
       {page.entries.length > 0 && (
         <div className="grid gap-3 lg:grid-cols-2">
-          {page.entries.map((entry) => (
+          {uniqueEntries(page.entries).map((entry) => (
             <CatalogEntryCard
-              key={`${entry.id}-${entry.title}`}
+              key={entryKey(entry)}
               entry={entry}
               onAdd={(target, index) => acquire(sourceId, target, index)}
             />
@@ -232,31 +247,44 @@ function FindBooks({ sources }: { sources: BookSourceInfo[] }) {
   const [loadingMore, setLoadingMore] = useState(false);
   const source = searchable.find((candidate) => candidate.id === sourceId);
 
+  // Only the newest request may write results: a slow earlier search (or
+  // "Load more") resolving late must not overwrite or append to a newer one.
+  const requestSeq = useRef(0);
+
   const run = async () => {
     if (!query.trim()) return;
+    const seq = ++requestSeq.current;
+    setPage(null);
     setLoading(true);
     try {
-      setPage(await readerApi.search(sourceId, query));
+      const result = await readerApi.search(sourceId, query);
+      if (seq === requestSeq.current) setPage({ ...result, entries: uniqueEntries(result.entries) });
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Search failed");
-      setPage(null);
+      if (seq === requestSeq.current) {
+        toast.error(error instanceof Error ? error.message : "Search failed");
+        setPage(null);
+      }
     } finally {
-      setLoading(false);
+      if (seq === requestSeq.current) setLoading(false);
     }
   };
 
   const more = async () => {
     if (!page?.nextHref) return;
+    const seq = requestSeq.current;
     setLoadingMore(true);
     try {
       const next = await readerApi.search(sourceId, query, page.nextHref);
+      if (seq !== requestSeq.current) return;
       setPage({
         ...next,
-        entries: [...page.entries, ...next.entries],
+        entries: uniqueEntries([...page.entries, ...next.entries]),
         navigation: page.navigation,
       });
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not load more");
+      if (seq === requestSeq.current) {
+        toast.error(error instanceof Error ? error.message : "Could not load more");
+      }
     } finally {
       setLoadingMore(false);
     }
@@ -275,8 +303,10 @@ function FindBooks({ sources }: { sources: BookSourceInfo[] }) {
           aria-label="Source"
           value={sourceId}
           onChange={(event) => {
+            requestSeq.current++;
             setSourceId(event.target.value);
             setPage(null);
+            setLoading(false);
           }}
           className="h-9 rounded border border-black/10 bg-transparent px-2 text-sm dark:border-white/10"
         >
@@ -317,9 +347,11 @@ function FindBooks({ sources }: { sources: BookSourceInfo[] }) {
             onNavigate={
               sourceId.startsWith("opds:")
                 ? async (href) => {
+                    const seq = ++requestSeq.current;
                     setLoading(true);
                     try {
-                      setPage(await readerApi.browse(sourceId, href));
+                      const result = await readerApi.browse(sourceId, href);
+                      if (seq === requestSeq.current) setPage(result);
                     } catch (error) {
                       toast.error(error instanceof Error ? error.message : "Could not open that entry");
                     } finally {
@@ -412,7 +444,7 @@ function Catalogs({
                         ...frame,
                         page: {
                           ...next,
-                          entries: [...frame.page.entries, ...next.entries],
+                          entries: uniqueEntries([...frame.page.entries, ...next.entries]),
                           navigation: [...frame.page.navigation, ...next.navigation],
                         },
                       },
