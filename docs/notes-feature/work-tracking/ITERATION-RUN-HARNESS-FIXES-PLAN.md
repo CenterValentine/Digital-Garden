@@ -167,3 +167,96 @@ The meter read **$1.22** for `ecf1d0e5`; the same usage at base rates is **$0.82
 **What two jobs would and would not have fixed (owner question):** two items would have produced a proposal and therefore the run cap and tail (P14's effect). They would not have removed the read approvals (P16), the cap decay across approvals (P15), the cold cache per request, or the repeated searches (P18).
 
 **Gate:** `run-harness:check` §9 (charter cap 16 / tail 6 / tail tools; floor cases incl. the 8 → 3 → 1 and 16 → 14 shapes; guard key order and notice) — three mutations caught. **Cost ceiling:** a charter turn's worst case goes from 8 to 16 steps, only with a charter attached.
+
+## 10. What a $1.35 resume cost, and the levers (2026-09-29)
+
+**Evidence.** Prod `de65f6bb` (conversation `ece3e497`), gpt-6-sol, *Apply for a job* attached, "only one job (low interest)" → Clay Partner Technical Engineer. #267 was live and held: cap source `charter`, one user message, no "continue" replies, docx delivered. 25 steps over 6 requests; 976k input tokens, 39% cached; **$1.349, and the meter is exact** (largest step 51k, base tier). $1.19 of it is uncached input, $0.08 cached input, $0.09 output. The ~96-minute approval gap before request 6 cost **$0.04** — the cache was already mostly cold, so expiry had little left to lose.
+
+| Finding | Cost in this run | Lever |
+|---|---|---|
+| **F22 The cached prefix froze again** — 21,300 → 22,419 → 22,803 tokens across four requests while the prompt grew to 51k | ~$0.79 | L1 |
+| **F23 Tool-list changes flushed the cache** — s5 (summon), s16 (summon `update_rows`), s23 (tail narrowing dropped ~11k of schemas): zero cached each time | ~$0.19 after L1 | L2 |
+| **F24 A validation rejection that does not teach** — `insert_rows`: "6 cells rejected by validation: Unknown option for this column" ×5, no column, value or options; six steps of recovery (s14–s19) | $0.26 today, ~$0.05 after L1 | L3a |
+| **F25 Summon says "already available" for a tool the tail hid** — `phase_checkpoint` | $0.06 today | L3b |
+| **F26 Two zero-row Claims queries; "Name" for "Gap Name"** — the existing teaching worked on the next step | $0.06 | none |
+| **F27 Provider-native web search on 10 of 25 steps** (11 calls, near-duplicate `site:clay.com` queries) | per-call fees unmetered | L4 |
+
+**F22 — what is new.** The frozen value moves only when tool schemas are added (+1,119 after summoning three tools priced at ≈1,273; +384 after `update_rows` priced at ≈584). It never moves as history grows, even across requests. In both measured runs it sits just past the end of request 1, at the `propose_item_iteration` approval boundary:
+
+- `ecf1d0e5`: s3's input was 25,498. Adding the propose call and its result gives ≈27.1k, and the frozen value was 27,133.
+  - Caching was normal inside request 1 (24,069 of 24,137) and request 2 (30,295 of 30,363).
+  - The freeze began in request 3.
+- `de65f6bb`: request 1 ends at ≈21k, and the frozen value was 21,300.
+
+`prepareStep` does not rewrite history. It spreads `stepMessages` and appends the notice (route `prepareStep`, the tail branch). **Working hypothesis, unconfirmed:** the approved call's representation in the provider request changes between model calls. Candidates are the approval request/response pair and where the result executed at the start of a request is placed.
+
+**The diagnostic has a blind spot.** `prompt-prefix-diag.ts` fingerprints the SDK message array, not the HTTP body. A divergence introduced in `@ai-sdk/openai`'s conversion would log "stable — grew or unchanged" while the cache still froze. Candidates for that are approval parts, reasoning items, and `web_search_call` items.
+
+### L1 — name the break (one flagged run)
+
+- **L1a — the wire tap (BUILT, `feat/run-cache-levers`).**
+  - When the flag is on, every OpenAI provider in `providers/registry.ts` gets a `fetch` wrapper (`prompt-wire-tap.ts`).
+  - The wrapper fingerprints the outgoing body in provider order: `prompt_cache_key` → model → tools → instructions → each `input[]` item.
+  - It logs `ai:prompt_wire` naming the first part that stopped extending the previous call of the same conversation. For an input item it gives the index and kind (`function_call_output`, `reasoning`, `message:user`, …), with excerpts of both sides at the first differing character.
+  - A replaced trailing item (the per-step notice) is not a divergence.
+  - The pure helpers `fingerprintWireBody` and `findWireDivergence` are pinned by `run-harness:check` §10. Two mutations were caught: dropping the trailing-notice rule, and dropping the cache-key check.
+  - **Second suspect, for F19's cold request starts:** `buildPromptCachePolicy` derives `prompt_cache_key` from the *advertised* tool set and a digest of the charter context. Either can change between requests, which reroutes the call to a cold cache. The tap reports a changed key as `part: cacheKey` before anything else.
+- **The run (owner), in order:**
+  1. Merge the PR carrying L1a and let Vercel deploy it.
+  2. In Vercel → Settings → Environment Variables, add `AI_PROMPT_PREFIX_DIAG` = `1` for Production, then redeploy. An env change reaches new deployments only.
+  3. Start a NEW chat on gpt-6-sol with *Apply for a job* attached, and ask for one *different* low-interest job, so the Clay artifacts are not duplicated. Approve the proposal and let it run to the end; answer any approval promptly (a long gap adds noise, not signal). This shape covers what is needed:
+     - a proposal approval (the suspected boundary);
+     - three or more steps after it inside one request;
+     - a browser read (a request boundary).
+  4. In Vercel → Logs, filter `ai:prompt_wire` (and `ai:prompt_prefix`) for the run's time window and export the lines, or paste them into the chat. Runtime logs are kept only briefly, so do this the same day.
+  5. Remove the variable and redeploy.
+- **Caveat:** both diagnostics keep their state in instance memory. Within-request comparisons are reliable; cross-request ones appear when Fluid Compute reuses the instance, which it usually does.
+- **Expected:** the run names the element; the fix follows from it. This run would have cost $1.35 → ~$0.56.
+
+### L2 — keep the tool list constant for the turn
+
+Adding or removing a tool rewrites everything after the tool definitions, so every mid-turn change is a full cache flush. Today it costs 5–9¢ a time; after L1 it costs the whole prompt.
+
+- **L2a — enforce the tail at execute, not by hiding tools.**
+  - `activeTools` stays the same through the reserved tail.
+  - A non-tail tool called in the tail returns a teaching refusal that names the tail tools and the steps left, which fits "schemas describe shape; execute judges".
+  - Trade: a refused call costs one step (~1.5¢ once cached); hiding costs a flush.
+- **L2b — a charter turn advertises its run tools from step 1.**
+  - That means the tools the charter's phases name plus the run-loop set: `record_*`, `update_rows` and `read_page_headless_or_browser`. No mid-turn summon is needed.
+  - With a warm cache, 10k tokens of stable schema cost ~0.2¢ a step. The summon economics (§8 F21) invert once L1 lands: stable and large beats small and changing.
+- L2a also removes F25's cause.
+- **Projected:** $0.56 → ~$0.37.
+
+### L3 — two teaching fixes
+
+- **L3a — validation rejections name what went wrong.**
+  - `cells.ts` `encodeOptionId`/`encodeOptionIds` fail with a bare "Unknown option for this column". `data-tools.ts` then joins the first five of six.
+  - Each rejection should name the column, the rejected value and the allowed option labels (capped at about 12), plus a case-insensitive near-match when one exists.
+  - The failed-cells footer should group rejections by column and row.
+  - This run's six-step recovery would have been one `update_rows` call.
+- **L3b — the tail extra applies whenever a charter is bound.**
+  - `CHARTER_TAIL_EXTRA` (`phase_checkpoint`) is added only for charter *turns* (route: `extra: charterTurn ? …`). An item run under a charter therefore hid `phase_checkpoint` in the tail.
+  - Summon's `isAdvertised` check does not know about tail narrowing, so it answered "Already available … call them directly", and the model could not.
+  - Superseded by L2a if that lands. Otherwise, apply the extra for any bound charter and make summon consult the step's narrowed list.
+
+### L4 — provider-native search
+
+OpenAI ran the built-in `web_search` 11 times, on 10 of 25 steps: five variants of "data enrichment waterfall" and two identical "careers partner technical engineer" queries. P18's repeat guard cannot see these: the provider executes them, so there is no execute to wrap.
+
+- **L4a — meter:** count the turn's `web_search_call` parts and price them per call in `pricing.ts`. Today the meter omits them. OpenAI prices search per call; confirm the gpt-6 rate on developers.openai.com/api/docs/pricing before adding the row.
+- **L4b — a turn budget for native search:** after N native searches in a charter turn (proposed N = 4), stop advertising the provider search tool, as one deliberate list change, and say so in the step notice.
+
+### Decisions needed
+
+- **D7 (L2b vs the summon design):** should a charter turn's tool list be fixed at step 1? Recommended **yes, once L1 has landed**; before that the cache is broken anyway and a larger list costs full price.
+- **D8 (L4b):** is the native-search budget per turn, and N = 4? Recommended yes.
+
+**Projection, same model:** $1.35 → ~$0.56 (L1) → ~$0.37 (L2) → ~$0.33 (L3), plus the true search fees (L4a) made visible.
+
+**Gates when built:**
+- `run-harness:check`:
+  - a tail refusal fixture: tool list constant, refusal names the tail tools;
+  - the tail extra applies under a bound charter.
+- A cells fixture: the rejection names the column, value and options.
+- `ai:pricing:check`: a search-fee fixture.
+- The wire tap stays opt-in: `process.env` gated, no body logging by default.

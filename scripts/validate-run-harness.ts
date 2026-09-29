@@ -314,6 +314,8 @@ import {
   findPrefixDivergence,
   serializePromptForDiag,
   PREFIX_CHUNK_CHARS,
+  fingerprintWireBody,
+  findWireDivergence,
 } from "../lib/domain/ai/prompt-prefix-diag";
 
 {
@@ -371,12 +373,49 @@ import {
   assert(s1 !== s2, "§8: tool order is part of the fingerprint (it is part of the provider prefix)");
 }
 
+{
+  // §10 L1a — the wire tap names the body part that stopped extending the
+  // previous call: routing key, tools, or the index + kind of an input item.
+  const body = (items: unknown[], extra: Record<string, unknown> = {}) => ({
+    model: "gpt-6-sol",
+    prompt_cache_key: "dg-chat:a",
+    tools: [{ type: "function", name: "query_database" }],
+    input: items,
+    ...extra,
+  });
+  const sys = { role: "system", content: "S" };
+  const user = { role: "user", content: [{ type: "input_text", text: "one low-interest job" }] };
+  const call = { type: "function_call", call_id: "c1", name: "propose_item_iteration", arguments: "{}" };
+  const out = { type: "function_call_output", call_id: "c1", output: "{\"ok\":true}" };
+  const notice = (n: number) => ({ role: "user", content: `[Harness notice] ${n} steps left` });
+  const fp = (b: unknown) => fingerprintWireBody(b)!;
+
+  const step1 = fp(body([sys, user, call, out, notice(5)]));
+  const step2 = fp(body([sys, user, call, out, { type: "function_call", call_id: "c2", name: "x", arguments: "{}" }, notice(4)]));
+  assert(findWireDivergence(step1, step2) === null, "§10: a body that only grew (trailing notice replaced) is cache-friendly");
+  assert(step1.conversationKey !== null && step1.conversationKey === step2.conversationKey, "§10: the conversation key is stable across steps");
+
+  const rewritten = fp(body([sys, user, call, { ...out, output: "{\"ok\":true,\"openedAt\":2}" }, notice(4)]));
+  const d = findWireDivergence(step1, rewritten);
+  assert(
+    d?.part === "input" && d.index === 3 && d.kindBefore === "function_call_output" && d.currExcerpt.includes("openedAt"),
+    `§10: a rewritten mid-history item is named by index, kind and excerpt (got ${JSON.stringify(d)})`,
+  );
+  const rekeyed = findWireDivergence(step1, fp(body([sys, user, call, out, notice(5)], { prompt_cache_key: "dg-chat:b" })));
+  assert(rekeyed?.part === "cacheKey", "§10: a changed prompt_cache_key is reported before anything else (it routes the cache)");
+  const retooled = findWireDivergence(step1, fp(body([sys, user, call, out, notice(5)], { tools: [] })));
+  assert(retooled?.part === "tools", "§10: a changed tool list is reported as the tools part");
+  const dropped = findWireDivergence(step2, fp(body([sys, user, call])));
+  assert(dropped?.part === "input" && dropped.index === 3, "§10: removed history items are a divergence");
+  assert(fingerprintWireBody({ model: "x" }) === null, "§10: a body without input/messages is ignored");
+}
+
 if (errors.length > 0) {
   console.error(`\n✖ run-harness:check (§8) failed — ${errors.length} problem(s):\n`);
   for (const e of errors) console.error(`  ${e}\n`);
   process.exit(1);
 }
-console.log("✓ run-harness:check §8 — per-step long-context tier; prefix diagnostic locates a mid-prompt change");
+console.log("✓ run-harness:check §8/§10 — per-step long-context tier; prefix diagnostic locates a mid-prompt change; wire tap names the diverging body part");
 
 // ── write-args — the document body under any sibling key ─────────────────────
 
