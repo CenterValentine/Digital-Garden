@@ -40,7 +40,7 @@ import {
 export const DIAGNOSTICS_VERSION = 1;
 
 /** Where the turn's `stopWhen` step cap came from. */
-export type StepCapSource = "item-iteration" | "research" | "editable" | "base";
+export type StepCapSource = "item-iteration" | "research" | "charter" | "editable" | "base";
 
 /** Where the applied output-token ceiling came from. */
 export type MaxTokensSource = "user" | "catalog" | "provider-default";
@@ -296,6 +296,7 @@ function strOrNull(v: unknown): string | null {
 const CAP_SOURCES: readonly StepCapSource[] = [
   "item-iteration",
   "research",
+  "charter",
   "editable",
   "base",
 ];

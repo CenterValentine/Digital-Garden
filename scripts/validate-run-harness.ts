@@ -461,3 +461,48 @@ if (errors.length > 0) {
   process.exit(1);
 }
 console.log("✓ run-harness:check unsupported parameters — gpt-6 / o-series send no temperature; a provider's refusal names the key to retry without");
+
+// ── §9 — charter turns carry a run budget; continuations keep a floor ─────────
+
+import {
+  CHARTER_TAIL_EXTRA,
+  CHARTER_TURN_DELIVERABLES,
+  continuationStepCap,
+  computeIterationStepCap as capFor,
+  reservedTailTools as tailToolsFor,
+  reservedTailSize as tailSizeFor,
+} from "../lib/domain/ai/tools/iteration-proposal";
+import { REPEAT_GUARDED_TOOLS, repeatedCallKey, repeatedCallNotice } from "../lib/domain/ai/tools/repeat-guard";
+
+{
+  const charterCap = capFor({ itemBudget: 1, deliverables: CHARTER_TURN_DELIVERABLES });
+  assert(charterCap === 16, `§9: a charter turn is sized like a one-item run with four write tools (got ${charterCap})`);
+  assert(tailSizeFor(CHARTER_TURN_DELIVERABLES) === 6, "§9: the charter tail reserves the four writes plus two");
+  const charterTail = tailToolsFor(CHARTER_TURN_DELIVERABLES, { record: false, extra: CHARTER_TAIL_EXTRA });
+  assert(charterTail.includes("phase_checkpoint") && charterTail.includes("summon") && !charterTail.includes("record_item_result"), `§9: a charter tail keeps the writes, the checkpoint and summon, not the item-run record tools (got ${charterTail.join(",")})`);
+  const itemTail = tailToolsFor(["create_docx"]);
+  assert(itemTail.includes("record_item_result") && itemTail.includes("record_iteration_findings"), "§9: item runs keep their record/close tools in the tail (unchanged)");
+
+  assert(continuationStepCap({ rawStepCap: 8, stepsAlreadySpent: 0, tailDeliverables: null }) === 8, "§9: a fresh request gets the whole cap");
+  assert(continuationStepCap({ rawStepCap: 8, stepsAlreadySpent: 7, tailDeliverables: null }) === 3, "§9: a plain-chat continuation gets at least three (prod f51fa2d8 got one)");
+  assert(continuationStepCap({ rawStepCap: 8, stepsAlreadySpent: 5, tailDeliverables: null }) === 3, "§9: a continuation with three left keeps three");
+  assert(continuationStepCap({ rawStepCap: 8, stepsAlreadySpent: 2, tailDeliverables: null }) === 6, "§9: a continuation with more than the floor left keeps the remainder");
+  assert(continuationStepCap({ rawStepCap: 16, stepsAlreadySpent: 14, tailDeliverables: CHARTER_TURN_DELIVERABLES }) === 7, "§9: a charter continuation gets its tail plus the answer (prod 62ac2b76 went 8 → 3 → 1)");
+  assert(continuationStepCap({ rawStepCap: 16, stepsAlreadySpent: 4, tailDeliverables: CHARTER_TURN_DELIVERABLES }) === 12, "§9: a charter continuation with plenty left keeps the remainder");
+  assert(continuationStepCap({ rawStepCap: 1, stepsAlreadySpent: 0, tailDeliverables: null }) === 1, "§9: a one-step cap stays one on a fresh request");
+
+  assert(REPEAT_GUARDED_TOOLS.includes("search_web") && !(REPEAT_GUARDED_TOOLS as readonly string[]).includes("query_database"), "§9: only searches are repeat-guarded — a re-read after a write is legitimate");
+  const k1 = repeatedCallKey("search_web", { query: "site:clay.com data providers", limit: 5 });
+  const k2 = repeatedCallKey("search_web", { limit: 5, query: "site:clay.com data providers" });
+  const k3 = repeatedCallKey("search_web", { query: "site:clay.com data provider", limit: 5 });
+  assert(k1 === k2, "§9: key order does not change identity");
+  assert(k1 !== k3, "§9: a different query is a different call");
+  assert(/step 4/.test(repeatedCallNotice("search_web", 4)) && /NOT run again/.test(repeatedCallNotice("search_web", 4)), "§9: the notice names the first step and says it did not run");
+}
+
+if (errors.length > 0) {
+  console.error(`\n✖ run-harness:check (§9) failed — ${errors.length} problem(s):\n`);
+  for (const e of errors) console.error(`  ${e}\n`);
+  process.exit(1);
+}
+console.log("✓ run-harness:check §9 — charter turns are run-sized with a reserved tail; continuations keep a floor; identical searches are guarded");

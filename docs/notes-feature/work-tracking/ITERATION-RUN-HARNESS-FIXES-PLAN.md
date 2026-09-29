@@ -152,3 +152,18 @@ The meter read **$1.22** for `ecf1d0e5`; the same usage at base rates is **$0.82
 | Output incl. 1,890 reasoning tokens | 5,947 | $0.07 | — |
 
 **Projected, same model:** $0.82 → $0.69 (#262) → $0.36 (F18) → $0.19 (F19) → ~$0.15 (F21). A 2.5× pricier model after those lands near $0.45. The better "spend more" lever is reasoning effort: the route ran with no reasoning config, and the wasted steps were judgment failures; 20k reasoning tokens on terra is $0.24.
+
+## 9. Turn budget for charter work (2026-09-29)
+
+**Evidence.** Prod `62ac2b76` (*Reviewing Low-Interest Job Opportunity*, gpt-6-sol, charter attached, "only one job"): the prompt's "ONE item is NOT an iteration" rule made the model skip `propose_item_iteration`, so the turn ran under the 8-step chat cap with no reserved tail. Five bulk reads over the 6,000-token threshold each stopped the turn for an approval; each approval opened a new request with only the remainder (8 → 3 → 1, then 8 → 6 → 5 → 4 → 3 → 1); the last request of each turn was forced to text ("still unfinished, reply continue"). Five near-identical `site:clay.com` searches; turn 2 re-read what turn 1 had read because the evidence library's read was `turn`-lifetime. Fifteen steps, nine requests, six user replies, ~$0.80, no artifact. Prod `1fc59f46` and `f51fa2d8` are the same shape (8/8 on research; a one-step continuation losing a finished resume).
+
+**Rules (P14–P18), all harness:**
+- **P14 Charter turns are run-sized.** With a charter attached (picked, bound, or mentioned) and no proposal or research run, the cap is `computeIterationStepCap({ itemBudget: 1, deliverables: CHARTER_TURN_DELIVERABLES })` = 16, cap source `charter`, and the last six steps are reserved for the write tools (`create_docx`, `create_note`, `update_row`, `insert_rows`) plus `phase_checkpoint` and `summon`; the per-step notice names them. The proposal is scope and consent, not what unlocks the budget — one job asked for plainly gets what a proposed one-item run gets.
+- **P15 Continuations keep a floor.** `continuationStepCap`: a request that follows earlier spend in the same turn opens with at least the tail + 1 (charter/item turns) or 3 (plain chat), never the bare remainder.
+- **P16 A charter run's attachment covers its reads.** `query_database` bulk reads up to `CHARTER_RUN_READ_CEILING` (15,000 tokens) need no approval inside a charter turn; larger reads still ask.
+- **P17 Charter-named tables read at `run` lifetime.** The evidence library the charter's Inputs list names is promoted to `run` like master-linked tables, so it is read once and carried across jobs and continuations.
+- **P18 Identical searches are guarded.** `search_web` / `search_content` (app-run) with byte-identical input inside one request return a pointer to the first result. Only searches: a re-read after a write is legitimate. Provider-native search has no execute to wrap.
+
+**What two jobs would and would not have fixed (owner question):** two items would have produced a proposal and therefore the run cap and tail (P14's effect). They would not have removed the read approvals (P16), the cap decay across approvals (P15), the cold cache per request, or the repeated searches (P18).
+
+**Gate:** `run-harness:check` §9 (charter cap 16 / tail 6 / tail tools; floor cases incl. the 8 → 3 → 1 and 16 → 14 shapes; guard key order and notice) — three mutations caught. **Cost ceiling:** a charter turn's worst case goes from 8 to 16 steps, only with a charter attached.
