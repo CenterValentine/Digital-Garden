@@ -31,6 +31,7 @@ import { logger } from "@/lib/core/logger";
 import { canAlterSchema, canWrite } from "@/lib/domain/data/server/access";
 import { loadRowPage } from "@/lib/domain/data/server/queries";
 import {
+  charterReferencedTableIds,
   charterRegistryAuthorizes,
   findColumn,
   normalizeCellInput,
@@ -104,6 +105,11 @@ const BULK_CLIP_CHARS = 120;
 const INDEX_RELATION_RENDER = { maxLinkedTitles: 1, linkedTitleClip: 40 } as const;
 /** Default threshold when the user has not set one (plan D3). */
 export const DEFAULT_BULK_READ_THRESHOLD = 6_000;
+/**
+ * Bulk reads up to this many tokens need no approval inside a charter turn
+ * (the attachment is the consent). Above it the user's threshold applies.
+ */
+export const CHARTER_RUN_READ_CEILING = 15_000;
 /** Share of the executed model's window one read may take (plan §4.5). */
 const BULK_READ_CEILING_SHARE = 0.1;
 const BULK_READ_CEILING_FALLBACK = 20_000;
@@ -820,6 +826,12 @@ export function createDataTools(ctx: ToolExecuteContext) {
       needsApproval: async (input) => {
         const budget = numberOf(input.budget);
         if (budget === null) return false;
+        // A charter run's attachment is consent for its evidence reads (§9,
+        // prod 62ac2b76 2026-09-29: five approval clicks for 9–11k-token
+        // reads of Experiences/Sources/Claims, each one splitting the turn
+        // and shrinking what was left of its cap). Under the charter
+        // ceiling no prompt; a genuinely large read still asks.
+        if (ctx.activeCharter && budget <= CHARTER_RUN_READ_CEILING) return false;
         return budget > (await bulkReadThresholdFor(ctx.userId));
       },
       execute: async (input) => {
@@ -1022,10 +1034,16 @@ export function createDataTools(ctx: ToolExecuteContext) {
           let lifetimeOrigin: "charter" | "requested" | "default" = validLifetime
             ? "requested"
             : "default";
+          // Charter-NAMED tables count as charter-linked here too (§9): the
+          // evidence library the charter's Inputs list names is read once
+          // per RUN and carried across jobs and continuations, not
+          // re-read every turn (prod 62ac2b76: its read was `turn`, folded
+          // at "continue", read again).
           if (
             ctx.activeCharter &&
             validLifetime !== "turn" &&
-            (await charterRegistryAuthorizes(ctx, databaseId))
+            ((await charterRegistryAuthorizes(ctx, databaseId)) ||
+              (await charterReferencedTableIds(ctx)).includes(databaseId))
           ) {
             lifetime = validLifetime === "chat" ? "chat" : "run";
             lifetimeOrigin = validLifetime === "chat" ? "requested" : "charter";

@@ -249,14 +249,71 @@ export function computeIterationStepCap(input: {
   return items * stepsPerItemFor(input.deliverables, input.stepsPerItem) + RUN_OVERHEAD_STEPS;
 }
 
-/** The tools the reserved tail keeps callable: the deliverables plus the record/close tools. */
-export function reservedTailTools(deliverables: readonly string[]): string[] {
-  return [...new Set([...deliverables, ...TAIL_ALWAYS])];
+/**
+ * A CHARTER turn without a proposal is sized like a one-item fulfilment run
+ * (ITERATION-RUN-HARNESS-FIXES §9, prod 62ac2b76 2026-09-29): the user
+ * asked for one job, the prompt's "one item is not an iteration" rule made
+ * the model skip the proposal, and the turn fell to the 8-step chat cap
+ * with nothing reserved for writing — fifteen steps of reading across two
+ * turns and six user replies, no artifact. The proposal is scope and
+ * consent; it must not be what unlocks the budget. These are the write
+ * tools a charter's per-item work ends in; the cap is
+ * `1 × (research + these + 1) + overhead` = 16, tail 6.
+ */
+export const CHARTER_TURN_DELIVERABLES: readonly DeliverableTool[] = [
+  "create_docx",
+  "create_note",
+  "update_row",
+  "insert_rows",
+];
+
+/** Tools a charter turn's tail keeps beside the deliverables (its close). */
+export const CHARTER_TAIL_EXTRA = ["phase_checkpoint"] as const;
+
+/**
+ * The tools the reserved tail keeps callable: the deliverables plus the
+ * record/close tools (item runs) or the charter's close tools (charter
+ * turns). `summon` always, so a deliverable not yet activated can be.
+ */
+export function reservedTailTools(
+  deliverables: readonly string[],
+  options: { record?: boolean; extra?: readonly string[] } = {},
+): string[] {
+  const record = options.record ?? true;
+  return [
+    ...new Set([
+      ...deliverables,
+      ...(record ? TAIL_ALWAYS : ["summon"]),
+      ...(options.extra ?? []),
+    ]),
+  ];
 }
 
 /** How many of the turn's last steps are held for the tail: deliverables + record + close. */
 export function reservedTailSize(deliverables: readonly string[]): number {
   return deliverables.length + 2;
+}
+
+/**
+ * The step cap for THIS request of a turn (§9, prod 62ac2b76 / f51fa2d8):
+ * the turn's cap minus what earlier requests spent — but an approval
+ * continuation never opens with fewer steps than its tail needs plus the
+ * text answer. Before this, a continuation inherited whatever was left
+ * (8 → 3 → 1) and an approved action died on the step that was supposed
+ * to perform it. A fresh request (nothing spent) gets the full cap; a
+ * plain chat continuation gets at least three.
+ */
+export function continuationStepCap(input: {
+  rawStepCap: number;
+  stepsAlreadySpent: number;
+  tailDeliverables: readonly string[] | null;
+}): number {
+  const remaining = input.rawStepCap - input.stepsAlreadySpent;
+  if (input.stepsAlreadySpent <= 0) return Math.max(1, remaining);
+  const floor = input.tailDeliverables
+    ? reservedTailSize(input.tailDeliverables) + 1
+    : 3;
+  return Math.max(floor, remaining);
 }
 
 /**
@@ -268,10 +325,12 @@ export function stepsRemainingNotice(input: {
   stepNumber: number;
   stepCap: number;
   deliverables: readonly string[];
+  /** The tail's tool list when it differs from the item-run default. */
+  tailTools?: readonly string[];
 }): string {
   const remaining = Math.max(0, input.stepCap - input.stepNumber);
   const tail = reservedTailSize(input.deliverables);
-  const tools = reservedTailTools(input.deliverables).filter((t) => t !== "summon");
+  const tools = (input.tailTools ?? reservedTailTools(input.deliverables)).filter((t) => t !== "summon");
   const reservedNote =
     remaining <= tail
       ? `The remaining steps are RESERVED for the deliverables — only ${tools.join(", ")} are available now; produce the artifacts with what you have, record any gap, and close.`

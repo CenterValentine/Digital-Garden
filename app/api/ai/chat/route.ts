@@ -87,7 +87,10 @@ import {
   teachDeniedApprovals,
 } from "@/lib/domain/ai/context-diet";
 import {
+  CHARTER_TAIL_EXTRA,
+  CHARTER_TURN_DELIVERABLES,
   computeIterationStepCap,
+  continuationStepCap,
   reservedTailSize,
   reservedTailTools,
   stepsRemainingNotice,
@@ -240,6 +243,11 @@ import { effectiveCapabilities } from "@/lib/domain/ai/features/capabilities";
 import { prisma } from "@/lib/database/client";
 import type { Prisma } from "@/lib/database/generated/prisma";
 import { logger, spanPayload, startSpan, withRouteTrace, withSpan } from "@/lib/core/logger";
+import {
+  REPEAT_GUARDED_TOOLS,
+  repeatedCallKey,
+  repeatedCallNotice,
+} from "@/lib/domain/ai/tools/repeat-guard";
 import {
   excerptAt,
   findPrefixDivergence,
@@ -1657,6 +1665,30 @@ export async function POST(request: Request) {
       // ── The summoner (AI-TOOL-SUMMONER-PLAN §3) ────────────────────────
       // Registered last, so `registered` covers every tool this turn has —
       // including the conditional browser/editor/search families above.
+      // Repeat guard (§9): a byte-identical search within this request is
+      // answered with a pointer to the first result. Wraps only app-run
+      // tools that have an execute (provider-native search has none).
+      const repeatedCalls = new Map<string, number>();
+      for (const name of REPEAT_GUARDED_TOOLS) {
+        const entry = (tools as Record<string, { execute?: unknown } | undefined>)[name];
+        if (!entry || typeof entry.execute !== "function") continue;
+        const original = entry.execute as (input: unknown, options: unknown) => unknown;
+        entry.execute = async (input: unknown, options: unknown) => {
+          const key = repeatedCallKey(name, input);
+          const first = repeatedCalls.get(key);
+          if (first !== undefined) {
+            logger.info({
+              layer: "ai",
+              event: "ai:repeated_call_guarded",
+              summary: `${name} repeated with identical input — answered from the first result`,
+              attrs: { tool: name, first_step: first, step: stepsTracker.used + 1 },
+            });
+            return repeatedCallNotice(name, first);
+          }
+          repeatedCalls.set(key, stepsTracker.used + 1);
+          return original(input, options);
+        };
+      }
       const registered = new Set(Object.keys(tools));
       (tools as Record<string, unknown>)[SUMMON_TOOL_ID] = createSummonTool({
         registered,
@@ -2648,6 +2680,14 @@ export async function POST(request: Request) {
       // (iteration-proposal.ts). With no deliverables this is the old
       // `items × 4 + 8`; a fulfilment run declaring create_docx + update_row
       // gets 6 per item instead of 4 — the two steps its tail actually needs.
+      // A charter turn WITHOUT a proposal is a one-item fulfilment run (§9,
+      // prod 62ac2b76): the proposal is scope and consent, not the thing
+      // that unlocks the budget. One job asked for plainly gets the same
+      // cap and reserved tail a proposed one-item run gets.
+      const charterTurn =
+        itemIterationBudget == null &&
+        researchPageBudget == null &&
+        (attachedCharterResolved || rootedCharterResolved);
       const rawStepCap =
         itemIterationBudget != null
           ? computeIterationStepCap({
@@ -2657,22 +2697,47 @@ export async function POST(request: Request) {
             })
           : researchPageBudget != null
             ? researchPageBudget * 2 + 4
-            : editableContentId
-              ? 8
-              : 7;
-      // At least one step, always: a turn that has already spent its budget
-      // must still be able to answer in prose (the final-step reservation
-      // below is what makes that answer honest), never be cut to zero steps
-      // and return an empty message.
-      const stepCap = Math.max(1, rawStepCap - stepsAlreadySpent);
+            : charterTurn
+              ? computeIterationStepCap({
+                  itemBudget: 1,
+                  deliverables: CHARTER_TURN_DELIVERABLES,
+                })
+              : editableContentId
+                ? 8
+                : 7;
+      // The tail this turn reserves: the run's declared deliverables, or the
+      // charter's write tools. Null for plain chat turns (no tail).
+      const tailDeliverables: readonly string[] | null =
+        itemIterationBudget != null
+          ? itemIterationDeliverables
+          : charterTurn
+            ? CHARTER_TURN_DELIVERABLES
+            : null;
+      const tailToolsForTurn = tailDeliverables
+        ? reservedTailTools(tailDeliverables, {
+            record: itemIterationBudget != null,
+            extra: charterTurn ? CHARTER_TAIL_EXTRA : [],
+          })
+        : [];
+      // What is left of the turn's cap for THIS request — with a floor, so
+      // an approval continuation can still perform the approved action,
+      // follow through, and answer (§9: a continuation used to inherit
+      // 8 → 3 → 1 and die on the step meant to write the document).
+      const stepCap = continuationStepCap({
+        rawStepCap,
+        stepsAlreadySpent,
+        tailDeliverables,
+      });
       const stepCapSource: StepCapSource =
         itemIterationBudget != null
           ? "item-iteration"
           : researchPageBudget != null
             ? "research"
-            : editableContentId
-              ? "editable"
-              : "base";
+            : charterTurn
+              ? "charter"
+              : editableContentId
+                ? "editable"
+                : "base";
       const reasoningConfigSummary = describeReasoningConfig(
         executedVendorId,
         reasoningProviderOptions !== undefined,
@@ -2850,20 +2915,20 @@ export async function POST(request: Request) {
             }
           }
           if (stepNumber < stepCap - 1) {
-            if (itemIterationBudget == null) return { activeTools: stepActiveTools };
+            if (!tailDeliverables) return { activeTools: stepActiveTools };
             // DELIVERABLE-TAIL RESERVATION (plan §6b, prod 5e5b739d): the
             // final-step rule generalised. The last `tail` steps of an item
-            // run keep only the run's deliverables + record + close tools
-            // callable, so research physically cannot consume them — and
-            // every step tells the model where it stands, since a budget it
-            // cannot see is a budget it cannot plan against.
+            // run — or of a charter turn (§9) — keep only the deliverables
+            // + record/close tools callable, so research physically cannot
+            // consume them — and every step tells the model where it
+            // stands, since a budget it cannot see is a budget it cannot
+            // plan against.
             const remaining = stepCap - stepNumber;
-            const tail = reservedTailSize(itemIterationDeliverables);
+            const tail = reservedTailSize(tailDeliverables);
             const inTail = remaining <= tail + 1; // +1: the text-only last step
-            const tailTools = reservedTailTools(itemIterationDeliverables);
             const narrowed =
               inTail && stepActiveTools
-                ? stepActiveTools.filter((t) => tailTools.includes(t))
+                ? stepActiveTools.filter((t) => tailToolsForTurn.includes(t))
                 : stepActiveTools;
             if (inTail) stepsTracker.tailReservedSteps += 1;
             return {
@@ -2875,7 +2940,8 @@ export async function POST(request: Request) {
                   content: stepsRemainingNotice({
                     stepNumber,
                     stepCap,
-                    deliverables: itemIterationDeliverables,
+                    deliverables: tailDeliverables,
+                    tailTools: tailToolsForTurn,
                   }),
                 },
               ],
