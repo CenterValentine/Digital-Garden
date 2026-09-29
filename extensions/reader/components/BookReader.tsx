@@ -9,6 +9,7 @@ import {
   ChevronRight,
   Copy,
   Highlighter,
+  Info,
   List,
   Loader2,
   MessageSquarePlus,
@@ -34,6 +35,7 @@ import { ReaderApiError, readerApi } from "../lib/api";
 import { attachSanitizer } from "../lib/sanitize";
 import { useReaderPreferences, type ReaderTheme } from "../state/reader-store";
 import { AnnotationsPanel } from "./AnnotationsPanel";
+import { BookDetailsPanel } from "./BookDetailsPanel";
 
 export const HIGHLIGHT_CSS: Record<string, string> = {
   yellow: "rgba(250, 204, 21, 0.45)",
@@ -105,7 +107,7 @@ export function BookReader({ contentId }: { contentId: string }) {
   const [toc, setToc] = useState<FoliateTocItem[]>([]);
   const [location, setLocation] = useState<{ fraction: number; label?: string }>({ fraction: 0 });
   const [annotations, setAnnotations] = useState<ReaderAnnotationDto[]>([]);
-  const [panel, setPanel] = useState<"none" | "toc" | "notes" | "settings">("none");
+  const [panel, setPanel] = useState<"none" | "toc" | "notes" | "settings" | "about">("none");
   const [selection, setSelection] = useState<SelectionState | null>(null);
   const [noteDraft, setNoteDraft] = useState<string | null>(null);
 
@@ -455,6 +457,9 @@ export function BookReader({ contentId }: { contentId: string }) {
             ))}
           </select>
         )}
+        <button type="button" title="About this book" onClick={() => setPanel(panel === "about" ? "none" : "about")} className="rounded p-1.5 hover:bg-black/5 dark:hover:bg-white/10">
+          <Info className="h-4 w-4" />
+        </button>
         <button type="button" title="Bookmark this page" onClick={() => void addBookmark()} className="rounded p-1.5 hover:bg-black/5 dark:hover:bg-white/10">
           <Bookmark className="h-4 w-4" />
         </button>
@@ -613,6 +618,31 @@ export function BookReader({ contentId }: { contentId: string }) {
               </div>
             </div>
           </aside>
+        )}
+
+        {panel === "about" && meta && (
+          <BookDetailsPanel
+            className="w-80 shrink-0 rounded-none border-y-0 border-r-0"
+            subject={{
+              title: meta.title,
+              authors: meta.authors,
+              coverUrl: meta.coverUrl,
+              summary: meta.description,
+              publishedYear: meta.publishedYear,
+              language: meta.language,
+              license: meta.license,
+              isbn: meta.isbn,
+              publisher: meta.publisher,
+            }}
+            query={{
+              title: meta.title,
+              author: meta.authors[0],
+              isbn: meta.isbn ?? undefined,
+              openLibraryId: meta.openLibraryId ?? undefined,
+              contentId,
+            }}
+            onClose={() => setPanel("none")}
+          />
         )}
 
         {panel === "notes" && (

@@ -5,6 +5,8 @@
 
 import type {
   AcquireResult,
+  BookDetails,
+  BookDetailsQuery,
   BookMetaDto,
   BookSourceInfo,
   CatalogEntry,
@@ -76,6 +78,13 @@ export const readerApi = {
     parentId?: string | null;
   }) => call<AcquireResult>("/api/reader/acquire", json("POST", input)),
   books: () => call<{ books: BookMetaDto[] }>("/api/reader/books"),
+  details: (query: BookDetailsQuery) => {
+    const params = new URLSearchParams();
+    for (const [key, value] of Object.entries(query)) {
+      if (value) params.set(key, String(value));
+    }
+    return call<BookDetails>(`/api/reader/details?${params.toString()}`);
+  },
   book: (contentId: string) =>
     call<{ meta: BookMetaDto; progress: ReadingProgressDto | null; drmMessage: string | null }>(
       `/api/reader/books/${contentId}`

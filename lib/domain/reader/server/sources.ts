@@ -514,7 +514,7 @@ interface GoogleVolume {
   };
 }
 
-async function googleBooksKey(ownerId: string): Promise<string | undefined> {
+export async function googleBooksKey(ownerId: string): Promise<string | undefined> {
   try {
     const connection = await readerDb.readerConnection.findFirst({
       where: { ownerId, provider: "google-books" },

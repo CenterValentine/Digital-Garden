@@ -21,6 +21,11 @@ import type {
 } from "@/lib/domain/reader/types";
 import { readerApi } from "../lib/api";
 import { useReaderSession } from "../state/reader-store";
+import {
+  BookDetailsPanel,
+  queryFromEntry,
+  subjectFromEntry,
+} from "./BookDetailsPanel";
 import { CatalogEntryCard } from "./CatalogEntryCard";
 import { ConnectionsPanel, ImportPanel } from "./IntegrationsPanel";
 
@@ -98,8 +103,14 @@ function ResultsList({
   onNavigate?: (href: string, title: string) => void;
 }) {
   const acquire = useAcquire();
+  const [selected, setSelected] = useState<CatalogEntry | null>(null);
+  const entries = uniqueEntries(page.entries);
+  // A panel for an entry that scrolled out of a new result set closes itself.
+  const selectedEntry =
+    selected && entries.some((entry) => entryKey(entry) === entryKey(selected)) ? selected : null;
   return (
-    <div className="space-y-3">
+    <div className="flex items-start gap-4">
+    <div className="min-w-0 flex-1 space-y-3">
       {page.navigation.length > 0 && onNavigate && (
         <ul className="grid gap-1 sm:grid-cols-2">
           {page.navigation.map((nav) => (
@@ -123,10 +134,12 @@ function ResultsList({
       )}
       {page.entries.length > 0 && (
         <div className="grid gap-3 lg:grid-cols-2">
-          {uniqueEntries(page.entries).map((entry) => (
+          {entries.map((entry) => (
             <CatalogEntryCard
               key={entryKey(entry)}
               entry={entry}
+              selected={selectedEntry !== null && entryKey(selectedEntry) === entryKey(entry)}
+              onOpen={setSelected}
               onAdd={(target, index) => acquire(sourceId, target, index)}
             />
           ))}
@@ -149,11 +162,24 @@ function ResultsList({
         </button>
       )}
     </div>
+      {selectedEntry && (
+        <BookDetailsPanel
+          key={entryKey(selectedEntry)}
+          className="sticky top-0 max-h-[calc(100vh-12rem)] w-80 shrink-0 xl:w-96"
+          subject={subjectFromEntry(selectedEntry)}
+          query={queryFromEntry(sourceId, selectedEntry)}
+          entry={selectedEntry}
+          onAdd={(target, index) => acquire(sourceId, target, index)}
+          onClose={() => setSelected(null)}
+        />
+      )}
+    </div>
   );
 }
 
 function MyBooks({ onFind }: { onFind: () => void }) {
   const [books, setBooks] = useState<BookMetaDto[] | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -170,6 +196,8 @@ function MyBooks({ onFind }: { onFind: () => void }) {
       cancelled = true;
     };
   }, []);
+
+  const selectedBook = books?.find((book) => book.contentId === selectedId) ?? null;
 
   if (!books) return <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />;
   if (error) return <p className="text-sm text-muted-foreground">{error}</p>;
@@ -193,13 +221,18 @@ function MyBooks({ onFind }: { onFind: () => void }) {
     );
   }
   return (
-    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+    <div className="flex items-start gap-4">
+    <div className="grid min-w-0 flex-1 grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5">
       {books.map((book) => (
         <button
           key={book.contentId}
           type="button"
-          onClick={() => openBook(book.contentId, book.title)}
-          className="group flex flex-col gap-1 text-left"
+          onClick={() => setSelectedId(book.contentId)}
+          onDoubleClick={() => openBook(book.contentId, book.title)}
+          title="Click for details · double-click to read"
+          className={`group flex flex-col gap-1 rounded-md text-left ${
+            selectedId === book.contentId ? "ring-2 ring-primary ring-offset-2 ring-offset-background" : ""
+          }`}
         >
           <div className="aspect-[2/3] overflow-hidden rounded-md bg-black/5 shadow-sm transition group-hover:shadow-md dark:bg-white/5">
             {book.coverUrl ? (
@@ -227,6 +260,33 @@ function MyBooks({ onFind }: { onFind: () => void }) {
           )}
         </button>
       ))}
+    </div>
+      {selectedBook && (
+        <BookDetailsPanel
+          key={selectedBook.contentId}
+          className="sticky top-0 max-h-[calc(100vh-12rem)] w-80 shrink-0 xl:w-96"
+          subject={{
+            title: selectedBook.title,
+            authors: selectedBook.authors,
+            coverUrl: selectedBook.coverUrl,
+            summary: selectedBook.description,
+            publishedYear: selectedBook.publishedYear,
+            language: selectedBook.language,
+            license: selectedBook.license,
+            isbn: selectedBook.isbn,
+            publisher: selectedBook.publisher,
+          }}
+          query={{
+            title: selectedBook.title,
+            author: selectedBook.authors[0],
+            isbn: selectedBook.isbn ?? undefined,
+            openLibraryId: selectedBook.openLibraryId ?? undefined,
+            contentId: selectedBook.contentId,
+          }}
+          onRead={() => openBook(selectedBook.contentId, selectedBook.title)}
+          onClose={() => setSelectedId(null)}
+        />
+      )}
     </div>
   );
 }

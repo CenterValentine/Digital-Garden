@@ -7,7 +7,7 @@ import {
   type CatalogEntry,
 } from "@/lib/domain/reader/types";
 
-const FORMAT_LABELS: Record<string, string> = {
+export const FORMAT_LABELS: Record<string, string> = {
   "application/epub+zip": "EPUB",
   "application/pdf": "PDF",
   "application/x-mobipocket-ebook": "MOBI",
@@ -16,7 +16,7 @@ const FORMAT_LABELS: Record<string, string> = {
   "application/vnd.comicbook+zip": "CBZ",
 };
 
-const LICENSE_LABELS: Record<string, string> = {
+export const LICENSE_LABELS: Record<string, string> = {
   "public-domain": "Public domain",
   "creative-commons": "Creative Commons",
   owned: "Yours",
@@ -29,9 +29,12 @@ export function formatLabel(type: string): string {
 interface CatalogEntryCardProps {
   entry: CatalogEntry;
   onAdd: (entry: CatalogEntry, acquisitionIndex: number) => Promise<void>;
+  /** Open the details panel (cover / title click). */
+  onOpen?: (entry: CatalogEntry) => void;
+  selected?: boolean;
 }
 
-export function CatalogEntryCard({ entry, onAdd }: CatalogEntryCardProps) {
+export function CatalogEntryCard({ entry, onAdd, onOpen, selected }: CatalogEntryCardProps) {
   const readable = entry.acquisitions
     .map((acquisition, index) => ({ acquisition, index }))
     .filter(({ acquisition }) => FORMAT_LABELS[acquisition.type.split(";")[0]]);
@@ -41,8 +44,17 @@ export function CatalogEntryCard({ entry, onAdd }: CatalogEntryCardProps) {
   const paidOnly = entry.acquisitions.length > 0 && readable.length === 0;
 
   return (
-    <article className="flex gap-3 rounded-lg border border-black/10 p-3 dark:border-white/10">
-      <div className="h-28 w-20 shrink-0 overflow-hidden rounded bg-black/5 dark:bg-white/5">
+    <article
+      className={`flex gap-3 rounded-lg border p-3 ${
+        selected ? "border-primary" : "border-black/10 dark:border-white/10"
+      }`}
+    >
+      <button
+        type="button"
+        onClick={() => onOpen?.(entry)}
+        title="About this book"
+        className="h-28 w-20 shrink-0 overflow-hidden rounded bg-black/5 dark:bg-white/5"
+      >
         {entry.coverUrl && !coverFailed ? (
           // eslint-disable-next-line @next/next/no-img-element -- remote catalog covers, arbitrary hosts
           <img
@@ -58,9 +70,13 @@ export function CatalogEntryCard({ entry, onAdd }: CatalogEntryCardProps) {
             <BookOpen className="h-6 w-6 text-muted-foreground" />
           </div>
         )}
-      </div>
+      </button>
       <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <h3 className="line-clamp-2 text-sm font-semibold">{entry.title}</h3>
+        <h3 className="line-clamp-2 text-sm font-semibold">
+          <button type="button" onClick={() => onOpen?.(entry)} className="text-left hover:underline">
+            {entry.title}
+          </button>
+        </h3>
         {entry.authors.length > 0 && (
           <p className="truncate text-xs text-muted-foreground">{entry.authors.join(", ")}</p>
         )}

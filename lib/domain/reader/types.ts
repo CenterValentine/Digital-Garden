@@ -188,6 +188,31 @@ export interface CatalogPage {
   searchTemplate?: string;
 }
 
+/** Enriched details for the book panel (fetched when a book is opened). */
+export interface BookDetails {
+  description: string | null;
+  /** Human label of where the description came from ("Open Library", …). */
+  descriptionSource: string | null;
+  subjects: string[];
+  pageCount: number | null;
+  publisher: string | null;
+  publishedYear: number | null;
+  isbn: string | null;
+  coverUrl: string | null;
+}
+
+/** What the client knows about a book when it asks for details. */
+export interface BookDetailsQuery {
+  sourceId?: string;
+  entryId?: string;
+  title: string;
+  author?: string;
+  isbn?: string;
+  openLibraryId?: string;
+  /** Library book to back-fill (BookMeta.description) when it had none. */
+  contentId?: string;
+}
+
 export interface AcquireResult {
   contentId: string;
   title: string;
