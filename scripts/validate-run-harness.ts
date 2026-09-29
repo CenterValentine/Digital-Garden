@@ -377,3 +377,53 @@ if (errors.length > 0) {
   process.exit(1);
 }
 console.log("✓ run-harness:check §8 — per-step long-context tier; prefix diagnostic locates a mid-prompt change");
+
+// ── write-args — the document body under any sibling key ─────────────────────
+
+import { resolveDocumentArgs } from "../lib/domain/ai/tools/write-args";
+
+{
+  // Prod f51fa2d8: a full resume sent as `content` to create_docx.
+  const asContent = resolveDocumentArgs(
+    { title: "David Valentine — Resume", content: "# David Valentine\n\nSummary…" },
+    { toolName: "create_docx", canonicalBodyKey: "markdown" },
+  );
+  assert(asContent.ok && asContent.body?.startsWith("# David"), "write-args: `content` is read as the docx body");
+  assert(asContent.shapeNotes.some((n) => /content/.test(n)), "write-args: the alias read is reported");
+
+  const canonical = resolveDocumentArgs(
+    { title: "T", markdown: "body" },
+    { toolName: "create_docx", canonicalBodyKey: "markdown" },
+  );
+  assert(canonical.ok && canonical.shapeNotes.length === 0, "write-args: the documented key needs no note");
+
+  const noBody = resolveDocumentArgs(
+    { title: "T", parentId: "x" },
+    { toolName: "create_docx", canonicalBodyKey: "markdown" },
+  );
+  assert(!noBody.ok && /markdown/.test(noBody.refusal ?? "") && /content, body, text/.test(noBody.refusal ?? ""), "write-args: a missing body is a teaching refusal naming the accepted keys");
+
+  const noTitle = resolveDocumentArgs(
+    { markdown: "## Tailored Resume\n\ntext" },
+    { toolName: "create_docx", canonicalBodyKey: "markdown" },
+  );
+  assert(noTitle.ok && noTitle.title === "Tailored Resume", `write-args: a missing title falls back to the first heading (got ${noTitle.title})`);
+
+  const loc = resolveDocumentArgs(
+    { title: "T", markdown: "x", outputLocation: "Under Content" },
+    { toolName: "create_docx", canonicalBodyKey: "markdown" },
+  );
+  assert(loc.ok && loc.outputLocation === "under_content", "write-args: outputLocation resolves by meaning");
+  const badLoc = resolveDocumentArgs(
+    { title: "T", markdown: "x", outputLocation: "somewhere" },
+    { toolName: "create_docx", canonicalBodyKey: "markdown" },
+  );
+  assert(badLoc.ok && badLoc.outputLocation === undefined && badLoc.shapeNotes.some((n) => /ignored/.test(n)), "write-args: an unknown outputLocation is ignored with a note, never fatal");
+}
+
+if (errors.length > 0) {
+  console.error(`\n✖ run-harness:check (write-args) failed — ${errors.length} problem(s):\n`);
+  for (const e of errors) console.error(`  ${e}\n`);
+  process.exit(1);
+}
+console.log("✓ run-harness:check write-args — the document body is read under any sibling key; a miss teaches");
