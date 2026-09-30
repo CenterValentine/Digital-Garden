@@ -90,6 +90,11 @@ export interface BookMetaDto {
   sourceUrl: string | null;
   license: BookLicense;
   readingStatus: ReadingStatus | null;
+  /**
+   * "file" = a readable book file; "link" = a catalog book with no free
+   * download, kept as an external link to its source (an `external` node).
+   */
+  kind?: "file" | "link";
 }
 
 /** Book file formats the reader opens. */

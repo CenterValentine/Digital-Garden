@@ -24,6 +24,7 @@ import {
 import { describeDrm, inspectEpub, type EpubInspection } from "./epub";
 import { MAX_BOOK_BYTES, ReaderFetchError, readerFetch } from "./http";
 import { resolveAcquisition } from "./sources";
+import { normalizeUrl, validateExternalUrl } from "@/lib/domain/content/external-validation";
 
 export const LIBRARY_FOLDER_TITLE = "Books";
 
@@ -414,5 +415,88 @@ export async function listLibraryBooks(ownerId: string): Promise<BookMetaDto[]> 
     orderBy: { updatedAt: "desc" },
     take: 500,
   });
-  return rows.map(toBookMetaDto);
+  const types = await prisma.contentNode.findMany({
+    where: { id: { in: rows.map((row) => row.contentId) }, ownerId },
+    select: { id: true, contentType: true },
+  });
+  const linkIds = new Set(types.filter((node) => node.contentType === "external").map((node) => node.id));
+  return rows.map((row) => ({
+    ...toBookMetaDto(row),
+    kind: linkIds.has(row.contentId) ? "link" : "file",
+  }));
+}
+
+/**
+ * A catalog book with no free download (borrow-only, in copyright, preview
+ * only) still belongs in the user's library as a *reference*: an external
+ * link node to its source page, carrying BookMeta so it shows in My books,
+ * gets details and AI context, and can be shelved like any book.
+ */
+export async function addLinkBook(input: {
+  ownerId: string;
+  sourceId: string;
+  entry: CatalogEntry;
+  parentId?: string | null;
+}): Promise<AcquireResult> {
+  const { ownerId, sourceId, entry } = input;
+  const url = entry.externalUrl;
+  if (!url) throw new ReaderFetchError("This book has no source page to link to", 400);
+  const verdict = validateExternalUrl(url);
+  if (!verdict.valid) throw new ReaderFetchError(verdict.error ?? "Invalid source link", 400);
+  const normalizedUrl = normalizeUrl(url);
+  const parentId = await resolveFolderTarget(ownerId, input.parentId);
+
+  const sameLinks = await prisma.contentNode.findMany({
+    where: { ownerId, deletedAt: null, contentType: "external", externalPayload: { normalizedUrl } },
+    select: { id: true },
+    take: 20,
+  });
+  for (const candidate of sameLinks) {
+    const meta = await readerDb.bookMeta.findUnique({ where: { contentId: candidate.id } });
+    if (meta) return { contentId: candidate.id, title: entry.title, parentId, duplicate: true };
+  }
+
+  const title = entry.title.slice(0, 255);
+  const parsed = new URL(url);
+  const created = await prisma.contentNode.create({
+    data: {
+      ownerId,
+      title,
+      slug: await generateUniqueSlug(title, ownerId),
+      contentType: "external",
+      parentId,
+      displayOrder: 0,
+      externalPayload: {
+        create: {
+          url,
+          normalizedUrl,
+          canonicalUrl: normalizedUrl,
+          subtype: "website",
+          description: entry.summary?.slice(0, 2000) ?? null,
+          resourceType: "book",
+          sourceDomain: parsed.hostname.replace(/^www\./, ""),
+          sourceHostname: parsed.hostname,
+          preview: {},
+        },
+      },
+    },
+    select: { id: true },
+  });
+
+  await upsertBookMeta(ownerId, created.id, {
+    title: entry.title,
+    authors: entry.authors,
+    language: entry.language ?? null,
+    description: entry.summary ?? null,
+    publisher: null,
+    publishedYear: entry.publishedYear ?? null,
+    isbn: entry.isbn ?? null,
+    openLibraryId: entry.openLibraryId ?? null,
+    coverUrl: entry.coverUrl ?? null,
+    sourceAdapter: sourceId,
+    sourceUrl: url,
+    sourceEntryId: entry.id.slice(0, 255),
+    license: entry.license ?? "unknown",
+  });
+  return { contentId: created.id, title: entry.title, parentId, duplicate: false };
 }

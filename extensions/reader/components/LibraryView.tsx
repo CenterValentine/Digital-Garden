@@ -225,10 +225,14 @@ function MyBooks({ onFind }: { onFind: () => void }) {
           title={book.title}
           authors={book.authors}
           coverUrl={book.coverUrl}
-          status={book.readingStatus ? STATUS_LABELS[book.readingStatus] : null}
+          status={
+            [book.kind === "link" ? "Link" : null, book.readingStatus ? STATUS_LABELS[book.readingStatus] : null]
+              .filter(Boolean)
+              .join(" · ") || null
+          }
           selected={selectedId === book.contentId}
           onSelect={() => select({ kind: "book", book })}
-          onOpen={() => openBookTab(book.contentId, book.title)}
+          onOpen={() => openBookTab(book.contentId, book.title, book.kind ?? "file")}
         />
       ))}
     </div>

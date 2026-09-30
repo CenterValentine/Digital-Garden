@@ -37,7 +37,7 @@ function openLibrary(parentId: string | null) {
 function openBook(book: BookMetaDto) {
   useContentStore.getState().setSelectedContentId(book.contentId, {
     title: book.title,
-    contentType: "file",
+    contentType: book.kind === "link" ? "external" : "file",
     pin: true,
   });
 }

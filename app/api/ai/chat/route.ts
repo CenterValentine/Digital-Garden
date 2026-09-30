@@ -1939,8 +1939,11 @@ export async function POST(request: Request) {
               mentionedNodes
                 .filter(
                   (node) =>
-                    node.contentType === "file" &&
-                    isBookMimeType(node.filePayload?.mimeType),
+                    (node.contentType === "file" &&
+                      isBookMimeType(node.filePayload?.mimeType)) ||
+                    // Library books kept as links (no free download);
+                    // the capsule returns null for ordinary links.
+                    node.contentType === "external",
                 )
                 .map(async (node) => {
                   const capsule = await buildBookCapsule(session.user.id, node.id);

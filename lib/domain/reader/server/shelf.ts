@@ -26,7 +26,12 @@ export async function placeBookShortcut(
   input: { contentId: string; parentId: string | null }
 ): Promise<PlaceBookResult> {
   const book = await prisma.contentNode.findFirst({
-    where: { id: input.contentId, ownerId, deletedAt: null, contentType: "file" },
+    where: {
+      id: input.contentId,
+      ownerId,
+      deletedAt: null,
+      contentType: { in: ["file", "external"] },
+    },
     select: { id: true, title: true, parentId: true },
   });
   if (!book) throw new ReaderFetchError("Book not found", 404);

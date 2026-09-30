@@ -6,6 +6,7 @@ import {
   Download,
   ExternalLink,
   Library,
+  Link2,
   Loader2,
   X,
 } from "lucide-react";
@@ -38,6 +39,8 @@ interface BookDetailsPanelProps {
   /** Catalog entry → offer Add (with the enriched description). */
   entry?: CatalogEntry;
   onAdd?: (entry: CatalogEntry, acquisitionIndex: number) => Promise<void>;
+  /** No free download: keep the book as a link to its source. */
+  onAddLink?: (entry: CatalogEntry) => Promise<void>;
   /** Library book → offer Read. */
   onRead?: () => void;
   /** Extra buttons beside Read/Add (e.g. "Add shortcut here"). */
@@ -57,6 +60,7 @@ export function BookDetailsPanel({
   onClose,
   entry,
   onAdd,
+  onAddLink,
   onRead,
   extraActions,
   className,
@@ -170,6 +174,25 @@ export function BookDetailsPanel({
             >
               {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
               Add to library ({formatLabel(readable[0].acquisition.type)})
+            </button>
+          )}
+          {entry && onAddLink && readable.length === 0 && entry.externalUrl && (
+            <button
+              type="button"
+              disabled={busy}
+              title="No free download — save it to your library as a link to its source page"
+              onClick={async () => {
+                setBusy(true);
+                try {
+                  await onAddLink({ ...entry, summary: longer(entry.summary, details?.description) });
+                } finally {
+                  setBusy(false);
+                }
+              }}
+              className="inline-flex h-8 items-center gap-1 rounded bg-primary px-3 text-xs font-medium text-primary-foreground disabled:opacity-60"
+            >
+              {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Link2 className="h-3.5 w-3.5" />}
+              Add to library as link
             </button>
           )}
           {entry?.externalUrl && (

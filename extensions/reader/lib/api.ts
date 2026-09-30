@@ -78,6 +78,8 @@ export const readerApi = {
     parentId?: string | null;
   }) => call<AcquireResult>("/api/reader/acquire", json("POST", input)),
   books: () => call<{ books: BookMetaDto[] }>("/api/reader/books"),
+  addLink: (input: { sourceId: string; entry: CatalogEntry; parentId?: string | null }) =>
+    call<AcquireResult>("/api/reader/acquire/link", json("POST", input)),
   placeOnShelf: (input: { contentId: string; parentId: string | null }) =>
     call<{
       folderId: string | null;

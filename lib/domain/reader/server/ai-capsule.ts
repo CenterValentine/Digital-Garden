@@ -12,6 +12,7 @@
  */
 
 import "server-only";
+import { prisma } from "@/lib/database/client";
 import { readerDb } from "../db";
 import {
   contentTargetKey,
@@ -69,10 +70,20 @@ export async function buildBookCapsule(
     meta.isbn ? `ISBN ${meta.isbn}` : null,
   ].filter(Boolean);
 
-  const lines: string[] = [
-    `E-book in the user's library: "${meta.title}"${facts.length ? ` — ${facts.join(" · ")}` : ""}.`,
-    `Content id ${contentId}. read_content returns an excerpt of its text; the user reads and highlights it in Digital Garden's reader.`,
-  ];
+  const node = await prisma.contentNode.findFirst({
+    where: { id: contentId, ownerId },
+    select: { contentType: true },
+  });
+  const isLink = node?.contentType === "external";
+  const lines: string[] = isLink
+    ? [
+        `Book in the user's library, kept as a reference link (no local copy): "${meta.title}"${facts.length ? ` — ${facts.join(" · ")}` : ""}.`,
+        `Content id ${contentId}. Its source page: ${meta.sourceUrl ?? "unknown"}. The full text is not in Digital Garden — don't quote from memory.`,
+      ]
+    : [
+        `E-book in the user's library: "${meta.title}"${facts.length ? ` — ${facts.join(" · ")}` : ""}.`,
+        `Content id ${contentId}. read_content returns an excerpt of its text; the user reads and highlights it in Digital Garden's reader.`,
+      ];
   if (meta.readingStatus) {
     lines.push(
       `Reading status: ${

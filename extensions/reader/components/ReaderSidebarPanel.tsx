@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { BookOpen } from "lucide-react";
 import { READER_LIBRARY_CONTENT_ID } from "../manifest";
 import { readerApi } from "../lib/api";
-import { openBookTab, useAcquire } from "../lib/use-acquire";
+import { openBookTab, useAcquire, useAddLink } from "../lib/use-acquire";
 import { useReaderSession } from "../state/reader-store";
 import { BookDetailsPanel, queryFromEntry, subjectFromEntry } from "./BookDetailsPanel";
 
@@ -18,6 +18,7 @@ export function ReaderSidebarPanel({ contentId }: { contentId: string }) {
   const setSelection = useReaderSession((state) => state.setSidebarSelection);
   const targetParentId = useReaderSession((state) => state.libraryTargetParentId);
   const acquire = useAcquire();
+  const addLink = useAddLink();
   const [placing, setPlacing] = useState(false);
   const inLibrary = contentId === READER_LIBRARY_CONTENT_ID;
 
@@ -43,6 +44,7 @@ export function ReaderSidebarPanel({ contentId }: { contentId: string }) {
         query={queryFromEntry(sourceId, entry)}
         entry={entry}
         onAdd={(target, index) => acquire(sourceId, target, index)}
+        onAddLink={(target) => addLink(sourceId, target)}
         onClose={close}
       />
     );
@@ -72,7 +74,7 @@ export function ReaderSidebarPanel({ contentId }: { contentId: string }) {
         openLibraryId: book.openLibraryId ?? undefined,
         contentId: book.contentId,
       }}
-      onRead={isOpenBook ? undefined : () => openBookTab(book.contentId, book.title)}
+      onRead={isOpenBook ? undefined : () => openBookTab(book.contentId, book.title, book.kind ?? "file")}
       extraActions={
         inLibrary ? (
           <button
