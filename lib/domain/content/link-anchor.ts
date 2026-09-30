@@ -12,9 +12,10 @@
  *     pending-anchor slot (state/content-anchor-store.ts); the viewer that
  *     opens the target takes it and scrolls/jumps there.
  *
- * Kinds today: `annotation` (reader highlights/notes/bookmarks). Designed for
- * more — headings in other notes, block refs, scripture verses, PDF pages,
- * media timestamps — each added by its owner, no schema change.
+ * Kinds today: `annotation` (reader highlights/notes/bookmarks) and `verse`
+ * (scripture: `verse:alma/32/21-23`, typed directly as `[[Alma 32:21`).
+ * Designed for more — headings in other notes, block refs, PDF pages, media
+ * timestamps — each added by its owner, no schema change.
  *
  * Absent `anchor` renders nothing, so every link written before this existed
  * serializes byte-identically (same contract as `targetId` / `expand`).
@@ -54,6 +55,11 @@ export interface LinkAnchorItem {
   detail?: string;
   /** Optional swatch color for the menu row. */
   color?: string;
+  /**
+   * The link's text instead of "Title › “label”" — for anchors that name
+   * themselves ("Alma 32:21").
+   */
+  display?: string;
 }
 
 /**
@@ -82,6 +88,32 @@ export async function listLinkAnchors(
 ): Promise<LinkAnchorItem[]> {
   if (!activeLister) return [];
   return (await activeLister(target, query)) ?? [];
+}
+
+/**
+ * Anchors reachable straight from what's typed after `[[`, without first
+ * picking a target — a scripture reference ("Alma 32:21") names both the
+ * collection and the verse. Returns null/[] when the query isn't one.
+ */
+export type LinkAnchorSuggester = (
+  query: string
+) => Promise<Array<{ target: LinkAnchorTarget; anchor: LinkAnchorItem }> | null>;
+
+let activeSuggester: LinkAnchorSuggester | null = null;
+
+export function setLinkAnchorSuggester(suggester: LinkAnchorSuggester | null): void {
+  activeSuggester = suggester;
+}
+
+export async function suggestLinkAnchors(
+  query: string
+): Promise<Array<{ target: LinkAnchorTarget; anchor: LinkAnchorItem }>> {
+  if (!activeSuggester) return [];
+  try {
+    return (await activeSuggester(query)) ?? [];
+  } catch {
+    return [];
+  }
 }
 
 /** Clip a label for storage on the link (it's a label, not the source of truth). */

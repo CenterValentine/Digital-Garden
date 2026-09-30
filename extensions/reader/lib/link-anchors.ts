@@ -1,5 +1,6 @@
 import type { LinkAnchorItem, LinkAnchorLister } from "@/lib/domain/content/link-anchor";
 import { contentTargetKey, type ReaderAnnotationDto } from "@/lib/domain/reader/types";
+import { corpusIdFromTabId, scriptureTargetKey, VERSE_ANCHOR_KIND } from "@/lib/domain/scripture/types";
 import { readerApi } from "./api";
 import { MARK_SWATCH, parseMark } from "./marks";
 
@@ -23,14 +24,16 @@ function toItem(annotation: ReaderAnnotationDto): LinkAnchorItem {
 
 /**
  * `[[Book#` in the link menu: the book's highlights, notes and bookmarks in
- * book order, filtered by the text typed after `#`. Only books answer (files
- * and link-books); everything else is some other provider's business.
+ * book order, filtered by the text typed after `#`. Only books (files and
+ * link-books) and scripture collections answer; everything else is some
+ * other provider's business.
  */
 export const readerLinkAnchors: LinkAnchorLister = async (target, query) => {
-  if (target.contentType !== "file" && target.contentType !== "external") return null;
+  const corpusId = corpusIdFromTabId(target.id);
+  if (!corpusId && target.contentType !== "file" && target.contentType !== "external") return null;
   let annotations: ReaderAnnotationDto[];
   try {
-    ({ annotations } = await readerApi.annotations(contentTargetKey(target.id)));
+    ({ annotations } = await readerApi.annotations(corpusId ? scriptureTargetKey(corpusId) : contentTargetKey(target.id)));
   } catch {
     return null;
   }
@@ -49,5 +52,16 @@ export const readerLinkAnchors: LinkAnchorLister = async (target, query) => {
           .filter(Boolean)
           .some((text) => text!.toLowerCase().includes(q))
     )
-    .map(toItem);
+    .map((annotation) => (corpusId ? toVerseItem(annotation) : toItem(annotation)));
 };
+
+/**
+ * Scripture highlights link by passage (`verse:alma/32/21-23`), not by the
+ * highlight's id: the verses are fixed text, so the link outlives the mark.
+ */
+function toVerseItem(annotation: ReaderAnnotationDto): LinkAnchorItem {
+  const item = toItem(annotation);
+  const href = annotation.locator.href;
+  const reference = annotation.locator.label;
+  return href ? { ...item, anchor: `${VERSE_ANCHOR_KIND}:${href}`, display: reference } : item;
+}

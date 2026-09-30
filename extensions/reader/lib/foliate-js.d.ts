@@ -56,6 +56,13 @@ declare module "foliate-js/view.js" {
     addAnnotation(annotation: FoliateAnnotation, remove?: boolean): Promise<unknown>;
     deleteAnnotation(annotation: FoliateAnnotation): Promise<unknown>;
     showAnnotation(annotation: FoliateAnnotation): Promise<void>;
+    /** Full-text search; yields per-section results, progress, then "done". */
+    search(options: { query: string; index?: number; matchCase?: boolean; matchDiacritics?: boolean; matchWholeWords?: boolean }): AsyncGenerator<
+      | { label: string; subitems: Array<{ cfi: string; excerpt: { pre: string; match: string; post: string } }> }
+      | { progress: number }
+      | "done"
+    >;
+    clearSearch(): void;
   }
 
   export function makeBook(file: File | Blob | string): Promise<FoliateBook>;

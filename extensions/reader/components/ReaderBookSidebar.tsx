@@ -1,7 +1,7 @@
 "use client";
 
-import type { ReactNode } from "react";
-import { Info, List, NotebookPen, Settings2, X, type LucideIcon } from "lucide-react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Info, List, Loader2, NotebookPen, Search, Settings2, X, type LucideIcon } from "lucide-react";
 import {
   useReaderPreferences,
   useReaderSession,
@@ -14,6 +14,7 @@ import { AnnotationsPanel } from "./AnnotationsPanel";
 /** Icon rail, styled like the sidebar's own tab rail above it. */
 const VIEWS: Array<{ id: ReaderSidebarView; label: string; icon: LucideIcon }> = [
   { id: "contents", label: "Contents", icon: List },
+  { id: "search", label: "Search", icon: Search },
   { id: "notes", label: "Highlights & notes", icon: NotebookPen },
   { id: "settings", label: "Display settings", icon: Settings2 },
   { id: "about", label: "About this book", icon: Info },
@@ -53,7 +54,7 @@ export function ReaderBookSidebar({
             aria-selected={view === id}
             aria-label={label}
             title={label}
-            disabled={id === "about" && !about}
+            disabled={(id === "about" && !about) || (id === "search" && !book.search)}
             onClick={() => setView(contentId, id)}
             className={`relative flex flex-1 items-center justify-center py-2 transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
               view === id
@@ -93,6 +94,7 @@ export function ReaderBookSidebar({
           />
         )}
         {view === "contents" && <ContentsView book={book} />}
+        {view === "search" && book.search && <SearchView contentId={contentId} book={book} />}
         {view === "settings" && <DisplaySettings />}
         {view === "about" && about}
       </div>
@@ -191,4 +193,171 @@ function DisplaySettings() {
       </div>
     </div>
   );
+}
+
+/**
+ * Full-text search in what's open (a book, a scripture collection) — its own
+ * view in the sidebar rail, like Contents. The open item supplies the search
+ * (ReaderOpenBook.search); results stream in and keep across view switches.
+ */
+function SearchView({ contentId, book }: { contentId: string; book: ReaderOpenBook }) {
+  const search = book.search!;
+  const saved = useReaderSession((state) => state.searches[contentId] ?? null);
+  const setSearch = useReaderSession((state) => state.setSearch);
+  const [query, setQuery] = useState(saved?.query ?? "");
+  const [filters, setFilters] = useState<Record<string, string>>(() =>
+    Object.fromEntries(
+      (search.filters ?? []).map((filter) => [filter.id, saved?.filters?.[filter.id] ?? filter.options[0]?.value ?? ""])
+    )
+  );
+  const [running, setRunning] = useState(false);
+  const cancelRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => () => cancelRef.current?.(), []);
+
+  const run = (text: string, activeFilters: Record<string, string>) => {
+    const q = text.trim();
+    cancelRef.current?.();
+    if (!q) {
+      search.clear?.();
+      setSearch(contentId, null);
+      setRunning(false);
+      return;
+    }
+    setRunning(true);
+    setSearch(contentId, { query: q, hits: [], done: false, filters: activeFilters });
+    cancelRef.current = search.run(
+      q,
+      (hits, done, note) => {
+        setSearch(contentId, { query: q, hits, done, note, filters: activeFilters });
+        if (done) setRunning(false);
+      },
+      activeFilters
+    );
+  };
+
+  const hits = saved?.hits ?? [];
+  const matches = hits.filter((hit) => !hit.kind || hit.kind === "match").length;
+  const select =
+    "h-7 min-w-0 flex-1 rounded border border-black/10 bg-transparent px-1 text-[11px] dark:border-white/10";
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      <form
+        className="space-y-1.5 border-b border-black/10 p-2 dark:border-white/10"
+        onSubmit={(event) => {
+          event.preventDefault();
+          run(query, filters);
+        }}
+      >
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+          <input
+            autoFocus
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder={search.placeholder}
+            aria-label="Search"
+            className="h-8 w-full rounded border border-black/10 bg-transparent pl-7 pr-7 text-sm dark:border-white/10"
+          />
+          {running && (
+            <Loader2 className="absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 animate-spin text-muted-foreground" />
+          )}
+        </div>
+        {search.filters?.length ? (
+          <div className="flex gap-1">
+            {search.filters.map((filter) => (
+              <select
+                key={filter.id}
+                aria-label={filter.label}
+                title={filter.label}
+                value={filters[filter.id] ?? ""}
+                onChange={(event) => {
+                  const next = { ...filters, [filter.id]: event.target.value };
+                  setFilters(next);
+                  if (query.trim()) run(query, next);
+                }}
+                className={select}
+              >
+                {filter.options.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            ))}
+          </div>
+        ) : null}
+      </form>
+      <div className="min-h-0 flex-1 overflow-auto p-2 text-xs">
+        {saved && (
+          <p className="px-2 pb-2 text-muted-foreground">
+            {saved.note ??
+              (matches === 0
+                ? saved.done
+                  ? hits.length
+                    ? "No verses match."
+                    : "No matches."
+                  : "Searching…"
+                : `${matches} match${matches === 1 ? "" : "es"}${saved.done ? "" : "…"}`)}
+          </p>
+        )}
+        {hits.map((hit) => (
+          <button
+            key={hit.id}
+            type="button"
+            onClick={() => search.go(hit)}
+            className={`mb-1 block w-full rounded px-2 py-1 text-left hover:bg-black/5 dark:hover:bg-white/5 ${
+              hit.kind === "jump" || hit.kind === "place" ? "border border-primary/30 bg-primary/5" : ""
+            }`}
+          >
+            <span className="font-medium">{hit.label}</span>
+            {hit.detail && <span className="ml-1.5 text-muted-foreground">{hit.detail}</span>}
+            {hit.parts ? (
+              <span className="line-clamp-3 text-muted-foreground">
+                {excerptWindow(hit.parts).map((part, index) =>
+                  part.hit ? (
+                    <mark key={index} className={MARK_CLASS}>
+                      {part.text}
+                    </mark>
+                  ) : (
+                    <span key={index}>{part.text}</span>
+                  )
+                )}
+              </span>
+            ) : hit.excerpt ? (
+              <span className="line-clamp-3 text-muted-foreground">
+                {hit.excerpt.pre}
+                <mark className={MARK_CLASS}>{hit.excerpt.match}</mark>
+                {hit.excerpt.post}
+              </span>
+            ) : null}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+const MARK_CLASS = "rounded-sm bg-yellow-300/60 px-0.5 text-foreground dark:bg-yellow-500/40";
+
+/** Start the excerpt shortly before the first match, so a late match isn't clamped away. */
+function excerptWindow(parts: Array<{ text: string; hit: boolean }>): Array<{ text: string; hit: boolean }> {
+  const LEAD = 50;
+  let offset = 0;
+  for (const part of parts) {
+    if (part.hit) break;
+    offset += part.text.length;
+  }
+  if (offset <= LEAD) return parts;
+  let skip = offset - LEAD;
+  const out: Array<{ text: string; hit: boolean }> = [];
+  for (const part of parts) {
+    if (skip >= part.text.length) {
+      skip -= part.text.length;
+      continue;
+    }
+    out.push(skip > 0 ? { text: `…${part.text.slice(skip).replace(/^\S*\s/, "")}`, hit: part.hit } : part);
+    skip = 0;
+  }
+  return out;
 }

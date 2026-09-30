@@ -80,3 +80,25 @@ export const MARK_SWATCH: Record<ReaderHighlightColor, string> = {
   pink: "#ec4899",
   purple: "#a855f7",
 };
+
+/**
+ * The same marks as inline styles, for readers that render their own HTML
+ * (scriptures) rather than drawing on foliate's overlay. A span's background
+ * sits under its text, so no blend is needed: the light fill is translucent
+ * under dark ink, the dark fill opaque under light text.
+ */
+export function markInlineStyle(
+  value: string | null | undefined,
+  tone: MarkTone
+): { backgroundColor?: string; textDecorationLine?: string; textDecorationColor?: string; textDecorationThickness?: string; textUnderlineOffset?: string } {
+  const paint = markPaint(value, tone);
+  if (paint.style === "underline") {
+    return {
+      textDecorationLine: "underline",
+      textDecorationColor: paint.color,
+      textDecorationThickness: "2px",
+      textUnderlineOffset: "3px",
+    };
+  }
+  return { backgroundColor: tone === "light" ? `${paint.color}73` : paint.color };
+}
