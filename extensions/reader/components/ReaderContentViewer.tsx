@@ -7,9 +7,13 @@ import { useContentSidebarClaims } from "@/lib/extensions/content-sidebar";
 import {
   READER_EXTENSION_ID,
   READER_LIBRARY_CONTENT_ID,
+  READER_SCRIPTURES_CONTENT_ID,
   READER_VIRTUAL_PREFIX,
 } from "../manifest";
+import { corpusIdFromTabId } from "@/lib/domain/scripture/types";
 import { LibraryView } from "./LibraryView";
+import { ScriptureCatalog } from "./ScriptureCatalog";
+import { ScriptureReader } from "./ScriptureReader";
 import { ReaderErrorBoundary } from "./ReaderErrorBoundary";
 
 // foliate-js is browser-only (custom elements, Blob URLs) — never SSR it.
@@ -36,10 +40,19 @@ export function ReaderContentViewer({ selectedContentId }: ExtensionContentViewe
   }, [selectedContentId]);
 
   if (!selectedContentId) return null;
+  const corpusId = corpusIdFromTabId(selectedContentId);
   return (
     <ReaderErrorBoundary resetKey={selectedContentId}>
       {selectedContentId === READER_LIBRARY_CONTENT_ID ? (
         <LibraryView />
+      ) : selectedContentId === READER_SCRIPTURES_CONTENT_ID ? (
+        <div className="h-full overflow-auto p-6">
+          <div className="mx-auto max-w-3xl">
+            <ScriptureCatalog />
+          </div>
+        </div>
+      ) : corpusId ? (
+        <ScriptureReader key={selectedContentId} corpusId={corpusId} contentId={selectedContentId} />
       ) : selectedContentId.startsWith(READER_VIRTUAL_PREFIX) ? (
         <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
           This reader source isn&apos;t available yet.

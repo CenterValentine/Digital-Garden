@@ -107,6 +107,10 @@ export const readerApi = {
     ),
   setStatus: (contentId: string, readingStatus: ReadingStatus | null) =>
     call<{ syncedToHardcover: boolean }>(`/api/reader/books/${contentId}`, json("PATCH", { readingStatus })),
+  progress: (targetKey: string) =>
+    call<{ progress: ReadingProgressDto | null }>(
+      `/api/reader/progress?targetKey=${encodeURIComponent(targetKey)}`
+    ),
   saveProgress: (targetKey: string, locator: ReaderLocator, percent: number) =>
     call<{ progress: ReadingProgressDto }>("/api/reader/progress", json("PUT", { targetKey, locator, percent })),
   annotations: (targetKey: string) =>

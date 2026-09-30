@@ -30,6 +30,8 @@ import { buildBookIndex, formatReference, parseReference, parseReferenceList, re
 import { LDS_BOOKS, ldsShortName } from "../lib/domain/scripture/lds";
 import { normalizeLdsVolume } from "../lib/domain/scripture/adapters/lds";
 import { formatVerseHref, parseVerseHref } from "../lib/domain/scripture/types";
+import { marksForVerse, segmentVerse } from "../lib/domain/scripture/verse-marks";
+import type { ReaderAnnotationDto } from "../lib/domain/reader/types";
 
 let checks = 0;
 async function check(name: string, fn: () => void | Promise<void>) {
@@ -414,6 +416,41 @@ async function main() {
     assert.equal(dc.books[0].slug, "dc");
     assert.deepEqual(dc.verses[0], { bookSlug: "dc", chapter: 88, verse: 118, text: "seek learning, even by study and also by faith." });
     assert.throws(() => normalizeLdsVolume("bofm", { books: [{ book: "X", lds_slug: "nope", chapters: [] }] }));
+  });
+
+  await check("Scripture marks: multi-verse ranges clip per verse; segments split at every edge", () => {
+    const annotation = (id: string, href: string, start: number, end: number, color = "yellow") =>
+      ({
+        id,
+        kind: "highlight",
+        color,
+        body: null,
+        locator: { href, locations: { start, end } },
+      }) as unknown as ReaderAnnotationDto;
+    const list = [
+      annotation("a", "alma/32/21-23", 10, 5),
+      annotation("b", "alma/32/22", 3, 8, "underline:blue"),
+      annotation("c", "alma/33/22", 0, 4),
+      { ...annotation("d", "alma/32/22", 0, 0), kind: "bookmark" } as ReaderAnnotationDto,
+    ];
+    assert.deepEqual(marksForVerse(list, "alma", 32, 21, 40), [{ annotationId: "a", color: "yellow", start: 10, end: 40 }]);
+    assert.deepEqual(
+      marksForVerse(list, "alma", 32, 22, 20).map((mark) => [mark.annotationId, mark.start, mark.end]),
+      [["a", 0, 20], ["b", 3, 8]]
+    );
+    assert.deepEqual(marksForVerse(list, "alma", 32, 23, 30), [{ annotationId: "a", color: "yellow", start: 0, end: 5 }]);
+    assert.deepEqual(marksForVerse(list, "alma", 32, 24, 30), []);
+
+    const segments = segmentVerse("0123456789", [
+      { annotationId: "a", color: null, start: 0, end: 10 },
+      { annotationId: "b", color: null, start: 3, end: 8 },
+    ]);
+    assert.deepEqual(
+      segments.map((segment) => [segment.text, segment.marks.map((mark) => mark.annotationId).join("")]),
+      [["012", "a"], ["34567", "ab"], ["89", "a"]]
+    );
+    assert.equal(segments.map((segment) => segment.text).join(""), "0123456789");
+    assert.deepEqual(segmentVerse("plain", []), [{ text: "plain", start: 0, marks: [] }]);
   });
 
   console.log(`reader:check passed (${checks} checks)`);

@@ -5,7 +5,7 @@
  * Inclusive by construction: tradition is a property of a corpus, never of
  * the code. The reader, highlights, links, search and speed reading are one
  * pipeline; a tradition joins by adding an adapter that yields the same
- * book → chapter → verse rows (lib/domain/scripture/server/adapters.ts).
+ * book → chapter → verse rows (lib/domain/scripture/adapters/).
  *
  * Status:
  *   "available" — an adapter exists; the owner can install it.

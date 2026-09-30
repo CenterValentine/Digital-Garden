@@ -19,7 +19,6 @@ import type {
   ScriptureContents,
   ScriptureCorpusInfo,
   ScriptureResolvedReference,
-  ScriptureSearchHit,
   ScriptureSearchResult,
   ScriptureTradition,
   ScriptureVersification,

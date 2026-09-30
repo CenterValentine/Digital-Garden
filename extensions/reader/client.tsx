@@ -9,12 +9,14 @@ import { resolveServerCreateParent } from "@/lib/domain/content/create-target";
 import { ReaderBookshelfController } from "./components/ReaderBookshelfController";
 import { ReaderContentViewer } from "./components/ReaderContentViewer";
 import { ReaderSidebarPanel } from "./components/ReaderSidebarPanel";
+import { openScriptureTab } from "./components/ScriptureCatalog";
 import { READER_SIDEBAR_SVG_PATH } from "./lib/sidebar";
 import { readerLinkAnchors } from "./lib/link-anchors";
 import { placeShortcut } from "./lib/use-acquire";
 import {
   READER_EXTENSION_ID,
   READER_LIBRARY_CONTENT_ID,
+  READER_SCRIPTURES_CONTENT_ID,
   READER_VIRTUAL_CONTENT_TYPE,
   READER_VIRTUAL_PREFIX,
 } from "./manifest";
@@ -65,6 +67,34 @@ function truncate(text: string, max: number): string {
   return text.length > max ? `${text.slice(0, max - 1)}…` : text;
 }
 
+function openScriptureCatalog() {
+  useContentStore.getState().setSelectedContentId(READER_SCRIPTURES_CONTENT_ID, {
+    title: "Scriptures",
+    contentType: READER_VIRTUAL_CONTENT_TYPE,
+    pin: true,
+  });
+}
+
+function scriptureMenu(): ExtensionCreateMenuItem[] {
+  const { scriptures } = useReaderBookshelf.getState();
+  return [
+    ...scriptures.map<ExtensionCreateMenuItem>((corpus) => ({
+      id: `reader-scripture-${corpus.id}`,
+      label: truncate(corpus.title, 44),
+      iconName: "ScrollText",
+      title: `Open ${corpus.title}`,
+      onSelect: () => openScriptureTab(corpus.id, corpus.title),
+    })),
+    {
+      id: "reader-scripture-catalog",
+      label: scriptures.length ? "Browse traditions…" : "Browse traditions to enable…",
+      iconName: "Library",
+      title: "Scripture collections across traditions — install (owner) and enable",
+      onSelect: () => openScriptureCatalog(),
+    },
+  ];
+}
+
 function readerMenu(): ExtensionCreateMenuItem[] {
   const { books } = useReaderBookshelf.getState();
   const recent = [...books]
@@ -111,10 +141,10 @@ function readerMenu(): ExtensionCreateMenuItem[] {
         },
         {
           id: "new-reader-scriptures",
-          label: "Scriptures (coming soon)",
+          label: "Scriptures",
           iconName: "ScrollText",
-          title: "The standard works, planned — see SCRIPTURES-INTEGRATION-PLAN.md",
-          disabled: true,
+          title: "Scripture collections you've enabled — or browse the traditions",
+          submenu: scriptureMenu(),
         },
         {
           id: "new-reader-research",

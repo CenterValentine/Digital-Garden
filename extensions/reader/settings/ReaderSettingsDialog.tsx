@@ -2,6 +2,7 @@
 
 import { SettingSection } from "@/components/settings/ui";
 import { ConnectionsPanel, ImportPanel } from "../components/IntegrationsPanel";
+import { ScriptureCatalog } from "../components/ScriptureCatalog";
 import { useReaderPreferences, type ReaderFlow, type ReaderTheme } from "../state/reader-store";
 
 const THEMES: ReaderTheme[] = ["system", "light", "sepia", "dark"];
@@ -53,6 +54,13 @@ export default function ReaderSettingsDialog() {
             </div>
           </div>
         </div>
+      </SettingSection>
+
+      <SettingSection
+        title="Scriptures"
+        description="Canonical texts across traditions. The owner installs a collection once for this Digital Garden; enable the ones you want under + → Reader → Scriptures. Highlights, notes and verse links work as they do in books."
+      >
+        <ScriptureCatalog />
       </SettingSection>
 
       <SettingSection

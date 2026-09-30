@@ -7,15 +7,11 @@ import {
   Bookmark,
   ChevronLeft,
   ChevronRight,
-  Copy,
-  Highlighter,
   Info,
   List,
   Loader2,
-  MessageSquarePlus,
   NotebookPen,
   Settings2,
-  Underline,
 } from "lucide-react";
 import type {
   FoliateAnnotation,
@@ -25,8 +21,8 @@ import type {
 } from "foliate-js/view.js";
 import {
   contentTargetKey,
-  READER_HIGHLIGHT_COLORS,
   type BookMetaDto,
+  type ReaderHighlightColor,
   type ReaderAnnotationDto,
   type ReaderLocator,
   type ReadingStatus,
@@ -41,10 +37,10 @@ import type { LinkAnchor } from "@/lib/domain/content/link-anchor";
 import { ANNOTATION_ANCHOR_KIND } from "../lib/link-anchors";
 import { ReaderApiError, readerApi } from "../lib/api";
 import { attachSanitizer } from "../lib/sanitize";
+import { resolveTheme, themeTone, THEME_COLORS } from "../lib/theme";
 import { useReaderPreferences, type ReaderTheme } from "../state/reader-store";
 import {
   HIGHLIGHT_LAYER,
-  MARK_SWATCH,
   markPaint,
   markValue,
   parseMark,
@@ -52,28 +48,11 @@ import {
   type MarkTone,
 } from "../lib/marks";
 import { BookDetailsPanel } from "./BookDetailsPanel";
+import { MarkPopover } from "./MarkPopover";
 import { ContentsView, ReaderBookSidebar } from "./ReaderBookSidebar";
 import { revealReaderSidebar } from "../lib/sidebar";
 import { notifyBooksChanged } from "../state/bookshelf-store";
 import { useReaderSession, type ReaderSidebarView } from "../state/reader-store";
-
-const THEME_COLORS: Record<Exclude<ReaderTheme, "system">, { bg: string; fg: string; link: string }> = {
-  light: { bg: "#ffffff", fg: "#1f2328", link: "#0b62d6" },
-  sepia: { bg: "#f4ecd8", fg: "#3b2f1e", link: "#8a4b0f" },
-  dark: { bg: "#16181d", fg: "#d8dce3", link: "#8ab4ff" },
-};
-
-function resolveTheme(theme: ReaderTheme): Exclude<ReaderTheme, "system"> {
-  if (theme !== "system") return theme;
-  if (typeof document !== "undefined" && document.documentElement.classList.contains("dark")) {
-    return "dark";
-  }
-  return "light";
-}
-
-function themeTone(theme: ReaderTheme): MarkTone {
-  return resolveTheme(theme) === "dark" ? "dark" : "light";
-}
 
 function bookCss(fontSizePct: number, lineHeight: number, theme: ReaderTheme): string {
   const colors = THEME_COLORS[resolveTheme(theme)];
@@ -141,7 +120,6 @@ export function BookReader({ contentId }: { contentId: string }) {
   const contentsHoldTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const contentsHeldRef = useRef(false);
   const [selection, setSelection] = useState<SelectionState | null>(null);
-  const [noteDraft, setNoteDraft] = useState<string | null>(null);
   // Full-screen reading. The app's right sidebar is out of view then, so
   // highlights & notes open as a drawer inside the reader instead.
   // (Full screen itself is the content toolbar's — see content-fullscreen-store.)
@@ -368,7 +346,6 @@ export function BookReader({ contentId }: { contentId: string }) {
   // ── Actions ─────────────────────────────────────────────────────────────
   const clearSelection = useCallback(() => {
     setSelection(null);
-    setNoteDraft(null);
     for (const { doc } of viewRef.current?.renderer.getContents() ?? []) {
       doc.getSelection()?.removeAllRanges();
     }
@@ -602,7 +579,7 @@ export function BookReader({ contentId }: { contentId: string }) {
   const iconButton = "rounded p-1.5 hover:bg-black/5 dark:hover:bg-white/10";
   const pageButton =
     "inline-flex h-7 items-center gap-0.5 rounded px-1.5 text-xs hover:bg-black/5 hover:text-foreground dark:hover:bg-white/10";
-  const mark = (style: MarkStyle, color: (typeof READER_HIGHLIGHT_COLORS)[number]) => {
+  const mark = (style: MarkStyle, color: ReaderHighlightColor) => {
     setHighlightColor(color);
     void createAnnotation("highlight", markValue(style, color));
   };
@@ -729,84 +706,21 @@ export function BookReader({ contentId }: { contentId: string }) {
           )}
 
           {selection && (
-            <div
-              className="absolute z-20 -translate-x-1/2 -translate-y-full rounded-lg border border-black/10 bg-background p-1 shadow-lg dark:border-white/10"
-              style={{ left: selection.x, top: Math.max(8, selection.y - 6) }}
-              onMouseDown={(event) => event.preventDefault()}
-            >
-              {noteDraft === null ? (
-                <div className="flex flex-col gap-1">
-                  <div className="flex items-center gap-1">
-                    <Highlighter className="mx-0.5 h-3.5 w-3.5 text-muted-foreground" aria-hidden />
-                    {READER_HIGHLIGHT_COLORS.map((color) => (
-                      <button
-                        key={color}
-                        type="button"
-                        title={`Highlight ${color}`}
-                        onClick={() => mark("highlight", color)}
-                        className={`h-5 w-5 rounded-full border ${color === highlightColor ? "border-foreground" : "border-transparent"}`}
-                        style={{ background: MARK_SWATCH[color] }}
-                      />
-                    ))}
-                    <span className="mx-1 h-4 w-px bg-black/10 dark:bg-white/10" />
-                    <button type="button" title="Highlight with a note" onClick={() => setNoteDraft("")} className="rounded p-1 hover:bg-black/5 dark:hover:bg-white/10">
-                      <MessageSquarePlus className="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      title="Copy with citation"
-                      onClick={() => {
-                        const citation = `“${selection.text}” — ${title}${meta?.authors?.[0] ? `, ${meta.authors[0]}` : ""}`;
-                        void navigator.clipboard.writeText(citation).then(() => toast.success("Copied"));
-                        clearSelection();
-                      }}
-                      className="rounded p-1 hover:bg-black/5 dark:hover:bg-white/10"
-                    >
-                      <Copy className="h-4 w-4" />
-                    </button>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Underline className="mx-0.5 h-3.5 w-3.5 text-muted-foreground" aria-hidden />
-                    {READER_HIGHLIGHT_COLORS.map((color) => (
-                      <button
-                        key={color}
-                        type="button"
-                        title={`Underline ${color}`}
-                        onClick={() => mark("underline", color)}
-                        className="flex h-5 w-5 items-end justify-center rounded hover:bg-black/5 dark:hover:bg-white/10"
-                      >
-                        <span className="mb-1 h-0.5 w-3.5 rounded-full" style={{ background: MARK_SWATCH[color] }} />
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <form
-                  className="flex w-72 flex-col gap-1 p-1"
-                  onSubmit={(event) => {
-                    event.preventDefault();
-                    void createAnnotation("note", markValue("highlight", parseMark(highlightColor).color), noteDraft);
-                  }}
-                >
-                  <textarea
-                    autoFocus
-                    rows={3}
-                    value={noteDraft}
-                    onChange={(event) => setNoteDraft(event.target.value)}
-                    placeholder="Your note…"
-                    className="w-full resize-none rounded border border-black/10 bg-transparent p-1.5 text-xs dark:border-white/10"
-                  />
-                  <div className="flex justify-end gap-1">
-                    <button type="button" onClick={() => setNoteDraft(null)} className="h-7 rounded px-2 text-xs text-muted-foreground">
-                      Cancel
-                    </button>
-                    <button type="submit" className="inline-flex h-7 items-center gap-1 rounded bg-primary px-2 text-xs text-primary-foreground">
-                      <NotebookPen className="h-3.5 w-3.5" /> Save note
-                    </button>
-                  </div>
-                </form>
-              )}
-            </div>
+            <MarkPopover
+              key={selection.cfi}
+              x={selection.x}
+              y={selection.y}
+              highlightColor={highlightColor}
+              onMark={mark}
+              onNote={(body) =>
+                void createAnnotation("note", markValue("highlight", parseMark(highlightColor).color), body)
+              }
+              onCopy={() => {
+                const citation = `“${selection.text}” — ${title}${meta?.authors?.[0] ? `, ${meta.authors[0]}` : ""}`;
+                void navigator.clipboard.writeText(citation).then(() => toast.success("Copied"));
+                clearSelection();
+              }}
+            />
           )}
         </div>
 
