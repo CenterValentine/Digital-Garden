@@ -36,6 +36,9 @@ import {
   type SpeedReaderPage,
 } from "@/extensions/speed-reader/events";
 import { useContentFullscreenStore } from "@/state/content-fullscreen-store";
+import { useContentAnchorStore } from "@/state/content-anchor-store";
+import type { LinkAnchor } from "@/lib/domain/content/link-anchor";
+import { ANNOTATION_ANCHOR_KIND } from "../lib/link-anchors";
 import { ReaderApiError, readerApi } from "../lib/api";
 import { attachSanitizer } from "../lib/sanitize";
 import { useReaderPreferences, type ReaderTheme } from "../state/reader-store";
@@ -104,6 +107,12 @@ const STATUS_OPTIONS: Array<{ value: ReadingStatus | ""; label: string }> = [
 
 /** Press-and-hold on Contents opens it in the right sidebar. */
 const CONTENTS_HOLD_MS = 450;
+
+/** The annotation an anchored wiki-link points at, if it still exists. */
+function anchoredAnnotation(anchor: LinkAnchor, annotations: ReaderAnnotationDto[]): ReaderAnnotationDto | null {
+  if (anchor.kind !== ANNOTATION_ANCHOR_KIND) return null;
+  return annotations.find((annotation) => annotation.id === anchor.id) ?? null;
+}
 
 function readerLocFromUrl(): string | null {
   if (typeof window === "undefined") return null;
@@ -180,6 +189,11 @@ export function BookReader({ contentId }: { contentId: string }) {
         if (cancelled) return;
         setAnnotations(saved);
         annotationsRef.current = saved;
+        // Opened from an anchored wiki-link: start at that highlight.
+        const pending = useContentAnchorStore.getState().take(contentId);
+        const anchored = pending ? anchoredAnnotation(pending, saved) : null;
+        if (anchored?.locator.locations.cfi) lastLocation = anchored.locator.locations.cfi;
+        else if (pending) toast.info("That highlight no longer exists — opened the book where you left off");
       } catch (error) {
         // The book is still readable without the reader tables — just no
         // saved progress / highlights.
@@ -551,6 +565,16 @@ export function BookReader({ contentId }: { contentId: string }) {
 
 
 
+
+  // An anchored wiki-link clicked while this book is already open: jump.
+  const pendingAnchor = useContentAnchorStore((state) => state.pending[contentId] ?? null);
+  useEffect(() => {
+    if (!pendingAnchor || phase !== "ready") return;
+    useContentAnchorStore.getState().take(contentId);
+    const annotation = anchoredAnnotation(pendingAnchor, annotationsRef.current);
+    if (annotation) goToAnnotation(annotation);
+    else toast.info("That highlight no longer exists");
+  }, [contentId, goToAnnotation, pendingAnchor, phase]);
 
   // Window-level arrow keys when focus is outside the book iframe.
   useEffect(() => {

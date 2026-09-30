@@ -44,6 +44,7 @@ import { ContentPathBreadcrumb } from "./ContentPathBreadcrumb";
 import { EditorSkeleton } from "@/components/content/skeletons/EditorSkeleton";
 import { useTreeStateStore } from "@/state/tree-state-store";
 import {
+  listExtensionLinkAnchors,
   resolveExtensionVirtualContentType,
   useExtensionContentViewer,
   useExtensionMainWorkspace,
@@ -119,6 +120,8 @@ import { tiptapToMarkdown, markdownToTiptapResult } from "@/lib/domain/content/m
 import { useEditorInstanceStore } from "@/state/editor-instance-store";
 import { MarkdownSourceView } from "../editor/MarkdownSourceView";
 import { useContentFullscreenStore } from "@/state/content-fullscreen-store";
+import { useContentAnchorStore } from "@/state/content-anchor-store";
+import { setLinkAnchorLister } from "@/lib/domain/content/link-anchor";
 
 interface ContentResponse {
   success: boolean;
@@ -1495,12 +1498,19 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
     setSourceDraft("");
   }, [selectedContentId]);
 
+  // The link menu's `[[Title#` step lists spots inside a target through the
+  // enabled extensions (the reader: book highlights). Installed, never
+  // cleared — every pane installs the same lister.
+  useEffect(() => {
+    setLinkAnchorLister(listExtensionLinkAnchors);
+  }, []);
+
   // Wiki-link click handler — resolves by stable id first, then by title.
   // Renaming a note used to orphan every inbound link (title-only lookup, and
   // a miss did nothing at all, which read as a dead click).
   const handleWikiLinkClick = useCallback(
     async (target: WikiLinkClickTarget) => {
-      const { targetId, targetTitle, headingSlug, heal, markBroken } = target;
+      const { targetId, targetTitle, headingSlug, anchor, heal, markBroken } = target;
 
       // In-document heading link: same-document navigation, no lookup. The
       // scroll-to-heading listener expands any fold hiding the target. A
@@ -1534,6 +1544,10 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
         heal(resolved.id);
       }
 
+      // Anchored link: the target's viewer takes this on open and jumps there
+      // (lib/domain/content/link-anchor.ts).
+      if (anchor) useContentAnchorStore.getState().request(resolved.id, anchor);
+
       setSelectedContentId(resolved.id, {
         title: resolved.title,
         contentType: resolved.contentType,
@@ -1549,17 +1563,19 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
   // this path resolves but doesn't write back.
   useEffect(() => {
     const handleOpen = (e: Event) => {
-      const { targetId, targetTitle, headingSlug } = (
+      const { targetId, targetTitle, headingSlug, anchor } = (
         e as CustomEvent<{
           targetId?: string | null;
           targetTitle: string;
           headingSlug?: string | null;
+          anchor?: string | null;
         }>
       ).detail;
       void handleWikiLinkClick({
         targetId: targetId ?? null,
         targetTitle,
         headingSlug: headingSlug ?? null,
+        anchor: anchor ?? null,
         heal: () => {},
         markBroken: () => {},
       });

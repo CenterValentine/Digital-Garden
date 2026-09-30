@@ -10,6 +10,7 @@ import { ReaderBookshelfController } from "./components/ReaderBookshelfControlle
 import { ReaderContentViewer } from "./components/ReaderContentViewer";
 import { ReaderSidebarPanel } from "./components/ReaderSidebarPanel";
 import { READER_SIDEBAR_SVG_PATH } from "./lib/sidebar";
+import { readerLinkAnchors } from "./lib/link-anchors";
 import { placeShortcut } from "./lib/use-acquire";
 import {
   READER_EXTENSION_ID,
@@ -146,6 +147,8 @@ export const readerExtensionRuntime: ExtensionRuntime = {
     component: ReaderSidebarPanel,
   },
   createMenuItems: readerMenu,
+  // `[[Book#` → link to a highlight (lib/domain/content/link-anchor.ts).
+  linkAnchors: readerLinkAnchors,
   shellControllers: [ReaderBookshelfController],
   settingsDialog: ReaderSettingsDialog,
 };

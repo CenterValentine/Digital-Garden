@@ -413,3 +413,28 @@ hosts were unreachable from the build sandbox, so every source needs a live smok
   - **Out:** before any choice runs, the card and veil ease out (200 ms).
   - **Auto-continue:** a hairline countdown fills across the card's hold.
   - Everything respects reduced-motion settings.
+
+### Added 2026-09-30: links to a highlight (wiki-link anchors)
+
+- **Generic contract, not book-specific** (`lib/domain/content/link-anchor.ts`). A
+  wiki-link can now carry an optional `anchor` (`"<kind>:<id>"`) plus an
+  `anchorLabel`, meaning "where inside the target". The editor never interprets the
+  kind.
+  - **Picking:** in the `[[` menu, Tab on a result (or typing `[[Title#`) lists the
+    spots inside it. They come from whichever extension owns that content
+    (`ExtensionRuntime.linkAnchors`); the reader lists highlights, notes and
+    bookmarks in book order, filtered by the text after `#`.
+  - **Following:** a click resolves the target, parks the anchor in
+    `state/content-anchor-store.ts`, and opens the target. The reader starts at
+    that highlight, or jumps to it if the book is already open. If the highlight
+    was deleted, the book opens normally with a notice.
+- **Display:** the link shows `Title › “quote…”`, and hovering shows the full quote.
+  - Typed syntax: `[[Title#^annotation:<id>]]`.
+  - Markdown export writes the same form.
+  - Covered by the lossless-markdown gate.
+- **Schema:** TipTap schema 1.19.0 (minor, optional attributes). ⚠ **Hocuspocus
+  redeploy after merge**: until then, live documents drop the new attributes.
+- **Next kinds** (no schema change needed): headings in other notes, block
+  references, scripture verses, PDF pages, media timestamps.
+- **Possible limit (unverified):** inside a bulleted list, Tab may indent the list item instead of
+  drilling in. Type `#` after the title instead.

@@ -15,6 +15,7 @@ import { Plugin, PluginKey } from "@tiptap/pm/state";
 import { InputRule } from "@tiptap/core";
 import Suggestion from "@tiptap/suggestion";
 import { slugifyHeading } from "@/lib/domain/content/heading-ids";
+import { parseLinkAnchor } from "@/lib/domain/content/link-anchor";
 
 /**
  * Attrs for a hand-typed [[...]] body. A leading `#` makes an in-document
@@ -25,7 +26,22 @@ import { slugifyHeading } from "@/lib/domain/content/heading-ids";
 function attrsForTypedLink(
   body: string,
   displayText: string | null,
-): { targetTitle: string; displayText: string | null; headingSlug: string | null } | null {
+): {
+  targetTitle: string;
+  displayText: string | null;
+  headingSlug: string | null;
+  anchor?: string | null;
+} | null {
+  // [[Title#^kind:id]] — an anchored link (lib/domain/content/link-anchor.ts).
+  // The Obsidian block-ref marker `#^` keeps it distinct from [[#Heading]].
+  const anchorAt = body.indexOf("#^");
+  if (anchorAt > 0) {
+    const title = body.slice(0, anchorAt).trim();
+    const anchor = body.slice(anchorAt + 2).trim();
+    if (title && parseLinkAnchor(anchor)) {
+      return { targetTitle: title, displayText, headingSlug: null, anchor };
+    }
+  }
   if (body.startsWith("#")) {
     const headingText = body.slice(1).trim();
     if (!headingText) return null;
@@ -43,9 +59,26 @@ function wikiTextFor(attrs: {
   targetTitle?: string | null;
   displayText?: string | null;
   headingSlug?: string | null;
+  anchor?: string | null;
 }): string {
-  const title = `${attrs.headingSlug ? "#" : ""}${attrs.targetTitle ?? ""}`;
+  const title = `${attrs.headingSlug ? "#" : ""}${attrs.targetTitle ?? ""}${attrs.anchor ? `#^${attrs.anchor}` : ""}`;
   return attrs.displayText ? `[[${title}|${attrs.displayText}]]` : `[[${title}]]`;
+}
+
+/**
+ * What a link shows: the alias, else the title — plus the anchor's label for
+ * an anchored link ("Pride and Prejudice › “It is a truth…”").
+ */
+export function wikiLinkDisplayText(attrs: {
+  displayText?: string | null;
+  targetTitle?: string | null;
+  anchorLabel?: string | null;
+}): string {
+  if (attrs.displayText) return attrs.displayText;
+  const title = attrs.targetTitle || "Unknown";
+  if (!attrs.anchorLabel) return title;
+  const label = attrs.anchorLabel.length > 40 ? `${attrs.anchorLabel.slice(0, 39)}…` : attrs.anchorLabel;
+  return `${title} › “${label}”`;
 }
 
 export interface WikiLinkSuggestionItem {
@@ -72,6 +105,12 @@ export interface WikiLinkClickTarget {
    * navigation — scroll to the heading, expanding folds — not a note lookup.
    */
   headingSlug: string | null;
+  /**
+   * Where inside the target (`"<kind>:<id>"`, lib/domain/content/link-anchor.ts),
+   * e.g. a highlight in a book. The app opens the target, then hands the
+   * anchor to its viewer.
+   */
+  anchor: string | null;
   /**
    * Persist a resolved id back into the clicked node. Called when resolution
    * fell back to a title search, so the link upgrades itself in place and the
@@ -204,6 +243,25 @@ export const WikiLink = Node.create<WikiLinkOptions>({
           };
         },
       },
+      /**
+       * Where inside the target: `"<kind>:<id>"` (lib/domain/content/
+       * link-anchor.ts) — e.g. `annotation:<id>` for a book highlight. The
+       * editor never interprets the kind; the target's viewer does. Absent
+       * renders no attribute, so pre-existing links serialize unchanged.
+       */
+      anchor: {
+        default: null,
+        parseHTML: (element) => element.getAttribute("data-anchor"),
+        renderHTML: (attributes) =>
+          attributes.anchor ? { "data-anchor": attributes.anchor } : {},
+      },
+      /** Human label of the anchor (a quote, a heading) — display + hover only. */
+      anchorLabel: {
+        default: null,
+        parseHTML: (element) => element.getAttribute("data-anchor-label"),
+        renderHTML: (attributes) =>
+          attributes.anchorLabel ? { "data-anchor-label": attributes.anchorLabel } : {},
+      },
     };
   },
 
@@ -217,13 +275,16 @@ export const WikiLink = Node.create<WikiLinkOptions>({
 
   renderHTML({ node, HTMLAttributes }) {
     // Display alias text if present, otherwise show target title (Obsidian-style)
-    const displayText = node.attrs.displayText || node.attrs.targetTitle || "Unknown";
+    const displayText = wikiLinkDisplayText(node.attrs);
 
     return [
       "span",
       mergeAttributes(this.options.HTMLAttributes, HTMLAttributes, {
         "data-type": "wiki-link",
         class: "wiki-link cursor-pointer text-primary hover:underline",
+        ...(node.attrs.anchorLabel
+          ? { title: `“${node.attrs.anchorLabel}” — ${node.attrs.targetTitle ?? ""}` }
+          : {}),
       }),
       displayText,
     ];
@@ -405,12 +466,13 @@ export const WikiLink = Node.create<WikiLinkOptions>({
             };
 
             const headingSlug = wikiLinkEl.getAttribute("data-heading-slug");
+            const anchor = wikiLinkEl.getAttribute("data-anchor");
 
             event.preventDefault();
             // Each attempt starts clean — a link that failed while offline
             // shouldn't stay marked once it resolves.
             wikiLinkEl.classList.remove("wiki-link-broken");
-            options.onClickLink({ targetId, targetTitle, headingSlug, heal, markBroken });
+            options.onClickLink({ targetId, targetTitle, headingSlug, anchor, heal, markBroken });
             return true;
           },
 

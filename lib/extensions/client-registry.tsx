@@ -1,5 +1,6 @@
 "use client";
 
+import type { LinkAnchorLister } from "@/lib/domain/content/link-anchor";
 import { createElement, useMemo } from "react";
 import type { ComponentType, ReactNode } from "react";
 import type { Extensions } from "@tiptap/core";
@@ -186,6 +187,18 @@ export function getExtensionCreateMenuItems(): ExtensionCreateMenuItem[] {
     return typeof items === "function" ? items() : items ?? [];
   });
 }
+
+/**
+ * The link menu's anchor lister: asks every enabled extension that lists
+ * anchors (lib/domain/content/link-anchor.ts), first answer wins.
+ */
+export const listExtensionLinkAnchors: LinkAnchorLister = async (target, query) => {
+  for (const runtime of getClientEnabledExtensionRuntimes()) {
+    const items = await runtime.linkAnchors?.(target, query);
+    if (items) return items;
+  }
+  return null;
+};
 
 /**
  * Resolve a synthetic content id (e.g. `reader:library`) to the content type

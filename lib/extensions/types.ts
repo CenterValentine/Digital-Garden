@@ -1,3 +1,4 @@
+import type { LinkAnchorLister } from "@/lib/domain/content/link-anchor";
 import type { Extensions } from "@tiptap/core";
 import type { ComponentType } from "react";
 import type { ToolDefinition } from "@/lib/domain/tools";
@@ -144,6 +145,13 @@ export interface ExtensionRuntime {
   contentSidebarPanel?: ExtensionContentSidebarPanel;
   /** Static items, or a builder read each time the menu opens (dynamic lists). */
   createMenuItems?: ExtensionCreateMenuItem[] | (() => ExtensionCreateMenuItem[]);
+  /**
+   * Lists the spots inside a wiki-link target this extension owns (the
+   * reader: a book's highlights), for the `[[Title#` step of the link menu.
+   * Return null for targets that aren't this extension's kind of content.
+   * See lib/domain/content/link-anchor.ts.
+   */
+  linkAnchors?: LinkAnchorLister;
   virtualContent?: ExtensionVirtualContent[];
   shellNavigationControls?: ComponentType<ExtensionShellNavigationProps>[];
   shellNavigationTrailingControls?: ComponentType<ExtensionShellNavigationProps>[];

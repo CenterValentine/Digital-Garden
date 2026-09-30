@@ -367,10 +367,12 @@ export class MarkdownConverter implements DocumentConverter {
       case "wikiLink": {
         const target = node.attrs?.targetTitle || "";
         const display = node.attrs?.displayText || "";
+        // Anchored link (lib/domain/content/link-anchor.ts) → Obsidian's `#^` form.
+        const anchor = node.attrs?.anchor ? `#^${node.attrs.anchor}` : "";
 
         if (settings.wikiLinkStyle === "[[]]") {
           // Obsidian style
-          const result = display ? `[[${target}|${display}]]` : `[[${target}]]`;
+          const result = display ? `[[${target}${anchor}|${display}]]` : `[[${target}${anchor}]]`;
 
           if (settings.preserveSemantics) {
             const contentId = node.attrs?.contentId || "";
