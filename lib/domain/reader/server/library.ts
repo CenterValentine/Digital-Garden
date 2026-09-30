@@ -11,7 +11,7 @@
 import "server-only";
 import crypto from "crypto";
 import { prisma } from "@/lib/database/client";
-import { generateUniqueSlug } from "@/lib/domain/content";
+import { generateUniqueSlug } from "@/lib/domain/content/slug";
 import { getUserStorageProvider } from "@/lib/infrastructure/storage";
 import { readerDb, type BookMetaRow } from "../db";
 import {

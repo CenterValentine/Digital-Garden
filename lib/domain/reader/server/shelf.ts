@@ -8,7 +8,7 @@
 import "server-only";
 import crypto from "crypto";
 import { prisma } from "@/lib/database/client";
-import { generateUniqueSlug } from "@/lib/domain/content";
+import { generateUniqueSlug } from "@/lib/domain/content/slug";
 import { readerDb } from "../db";
 import { ReaderFetchError } from "./http";
 import { resolveFolderTarget } from "./library";

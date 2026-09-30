@@ -45,6 +45,7 @@ import { EditorSkeleton } from "@/components/content/skeletons/EditorSkeleton";
 import { useTreeStateStore } from "@/state/tree-state-store";
 import {
   listExtensionLinkAnchors,
+  suggestExtensionLinkAnchors,
   resolveExtensionVirtualContentType,
   useExtensionContentViewer,
   useExtensionMainWorkspace,
@@ -124,7 +125,7 @@ import { useContentAnchorStore } from "@/state/content-anchor-store";
 import { usePanelStore } from "@/state/panel-store";
 import { useIsMobile } from "@/components/common/useIsMobile";
 
-import { setLinkAnchorLister } from "@/lib/domain/content/link-anchor";
+import { setLinkAnchorLister, setLinkAnchorSuggester } from "@/lib/domain/content/link-anchor";
 
 interface ContentResponse {
   success: boolean;
@@ -165,6 +166,7 @@ interface ContentResponse {
     external?: {
       url: string;
       subtype: string | null;
+      resourceType?: string | null;
       preview: Record<string, unknown>;
     };
     chat?: {
@@ -370,6 +372,15 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
   // File payload MIME type — lets an extension claim a file viewer by format
   // (e.g. the reader owns application/epub+zip).
   const [contentMimeType, setContentMimeType] = useState<string | null>(null);
+  // External payload resourceType — lets an extension claim a kind of link
+  // node (the reader owns resourceType "scripture": scripture sessions).
+  const [contentExternalResourceType, setContentExternalResourceType] = useState<string | null>(null);
+  // Which content id the type fields above describe. They update only when
+  // that content's load commits, so between a switch and the new load they
+  // still describe the PREVIOUS item — extension viewers must not match the
+  // new id on them (an EPUB's "file"+mime opened the next item — a scripture
+  // session, a note — in the book reader: "This book could not be found").
+  const [contentTypeFor, setContentTypeFor] = useState<string | null>(null);
   const [contentParentId, setContentParentId] = useState<string | null>(null);
   const [contentIsPublished, setContentIsPublished] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- TODO(any-epic-phase-3d): payload is a discriminated union (folder/note/external/chat/viz/data/hope/workflow) — model as `ContentPayload` union in api-types.ts and switch each viewer branch to a narrowed value
@@ -581,6 +592,7 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
       setContentCustomIcon(null);
       setContentIconColor(null);
       setContentType("person-profile");
+      setContentTypeFor(selectedContentId);
       setOwnedByNote(null);
       return;
     }
@@ -596,6 +608,7 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
       setContentCustomIcon(null);
       setContentIconColor(null);
       setContentType("dm-thread");
+      setContentTypeFor(selectedContentId);
       setOwnedByNote(null);
       return;
     }
@@ -610,9 +623,11 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
       setContentParentId(null);
       setContentData(null);
       setContentMimeType(null);
+      setContentExternalResourceType(null);
       setContentCustomIcon(null);
       setContentIconColor(null);
       setContentType(virtualContentType);
+      setContentTypeFor(selectedContentId);
       setOwnedByNote(null);
       return;
     }
@@ -626,6 +641,7 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
       setNoteContent(null);
       setNoteTitle("");
       setContentType(null);
+      setContentTypeFor(selectedContentId);
       setContentData(null);
       setOwnedByNote(null);
       return;
@@ -676,6 +692,7 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
           setContentParentId(null);
           setContentIsPublished(false);
           setContentType("page-template");
+          setContentTypeFor(selectedContentId);
           setContentCustomIcon(result.customIcon ?? null);
           setContentIconColor(result.iconColor ?? null);
           setOwnedByNote(null);
@@ -782,6 +799,8 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
         setContentIsPublished(Boolean(result.data.isPublished));
         setContentType(result.data.contentType);
         setContentMimeType(result.data.file?.mimeType ?? null);
+        setContentExternalResourceType(result.data.external?.resourceType ?? null);
+        setContentTypeFor(selectedContentId);
         setContentCustomIcon(result.data.customIcon ?? null);
         setContentIconColor(result.data.iconColor ?? null);
         setOwnedByNote(result.data.ownedByNote ?? null);
@@ -1512,6 +1531,7 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
   // cleared — every pane installs the same lister.
   useEffect(() => {
     setLinkAnchorLister(listExtensionLinkAnchors);
+    setLinkAnchorSuggester(suggestExtensionLinkAnchors);
   }, []);
 
   // Wiki-link click handler — resolves by stable id first, then by title.
@@ -1529,6 +1549,15 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
         window.dispatchEvent(
           new CustomEvent("scroll-to-heading", { detail: { slug: headingSlug } })
         );
+        return;
+      }
+
+      // An extension's virtual content (a scripture collection): no node to
+      // resolve — open its tab, and its viewer takes the anchor.
+      const virtualContentType = targetId ? resolveExtensionVirtualContentType(targetId) : null;
+      if (targetId && virtualContentType) {
+        if (anchor) useContentAnchorStore.getState().request(targetId, anchor);
+        setSelectedContentId(targetId, { title: targetTitle, contentType: virtualContentType, paneId });
         return;
       }
 
@@ -2389,8 +2418,18 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
   // Extension workspace — shown in pane 1 when an extension view is active
   const ExtensionMainWorkspace = useExtensionMainWorkspace(activeView);
   const extensionViewerMatch = useMemo(
-    () => ({ selectedContentId, contentType, mimeType: contentMimeType }),
-    [selectedContentId, contentType, contentMimeType]
+    () =>
+      // Type facts about another item never claim this one (see contentTypeFor).
+      // Synthetic ids (reader:…) still match on their prefix.
+      contentTypeFor === selectedContentId
+        ? {
+            selectedContentId,
+            contentType,
+            mimeType: contentMimeType,
+            externalResourceType: contentExternalResourceType,
+          }
+        : { selectedContentId, contentType: null, mimeType: null, externalResourceType: null },
+    [selectedContentId, contentTypeFor, contentType, contentMimeType, contentExternalResourceType]
   );
   const ExtensionContentViewer = useExtensionContentViewer(extensionViewerMatch);
 
@@ -2430,6 +2469,14 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
     return <EditorSkeleton />;
   }
 
+  // The type/data state still describes the PREVIOUS item (the first render
+  // after a switch runs before the load effect): no viewer may draw the new
+  // id with it — a link viewer auto-fetched the old URL's preview under the
+  // new id, the book reader opened a session. Errors still show.
+  if (!error && contentTypeFor !== selectedContentId) {
+    return <EditorSkeleton />;
+  }
+
   // Render content based on type
   let contentElement: React.ReactNode;
   const isReadOnlyPageTemplate =
@@ -2456,8 +2503,8 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
     contentElement = (
       <ExtensionContentViewer
         paneId={paneId}
+        {...extensionViewerMatch}
         selectedContentId={selectedContentId}
-        contentType={contentType}
       />
     );
   } else if (contentType === "file" && selectedContentId) {

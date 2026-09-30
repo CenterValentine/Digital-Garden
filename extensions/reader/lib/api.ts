@@ -20,6 +20,17 @@ import type {
   ReadingProgressDto,
   ReadingStatus,
 } from "@/lib/domain/reader/types";
+import type {
+  ScriptureBookChapters,
+  ScriptureCatalogItem,
+  ScriptureChapterDto,
+  ScriptureContents,
+  ScriptureCorpusInfo,
+  ScriptureResolvedReference,
+  ScriptureSearchOptions,
+  ScriptureSearchResult,
+  ScriptureSessionDto,
+} from "@/lib/domain/scripture/types";
 
 export class ReaderApiError extends Error {
   constructor(
@@ -99,6 +110,10 @@ export const readerApi = {
     ),
   setStatus: (contentId: string, readingStatus: ReadingStatus | null) =>
     call<{ syncedToHardcover: boolean }>(`/api/reader/books/${contentId}`, json("PATCH", { readingStatus })),
+  progress: (targetKey: string) =>
+    call<{ progress: ReadingProgressDto | null }>(
+      `/api/reader/progress?targetKey=${encodeURIComponent(targetKey)}`
+    ),
   saveProgress: (targetKey: string, locator: ReaderLocator, percent: number) =>
     call<{ progress: ReadingProgressDto }>("/api/reader/progress", json("PUT", { targetKey, locator, percent })),
   annotations: (targetKey: string) =>
@@ -136,4 +151,46 @@ export const readerApi = {
   },
   importReadwise: () =>
     call<HighlightImportSummary>("/api/reader/import/readwise", { method: "POST" }),
+};
+
+/** Scriptures: shared corpora; each user adds the ones they want (the first add loads the text). */
+export const scriptureApi = {
+  catalog: () =>
+    call<{ items: ScriptureCatalogItem[] }>("/api/reader/scriptures/catalog"),
+  enabled: () =>
+    call<{ corpora: ScriptureCorpusInfo[]; migrated: boolean }>("/api/reader/scriptures/enabled"),
+  install: (corpusId: string) =>
+    call<{ verseCount: number; alreadyInstalled: boolean }>(
+      "/api/reader/scriptures/install",
+      json("POST", { corpusId })
+    ),
+  setEnabled: (corpusId: string, enabled: boolean) =>
+    call<{ corpusId: string; enabled: boolean }>("/api/reader/scriptures/enable", json("POST", { corpusId, enabled })),
+  contents: (corpusId: string) =>
+    call<ScriptureContents>(`/api/reader/scriptures/${encodeURIComponent(corpusId)}/contents`),
+  createSession: (input: { corpusId: string; parentId?: string | null; title?: string }) =>
+    call<ScriptureSessionDto & { parentId: string | null }>("/api/reader/scriptures/session", json("POST", input)),
+  session: (contentId: string) =>
+    call<ScriptureSessionDto>(`/api/reader/scriptures/session/${encodeURIComponent(contentId)}`),
+  bookChapters: (corpusId: string, book: string) =>
+    call<ScriptureBookChapters>(
+      `/api/reader/scriptures/${encodeURIComponent(corpusId)}/book?book=${encodeURIComponent(book)}`
+    ),
+  chapter: (corpusId: string, book: string, chapter: number) =>
+    call<ScriptureChapterDto>(
+      `/api/reader/scriptures/${encodeURIComponent(corpusId)}/chapter?${new URLSearchParams({ book, chapter: String(chapter) }).toString()}`
+    ),
+  search: (corpusId: string, q: string, options: ScriptureSearchOptions = {}) => {
+    const params = new URLSearchParams({ q });
+    if (options.mode) params.set("mode", options.mode);
+    if (options.volume) params.set("volume", options.volume);
+    if (options.sort) params.set("sort", options.sort);
+    return call<ScriptureSearchResult>(
+      `/api/reader/scriptures/${encodeURIComponent(corpusId)}/search?${params.toString()}`
+    );
+  },
+  resolve: (corpusId: string, ref: string) =>
+    call<{ references: ScriptureResolvedReference[] }>(
+      `/api/reader/scriptures/${encodeURIComponent(corpusId)}/resolve?ref=${encodeURIComponent(ref)}`
+    ),
 };

@@ -1,4 +1,4 @@
-import type { LinkAnchorLister } from "@/lib/domain/content/link-anchor";
+import type { LinkAnchorLister, LinkAnchorSuggester } from "@/lib/domain/content/link-anchor";
 import type { Extensions } from "@tiptap/core";
 import type { ComponentType } from "react";
 import type { ToolDefinition } from "@/lib/domain/tools";
@@ -91,6 +91,11 @@ export interface ExtensionContentViewerMatch {
   contentType: string | null;
   /** File payload MIME type when `contentType === "file"`, else null. */
   mimeType?: string | null;
+  /**
+   * External payload `resourceType` when `contentType === "external"` — lets
+   * an extension claim a kind of link node (the reader: scripture sessions).
+   */
+  externalResourceType?: string | null;
 }
 
 /**
@@ -152,6 +157,11 @@ export interface ExtensionRuntime {
    * See lib/domain/content/link-anchor.ts.
    */
   linkAnchors?: LinkAnchorLister;
+  /**
+   * Anchors typed directly after `[[` (a scripture reference). See
+   * `LinkAnchorSuggester` in lib/domain/content/link-anchor.ts.
+   */
+  linkAnchorSuggestions?: LinkAnchorSuggester;
   virtualContent?: ExtensionVirtualContent[];
   shellNavigationControls?: ComponentType<ExtensionShellNavigationProps>[];
   shellNavigationTrailingControls?: ComponentType<ExtensionShellNavigationProps>[];

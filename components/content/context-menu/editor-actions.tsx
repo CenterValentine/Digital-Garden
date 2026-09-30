@@ -15,6 +15,7 @@ import { useSnippetStore } from "@/state/snippet-store";
 import { useEditorInstanceStore } from "@/state/editor-instance-store";
 import { instantiateTemplateContent } from "@/lib/domain/editor/template-instantiation";
 import { resolveWikiLinkTarget } from "@/lib/domain/editor/wiki-link-resolve";
+import { resolveExtensionVirtualContentType } from "@/lib/extensions/client-registry";
 import { markdownPasteToTiptap } from "@/lib/domain/content/markdown";
 import { clipboardBlockedGuidance } from "@/lib/domain/content/markdown-detect";
 import { triggerBlobDownload } from "@/lib/core/download";
@@ -604,7 +605,12 @@ async function resolveWikiLinkAndOpen(
 ) {
   const { layoutMode, openContentInPane, setLayoutMode } = useContentStore.getState();
 
-  const match = await resolveWikiLinkTarget(ref);
+  // An extension's virtual content (a scripture collection) has no node.
+  const virtualContentType = ref.targetId ? resolveExtensionVirtualContentType(ref.targetId) : null;
+  const match =
+    ref.targetId && virtualContentType
+      ? { id: ref.targetId, title: ref.targetTitle, contentType: virtualContentType }
+      : await resolveWikiLinkTarget(ref);
   if (!match) { toast.error(`"${ref.targetTitle}" not found`); return; }
 
   const visible = new Set(getVisiblePaneIds(layoutMode));

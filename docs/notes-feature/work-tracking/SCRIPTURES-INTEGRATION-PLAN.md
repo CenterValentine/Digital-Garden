@@ -1,5 +1,5 @@
 ---
-status: parked 2026-09-29 — the scripture *reader* and highlight store (§4.4, §5.1) moved into EREADER-PLAN.md (scriptures become a reader source, phase R3). Corpus, references, citation index, study notes and talks remain here.
+status: building — R3 (LDS standard works in the reader) built 2026-09-30 on `claude/inspiring-franklin-2g7h8l`, see §11. Schema migrated: `prisma/migrations/20260930120000_scripture_corpus`. Citation index, `scriptureRef`/`scriptureQuote` nodes, talks, flashcards and AI remain open.
 created: 2026-09-28
 depends_on: none (P0 needs an owner-run migration: shared corpus tables)
 ---
@@ -337,3 +337,140 @@ user, and writable only by the seed script. We rejected the alternatives:
 | **P2 Study** | `scriptureQuote` block. "Add study note" flow with folder and layout settings. Citations sidebar tab. Scripture search scope. Speed-reader source. | As P1, plus a Playwright stub for the reader. |
 | **P3 Mark and memorize** | `ScriptureAnnotation` highlights in the reader. Flashcard "Memorize" (`sourceScriptureRef`). | Migration and smoke. |
 | **P4 Talks and AI** | Talk and study-material clipping with footnote→ref parsing. Optional Talks database. Publishing copyright guard. AI tools and grounding rule. | Needs an answer to Q2. `ai:drift:check`. |
+
+## 11. As built — R3, LDS in the reader (2026-09-30)
+
+The owner's call (2026-09-30): build the LDS standard works out completely and see
+whether the shape is a good model for other traditions. It is one pipeline with the
+tradition as data; the pieces below are the template a second tradition follows.
+
+### 11.1 Model (`prisma/migrations/20260930120000_scripture_corpus`)
+
+| Table | Holds | Keys |
+|---|---|---|
+| `ScriptureCorpus` | one tradition's canon in one edition (id `lds-standard-works`) — tradition, source URL, licence, versification, pinned version, `verseCount` | id (slug) |
+| `ScriptureBook` | books in canonical order, grouped by `volume` (ot, nt, bofm, dc-testament, pgp), with abbreviations | corpusId + slug |
+| `ScriptureVerse` | the text, book/chapter/verse + a corpus-wide `ordinal` | corpusId + bookSlug + chapter + verse; corpusId + ordinal |
+| `UserScriptureCorpus` | which installed collections a user enabled | userId + corpusId |
+
+Global and read-only (open question 1 answered: yes). **Each user adds the
+collections they want** (owner decision, 2026-09-30): "Add" in the catalog
+(`POST /api/reader/scriptures/install`, any signed-in user) loads the text the
+first time anyone adds it, then enables it for that user; "Remove" only takes it off
+their menu. Why no role gate: the text is pinned public-domain data, so an install
+can't change what gets written. The one real hazard, concurrent installs, is closed
+by running the write in one transaction under a per-corpus advisory lock — a second
+add waits, then finds the corpus loaded; a failure rolls back, so no reader sees a
+half-filled collection. Anything destructive later (remove a corpus for everyone,
+re-pin a version) stays admin-only. Until a database has run `migrate deploy`, every scripture route
+answers 503 with that instruction and the `+` menu shows only "Browse traditions…".
+
+Annotations, bookmarks and progress reuse the reader tables with
+`targetKey = scripture:<corpusId>`; a locator's `href` is `<book>/<chapter>[/<v>[-<v>]]`
+and `locations.start/end` are character offsets into the first/last verse (the text is
+pinned, so offsets are exact; the quote rides along in `text.highlight`).
+
+### 11.2 Source — bcbooks/scriptures-json pinned to `3bda76e`
+
+`lib/domain/scripture/adapters/lds.ts` normalizes the five volume files (D&C ships
+`sections`, the others `books`). Verified against the real files: 87 books, every
+chapter count matches the book table, 41,995 verses. Verse text and book headings only
+— no footnotes, chapter summaries or Bible Dictionary (open question 5 answered in the
+UI: an "Open in Gospel Library" button per chapter).
+
+### 11.3 References — why not a library
+
+`scripture-guide` (npm, the parser with LDS names) depends on `mysql2` and `dotenv` —
+not acceptable in a client-side parser — and `bible-passage-reference-parser` has no
+Restoration scripture. `lib/domain/scripture/reference.ts` is a small grammar over a
+book table each corpus supplies: Church abbreviations ("1 Ne.", "D&C", "JS—H"),
+ordinals ("First Nephi"), unambiguous prefixes ("Hela"), ranges, lists ("John 3:16,
+17; Matt. 5:14–16; 6"), one-chapter books ("Enos 3" = Enos 1:3). Gated in
+`reader:check` (every abbreviation resolves to its own book).
+
+### 11.4 Surfaces
+
+- **+ → Reader → Scriptures**: your added collections, then "Browse traditions…"
+  (the catalog tab; the same component is Settings → Reader → Scriptures). The
+  catalog shows addable collections as cards and folds planned / link-only
+  traditions into one "More traditions" list.
+- **Sessions — scripture in the file tree** (`lib/domain/scripture/server/sessions.ts`):
+  "+ → Reader → Scriptures → <collection>" puts a session where the "+" pointed, the
+  book convention. A session is an `external` content node with `resourceType:
+  "scripture"` (collection id in `captureMetadata`, URL = the collection's public home
+  page), so rename, move, icon, delete, search and trash are the tree's own. Default
+  icon `lucide:BookMarked` in gold (books are BookOpen; charters ScrollText). Each
+  session keeps its own reading position (`content:<sessionId>`); highlights and
+  notes stay per collection (`scripture:<corpus>`), shared by every session — marks
+  are about the verse. The viewer match gained `externalResourceType` (generic: any
+  extension can claim a kind of link node, as `mimeType` does for files).
+- **Menu drill-down**: hovering the collection in "+ → Reader → Scriptures" lists
+  "Open at the covers", then volumes → books → chapters; any pick adds a session
+  there and opens it at that spot (a session is still the whole collection). Books
+  over 20 chapters group them by tens ("Chapters 141–150" — Psalms has 150, D&C 138
+  sections) so no submenu is a wall of rows. Needs a book table that ships with the
+  code (`lib/domain/scripture/tables.ts`; LDS has one) because the menu is built
+  synchronously; other collections get a plain entry.
+- **Browse** (the default way in, `ScriptureBrowse`): volumes as bound-book covers →
+  a volume's books → a book's chapter cards (verse count, opening line, your mark
+  count; `GET …/[corpus]/book`) → verses, with breadcrumbs back up at every level
+  and a "Continue reading" card from saved progress. One-chapter books open straight
+  to the text; a verse link skips browsing. Covers are drawn (leather tone + gold
+  foil per volume, `lib/domain/scripture/covers.ts`) — official edition artwork is
+  someone else's design, so it isn't copied or hotlinked.
+- **Reader** (`reader:scripture/<corpus>`, `ScriptureReader`): chapter view in the
+  reader's theme/typography; a narrow contents aside beside the text (it follows where you
+  are — browsing or reading — opening that volume and book and folding the rest; hold/⌥-click opens the right rail); the breadcrumb on its own
+  line starting at the volume (home icon → covers); ←/→ and prev/next across book
+  boundaries; progress bar over the whole corpus. The collection is titled "Gospel
+  Library" (catalog title wins over the stored row; the id stays `lds-standard-works`).
+- **Search** lives in the right-sidebar rail (both readers — a `ReaderSearchCapability`
+  in the reader store: placeholder, filters, a streaming `run`, `go`). The secondary
+  toolbar's search icon opens it. Scripture search (`searchCorpus`), modelled on the
+  Gospel Library site: a reference ("Alma 32:21") jumps; a book name ("nephi", "Alma")
+  lists the matching books first as places; words go through Postgres full-text
+  search on stored, GIN-indexed vectors (`ScriptureVerse.searchEnglish` stemmed /
+  `searchSimple` exact — migration `20260930180000_scripture_search_vectors`, filled
+  at install and backfilled by the migration; ~10 ms vs ~800 ms unindexed).
+  Filters: **Smart** (stemmed, `"phrases"`, `or`, `-not`), **Exact phrase**, **All
+  words**, **Any word**; a volume; **Best match** (`ts_rank`) or **In order**. Matches
+  are highlighted (`ts_headline`); a stopword-only query falls back to substring. The
+  book reader's search (foliate) offers whole-words and match-case filters.
+- **Marks**: select text (or click a verse number for the whole verse) → the shared
+  `MarkPopover` — highlight/underline in five colours, note, copy with citation. Same
+  right-sidebar Book rail (notes, contents, display), same send-to-note ("<Book> — Notes"
+  at the tree root, quote + a verse link back), same full-screen drawer, same speed
+  read (a chapter is a page).
+- **Links**: `[[Alma 32:21` in the link menu offers the passage in each enabled
+  collection (with a verse preview) and inserts a `verse:` anchored link to the
+  collection's tab, shown as "Alma 32:21" — the generic `LinkAnchorSuggester` in
+  `lib/domain/content/link-anchor.ts`. `[[Gospel Library#` lists your scripture
+  highlights as passage links. Clicking opens the tab at the verses.
+
+### 11.5 Other traditions — what a second corpus needs
+
+| Tradition | Catalog entry | Source / licence | Versification | Adapter work |
+|---|---|---|---|---|
+| Christian | BSB, WEB + deuterocanon | eBible.org, public domain | chapter-verse | USFX/VPL → rows; book table |
+| Jewish | Tanakh (JPS 1917) | Sefaria API, public domain | chapter-verse | Hebrew book names/abbreviations |
+| Islamic | Qur'an (Tanzil text + PD translation) | Tanzil (text licence: attribution, no alteration) | surah-ayah | surah names; "2:255" references |
+| Buddhist | Pāli Canon (SuttaCentral, Sujato) | CC0 | sutta-segment | "MN 10" style; segments as verses |
+| Hindu | Bhagavad Gita (Arnold) | public domain | chapter-verse | small |
+| Sikh | Sri Guru Granth Sahib | public-domain English (Sant Singh Khalsa translation status to verify) | section-verse | ang-based addressing |
+| Taoist | Tao Te Ching (Legge) | public domain | chapter-verse | 81 chapters, one book |
+| Bahá'í | Bahá'í Reference Library | linking only | — | "Read online" link, no install |
+
+Each needs: a catalog entry flipped to `available`, an adapter yielding book/verse
+rows, and a book table with the tradition's reference spellings. The reader, marks,
+links, search, speed read and send-to-note need nothing.
+
+### 11.6 Not built yet (next)
+
+- **AI context.** The AI Chat sidebar tab isn't offered on reader tabs (content type
+  `reader`), and enabling it needs a virtual-id audit first: the chat route's bound
+  content lookup and `listConversationsByContent` query `@db.Uuid` columns with the
+  raw id, which throws on `reader:…`. (`collectWikiLinkRefs` already skips non-UUID
+  link targets.) Today the AI sees scripture through notes it was sent to.
+- Citation index / "cited in" by verse (§4.3), `scriptureRef` inline node and
+  `scriptureQuote` block (§4.1–4.2), talks (§6), memorize (§8).
+

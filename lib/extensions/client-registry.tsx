@@ -1,6 +1,6 @@
 "use client";
 
-import type { LinkAnchorLister } from "@/lib/domain/content/link-anchor";
+import type { LinkAnchorLister, LinkAnchorSuggester } from "@/lib/domain/content/link-anchor";
 import { createElement, useMemo } from "react";
 import type { ComponentType, ReactNode } from "react";
 import type { Extensions } from "@tiptap/core";
@@ -198,6 +198,19 @@ export const listExtensionLinkAnchors: LinkAnchorLister = async (target, query) 
     if (items) return items;
   }
   return null;
+};
+
+/**
+ * The link menu's direct anchors (`[[Alma 32:21`): every enabled extension's
+ * suggestions, concatenated.
+ */
+export const suggestExtensionLinkAnchors: LinkAnchorSuggester = async (query) => {
+  const results = await Promise.all(
+    getClientEnabledExtensionRuntimes().map((runtime) =>
+      runtime.linkAnchorSuggestions?.(query).catch(() => null) ?? Promise.resolve(null)
+    )
+  );
+  return results.flatMap((items) => items ?? []);
 };
 
 /**

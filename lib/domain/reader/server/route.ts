@@ -10,7 +10,8 @@ import { ZodError } from "zod";
 import { logger, withRouteTrace } from "@/lib/core/logger";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import { NoteEditRefused } from "@/lib/domain/content/write-note-content";
-import { isReaderNotMigrated } from "../db";
+import { isReaderNotMigrated, ReaderNotMigratedError } from "../db";
+import { ScriptureError } from "@/lib/domain/scripture/server/corpus";
 import { ReaderFetchError } from "./http";
 import { ReaderDrmError } from "./library";
 
@@ -44,8 +45,14 @@ export function readerRoute<T>(
           return errorResponse(
             503,
             "READER_NOT_MIGRATED",
-            "The reader's database tables haven't been created yet. Apply docs/notes-feature/work-tracking/reader-schema-additions.prisma and run the reader migration."
+            // The scripture tables carry their own apply instructions.
+            error instanceof ReaderNotMigratedError && error.message.startsWith("Scripture")
+              ? error.message
+              : "The reader's database tables haven't been created yet. Apply docs/notes-feature/work-tracking/reader-schema-additions.prisma and run the reader migration."
           );
+        }
+        if (error instanceof ScriptureError) {
+          return errorResponse(error.status, "SCRIPTURE_ERROR", error.message);
         }
         if (error instanceof ZodError) {
           return errorResponse(400, "VALIDATION_ERROR", error.issues[0]?.message ?? "Invalid request");
