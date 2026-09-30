@@ -90,6 +90,7 @@ import {
 import type { SuggestionItem } from "@/components/content/ai/ChatSuggestionMenu";
 import { useSettingsStore } from "@/state/settings-store";
 import { compactToolOutputs } from "@/lib/domain/ai/compact-tool-outputs";
+import { cacheVolleyDelayMs, pendingApprovalKey } from "@/lib/domain/ai/cache-volley";
 import {
   getAttachedPageContext,
   getCurrentPageHint,
@@ -2884,6 +2885,50 @@ export function useConversationEngine({
     addToolApprovalResponse,
     resumeStream,
   } = chat;
+
+  // ── cache volley (ITERATION-RUN-HARNESS-FIXES §10 round 3) ──
+  // A turn stopped on a pending approval keeps its prompt in the provider's
+  // cache only for the cache's lifetime (Anthropic 5 min, older OpenAI 5–10).
+  // ONE volley shortly before that lapses re-reads the cached prefix, which
+  // refreshes it, so an approval answered within ~10 minutes still resumes
+  // warm. Providers whose cache outlives the window (GPT-5.6+, 30 min) and
+  // providers with no controllable cache get none (`cacheVolleyDelayMs`).
+  // Cancelled when the approval is answered, the chat changes, or the
+  // surface unmounts; never repeated for the same pending approvals.
+  const volleyedApprovalsRef = useRef<Set<string>>(new Set());
+  // When each pending approval was first seen — the delay is measured from
+  // there, so an unrelated re-render cannot restart the clock past expiry.
+  const pendingSinceRef = useRef<Map<string, number>>(new Map());
+  useEffect(() => {
+    if (status !== "ready") return;
+    const key = pendingApprovalKey(messages);
+    if (!key || volleyedApprovalsRef.current.has(key)) return;
+    const last = messages[messages.length - 1];
+    const route = (last?.metadata as { modelRoute?: { providerId?: string; modelId?: string } } | undefined)
+      ?.modelRoute;
+    const delay = cacheVolleyDelayMs(route?.providerId ?? providerId, route?.modelId ?? modelId);
+    if (delay === null) return;
+    const baseline = lastSentBodies.get(conversationKey);
+    if (!baseline) return;
+    const now = Date.now();
+    const since = pendingSinceRef.current.get(key) ?? now;
+    pendingSinceRef.current.set(key, since);
+    const timer = setTimeout(() => {
+      volleyedApprovalsRef.current.add(key);
+      void fetch("/api/ai/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...baseline,
+          id: conversationKey,
+          messages: compactToolOutputs(messages),
+          trigger: "submit-message",
+          warmOnly: true,
+        }),
+      }).catch(() => null);
+    }, Math.max(0, delay - (now - since)));
+    return () => clearTimeout(timer);
+  }, [status, messages, providerId, modelId, conversationKey]);
 
   // ── active playbook: derived phase index (AI v3.2 T3) ──
   // Phase index is DERIVED from the message history, not manually

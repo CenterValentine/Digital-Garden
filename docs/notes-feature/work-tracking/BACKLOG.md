@@ -40,7 +40,9 @@ LDS standard works as a shared read-only corpus (seeded from the public-domain `
 - [ ] **`durationMs` on turn metadata is server time only.** It sums per-request server durations and excludes client-executed tools (browser reads, `create_docx`); a five-minute turn reports ~72 s. Not wrong, but unlabelled — rename or add `wallClockMs` from the first request's `startedAt` to the last request's finish.
 - [ ] **Extension-side chrome detection.** `looksLikeNavigationChrome` runs server-side (P1/P2 material) and on the session-tab result; the extension's own reader could apply it before hydration settles and retry once with a longer settle when the body is chrome.
 - [ ] **Run cost levers (plan §10) — remaining.**
-  - L1, L2, L3a and L4a are built (#270; `feat/one-prompt-per-turn`). L3b was superseded by L2.
+  - L1, L2, L3a and L4a are built (#270, #271). L3b was superseded by L2. Round 3 is on `fix/docx-cache-volley`: budget on tool results, DOCX hyperlinks and file-extracted check text, GPT-5.6+ write pricing, gpt-6 cache key, Anthropic breakpoints, and the approval volley.
+  - **Verify on the next run:** `cachedInputTokens` climbs inside a request now that the trailing notice is gone. If it still freezes, export `ai:prompt_wire` again.
+  - **DOCX layout render (optional):** a DOCX → PDF tool (OnlyOffice conversion) returning the page count and an image of page one, for a true layout check. Until then the charter hands visual review to the owner.
   - Open decision **D8 (revised):** should charter turns on OpenAI use the app-run search backend instead of native search, so search is refusable, repeat-guarded and budgetable, at the cost of OpenAI's integrated citations?
   - **Model watch:** a weekly routine reporting gaps between new model releases and our catalog, pricing, constraints, adapter and gateway rows to a GitHub Issue. Waits on the owner: provider keys as repo secrets, and Issue versus Wiki.
   - **Cost forecast:** a per-task token and cost estimate before a run or charter turn, with actual next to forecast afterwards.

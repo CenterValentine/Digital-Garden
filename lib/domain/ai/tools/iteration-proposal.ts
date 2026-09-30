@@ -306,6 +306,26 @@ export const CHARTER_TURN_TOOLS: readonly string[] = [
  * execute keeps the list constant and costs the model one step it is told
  * how to spend.
  */
+/**
+ * Carry the step budget on a tool result instead of a trailing harness
+ * message (§10 round 3). Strings get the line appended; plain objects get a
+ * `harnessNotice` field; anything else (arrays, streams, null) is returned
+ * unchanged — the next result carries it.
+ */
+export function withBudgetNotice(output: unknown, notice: string): unknown {
+  if (typeof output === "string") return `${output}\n\n${notice}`;
+  if (
+    output &&
+    typeof output === "object" &&
+    !Array.isArray(output) &&
+    !(Symbol.asyncIterator in output) &&
+    Object.getPrototypeOf(output) === Object.prototype
+  ) {
+    return { ...(output as Record<string, unknown>), harnessNotice: notice };
+  }
+  return output;
+}
+
 export function tailRefusalNotice(input: {
   tool: string;
   tailTools: readonly string[];
