@@ -357,6 +357,24 @@ For gpt-6-sol, every search's retrieved content is billed at $2–2.50 / 1M and 
 - A hiring-thesis standard: why now; the employer's customer; the failure surface; ranked behaviours tagged Stated or Inferred; the screen-out risk; the candidate bridge; research → decision.
 - A bullet standard, the decisive-gap strategy, the DOCX check, and the duplicated paragraphs removed.
 
+### Round 6 (2026-09-30) — approvals: lift the formalities, keep the decisions
+
+**Evidence.** Every approval request in four days (25 of them) was approved; none was denied.
+- The last three charter runs (e5b899a2, e9ca56f2, 36237eb8) each paused three times: `create_docx`, `create_note` and `phase_checkpoint`.
+- The two creates are hard-coded approvals. The charter's Required outputs already ask for both documents.
+- On a one-phase charter the checkpoint is the gate right before the closing summary.
+- Earlier runs also paused on `propose_item_iteration` (the scope of a multi-item run) and, before #267, on bulk evidence reads.
+
+**Built (PR #273):** the user setting `ai.charterAutoApprove` ("Approve charter deliverables automatically", AI settings, off by default). The policy is `charters/auto-approve.ts` (pure): in a charter chat with the setting on, these no longer ask:
+- creating a document or note;
+- overwriting a document **this chat created**: associated with the conversation and created after it began, so a mentioned file of the user's still asks;
+- the **final** phase's checkpoint, which returns `AUTO_CLOSED_CHECKPOINT_NEXT` rather than "APPROVED", because nobody clicked;
+- bulk database reads (the model's ceiling still refuses an oversized read).
+
+**Kept deliberately:** intermediate checkpoints, which are real review points since the next phase loads on the next turn, and run proposals, which carry the scope and item budget. `update_note`'s destructive-rewrite guard is unchanged.
+
+**Gate:** `run-harness:check` round 6 (policy table; the wiring of each predicate; proposal always asks; route passes the setting and marks the final phase on both charter paths). Four mutations caught.
+
 ### L2 — keep the tool list constant for the turn
 
 Adding or removing a tool rewrites everything after the tool definitions, so every mid-turn change is a full cache flush. Today it costs 5–9¢ a time; after L1 it costs the whole prompt.

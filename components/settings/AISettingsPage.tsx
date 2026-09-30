@@ -95,6 +95,7 @@ export default function AISettingsPage() {
   // the catalog-resolved maximum instead of a silent truncation cap.
   const maxTokens = ai?.maxTokens === 4096 ? null : (ai?.maxTokens ?? null);
   const bulkReadThreshold = ai?.bulkReadTokenThreshold ?? BULK_READ_DEFAULT;
+  const charterAutoApprove = ai?.charterAutoApprove ?? false;
   const typingEffect = ai?.typingEffect ?? true;
   const showAiHighlight = ai?.showAiHighlight ?? true;
   const showReasoning = ai?.showReasoning ?? true;
@@ -292,6 +293,20 @@ export default function AISettingsPage() {
                 commitBulkRead();
               }
             }}
+          />
+        </SettingRow>
+
+        <SettingRow
+          label="Approve charter deliverables automatically"
+          description="In a chat running a charter: create the documents and notes it asks for, rewrite a document the chat created, read its databases, and close its final checkpoint — without asking. Run proposals, checkpoints between phases, and overwrites of files you made still ask."
+          htmlFor="ai-charter-auto-approve"
+        >
+          <Switch
+            id="ai-charter-auto-approve"
+            checked={charterAutoApprove}
+            onCheckedChange={(checked) =>
+              void generation.track(setAISettings({ charterAutoApprove: checked }))
+            }
           />
         </SettingRow>
 

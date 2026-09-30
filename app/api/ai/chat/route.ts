@@ -1470,6 +1470,10 @@ export async function POST(request: Request) {
         // Filled in AFTER playbook resolution below (tools close over this
         // object, so a later property assignment is visible at execute time).
         activeCharter: undefined as { contentId: string; title: string } | undefined,
+        // Charter auto-approval (§10 round 6): the user's setting, and
+        // whether the charter's current phase is its last (set below).
+        charterAutoApprove: aiSettings.charterAutoApprove === true,
+        charterFinalPhase: false,
         // Executed model identity (cost metering): lets ledger stamps
         // price the run's tokens. Bare id + vendor, post-resolution.
         executedModel: {
@@ -2409,6 +2413,7 @@ export async function POST(request: Request) {
                 parsed.phases.length - 1,
               );
               const phase = parsed.phases[phaseIndex];
+              toolCtx.charterFinalPhase = phaseIndex === parsed.phases.length - 1;
               charterOutputDirectives.push(
                 ...extractCharterOutputDirectives(parsed, [phaseIndex]),
               );
@@ -2512,6 +2517,9 @@ export async function POST(request: Request) {
             );
             charterParsedForIngest = parsed;
             rootedCharterResolved = true;
+            // Rooted execution shows every phase at once, so only a
+            // one-phase charter's checkpoint is known to be the last.
+            toolCtx.charterFinalPhase = parsed.phases.length <= 1;
             attachedPlaybookTitle = rootedNode.title;
             // Context diet (S7-C2): same pointer rule for rooted execution.
             toolCtx.activeCharter = {

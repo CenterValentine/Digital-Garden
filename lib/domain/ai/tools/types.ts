@@ -33,6 +33,13 @@ export interface ToolExecuteContext {
    */
   activeCharter?: { contentId: string; title: string };
   /**
+   * The user's `ai.charterAutoApprove` setting, and whether the charter's
+   * current phase is its last — read by the approval predicates of the
+   * tools a charter run pauses on (charters/auto-approve.ts).
+   */
+  charterAutoApprove?: boolean;
+  charterFinalPhase?: boolean;
+  /**
    * The bound Conversation entity id (sidebar multi-conv / full-page chat).
    * AI v3 core S3: lets tools associate created/read content with the
    * conversation (dual association — node + target folder).

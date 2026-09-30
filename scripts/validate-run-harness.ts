@@ -338,6 +338,7 @@ import {
 } from "../lib/domain/ai/cache-volley";
 import { docxHtmlToCheckText } from "../lib/domain/ai/docx-check-text";
 import { DOCXConverter } from "../lib/domain/export/converters/docx";
+import { AUTO_CLOSED_CHECKPOINT_NEXT, charterAutoApproves } from "../lib/domain/ai/charters/auto-approve";
 import JSZip from "jszip";
 
 {
@@ -627,6 +628,42 @@ void (async () => {
       promptSrc.includes("Facts of record:") &&
       promptSrc.includes("Closing a charter's work:"),
     "round 5: the general reading and facts-of-record rules and the charter gate check are in the system prompt",
+  );
+}
+
+{
+  // §10 round 6 — charter auto-approval lifts exactly the formalities, and
+  // only in a charter chat with the setting on.
+  const on = { charterActive: true, autoApprove: true };
+  const off = { charterActive: true, autoApprove: false };
+  const noCharter = { charterActive: false, autoApprove: true };
+  assert(charterAutoApproves(on, { kind: "create" }) && charterAutoApproves(on, { kind: "bulk-read" }), "round 6: creates and reads run without a card when on");
+  assert(charterAutoApproves(on, { kind: "overwrite", targetCreatedInThisChat: true }) && !charterAutoApproves(on, { kind: "overwrite", targetCreatedInThisChat: false }), "round 6: only a document this chat created is overwritten without asking");
+  assert(charterAutoApproves(on, { kind: "checkpoint", finalPhase: true }) && !charterAutoApproves(on, { kind: "checkpoint", finalPhase: false }), "round 6: only the final checkpoint closes without asking");
+  assert(!charterAutoApproves(off, { kind: "create" }) && !charterAutoApproves(noCharter, { kind: "create" }), "round 6: setting off, or no charter → everything still asks");
+  assert(!/APPROVED/.test(AUTO_CLOSED_CHECKPOINT_NEXT) && /setting/.test(AUTO_CLOSED_CHECKPOINT_NEXT), "round 6: an auto-closed checkpoint never claims the user approved it");
+
+  const registrySrc = readFileSync(path.join(process.cwd(), "lib/domain/ai/tools/registry.ts"), "utf8");
+  const between = (from: string, to: string) => registrySrc.slice(registrySrc.indexOf(from), registrySrc.indexOf(to, registrySrc.indexOf(from)));
+  const docx = between("    create_docx: tool({", "description:");
+  const note = between("    create_note: tool({", "description:");
+  const checkpoint = between("    phase_checkpoint: tool({", "description:");
+  const propose = between("    propose_item_iteration: tool({", "inputSchema");
+  assert(
+    /kind: "overwrite"/.test(docx) && /contentCreatedInThisChat\(ctx, overwriteId\)/.test(docx) && /kind: "create"/.test(docx),
+    "round 6: create_docx asks unless the policy lifts it — creates, and overwrites of this chat's own documents",
+  );
+  assert(/charterAutoApproves\(/.test(note) && /kind: "create"/.test(note), "round 6: create_note asks unless the policy lifts it");
+  assert(/finalPhase: ctx.charterFinalPhase === true/.test(checkpoint), "round 6: the checkpoint's card is lifted only for the final phase");
+  assert(/needsApproval: true/.test(propose), "round 6: a run proposal always asks (scope and item budget are a decision)");
+  const dataSrc = readFileSync(path.join(process.cwd(), "lib/domain/ai/tools/data-tools.ts"), "utf8");
+  assert(/kind: "bulk-read"/.test(dataSrc), "round 6: large database reads honour the setting");
+  const routeSrc6 = readFileSync(path.join(process.cwd(), "app/api/ai/chat/route.ts"), "utf8");
+  assert(
+    routeSrc6.includes("charterAutoApprove: aiSettings.charterAutoApprove === true") &&
+      routeSrc6.includes("toolCtx.charterFinalPhase = phaseIndex === parsed.phases.length - 1") &&
+      routeSrc6.includes("toolCtx.charterFinalPhase = parsed.phases.length <= 1"),
+    "round 6: the route passes the setting and marks the final phase on both charter paths",
   );
 }
 
