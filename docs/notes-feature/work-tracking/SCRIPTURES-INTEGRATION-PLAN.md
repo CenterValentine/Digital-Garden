@@ -394,6 +394,16 @@ ordinals ("First Nephi"), unambiguous prefixes ("Hela"), ranges, lists ("John 3:
   (the catalog tab; the same component is Settings → Reader → Scriptures). The
   catalog shows addable collections as cards and folds planned / link-only
   traditions into one "More traditions" list.
+- **Sessions — scripture in the file tree** (`lib/domain/scripture/server/sessions.ts`):
+  "+ → Reader → Scriptures → <collection>" puts a session where the "+" pointed, the
+  book convention. A session is an `external` content node with `resourceType:
+  "scripture"` (collection id in `captureMetadata`, URL = the collection's public home
+  page), so rename, move, icon, delete, search and trash are the tree's own. Default
+  icon `lucide:BookMarked` in gold (books are BookOpen; charters ScrollText). Each
+  session keeps its own reading position (`content:<sessionId>`); highlights and
+  notes stay per collection (`scripture:<corpus>`), shared by every session — marks
+  are about the verse. The viewer match gained `externalResourceType` (generic: any
+  extension can claim a kind of link node, as `mimeType` does for files).
 - **Browse** (the default way in, `ScriptureBrowse`): volumes as bound-book covers →
   a volume's books → a book's chapter cards (verse count, opening line, your mark
   count; `GET …/[corpus]/book`) → verses, with breadcrumbs back up at every level

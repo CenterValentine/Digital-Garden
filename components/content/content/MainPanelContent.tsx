@@ -166,6 +166,7 @@ interface ContentResponse {
     external?: {
       url: string;
       subtype: string | null;
+      resourceType?: string | null;
       preview: Record<string, unknown>;
     };
     chat?: {
@@ -371,6 +372,9 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
   // File payload MIME type — lets an extension claim a file viewer by format
   // (e.g. the reader owns application/epub+zip).
   const [contentMimeType, setContentMimeType] = useState<string | null>(null);
+  // External payload resourceType — lets an extension claim a kind of link
+  // node (the reader owns resourceType "scripture": scripture sessions).
+  const [contentExternalResourceType, setContentExternalResourceType] = useState<string | null>(null);
   const [contentParentId, setContentParentId] = useState<string | null>(null);
   const [contentIsPublished, setContentIsPublished] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- TODO(any-epic-phase-3d): payload is a discriminated union (folder/note/external/chat/viz/data/hope/workflow) — model as `ContentPayload` union in api-types.ts and switch each viewer branch to a narrowed value
@@ -611,6 +615,7 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
       setContentParentId(null);
       setContentData(null);
       setContentMimeType(null);
+      setContentExternalResourceType(null);
       setContentCustomIcon(null);
       setContentIconColor(null);
       setContentType(virtualContentType);
@@ -783,6 +788,7 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
         setContentIsPublished(Boolean(result.data.isPublished));
         setContentType(result.data.contentType);
         setContentMimeType(result.data.file?.mimeType ?? null);
+        setContentExternalResourceType(result.data.external?.resourceType ?? null);
         setContentCustomIcon(result.data.customIcon ?? null);
         setContentIconColor(result.data.iconColor ?? null);
         setOwnedByNote(result.data.ownedByNote ?? null);
@@ -2400,8 +2406,13 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
   // Extension workspace — shown in pane 1 when an extension view is active
   const ExtensionMainWorkspace = useExtensionMainWorkspace(activeView);
   const extensionViewerMatch = useMemo(
-    () => ({ selectedContentId, contentType, mimeType: contentMimeType }),
-    [selectedContentId, contentType, contentMimeType]
+    () => ({
+      selectedContentId,
+      contentType,
+      mimeType: contentMimeType,
+      externalResourceType: contentExternalResourceType,
+    }),
+    [selectedContentId, contentType, contentMimeType, contentExternalResourceType]
   );
   const ExtensionContentViewer = useExtensionContentViewer(extensionViewerMatch);
 

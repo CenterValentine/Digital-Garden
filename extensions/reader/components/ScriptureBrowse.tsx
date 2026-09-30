@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { BookOpen, ChevronRight, Loader2, NotebookPen } from "lucide-react";
 import type { ReaderAnnotationDto } from "@/lib/domain/reader/types";
 import {
@@ -69,6 +69,64 @@ export function ScriptureCrumbs({
   );
 }
 
+/** Width budget for one line of lettering, in cover-widths (cqw) — inside the inner border. */
+const LETTERING_BUDGET_CQW = 62;
+/** Average uppercase serif advance, in em, before tracking. */
+const CAP_ADVANCE_EM = 0.7;
+
+/**
+ * Split "1 Thessalonians" into a small ordinal line and the name, the way
+ * printed editions set numbered books.
+ */
+function splitOrdinal(title: string): { ordinal: string | null; name: string } {
+  const match = /^(\d+|[IVX]+)\s+(.+)$/.exec(title.trim());
+  return match
+    ? { ordinal: match[1], name: match[2] }
+    : { ordinal: null, name: title };
+}
+
+/**
+ * Gold lettering sized to its longest word, so "THESSALONIANS" fits the
+ * border as surely as "ENOS": font = min(the size's base, budget ÷ (longest
+ * word × advance)), all in the cover's own width (cqw).
+ */
+function CoverLettering({
+  title,
+  foil,
+  size,
+}: {
+  title: string;
+  foil: string;
+  size: "large" | "small";
+}) {
+  if (!title) return null;
+  const { ordinal, name } = splitOrdinal(title);
+  const longest = Math.max(...name.split(/\s+/).map((word) => word.length), 1);
+  const tracking = longest > 9 ? 0.03 : size === "large" ? 0.12 : 0.08;
+  const fit = LETTERING_BUDGET_CQW / (longest * (CAP_ADVANCE_EM + tracking));
+  const base = size === "large" ? 8.6 : 9;
+  const fontSize = `clamp(6px, ${Math.min(base, fit).toFixed(2)}cqw, ${size === "large" ? 15 : 11}px)`;
+  const shadow = "0 1px 0 rgba(0,0,0,0.45)";
+  return (
+    <span
+      className="flex flex-col items-center font-serif uppercase leading-snug"
+      style={{ color: foil, textShadow: shadow }}
+    >
+      {ordinal && (
+        <span
+          style={{
+            fontSize: `clamp(6px, ${(base * 0.8).toFixed(2)}cqw, 12px)`,
+            letterSpacing: "0.1em",
+          }}
+        >
+          {ordinal}
+        </span>
+      )}
+      <span style={{ fontSize, letterSpacing: `${tracking}em` }}>{name}</span>
+    </span>
+  );
+}
+
 /** A bound-book cover: leather, a spine, a double foil border, gold lettering. */
 function Cover({
   title,
@@ -115,19 +173,7 @@ function Cover({
       />
       {/* Lettering */}
       <div className="absolute inset-[14%] left-[20%] flex flex-col items-center justify-center gap-2 text-center">
-        <span
-          className={`font-serif uppercase leading-snug ${size === "large" ? "tracking-[0.12em]" : "tracking-[0.08em]"}`}
-          style={{
-            color: foil,
-            textShadow: "0 1px 0 rgba(0,0,0,0.45)",
-            fontSize:
-              size === "large"
-                ? "clamp(9px, 8.6cqw, 15px)"
-                : "clamp(7px, 9cqw, 11px)",
-          }}
-        >
-          {title}
-        </span>
+        <CoverLettering title={title} foil={foil} size={size} />
         <svg
           viewBox="0 0 60 8"
           className={size === "large" ? "w-12" : "w-8"}
@@ -228,7 +274,7 @@ export function ScriptureBrowse({
       ? bookBySlug.get(continueAt.bookSlug)
       : null;
     return (
-      <div className="mx-auto max-w-5xl px-6 py-5">
+      <div className="@container mx-auto max-w-5xl px-4 py-5 sm:px-6">
         {continueAt && continueBook && (
           <button
             type="button"
@@ -259,12 +305,15 @@ export function ScriptureBrowse({
           </button>
         )}
 
-        {/* The volumes share one row, sized to the pane (capped at 160px, never stretched). */}
+        {/* The volumes share one row, sized to the pane (capped at 160px, never
+            stretched); a phone-width pane takes three per row instead. */}
         <div
-          className="grid gap-x-4 gap-y-6"
-          style={{
-            gridTemplateColumns: `repeat(${Math.min(contents.volumes.length, 6)}, minmax(0, 160px))`,
-          }}
+          className="grid grid-cols-3 gap-x-3 gap-y-5 @xl:gap-x-4 @xl:[grid-template-columns:repeat(var(--volumes),minmax(0,160px))]"
+          style={
+            {
+              "--volumes": Math.min(contents.volumes.length, 6),
+            } as CSSProperties
+          }
         >
           {contents.volumes.map((volume) => (
             <button
@@ -295,8 +344,8 @@ export function ScriptureBrowse({
     if (!volume) return null;
     const style = volumeCover(volume.slug);
     return (
-      <div className="mx-auto max-w-5xl px-6 py-5">
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(84px,104px))] gap-x-4 gap-y-5">
+      <div className="@container mx-auto max-w-5xl px-4 py-5 sm:px-6">
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(84px,1fr))] gap-x-3 gap-y-5 @md:grid-cols-[repeat(auto-fill,minmax(84px,104px))] @md:gap-x-4">
           {volume.books.map((book) => {
             const bookMarks = [...marks.entries()]
               .filter(([key]) => key.startsWith(`${book.slug}/`))
@@ -373,7 +422,7 @@ function BookChapters({
     (book.volume === "dc-testament" ? "Section" : "Chapter");
 
   return (
-    <div className="mx-auto max-w-5xl px-6 py-5">
+    <div className="@container mx-auto max-w-5xl px-4 py-5 sm:px-6">
       {(book.fullTitle !== book.name || book.heading) && (
         <div className="mb-4 max-w-3xl font-serif text-sm text-muted-foreground">
           {book.fullTitle !== book.name && <div>{book.fullTitle}</div>}
@@ -392,7 +441,7 @@ function BookChapters({
           <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
         </div>
       ) : (
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-2 @md:grid-cols-[repeat(auto-fill,minmax(180px,1fr))] @md:gap-3">
           {data.chapters.map((chapter) => {
             const count = marks.get(`${book.slug}/${chapter.chapter}`) ?? 0;
             return (

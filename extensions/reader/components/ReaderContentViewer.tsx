@@ -10,10 +10,11 @@ import {
   READER_SCRIPTURES_CONTENT_ID,
   READER_VIRTUAL_PREFIX,
 } from "../manifest";
-import { corpusIdFromTabId } from "@/lib/domain/scripture/types";
+import { corpusIdFromTabId, SCRIPTURE_RESOURCE_TYPE } from "@/lib/domain/scripture/types";
 import { LibraryView } from "./LibraryView";
 import { ScriptureCatalog } from "./ScriptureCatalog";
 import { ScriptureReader } from "./ScriptureReader";
+import { ScriptureSessionViewer } from "./ScriptureSessionViewer";
 import { ReaderErrorBoundary } from "./ReaderErrorBoundary";
 
 // foliate-js is browser-only (custom elements, Blob URLs) — never SSR it.
@@ -29,7 +30,7 @@ const BookReader = dynamic(
   }
 );
 
-export function ReaderContentViewer({ selectedContentId }: ExtensionContentViewerProps) {
+export function ReaderContentViewer({ selectedContentId, contentType, externalResourceType }: ExtensionContentViewerProps) {
   // The right sidebar follows what the reader shows: claim its Book tab for
   // this content while mounted.
   useEffect(() => {
@@ -51,6 +52,8 @@ export function ReaderContentViewer({ selectedContentId }: ExtensionContentViewe
             <ScriptureCatalog />
           </div>
         </div>
+      ) : contentType === "external" && externalResourceType === SCRIPTURE_RESOURCE_TYPE ? (
+        <ScriptureSessionViewer key={selectedContentId} contentId={selectedContentId} />
       ) : corpusId ? (
         <ScriptureReader key={selectedContentId} corpusId={corpusId} contentId={selectedContentId} />
       ) : selectedContentId.startsWith(READER_VIRTUAL_PREFIX) ? (

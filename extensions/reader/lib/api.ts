@@ -28,6 +28,7 @@ import type {
   ScriptureCorpusInfo,
   ScriptureResolvedReference,
   ScriptureSearchResult,
+  ScriptureSessionDto,
 } from "@/lib/domain/scripture/types";
 
 export class ReaderApiError extends Error {
@@ -166,6 +167,10 @@ export const scriptureApi = {
     call<{ corpusId: string; enabled: boolean }>("/api/reader/scriptures/enable", json("POST", { corpusId, enabled })),
   contents: (corpusId: string) =>
     call<ScriptureContents>(`/api/reader/scriptures/${encodeURIComponent(corpusId)}/contents`),
+  createSession: (input: { corpusId: string; parentId?: string | null; title?: string }) =>
+    call<ScriptureSessionDto & { parentId: string | null }>("/api/reader/scriptures/session", json("POST", input)),
+  session: (contentId: string) =>
+    call<ScriptureSessionDto>(`/api/reader/scriptures/session/${encodeURIComponent(contentId)}`),
   bookChapters: (corpusId: string, book: string) =>
     call<ScriptureBookChapters>(
       `/api/reader/scriptures/${encodeURIComponent(corpusId)}/book?book=${encodeURIComponent(book)}`

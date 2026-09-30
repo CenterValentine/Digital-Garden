@@ -9,7 +9,9 @@ import { resolveServerCreateParent } from "@/lib/domain/content/create-target";
 import { ReaderBookshelfController } from "./components/ReaderBookshelfController";
 import { ReaderContentViewer } from "./components/ReaderContentViewer";
 import { ReaderSidebarPanel } from "./components/ReaderSidebarPanel";
-import { openScriptureTab } from "./components/ScriptureCatalog";
+import { withOptimisticTreeRow } from "@/lib/features/content/tree-optimistic";
+import { SCRIPTURE_RESOURCE_TYPE, type ScriptureCorpusInfo } from "@/lib/domain/scripture/types";
+import { scriptureApi } from "./lib/api";
 import { READER_SIDEBAR_SVG_PATH } from "./lib/sidebar";
 import { readerLinkAnchors } from "./lib/link-anchors";
 import { scriptureLinkSuggestions } from "./lib/scripture-links";
@@ -76,15 +78,37 @@ function openScriptureCatalog() {
   });
 }
 
+/**
+ * "+ → Reader → Scriptures → <collection>": a session in the tree where the
+ * "+" pointed (the tree's create rule, as for books), then open it.
+ */
+async function placeScriptureSession(corpus: ScriptureCorpusInfo, parentId: string | null) {
+  const serverParentId = resolveServerCreateParent(parentId);
+  try {
+    const session = await withOptimisticTreeRow(
+      { title: corpus.title, contentType: "external", parentId: serverParentId },
+      () => scriptureApi.createSession({ corpusId: corpus.id, parentId: serverParentId }),
+      (created) => created.contentId
+    );
+    useContentStore.getState().setSelectedContentId(session.contentId, {
+      title: session.title,
+      contentType: "external",
+      pin: true,
+    });
+  } catch (error) {
+    toast.error(error instanceof Error ? error.message : "Could not add the session");
+  }
+}
+
 function scriptureMenu(): ExtensionCreateMenuItem[] {
   const { scriptures } = useReaderBookshelf.getState();
   return [
     ...scriptures.map<ExtensionCreateMenuItem>((corpus) => ({
       id: `reader-scripture-${corpus.id}`,
       label: truncate(corpus.title, 44),
-      iconName: "ScrollText",
-      title: `Open ${corpus.title}`,
-      onSelect: () => openScriptureTab(corpus.id, corpus.title),
+      iconName: "BookMarked",
+      title: `Add a ${corpus.title} session here — its own name, icon and reading place`,
+      onSelect: ({ parentId }) => void placeScriptureSession(corpus, parentId),
     })),
     {
       id: "reader-scripture-catalog",
@@ -162,9 +186,11 @@ function readerMenu(): ExtensionCreateMenuItem[] {
 export const readerExtensionRuntime: ExtensionRuntime = {
   id: READER_EXTENSION_ID,
   contentViewer: ReaderContentViewer,
-  matchesContentViewer: ({ selectedContentId, contentType, mimeType }) =>
+  matchesContentViewer: ({ selectedContentId, contentType, mimeType, externalResourceType }) =>
     Boolean(
       selectedContentId?.startsWith(READER_VIRTUAL_PREFIX) ||
+        // Scripture sessions: link nodes the reader owns (see sessions.ts).
+        (contentType === "external" && externalResourceType === SCRIPTURE_RESOURCE_TYPE) ||
         (contentType === "file" &&
           mimeType &&
           READER_DEFAULT_VIEWER_MIME_TYPES.includes(mimeType))

@@ -13,7 +13,7 @@ import "server-only";
 import type { JSONContent } from "@tiptap/core";
 import { prisma } from "@/lib/database/client";
 import type { Prisma } from "@/lib/database/generated/prisma";
-import { generateUniqueSlug } from "@/lib/domain/content";
+import { generateUniqueSlug } from "@/lib/domain/content/slug";
 import { extractSearchTextFromTipTap } from "@/lib/domain/content/search-text";
 import { writeNoteContent } from "@/lib/domain/content/write-note-content";
 import type { ReaderLocator } from "@/lib/domain/reader/types";

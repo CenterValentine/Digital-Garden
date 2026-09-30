@@ -180,5 +180,22 @@ export function parseVerseHref(href: string): ScriptureRef | null {
   };
 }
 
+/**
+ * A scripture *session*: an ordinary tree item (external content node,
+ * `resourceType: "scripture"`) that opens a collection in the reader — its
+ * own title, icon, place in the tree and reading position. Highlights and
+ * notes stay per collection (`scriptureTargetKey`), shared by every session.
+ */
+export const SCRIPTURE_RESOURCE_TYPE = "scripture";
+/** Default tree icon for a session (distinct from books and charters). */
+export const SCRIPTURE_SESSION_ICON = "lucide:BookMarked";
+export const SCRIPTURE_SESSION_ICON_COLOR = "text-gold-primary";
+
+export interface ScriptureSessionDto {
+  contentId: string;
+  corpusId: string;
+  title: string;
+}
+
 /** The anchor kind for verse links (lib/domain/content/link-anchor.ts). */
 export const VERSE_ANCHOR_KIND = "verse";

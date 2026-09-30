@@ -12,7 +12,7 @@ import type { JSONContent } from "@tiptap/core";
 import { z } from "zod";
 import { prisma } from "@/lib/database/client";
 import type { Prisma } from "@/lib/database/generated/prisma";
-import { generateUniqueSlug } from "@/lib/domain/content";
+import { generateUniqueSlug } from "@/lib/domain/content/slug";
 import { extractSearchTextFromTipTap } from "@/lib/domain/content/search-text";
 import { writeNoteContent } from "@/lib/domain/content/write-note-content";
 import { readerDb, type ReaderAnnotationRow, type ReadingProgressRow } from "../db";

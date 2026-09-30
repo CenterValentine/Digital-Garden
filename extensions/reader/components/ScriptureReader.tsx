@@ -110,6 +110,12 @@ function chapterText(chapter: ScriptureChapterDto): string {
   return chapter.verses.map((verse) => verse.text).join(" ");
 }
 
+/** Keep the selection popover (≤ 18rem wide, centered on x) inside the page. */
+function clampPopoverX(x: number, hostWidth: number): number {
+  const half = Math.min(150, hostWidth / 2);
+  return Math.min(Math.max(x, half), hostWidth - half);
+}
+
 /** The selected words, from the verse text itself (no verse numbers). */
 function quoteOf(
   verses: ScriptureChapterDto["verses"],
@@ -165,11 +171,22 @@ function boundary(
 export function ScriptureReader({
   corpusId,
   contentId,
+  progressKey,
+  rootTitle,
 }: {
   corpusId: string;
   contentId: string;
+  /**
+   * Where reading position is saved. A session (a tree item) keeps its own
+   * (`content:<sessionId>`); the bare collection tab uses the collection's.
+   * Highlights and notes are always the collection's — shared by sessions.
+   */
+  progressKey?: string;
+  /** The session's own name, shown in place of the collection title. */
+  rootTitle?: string;
 }) {
   const targetKey = scriptureTargetKey(corpusId);
+  const positionKey = progressKey ?? targetKey;
   const rootRef = useRef<HTMLDivElement>(null);
   const pageRef = useRef<HTMLDivElement>(null);
   const hostRef = useRef<HTMLDivElement>(null);
@@ -321,7 +338,14 @@ export function ScriptureReader({
         return;
       }
       if (cancelled) return;
-      setContents(loadedContents);
+      setContents(
+        rootTitle
+          ? {
+              ...loadedContents,
+              corpus: { ...loadedContents.corpus, title: rootTitle },
+            }
+          : loadedContents,
+      );
 
       // Opened from a verse link: start at the passage. Otherwise land on the
       // volumes, with "Continue reading" where the reader left off.
@@ -331,7 +355,7 @@ export function ScriptureReader({
       try {
         const [{ annotations: list }, { progress }] = await Promise.all([
           readerApi.annotations(targetKey),
-          readerApi.progress(targetKey),
+          readerApi.progress(positionKey),
         ]);
         saved = list;
         const ref = progress?.locator.href
@@ -364,7 +388,7 @@ export function ScriptureReader({
       cancelled = true;
       if (progressTimer.current) clearTimeout(progressTimer.current);
     };
-  }, [contentId, corpusId, goToRef, targetKey]);
+  }, [contentId, corpusId, goToRef, positionKey, rootTitle, targetKey]);
 
   // Remember where the reader is (per user, per corpus).
   useEffect(() => {
@@ -382,10 +406,10 @@ export function ScriptureReader({
         label: `${chapter.book.name}${chapter.book.chapterCount > 1 ? ` ${chapter.chapter}` : ""}`,
       };
       void readerApi
-        .saveProgress(targetKey, locator, chapter.fraction)
+        .saveProgress(positionKey, locator, chapter.fraction)
         .catch(() => undefined);
     }, 1200);
-  }, [chapter, targetKey]);
+  }, [chapter, positionKey]);
 
   // Bring the focused verses into view (link targets, search results,
   // notes) — once per navigation, not when the focus flash clears.
@@ -455,7 +479,10 @@ export function ScriptureReader({
         selected.toString().trim(),
       before: first.slice(Math.max(0, from.offset - 80), from.offset),
       after: last.slice(to.offset, to.offset + 80),
-      x: rect.left + rect.width / 2 - hostRect.left,
+      x: clampPopoverX(
+        rect.left + rect.width / 2 - hostRect.left,
+        hostRect.width,
+      ),
       y: rect.top - hostRect.top,
     });
   }, []);
@@ -478,7 +505,10 @@ export function ScriptureReader({
       text,
       before: "",
       after: "",
-      x: rect.left + Math.min(rect.width / 2, 160) - hostRect.left,
+      x: clampPopoverX(
+        rect.left + Math.min(rect.width / 2, 160) - hostRect.left,
+        hostRect.width,
+      ),
       y: rect.top - hostRect.top,
     });
   }, []);
@@ -877,6 +907,18 @@ export function ScriptureReader({
             className="h-7 w-52 rounded border border-black/10 bg-transparent pl-7 pr-2 text-xs dark:border-white/10"
           />
         </form>
+        {/* Phones: the search box lives in the search panel. */}
+        <button
+          type="button"
+          title="Go to a reference or search"
+          aria-pressed={aside === "search"}
+          onClick={() =>
+            setAside((current) => (current === "search" ? null : "search"))
+          }
+          className={`${iconButton} sm:hidden`}
+        >
+          <Search className="h-4 w-4" />
+        </button>
         {corpusId === LDS_CORPUS_ID && chapter && !browse && (
           <a
             href={gospelLibraryUrl(chapter.book.slug, chapter.chapter)}
@@ -923,7 +965,7 @@ export function ScriptureReader({
         {/* Contents / search beside the text (the owner's navigation
             exception; the same contents are in the right sidebar's rail). */}
         {aside && contents && (
-          <aside className="flex w-64 shrink-0 flex-col border-r border-black/10 dark:border-white/10">
+          <aside className="absolute inset-y-0 left-0 z-30 flex w-[min(18rem,85%)] flex-col border-r border-black/10 bg-background shadow-xl sm:static sm:z-auto sm:w-64 sm:shrink-0 sm:shadow-none dark:border-white/10">
             <div className="flex items-center justify-between border-b border-black/10 px-3 py-1.5 text-xs font-medium dark:border-white/10">
               {aside === "contents" ? "Contents" : "Search"}
               <button
@@ -935,6 +977,21 @@ export function ScriptureReader({
                 <X className="h-3.5 w-3.5" />
               </button>
             </div>
+            {aside === "search" && (
+              <form
+                onSubmit={(event) => void submitQuery(event)}
+                className="border-b border-black/10 p-2 sm:hidden dark:border-white/10"
+              >
+                <input
+                  autoFocus
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="Alma 32:21 or a phrase"
+                  aria-label="Go to a reference or search"
+                  className="h-8 w-full rounded border border-black/10 bg-transparent px-2 text-sm dark:border-white/10"
+                />
+              </form>
+            )}
             <div className="min-h-0 flex-1 overflow-auto p-2 text-xs">
               {aside === "contents" ? (
                 contents.volumes.map((volume) => (
@@ -1013,12 +1070,15 @@ export function ScriptureReader({
                     <button
                       key={`${hit.bookSlug}-${hit.chapter}-${hit.verse}`}
                       type="button"
-                      onClick={() =>
+                      onClick={() => {
                         void goTo(
                           { bookSlug: hit.bookSlug, chapter: hit.chapter },
                           { start: hit.verse, end: hit.verse },
-                        )
-                      }
+                        );
+                        // On a phone the panel covers the text: get out of the way.
+                        if (window.matchMedia("(max-width: 639px)").matches)
+                          setAside(null);
+                      }}
                       className="mb-1 block w-full rounded px-2 py-1 text-left hover:bg-black/5 dark:hover:bg-white/5"
                     >
                       <span className="font-medium">{hit.reference}</span>

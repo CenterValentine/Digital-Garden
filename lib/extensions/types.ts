@@ -91,6 +91,11 @@ export interface ExtensionContentViewerMatch {
   contentType: string | null;
   /** File payload MIME type when `contentType === "file"`, else null. */
   mimeType?: string | null;
+  /**
+   * External payload `resourceType` when `contentType === "external"` — lets
+   * an extension claim a kind of link node (the reader: scripture sessions).
+   */
+  externalResourceType?: string | null;
 }
 
 /**
