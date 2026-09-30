@@ -34,6 +34,13 @@ import {
   nativeSearchLabel,
   type SearchBackendPreference,
 } from "@/lib/domain/ai/use-chat-search-backend";
+import { Switch } from "@/components/client/ui/switch";
+import { useSettingsStore } from "@/state/settings-store";
+import {
+  BULK_READ_MAX_TOKENS,
+  BULK_READ_MIN_TOKENS,
+  effectiveBulkReadThreshold,
+} from "@/lib/features/settings/validation";
 
 const PANEL_WIDTH = 340;
 const PANEL_MAX_HEIGHT = 420;
@@ -112,6 +119,22 @@ export function ChatControlPanel({
     maxHeight: number;
   } | null>(null);
   const nativeLabel = nativeSearchLabel(providerId, modelId);
+  // Approvals (owner, 2026-09-30): the two account-wide AI settings that
+  // decide when a run pauses — surfaced here beside the chat, written
+  // through the same store as Settings → AI so the two never disagree.
+  const aiSettings = useSettingsStore((state) => state.ai);
+  const setAISettings = useSettingsStore((state) => state.setAISettings);
+  const charterAutoApprove = aiSettings?.charterAutoApprove ?? false;
+  const readThreshold = effectiveBulkReadThreshold(aiSettings?.bulkReadTokenThreshold);
+  const [readThresholdDraft, setReadThresholdDraft] = useState<string | null>(null);
+  const commitReadThreshold = () => {
+    if (readThresholdDraft === null) return;
+    const parsed = parseInt(readThresholdDraft.trim().replace(/[,_\s]/g, ""), 10);
+    setReadThresholdDraft(null);
+    if (Number.isNaN(parsed)) return;
+    const clamped = Math.min(Math.max(parsed, BULK_READ_MIN_TOKENS), BULK_READ_MAX_TOKENS);
+    if (clamped !== readThreshold) void setAISettings({ bulkReadTokenThreshold: clamped });
+  };
   // undefined = not loaded yet; null = the user has no search connection.
   const [searchService, setSearchService] = useState<string | null | undefined>(undefined);
   useEffect(() => {
@@ -289,6 +312,46 @@ export function ChatControlPanel({
                   onChange={onContextChange}
                   disabled={busy}
                 />
+              </PanelRow>
+              <PanelRow
+                label="Auto-approve charter"
+                hint={
+                  charterAutoApprove
+                    ? "On — in a charter chat, its documents, notes, database reads and final checkpoint run without asking. Run proposals, checkpoints between phases, and overwrites of your own files still ask. Applies to every chat."
+                    : "Off — a charter chat asks before creating documents and notes, large reads, and its final checkpoint. Turn on to skip what the charter already asked for. Applies to every chat."
+                }
+              >
+                <Switch
+                  checked={charterAutoApprove}
+                  onCheckedChange={(checked) => void setAISettings({ charterAutoApprove: checked })}
+                  aria-label="Auto-approve charter deliverables"
+                />
+              </PanelRow>
+              <PanelRow
+                label="Ask before reads over"
+                hint="Database reads estimated above this many tokens ask for approval; smaller ones run. Applies to every chat (also in Settings → AI)."
+              >
+                <span className="inline-flex items-center gap-1.5">
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    min={BULK_READ_MIN_TOKENS}
+                    max={BULK_READ_MAX_TOKENS}
+                    step={1000}
+                    aria-label="Read approval threshold in tokens"
+                    value={readThresholdDraft ?? String(readThreshold)}
+                    onChange={(event) => setReadThresholdDraft(event.target.value)}
+                    onBlur={commitReadThreshold}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        commitReadThreshold();
+                      }
+                    }}
+                    className="w-20 rounded-md border border-black/10 bg-transparent px-1.5 py-0.5 text-right text-[11px] text-gray-800 focus:outline-none focus:ring-1 focus:ring-gold-primary/50 dark:border-white/10 dark:text-gray-100"
+                  />
+                  <span className="text-[11px] text-gray-500 dark:text-gray-400">tokens</span>
+                </span>
               </PanelRow>
               {nativeLabel && onSearchBackendChange ? (
                 <PanelRow

@@ -388,6 +388,31 @@ export const userSettingsSchema = z.object({
 
 export type UserSettings = z.infer<typeof userSettingsSchema>;
 
+/**
+ * Database reads larger than this many estimated tokens ask for approval
+ * (AI-BULK-ROW-READING-PLAN D3). Raised from 6k to 25k on 2026-09-30 (owner):
+ * a whole evidence table or a job row with its full description ran 9–12k,
+ * so every useful read paused the turn.
+ */
+export const BULK_READ_DEFAULT_TOKENS = 25_000;
+/** The previous default — whole-snapshot saves wrote it into user profiles. */
+export const LEGACY_BULK_READ_DEFAULT_TOKENS = 6_000;
+export const BULK_READ_MIN_TOKENS = 1_000;
+export const BULK_READ_MAX_TOKENS = 100_000;
+
+/**
+ * The threshold in force for a stored value. A stored 6,000 is the OLD
+ * DEFAULT, not a choice: earlier whole-snapshot settings saves persisted it
+ * for every user who never touched the field (prod 2026-09-30: the only
+ * account held exactly 6000). Same precedent as the stored-4096 maxTokens
+ * normalization. Any other stored value is the user's and is kept.
+ */
+export function effectiveBulkReadThreshold(stored: unknown): number {
+  const n = typeof stored === "number" && Number.isFinite(stored) ? Math.floor(stored) : null;
+  if (n === null || n <= 0 || n === LEGACY_BULK_READ_DEFAULT_TOKENS) return BULK_READ_DEFAULT_TOKENS;
+  return Math.min(Math.max(n, BULK_READ_MIN_TOKENS), BULK_READ_MAX_TOKENS);
+}
+
 // Default settings (all optional fields filled with sensible defaults)
 export const DEFAULT_SETTINGS: UserSettings = {
   version: 1,
@@ -551,7 +576,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
     // null = model maximum (catalog-resolved per executed model). A flat
     // numeric default here silently truncated reasoning-heavy models.
     maxTokens: null,
-    bulkReadTokenThreshold: 6_000,
+    bulkReadTokenThreshold: BULK_READ_DEFAULT_TOKENS,
     charterAutoApprove: false,
     streamingEnabled: true,
     typingEffect: true,

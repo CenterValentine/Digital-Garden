@@ -373,6 +373,12 @@ For gpt-6-sol, every search's retrieved content is billed at $2–2.50 / 1M and 
 
 **Kept deliberately:** intermediate checkpoints, which are real review points since the next phase loads on the next turn, and run proposals, which carry the scope and item budget. `update_note`'s destructive-rewrite guard is unchanged.
 
+**Round 6b (owner, same day):**
+- **Both approval settings are in Chat controls:** *Auto-approve charter* (switch) and *Ask before reads over* (tokens). They're written through the same settings store as Settings → AI, so the two surfaces never disagree.
+- **The read-approval default is now 25k (was 6k).** A whole evidence table or a job row with its description runs 9–12k, so every useful read paused the turn.
+- **A stored 6,000 counts as the old default**, not a choice (`effectiveBulkReadThreshold`). Whole-snapshot saves had persisted it; production's only account held exactly 6000. This follows the stored-4096 maxTokens precedent.
+- Pinned-read allowance stays 2× the threshold, now 50k.
+
 **Gate:** `run-harness:check` round 6 (policy table; the wiring of each predicate; proposal always asks; route passes the setting and marks the final phase on both charter paths). Four mutations caught.
 
 ### L2 — keep the tool list constant for the turn

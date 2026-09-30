@@ -65,12 +65,18 @@ import {
   BASE_TOOL_METADATA,
 } from "@/lib/domain/ai/tools/metadata";
 import { useSettingsStore } from "@/state/settings-store";
+import {
+  BULK_READ_DEFAULT_TOKENS,
+  BULK_READ_MAX_TOKENS,
+  BULK_READ_MIN_TOKENS,
+  effectiveBulkReadThreshold,
+} from "@/lib/features/settings/validation";
 
 const MAX_TOKENS_MIN = 1;
 const MAX_TOKENS_MAX = 200_000;
-const BULK_READ_MIN = 1_000;
-const BULK_READ_MAX = 100_000;
-const BULK_READ_DEFAULT = 6_000;
+const BULK_READ_MIN = BULK_READ_MIN_TOKENS;
+const BULK_READ_MAX = BULK_READ_MAX_TOKENS;
+const BULK_READ_DEFAULT = BULK_READ_DEFAULT_TOKENS;
 
 interface ToolConfigEntry {
   enabled?: boolean;
@@ -94,7 +100,7 @@ export default function AISettingsPage() {
   // deliberate choice) — normalize it to "unset" so legacy settings pick up
   // the catalog-resolved maximum instead of a silent truncation cap.
   const maxTokens = ai?.maxTokens === 4096 ? null : (ai?.maxTokens ?? null);
-  const bulkReadThreshold = ai?.bulkReadTokenThreshold ?? BULK_READ_DEFAULT;
+  const bulkReadThreshold = effectiveBulkReadThreshold(ai?.bulkReadTokenThreshold);
   const charterAutoApprove = ai?.charterAutoApprove ?? false;
   const typingEffect = ai?.typingEffect ?? true;
   const showAiHighlight = ai?.showAiHighlight ?? true;

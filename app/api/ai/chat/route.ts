@@ -103,7 +103,7 @@ import {
   reservedTailTools,
   stepsRemainingNotice,
 } from "@/lib/domain/ai/tools/iteration-proposal";
-import { DEFAULT_BULK_READ_THRESHOLD } from "@/lib/domain/ai/tools/data-tools";
+import { effectiveBulkReadThreshold } from "@/lib/features/settings/validation";
 import {
   MAX_STEP_SUMMARIES,
   type MaxTokensSource,
@@ -546,7 +546,7 @@ export async function POST(request: Request) {
       // Pinned bulk reads (AI-BULK-ROW-READING-PLAN §4.6) may hold twice
       // the user's approval threshold, newest first.
       const bulkReadPinnedAllowance =
-        2 * (aiSettings.bulkReadTokenThreshold ?? DEFAULT_BULK_READ_THRESHOLD);
+        2 * effectiveBulkReadThreshold(aiSettings.bulkReadTokenThreshold);
       // Auto-pronounce: when on (default), the model is told to attach spoken
       // audio to non-English vocab cards by default. The proposal gate still
       // gates the actual TTS spend, so "default on" never auto-bills.

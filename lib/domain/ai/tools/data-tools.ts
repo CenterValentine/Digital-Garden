@@ -97,6 +97,10 @@ import {
 import type { ToolExecuteContext } from "./types";
 import { summarizeRejections } from "@/lib/domain/data/cells";
 import { charterAutoApproves } from "@/lib/domain/ai/charters/auto-approve";
+import {
+  BULK_READ_DEFAULT_TOKENS,
+  effectiveBulkReadThreshold,
+} from "@/lib/features/settings/validation";
 
 
 const DEFAULT_LIMIT = 100;
@@ -106,8 +110,8 @@ const MAX_LIMIT = 1000;
 const BULK_CLIP_CHARS = 120;
 /** Index-tier relation rendering: one short linked title, then "+N more". */
 const INDEX_RELATION_RENDER = { maxLinkedTitles: 1, linkedTitleClip: 40 } as const;
-/** Default threshold when the user has not set one (plan D3). */
-export const DEFAULT_BULK_READ_THRESHOLD = 6_000;
+/** Default threshold when the user has not set one (plan D3; 25k since 2026-09-30). */
+export const DEFAULT_BULK_READ_THRESHOLD = BULK_READ_DEFAULT_TOKENS;
 /**
  * Bulk reads up to this many tokens need no approval inside a charter turn
  * (the attachment is the consent). Above it the user's threshold applies.
@@ -142,10 +146,7 @@ function numberOf(v: unknown): number | null {
 
 export async function bulkReadThresholdFor(userId: string): Promise<number> {
   const settings = await getUserSettings(userId).catch(() => null);
-  const n = settings?.ai?.bulkReadTokenThreshold;
-  return typeof n === "number" && Number.isFinite(n) && n > 0
-    ? n
-    : DEFAULT_BULK_READ_THRESHOLD;
+  return effectiveBulkReadThreshold(settings?.ai?.bulkReadTokenThreshold);
 }
 
 export function bulkReadCeilingFor(modelId: string | undefined): number {

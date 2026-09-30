@@ -339,6 +339,7 @@ import {
 import { docxHtmlToCheckText } from "../lib/domain/ai/docx-check-text";
 import { DOCXConverter } from "../lib/domain/export/converters/docx";
 import { AUTO_CLOSED_CHECKPOINT_NEXT, charterAutoApproves } from "../lib/domain/ai/charters/auto-approve";
+import { BULK_READ_DEFAULT_TOKENS, effectiveBulkReadThreshold } from "../lib/features/settings/validation";
 import JSZip from "jszip";
 
 {
@@ -665,6 +666,25 @@ void (async () => {
       routeSrc6.includes("toolCtx.charterFinalPhase = parsed.phases.length <= 1"),
     "round 6: the route passes the setting and marks the final phase on both charter paths",
   );
+}
+
+{
+  // §10 round 6b — the read-approval default is 25k; a stored 6,000 is the
+  // old default persisted by whole-snapshot saves, not a choice. Both
+  // approval settings live in Chat controls too, through the same store.
+  assert(BULK_READ_DEFAULT_TOKENS === 25_000, "round 6b: the read-approval default is 25k");
+  assert(effectiveBulkReadThreshold(6_000) === 25_000 && effectiveBulkReadThreshold(undefined) === 25_000, "round 6b: unset or the legacy 6,000 → 25k");
+  assert(effectiveBulkReadThreshold(8_000) === 8_000 && effectiveBulkReadThreshold(40_000) === 40_000, "round 6b: a value the user chose is kept");
+  assert(effectiveBulkReadThreshold(500) === 1_000 && effectiveBulkReadThreshold(500_000) === 100_000, "round 6b: stored values clamp to 1k–100k");
+  const panelSrc = readFileSync(path.join(process.cwd(), "components/content/ai/ChatControlPanel.tsx"), "utf8");
+  assert(
+    panelSrc.includes("setAISettings({ charterAutoApprove: checked })") &&
+      panelSrc.includes("setAISettings({ bulkReadTokenThreshold: clamped })") &&
+      panelSrc.includes("effectiveBulkReadThreshold(aiSettings?.bulkReadTokenThreshold)"),
+    "round 6b: Chat controls writes both approval settings through the settings store and shows the effective threshold",
+  );
+  const dataSrc6b = readFileSync(path.join(process.cwd(), "lib/domain/ai/tools/data-tools.ts"), "utf8");
+  assert(dataSrc6b.includes("return effectiveBulkReadThreshold(settings?.ai?.bulkReadTokenThreshold);"), "round 6b: the server reads the effective threshold");
 }
 
 {
