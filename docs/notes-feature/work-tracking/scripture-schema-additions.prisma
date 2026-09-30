@@ -1,0 +1,84 @@
+// Scripture corpus tables — staged for the owner (prisma/ is human-owned).
+// Approved 2026-09-30 ("shared corpus, per-user enable"). Apply by pasting the
+// four models below into prisma/schema.prisma, adding the back-relation on
+// User, then generating the migration:
+//
+//   SHADOW_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/shadow \
+//     npx prisma migrate dev --name scripture_corpus
+//
+// Plan: docs/notes-feature/work-tracking/SCRIPTURES-INTEGRATION-PLAN.md §R3.
+// The equivalent hand-written SQL is in scripture-migration.sql.
+
+// ── add to model User ─────────────────────────────────────────────────────
+//   scriptureCorpora UserScriptureCorpus[]
+
+/// A scripture collection (one tradition's canon in one edition/translation).
+/// Global and read-only: the text lives once, loaded by the owner, never
+/// copied per user. `id` is a stable slug ("lds-standard-works").
+model ScriptureCorpus {
+  id           String   @id @db.VarChar(80)
+  // "lds" | "jewish" | "buddhist" | "islamic" | "christian" | "sikh" | …
+  tradition    String   @db.VarChar(40)
+  title        String   @db.VarChar(255)
+  language     String   @db.VarChar(20)
+  // Where the text came from (pinned repo/URL) and its licence.
+  sourceUrl    String
+  license      String   @db.VarChar(80)
+  // "chapter-verse" | "surah-ayah" | "sutta-segment" | … (how references read)
+  versification String  @default("chapter-verse") @db.VarChar(40)
+  version      String   @db.VarChar(80)
+  verseCount   Int      @default(0)
+  installedAt  DateTime @default(now()) @db.Timestamptz(6)
+  books        ScriptureBook[]
+  verses       ScriptureVerse[]
+  users        UserScriptureCorpus[]
+}
+
+/// A book in a corpus (1 Nephi, Genesis, D&C, Moses …), in canonical order.
+/// `volume` groups books (the LDS standard works: ot, nt, bofm, dc-testament, pgp).
+model ScriptureBook {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  corpusId      String   @db.VarChar(80)
+  ordinal       Int
+  slug          String   @db.VarChar(40)
+  name          String   @db.VarChar(120)
+  fullTitle     String   @db.VarChar(255)
+  heading       String?
+  volume        String   @db.VarChar(40)
+  volumeTitle   String   @db.VarChar(120)
+  chapterCount  Int
+  // Accepted reference spellings ("1 Ne.", "1 Nephi", "1ne").
+  abbreviations String[]
+  corpus        ScriptureCorpus @relation(fields: [corpusId], references: [id], onDelete: Cascade)
+
+  @@unique([corpusId, slug])
+  @@index([corpusId, ordinal])
+}
+
+/// One verse (or equivalent unit). ~42k rows for the LDS standard works.
+model ScriptureVerse {
+  id        String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  corpusId  String @db.VarChar(80)
+  bookSlug  String @db.VarChar(40)
+  chapter   Int
+  verse     Int
+  // Global reading order within the corpus (navigation, ranges, search order).
+  ordinal   Int
+  text      String
+  corpus    ScriptureCorpus @relation(fields: [corpusId], references: [id], onDelete: Cascade)
+
+  @@unique([corpusId, bookSlug, chapter, verse])
+  @@index([corpusId, ordinal])
+}
+
+/// A user's enabled collections (the text itself is shared).
+model UserScriptureCorpus {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String   @db.Uuid
+  corpusId  String   @db.VarChar(80)
+  enabledAt DateTime @default(now()) @db.Timestamptz(6)
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  corpus    ScriptureCorpus @relation(fields: [corpusId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, corpusId])
+}

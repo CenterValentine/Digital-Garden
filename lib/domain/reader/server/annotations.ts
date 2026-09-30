@@ -25,6 +25,8 @@ import {
   type ReadingProgressDto,
 } from "../types";
 import { ReaderFetchError } from "./http";
+import { parseScriptureTargetKey } from "@/lib/domain/scripture/types";
+import { sendScriptureAnnotationToNote } from "@/lib/domain/scripture/server/notes";
 
 export const locatorSchema = z.object({
   href: z.string().max(2000).optional(),
@@ -234,8 +236,24 @@ export async function sendAnnotationToNote(
   annotationId: string
 ): Promise<{ noteContentId: string; created: boolean }> {
   const annotation = await ownedAnnotation(ownerId, annotationId);
+  // Scripture highlights: "<Book> — Notes" at the top of the tree.
+  const corpusId = parseScriptureTargetKey(annotation.targetKey);
+  if (corpusId) {
+    const result = await sendScriptureAnnotationToNote({
+      ownerId,
+      corpusId,
+      locator: annotation.locator as ReaderLocator,
+      body: annotation.body,
+      existingNoteId: annotation.noteContentId,
+    });
+    await readerDb.readerAnnotation.update({
+      where: { id: annotation.id },
+      data: { noteContentId: result.noteContentId },
+    });
+    return result;
+  }
   const bookId = parseContentTargetKey(annotation.targetKey);
-  if (!bookId) throw new ReaderFetchError("Only book annotations can be sent to a note yet", 400);
+  if (!bookId) throw new ReaderFetchError("Only book and scripture annotations can be sent to a note", 400);
   const book = await prisma.contentNode.findFirst({
     where: { id: bookId, ownerId, deletedAt: null },
     select: { title: true, parentId: true },

@@ -20,6 +20,14 @@ import type {
   ReadingProgressDto,
   ReadingStatus,
 } from "@/lib/domain/reader/types";
+import type {
+  ScriptureCatalogItem,
+  ScriptureChapterDto,
+  ScriptureContents,
+  ScriptureCorpusInfo,
+  ScriptureResolvedReference,
+  ScriptureSearchResult,
+} from "@/lib/domain/scripture/types";
 
 export class ReaderApiError extends Error {
   constructor(
@@ -136,4 +144,33 @@ export const readerApi = {
   },
   importReadwise: () =>
     call<HighlightImportSummary>("/api/reader/import/readwise", { method: "POST" }),
+};
+
+/** Scriptures: shared corpora the owner installs and each user enables. */
+export const scriptureApi = {
+  catalog: () =>
+    call<{ items: ScriptureCatalogItem[]; canInstall: boolean }>("/api/reader/scriptures/catalog"),
+  enabled: () =>
+    call<{ corpora: ScriptureCorpusInfo[]; migrated: boolean }>("/api/reader/scriptures/enabled"),
+  install: (corpusId: string) =>
+    call<{ verseCount: number; alreadyInstalled: boolean }>(
+      "/api/reader/scriptures/install",
+      json("POST", { corpusId })
+    ),
+  setEnabled: (corpusId: string, enabled: boolean) =>
+    call<{ corpusId: string; enabled: boolean }>("/api/reader/scriptures/enable", json("POST", { corpusId, enabled })),
+  contents: (corpusId: string) =>
+    call<ScriptureContents>(`/api/reader/scriptures/${encodeURIComponent(corpusId)}/contents`),
+  chapter: (corpusId: string, book: string, chapter: number) =>
+    call<ScriptureChapterDto>(
+      `/api/reader/scriptures/${encodeURIComponent(corpusId)}/chapter?${new URLSearchParams({ book, chapter: String(chapter) }).toString()}`
+    ),
+  search: (corpusId: string, q: string) =>
+    call<ScriptureSearchResult>(
+      `/api/reader/scriptures/${encodeURIComponent(corpusId)}/search?q=${encodeURIComponent(q)}`
+    ),
+  resolve: (corpusId: string, ref: string) =>
+    call<{ references: ScriptureResolvedReference[] }>(
+      `/api/reader/scriptures/${encodeURIComponent(corpusId)}/resolve?ref=${encodeURIComponent(ref)}`
+    ),
 };

@@ -26,6 +26,10 @@ import {
   normalizeBookTitle,
   parseKindleClippings,
 } from "../lib/domain/reader/kindle-clippings";
+import { buildBookIndex, formatReference, parseReference, parseReferenceList, resolveBook } from "../lib/domain/scripture/reference";
+import { LDS_BOOKS, ldsShortName } from "../lib/domain/scripture/lds";
+import { normalizeLdsVolume } from "../lib/domain/scripture/adapters/lds";
+import { formatVerseHref, parseVerseHref } from "../lib/domain/scripture/types";
 
 let checks = 0;
 async function check(name: string, fn: () => void | Promise<void>) {
@@ -323,6 +327,93 @@ async function main() {
     );
     assert.equal(cleanDescription({ value: "Another long enough description, from an OL object value." }), "Another long enough description, from an OL object value.");
     assert.equal(cleanDescription("too short"), null);
+  });
+
+  const lds = buildBookIndex(LDS_BOOKS);
+  const ref = (text: string) => parseReference(text, lds);
+
+  await check("Scripture refs: Church abbreviations, full names, ranges", () => {
+    assert.deepEqual(ref("1 Ne. 3:7"), { bookSlug: "1-ne", chapter: 3, verseStart: 7, verseEnd: 7 });
+    assert.deepEqual(ref("Alma 32:21–23"), { bookSlug: "alma", chapter: 32, verseStart: 21, verseEnd: 23 });
+    assert.deepEqual(ref("D&C 88:118"), { bookSlug: "dc", chapter: 88, verseStart: 118, verseEnd: 118 });
+    assert.deepEqual(ref("First Nephi 3"), { bookSlug: "1-ne", chapter: 3, verseStart: null, verseEnd: null });
+    assert.deepEqual(ref("John 3:16"), { bookSlug: "john", chapter: 3, verseStart: 16, verseEnd: 16 });
+    assert.deepEqual(ref("Moroni"), { bookSlug: "moro", chapter: null, verseStart: null, verseEnd: null });
+    assert.equal(resolveBook("Hela", lds)?.slug, "hel");
+  });
+
+  await check("Scripture refs: one-chapter books, out-of-range, reversed, unknown", () => {
+    assert.deepEqual(ref("Enos 3"), { bookSlug: "enos", chapter: 1, verseStart: 3, verseEnd: 3 });
+    assert.deepEqual(ref("Enos 1:3"), { bookSlug: "enos", chapter: 1, verseStart: 3, verseEnd: 3 });
+    assert.equal(ref("Alma 64"), null);
+    assert.equal(ref("Alma 32:23-21"), null);
+    assert.equal(ref("Hezekiah 3:1"), null);
+  });
+
+  await check("Scripture ref lists: commas continue verses, semicolons start chapters", () => {
+    const list = parseReferenceList("John 3:16, 17; Matt. 5:14–16; 6", lds);
+    assert.deepEqual(list, [
+      { bookSlug: "john", chapter: 3, verseStart: 16, verseEnd: 16 },
+      { bookSlug: "john", chapter: 3, verseStart: 17, verseEnd: 17 },
+      { bookSlug: "matt", chapter: 5, verseStart: 14, verseEnd: 16 },
+      { bookSlug: "matt", chapter: 6, verseStart: null, verseEnd: null },
+    ]);
+    assert.equal(formatReference(list[2], ldsShortName), "Matt. 5:14–16");
+    assert.equal(formatReference({ bookSlug: "dc", chapter: 88, verseStart: null, verseEnd: null }, ldsShortName), "D&C 88");
+  });
+
+  await check("Scripture verse hrefs round-trip", () => {
+    for (const r of [
+      { bookSlug: "alma", chapter: 32, verseStart: 21, verseEnd: 23 },
+      { bookSlug: "1-ne", chapter: 3, verseStart: 7, verseEnd: 7 },
+      { bookSlug: "js-h", chapter: 1, verseStart: null, verseEnd: null },
+    ]) {
+      assert.deepEqual(parseVerseHref(formatVerseHref(r)), r);
+    }
+    assert.equal(parseVerseHref("../etc"), null);
+  });
+
+  await check("Scripture book table: every abbreviation resolves to its own book", () => {
+    for (const book of LDS_BOOKS) {
+      for (const spelling of [book.name, ...book.abbreviations]) {
+        assert.equal(resolveBook(spelling, lds)?.slug, book.slug, `${spelling} → ${book.slug}`);
+      }
+    }
+  });
+
+  await check("LDS adapter: books volumes and the D&C sections shape", () => {
+    const bofm = normalizeLdsVolume("bofm", {
+      version: 2,
+      books: [
+        {
+          book: "Enos",
+          lds_slug: "enos",
+          full_title: "The Book of Enos",
+          heading: " Enos prays mightily. ",
+          chapters: [{ chapter: 1, verses: [{ verse: 1, text: " Behold, it came to pass… " }, { verse: 2, text: "And I will tell you" }] }],
+        },
+      ],
+    });
+    assert.equal(bofm.version, "2");
+    assert.deepEqual(bofm.books[0], {
+      slug: "enos",
+      name: "Enos",
+      fullTitle: "The Book of Enos",
+      heading: "Enos prays mightily.",
+      volume: "bofm",
+      volumeTitle: "Book of Mormon",
+      chapterCount: 1,
+      abbreviations: LDS_BOOKS.find((book) => book.slug === "enos")!.abbreviations,
+    });
+    assert.deepEqual(bofm.verses[0], { bookSlug: "enos", chapter: 1, verse: 1, text: "Behold, it came to pass…" });
+
+    const dc = normalizeLdsVolume("dc-testament", {
+      title: "The Doctrine and Covenants",
+      sections: [{ section: 88, verses: [{ verse: 118, text: "seek learning, even by study and also by faith." }] }],
+    });
+    assert.equal(dc.books[0].slug, "dc");
+    assert.deepEqual(dc.verses[0], { bookSlug: "dc", chapter: 88, verse: 118, text: "seek learning, even by study and also by faith." });
+    assert.throws(() => normalizeLdsVolume("bofm", { books: [{ book: "X", lds_slug: "nope", chapters: [] }] }));
   });
 
   console.log(`reader:check passed (${checks} checks)`);
