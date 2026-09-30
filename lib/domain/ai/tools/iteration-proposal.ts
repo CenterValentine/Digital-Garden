@@ -271,6 +271,54 @@ export const CHARTER_TURN_DELIVERABLES: readonly DeliverableTool[] = [
 export const CHARTER_TAIL_EXTRA = ["phase_checkpoint"] as const;
 
 /**
+ * ONE PROMPT PER TURN (ITERATION-RUN-HARNESS-FIXES §10 L2): a charter turn
+ * advertises the tools its work uses from its FIRST request, so neither a
+ * summon nor the reserved tail changes the tool list mid-turn — every change
+ * to the list rewrites everything after the tool definitions, which the
+ * provider cache then bills in full. The set is what every measured charter
+ * run summoned (dce6cf56, ecf1d0e5, de65f6bb, e5b899a2): the evidence reads,
+ * the one-item run loop, the deliverables, and the checkpoint. Anything
+ * outside it is still one summon away. Tools not registered this turn are
+ * skipped by the caller.
+ */
+export const CHARTER_TURN_TOOLS: readonly string[] = [
+  "query_database",
+  "describe_database",
+  "read_content",
+  "propose_item_iteration",
+  "record_item_result",
+  "record_iteration_findings",
+  "create_docx",
+  "create_note",
+  "update_note",
+  "update_row",
+  "update_rows",
+  "insert_rows",
+  "phase_checkpoint",
+  "read_page_headless_or_browser",
+];
+
+/**
+ * The answer a tool gets when it is called inside the reserved tail but is
+ * not one of the tail's tools. The tail used to HIDE those tools, which
+ * changed the tool list and cold-started the cache on the tail's first step
+ * (prod de65f6bb s23: 11k of schemas dropped, zero cached). Refusing at
+ * execute keeps the list constant and costs the model one step it is told
+ * how to spend.
+ */
+export function tailRefusalNotice(input: {
+  tool: string;
+  tailTools: readonly string[];
+  remaining: number;
+}): string {
+  const tools = input.tailTools.filter((t) => t !== "summon");
+  return (
+    `[Harness — not run. ${input.tool} is outside the reserved tail: ${input.remaining} step${input.remaining === 1 ? "" : "s"} ` +
+    `remain for ${tools.join(", ")}. Produce the deliverables with what you have, record any gap, and close.]`
+  );
+}
+
+/**
  * The tools the reserved tail keeps callable: the deliverables plus the
  * record/close tools (item runs) or the charter's close tools (charter
  * turns). `summon` always, so a deliverable not yet activated can be.

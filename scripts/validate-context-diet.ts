@@ -497,12 +497,15 @@ const isStub = (v: unknown, word: string): boolean =>
   assert(
     /reservedTailTools\(\s*tailDeliverables/.test(routeSrc) &&
       routeSrc.includes("reservedTailSize(tailDeliverables)") &&
-      routeSrc.includes("if (!tailDeliverables) return") &&
+      routeSrc.includes("if (!tailDeliverables) {") &&
+      routeSrc.includes("tailGate.active = inTail") &&
+      routeSrc.includes("return tailRefusalNotice({") &&
+      !routeSrc.includes("stepActiveTools.filter((t) => tailToolsForTurn.includes(t))") &&
       routeSrc.includes("stepsRemainingNotice({") &&
       routeSrc.includes("tailTools: tailToolsForTurn") &&
       routeSrc.includes("CHARTER_TURN_DELIVERABLES") &&
       routeSrc.includes("continuationStepCap({"),
-    "G5: prepareStep must reserve the deliverable tail (item runs AND charter turns) from tailDeliverables, append the remaining-steps notice naming the tail tools, and size continuations with continuationStepCap (plan §6b, §9)",
+    "G5: prepareStep must reserve the deliverable tail (item runs AND charter turns) from tailDeliverables — enforced at execute through tailGate, never by narrowing the tool list (§10 L2) — append the remaining-steps notice naming the tail tools, and size continuations with continuationStepCap (plan §6b, §9)",
   );
   const engineSrc = readFileSync(path.join(process.cwd(), "lib/domain/ai/use-conversation-engine.ts"), "utf8");
   assert(
@@ -576,8 +579,9 @@ const isStub = (v: unknown, word: string): boolean =>
       routeSrc8.includes("stripOpenAIItemIdsFromModelMessages(rawStepMessages)") &&
       /hasCheckpointTool: isOffered\("phase_checkpoint"\)/.test(routeSrc8) &&
       !/buildSystemPrompt\(\{[\s\S]{0,1200}isAdvertised\(/.test(routeSrc8) &&
-      routeSrc8.includes('activated.add("phase_checkpoint")'),
-    "G8 wiring: the route forces reasoning for OpenAI reasoning families, strips item ids from each step's messages, reads system-prompt flags from isOffered (never a summon), and gives charter turns phase_checkpoint",
+      routeSrc8.includes("for (const id of CHARTER_TURN_TOOLS) if (id in tools) activated.add(id)") &&
+      routeSrc8.includes("CHARTER_TURN_TOOLS.includes(id)"),
+    "G8 wiring: the route forces reasoning for OpenAI reasoning families, strips item ids from each step's messages, reads system-prompt flags from isOffered (never a summon), and gives charter turns their whole tool set from the first request (isOffered agrees)",
   );
 }
 

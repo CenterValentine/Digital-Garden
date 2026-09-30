@@ -231,6 +231,27 @@ The owner ran one job (Coinme Technical Solutions Engineer) with `AI_PROMPT_PREF
 
 **Expected on the next run:** cached tokens climb with the prompt inside a request; the first step of a continuation request starts near the previous request's last prompt. The projection in this section ($1.35 → ~$0.56) applies from here.
 
+### Round 2 (2026-09-30, branch `feat/one-prompt-per-turn`) — built
+
+- **L2 built as the principle "one prompt per turn"** (AI-ARCHITECTURE §8).
+  - A bound charter advertises `CHARTER_TURN_TOOLS` from its first request: the evidence reads, the one-item run loop, the deliverables, `update_rows`, `update_note`, the browser reader and the checkpoint.
+  - System-prompt flags read `isOffered`, which covers the same set.
+  - The reserved tail no longer narrows `activeTools`. A server-run tool called there gets `tailRefusalNotice` and does not run (`ai:tail_refused` log).
+  - **Known limit:** provider-executed tools (OpenAI's own web search) and browser-executed tools (the page readers) have no server execute, so they cannot be refused. The steps notice names the tail tools for those. The trade: hiding cost a cache flush on every run; an ignored notice costs one step, only when the model strays.
+- **L3a built.**
+  - `unknownOptionError` names the column, the rejected value, up to 12 choices (then "+N more") and a single unambiguous near match.
+  - `summarizeRejections` groups identical rejections with a count, in both `insert_rows` and `update_rows`.
+  - The grid shows the same clearer message.
+- **L3b superseded by L2:** nothing is hidden in the tail any more, so summon's "already available" is true again.
+- **L4a built.**
+  - Each step records `providerTools`, the calls the provider executed. Native and app-run search share the name `search_web`, so this is what tells them apart.
+  - The fold prices provider-run searches per call via `webSearchCallUsd`. OpenAI's rate, verified 2026-09-30: $0.01 per call for reasoning models, $0.025 for others. Search content is already in the input tokens. Other vendors are unverified and priced at 0.
+- **L4b dropped.** Hiding native search after N calls would break "one prompt per turn", and OpenAI's `web_search` tool has no per-turn cap. Anthropic's is created with `maxUses: 5`. Now that the calls are visible, the open question (D8, revised): should charter turns on OpenAI use the app-run search backend instead of native search? The app-run backend is refusable, repeat-guarded and budgetable, but gives up OpenAI's integrated citations.
+- **Gates:**
+  - `run-harness:check` §10: rejection text; grouping; charter tool set; tail refusal; provider-run search pricing.
+  - `context:diet:check` G5: the tail is enforced through `tailGate` and never by narrowing. G8: charter tools from the first request.
+  - Five mutations caught.
+
 ### L2 — keep the tool list constant for the turn
 
 Adding or removing a tool rewrites everything after the tool definitions, so every mid-turn change is a full cache flush. Today it costs 5–9¢ a time; after L1 it costs the whole prompt.

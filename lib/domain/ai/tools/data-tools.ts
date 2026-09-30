@@ -95,6 +95,8 @@ import {
   type FilterOperator,
 } from "@/lib/domain/data";
 import type { ToolExecuteContext } from "./types";
+import { summarizeRejections } from "@/lib/domain/data/cells";
+
 
 const DEFAULT_LIMIT = 100;
 /** The token budget is the governor; the page is a safety rail (plan D1 scale). */
@@ -670,9 +672,7 @@ async function applyRowUpdates(
   }
   const failed = result.results.filter((r) => r.status === "error");
   if (failed.length > 0) {
-    return `Not updated — validation rejected: ${failed
-      .map((f) => f.message)
-      .join("; ")}. Nothing changed (all-or-nothing).`;
+    return `Not updated — validation rejected (nothing changed, all-or-nothing):\n${summarizeRejections(failed.map((f) => f.message))}`;
   }
 
   // Links last, and only once every cell write succeeded.
@@ -1478,10 +1478,7 @@ export function createDataTools(ctx: ToolExecuteContext) {
           }
           if (failed.length > 0) {
             parts.push(
-              `${failed.length} cell${failed.length === 1 ? "" : "s"} rejected by validation (rows created without them): ${failed
-                .slice(0, 5)
-                .map((f) => f.message)
-                .join("; ")}`
+              `${failed.length} cell${failed.length === 1 ? "" : "s"} rejected by validation (rows created without them) — fix with update_rows:\n${summarizeRejections(failed.map((f) => f.message))}`
             );
           }
           parts.push(

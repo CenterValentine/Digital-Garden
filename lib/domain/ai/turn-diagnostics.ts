@@ -80,6 +80,13 @@ export interface TurnStepSummary {
    */
   inputTokens: number | null;
   cachedInputTokens: number | null;
+  /**
+   * Tool calls the PROVIDER executed this step (native web search). Kept
+   * apart from `tools` because a native search and the app-run backend share
+   * the name `search_web`, and only the provider's is billed per call.
+   * Absent on rows persisted before §10 L4a and on steps with none.
+   */
+  providerTools?: string[];
 }
 
 export interface TurnSegmentUsage {
@@ -328,6 +335,13 @@ export function readTurnSegment(raw: unknown): TurnSegment | null {
             outputTokens: numOrNull(st.outputTokens),
             inputTokens: numOrNull(st.inputTokens),
             cachedInputTokens: numOrNull(st.cachedInputTokens),
+            ...(Array.isArray(st.providerTools)
+              ? {
+                  providerTools: st.providerTools.filter(
+                    (t): t is string => typeof t === "string",
+                  ),
+                }
+              : {}),
           },
         ];
       })
@@ -569,6 +583,9 @@ export function mergeTurnUsageMetadata(
         entry.costBreakdown.cachedInput += b.cachedInput ?? 0;
         entry.costBreakdown.cacheWrite += b.cacheWrite ?? 0;
         entry.costBreakdown.output += b.output ?? 0;
+        if (b.webSearch) {
+          entry.costBreakdown.webSearch = (entry.costBreakdown.webSearch ?? 0) + b.webSearch;
+        }
       }
       if (request.persistedCostVersion) {
         entry.costPriceVersion = request.persistedCostVersion;
@@ -598,6 +615,12 @@ export function mergeTurnUsageMetadata(
       )?.steps;
       let maxStepInputTokens = 0;
       let maxStepCachedInputTokens = 0;
+      // Provider-run searches carry a per-call fee (§10 L4a).
+      const webSearchCalls = (stepsForTier ?? []).reduce(
+        (n, step) =>
+          n + (step.providerTools ?? []).filter((t) => t === "search_web").length,
+        0,
+      );
       for (const step of stepsForTier ?? []) {
         const input = step.inputTokens ?? 0;
         if (input > maxStepInputTokens) {
@@ -615,6 +638,7 @@ export function mergeTurnUsageMetadata(
               ...(maxStepInputTokens > 0
                 ? { maxStepInputTokens, maxStepCachedInputTokens }
                 : {}),
+              ...(webSearchCalls > 0 ? { webSearchCalls } : {}),
             },
             modelId,
             vendor,
@@ -626,6 +650,10 @@ export function mergeTurnUsageMetadata(
         entry.costBreakdown.cachedInput += cost.breakdown.cachedInput;
         entry.costBreakdown.cacheWrite += cost.breakdown.cacheWrite;
         entry.costBreakdown.output += cost.breakdown.output;
+        if (cost.breakdown.webSearch) {
+          entry.costBreakdown.webSearch =
+            (entry.costBreakdown.webSearch ?? 0) + cost.breakdown.webSearch;
+        }
         entry.costPriceVersion = cost.priceVersion;
       } else {
         entry.unpriced = true;

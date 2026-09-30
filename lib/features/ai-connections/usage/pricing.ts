@@ -35,6 +35,7 @@
  */
 
 /** Bump on ANY change to the tables below. Stamped into persisted costs. */
+import { openaiModelReasons } from "@/lib/domain/ai/model-constraints";
 export const PRICING_VERSION = "2026-08-08";
 
 export interface ModelPriceTier {
@@ -332,6 +333,13 @@ export interface UsageLike {
    */
   maxStepInputTokens?: number;
   maxStepCachedInputTokens?: number;
+  /**
+   * Provider-executed web search calls in this usage. Billed per call on top
+   * of tokens (the retrieved content is already in `inputTokens`). Prod
+   * de65f6bb ran OpenAI's built-in search 11 times and the meter showed
+   * none of it (ITERATION-RUN-HARNESS-FIXES §10 L4a).
+   */
+  webSearchCalls?: number;
 }
 
 export interface TurnCostBreakdown {
@@ -343,6 +351,8 @@ export interface TurnCostBreakdown {
   cacheWrite: number;
   /** USD for output tokens (reasoning included). */
   output: number;
+  /** USD for provider-executed web search calls (per-call fee). */
+  webSearch?: number;
 }
 
 export interface TurnCost {
@@ -363,6 +373,24 @@ const per1M = (tokens: number, rate: number) => (tokens / 1_000_000) * rate;
  *
  * Returns null when the model has no price row (render "unpriced").
  */
+/**
+ * Per-call fee for a provider's built-in web search. OpenAI (verified
+ * 2026-09-30, developers.openai.com/api/docs/pricing): $10 / 1k calls for
+ * reasoning models (gpt-5, o-series — gpt-6 follows), $25 / 1k for the rest;
+ * search content tokens are billed as input at the model's rate, which the
+ * token lines already count. Other vendors: not yet verified → 0, so the
+ * meter under-reports rather than invents.
+ */
+export function webSearchCallUsd(
+  modelId: string | null | undefined,
+  providerId?: string | null,
+): number {
+  const id = (modelId ?? "").toLowerCase();
+  const vendor = providerId ?? (id.includes("/") ? id.split("/")[0] : undefined);
+  if (vendor !== "openai") return 0;
+  return openaiModelReasons(id) ? 0.01 : 0.025;
+}
+
 export function computeTurnCost(
   usage: UsageLike,
   modelId: string | null | undefined,
@@ -412,8 +440,14 @@ export function computeTurnCost(
     cacheWrite: per1M(cacheWrite, rates.cacheWrite),
     output: per1M(output, rates.output),
   };
+  const searches = Math.max(0, usage.webSearchCalls ?? 0);
+  if (searches > 0) breakdown.webSearch = searches * webSearchCallUsd(modelId, providerId);
   const usd =
-    breakdown.input + breakdown.cachedInput + breakdown.cacheWrite + breakdown.output;
+    breakdown.input +
+    breakdown.cachedInput +
+    breakdown.cacheWrite +
+    breakdown.output +
+    (breakdown.webSearch ?? 0);
   return { usd, priceVersion: PRICING_VERSION, breakdown, estimated: true };
 }
 

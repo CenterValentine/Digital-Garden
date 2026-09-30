@@ -282,6 +282,14 @@ rate is visible only via `cachedInputTokens` in persisted usage (#156). The syst
 prompt is ordered cache-friendly: stable playbook context precedes run-specific
 sections (`buildSystemPrompt` section ordering).
 
+### Provider seam principles (2026-09-30)
+
+Owner-endorsed after the gpt-6 cache freeze (ITERATION-RUN-HARNESS-FIXES §10). They are absolutes, not heuristics:
+
+- **One prompt per turn.** The system prompt and the tool list are fixed at a turn's first request; the requests of one turn differ by appended history only. A charter's turn-scoped data (the current phase, the item's rows) may differ between turns, never between the requests of one. Anything that would change the prompt mid-turn is present from the first request or waits for the next turn. In code: system-prompt flags read `isOffered` (base policy + charter binding, never a summon); a bound charter advertises `CHARTER_TURN_TOOLS` from its first request; the reserved tail is enforced when a tool runs (`tailGate` → `tailRefusalNotice`), never by narrowing `activeTools`. A request that departs from this is a full cache miss.
+- **Provider state in the transcript is not ours to diet.** Parts a provider authored for its own round-trip — Anthropic's signed thinking, OpenAI's encrypted reasoning under `store: false` — are carried back whatever their size. Context diet removes only content we generated or fetched. (`stripReasoningForResend` keeps both; the cache freeze was this rule broken.)
+- **A model we allow is a model we own.** An id that can reach a provider has our own capability row driving the adapter (`openaiModelReasons` → `forceReasoning`, `resolveModelTemperature`, the pricing row); the adapter's built-in model list is never the source of truth. New releases are watched against these rows rather than discovered in production.
+
 ---
 
 ## 9. Changing things safely
