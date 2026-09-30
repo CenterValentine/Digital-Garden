@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { AlertTriangle, BookOpen, ExternalLink, Loader2 } from "lucide-react";
+import { AlertTriangle, BookOpen, ChevronRight, ExternalLink, Loader2 } from "lucide-react";
 import { TRADITION_LABELS } from "@/lib/domain/scripture/catalog";
 import {
   scriptureTabId,
@@ -55,12 +55,18 @@ export function ScriptureCatalog() {
     void load();
   }, [load]);
 
-  const groups = useMemo(() => {
+  // Installable collections lead, as cards by tradition. Everything planned or
+  // link-only folds into one compact "More traditions" list — the catalog
+  // stays one screen however many traditions it names.
+  const { groups, later } = useMemo(() => {
     const byTradition = new Map<ScriptureTradition, ScriptureCatalogItem[]>();
+    const rest: ScriptureCatalogItem[] = [];
     for (const item of items ?? []) {
-      byTradition.set(item.tradition, [...(byTradition.get(item.tradition) ?? []), item]);
+      if (item.status === "available" || item.installed) {
+        byTradition.set(item.tradition, [...(byTradition.get(item.tradition) ?? []), item]);
+      } else rest.push(item);
     }
-    return [...byTradition.entries()];
+    return { groups: [...byTradition.entries()], later: rest };
   }, [items]);
 
   const run = async (item: ScriptureCatalogItem, action: () => Promise<unknown>, done: string) => {
@@ -136,7 +142,7 @@ export function ScriptureCatalog() {
                       </button>
                     )}
                     {item.status === "available" && !item.installed && !canInstall && (
-                      <span className="text-[11px] text-muted-foreground">Not installed yet — ask the owner</span>
+                      <span className="text-[11px] text-muted-foreground">Not installed yet — ask an admin</span>
                     )}
                     {item.installed && (
                       <>
@@ -171,6 +177,52 @@ export function ScriptureCatalog() {
           </ul>
         </section>
       ))}
+
+      {later.length > 0 && (
+        <details className="group rounded-lg border border-black/10 dark:border-white/10">
+          <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2 text-xs text-muted-foreground hover:text-foreground">
+            <ChevronRight className="h-3.5 w-3.5 transition-transform group-open:rotate-90" />
+            <span className="font-medium text-foreground">More traditions</span>
+            <span>
+              {[
+                countLabel(later.filter((item) => item.status === "planned").length, "planned"),
+                countLabel(later.filter((item) => item.status === "link").length, "link only"),
+              ]
+                .filter(Boolean)
+                .join(" · ")}
+            </span>
+          </summary>
+          <ul className="divide-y divide-black/5 border-t border-black/10 dark:divide-white/5 dark:border-white/10">
+            {later.map((item) => (
+              <li key={item.id} className="flex items-center gap-3 px-3 py-1.5 text-xs" title={`${item.description}\n${item.license}`}>
+                <span className="w-24 shrink-0 truncate text-[10px] uppercase tracking-wide text-muted-foreground">
+                  {TRADITION_LABELS[item.tradition]}
+                </span>
+                <span className="min-w-0 flex-1 truncate">{item.title}</span>
+                <span className="shrink-0 text-[10px] text-muted-foreground">
+                  {item.status === "planned" ? "Planned" : "Link only"}
+                </span>
+                {item.homepage && (
+                  <a
+                    href={item.homepage}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label={`Read ${item.title} online`}
+                    title="Read online"
+                    className="shrink-0 rounded p-1 text-muted-foreground hover:bg-black/5 hover:text-foreground dark:hover:bg-white/10"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" />
+                  </a>
+                )}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
     </div>
   );
+}
+
+function countLabel(count: number, label: string): string | null {
+  return count ? `${count} ${label}` : null;
 }

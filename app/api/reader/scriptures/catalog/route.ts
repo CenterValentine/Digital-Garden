@@ -1,7 +1,7 @@
 /**
  * GET /api/reader/scriptures/catalog → every catalogued collection across
  * traditions, with installed/enabled state, and whether the caller may
- * install (owner).
+ * install (owner or admin).
  */
 
 import { getCurrentSession } from "@/lib/infrastructure/auth/middleware";
@@ -12,6 +12,7 @@ export const GET = readerRoute("/api/reader/scriptures/catalog", async ({ ownerI
   const session = await getCurrentSession();
   return {
     items: await listCatalog(ownerId),
-    canInstall: session?.user.role === "owner",
+    // Same bar as the install route: owner or admin.
+    canInstall: session?.user.role === "owner" || session?.user.role === "admin",
   };
 });

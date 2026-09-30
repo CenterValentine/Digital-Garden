@@ -1,6 +1,6 @@
 /**
  * POST /api/reader/scriptures/install { corpusId } — load a collection into
- * the shared tables (owner only; idempotent), then enable it for the caller.
+ * the shared tables (owner or admin; idempotent), then enable it for the caller.
  */
 
 import { NextResponse } from "next/server";
@@ -16,10 +16,11 @@ const bodySchema = z.object({ corpusId: z.string().min(1).max(80) });
 
 export const POST = readerRoute("/api/reader/scriptures/install", async ({ ownerId, request }) => {
   try {
-    await requireRole("owner");
+    // Shared, public-domain text for the whole garden: an owner/admin action.
+    await requireRole("admin");
   } catch {
     return NextResponse.json(
-      { success: false, error: { code: "FORBIDDEN", message: "Only the owner can install a scripture collection." } },
+      { success: false, error: { code: "FORBIDDEN", message: "Only an owner or admin can install a scripture collection." } },
       { status: 403 }
     );
   }
