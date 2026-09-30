@@ -406,3 +406,10 @@ hosts were unreachable from the build sandbox, so every source needs a live smok
     rule.
 - **Notes filters:** *Highlights only* and *Underlines only* toggles, combinable with
   a colour filter.
+- **Page-end transition.** Nothing stays on screen longer than before. The motion
+  just fills the time it already had:
+  - **In:** the veil starts opaque and thins to reveal the book, while the card
+    rises and scales in.
+  - **Out:** before any choice runs, the card and veil ease out (200 ms).
+  - **Auto-continue:** a hairline countdown fills across the card's hold.
+  - Everything respects reduced-motion settings.

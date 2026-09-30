@@ -30,6 +30,12 @@ import {
 
 /** How long the page-end overlay shows before auto-continue turns the page. */
 const AUTO_CONTINUE_DELAY_MS = 1800;
+/** Exit animation of the page-end overlay; the page turns once it's done. */
+const PAGE_END_EXIT_MS = 200;
+
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 /** "pageEnd" = a paged source's page is finished; offer the next one. */
 type Phase = "idle" | "loading" | "ready" | "playing" | "paused" | "pageEnd" | "done" | "error";
@@ -51,6 +57,8 @@ export function SpeedReaderDialog() {
   const pagedSourceRef = useRef<SpeedReaderPagedSource | null>(null);
   const [pageLabel, setPageLabel] = useState<string | null>(null);
   const [advancing, setAdvancing] = useState(false);
+  // The page-end overlay is animating out (then the chosen action runs).
+  const [pageEndLeaving, setPageEndLeaving] = useState(false);
   // Words from pages already finished this session (paged sources).
   const finishedPagesWordsRef = useRef(0);
   const [summaryWords, setSummaryWords] = useState(0);
@@ -356,6 +364,9 @@ export function SpeedReaderDialog() {
     if (!source) return;
     setAdvancing(true);
     try {
+      // Let the overlay bow out before the words come back.
+      setPageEndLeaving(true);
+      await wait(PAGE_END_EXIT_MS);
       let page = await source.next();
       for (let skipped = 0; page && !page.text.trim() && skipped < 5; skipped++) {
         page = await source.next();
@@ -373,7 +384,16 @@ export function SpeedReaderDialog() {
       setErrorMessage(err instanceof Error ? err.message : "Could not turn the page");
     } finally {
       setAdvancing(false);
+      setPageEndLeaving(false);
     }
+  }
+
+  /** Re-read / Finish from the page-end overlay: animate it out first. */
+  async function leavePageEnd(then: () => void) {
+    setPageEndLeaving(true);
+    await wait(PAGE_END_EXIT_MS);
+    setPageEndLeaving(false);
+    then();
   }
 
   function recordAndSummarize(wordsRead: number) {
@@ -445,7 +465,17 @@ export function SpeedReaderDialog() {
       {/* End of a page: the dialog turns see-through so the book's page shows
           behind the choice. */}
       {phase === "pageEnd" && (
-        <div aria-hidden className="pointer-events-none absolute inset-0" style={{ background: theme.background, opacity: 0.55 }} />
+        // The veil starts opaque (where the words were) and thins to reveal the
+        // book, then thickens again on the way out — no hard cut either way.
+        <div
+          aria-hidden
+          className={`pointer-events-none absolute inset-0 motion-reduce:animate-none ${
+            pageEndLeaving
+              ? "animate-out fade-out-100 fill-mode-forwards duration-200 ease-in"
+              : "animate-in fade-in-100 duration-500 ease-out"
+          }`}
+          style={{ background: theme.background, opacity: 0.55 }}
+        />
       )}
       {/* Header */}
       <div
@@ -559,9 +589,11 @@ export function SpeedReaderDialog() {
             advancing={advancing}
             autoContinue={autoContinuePages}
             onAutoContinueChange={setAutoContinuePages}
+            leaving={pageEndLeaving}
+            autoDelayMs={AUTO_CONTINUE_DELAY_MS}
             onContinue={() => void continueToNextPage()}
-            onRereadPage={restart}
-            onFinish={() => recordAndSummarize(finishedPagesWordsRef.current)}
+            onRereadPage={() => void leavePageEnd(restart)}
+            onFinish={() => void leavePageEnd(() => recordAndSummarize(finishedPagesWordsRef.current))}
           />
         )}
         {phase === "done" && (
@@ -750,6 +782,10 @@ function ErrorState({
 
 interface PageEndStateProps {
   theme: ReturnType<typeof resolveTheme>;
+  /** Animating out (the chosen action runs when it's done). */
+  leaving: boolean;
+  /** Auto-continue's hold, drawn as a countdown line. */
+  autoDelayMs: number;
   wordsSoFar: number;
   advancing: boolean;
   autoContinue: boolean;
@@ -762,6 +798,8 @@ interface PageEndStateProps {
 /** End of a paged source's page: continue, re-read, or finish the session. */
 function PageEndState({
   theme,
+  leaving,
+  autoDelayMs,
   wordsSoFar,
   advancing,
   autoContinue,
@@ -778,7 +816,11 @@ function PageEndState({
   return (
     <div className="flex h-full w-full items-center justify-center px-6">
     <div
-      className="flex flex-col items-center gap-5 rounded-xl px-8 py-6 text-center shadow-xl"
+      className={`relative flex flex-col items-center gap-5 overflow-hidden rounded-xl px-8 py-6 text-center shadow-xl motion-reduce:animate-none ${
+        leaving
+          ? "animate-out fade-out zoom-out-95 fill-mode-forwards duration-200 ease-in"
+          : "animate-in fade-in zoom-in-95 slide-in-from-bottom-3 duration-300 ease-out"
+      }`}
       style={{
         color: theme.textPrimary,
         background: theme.surface,
@@ -821,7 +863,34 @@ function PageEndState({
         />
         Continue automatically to the next page
       </label>
+      {autoContinue && !leaving && <CountdownLine theme={theme} durationMs={autoDelayMs} />}
     </div>
     </div>
+  );
+}
+
+/**
+ * A hairline along the card's bottom edge that fills over the auto-continue
+ * hold, so the brief pause reads as intentional rather than a stall.
+ * Remounts (restarts) whenever auto-continue is switched back on.
+ */
+function CountdownLine({ theme, durationMs }: { theme: ReturnType<typeof resolveTheme>; durationMs: number }) {
+  const [running, setRunning] = useState(false);
+  useEffect(() => {
+    // Start from empty on the next frame so the transition has a from-state.
+    const frame = requestAnimationFrame(() => setRunning(true));
+    return () => cancelAnimationFrame(frame);
+  }, []);
+  return (
+    <span
+      aria-hidden
+      className="absolute bottom-0 left-0 h-0.5 w-full origin-left ease-linear"
+      style={{
+        background: theme.orpAccent,
+        transform: `scaleX(${running ? 1 : 0})`,
+        transitionProperty: "transform",
+        transitionDuration: `${durationMs}ms`,
+      }}
+    />
   );
 }
