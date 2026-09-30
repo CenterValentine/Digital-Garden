@@ -179,7 +179,53 @@ function blockToParagraphs(
   }
 }
 
+/**
+ * Professional document defaults (§10 round 5). The converter used to build
+ * a bare `Document`, so Word's built-in theme applied — blue, differently
+ * styled headings in Calibri Light, Word's default spacing — and an AI resume
+ * rendered in a look the owner's Resume Guidance rules out (one family,
+ * restrained styling, 10–11 pt body, 0.55–0.7 in margins). Every document now
+ * carries one font family, black headings and US Letter pages; `compact`
+ * (AI-written documents: resumes, letters) tightens to 10.5 pt and 0.6 in.
+ * Sizes are half-points; spacing and margins are twips (1 pt = 20).
+ */
+export interface DocxLayout {
+  compact?: boolean;
+}
+
+export function documentDefaults(layout: DocxLayout = {}) {
+  const font = "Calibri";
+  const body = layout.compact ? 21 : 22;
+  const margin = layout.compact ? 864 : 1440;
+  const heading = (size: number, before: number, after: number) => ({
+    run: { font, size, bold: true, color: "000000" },
+    paragraph: { spacing: { before, after }, keepNext: true },
+  });
+  return {
+    styles: {
+      default: {
+        document: {
+          run: { font, size: body, color: "000000" },
+          paragraph: { spacing: { after: layout.compact ? 60 : 120, line: 259 } },
+        },
+        heading1: heading(layout.compact ? 32 : 36, 0, 80),
+        heading2: heading(layout.compact ? 23 : 26, layout.compact ? 160 : 240, 60),
+        heading3: heading(layout.compact ? 21 : 24, layout.compact ? 120 : 200, 40),
+        heading4: heading(body, 120, 40),
+        heading5: heading(body, 120, 40),
+        heading6: heading(body, 120, 40),
+      },
+    },
+    page: {
+      size: { width: 12240, height: 15840 },
+      margin: { top: margin, right: margin, bottom: margin, left: margin },
+    },
+  };
+}
+
 export class DOCXConverter implements DocumentConverter {
+  constructor(private readonly layout: DocxLayout = {}) {}
+
   async convert(
     tiptapJson: JSONContent,
     options: ConversionOptions
@@ -195,7 +241,11 @@ export class DOCXConverter implements DocumentConverter {
       children.push(new Paragraph({ children: [new TextRun({ text: "" })] }));
     }
 
-    const document = new Document({ sections: [{ children }] });
+    const defaults = documentDefaults(this.layout);
+    const document = new Document({
+      styles: defaults.styles,
+      sections: [{ properties: { page: defaults.page }, children }],
+    });
     const buffer = await Packer.toBuffer(document);
 
     return {

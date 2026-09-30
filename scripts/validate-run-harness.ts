@@ -563,6 +563,74 @@ import JSZip from "jszip";
 }
 
 {
+  // §10 round 5 — `Ingest in full:` is a line-start directive: it names the
+  // databases loaded whole; prose, code and quotes never trigger it.
+  const wl = (title: string, id?: string) => ({ type: "wikiLink", attrs: { targetTitle: title, ...(id ? { targetId: id } : {}) } });
+  const para = (...content: unknown[]) => ({ type: "paragraph", content });
+  const doc = {
+    type: "doc",
+    content: [
+      { type: "heading", attrs: { level: 1 }, content: [{ type: "text", text: "Resume charter" }] },
+      para({ type: "text", text: "Ingest in full: " }, wl("Career Evidence Library", "cel-1"), { type: "text", text: ", " }, wl("Experience Gaps Library")),
+      para({ type: "text", text: "We could ingest in full: " }, wl("Job Opportunities Library")),
+      { type: "codeBlock", content: [{ type: "text", text: "Ingest in full: [[Secrets]]" }] },
+      { type: "bulletList", content: [{ type: "listItem", content: [para({ type: "text", text: "INGEST IN FULL: " }, wl("Career Evidence Library", "cel-1"))] }] },
+      para({ type: "text", text: "Inputs\nIngest in full: [[Style Guide]]\nThe rest of the note." }),
+    ],
+  };
+  const parsed = parseCharter(doc as never);
+  const ingest = parsed.ingest ?? [];
+  assert(
+    ingest.map((r) => r.targetTitle).join("|") === "Career Evidence Library|Experience Gaps Library|Style Guide" &&
+      ingest[0].targetId === "cel-1",
+    `round 5: ingest lines name their databases (ids kept, duplicates once, prose/code ignored, markdown-like lines read) — got ${JSON.stringify(ingest)}`,
+  );
+  assert(parseCharter({ type: "doc", content: [para({ type: "text", text: "No directive here." })] } as never).ingest === undefined, "round 5: no directive → no ingest");
+}
+
+void (async () => {
+  // §10 round 5 — documents carry one font family, black headings, US
+  // Letter; AI documents use the compact layout (0.6 in margins, 10.5 pt).
+  const doc = { type: "doc", content: [{ type: "heading", attrs: { level: 1 }, content: [{ type: "text", text: "Name" }] }, { type: "paragraph", content: [{ type: "text", text: "Body" }] }] };
+  const compact = await new DOCXConverter({ compact: true }).convert(doc, { format: "docx", settings: {} as never });
+  const zip = await JSZip.loadAsync(Buffer.from(compact.files[0].content as Buffer));
+  const xml = await zip.file("word/document.xml")!.async("string");
+  const styles = await zip.file("word/styles.xml")!.async("string");
+  const h1 = styles.slice(styles.indexOf('w:styleId="Heading1"'), styles.indexOf("</w:style>", styles.indexOf('w:styleId="Heading1"')));
+  assert(
+    /w:top="864"/.test(xml) && /w:w="12240"/.test(xml) && /w:ascii="Calibri"/.test(h1) && /w:val="000000"/.test(h1) && !/2F5496/i.test(h1),
+    "round 5: compact AI documents — 0.6 in margins, US Letter, Calibri black Heading 1 (not Word's blue theme heading)",
+  );
+  const standard = await new DOCXConverter().convert(doc, { format: "docx", settings: {} as never });
+  const xml2 = await (await JSZip.loadAsync(Buffer.from(standard.files[0].content as Buffer))).file("word/document.xml")!.async("string");
+  assert(/w:top="1440"/.test(xml2), "round 5: exports keep the standard 1 in margins");
+  if (errors.length > 0) {
+    console.error(`\n✖ run-harness:check (round 5 DOCX) failed — ${errors.length} problem(s):\n`);
+    for (const e of errors) console.error(`  ${e}\n`);
+    process.exit(1);
+  }
+})();
+
+{
+  // §10 round 5 — wiring: ingestion is appended to the charter context
+  // before the prompt-cache key is computed; both charter paths feed it.
+  const routeSrc5 = readFileSync(path.join(process.cwd(), "app/api/ai/chat/route.ts"), "utf8");
+  const ingestAt = routeSrc5.indexOf("await buildCharterIngest(session.user.id, charterParsedForIngest)");
+  const keyAt = routeSrc5.indexOf("buildPromptCachePolicy({");
+  assert(
+    ingestAt > 0 && keyAt > ingestAt && (routeSrc5.match(/charterParsedForIngest = parsed;/g) ?? []).length === 2,
+    "round 5: both charter paths feed ingestion, which lands in charterContext before the prompt-cache key",
+  );
+  const promptSrc = readFileSync(path.join(process.cwd(), "lib/domain/ai/system-prompt.ts"), "utf8");
+  assert(
+    promptSrc.includes("Reading before concluding: a partial read is not an absence") &&
+      promptSrc.includes("Facts of record:") &&
+      promptSrc.includes("Closing a charter's work:"),
+    "round 5: the general reading and facts-of-record rules and the charter gate check are in the system prompt",
+  );
+}
+
+{
   // §10 round 3 — the step budget rides the result, not a trailing message.
   assert(withBudgetNotice("done", "[N]") === "done\n\n[N]", "round 3: a string result carries the budget line");
   const obj = withBudgetNotice({ ok: true }, "[N]") as Record<string, unknown>;

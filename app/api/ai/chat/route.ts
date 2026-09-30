@@ -291,6 +291,8 @@ import type {
   ResolvedModelRoute,
 } from "@/lib/domain/ai/model-directive";
 import { renderCharterSection } from "@/lib/domain/ai/charters/render";
+import { buildCharterIngest } from "@/lib/domain/ai/charters/ingest";
+import type { ParsedCharter } from "@/lib/domain/ai/charters/parse";
 import { getServerExtensions } from "@/lib/domain/editor/extensions-server";
 import {
   isCharterMetadata,
@@ -2298,6 +2300,9 @@ export async function POST(request: Request) {
       // itself marked as a playbook) are called out so the model follows
       // their own directives rather than treating them as passive reading.
       let charterContext = "";
+      // The charter parsed on either context path below — its `Ingest in
+      // full:` tables are loaded once both paths have run (§10 round 5).
+      let charterParsedForIngest: ParsedCharter | null = null;
       let attachedCharterResolved = false;
       let rootedCharterResolved = false;
       let attachedPlaybookTitle = "";
@@ -2350,6 +2355,7 @@ export async function POST(request: Request) {
             const parsed = parseCharter(
               charterNode.notePayload.tiptapJson as JSONContent,
             );
+            charterParsedForIngest = parsed;
             // LEDGER AWARENESS (owner directive 2026-09-11). The master
             // ledger is minted at mark and referenced to this charter, but
             // no prompt string ever said so — "create the charter's
@@ -2504,6 +2510,7 @@ export async function POST(request: Request) {
             const parsed = parseCharter(
               rootedNode.notePayload.tiptapJson as JSONContent,
             );
+            charterParsedForIngest = parsed;
             rootedCharterResolved = true;
             attachedPlaybookTitle = rootedNode.title;
             // Context diet (S7-C2): same pointer rule for rooted execution.
@@ -2570,6 +2577,37 @@ export async function POST(request: Request) {
             summary:
               "explicit rooted playbook injection failed — continuing without it",
             error: rootedPlaybookError,
+          });
+        }
+      }
+
+      // INGEST IN FULL (§10 round 5, owner decision 2026-09-30). A charter
+      // that names a database with `Ingest in full: [[…]]` gets it — every
+      // row, every column, and the tables it links to — in its context, so
+      // the model reads the whole profile instead of choosing what to read.
+      // Appended to the charter context: part of the system prompt, the
+      // same on every request of the turn, cached after the first step.
+      if (charterParsedForIngest && charterContext) {
+        try {
+          const ingested = await buildCharterIngest(session.user.id, charterParsedForIngest);
+          if (ingested) {
+            charterContext += ingested.text;
+            logger.info({
+              layer: "ai",
+              event: "charter:ingested",
+              summary: `ingested ${ingested.tables.length} database(s) in full — ~${ingested.tokens} tokens`,
+              attrs: {
+                tables: ingested.tables.map((t) => `${t.title}:${t.rows}${t.truncatedAfter !== undefined ? `(cut@${t.truncatedAfter})` : ""}`).join(", "),
+                tokens: ingested.tokens,
+              },
+            });
+          }
+        } catch (ingestError) {
+          logger.warn({
+            layer: "ai",
+            event: "charter:ingest_failed",
+            summary: "charter ingestion failed — continuing without the ingested section",
+            error: ingestError,
           });
         }
       }

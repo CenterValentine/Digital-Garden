@@ -331,6 +331,32 @@ For gpt-6-sol, every search's retrieved content is billed at $2–2.50 / 1M and 
 
 **Gates:** `run-harness:check` round 4 (`read_content` in both tail shapes; search label only for native-search models; route honours the preference only with a connection, before the native branch; `searchBackend` on all 8 body and dependency sites). `proposal:shape:check` tail-notice fixture updated. Four mutations caught.
 
+### Round 5 (2026-09-30) — resume quality: the profile, facts of record, finished documents
+
+**Evidence:** the LeanData resumes from Sol (in-app) and Astra, reviewed against the posting and the evidence tables.
+- Astra's is clearly stronger: outcome-first bullets; the 74%→85% satisfaction metric; QA and acceptance-criteria evidence; specific integrations; clean typography.
+- Both got the job titles wrong. Sol merged Tier III Support through 2023 and dropped Customer Success Automation Engineer; Astra invented "CS Operations Analyst". The evidence stores one combined title string for 2020–2025, and the charter says "stated employment history" without stating it.
+- Sol's run read the evidence index, about a third of Experiences, and **none of Claims and metrics**, where the satisfaction metric lives.
+- Sol's DOCX used Word's built-in theme: blue headings, default spacing.
+
+**Built (PR #273):**
+- **`Ingest in full: [[…]]`**, a line-start charter directive (`extractIngestReferences`). The named databases, every row and column, plus their forward-linked tables (no backlinks), are appended to the charter context by `buildCharterIngest` (`charters/ingest.ts`), before the prompt-cache key.
+  - It's part of the system prompt, the same on every request of a turn and cached after the first step.
+  - Ceiling: 60k tokens, with an explicit "not above; read with query_database" note if the ceiling cuts a table.
+  - Estimated ~30–35k tokens for the Career Evidence Library with Experiences, Claims and metrics, and Sources.
+- **Two general system-prompt rules:**
+  - *Reading before concluding*: a partial read is not an absence.
+  - *Facts of record*: names, titles, employers, dates, credentials and figures are copied exactly, never merged, renamed, re-dated or inferred.
+- **Charter gate check (system prompt):** before the closing summary, check each deliverable against the charter's gates, reading documents back first, and report each gate as met, not met or unchecked.
+- **DOCX defaults:** one font family (Calibri), black headings, US Letter. AI-written documents use the compact layout: 10.5 pt, 0.6 in margins. Exports keep 11 pt and 1 in.
+- **Gates:** `run-harness:check` round 5 (directive parsing; DOCX styles and margins; route wiring; prompt rules). Five mutations caught.
+
+**Charter (owner's note, text drafted in chat):**
+- The employment history of record, confirmed 2026-09-30.
+- `Ingest in full: [[Career Evidence Library]]`.
+- A hiring-thesis standard: why now; the employer's customer; the failure surface; ranked behaviours tagged Stated or Inferred; the screen-out risk; the candidate bridge; research → decision.
+- A bullet standard, the decisive-gap strategy, the DOCX check, and the duplicated paragraphs removed.
+
 ### L2 — keep the tool list constant for the turn
 
 Adding or removing a tool rewrites everything after the tool definitions, so every mid-turn change is a full cache flush. Today it costs 5–9¢ a time; after L1 it costs the whole prompt.
