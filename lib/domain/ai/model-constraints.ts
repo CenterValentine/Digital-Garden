@@ -64,3 +64,26 @@ export function resolveModelTemperature(
 export function modelRejectsTemperature(modelId: string): boolean {
   return TEMPERATURE_UNSUPPORTED.some((re) => re.test(modelId));
 }
+
+/**
+ * OpenAI models that reason before they act. `@ai-sdk/openai` keeps its own
+ * list (o-series, gpt-5 minus gpt-5-chat) and treats everything else as a
+ * plain chat model — which for a NEW family means: no `developer` system
+ * role, temperature sent, and, with `store: false`, no request for
+ * `reasoning.encrypted_content`. That last omission is what froze the prompt
+ * cache on every gpt-6 run (ITERATION-RUN-HARNESS-FIXES §10 L1): a reasoning
+ * item sent back without its content cannot be lined up with the cached
+ * prefix, so nothing past the first tool call was ever served from cache.
+ * The route passes `forceReasoning: true` for these ids.
+ */
+const OPENAI_REASONING_MODELS: ReadonlyArray<RegExp> = [
+  /(^|\/)o[1-9][a-z0-9-]*$/i,
+  /(^|\/)gpt-5(?!-chat)(?:$|[.-])/i,
+  /(^|\/)gpt-6(?:$|[.-])/i,
+  /(^|\/)codex-mini/i,
+];
+
+/** True for OpenAI ids that reason before answering (see the list above). */
+export function openaiModelReasons(modelId: string): boolean {
+  return OPENAI_REASONING_MODELS.some((re) => re.test(modelId));
+}

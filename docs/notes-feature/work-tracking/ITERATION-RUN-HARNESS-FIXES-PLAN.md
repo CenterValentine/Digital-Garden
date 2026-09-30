@@ -213,6 +213,24 @@ The meter read **$1.22** for `ecf1d0e5`; the same usage at base rates is **$0.82
 - **Caveat:** both diagnostics keep their state in instance memory. Within-request comparisons are reliable; cross-request ones appear when Fluid Compute reuses the instance, which it usually does.
 - **Expected:** the run names the element; the fix follows from it. This run would have cost $1.35 → ~$0.56.
 
+### L1 result (2026-09-30, prod `e5b899a2`, gpt-6-sol, probe on)
+
+The owner ran one job (Coinme Technical Solutions Engineer) with `AI_PROMPT_PREFIX_DIAG=1`: two turns, five requests, 31 steps, $0.67 + $0.69. The 53 probe lines and the per-step cache numbers, side by side:
+
+- **Inside a request the body only grows.** `ai:prompt_wire` said "stable — previous body plus appended items" on every in-request step. Yet the cached count froze: 18,020 through prompts of 20k–41k (turn 1, request 1), 11,092 through 27k (request 2), 14,861 through 39k (turn 2). In every request, and in all three measured runs, **the hit ends at the first tool call**.
+- **Cause: the reasoning items were missing.** OpenAI's reasoning models put a reasoning item before each tool call. With `store: false` (the #193 fix) the documented contract is to send those items back as `encrypted_content`. We did not: `stripReasoningForResend` dropped every reasoning part between requests, and inside a request `@ai-sdk/openai` sent them id-only because it does not know gpt-6 as a reasoning family (`isReasoningModel` covers o-series and gpt-5), so it never requested `reasoning.encrypted_content`. `ecf1d0e5` (gpt-5.6, a known family) cached normally inside requests 1 and 2 and froze from request 3 at request 1's first call — the point from which its stripped reasoning began. Both runs obey the same rule.
+- **Two request-boundary breaks.** (a) `input[0] message:system` changed between requests 1 and 2: the checkpoint paragraph is gated on `phase_checkpoint` being advertised, and the model's step-1 summon reached the next request through `activationsFromHistory`. A changed system prompt is a cold request. (b) `input[36] function_call`: the in-request item carried `"id":"fc_…"`, the transcript's copy did not — the same call spelled two ways, so a new request diverged at the previous request's first call.
+- **Not the cache key.** No `cacheKey` divergence was logged; the key held across requests.
+
+**Fix (branch `feat/openai-reasoning-cache`):**
+- `openaiModelReasons()` (`model-constraints.ts`): o-series, gpt-5 (not -chat), gpt-6, codex-mini. The route passes `forceReasoning: true` for them, which makes the adapter request `reasoning.encrypted_content` under `store: false`, use the `developer` role, and drop `temperature`.
+- `stripReasoningForResend` keeps OpenAI reasoning parts that carry `reasoningEncryptedContent` (drops the rest, as before; other vendors unchanged).
+- `stripOpenAIItemIdsFromModelMessages` runs in `prepareStep` for OpenAI: text and tool-call parts lose `openai.itemId` inside the request too; reasoning keeps its id (the adapter groups summary parts by it and sends it beside the blob).
+- System-prompt flags read `isOffered` (base policy + charter binding), never a summon; a bound charter adds `phase_checkpoint` to the turn's tools on every request.
+- Gate: `context:diet:check` G8 (three pure rules + route wiring); four mutations caught.
+
+**Expected on the next run:** cached tokens climb with the prompt inside a request; the first step of a continuation request starts near the previous request's last prompt. The projection in this section ($1.35 → ~$0.56) applies from here.
+
 ### L2 — keep the tool list constant for the turn
 
 Adding or removing a tool rewrites everything after the tool definitions, so every mid-turn change is a full cache flush. Today it costs 5–9¢ a time; after L1 it costs the whole prompt.

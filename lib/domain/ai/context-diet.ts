@@ -11,7 +11,7 @@
  * snapshots already digested into the run ledger).
  */
 
-import type { UIMessage } from "ai";
+import type { ModelMessage, UIMessage } from "ai";
 import { parseReadHeader } from "@/lib/domain/data/read-format";
 
 /**
@@ -35,7 +35,16 @@ export function stripReasoningForResend(
   if (executedVendorId === "anthropic") return messages;
   return messages.map((m) => {
     if (m.role !== "assistant") return m;
-    const parts = m.parts.filter((p) => p.type !== "reasoning");
+    const parts = m.parts.filter(
+      (p) =>
+        p.type !== "reasoning" ||
+        // OpenAI with `store: false` is the same contract as Anthropic's
+        // signed thinking: the reasoning item must travel back as
+        // `encrypted_content`, or the provider cannot line the next request
+        // up with its cached prefix (plan §10 L1 — every gpt-6 run froze at
+        // the first tool call). A part without the blob is dead weight still.
+        (executedVendorId === "openai" && hasOpenAIEncryptedReasoning(p)),
+    );
     return parts.length === m.parts.length ? m : { ...m, parts };
   });
 }
@@ -58,6 +67,51 @@ const ITEM_ID_METADATA_FIELDS = [
 ] as const;
 
 /** Returns a cleaned copy of `part`, or null when it carried no item id. */
+/** A reasoning part carrying OpenAI's encrypted reasoning blob. */
+export function hasOpenAIEncryptedReasoning(
+  part: UIMessage["parts"][number],
+): boolean {
+  const namespace = (part as { providerMetadata?: Record<string, unknown> })
+    .providerMetadata?.[OPENAI_METADATA_NAMESPACE];
+  return (
+    !!namespace &&
+    typeof namespace === "object" &&
+    typeof (namespace as Record<string, unknown>).reasoningEncryptedContent === "string"
+  );
+}
+
+/**
+ * The same id strip for the MODEL messages a step is about to send. Inside a
+ * request the SDK's own response messages carry `openai.itemId` on text and
+ * tool-call parts (the provider sends them inline as `id`), while the
+ * transcript resent by the client has had them stripped — the same call
+ * spelled two ways, so a new request's prompt diverged from the previous
+ * request's at its first call (plan §10 L1, wire probe 04:17:42). Reasoning
+ * parts keep their id: the provider groups a reasoning item's summary parts
+ * by it and sends it beside `encrypted_content`, which `store: false`
+ * accepts. Pure; called from prepareStep for OpenAI.
+ */
+export function stripOpenAIItemIdsFromModelMessages(
+  messages: ModelMessage[],
+): ModelMessage[] {
+  return messages.map((m) => {
+    if (m.role !== "assistant" || typeof m.content === "string") return m;
+    let changed = false;
+    const content = m.content.map((part) => {
+      if (part.type === "reasoning" || !("providerOptions" in part)) return part;
+      const namespace = part.providerOptions?.[OPENAI_METADATA_NAMESPACE];
+      if (!namespace || !("itemId" in namespace)) return part;
+      const { itemId: _itemId, ...rest } = namespace;
+      changed = true;
+      return {
+        ...part,
+        providerOptions: { ...part.providerOptions, [OPENAI_METADATA_NAMESPACE]: rest },
+      };
+    });
+    return changed ? ({ ...m, content } as ModelMessage) : m;
+  });
+}
+
 function withoutOpenAIItemId(
   part: UIMessage["parts"][number],
 ): UIMessage["parts"][number] | null {
