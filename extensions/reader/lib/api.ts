@@ -21,6 +21,7 @@ import type {
   ReadingStatus,
 } from "@/lib/domain/reader/types";
 import type {
+  ScriptureBookChapters,
   ScriptureCatalogItem,
   ScriptureChapterDto,
   ScriptureContents,
@@ -165,6 +166,10 @@ export const scriptureApi = {
     call<{ corpusId: string; enabled: boolean }>("/api/reader/scriptures/enable", json("POST", { corpusId, enabled })),
   contents: (corpusId: string) =>
     call<ScriptureContents>(`/api/reader/scriptures/${encodeURIComponent(corpusId)}/contents`),
+  bookChapters: (corpusId: string, book: string) =>
+    call<ScriptureBookChapters>(
+      `/api/reader/scriptures/${encodeURIComponent(corpusId)}/book?book=${encodeURIComponent(book)}`
+    ),
   chapter: (corpusId: string, book: string, chapter: number) =>
     call<ScriptureChapterDto>(
       `/api/reader/scriptures/${encodeURIComponent(corpusId)}/chapter?${new URLSearchParams({ book, chapter: String(chapter) }).toString()}`

@@ -80,6 +80,7 @@ interface Delegate<Row> {
   update(args: { where: Where; data: Where }): Promise<Row>;
   upsert(args: { where: Where; create: Where; update: Where }): Promise<Row>;
   deleteMany(args: { where: Where }): Promise<{ count: number }>;
+  groupBy(args: { by: string[]; where: Where; _count: Where; orderBy?: Where }): Promise<Array<Record<string, unknown>>>;
 }
 
 type ScriptureModel = "scriptureCorpus" | "scriptureBook" | "scriptureVerse" | "userScriptureCorpus";

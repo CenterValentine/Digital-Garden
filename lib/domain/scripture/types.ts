@@ -85,6 +85,20 @@ export interface ScriptureChapterDto {
   fraction: number;
 }
 
+/** A chapter as a card: its size and how it opens. */
+export interface ScriptureChapterSummary {
+  chapter: number;
+  verseCount: number;
+  /** Verse 1's text (clipped by the client). */
+  opening: string;
+}
+
+export interface ScriptureBookChapters {
+  book: ScriptureBookInfo;
+  chapterLabel: string;
+  chapters: ScriptureChapterSummary[];
+}
+
 export interface ScriptureContents {
   corpus: ScriptureCorpusInfo;
   volumes: Array<ScriptureVolumeInfo & { books: ScriptureBookInfo[] }>;

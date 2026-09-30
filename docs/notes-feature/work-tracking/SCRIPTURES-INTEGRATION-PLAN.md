@@ -394,6 +394,13 @@ ordinals ("First Nephi"), unambiguous prefixes ("Hela"), ranges, lists ("John 3:
   (the catalog tab; the same component is Settings → Reader → Scriptures). The
   catalog shows addable collections as cards and folds planned / link-only
   traditions into one "More traditions" list.
+- **Browse** (the default way in, `ScriptureBrowse`): volumes as bound-book covers →
+  a volume's books → a book's chapter cards (verse count, opening line, your mark
+  count; `GET …/[corpus]/book`) → verses, with breadcrumbs back up at every level
+  and a "Continue reading" card from saved progress. One-chapter books open straight
+  to the text; a verse link skips browsing. Covers are drawn (leather tone + gold
+  foil per volume, `lib/domain/scripture/covers.ts`) — official edition artwork is
+  someone else's design, so it isn't copied or hotlinked.
 - **Reader** (`reader:scripture/<corpus>`, `ScriptureReader`): chapter view in the
   reader's theme/typography; contents beside the text (volumes → books → chapter grid;
   hold/⌥-click opens the right rail); a "Alma 32:21 or a phrase" box that jumps to a

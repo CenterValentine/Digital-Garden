@@ -70,6 +70,11 @@ import {
   type ReaderTocItem,
 } from "../state/reader-store";
 import { MarkPopover } from "./MarkPopover";
+import {
+  ScriptureBrowse,
+  ScriptureCrumbs,
+  type ScriptureBrowseLevel,
+} from "./ScriptureBrowse";
 import { ReaderBookSidebar } from "./ReaderBookSidebar";
 
 /** Press-and-hold on Contents opens it in the right sidebar (as in books). */
@@ -193,6 +198,16 @@ export function ScriptureReader({
   const [results, setResults] = useState<ScriptureSearchResult | null>(null);
   const [searching, setSearching] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  // Browsing (volumes → books → chapters) until a chapter opens; null = reading.
+  const [browse, setBrowse] = useState<ScriptureBrowseLevel | null>({
+    level: "home",
+  });
+  const browseRef = useRef<ScriptureBrowseLevel | null>({ level: "home" });
+  const [continueAt, setContinueAt] = useState<{
+    bookSlug: string;
+    chapter: number;
+    label: string;
+  } | null>(null);
 
   const immersive = useContentFullscreenStore(
     (state) => state.active && state.contentId === contentId,
@@ -253,6 +268,8 @@ export function ScriptureReader({
       try {
         const loaded = await fetchChapter(place);
         chapterRef.current = loaded;
+        browseRef.current = null;
+        setBrowse(null);
         scrollTargetRef.current = verses?.start ?? 0;
         setChapter(loaded);
         setSelection(null);
@@ -294,7 +311,7 @@ export function ScriptureReader({
         if (cancelled) return;
         setErrorMessage(
           error instanceof ReaderApiError && error.status === 404
-            ? "This collection isn't installed. The owner can install it in Settings → Extensions → Reader → Scriptures."
+            ? "This collection isn't loaded yet. Add it in Settings → Extensions → Reader → Scriptures."
             : error instanceof Error
               ? error.message
               : "Could not open this collection",
@@ -305,22 +322,27 @@ export function ScriptureReader({
       if (cancelled) return;
       setContents(loadedContents);
 
-      let start: ScriptureRef | null = null;
-      // Opened from a verse link: start there.
+      // Opened from a verse link: start at the passage. Otherwise land on the
+      // volumes, with "Continue reading" where the reader left off.
       const pending = useContentAnchorStore.getState().take(contentId);
-      if (pending) start = anchorRef(pending);
+      const start = pending ? anchorRef(pending) : null;
       let saved: ReaderAnnotationDto[] = [];
       try {
         const [{ annotations: list }, { progress }] = await Promise.all([
           readerApi.annotations(targetKey),
-          start
-            ? Promise.resolve({ progress: null })
-            : readerApi.progress(targetKey),
+          readerApi.progress(targetKey),
         ]);
         saved = list;
-        if (!start && progress?.locator.href) {
-          const ref = parseVerseHref(progress.locator.href);
-          if (ref) start = { ...ref, verseStart: null, verseEnd: null };
+        const ref = progress?.locator.href
+          ? parseVerseHref(progress.locator.href)
+          : null;
+        if (!cancelled && ref) {
+          setContinueAt({
+            bookSlug: ref.bookSlug,
+            chapter: ref.chapter ?? 1,
+            label:
+              progress?.locator.label ?? `${ref.bookSlug} ${ref.chapter ?? 1}`,
+          });
         }
       } catch {
         // No reader tables: the text still reads, just nothing is saved.
@@ -328,32 +350,20 @@ export function ScriptureReader({
       }
       if (cancelled) return;
       setAnnotations(saved);
-      const first = loadedContents.volumes[0]?.books[0];
-      const target =
-        start ??
-        (first
-          ? {
-              bookSlug: first.slug,
-              chapter: 1,
-              verseStart: null,
-              verseEnd: null,
-            }
-          : null);
-      if (!target) {
+      if (!loadedContents.volumes.some((volume) => volume.books.length)) {
         setErrorMessage("This collection has no books.");
         setPhase("error");
         return;
       }
-      const opened = await goToRef(target);
+      if (start) await goToRef(start);
       if (cancelled) return;
-      if (!opened && first) await goTo({ bookSlug: first.slug, chapter: 1 });
       setPhase("ready");
     })();
     return () => {
       cancelled = true;
       if (progressTimer.current) clearTimeout(progressTimer.current);
     };
-  }, [contentId, corpusId, goTo, goToRef, targetKey]);
+  }, [contentId, corpusId, goToRef, targetKey]);
 
   // Remember where the reader is (per user, per corpus).
   useEffect(() => {
@@ -439,7 +449,9 @@ export function ScriptureReader({
       verseEnd: to.verse,
       start: from.offset,
       end: to.offset,
-      text: quoteOf(verses, from.verse, from.offset, to.verse, to.offset) || selected.toString().trim(),
+      text:
+        quoteOf(verses, from.verse, from.offset, to.verse, to.offset) ||
+        selected.toString().trim(),
       before: first.slice(Math.max(0, from.offset - 80), from.offset),
       after: last.slice(to.offset, to.offset + 80),
       x: rect.left + rect.width / 2 - hostRect.left,
@@ -731,6 +743,7 @@ export function ScriptureReader({
         return;
       if (target?.isContentEditable) return;
       if (!rootRef.current?.contains(document.activeElement ?? null)) return;
+      if (browseRef.current) return; // browsing: arrows aren't page turns
       const current = chapterRef.current;
       if (event.key === "ArrowLeft" && current?.prev) void goTo(current.prev);
       if (event.key === "ArrowRight" && current?.next) void goTo(current.next);
@@ -770,9 +783,16 @@ export function ScriptureReader({
   const book = chapter?.book;
   const prev = chapter?.prev ?? null;
   const next = chapter?.next ?? null;
-  const title = book
-    ? `${book.name}${book.chapterCount > 1 ? ` ${chapter.chapter}` : ""}`
-    : (contents?.corpus.title ?? "Scriptures");
+  const title =
+    book && !browse
+      ? `${book.name}${book.chapterCount > 1 ? ` ${chapter.chapter}` : ""}`
+      : (contents?.corpus.title ?? "Scriptures");
+  const showBrowse = (level: ScriptureBrowseLevel) => {
+    browseRef.current = level;
+    setBrowse(level);
+    setSelection(null);
+    pageRef.current?.scrollTo({ top: 0 });
+  };
   const openBook = useReaderSession(
     (state) => state.openBooks[contentId] ?? null,
   );
@@ -830,8 +850,9 @@ export function ScriptureReader({
         <div className="min-w-0 flex-1 px-1">
           <div className="truncate text-sm font-medium">{title}</div>
           <div className="truncate text-[11px] text-muted-foreground">
-            {contents?.corpus.title}
-            {book ? ` · ${book.volumeTitle}` : ""}
+            {browse
+              ? browseSubtitle(browse, contents)
+              : `${contents?.corpus.title ?? ""}${book ? ` · ${book.volumeTitle}` : ""}`}
           </div>
         </div>
         <form
@@ -847,7 +868,7 @@ export function ScriptureReader({
             className="h-7 w-52 rounded border border-black/10 bg-transparent pl-7 pr-2 text-xs dark:border-white/10"
           />
         </form>
-        {corpusId === LDS_CORPUS_ID && chapter && (
+        {corpusId === LDS_CORPUS_ID && chapter && !browse && (
           <a
             href={gospelLibraryUrl(chapter.book.slug, chapter.chapter)}
             target="_blank"
@@ -1006,8 +1027,10 @@ export function ScriptureReader({
         <div className="relative min-w-0 flex-1">
           <div
             ref={pageRef}
-            className="h-full overflow-auto"
-            style={{ background: colors.bg, color: colors.fg }}
+            className={`h-full overflow-auto ${browse ? "bg-background text-foreground" : ""}`}
+            style={
+              browse ? undefined : { background: colors.bg, color: colors.fg }
+            }
             onPointerUp={(event) => {
               // Verse numbers select their verse themselves (selectVerse).
               if (
@@ -1020,7 +1043,20 @@ export function ScriptureReader({
           >
             {/* The popover lives in the scrolled content, so it moves with the text. */}
             <div ref={hostRef} className="relative min-h-full">
-              {chapter && (
+              {browse && contents && (
+                <ScriptureBrowse
+                  corpusId={corpusId}
+                  contents={contents}
+                  level={browse}
+                  annotations={annotations}
+                  continueAt={continueAt}
+                  onNavigate={showBrowse}
+                  onOpenChapter={(bookSlug, number) =>
+                    void goTo({ bookSlug, chapter: number })
+                  }
+                />
+              )}
+              {!browse && chapter && (
                 <article
                   className={`mx-auto max-w-[720px] px-6 font-serif transition-opacity sm:px-10 ${immersive ? "py-6" : "py-8"} ${
                     turning ? "opacity-60" : ""
@@ -1030,6 +1066,37 @@ export function ScriptureReader({
                     lineHeight,
                   }}
                 >
+                  <div className="mb-5">
+                    <ScriptureCrumbs
+                      items={[
+                        {
+                          label: contents?.corpus.title ?? "Scriptures",
+                          onClick: () => showBrowse({ level: "home" }),
+                        },
+                        {
+                          label: chapter.book.volumeTitle,
+                          onClick: () =>
+                            showBrowse({
+                              level: "volume",
+                              volume: chapter.book.volume,
+                            }),
+                        },
+                        ...(chapter.book.chapterCount > 1
+                          ? [
+                              {
+                                label: chapter.book.name,
+                                onClick: () =>
+                                  showBrowse({
+                                    level: "book",
+                                    bookSlug: chapter.book.slug,
+                                  }),
+                              },
+                              { label: String(chapter.chapter) },
+                            ]
+                          : [{ label: chapter.book.name }]),
+                      ]}
+                    />
+                  </div>
                   <header className="mb-6 text-center">
                     {chapter.chapter === 1 &&
                       chapter.book.fullTitle !== chapter.book.name && (
@@ -1151,7 +1218,7 @@ export function ScriptureReader({
                   </nav>
                 </article>
               )}
-              {selection && chapter && (
+              {selection && chapter && !browse && (
                 <MarkPopover
                   key={`${selection.verseStart}:${selection.start}-${selection.verseEnd}:${selection.end}`}
                   x={selection.x}
@@ -1206,37 +1273,59 @@ export function ScriptureReader({
       </div>
 
       {/* Adjacent chapters + position in the whole collection */}
-      <div className="flex items-center gap-2 border-t border-black/10 px-2 py-1 text-[11px] text-muted-foreground dark:border-white/10">
-        <button
-          type="button"
-          disabled={!prev}
-          onClick={() => prev && void goTo(prev)}
-          className={pageButton}
-          title="Previous chapter (←)"
-        >
-          <ChevronLeft className="h-3.5 w-3.5 shrink-0" />{" "}
-          <span className="truncate">{prev?.label ?? "Prev"}</span>
-        </button>
-        <div className="h-1 min-w-0 flex-1 overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
-          <div
-            className="h-full bg-primary/60"
-            style={{ width: `${Math.round((chapter?.fraction ?? 0) * 100)}%` }}
-          />
+      {!browse && (
+        <div className="flex items-center gap-2 border-t border-black/10 px-2 py-1 text-[11px] text-muted-foreground dark:border-white/10">
+          <button
+            type="button"
+            disabled={!prev}
+            onClick={() => prev && void goTo(prev)}
+            className={pageButton}
+            title="Previous chapter (←)"
+          >
+            <ChevronLeft className="h-3.5 w-3.5 shrink-0" />{" "}
+            <span className="truncate">{prev?.label ?? "Prev"}</span>
+          </button>
+          <div className="h-1 min-w-0 flex-1 overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
+            <div
+              className="h-full bg-primary/60"
+              style={{
+                width: `${Math.round((chapter?.fraction ?? 0) * 100)}%`,
+              }}
+            />
+          </div>
+          <span>{Math.round((chapter?.fraction ?? 0) * 100)}%</span>
+          <button
+            type="button"
+            disabled={!next}
+            onClick={() => next && void goTo(next)}
+            className={pageButton}
+            title="Next chapter (→)"
+          >
+            <span className="truncate">{next?.label ?? "Next"}</span>{" "}
+            <ChevronRight className="h-3.5 w-3.5 shrink-0" />
+          </button>
         </div>
-        <span>{Math.round((chapter?.fraction ?? 0) * 100)}%</span>
-        <button
-          type="button"
-          disabled={!next}
-          onClick={() => next && void goTo(next)}
-          className={pageButton}
-          title="Next chapter (→)"
-        >
-          <span className="truncate">{next?.label ?? "Next"}</span>{" "}
-          <ChevronRight className="h-3.5 w-3.5 shrink-0" />
-        </button>
-      </div>
+      )}
     </div>
   );
+}
+
+/** The toolbar's second line while browsing: where in the collection you are. */
+function browseSubtitle(
+  level: ScriptureBrowseLevel,
+  contents: ScriptureContents | null,
+): string {
+  if (level.level === "home") return "Choose a volume";
+  if (level.level === "volume") {
+    return (
+      contents?.volumes.find((volume) => volume.slug === level.volume)?.title ??
+      ""
+    );
+  }
+  const book = contents?.volumes
+    .flatMap((volume) => volume.books)
+    .find((entry) => entry.slug === level.bookSlug);
+  return book ? `${book.volumeTitle} · ${book.name}` : "";
 }
 
 function anchorRef(anchor: LinkAnchor): ScriptureRef | null {

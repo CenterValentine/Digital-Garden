@@ -13,6 +13,7 @@ import { LDS_VOLUMES } from "../lds";
 import { ldsVolumeUrl, normalizeLdsVolume, type NormalizedBook, type NormalizedVerse, type RawLdsVolume } from "../adapters/lds";
 import { buildBookIndex, formatReference, parseReference, parseReferenceList, type BookIndex } from "../reference";
 import type {
+  ScriptureBookChapters,
   ScriptureBookInfo,
   ScriptureCatalogItem,
   ScriptureChapterDto,
@@ -337,6 +338,29 @@ export async function searchCorpus(corpusId: string, query: string, limit = 50):
     };
   });
   return { reference, hits, total };
+}
+
+/** A book's chapters as cards: verse counts and each chapter's first verse. */
+export async function getBookChapters(corpusId: string, bookSlug: string): Promise<ScriptureBookChapters> {
+  await requireCorpus(corpusId);
+  const book = await scriptureDb.book.findFirst({ where: { corpusId, slug: bookSlug } });
+  if (!book) throw new ScriptureError("No such book", 404);
+  const [counts, openings] = await Promise.all([
+    scriptureDb.verse.groupBy({ by: ["chapter"], where: { corpusId, bookSlug }, _count: { _all: true } }),
+    scriptureDb.verse.findMany({ where: { corpusId, bookSlug, verse: 1 }, orderBy: { chapter: "asc" } }),
+  ]);
+  const countByChapter = new Map(
+    counts.map((row) => [Number(row.chapter), Number((row._count as { _all?: number } | undefined)?._all ?? 0)])
+  );
+  return {
+    book: toBookInfo(book),
+    chapterLabel: chapterLabelFor(book),
+    chapters: openings.map((row) => ({
+      chapter: row.chapter,
+      verseCount: countByChapter.get(row.chapter) ?? 0,
+      opening: row.text.length > 220 ? `${row.text.slice(0, 219)}…` : row.text,
+    })),
+  };
 }
 
 /** Plain text of a chapter (speed reading, AI excerpts). */
