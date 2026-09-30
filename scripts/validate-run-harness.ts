@@ -314,6 +314,8 @@ import {
   findPrefixDivergence,
   serializePromptForDiag,
   PREFIX_CHUNK_CHARS,
+  fingerprintWireBody,
+  findWireDivergence,
 } from "../lib/domain/ai/prompt-prefix-diag";
 
 {
@@ -371,9 +373,175 @@ import {
   assert(s1 !== s2, "§8: tool order is part of the fingerprint (it is part of the provider prefix)");
 }
 
+{
+  // §10 L1a — the wire tap names the body part that stopped extending the
+  // previous call: routing key, tools, or the index + kind of an input item.
+  const body = (items: unknown[], extra: Record<string, unknown> = {}) => ({
+    model: "gpt-6-sol",
+    prompt_cache_key: "dg-chat:a",
+    tools: [{ type: "function", name: "query_database" }],
+    input: items,
+    ...extra,
+  });
+  const sys = { role: "system", content: "S" };
+  const user = { role: "user", content: [{ type: "input_text", text: "one low-interest job" }] };
+  const call = { type: "function_call", call_id: "c1", name: "propose_item_iteration", arguments: "{}" };
+  const out = { type: "function_call_output", call_id: "c1", output: "{\"ok\":true}" };
+  const notice = (n: number) => ({ role: "user", content: `[Harness notice] ${n} steps left` });
+  const fp = (b: unknown) => fingerprintWireBody(b)!;
+
+  const step1 = fp(body([sys, user, call, out, notice(5)]));
+  const step2 = fp(body([sys, user, call, out, { type: "function_call", call_id: "c2", name: "x", arguments: "{}" }, notice(4)]));
+  assert(findWireDivergence(step1, step2) === null, "§10: a body that only grew (trailing notice replaced) is cache-friendly");
+  assert(step1.conversationKey !== null && step1.conversationKey === step2.conversationKey, "§10: the conversation key is stable across steps");
+
+  const rewritten = fp(body([sys, user, call, { ...out, output: "{\"ok\":true,\"openedAt\":2}" }, notice(4)]));
+  const d = findWireDivergence(step1, rewritten);
+  assert(
+    d?.part === "input" && d.index === 3 && d.kindBefore === "function_call_output" && d.currExcerpt.includes("openedAt"),
+    `§10: a rewritten mid-history item is named by index, kind and excerpt (got ${JSON.stringify(d)})`,
+  );
+  const rekeyed = findWireDivergence(step1, fp(body([sys, user, call, out, notice(5)], { prompt_cache_key: "dg-chat:b" })));
+  assert(rekeyed?.part === "cacheKey", "§10: a changed prompt_cache_key is reported before anything else (it routes the cache)");
+  const retooled = findWireDivergence(step1, fp(body([sys, user, call, out, notice(5)], { tools: [] })));
+  assert(retooled?.part === "tools", "§10: a changed tool list is reported as the tools part");
+  const dropped = findWireDivergence(step2, fp(body([sys, user, call])));
+  assert(dropped?.part === "input" && dropped.index === 3, "§10: removed history items are a divergence");
+  assert(fingerprintWireBody({ model: "x" }) === null, "§10: a body without input/messages is ignored");
+}
+
 if (errors.length > 0) {
   console.error(`\n✖ run-harness:check (§8) failed — ${errors.length} problem(s):\n`);
   for (const e of errors) console.error(`  ${e}\n`);
   process.exit(1);
 }
-console.log("✓ run-harness:check §8 — per-step long-context tier; prefix diagnostic locates a mid-prompt change");
+console.log("✓ run-harness:check §8/§10 — per-step long-context tier; prefix diagnostic locates a mid-prompt change; wire tap names the diverging body part");
+
+// ── write-args — the document body under any sibling key ─────────────────────
+
+import { resolveDocumentArgs } from "../lib/domain/ai/tools/write-args";
+
+{
+  // Prod f51fa2d8: a full resume sent as `content` to create_docx.
+  const asContent = resolveDocumentArgs(
+    { title: "David Valentine — Resume", content: "# David Valentine\n\nSummary…" },
+    { toolName: "create_docx", canonicalBodyKey: "markdown" },
+  );
+  assert(asContent.ok && asContent.body?.startsWith("# David"), "write-args: `content` is read as the docx body");
+  assert(asContent.shapeNotes.some((n) => /content/.test(n)), "write-args: the alias read is reported");
+
+  const canonical = resolveDocumentArgs(
+    { title: "T", markdown: "body" },
+    { toolName: "create_docx", canonicalBodyKey: "markdown" },
+  );
+  assert(canonical.ok && canonical.shapeNotes.length === 0, "write-args: the documented key needs no note");
+
+  const noBody = resolveDocumentArgs(
+    { title: "T", parentId: "x" },
+    { toolName: "create_docx", canonicalBodyKey: "markdown" },
+  );
+  assert(!noBody.ok && /markdown/.test(noBody.refusal ?? "") && /content, body, text/.test(noBody.refusal ?? ""), "write-args: a missing body is a teaching refusal naming the accepted keys");
+
+  const noTitle = resolveDocumentArgs(
+    { markdown: "## Tailored Resume\n\ntext" },
+    { toolName: "create_docx", canonicalBodyKey: "markdown" },
+  );
+  assert(noTitle.ok && noTitle.title === "Tailored Resume", `write-args: a missing title falls back to the first heading (got ${noTitle.title})`);
+
+  const loc = resolveDocumentArgs(
+    { title: "T", markdown: "x", outputLocation: "Under Content" },
+    { toolName: "create_docx", canonicalBodyKey: "markdown" },
+  );
+  assert(loc.ok && loc.outputLocation === "under_content", "write-args: outputLocation resolves by meaning");
+  const badLoc = resolveDocumentArgs(
+    { title: "T", markdown: "x", outputLocation: "somewhere" },
+    { toolName: "create_docx", canonicalBodyKey: "markdown" },
+  );
+  assert(badLoc.ok && badLoc.outputLocation === undefined && badLoc.shapeNotes.some((n) => /ignored/.test(n)), "write-args: an unknown outputLocation is ignored with a note, never fatal");
+}
+
+if (errors.length > 0) {
+  console.error(`\n✖ run-harness:check (write-args) failed — ${errors.length} problem(s):\n`);
+  for (const e of errors) console.error(`  ${e}\n`);
+  process.exit(1);
+}
+console.log("✓ run-harness:check write-args — the document body is read under any sibling key; a miss teaches");
+
+// ── Unsupported parameters — known families, and the net under the list ──────
+
+import { resolveModelTemperature, modelRejectsTemperature } from "../lib/domain/ai/model-constraints";
+import { parseUnsupportedParameter, withoutParameter } from "../lib/domain/ai/middleware/unsupported-parameter";
+
+{
+  assert(resolveModelTemperature("gpt-6-astra", 0.7) === undefined, "constraints: gpt-6-astra sends no temperature (prod 2026-09-29)");
+  assert(resolveModelTemperature("openai/gpt-6", 0.7) === undefined, "constraints: namespaced gpt-6 sends no temperature");
+  assert(resolveModelTemperature("o3-mini", 0.7) === undefined, "constraints: o-series sends no temperature");
+  assert(resolveModelTemperature("kimi-k2.6", 0.7) === 1, "constraints: Kimi thinking line is fixed at 1");
+  assert(resolveModelTemperature("gpt-5.6-terra", 0.7) === 0.7, "constraints: gpt-5.6 keeps the user's setting");
+  assert(resolveModelTemperature("gpt-4o", 0.2) === 0.2, "constraints: an unconstrained model is untouched");
+  assert(modelRejectsTemperature("gpt-6-astra") && !modelRejectsTemperature("gpt-5.6-luna"), "constraints: the reject predicate matches the resolver");
+
+  const openai = new Error("Unsupported parameter: 'temperature' is not supported with this model.");
+  assert(parseUnsupportedParameter(openai) === "temperature", "middleware: OpenAI's message names the SDK key");
+  assert(parseUnsupportedParameter(new Error("Unsupported parameter: 'top_p' is not supported with this model.")) === "topP", "middleware: provider names map to SDK keys");
+  assert(parseUnsupportedParameter(new Error("Unsupported parameter: 'max_tokens' is not supported with this model. Use 'max_completion_tokens' instead.")) === "maxOutputTokens", "middleware: max_tokens maps to maxOutputTokens");
+  assert(parseUnsupportedParameter(new Error("Rate limit reached for gpt-6-astra")) === null, "middleware: an unrelated error is not a parameter refusal");
+  assert(parseUnsupportedParameter(new Error("Unsupported parameter: 'banana' is not supported")) === null, "middleware: an unknown parameter name is not retried blindly");
+  const stripped = withoutParameter(
+    { temperature: 0.7, maxOutputTokens: 4000, prompt: [] } as Record<string, unknown>,
+    "temperature",
+  );
+  assert(stripped.temperature === undefined && !Object.keys(stripped).includes("temperature") && stripped.maxOutputTokens === 4000, "middleware: the named parameter is removed, the rest kept");
+}
+
+if (errors.length > 0) {
+  console.error(`\n✖ run-harness:check (unsupported parameters) failed — ${errors.length} problem(s):\n`);
+  for (const e of errors) console.error(`  ${e}\n`);
+  process.exit(1);
+}
+console.log("✓ run-harness:check unsupported parameters — gpt-6 / o-series send no temperature; a provider's refusal names the key to retry without");
+
+// ── §9 — charter turns carry a run budget; continuations keep a floor ─────────
+
+import {
+  CHARTER_TAIL_EXTRA,
+  CHARTER_TURN_DELIVERABLES,
+  continuationStepCap,
+  computeIterationStepCap as capFor,
+  reservedTailTools as tailToolsFor,
+  reservedTailSize as tailSizeFor,
+} from "../lib/domain/ai/tools/iteration-proposal";
+import { REPEAT_GUARDED_TOOLS, repeatedCallKey, repeatedCallNotice } from "../lib/domain/ai/tools/repeat-guard";
+
+{
+  const charterCap = capFor({ itemBudget: 1, deliverables: CHARTER_TURN_DELIVERABLES });
+  assert(charterCap === 16, `§9: a charter turn is sized like a one-item run with four write tools (got ${charterCap})`);
+  assert(tailSizeFor(CHARTER_TURN_DELIVERABLES) === 6, "§9: the charter tail reserves the four writes plus two");
+  const charterTail = tailToolsFor(CHARTER_TURN_DELIVERABLES, { record: false, extra: CHARTER_TAIL_EXTRA });
+  assert(charterTail.includes("phase_checkpoint") && charterTail.includes("summon") && !charterTail.includes("record_item_result"), `§9: a charter tail keeps the writes, the checkpoint and summon, not the item-run record tools (got ${charterTail.join(",")})`);
+  const itemTail = tailToolsFor(["create_docx"]);
+  assert(itemTail.includes("record_item_result") && itemTail.includes("record_iteration_findings"), "§9: item runs keep their record/close tools in the tail (unchanged)");
+
+  assert(continuationStepCap({ rawStepCap: 8, stepsAlreadySpent: 0, tailDeliverables: null }) === 8, "§9: a fresh request gets the whole cap");
+  assert(continuationStepCap({ rawStepCap: 8, stepsAlreadySpent: 7, tailDeliverables: null }) === 3, "§9: a plain-chat continuation gets at least three (prod f51fa2d8 got one)");
+  assert(continuationStepCap({ rawStepCap: 8, stepsAlreadySpent: 5, tailDeliverables: null }) === 3, "§9: a continuation with three left keeps three");
+  assert(continuationStepCap({ rawStepCap: 8, stepsAlreadySpent: 2, tailDeliverables: null }) === 6, "§9: a continuation with more than the floor left keeps the remainder");
+  assert(continuationStepCap({ rawStepCap: 16, stepsAlreadySpent: 14, tailDeliverables: CHARTER_TURN_DELIVERABLES }) === 7, "§9: a charter continuation gets its tail plus the answer (prod 62ac2b76 went 8 → 3 → 1)");
+  assert(continuationStepCap({ rawStepCap: 16, stepsAlreadySpent: 4, tailDeliverables: CHARTER_TURN_DELIVERABLES }) === 12, "§9: a charter continuation with plenty left keeps the remainder");
+  assert(continuationStepCap({ rawStepCap: 1, stepsAlreadySpent: 0, tailDeliverables: null }) === 1, "§9: a one-step cap stays one on a fresh request");
+
+  assert(REPEAT_GUARDED_TOOLS.includes("search_web") && !(REPEAT_GUARDED_TOOLS as readonly string[]).includes("query_database"), "§9: only searches are repeat-guarded — a re-read after a write is legitimate");
+  const k1 = repeatedCallKey("search_web", { query: "site:clay.com data providers", limit: 5 });
+  const k2 = repeatedCallKey("search_web", { limit: 5, query: "site:clay.com data providers" });
+  const k3 = repeatedCallKey("search_web", { query: "site:clay.com data provider", limit: 5 });
+  assert(k1 === k2, "§9: key order does not change identity");
+  assert(k1 !== k3, "§9: a different query is a different call");
+  assert(/step 4/.test(repeatedCallNotice("search_web", 4)) && /NOT run again/.test(repeatedCallNotice("search_web", 4)), "§9: the notice names the first step and says it did not run");
+}
+
+if (errors.length > 0) {
+  console.error(`\n✖ run-harness:check (§9) failed — ${errors.length} problem(s):\n`);
+  for (const e of errors) console.error(`  ${e}\n`);
+  process.exit(1);
+}
+console.log("✓ run-harness:check §9 — charter turns are run-sized with a reserved tail; continuations keep a floor; identical searches are guarded");

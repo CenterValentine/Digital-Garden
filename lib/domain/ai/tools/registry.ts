@@ -77,6 +77,7 @@ import {
   type QuestInfo,
 } from "@/lib/domain/ai/quests";
 import { computeTurnCost } from "@/lib/features/ai-connections/usage/pricing";
+import { resolveDocumentArgs } from "./write-args";
 import type { JSONContent } from "@tiptap/core";
 import { listCharters, isCharterMetadata } from "@/lib/domain/ai/charters/registry";
 import {
@@ -2329,12 +2330,21 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         "Create a Word (.docx) document from markdown content and file it in the user's garden. " +
         "Use when the user asks for a Word/docx deliverable (e.g. a resume). Headings, lists, bold/italic and links from the markdown are preserved. Do NOT create output on your own initiative — only when the user asks for it. " +
         "Targeting: omit placement fields to use the configured output-target preset. If the user or active charter gives THIS document a different relative destination, pass outputLocation (`under_chat`, `under_content`, or `beside_content`). Pass parentId only for a specifically resolved folder UUID. A per-document instruction always overrides the preset.",
+      // Describe-only schema (drift gate 7; the rule in
+      // iteration-proposal.ts): the body is read from `markdown` OR the
+      // sibling tools' `content`/`body`/`text`, the title falls back to the
+      // first heading, and placement resolves in execute — prod f51fa2d8
+      // (2026-09-29) lost a finished resume to `content` vs `markdown` on
+      // a turn with one step left. See write-args.ts.
       inputSchema: z.object({
-        title: z.string().min(1).max(200).describe("Document title (also the file name)"),
+        title: z.string().optional().describe("Document title (also the file name); defaults to the body's first heading"),
         markdown: z
           .string()
-          .min(1)
-          .describe("Full document body as markdown"),
+          .optional()
+          .describe("Full document body as markdown (also read from `content`, `body` or `text`)"),
+        content: z.string().optional().describe("Alias for markdown"),
+        body: z.string().optional().describe("Alias for markdown"),
+        text: z.string().optional().describe("Alias for markdown"),
         parentId: z
           .string()
           .optional()
@@ -2342,10 +2352,10 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             "Destination folder id. Pass ONLY when the user explicitly names a folder; otherwise omit it so the configured output-target preset is enforced.",
           ),
         outputLocation: z
-          .enum(["under_chat", "under_content", "beside_content"])
+          .string()
           .optional()
           .describe(
-            "Per-document relative destination. Pass when the user or active charter explicitly routes this document differently from the configured preset; otherwise omit.",
+            'Per-document relative destination: "under_chat", "under_content" or "beside_content". Pass when the user or active charter explicitly routes this document differently from the configured preset; otherwise omit.',
           ),
         alsoShortcutTo: z
           .string()
@@ -2360,16 +2370,24 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             "Id of an EXISTING file to overwrite in place with this document — same id, so every File cell and shortcut referencing it sees the new version. Use when the user asks to update/regenerate an attached or existing document; NEVER create a second copy for that. Placement fields are ignored in overwrite mode.",
           ),
       }),
-      execute: async ({
-        title,
-        markdown,
-        parentId,
-        outputLocation,
-        alsoShortcutTo,
-        overwriteContentId,
-      }) => {
+      execute: async (rawArgs) => {
+        const { parentId, alsoShortcutTo, overwriteContentId } = rawArgs;
+        const resolved = resolveDocumentArgs(rawArgs, {
+          toolName: "create_docx",
+          canonicalBodyKey: "markdown",
+        });
+        if (!resolved.ok || !resolved.body || !resolved.title) {
+          return {
+            ok: false,
+            refusal: resolved.refusal ?? "create_docx needs a markdown body.",
+            nextAction: "Call create_docx again with `markdown` set. Do not write the document anywhere else.",
+          };
+        }
+        const title = resolved.title;
+        const markdown = resolved.body;
+        const shapeNotes = resolved.shapeNotes;
         const effectiveOutputLocation =
-          (outputLocation as ToolOutputLocation | undefined) ??
+          (resolved.outputLocation as ToolOutputLocation | undefined) ??
           resolveCharterOutputLocation(
             ctx.charterOutputDirectives,
             title,
@@ -2389,6 +2407,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
               contentNodeId: result.contentNodeId,
               fileName: result.fileName,
               overwritten: true,
+              ...(shapeNotes.length > 0 ? { shapeNotes } : {}),
               ...(await getContentWriteReceiptEnvelope(
                 ctx.userId,
                 result.contentNodeId,
@@ -2463,6 +2482,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             fileName: result.fileName,
             parentFolderId: destination,
             ...mirror,
+            ...(shapeNotes.length > 0 ? { shapeNotes } : {}),
             ...(await getContentWriteReceiptEnvelope(
               ctx.userId,
               result.contentNodeId,
@@ -2776,9 +2796,25 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             const preview = await renderDataNodePreview(contentId, {
               viewerId: ctx.userId,
             });
+            // Reading a database ATTACHES it (prod 6d0b0e30, 2026-09-29: the
+            // model read the Career Evidence Library here after
+            // describe_database had refused it, then concluded its linked
+            // tables were unreachable without trying — they were reachable
+            // from this moment on). Say so, in the result, every time.
+            let attachedNote = "";
+            if (ctx.conversationId) {
+              await addAutoAssociation(
+                ctx.userId,
+                ctx.conversationId,
+                contentId,
+                "tool-call",
+              ).catch(() => null);
+              attachedNote =
+                "\n\n[This database is now attached to this chat: describe_database and query_database reach it, and every table it links by relation column.]";
+            }
             return preview
-              ? `${header}\n\n${preview}`
-              : `${header}\n\nThis database has no schema yet.`;
+              ? `${header}\n\n${preview}${attachedNote}`
+              : `${header}\n\nThis database has no schema yet.${attachedNote}`;
           },
 
           file: async () => {
@@ -2920,8 +2956,13 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           .string()
           .optional()
           .describe(
-            "Markdown content for the note (optional). Use standard markdown: # headings, **bold**, *italic*, `code`, bulleted/numbered lists, tables, blockquotes, links, images. The system converts it to rich text.",
+            "Markdown content for the note (optional; also read from `markdown` or `body`). Use standard markdown: # headings, **bold**, *italic*, `code`, bulleted/numbered lists, tables, blockquotes, links, images. The system converts it to rich text.",
           ),
+        // Sibling keys (create_docx says `markdown`): same concept, same
+        // key, everywhere — a model that used one tool's word for the
+        // other's must not lose the note to it.
+        markdown: z.string().optional().describe("Alias for content"),
+        body: z.string().optional().describe("Alias for content"),
         parentId: z
           .string()
           .uuid()
@@ -2945,11 +2986,14 @@ export function createBaseTools(ctx: ToolExecuteContext) {
       execute: async ({
         title,
         abstract,
-        content = "",
+        content: contentArg,
+        markdown: markdownAlias,
+        body: bodyAlias,
         parentId,
         outputLocation,
         alsoShortcutTo,
       }) => {
+        const content = contentArg?.trim() ? contentArg : (markdownAlias?.trim() ? markdownAlias : bodyAlias) ?? "";
         // Resolve the parent folder. Priority:
         //   1. AI-supplied parentId (validated to exist + belong to user)
         //   2. Chat's own parent folder (when in a chat context)

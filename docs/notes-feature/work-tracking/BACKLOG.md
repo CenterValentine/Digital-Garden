@@ -39,6 +39,13 @@ LDS standard works as a shared read-only corpus (seeded from the public-domain `
 - [ ] **Status-column regressions during a rows pass.** The evaluated run moved a Qualified opportunity back to Research Queue on its own judgment. Deliberately not guarded in the harness (D6) — the charter's wording owns pipeline state. If it recurs, the cheapest guard is a capture rule "a status column only moves forward within its group order unless the charter says otherwise".
 - [ ] **`durationMs` on turn metadata is server time only.** It sums per-request server durations and excludes client-executed tools (browser reads, `create_docx`); a five-minute turn reports ~72 s. Not wrong, but unlabelled — rename or add `wallClockMs` from the first request's `startedAt` to the last request's finish.
 - [ ] **Extension-side chrome detection.** `looksLikeNavigationChrome` runs server-side (P1/P2 material) and on the session-tab result; the extension's own reader could apply it before hydration settles and retry once with a longer settle when the body is chrome.
+- [ ] **Run cost levers L1–L4 (plan §10, from prod `de65f6bb`, $1.35).**
+  - L1a: wire-level prompt tap (built on `feat/run-cache-levers`), then one flagged run to name the frozen cache prefix, which sits at the proposal-approval boundary in both measured runs.
+  - L2: constant tool list for the turn; the tail is enforced at execute.
+  - L3a: option-validation rejections name the column, value and allowed options.
+  - L3b: `phase_checkpoint` stays in an item run's tail under a charter.
+  - L4: meter and budget provider-native web search.
+  - Decisions D7 and D8 are open.
 
 ## Move tab to workplace / workbench — follow-ups (2026-09-21, from `feat/move-tab-to-workspace`)
 

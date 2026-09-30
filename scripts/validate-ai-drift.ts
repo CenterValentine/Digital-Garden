@@ -672,6 +672,10 @@ const RUN_LOOP_TOOLS = [
   "record_batch_checkpoint",
   "record_iteration_findings",
   "add_quest_ledger_column",
+  // The deliverable a fulfilment run ends with: a schema miss here loses the
+  // artifact on the turn's last step (prod f51fa2d8, 2026-09-29 — a finished
+  // resume sent as `content` instead of `markdown`). write-args.ts judges.
+  "create_docx",
 ];
 const SCHEMA_REFINEMENT_RE = /\.(enum|min|max|int|regex|refine|superRefine|length|email|url|uuid|nonempty)\(/g;
 

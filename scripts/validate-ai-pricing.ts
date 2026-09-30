@@ -183,6 +183,46 @@ const approx = (actual: number, expected: number, label: string) => {
   );
 }
 
+// gpt-6 family (verified 2026-09-29): every id the connection's fetched
+// list offers resolves to a row, and the rates are the pricing page's.
+{
+  for (const id of ["gpt-6-astra", "gpt-6-sol", "gpt-6-luna", "openai/gpt-6-sol", "gpt-6-sol-2026-09-22"]) {
+    assert.ok(priceFor(id), `gpt-6: ${id} resolves to a price row`);
+  }
+  const sol = computeTurnCost(
+    { inputTokens: 100_000, cachedInputTokens: 40_000, outputTokens: 5_000 },
+    "gpt-6-sol",
+    "openai",
+  );
+  assert.ok(sol, "gpt-6-sol fixture priced");
+  approx(
+    sol.usd,
+    (60_000 * 2 + 40_000 * 0.2 + 5_000 * 10) / 1_000_000,
+    "gpt-6-sol: 2 / 0.20 / 10 per 1M",
+  );
+  const astra = computeTurnCost(
+    { inputTokens: 10_000, outputTokens: 1_000 },
+    "gpt-6-astra",
+    "openai",
+  );
+  assert.ok(astra, "gpt-6-astra fixture priced");
+  approx(astra.usd, (10_000 * 10 + 1_000 * 50) / 1_000_000, "gpt-6-astra: 10 / 50 per 1M");
+  // Under the 272K line — a 1M prompt would (correctly) bill at the tier.
+  const luna = computeTurnCost(
+    { inputTokens: 100_000, cachedInputTokens: 50_000, outputTokens: 10_000 },
+    "gpt-6-luna",
+    "openai",
+  );
+  assert.ok(luna, "gpt-6-luna fixture priced");
+  approx(luna.usd, (50_000 * 0.1 + 50_000 * 0.01 + 10_000 * 0.5) / 1_000_000, "gpt-6-luna: 0.10 / 0.01 / 0.50 per 1M");
+  const sol56 = computeTurnCost({ inputTokens: 100_000, outputTokens: 0 }, "gpt-5.6-sol", "openai");
+  assert.ok(sol56, "gpt-5.6-sol fixture priced");
+  approx(sol56.usd, 0.4, "gpt-5.6-sol: input cut to 4 per 1M at the gpt-6 launch");
+  const lunaLong = computeTurnCost({ inputTokens: 300_000, outputTokens: 0 }, "gpt-6-luna", "openai");
+  assert.ok(lunaLong, "gpt-6-luna long-context fixture priced");
+  approx(lunaLong.usd, (300_000 * 0.2) / 1_000_000, "gpt-6-luna: a >272K call bills at the long-context tier");
+}
+
 // A multi-step request whose SUM crosses 272K but whose largest step does
 // not bills at base rates — tiers are per call (prod ecf1d0e5, 2026-09-28:
 // nine steps, 369K summed, 46K largest, priced at tier → $1.22 for $0.82).

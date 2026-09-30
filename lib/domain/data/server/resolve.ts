@@ -27,8 +27,13 @@ import { Prisma } from "@/lib/database/generated/prisma";
 import {
   parseCharter,
   resolveCharterReferencedTables,
+  type CharterReference,
 } from "@/lib/domain/ai/charters/parse";
+import { collectWikiLinkRefs } from "@/lib/domain/editor/wiki-link-refs";
 import type { JSONContent } from "@tiptap/core";
+
+/** Notes whose wiki-links extend jurisdiction — most recent first. */
+const NOTE_LINK_ROOTS_MAX = 10;
 
 /** The context ids database resolution needs — a structural subset of ToolExecuteContext. */
 export interface DataToolContext {
@@ -257,6 +262,62 @@ async function jurisdictionRoots(ctx: DataToolContext): Promise<string[]> {
     if (typeof meta?.masterLedgerId === "string") roots.add(meta.masterLedgerId);
     for (const id of await charterReferencedTableIds(ctx)) roots.add(id);
   }
+
+  // Databases wiki-linked from NOTES already in this conversation — the
+  // @-mentioned ones and the ones the model read. Their bodies are printed
+  // in context with those links; refusing the link the model can read is
+  // the contradiction the relation walk closed for columns (prod 6d0b0e30,
+  // 2026-09-29: the charter was @-mentioned as a note, its
+  // [[Career Evidence Library]] link was in context, and query_database
+  // refused it). Bounded: the most recent notes only, one load.
+  const noteRoots = [...roots].filter(
+    (id) => id !== ctx.boundContentId && id !== ctx.contentId,
+  );
+  if (noteRoots.length > 0) {
+    const notes = await prisma.contentNode.findMany({
+      where: {
+        id: { in: noteRoots },
+        ownerId: ctx.userId,
+        contentType: "note",
+        deletedAt: null,
+      },
+      orderBy: { updatedAt: "desc" },
+      take: NOTE_LINK_ROOTS_MAX,
+      select: { notePayload: { select: { tiptapJson: true } } },
+    });
+    const references: CharterReference[] = [];
+    for (const note of notes) {
+      const doc = note.notePayload?.tiptapJson as JSONContent | null | undefined;
+      if (!doc || typeof doc !== "object") continue;
+      for (const ref of collectWikiLinkRefs(doc)) {
+        references.push({
+          targetTitle: ref.targetTitle,
+          ...(ref.targetId ? { targetId: ref.targetId } : {}),
+        });
+      }
+    }
+    if (references.length > 0) {
+      const ids = references
+        .map((r) => r.targetId)
+        .filter((id): id is string => typeof id === "string" && id.length > 0);
+      const titles = [...new Set(references.map((r) => r.targetTitle.trim()))];
+      const dataNodes = await prisma.contentNode.findMany({
+        where: {
+          ownerId: ctx.userId,
+          contentType: "data",
+          deletedAt: null,
+          OR: [
+            ...(ids.length > 0 ? [{ id: { in: ids } }] : []),
+            { title: { in: titles, mode: "insensitive" as const } },
+          ],
+        },
+        select: { id: true, title: true },
+      });
+      for (const id of resolveCharterReferencedTables(references, dataNodes)) {
+        roots.add(id);
+      }
+    }
+  }
   if (ctx.conversationId) {
     const assocs = await prisma.conversationAssociation.findMany({
       where: { conversationId: ctx.conversationId },
@@ -335,7 +396,7 @@ export async function resolveJurisdiction(
     ) {
       return {
         refusal:
-          "That database is not associated with this conversation — tools reach only associated databases, the ones they link to, and the ones the attached charter names. Ask the user to @-mention it (or open the chat from the database) first." +
+          "That database is not associated with this conversation — tools reach only associated databases, the ones they link to (by relation column or by a [[wiki-link]] in a note that is here), and the ones the attached charter names. Call read_content on it once — that attaches it to this chat, after which describe_database / query_database reach it and the tables it links — or ask the user to @-mention it." +
           // P2: a charter run must not "work around" a missing input. The
           // loop's never-stop rule has exactly this exception, and the
           // refusal is where the model reads it.

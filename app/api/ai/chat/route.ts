@@ -87,7 +87,10 @@ import {
   teachDeniedApprovals,
 } from "@/lib/domain/ai/context-diet";
 import {
+  CHARTER_TAIL_EXTRA,
+  CHARTER_TURN_DELIVERABLES,
   computeIterationStepCap,
+  continuationStepCap,
   reservedTailSize,
   reservedTailTools,
   stepsRemainingNotice,
@@ -210,6 +213,7 @@ import type {
 } from "@/lib/features/ai-connections";
 import {
   applyMiddleware,
+  unsupportedParameterMiddleware,
   defaultSettingsMiddleware,
   rateLimitRetryMiddleware,
 } from "@/lib/domain/ai/middleware";
@@ -239,6 +243,11 @@ import { effectiveCapabilities } from "@/lib/domain/ai/features/capabilities";
 import { prisma } from "@/lib/database/client";
 import type { Prisma } from "@/lib/database/generated/prisma";
 import { logger, spanPayload, startSpan, withRouteTrace, withSpan } from "@/lib/core/logger";
+import {
+  REPEAT_GUARDED_TOOLS,
+  repeatedCallKey,
+  repeatedCallNotice,
+} from "@/lib/domain/ai/tools/repeat-guard";
 import {
   excerptAt,
   findPrefixDivergence,
@@ -294,6 +303,24 @@ import {
 } from "@/lib/domain/ai/charters/output-directives";
 
 const ROUTE_PATH = "/api/ai/chat";
+
+/**
+ * The first @-mentioned node that is a charter (marked note/folder), or
+ * null. Bounded to the mention cap; one metadata read per candidate.
+ */
+async function firstCharterMention(
+  userId: string,
+  mentioned: unknown,
+): Promise<string | null> {
+  if (!Array.isArray(mentioned)) return null;
+  const ids = mentioned
+    .filter((id): id is string => typeof id === "string" && id.length > 0)
+    .slice(0, 6);
+  for (const id of ids) {
+    if (await isCharterNodeId(userId, id)) return id;
+  }
+  return null;
+}
 
 /** Last fingerprinted prompt per conversation for the opt-in prefix diagnostic (bounded). */
 const promptPrefixDiagState = new Map<
@@ -541,13 +568,23 @@ export async function POST(request: Request) {
       // would have been a lie — the model would still have been handed the
       // charter (owner report 2026-09-18).
       const charterDetached = body.charterDetached === true;
+      // A charter the user @-MENTIONS is the charter (prod 6d0b0e30,
+      // 2026-09-29: "fulfil the charter's instructions … @[Apply for a job]"
+      // reached the model as a plain note — no charter context, no charter
+      // reach, and the model read the charter with read_content). Only when
+      // nothing else names one: the picker and the binding still win, and a
+      // dismissed chip stays dismissed.
+      const mentionedCharterId =
+        typeof body.charterId !== "string"
+          ? await firstCharterMention(session.user.id, body.mentionedContentIds)
+          : null;
       const boundCharterId =
         !charterDetached &&
         typeof body.charterId !== "string" &&
         contentId &&
         (await isCharterNodeId(session.user.id, contentId))
           ? contentId
-          : null;
+          : mentionedCharterId;
       const routingExplicitCharterId =
         typeof body.charterId === "string" ? body.charterId : boundCharterId;
       const routingRootedCharterId =
@@ -997,10 +1034,11 @@ export async function POST(request: Request) {
           ? "gateway"
           : "direct";
 
-      // Fixed-temperature models (v3.1 R4): reasoning/thinking models
-      // (OpenAI o-series, Moonshot Kimi thinking line) reject any
-      // temperature but 1 with a 4xx. Clamp before it reaches the
-      // middleware AND the streamText call — both send temperature.
+      // Constrained-temperature models (v3.1 R4): Kimi's thinking line
+      // accepts only 1; OpenAI's o-series and gpt-6 family reject the
+      // parameter outright (`undefined` = not sent). Resolved before it
+      // reaches the middleware; unknown models that refuse are caught by
+      // unsupportedParameterMiddleware below.
       const effectiveTemperature = resolveModelTemperature(
         activeModelId,
         temperature,
@@ -1051,6 +1089,11 @@ export async function POST(request: Request) {
                 apiKey,
               });
           return applyMiddleware(model, [
+            // Innermost (wraps the raw provider model): when a model
+            // rejects a parameter by name, retry once without it and
+            // remember — the maintained constraint list is always one
+            // release behind (prod 2026-09-29, gpt-6-astra vs temperature).
+            unsupportedParameterMiddleware(),
             defaultSettingsMiddleware({
               temperature: effectiveTemperature,
               maxTokens,
@@ -1622,6 +1665,30 @@ export async function POST(request: Request) {
       // ── The summoner (AI-TOOL-SUMMONER-PLAN §3) ────────────────────────
       // Registered last, so `registered` covers every tool this turn has —
       // including the conditional browser/editor/search families above.
+      // Repeat guard (§9): a byte-identical search within this request is
+      // answered with a pointer to the first result. Wraps only app-run
+      // tools that have an execute (provider-native search has none).
+      const repeatedCalls = new Map<string, number>();
+      for (const name of REPEAT_GUARDED_TOOLS) {
+        const entry = (tools as Record<string, { execute?: unknown } | undefined>)[name];
+        if (!entry || typeof entry.execute !== "function") continue;
+        const original = entry.execute as (input: unknown, options: unknown) => unknown;
+        entry.execute = async (input: unknown, options: unknown) => {
+          const key = repeatedCallKey(name, input);
+          const first = repeatedCalls.get(key);
+          if (first !== undefined) {
+            logger.info({
+              layer: "ai",
+              event: "ai:repeated_call_guarded",
+              summary: `${name} repeated with identical input — answered from the first result`,
+              attrs: { tool: name, first_step: first, step: stepsTracker.used + 1 },
+            });
+            return repeatedCallNotice(name, first);
+          }
+          repeatedCalls.set(key, stepsTracker.used + 1);
+          return original(input, options);
+        };
+      }
       const registered = new Set(Object.keys(tools));
       (tools as Record<string, unknown>)[SUMMON_TOOL_ID] = createSummonTool({
         registered,
@@ -1752,9 +1819,22 @@ export async function POST(request: Request) {
         contentId !== routingRootedCharterId
           ? contentId
           : null;
+      // A mentioned charter is loaded as the charter (standing rules +
+      // phase), not as a mention capsule too — once, not twice.
       const requestedMentionIds: string[] = Array.isArray(body.mentionedContentIds)
-        ? body.mentionedContentIds.filter((id: unknown): id is string => typeof id === "string")
+        ? body.mentionedContentIds.filter(
+            (id: unknown): id is string =>
+              typeof id === "string" && id !== mentionedCharterId,
+          )
         : [];
+      if (conversationIdForAssoc && mentionedCharterId) {
+        void addAutoAssociation(
+          session.user.id,
+          conversationIdForAssoc,
+          mentionedCharterId,
+          "mention",
+        ).catch(() => null);
+      }
       const mentionedContentIds: string[] = boundAttachId
         ? [boundAttachId, ...requestedMentionIds.filter((id) => id !== boundAttachId)]
         : requestedMentionIds;
@@ -2281,7 +2361,7 @@ export async function POST(request: Request) {
               );
               charterContext =
                 `\n\n## Active Charter: "${charterNode.title}"\n` +
-                `This charter is ALREADY ATTACHED and loaded below — when the user asks to run "this charter" (or a bare "run it"/"go"), THIS is it. Do not search notes or read anything else to find it; act on the content already provided here.\n` +
+                `This charter is ALREADY ATTACHED${explicitPlaybookId === mentionedCharterId ? " (the user @-mentioned it)" : ""} and loaded below — when the user asks to run "this charter" (or a bare "run it"/"go"), THIS is it. Do not search notes or read anything else to find it; act on the content already provided here.\n` +
                 `Phase ${phaseIndex + 1} of ${parsed.phases.length}: "${phase.title}"\n\n` +
                 `**Phases:**\n${phaseToc}\n\n` +
                 (standingText
@@ -2638,6 +2718,14 @@ export async function POST(request: Request) {
       // (iteration-proposal.ts). With no deliverables this is the old
       // `items × 4 + 8`; a fulfilment run declaring create_docx + update_row
       // gets 6 per item instead of 4 — the two steps its tail actually needs.
+      // A charter turn WITHOUT a proposal is a one-item fulfilment run (§9,
+      // prod 62ac2b76): the proposal is scope and consent, not the thing
+      // that unlocks the budget. One job asked for plainly gets the same
+      // cap and reserved tail a proposed one-item run gets.
+      const charterTurn =
+        itemIterationBudget == null &&
+        researchPageBudget == null &&
+        (attachedCharterResolved || rootedCharterResolved);
       const rawStepCap =
         itemIterationBudget != null
           ? computeIterationStepCap({
@@ -2647,22 +2735,47 @@ export async function POST(request: Request) {
             })
           : researchPageBudget != null
             ? researchPageBudget * 2 + 4
-            : editableContentId
-              ? 8
-              : 7;
-      // At least one step, always: a turn that has already spent its budget
-      // must still be able to answer in prose (the final-step reservation
-      // below is what makes that answer honest), never be cut to zero steps
-      // and return an empty message.
-      const stepCap = Math.max(1, rawStepCap - stepsAlreadySpent);
+            : charterTurn
+              ? computeIterationStepCap({
+                  itemBudget: 1,
+                  deliverables: CHARTER_TURN_DELIVERABLES,
+                })
+              : editableContentId
+                ? 8
+                : 7;
+      // The tail this turn reserves: the run's declared deliverables, or the
+      // charter's write tools. Null for plain chat turns (no tail).
+      const tailDeliverables: readonly string[] | null =
+        itemIterationBudget != null
+          ? itemIterationDeliverables
+          : charterTurn
+            ? CHARTER_TURN_DELIVERABLES
+            : null;
+      const tailToolsForTurn = tailDeliverables
+        ? reservedTailTools(tailDeliverables, {
+            record: itemIterationBudget != null,
+            extra: charterTurn ? CHARTER_TAIL_EXTRA : [],
+          })
+        : [];
+      // What is left of the turn's cap for THIS request — with a floor, so
+      // an approval continuation can still perform the approved action,
+      // follow through, and answer (§9: a continuation used to inherit
+      // 8 → 3 → 1 and die on the step meant to write the document).
+      const stepCap = continuationStepCap({
+        rawStepCap,
+        stepsAlreadySpent,
+        tailDeliverables,
+      });
       const stepCapSource: StepCapSource =
         itemIterationBudget != null
           ? "item-iteration"
           : researchPageBudget != null
             ? "research"
-            : editableContentId
-              ? "editable"
-              : "base";
+            : charterTurn
+              ? "charter"
+              : editableContentId
+                ? "editable"
+                : "base";
       const reasoningConfigSummary = describeReasoningConfig(
         executedVendorId,
         reasoningProviderOptions !== undefined,
@@ -2840,20 +2953,20 @@ export async function POST(request: Request) {
             }
           }
           if (stepNumber < stepCap - 1) {
-            if (itemIterationBudget == null) return { activeTools: stepActiveTools };
+            if (!tailDeliverables) return { activeTools: stepActiveTools };
             // DELIVERABLE-TAIL RESERVATION (plan §6b, prod 5e5b739d): the
             // final-step rule generalised. The last `tail` steps of an item
-            // run keep only the run's deliverables + record + close tools
-            // callable, so research physically cannot consume them — and
-            // every step tells the model where it stands, since a budget it
-            // cannot see is a budget it cannot plan against.
+            // run — or of a charter turn (§9) — keep only the deliverables
+            // + record/close tools callable, so research physically cannot
+            // consume them — and every step tells the model where it
+            // stands, since a budget it cannot see is a budget it cannot
+            // plan against.
             const remaining = stepCap - stepNumber;
-            const tail = reservedTailSize(itemIterationDeliverables);
+            const tail = reservedTailSize(tailDeliverables);
             const inTail = remaining <= tail + 1; // +1: the text-only last step
-            const tailTools = reservedTailTools(itemIterationDeliverables);
             const narrowed =
               inTail && stepActiveTools
-                ? stepActiveTools.filter((t) => tailTools.includes(t))
+                ? stepActiveTools.filter((t) => tailToolsForTurn.includes(t))
                 : stepActiveTools;
             if (inTail) stepsTracker.tailReservedSteps += 1;
             return {
@@ -2865,7 +2978,8 @@ export async function POST(request: Request) {
                   content: stepsRemainingNotice({
                     stepNumber,
                     stepCap,
-                    deliverables: itemIterationDeliverables,
+                    deliverables: tailDeliverables,
+                    tailTools: tailToolsForTurn,
                   }),
                 },
               ],
