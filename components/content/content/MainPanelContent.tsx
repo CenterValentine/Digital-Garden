@@ -45,6 +45,7 @@ import { EditorSkeleton } from "@/components/content/skeletons/EditorSkeleton";
 import { useTreeStateStore } from "@/state/tree-state-store";
 import {
   listExtensionLinkAnchors,
+  suggestExtensionLinkAnchors,
   resolveExtensionVirtualContentType,
   useExtensionContentViewer,
   useExtensionMainWorkspace,
@@ -124,7 +125,7 @@ import { useContentAnchorStore } from "@/state/content-anchor-store";
 import { usePanelStore } from "@/state/panel-store";
 import { useIsMobile } from "@/components/common/useIsMobile";
 
-import { setLinkAnchorLister } from "@/lib/domain/content/link-anchor";
+import { setLinkAnchorLister, setLinkAnchorSuggester } from "@/lib/domain/content/link-anchor";
 
 interface ContentResponse {
   success: boolean;
@@ -1512,6 +1513,7 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
   // cleared — every pane installs the same lister.
   useEffect(() => {
     setLinkAnchorLister(listExtensionLinkAnchors);
+    setLinkAnchorSuggester(suggestExtensionLinkAnchors);
   }, []);
 
   // Wiki-link click handler — resolves by stable id first, then by title.
@@ -1529,6 +1531,15 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
         window.dispatchEvent(
           new CustomEvent("scroll-to-heading", { detail: { slug: headingSlug } })
         );
+        return;
+      }
+
+      // An extension's virtual content (a scripture collection): no node to
+      // resolve — open its tab, and its viewer takes the anchor.
+      const virtualContentType = targetId ? resolveExtensionVirtualContentType(targetId) : null;
+      if (targetId && virtualContentType) {
+        if (anchor) useContentAnchorStore.getState().request(targetId, anchor);
+        setSelectedContentId(targetId, { title: targetTitle, contentType: virtualContentType, paneId });
         return;
       }
 

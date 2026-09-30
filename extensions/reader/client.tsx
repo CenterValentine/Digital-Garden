@@ -12,6 +12,7 @@ import { ReaderSidebarPanel } from "./components/ReaderSidebarPanel";
 import { openScriptureTab } from "./components/ScriptureCatalog";
 import { READER_SIDEBAR_SVG_PATH } from "./lib/sidebar";
 import { readerLinkAnchors } from "./lib/link-anchors";
+import { scriptureLinkSuggestions } from "./lib/scripture-links";
 import { placeShortcut } from "./lib/use-acquire";
 import {
   READER_EXTENSION_ID,
@@ -179,6 +180,8 @@ export const readerExtensionRuntime: ExtensionRuntime = {
   createMenuItems: readerMenu,
   // `[[Book#` → link to a highlight (lib/domain/content/link-anchor.ts).
   linkAnchors: readerLinkAnchors,
+  // `[[Alma 32:21` → a verse link straight from the typed reference.
+  linkAnchorSuggestions: scriptureLinkSuggestions,
   shellControllers: [ReaderBookshelfController],
   settingsDialog: ReaderSettingsDialog,
 };

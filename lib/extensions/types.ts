@@ -1,4 +1,4 @@
-import type { LinkAnchorLister } from "@/lib/domain/content/link-anchor";
+import type { LinkAnchorLister, LinkAnchorSuggester } from "@/lib/domain/content/link-anchor";
 import type { Extensions } from "@tiptap/core";
 import type { ComponentType } from "react";
 import type { ToolDefinition } from "@/lib/domain/tools";
@@ -152,6 +152,11 @@ export interface ExtensionRuntime {
    * See lib/domain/content/link-anchor.ts.
    */
   linkAnchors?: LinkAnchorLister;
+  /**
+   * Anchors typed directly after `[[` (a scripture reference). See
+   * `LinkAnchorSuggester` in lib/domain/content/link-anchor.ts.
+   */
+  linkAnchorSuggestions?: LinkAnchorSuggester;
   virtualContent?: ExtensionVirtualContent[];
   shellNavigationControls?: ComponentType<ExtensionShellNavigationProps>[];
   shellNavigationTrailingControls?: ComponentType<ExtensionShellNavigationProps>[];

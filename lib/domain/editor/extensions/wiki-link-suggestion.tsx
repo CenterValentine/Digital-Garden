@@ -19,6 +19,7 @@ import { computeHeadingIds } from "@/lib/domain/content/heading-ids";
 import {
   clipAnchorLabel,
   listLinkAnchors,
+  suggestLinkAnchors,
   type LinkAnchorItem,
   type LinkAnchorTarget,
 } from "@/lib/domain/content/link-anchor";
@@ -186,7 +187,7 @@ export const WikiLinkList = forwardRef<WikiLinkListRef, WikiLinkListProps>((prop
               item.kind === "note"
                 ? item.id
                 : item.kind === "anchor"
-                  ? `^${item.anchor.anchor}`
+                  ? `^${item.target.id}#${item.anchor.anchor}`
                   : `#${item.slug}`
             }
             onClick={() => selectItem(index)}
@@ -340,12 +341,16 @@ export function createWikiLinkSuggestion(
       const requestId = ++requestSeq;
       latestSettled = false;
       try {
-        const notes = await fetchNotes(query);
+        // A reference that names a spot directly ("Alma 32:21") leads.
+        const [notes, direct] = await Promise.all([fetchNotes(query), suggestLinkAnchors(query)]);
         if (requestId === requestSeq) {
           latestSettled = true;
           latestFailed = false;
         }
-        return notes.map((note) => ({ kind: "note" as const, ...note }));
+        return [
+          ...direct.map(({ target, anchor }) => ({ kind: "anchor" as const, target, anchor })),
+          ...notes.map((note) => ({ kind: "note" as const, ...note })),
+        ];
       } catch {
         if (requestId === requestSeq) {
           latestSettled = true;
@@ -485,6 +490,7 @@ export function createWikiLinkSuggestion(
               targetTitle: item.target.title,
               anchor: item.anchor.anchor,
               anchorLabel: clipAnchorLabel(item.anchor.label),
+              ...(item.anchor.display ? { displayText: item.anchor.display } : {}),
             },
           })
           .run();
