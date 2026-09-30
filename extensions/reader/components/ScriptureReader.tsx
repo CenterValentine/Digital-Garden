@@ -54,6 +54,7 @@ import type { LinkAnchor } from "@/lib/domain/content/link-anchor";
 import { registerSpeedReaderPagedSource } from "@/extensions/speed-reader/events";
 import { useContentFullscreenStore } from "@/state/content-fullscreen-store";
 import { useContentAnchorStore } from "@/state/content-anchor-store";
+import { useNavigationHistoryStore } from "@/state/navigation-history-store";
 import { ReaderApiError, readerApi, scriptureApi } from "../lib/api";
 import {
   markInlineStyle,
@@ -173,9 +174,12 @@ export function ScriptureReader({
   contentId,
   progressKey,
   rootTitle,
+  paneId,
 }: {
   corpusId: string;
   contentId: string;
+  /** The workspace pane showing this reader — its Back/Forward history. */
+  paneId?: string;
   /**
    * Where reading position is saved. A session (a tree item) keeps its own
    * (`content:<sessionId>`); the bare collection tab uses the collection's.
@@ -318,6 +322,28 @@ export function ScriptureReader({
     [goTo],
   );
 
+  /** Show a browse level (covers, a volume, a book's chapters). */
+  const applyBrowse = useCallback((level: ScriptureBrowseLevel) => {
+    browseRef.current = level;
+    setBrowse(level);
+    setSelection(null);
+    pageRef.current?.scrollTo({ top: 0 });
+  }, []);
+
+  /** Go to whatever a location anchor names: a view, a chapter or verses. */
+  const applyAnchor = useCallback(
+    async (anchor: LinkAnchor) => {
+      const view = browseLevelFromAnchor(anchor);
+      if (view) {
+        applyBrowse(view);
+        return;
+      }
+      const ref = anchorRef(anchor);
+      if (ref) await goToRef(ref);
+    },
+    [applyBrowse, goToRef],
+  );
+
   // ── Open the corpus ─────────────────────────────────────────────────────
   useEffect(() => {
     let cancelled = false;
@@ -350,7 +376,7 @@ export function ScriptureReader({
       // Opened from a verse link: start at the passage. Otherwise land on the
       // volumes, with "Continue reading" where the reader left off.
       const pending = useContentAnchorStore.getState().take(contentId);
-      const start = pending ? anchorRef(pending) : null;
+      const start = pending;
       let saved: ReaderAnnotationDto[] = [];
       try {
         const [{ annotations: list }, { progress }] = await Promise.all([
@@ -380,7 +406,7 @@ export function ScriptureReader({
         setPhase("error");
         return;
       }
-      if (start) await goToRef(start);
+      if (start) await applyAnchor(start);
       if (cancelled) return;
       setPhase("ready");
     })();
@@ -388,7 +414,7 @@ export function ScriptureReader({
       cancelled = true;
       if (progressTimer.current) clearTimeout(progressTimer.current);
     };
-  }, [contentId, corpusId, goToRef, positionKey, rootTitle, targetKey]);
+  }, [applyAnchor, contentId, corpusId, positionKey, rootTitle, targetKey]);
 
   // Remember where the reader is (per user, per corpus).
   useEffect(() => {
@@ -438,9 +464,31 @@ export function ScriptureReader({
   useEffect(() => {
     if (!pendingAnchor || phase !== "ready") return;
     useContentAnchorStore.getState().take(contentId);
-    const ref = anchorRef(pendingAnchor);
-    if (ref) void goToRef(ref);
-  }, [contentId, goToRef, pendingAnchor, phase]);
+    void applyAnchor(pendingAnchor);
+  }, [applyAnchor, contentId, pendingAnchor, phase]);
+
+  // Every view is a step in the pane's Back/Forward history (covers →
+  // volume → book → chapter), so Back walks the reader's own views before it
+  // leaves the reader. Restoring a step (Back) records the same anchor — a
+  // no-op in the store.
+  const locationAnchor = !contents
+    ? null
+    : browse
+      ? browseAnchor(browse)
+      : chapter
+        ? `${VERSE_ANCHOR_KIND}:${formatVerseHref({ bookSlug: chapter.book.slug, chapter: chapter.chapter, verseStart: null, verseEnd: null })}`
+        : null;
+  const locationLabel = !contents
+    ? undefined
+    : browse
+      ? browseTitle(browse, contents)
+      : chapter
+        ? `${chapter.book.name}${chapter.book.chapterCount > 1 ? ` ${chapter.chapter}` : ""}`
+        : undefined;
+  useEffect(() => {
+    if (phase !== "ready" || !locationAnchor) return;
+    useNavigationHistoryStore.getState().recordLocation(contentId, paneId, locationAnchor, locationLabel);
+  }, [contentId, locationAnchor, locationLabel, paneId, phase]);
 
   // ── Selection → marks ───────────────────────────────────────────────────
   const readSelection = useCallback(() => {
@@ -823,12 +871,7 @@ export function ScriptureReader({
       : book
         ? `${book.name}${book.chapterCount > 1 ? ` ${chapter.chapter}` : ""}`
         : contents.corpus.title;
-  const showBrowse = (level: ScriptureBrowseLevel) => {
-    browseRef.current = level;
-    setBrowse(level);
-    setSelection(null);
-    pageRef.current?.scrollTo({ top: 0 });
-  };
+  const showBrowse = applyBrowse;
   const headerPath = pathTo(browse, book ?? null, contents, showBrowse);
   const openBook = useReaderSession(
     (state) => state.openBooks[contentId] ?? null,
@@ -1402,6 +1445,24 @@ function pathTo(
         },
       ]
     : [home, volumeCrumb(readingBook)];
+}
+
+/** Anchor kind for the reader's browse views in the Back/Forward history. */
+const VIEW_ANCHOR_KIND = "scripture-view";
+
+function browseAnchor(level: ScriptureBrowseLevel): string {
+  if (level.level === "home") return `${VIEW_ANCHOR_KIND}:home`;
+  if (level.level === "volume") return `${VIEW_ANCHOR_KIND}:volume/${level.volume}`;
+  return `${VIEW_ANCHOR_KIND}:book/${level.bookSlug}`;
+}
+
+function browseLevelFromAnchor(anchor: LinkAnchor): ScriptureBrowseLevel | null {
+  if (anchor.kind !== VIEW_ANCHOR_KIND) return null;
+  if (anchor.id === "home") return { level: "home" };
+  const [kind, slug] = anchor.id.split("/");
+  if (kind === "volume" && slug) return { level: "volume", volume: slug };
+  if (kind === "book" && slug) return { level: "book", bookSlug: slug };
+  return null;
 }
 
 function anchorRef(anchor: LinkAnchor): ScriptureRef | null {

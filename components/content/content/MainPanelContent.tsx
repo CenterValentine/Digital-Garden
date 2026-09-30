@@ -375,6 +375,12 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
   // External payload resourceType — lets an extension claim a kind of link
   // node (the reader owns resourceType "scripture": scripture sessions).
   const [contentExternalResourceType, setContentExternalResourceType] = useState<string | null>(null);
+  // Which content id the type fields above describe. They update only when
+  // that content's load commits, so between a switch and the new load they
+  // still describe the PREVIOUS item — extension viewers must not match the
+  // new id on them (an EPUB's "file"+mime opened the next item — a scripture
+  // session, a note — in the book reader: "This book could not be found").
+  const [contentTypeFor, setContentTypeFor] = useState<string | null>(null);
   const [contentParentId, setContentParentId] = useState<string | null>(null);
   const [contentIsPublished, setContentIsPublished] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- TODO(any-epic-phase-3d): payload is a discriminated union (folder/note/external/chat/viz/data/hope/workflow) — model as `ContentPayload` union in api-types.ts and switch each viewer branch to a narrowed value
@@ -619,6 +625,7 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
       setContentCustomIcon(null);
       setContentIconColor(null);
       setContentType(virtualContentType);
+      setContentTypeFor(selectedContentId);
       setOwnedByNote(null);
       return;
     }
@@ -789,6 +796,7 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
         setContentType(result.data.contentType);
         setContentMimeType(result.data.file?.mimeType ?? null);
         setContentExternalResourceType(result.data.external?.resourceType ?? null);
+        setContentTypeFor(selectedContentId);
         setContentCustomIcon(result.data.customIcon ?? null);
         setContentIconColor(result.data.iconColor ?? null);
         setOwnedByNote(result.data.ownedByNote ?? null);
@@ -2406,13 +2414,18 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
   // Extension workspace — shown in pane 1 when an extension view is active
   const ExtensionMainWorkspace = useExtensionMainWorkspace(activeView);
   const extensionViewerMatch = useMemo(
-    () => ({
-      selectedContentId,
-      contentType,
-      mimeType: contentMimeType,
-      externalResourceType: contentExternalResourceType,
-    }),
-    [selectedContentId, contentType, contentMimeType, contentExternalResourceType]
+    () =>
+      // Type facts about another item never claim this one (see contentTypeFor).
+      // Synthetic ids (reader:…) still match on their prefix.
+      contentTypeFor === selectedContentId
+        ? {
+            selectedContentId,
+            contentType,
+            mimeType: contentMimeType,
+            externalResourceType: contentExternalResourceType,
+          }
+        : { selectedContentId, contentType: null, mimeType: null, externalResourceType: null },
+    [selectedContentId, contentTypeFor, contentType, contentMimeType, contentExternalResourceType]
   );
   const ExtensionContentViewer = useExtensionContentViewer(extensionViewerMatch);
 
@@ -2478,8 +2491,8 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
     contentElement = (
       <ExtensionContentViewer
         paneId={paneId}
+        {...extensionViewerMatch}
         selectedContentId={selectedContentId}
-        contentType={contentType}
       />
     );
   } else if (contentType === "file" && selectedContentId) {

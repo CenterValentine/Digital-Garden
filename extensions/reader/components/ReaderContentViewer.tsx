@@ -30,7 +30,12 @@ const BookReader = dynamic(
   }
 );
 
-export function ReaderContentViewer({ selectedContentId, contentType, externalResourceType }: ExtensionContentViewerProps) {
+export function ReaderContentViewer({
+  selectedContentId,
+  contentType,
+  externalResourceType,
+  paneId,
+}: ExtensionContentViewerProps) {
   // The right sidebar follows what the reader shows: claim its Book tab for
   // this content while mounted.
   useEffect(() => {
@@ -53,16 +58,16 @@ export function ReaderContentViewer({ selectedContentId, contentType, externalRe
           </div>
         </div>
       ) : contentType === "external" && externalResourceType === SCRIPTURE_RESOURCE_TYPE ? (
-        <ScriptureSessionViewer key={selectedContentId} contentId={selectedContentId} />
+        <ScriptureSessionViewer key={selectedContentId} contentId={selectedContentId} paneId={paneId} />
       ) : corpusId ? (
-        <ScriptureReader key={selectedContentId} corpusId={corpusId} contentId={selectedContentId} />
+        <ScriptureReader key={selectedContentId} corpusId={corpusId} contentId={selectedContentId} paneId={paneId} />
       ) : selectedContentId.startsWith(READER_VIRTUAL_PREFIX) ? (
         <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
           This reader source isn&apos;t available yet.
         </div>
-      ) : (
+      ) : contentType === "file" ? (
         <BookReader key={selectedContentId} contentId={selectedContentId} />
-      )}
+      ) : null /* nothing of the reader's: never mount the book reader on a guess */}
     </ReaderErrorBoundary>
   );
 }

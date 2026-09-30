@@ -11,7 +11,7 @@ import { ScriptureReader } from "./ScriptureReader";
  * A scripture session from the file tree: resolve which collection it opens,
  * then read it with the session's own name and reading position.
  */
-export function ScriptureSessionViewer({ contentId }: { contentId: string }) {
+export function ScriptureSessionViewer({ contentId, paneId }: { contentId: string; paneId?: string }) {
   const [session, setSession] = useState<ScriptureSessionDto | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -57,6 +57,7 @@ export function ScriptureSessionViewer({ contentId }: { contentId: string }) {
       contentId={contentId}
       progressKey={contentTargetKey(contentId)}
       rootTitle={session.title}
+      paneId={paneId}
     />
   );
 }
