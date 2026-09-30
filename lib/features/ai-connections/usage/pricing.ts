@@ -35,6 +35,7 @@
  */
 
 /** Bump on ANY change to the tables below. Stamped into persisted costs. */
+import { openaiModelReasons } from "@/lib/domain/ai/model-constraints";
 export const PRICING_VERSION = "2026-08-08";
 
 export interface ModelPriceTier {
@@ -98,12 +99,33 @@ export const MODEL_PRICING: Record<string, ModelPrice> = {
   "claude-sonnet-3-5": { inputPer1M: 3, outputPer1M: 15, asOf: "2026-Q2", note: "legacy" },
   "claude-haiku-3-5": { inputPer1M: 0.8, outputPer1M: 4, asOf: "2026-Q2", note: "legacy" },
 
-  // ── OpenAI (verified 2026-08-08; cache writes bill only on gpt-5.6;
-  //    long-context tier >272K input — threshold corroborated-secondary) ─
+  // ── OpenAI gpt-6 (verified 2026-09-29 against developers.openai.com/api/
+  //    docs/pricing; launched 2026-09-22/23 at half the gpt-5.6 rates;
+  //    cache reads 0.1× input; cache writes 1.25× input as on gpt-5.6;
+  //    long-context tier >272K input — the whole call bills at tier rates) ─
+  "gpt-6-astra": {
+    inputPer1M: 10, outputPer1M: 50, cachedInputPer1M: 1, cacheWritePer1M: 12.5,
+    longContext: { thresholdTokens: 272_000, inputPer1M: 20, outputPer1M: 75, cachedInputPer1M: 2, cacheWritePer1M: 25 },
+    asOf: "2026-09-29",
+  },
+  "gpt-6-sol": {
+    inputPer1M: 2, outputPer1M: 10, cachedInputPer1M: 0.2, cacheWritePer1M: 2.5,
+    longContext: { thresholdTokens: 272_000, inputPer1M: 4, outputPer1M: 15, cachedInputPer1M: 0.4, cacheWritePer1M: 5 },
+    asOf: "2026-09-29",
+  },
+  "gpt-6-luna": {
+    inputPer1M: 0.1, outputPer1M: 0.5, cachedInputPer1M: 0.01, cacheWritePer1M: 0.125,
+    longContext: { thresholdTokens: 272_000, inputPer1M: 0.2, outputPer1M: 0.75, cachedInputPer1M: 0.02, cacheWritePer1M: 0.25 },
+    asOf: "2026-09-29",
+  },
+
+  // ── OpenAI gpt-5.6 and earlier (verified 2026-08-08; gpt-5.6-sol
+  //    re-verified 2026-09-29 — cut from 5/30 to 4/20 at the gpt-6 launch;
+  //    cache writes bill only on gpt-5.6; long-context tier >272K input) ─
   "gpt-5.6-sol": {
-    inputPer1M: 5, outputPer1M: 30, cachedInputPer1M: 0.5, cacheWritePer1M: 6.25,
-    longContext: { thresholdTokens: 272_000, inputPer1M: 10, outputPer1M: 45, cachedInputPer1M: 1, cacheWritePer1M: 12.5 },
-    asOf: "2026-08-08",
+    inputPer1M: 4, outputPer1M: 20, cachedInputPer1M: 0.4, cacheWritePer1M: 5,
+    longContext: { thresholdTokens: 272_000, inputPer1M: 8, outputPer1M: 30, cachedInputPer1M: 0.8, cacheWritePer1M: 10 },
+    asOf: "2026-09-29",
   },
   "gpt-5.6-terra": {
     inputPer1M: 2, outputPer1M: 12, cachedInputPer1M: 0.2, cacheWritePer1M: 2.5,
@@ -205,6 +227,9 @@ export const PRICING_PREFIX_RULES: Array<{ prefix: string; use: string }> = [
   { prefix: "gemini-3.5-flash", use: "gemini-3.5-flash" },
   { prefix: "gemini-2.5-flash", use: "gemini-2.5-flash" },
   { prefix: "gemini-2.5-pro", use: "gemini-2.5-pro" },
+  { prefix: "gpt-6-astra", use: "gpt-6-astra" },
+  { prefix: "gpt-6-luna", use: "gpt-6-luna" },
+  { prefix: "gpt-6-sol", use: "gpt-6-sol" },
   { prefix: "gpt-5.6-terra", use: "gpt-5.6-terra" },
   { prefix: "gpt-5.6-luna", use: "gpt-5.6-luna" },
   { prefix: "gpt-5.6-sol", use: "gpt-5.6-sol" },
@@ -297,6 +322,24 @@ export interface UsageLike {
   cachedInputTokens?: number;
   /** Cache writes (Anthropic providerMetadata; OpenAI gpt-5.6 unavailable via SDK usage — undercount accepted). */
   cacheWriteTokens?: number;
+  /**
+   * The largest SINGLE API call's prompt inside this usage, split the same
+   * way as `inputTokens`/`cachedInputTokens` (per-step figures from the
+   * segment log). Long-context tiers are billed per call, so when a request
+   * folds several steps this is what decides the tier — not the sum. Prod
+   * ecf1d0e5 (2026-09-28): a nine-step request summed to 369k and was priced
+   * at terra's >272k tier although no step exceeded 46k; the meter read
+   * $1.22 for an $0.82 turn. Absent → the sum decides (single-call usage).
+   */
+  maxStepInputTokens?: number;
+  maxStepCachedInputTokens?: number;
+  /**
+   * Provider-executed web search calls in this usage. Billed per call on top
+   * of tokens (the retrieved content is already in `inputTokens`). Prod
+   * de65f6bb ran OpenAI's built-in search 11 times and the meter showed
+   * none of it (ITERATION-RUN-HARNESS-FIXES §10 L4a).
+   */
+  webSearchCalls?: number;
 }
 
 export interface TurnCostBreakdown {
@@ -308,6 +351,8 @@ export interface TurnCostBreakdown {
   cacheWrite: number;
   /** USD for output tokens (reasoning included). */
   output: number;
+  /** USD for provider-executed web search calls (per-call fee). */
+  webSearch?: number;
 }
 
 export interface TurnCost {
@@ -328,6 +373,24 @@ const per1M = (tokens: number, rate: number) => (tokens / 1_000_000) * rate;
  *
  * Returns null when the model has no price row (render "unpriced").
  */
+/**
+ * Per-call fee for a provider's built-in web search. OpenAI (verified
+ * 2026-09-30, developers.openai.com/api/docs/pricing): $10 / 1k calls for
+ * reasoning models (gpt-5, o-series — gpt-6 follows), $25 / 1k for the rest;
+ * search content tokens are billed as input at the model's rate, which the
+ * token lines already count. Other vendors: not yet verified → 0, so the
+ * meter under-reports rather than invents.
+ */
+export function webSearchCallUsd(
+  modelId: string | null | undefined,
+  providerId?: string | null,
+): number {
+  const id = (modelId ?? "").toLowerCase();
+  const vendor = providerId ?? (id.includes("/") ? id.split("/")[0] : undefined);
+  if (vendor !== "openai") return 0;
+  return openaiModelReasons(id) ? 0.01 : 0.025;
+}
+
 export function computeTurnCost(
   usage: UsageLike,
   modelId: string | null | undefined,
@@ -341,12 +404,21 @@ export function computeTurnCost(
   const cached = Math.max(0, Math.min(usage.cachedInputTokens ?? 0, input * 2));
   const cacheWrite = Math.max(0, usage.cacheWriteTokens ?? 0);
 
-  // Long-context tier keys off the request's total prompt size.
+  // Long-context tier keys off ONE API call's prompt size. A request that
+  // folded several steps supplies its largest step; otherwise the usage IS
+  // one call and its total decides.
   const totalPrompt = inputIncludesCached(providerId)
     ? input
     : input + cached + cacheWrite;
+  const maxStep =
+    typeof usage.maxStepInputTokens === "number" && usage.maxStepInputTokens > 0
+      ? inputIncludesCached(providerId)
+        ? usage.maxStepInputTokens
+        : usage.maxStepInputTokens + Math.max(0, usage.maxStepCachedInputTokens ?? 0)
+      : null;
+  const tierPrompt = maxStep !== null ? Math.min(maxStep, totalPrompt) : totalPrompt;
   const tier =
-    base.longContext && totalPrompt > base.longContext.thresholdTokens
+    base.longContext && tierPrompt > base.longContext.thresholdTokens
       ? base.longContext
       : null;
   const rates = {
@@ -368,8 +440,14 @@ export function computeTurnCost(
     cacheWrite: per1M(cacheWrite, rates.cacheWrite),
     output: per1M(output, rates.output),
   };
+  const searches = Math.max(0, usage.webSearchCalls ?? 0);
+  if (searches > 0) breakdown.webSearch = searches * webSearchCallUsd(modelId, providerId);
   const usd =
-    breakdown.input + breakdown.cachedInput + breakdown.cacheWrite + breakdown.output;
+    breakdown.input +
+    breakdown.cachedInput +
+    breakdown.cacheWrite +
+    breakdown.output +
+    (breakdown.webSearch ?? 0);
   return { usd, priceVersion: PRICING_VERSION, breakdown, estimated: true };
 }
 

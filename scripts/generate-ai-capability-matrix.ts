@@ -154,8 +154,13 @@ for (const provider of PROVIDER_CATALOG) {
     const reasoning = m.reasoning
       ? m.reasoning + (m.thinkingBudgetTokens ? ` (budget ${fmtNumber(m.thinkingBudgetTokens)})` : "")
       : "—";
+    const resolvedTemperature = resolveModelTemperature(m.id, 0.123);
     const temperature =
-      resolveModelTemperature(m.id, 0.123) === 1 ? "fixed at 1" : "user setting";
+      resolvedTemperature === undefined
+        ? "not sent (rejected by model)"
+        : resolvedTemperature === 1
+          ? "fixed at 1"
+          : "user setting";
     const cached =
       provider.id === "openai" && supportsOpenAIPromptCaching(m.id) ? "yes" : "—";
     out(

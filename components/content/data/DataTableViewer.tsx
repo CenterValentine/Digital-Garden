@@ -19,7 +19,8 @@
  */
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
-import { Plus, Trash2, Undo2, Redo2, Layers } from "lucide-react";
+import { Plus, Trash2, Undo2, Redo2, Layers, Copy } from "lucide-react";
+import { cellDisplayValue } from "@/lib/domain/data/read-format";
 import {
   registerPollingTask,
   runPollingTaskNow,
@@ -36,6 +37,7 @@ import {
 import { cn } from "@/lib/core/utils";
 import {
   cellToText,
+  NON_STORING_COLUMN_TYPES,
   COLUMN_WIDTH_MAX,
   COLUMN_WIDTH_MIN,
   columnWidthMin,
@@ -65,7 +67,11 @@ import {
   type UndoOp,
   type UndoStackState,
 } from "@/lib/domain/data";
-import { DataGridRow, INLINE_EDITABLE_TYPES } from "./DataGridRow";
+import {
+  DataGridRow,
+  INLINE_EDITABLE_TYPES,
+  type CellSelectMods,
+} from "./DataGridRow";
 import { DataColumnHeader, DEFAULT_COLUMN_WIDTH } from "./DataColumnHeader";
 import { ContentPathBreadcrumb } from "../content/ContentPathBreadcrumb";
 import {
@@ -136,6 +142,23 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
     rowId: string;
     columnKey: string;
   } | null>(null);
+  /**
+   * Multi-cell selection (owner ask, 2026-09-28): `selectedCell` is the
+   * ANCHOR; a ⇧-click or a drag sets the focus corner of a rectangle;
+   * ⌘/Ctrl-click toggles single cells in `extraCells` (keyed rowId␀colKey).
+   * ⌘C copies the block as tab-separated text.
+   */
+  const [rangeFocus, setRangeFocus] = useState<{
+    rowId: string;
+    columnKey: string;
+  } | null>(null);
+  const [extraCells, setExtraCells] = useState<Set<string>>(new Set());
+  /** True between a cell mousedown and the next mouseup — text selection is
+   * suppressed on the grid while a drag-select is in flight. */
+  const [isDragSelecting, setIsDragSelecting] = useState(false);
+  const dragSelectingRef = useRef(false);
+  /** Last checkbox toggled — the far end of a ⇧-click row range. */
+  const lastToggledRowRef = useRef<string | null>(null);
   const [peekRowId, setPeekRowId] = useState<string | null>(null);
   const [peekFocusColumnId, setPeekFocusColumnId] = useState<string | null>(null);
   /** Bumped on every grid-"+" click so a field's auto-open can re-fire even
@@ -837,6 +860,46 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
     await load(state.view?.id ?? null);
   }, [contentId, selectedRows, load, clientId, state.view, state.rows, refreshTree]);
 
+  /**
+   * Duplicate the checked rows in place (owner ask, 2026-09-28). The server
+   * lands each copy directly below its source with every stored cell and
+   * its forward relation links; the copies become the selection so a
+   * follow-up action (edit, delete, duplicate again) targets them, and one
+   * undo removes them all.
+   */
+  const duplicateSelected = useCallback(async () => {
+    if (selectedRows.size === 0) return;
+    // Display order, so the copies interleave the way the grid shows them.
+    const sourceIds = state.rows
+      .filter((r) => selectedRows.has(r.id))
+      .map((r) => r.id);
+    const res = await fetch(`/api/content/data/${contentId}/rows`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ duplicateRowIds: sourceIds }),
+    });
+    const json = (await res.json()) as {
+      success?: boolean;
+      data?: { rowIds?: string[] };
+    };
+    const rowIds = json.data?.rowIds ?? [];
+    if (!res.ok || !json.success || rowIds.length === 0) {
+      setNotice("Could not duplicate");
+      return;
+    }
+    const n = rowIds.length;
+    const op: UndoOp = {
+      kind: "addRows",
+      rowIds,
+      label: n === 1 ? "duplicated row" : `${n} duplicated rows`,
+    };
+    setStack((s) => pushOp(s, op, clientId, Date.now()));
+    setSelectedRows(new Set(rowIds));
+    setNotice(`Duplicated ${n} row${n === 1 ? "" : "s"} · ⌘Z to undo`);
+    await load(state.view?.id ?? null);
+  }, [contentId, selectedRows, state.rows, load, clientId, state.view]);
+
   // Form view submission (plan O13): one fresh row, its cells written in a
   // single unconditional batch (no CAS — nothing existed before), then a
   // reload so the new row appears when the user switches back to the grid.
@@ -1391,10 +1454,101 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
 
   // ── Cell keyboard model (owner friction, 2026-08-24) ───────────────────
 
-  const selectCell = useCallback((rowId: string, columnKey: string) => {
-    setSelectedCell({ rowId, columnKey });
-    setEditTarget(null);
+  const cellKey = (rowId: string, columnKey: string) => `${rowId}\u0000${columnKey}`;
+
+  const selectCell = useCallback(
+    (rowId: string, columnKey: string, mods?: CellSelectMods) => {
+      setEditTarget(null);
+      if (mods?.shift && selectedCell) {
+        // Extend the rectangle from the anchor; adds stay.
+        setRangeFocus({ rowId, columnKey });
+        return;
+      }
+      if (mods?.meta && selectedCell) {
+        // Toggle one cell; the anchor joins the set the first time so the
+        // block the user sees is the block ⌘C copies.
+        setExtraCells((prev) => {
+          const next = new Set(prev);
+          next.add(cellKey(selectedCell.rowId, selectedCell.columnKey));
+          const k = cellKey(rowId, columnKey);
+          if (next.has(k)) next.delete(k);
+          else next.add(k);
+          return next;
+        });
+        return;
+      }
+      setSelectedCell({ rowId, columnKey });
+      setRangeFocus(null);
+      setExtraCells(new Set());
+      // A plain mousedown may become a drag: cells entered until mouseup
+      // extend the rectangle from this anchor.
+      dragSelectingRef.current = true;
+      setIsDragSelecting(true);
+    },
+    [selectedCell]
+  );
+
+  const hoverCell = useCallback((rowId: string, columnKey: string) => {
+    if (!dragSelectingRef.current) return;
+    setRangeFocus((prev) =>
+      prev?.rowId === rowId && prev.columnKey === columnKey
+        ? prev
+        : { rowId, columnKey }
+    );
   }, []);
+
+  useEffect(() => {
+    const end = () => {
+      if (!dragSelectingRef.current) return;
+      dragSelectingRef.current = false;
+      setIsDragSelecting(false);
+      // A drag that never left its cell is a click — no rectangle.
+      setRangeFocus((prev) =>
+        prev && selectedCell && prev.rowId === selectedCell.rowId && prev.columnKey === selectedCell.columnKey
+          ? null
+          : prev
+      );
+    };
+    window.addEventListener("mouseup", end);
+    return () => window.removeEventListener("mouseup", end);
+  }, [selectedCell]);
+
+  /**
+   * Row id → column keys inside the selection, display order. Null when
+   * only the anchor is selected (single-cell behaviour is untouched). A row
+   * outside the block gets null, so memo'd rows re-render only on change.
+   */
+  const rangeByRow = useMemo(() => {
+    if (!selectedCell) return null;
+    const rowIndex = new Map(state.rows.map((r, i) => [r.id, i] as const));
+    const colIndex = new Map(columns.map((c, i) => [c.key, i] as const));
+    const cells = new Map<string, Set<string>>();
+    const add = (rowId: string, key: string) => {
+      const set = cells.get(rowId) ?? new Set<string>();
+      set.add(key);
+      cells.set(rowId, set);
+    };
+    if (rangeFocus) {
+      const r1 = rowIndex.get(selectedCell.rowId);
+      const r2 = rowIndex.get(rangeFocus.rowId);
+      const c1 = colIndex.get(selectedCell.columnKey);
+      const c2 = colIndex.get(rangeFocus.columnKey);
+      if (r1 !== undefined && r2 !== undefined && c1 !== undefined && c2 !== undefined) {
+        for (let r = Math.min(r1, r2); r <= Math.max(r1, r2); r++) {
+          for (let c = Math.min(c1, c2); c <= Math.max(c1, c2); c++) {
+            add(state.rows[r].id, columns[c].key);
+          }
+        }
+      }
+    }
+    for (const k of extraCells) {
+      const [rowId, key] = k.split("\u0000");
+      if (rowIndex.has(rowId) && colIndex.has(key)) add(rowId, key);
+    }
+    let count = 0;
+    for (const set of cells.values()) count += set.size;
+    return count > 1 ? cells : null;
+  }, [selectedCell, rangeFocus, extraCells, state.rows, columns]);
 
   const clearEditTarget = useCallback(() => setEditTarget(null), []);
 
@@ -1499,11 +1653,72 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
         }
       } else if (e.key === "Escape") {
         setSelectedCell(null);
+        setRangeFocus(null);
+        setExtraCells(new Set());
+      } else if ((e.key === "Delete" || e.key === "Backspace") && canEditData) {
+        // Clear the selected cell or block (owner ask, 2026-09-28) — one
+        // batched CAS write, one undo entry. Computed and derived columns
+        // have nothing to clear; already-empty cells are skipped so the
+        // op (and its undo) is exactly the cells that changed.
+        e.preventDefault();
+        const targets: Array<{ rowId: string; columnKey: string }> = rangeByRow
+          ? [...rangeByRow.entries()].flatMap(([rowId, keys]) =>
+              [...keys].map((columnKey) => ({ rowId, columnKey }))
+            )
+          : [selectedCell];
+        const edits: CellEdit[] = [];
+        for (const t of targets) {
+          const column = columns.find((c) => c.key === t.columnKey);
+          const row = state.rows.find((r) => r.id === t.rowId);
+          if (!column || !row) continue;
+          if (NON_STORING_COLUMN_TYPES.includes(column.type)) continue;
+          const before = row.data[column.key];
+          if (before === undefined || before === "" || (Array.isArray(before) && before.length === 0)) continue;
+          edits.push({ rowId: row.id, columnKey: column.key, before, after: undefined });
+        }
+        if (edits.length === 0) {
+          setNotice("Nothing to clear");
+          return;
+        }
+        void (async () => {
+          const result = await sendWrites(edits, true);
+          if (!result.ok) {
+            setNotice(result.stale ? "Not cleared — a cell changed since you read it" : (result.message ?? "Could not clear"));
+            return;
+          }
+          const op: UndoOp = { kind: "setCells", edits, label: "" };
+          setStack((s) => pushOp(s, { ...op, label: `cleared ${edits.length} cell${edits.length === 1 ? "" : "s"}` }, clientId, Date.now()));
+          setNotice(`Cleared ${edits.length} cell${edits.length === 1 ? "" : "s"} · ⌘Z to undo`);
+          await load(state.view?.id ?? null);
+        })();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [selectedCell, editTarget, columns, state.rows, canEditData, commitCell]);
+  }, [selectedCell, editTarget, columns, state.rows, canEditData, commitCell, rangeByRow, sendWrites, load, clientId, state.view]);
+
+  // Delete / Backspace with rows CHECKED and no cell selected deletes the
+  // rows — the keyboard's "Delete N" button, undoable the same way.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Delete" && e.key !== "Backspace") return;
+      if (selectedCell || editTarget || selectedRows.size === 0) return;
+      const t = e.target as HTMLElement | null;
+      if (
+        t &&
+        (t.tagName === "INPUT" ||
+          t.tagName === "TEXTAREA" ||
+          t.tagName === "SELECT" ||
+          t.isContentEditable)
+      ) {
+        return;
+      }
+      e.preventDefault();
+      void deleteSelected();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selectedCell, editTarget, selectedRows, deleteSelected]);
 
   // ⌘C on a selected cell copies its display text — labels for selects,
   // never option ids. Skipped inside inputs and when the browser has a real
@@ -1522,6 +1737,41 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
       }
       if (window.getSelection()?.toString()) return;
       if (!selectedCell) return;
+      // A multi-cell selection copies as a tab-separated block over its
+      // bounding rectangle (cells outside the selection stay blank), so it
+      // pastes straight into a spreadsheet. Relations and derived columns
+      // copy as their display text — a title list, a computed value.
+      if (rangeByRow) {
+        e.preventDefault();
+        const rowIdx = state.rows
+          .map((r, i) => (rangeByRow.has(r.id) ? i : -1))
+          .filter((i) => i >= 0);
+        const colIdx = columns
+          .map((c, i) => ([...rangeByRow.values()].some((s) => s.has(c.key)) ? i : -1))
+          .filter((i) => i >= 0);
+        const tsvCell = (text: string) =>
+          /[\t\n"]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+        const lines: string[] = [];
+        let count = 0;
+        for (let r = Math.min(...rowIdx); r <= Math.max(...rowIdx); r++) {
+          const row = state.rows[r];
+          const members = rangeByRow.get(row.id);
+          const cells: string[] = [];
+          for (let c = Math.min(...colIdx); c <= Math.max(...colIdx); c++) {
+            const column = columns[c];
+            if (members?.has(column.key)) {
+              count++;
+              cells.push(tsvCell(cellDisplayValue(row, column)));
+            } else {
+              cells.push("");
+            }
+          }
+          lines.push(cells.join("\t"));
+        }
+        void navigator.clipboard.writeText(lines.join("\n"));
+        setNotice(`Copied ${count} cell${count === 1 ? "" : "s"} (${lines.length} row${lines.length === 1 ? "" : "s"})`);
+        return;
+      }
       const column = columns.find((c) => c.key === selectedCell.columnKey);
       const row = state.rows.find((r) => r.id === selectedCell.rowId);
       if (!column || !row) return;
@@ -1532,7 +1782,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [selectedCell, columns, state.rows]);
+  }, [selectedCell, rangeByRow, columns, state.rows]);
 
   /** contentLink chip → the real node, in a workspace tab (plan Phase 4). */
   const openContent = useCallback(
@@ -1638,14 +1888,32 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
     [state.rows]
   );
 
-  const toggleRow = useCallback((rowId: string) => {
-    setSelectedRows((prev) => {
-      const next = new Set(prev);
-      if (next.has(rowId)) next.delete(rowId);
-      else next.add(rowId);
-      return next;
-    });
-  }, []);
+  const toggleRow = useCallback(
+    (rowId: string, shiftKey?: boolean) => {
+      const last = lastToggledRowRef.current;
+      lastToggledRowRef.current = rowId;
+      setSelectedRows((prev) => {
+        const next = new Set(prev);
+        // ⇧-click selects every row between the last toggled row and this
+        // one (display order), like a file list — the range is ADDED, so a
+        // second ⇧-click elsewhere grows the selection.
+        if (shiftKey && last && last !== rowId) {
+          const a = state.rows.findIndex((r) => r.id === last);
+          const b = state.rows.findIndex((r) => r.id === rowId);
+          if (a >= 0 && b >= 0) {
+            for (let i = Math.min(a, b); i <= Math.max(a, b); i++) {
+              next.add(state.rows[i].id);
+            }
+            return next;
+          }
+        }
+        if (next.has(rowId)) next.delete(rowId);
+        else next.add(rowId);
+        return next;
+      });
+    },
+    [state.rows]
+  );
 
   // ── Render ─────────────────────────────────────────────────────────────
 
@@ -1764,6 +2032,17 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
           >
             <Redo2 className="h-4 w-4" />
           </button>
+          {selectedRows.size > 0 && canEditData && (
+            <button
+              type="button"
+              onClick={duplicateSelected}
+              title="Duplicate the selected rows below their originals"
+              className="flex items-center gap-1.5 rounded px-2 py-1 text-xs text-muted-foreground hover:bg-muted"
+            >
+              <Copy className="h-3.5 w-3.5" />
+              Duplicate {selectedRows.size}
+            </button>
+          )}
           {selectedRows.size > 0 && (
             <button
               type="button"
@@ -1918,7 +2197,8 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
       <div
         ref={scrollRef}
         onScroll={(e) => setScrollTop(e.currentTarget.scrollTop)}
-        className="flex-1 overflow-auto"
+        // No native text selection while a drag-select is in flight.
+        className={cn("flex-1 overflow-auto", isDragSelecting && "select-none")}
       >
         <div className="min-w-max">
           <div className="sticky top-0 z-10 flex border-b border-border bg-muted/60 backdrop-blur">
@@ -2018,9 +2298,11 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
                       ? selectedCell.columnKey
                       : null
                   }
+                  rangeColumnKeys={rangeByRow?.get(row.id) ?? null}
                   onToggleSelect={toggleRow}
                   onCommitCell={commitCell}
                   onSelectCell={selectCell}
+                  onHoverCell={hoverCell}
                   onOpenRow={openRow}
                   onOpenContent={openContent}
                   onAdvance={advanceEdit}

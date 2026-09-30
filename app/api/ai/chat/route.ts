@@ -25,9 +25,28 @@ import {
   streamText,
   convertToModelMessages,
   stepCountIs,
+  NoSuchToolError,
   UI_MESSAGE_STREAM_HEADERS,
 } from "ai";
 import type { UIMessage } from "ai";
+import {
+  LEGACY_TOOL_IDS,
+  countTurnSteps,
+  repairToolInputJson,
+  resolveToolNameAlias,
+} from "@/lib/domain/ai/tools/repair";
+import {
+  CORE_TOOL_IDS,
+  MODE_TOOL_IDS,
+  activationsFromHistory,
+  buildToolMenu,
+  type ToolFamily,
+} from "@/lib/domain/ai/tools/menu";
+import {
+  SUMMON_TOOL_ID,
+  createSummonTool,
+  estimateToolSchemaTokens,
+} from "@/lib/domain/ai/tools/summon";
 import { isResumableConfigured } from "@/lib/domain/ai/resumable/redis";
 import { getStreamContext } from "@/lib/domain/ai/resumable/context";
 import {
@@ -36,6 +55,7 @@ import {
   getActiveStreamId,
 } from "@/lib/domain/ai/resumable/association";
 import type { JSONContent } from "@tiptap/core";
+import { extractSearchTextFromTipTap } from "@/lib/domain/content/search-text";
 import { requireAuth } from "@/lib/infrastructure/auth";
 import { getUserSettings } from "@/lib/features/settings";
 import { getChatContextBody } from "@/lib/features/chat-contexts";
@@ -58,11 +78,26 @@ import {
   getModelMeta,
 } from "@/lib/domain/ai/providers/catalog";
 import {
+  dedupeRepeatedToolParts,
+  stripOpenAIItemIdsFromModelMessages,
   stripOpenAIItemReferences,
   stripReasoningForResend,
   supersedeBulkReads,
-  supersedeIterationHistory,
+  supersedePerceptionHistory,
+  supersedeWriteInputs,
+  teachDeniedApprovals,
 } from "@/lib/domain/ai/context-diet";
+import {
+  CHARTER_TAIL_EXTRA,
+  CHARTER_TURN_TOOLS,
+  tailRefusalNotice,
+  CHARTER_TURN_DELIVERABLES,
+  computeIterationStepCap,
+  continuationStepCap,
+  reservedTailSize,
+  reservedTailTools,
+  stepsRemainingNotice,
+} from "@/lib/domain/ai/tools/iteration-proposal";
 import { DEFAULT_BULK_READ_THRESHOLD } from "@/lib/domain/ai/tools/data-tools";
 import {
   MAX_STEP_SUMMARIES,
@@ -71,7 +106,10 @@ import {
   type TurnSegment,
   type TurnStepSummary,
 } from "@/lib/domain/ai/turn-diagnostics";
-import { resolveModelTemperature } from "@/lib/domain/ai/model-constraints";
+import {
+  openaiModelReasons,
+  resolveModelTemperature,
+} from "@/lib/domain/ai/model-constraints";
 import {
   DEFAULT_OUTPUT_TARGET,
   getLatestUserMessageOutputTarget,
@@ -181,6 +219,7 @@ import type {
 } from "@/lib/features/ai-connections";
 import {
   applyMiddleware,
+  unsupportedParameterMiddleware,
   defaultSettingsMiddleware,
   rateLimitRetryMiddleware,
 } from "@/lib/domain/ai/middleware";
@@ -210,6 +249,18 @@ import { effectiveCapabilities } from "@/lib/domain/ai/features/capabilities";
 import { prisma } from "@/lib/database/client";
 import type { Prisma } from "@/lib/database/generated/prisma";
 import { logger, spanPayload, startSpan, withRouteTrace, withSpan } from "@/lib/core/logger";
+import {
+  REPEAT_GUARDED_TOOLS,
+  repeatedCallKey,
+  repeatedCallNotice,
+} from "@/lib/domain/ai/tools/repeat-guard";
+import {
+  excerptAt,
+  findPrefixDivergence,
+  fingerprintPrompt,
+  serializePromptForDiag,
+  type PrefixFingerprint,
+} from "@/lib/domain/ai/prompt-prefix-diag";
 import { readRunLedgerCaptureConfig } from "@/lib/domain/ai/run-ledger";
 import { MASTER_LEDGER_META_KEY, parseQuestInfo } from "@/lib/domain/ai/quests";
 import { after } from "next/server";
@@ -258,6 +309,30 @@ import {
 } from "@/lib/domain/ai/charters/output-directives";
 
 const ROUTE_PATH = "/api/ai/chat";
+
+/**
+ * The first @-mentioned node that is a charter (marked note/folder), or
+ * null. Bounded to the mention cap; one metadata read per candidate.
+ */
+async function firstCharterMention(
+  userId: string,
+  mentioned: unknown,
+): Promise<string | null> {
+  if (!Array.isArray(mentioned)) return null;
+  const ids = mentioned
+    .filter((id): id is string => typeof id === "string" && id.length > 0)
+    .slice(0, 6);
+  for (const id of ids) {
+    if (await isCharterNodeId(userId, id)) return id;
+  }
+  return null;
+}
+
+/** Last fingerprinted prompt per conversation for the opt-in prefix diagnostic (bounded). */
+const promptPrefixDiagState = new Map<
+  string,
+  { fingerprint: PrefixFingerprint; serialized: string; requestStartedAt: string }
+>();
 
 /**
  * Gate + capsule for ONE folder reference — a chat mention pill, a playbook
@@ -330,11 +405,16 @@ async function resolveCharterReferenceContext(
   const uniqueTitles = Array.from(
     new Set(references.map((reference) => reference.targetTitle)),
   );
+  // Databases resolve too (ITERATION-RUN-HARNESS-FIXES P1): a charter that
+  // says "look at everything in [[Career Evidence Library]]" used to get
+  // "not found in your notes" back — true of notes, false of the vault —
+  // and the tools then refused the table. Now the manifest names the tool
+  // and the id, and jurisdiction admits it (resolve.ts).
   const referenceNodes = await prisma.contentNode.findMany({
     where: {
       ownerId: userId,
       title: { in: uniqueTitles },
-      contentType: { in: ["note", "folder"] },
+      contentType: { in: ["note", "folder", "data"] },
       deletedAt: null,
     },
     select: {
@@ -351,18 +431,24 @@ async function resolveCharterReferenceContext(
   const activeReferenceContentIds = Array.from(
     new Set(
       referenceNodes
-        // Folders are capsule-consumed (below), never getCurrentNote-read —
-        // keep them out of the checkpoint gate's reference expectations.
+        // Folders are capsule-consumed (below) and databases are
+        // query_database-read — never read_content-read; keep both out of
+        // the checkpoint gate's reference expectations.
         .filter(
           (node) =>
-            activeTitles.has(node.title) && node.contentType !== "folder",
+            activeTitles.has(node.title) &&
+            node.contentType !== "folder" &&
+            node.contentType !== "data",
         )
         .map((node) => node.id),
     ),
   );
   const lines = uniqueTitles.map((title) => {
     const found = byTitle.get(title);
-    if (!found) return `- [[${title}]] — not found in your notes`;
+    if (!found) return `- [[${title}]] — not found in your notes or databases`;
+    if (found.contentType === "data") {
+      return `- [[${title}]] — DATABASE (query_database databaseId: ${found.id}; reachable in this charter's runs without a mention)`;
+    }
     if (found.contentType === "folder") {
       // Folder refs behave like chat folder mentions (capsule-plan
       // follow-up): active-phase folders get their capsule injected below;
@@ -373,8 +459,8 @@ async function resolveCharterReferenceContext(
     }
     const isSubCharter = isCharterMetadata(found.notePayload?.metadata);
     return isSubCharter
-      ? `- [[${title}]] (getCurrentNote contentId: ${found.id}) — SUB-CHARTER: has its own standing rules/phases; follow its directives once read`
-      : `- [[${title}]] (getCurrentNote contentId: ${found.id})`;
+      ? `- [[${title}]] (read_content contentId: ${found.id}) — SUB-CHARTER: has its own standing rules/phases; follow its directives once read`
+      : `- [[${title}]] (read_content contentId: ${found.id})`;
   });
 
   // Active-phase folder refs get the full mention treatment (gate +
@@ -399,7 +485,7 @@ async function resolveCharterReferenceContext(
   return {
     manifest:
       "\n\n**Linked extensions** " +
-      "(call getCurrentNote with the contentId below when the current phase needs one — not preloaded):\n" +
+      "(call read_content with the contentId below when the current phase needs one — not preloaded):\n" +
       lines.join("\n") +
       folderCapsules,
     activeReferenceContentIds,
@@ -480,12 +566,31 @@ export async function POST(request: Request) {
       // machinery binds, but the model still runs only when asked. Resolved
       // ONCE here; the routing resolver and the context block both read it,
       // which keeps the two derivations mirrored as required.
+      // `charterDetached` is the user having dismissed the chip in a chat that
+      // is bound to this charter by virtue of being opened ON it. Without it
+      // the dismissal could not be expressed: `charterId: null` already means
+      // "nothing picked", which is what every fresh side chat sends and
+      // exactly the case this binding exists to serve. Hiding the chip alone
+      // would have been a lie — the model would still have been handed the
+      // charter (owner report 2026-09-18).
+      const charterDetached = body.charterDetached === true;
+      // A charter the user @-MENTIONS is the charter (prod 6d0b0e30,
+      // 2026-09-29: "fulfil the charter's instructions … @[Apply for a job]"
+      // reached the model as a plain note — no charter context, no charter
+      // reach, and the model read the charter with read_content). Only when
+      // nothing else names one: the picker and the binding still win, and a
+      // dismissed chip stays dismissed.
+      const mentionedCharterId =
+        typeof body.charterId !== "string"
+          ? await firstCharterMention(session.user.id, body.mentionedContentIds)
+          : null;
       const boundCharterId =
+        !charterDetached &&
         typeof body.charterId !== "string" &&
         contentId &&
         (await isCharterNodeId(session.user.id, contentId))
           ? contentId
-          : null;
+          : mentionedCharterId;
       const routingExplicitCharterId =
         typeof body.charterId === "string" ? body.charterId : boundCharterId;
       const routingRootedCharterId =
@@ -557,6 +662,12 @@ export async function POST(request: Request) {
       // record_iteration_findings) raises the step cap so the loop has room to
       // process ALL its items in the run. Without this the default 7/8-step cap
       // ends the turn after ~1 item, even though the client item budget allows N.
+      // The approved run's declared DELIVERABLES and per-item step override
+      // ride the same proposal result as its item budget (plan §6b): the
+      // step cap is sized from them, and prepareStep reserves the turn's
+      // last steps for them.
+      let itemIterationDeliverables: string[] = [];
+      let itemIterationStepsPerItem: number | undefined;
       let itemIterationBudget = ((): number | null => {
         const msgs = (body as { messages?: unknown }).messages;
         if (!Array.isArray(msgs)) return null;
@@ -568,7 +679,12 @@ export async function POST(request: Request) {
             const p = part as {
               type?: string;
               state?: string;
-              output?: { ok?: boolean; itemBudget?: number };
+              output?: {
+                ok?: boolean;
+                itemBudget?: number;
+                deliverables?: unknown;
+                stepsPerItem?: unknown;
+              };
             };
             if (
               p.type === "tool-propose_item_iteration" &&
@@ -580,12 +696,21 @@ export async function POST(request: Request) {
               // here would silently guillotine a large run at ~item 40.
               if (p.output?.ok && typeof b === "number" && Number.isFinite(b) && b > 0) {
                 budget = Math.min(Math.floor(b), 200);
+                itemIterationDeliverables = Array.isArray(p.output.deliverables)
+                  ? p.output.deliverables.filter((d): d is string => typeof d === "string")
+                  : [];
+                itemIterationStepsPerItem =
+                  typeof p.output.stepsPerItem === "number" && Number.isFinite(p.output.stepsPerItem)
+                    ? p.output.stepsPerItem
+                    : undefined;
               }
             } else if (
               p.type === "tool-record_iteration_findings" &&
               p.state === "output-available"
             ) {
               budget = null; // run closed → back to default caps
+              itemIterationDeliverables = [];
+              itemIterationStepsPerItem = undefined;
             }
           }
         }
@@ -915,10 +1040,11 @@ export async function POST(request: Request) {
           ? "gateway"
           : "direct";
 
-      // Fixed-temperature models (v3.1 R4): reasoning/thinking models
-      // (OpenAI o-series, Moonshot Kimi thinking line) reject any
-      // temperature but 1 with a 4xx. Clamp before it reaches the
-      // middleware AND the streamText call — both send temperature.
+      // Constrained-temperature models (v3.1 R4): Kimi's thinking line
+      // accepts only 1; OpenAI's o-series and gpt-6 family reject the
+      // parameter outright (`undefined` = not sent). Resolved before it
+      // reaches the middleware; unknown models that refuse are caught by
+      // unsupportedParameterMiddleware below.
       const effectiveTemperature = resolveModelTemperature(
         activeModelId,
         temperature,
@@ -969,6 +1095,11 @@ export async function POST(request: Request) {
                 apiKey,
               });
           return applyMiddleware(model, [
+            // Innermost (wraps the raw provider model): when a model
+            // rejects a parameter by name, retry once without it and
+            // remember — the maintained constraint list is always one
+            // release behind (prod 2026-09-29, gpt-6-astra vs temperature).
+            unsupportedParameterMiddleware(),
             defaultSettingsMiddleware({
               temperature: effectiveTemperature,
               maxTokens,
@@ -1262,7 +1393,17 @@ export async function POST(request: Request) {
       // step's usage; phase_checkpoint stamps the running total into the
       // Run Ledger. Input/output split added by cost metering so ledger
       // stamps can carry a $ estimate (totals alone can't be priced).
-      const runTokenCounter = { total: 0, input: 0, output: 0, cachedInput: 0 };
+      const runTokenCounter = {
+        total: 0,
+        input: 0,
+        output: 0,
+        cachedInput: 0,
+        maxStepInput: 0,
+        maxStepCachedInput: 0,
+      };
+      // Captured from the streamText call below so the prefix diagnostic in
+      // prepareStep can fingerprint what the provider actually sees.
+      let systemPromptForDiag = "";
       // Turn-cumulative usage (BACKLOG 2026-09-04): an approval continuation
       // is a NEW request whose accumulator starts at zero, but the turn's
       // earlier segments ride back in on the trailing assistant message's
@@ -1299,6 +1440,8 @@ export async function POST(request: Request) {
         summaries: [] as TurnStepSummary[],
         /** Set by prepareStep when the final step was forced text-only (D1). */
         finalStepReserved: false,
+        /** Steps prepareStep narrowed to the run's deliverable tail (plan §6b). */
+        tailReservedSteps: 0,
       };
       // Playbook validation happens below, after the tool registry is built.
       // Tool closures retain this array reference, so trusted directives
@@ -1331,7 +1474,7 @@ export async function POST(request: Request) {
         conversationId: conversationIdForAssoc ?? undefined,
         targetFolderId,
         // When the user is viewing this conversation in full-page mode the
-        // chat IS the open content. Pass that through so createNote can
+        // chat IS the open content. Pass that through so create_note can
         // default the new note's parent folder to the chat's own parent.
         chatContentId: isChatContent ? contentId : undefined,
         outputOwnerId,
@@ -1395,17 +1538,21 @@ export async function POST(request: Request) {
         string,
         { enabled?: boolean }
       > }).toolConfig ?? {};
-      // Rename compatibility (D2, 2026-09-10): `searchNotes` became
-      // `search_content`. toolConfig is keyed by tool id and defaults to
-      // ENABLED, so a user who had deliberately switched the old finder off
-      // would have had it silently switched back on under the new name.
-      // Carry the old entry forward when the new key is unset; the settings
-      // UI writes the new key from here on, so this fades on first save.
-      if (
-        toolConfig["search_content"] === undefined &&
-        toolConfig["searchNotes"] !== undefined
-      ) {
-        toolConfig["search_content"] = toolConfig["searchNotes"];
+      // Rename compatibility. toolConfig is keyed by tool id and defaults to
+      // ENABLED, so a user who had deliberately switched a tool OFF would have
+      // it silently switched back on under its new name. Carry every legacy
+      // entry forward when the new key is unset; the settings UI writes the new
+      // key from here on, so each fades on first save.
+      //
+      // Was a hand-rolled `searchNotes` special case (D2, 2026-09-10); now
+      // reads the shared rename table, so the next rename cannot forget it.
+      for (const [legacyId, currentId] of Object.entries(LEGACY_TOOL_IDS)) {
+        if (
+          toolConfig[currentId] === undefined &&
+          toolConfig[legacyId] !== undefined
+        ) {
+          toolConfig[currentId] = toolConfig[legacyId];
+        }
       }
       const tools = Object.fromEntries(
         Object.entries(allTools).filter(
@@ -1422,36 +1569,59 @@ export async function POST(request: Request) {
         ),
       );
 
-      // Context diet (S7-C5): during an APPROVED iteration run, narrow the
-      // schema set to the run's working tools. The full ~50-schema prefix
-      // measured ~36k tokens per request; the 128k window (not price) is the
-      // binding constraint on long runs. The set is stable for the whole run
-      // (itemIterationBudget stays non-null until record_iteration_findings),
-      // so the provider prefix cache re-warms once at run start. Pending
-      // approvals mid-run only occur for kept tools (createNote,
-      // phase_checkpoint).
+      // What the model is TOLD it has. The `tools` object above stays
+      // complete for the rest of this request: `activeTools` narrows only what
+      // is serialized into the provider payload, while incoming tool calls
+      // resolve against the full object (ai@6 `doParseToolCall`). So an
+      // unadvertised tool costs zero tokens and still executes if the model
+      // reaches for it — which is the recovery path that deleting destroyed.
+      const advertised = new Set(Object.keys(tools));
+      // Summoned mid-turn. Kept separate from `advertised` so the base set
+      // stays the one the menu is computed against, and so a summon is visible
+      // in diagnostics as something the model asked for rather than something
+      // the turn always had. RATCHET: only ever added to within a turn.
+      const activated = new Set<string>();
+      const isAdvertised = (id: string) =>
+        advertised.has(id) || activated.has(id);
+      // The base policy plus what a bound charter adds — never a summon. Read
+      // by the system-prompt flags so the prompt is the same on every request
+      // of a turn (see the buildSystemPrompt call).
+      const isOffered = (id: string) =>
+        advertised.has(id) ||
+        ((attachedCharterResolved || rootedCharterResolved) &&
+          CHARTER_TURN_TOOLS.includes(id));
+
+      // ADVERTISEMENT POLICY (AI-TOOL-SUMMONER-PLAN §3). Core tools are always
+      // offered; a mode's tools are offered while that mode is live; everything
+      // else is one `summon` away, listed in the menu at ~15 tokens each.
+      //
+      // This replaces the per-run tool diet, which cut 39 of 65 tools by a
+      // hardcoded allowlist and left them unreachable for a whole 48-step
+      // request. Measured: the full prefix is 31,149 tokens — 24% of a 128k
+      // window, re-sent every step — against ~4.9k in plain chat and ~10.1k in
+      // a co-browse run under this policy, with all 65 still reachable.
+      const modes: string[] = [];
+      if (editableContentId) modes.push("editor");
+      if (coBrowseAvailable) modes.push("browser");
+      if (itemIterationBudget != null) modes.push("runs");
+
+      const offered = new Set<string>(CORE_TOOL_IDS);
+      for (const mode of modes) {
+        for (const id of MODE_TOOL_IDS[mode] ?? []) offered.add(id);
+      }
+      for (const id of Object.keys(tools)) {
+        if (!offered.has(id)) advertised.delete(id);
+      }
+
+      // Predictive activation — the cheapest summon is the one never made.
+      // A run declares what it will touch at approval, so those tools are
+      // advertised BEFORE the turn's first inference: no step spent, and no
+      // mid-turn prefix change to invalidate the cache. This is precisely the
+      // path the 2026-09-17 run needed — it captures into a database, so it
+      // must be able to read that database to dedupe against it.
       if (itemIterationBudget != null) {
-        const ITERATION_RUN_TOOLS = new Set([
-          // browsing + enumeration
-          "co_browse_open", "co_browse_act", "read_current_page", "list_tabs",
-          "read_page_headless_or_browser", "open_tab_and_read", "read_page",
-          "search_web",
-          // the iteration harness itself
-          "propose_item_iteration", "record_item_result",
-          "record_batch_checkpoint", "record_iteration_findings",
-          // mid-run schema grace (D8) — this diet stripped it, so the only
-          // window it exists for never had it (lifecycle audit 2026-09-11)
-          "add_quest_ledger_column",
-          // note output + grounding
-          "createNote", "updateNote", "renameNote", "getCurrentNote",
-          "search_content", "read_folder_context",
-          "read_first_chunk", "read_next_chunk", "read_previous_chunk",
-          // run/plumbing
-          "phase_checkpoint", "ask_user", "notify_user",
-          "finish_with_summary", "plan",
-        ]);
-        for (const id of Object.keys(tools)) {
-          if (!ITERATION_RUN_TOOLS.has(id)) delete tools[id];
+        for (const id of ["query_database", "describe_database"]) {
+          if (id in tools) advertised.add(id);
         }
       }
 
@@ -1485,9 +1655,13 @@ export async function POST(request: Request) {
           ? resolveNativeWebSearchTool(executedProviderId)
           : null;
       const searchEnabled = toolConfig["search_web"]?.enabled !== false;
+      // Native search attaches AFTER the run narrowing above, so it must be
+      // advertised explicitly — otherwise it would sit in `tools` unannounced
+      // and the model would never know it could search.
       if (nativeSearch && searchEnabled) {
         // Big-four: provider-native search (integrated, well-cited).
         (tools as Record<string, unknown>)["search_web"] = nativeSearch;
+        advertised.add("search_web");
       } else if (
         !nativeSearch &&
         searchEnabled &&
@@ -1498,7 +1672,108 @@ export async function POST(request: Request) {
         // the SAME tool name — using the user's BYOK search connection.
         (tools as Record<string, unknown>)["search_web"] =
           createAppWebSearchTool(session.user.id);
+        advertised.add("search_web");
       }
+
+      // ── The summoner (AI-TOOL-SUMMONER-PLAN §3) ────────────────────────
+      // Registered last, so `registered` covers every tool this turn has —
+      // including the conditional browser/editor/search families above.
+      // Repeat guard (§9): a byte-identical search within this request is
+      // answered with a pointer to the first result. Wraps only app-run
+      // tools that have an execute (provider-native search has none).
+      const repeatedCalls = new Map<string, number>();
+      for (const name of REPEAT_GUARDED_TOOLS) {
+        const entry = (tools as Record<string, { execute?: unknown } | undefined>)[name];
+        if (!entry || typeof entry.execute !== "function") continue;
+        const original = entry.execute as (input: unknown, options: unknown) => unknown;
+        entry.execute = async (input: unknown, options: unknown) => {
+          const key = repeatedCallKey(name, input);
+          const first = repeatedCalls.get(key);
+          if (first !== undefined) {
+            logger.info({
+              layer: "ai",
+              event: "ai:repeated_call_guarded",
+              summary: `${name} repeated with identical input — answered from the first result`,
+              attrs: { tool: name, first_step: first, step: stepsTracker.used + 1 },
+            });
+            return repeatedCallNotice(name, first);
+          }
+          repeatedCalls.set(key, stepsTracker.used + 1);
+          return original(input, options);
+        };
+      }
+      const registered = new Set(Object.keys(tools));
+      (tools as Record<string, unknown>)[SUMMON_TOOL_ID] = createSummonTool({
+        registered,
+        activated,
+        isAdvertised,
+        schemaTokensFor: (id) =>
+          estimateToolSchemaTokens((tools as Record<string, unknown>)[id]),
+      });
+      // Core by construction: a menu the model cannot act on is worse than no
+      // menu, so the one tool that acts on it is never itself summonable.
+      advertised.add(SUMMON_TOOL_ID);
+
+      // RESERVED TAIL, ENFORCED AT EXECUTE (§10 L2). prepareStep marks the
+      // tail's steps; a server-run tool called there that is not a tail
+      // tool is answered with a refusal instead of running. The tail used to
+      // HIDE those tools, and every change to the tool list is a full cache
+      // flush. Tools with no server execute (provider-native search, the
+      // browser readers) cannot be refused here — the steps notice names the
+      // tail tools for those.
+      const tailGate: { active: boolean; allowed: readonly string[]; remaining: number } = {
+        active: false,
+        allowed: [],
+        remaining: 0,
+      };
+      for (const [name, entry] of Object.entries(
+        tools as Record<string, { execute?: unknown } | undefined>,
+      )) {
+        if (!entry || typeof entry.execute !== "function") continue;
+        const original = entry.execute as (input: unknown, options: unknown) => unknown;
+        entry.execute = async (input: unknown, options: unknown) => {
+          if (tailGate.active && !tailGate.allowed.includes(name)) {
+            logger.info({
+              layer: "ai",
+              event: "ai:tail_refused",
+              summary: `${name} called in the reserved tail — refused`,
+              attrs: { tool: name, remaining: tailGate.remaining },
+            });
+            return tailRefusalNotice({
+              tool: name,
+              tailTools: tailGate.allowed,
+              remaining: tailGate.remaining,
+            });
+          }
+          return original(input, options);
+        };
+      }
+
+      // Restore this TURN's earlier summons. A turn is not a request: every
+      // client-executed tool (co_browse_*, read_current_page, list_tabs, the
+      // browser readers) submits its result from the browser and opens a new
+      // request, which used to start with an empty activation set. A summon
+      // therefore died at the first browser action, and the model spent the
+      // rest of the turn calling tools whose schemas it could no longer see.
+      for (const id of activationsFromHistory(
+        (body as { messages?: unknown[] }).messages ?? [],
+        registered,
+      )) {
+        activated.add(id);
+      }
+
+      // Ordering is the only focus mechanism a menu has. Tool absence used to
+      // keep a run on task; discoverability gives that up, so the families the
+      // current mode actually touches are read first.
+      const leadWith: ToolFamily[] = [];
+      if (itemIterationBudget != null) leadWith.push("runs", "databases", "web");
+      if (coBrowseAvailable) leadWith.push("browser");
+      if (editableContentId) leadWith.push("editor");
+      const toolMenu = buildToolMenu({
+        registered,
+        advertised,
+        leadWith,
+      });
 
       // Resolve attachments for the model: keep file parts the active
       // provider can consume natively (images for vision; PDFs for
@@ -1522,28 +1797,48 @@ export async function POST(request: Request) {
       // Context diet (S7/S8): both transforms apply ONLY to this
       // model-message path — repairedMessages stays intact for
       // originalMessages/persistence.
-      //   - supersedeIterationHistory: raw perception outputs behind the
-      //     latest batch checkpoint collapse to stubs (the ledger is the
-      //     cross-batch memory); reclaims 128k-window space on long runs.
+      //   - supersedePerceptionHistory: raw perception outputs behind the
+      //     latest distillation point (checkpoint OR findings record) and
+      //     any re-readable read from an earlier turn collapse to stubs —
+      //     the ledger / the reply is the memory. Never gated on an active
+      //     run (AI-CONTEXT-ECONOMICS-PLAN D1: the old boundary switched
+      //     off when a run ended, re-sending 905 kB per request after).
+      //   - supersedeWriteInputs: a successful insert_rows / update_rows /
+      //     record_item_result behind the same boundaries keeps its
+      //     addresses and drops its payload — the database or ledger is the
+      //     durable home (plan B1, ~324 kB of generated text on the
+      //     evidence thread). Outputs untouched.
       //   - stripReasoningForResend: reasoning parts are model OUTPUT with
       //     no resend value for non-Anthropic providers, yet
       //     convertToModelMessages forwards them as input verbatim (~100k
       //     chars replayed per request in the measured DeepSeek run).
+      //   - dedupeRepeatedToolParts: a tool call whose id already appeared
+      //     is dropped whole; a call whose input+output are byte-identical
+      //     to an earlier one keeps a pointer stub (plan A2, ~543 kB on the
+      //     evidence thread). Applied AFTER the index-keyed folds so their
+      //     states are computed on the shape the UI sees — this is the only
+      //     pass that removes parts.
       //   - stripOpenAIItemReferences: dead `openai.itemId` pointers replay as
       //     item_reference against an expired server-side store, 400ing every
       //     send in the conversation (#193). Heals transcripts poisoned before
       //     the `store: false` option below existed.
       const resolvedMessages = resolveAttachmentsForModel(
         stripOpenAIItemReferences(
-          stripReasoningForResend(
-            // Bulk database reads fold by lifetime (turn/run/chat) — plan
-            // AI-BULK-ROW-READING §4.6; pinned reads survive, `turn`
-            // reads collapse once a newer user message exists.
-            supersedeBulkReads(
-              supersedeIterationHistory(repairedMessages),
-              { pinnedAllowanceTokens: bulkReadPinnedAllowance },
+          // A denied approval without a client reason reads as a bare
+          // "Tool execution denied." — teach instead (plan §6b.4).
+          teachDeniedApprovals(
+          dedupeRepeatedToolParts(
+            stripReasoningForResend(
+              // Bulk database reads fold by lifetime (turn/run/chat) — plan
+              // AI-BULK-ROW-READING §4.6; pinned reads survive, `turn`
+              // reads collapse once a newer user message exists.
+              supersedeBulkReads(
+                supersedeWriteInputs(supersedePerceptionHistory(repairedMessages)),
+                { pinnedAllowanceTokens: bulkReadPinnedAllowance },
+              ),
+              executedVendorId,
             ),
-            executedVendorId,
+          ),
           ),
         ),
         executedVendorId,
@@ -1559,7 +1854,7 @@ export async function POST(request: Request) {
       // EVERY side chat attaches the content it lives under (owner directive
       // 2026-09-11, generalizing the charter rule): the bound content rides
       // as an implicit FIRST mention, so its body / folder capsule / database
-      // digest loads the way an @-mention's does — no getCurrentNote
+      // digest loads the way an @-mention's does — no read_content
       // round-trip. Charters take the charter path instead (progressive
       // disclosure), a chat or workflow is its own subject, and an explicit
       // mention of the same id dedupes. The bound content gets its own slot
@@ -1572,9 +1867,22 @@ export async function POST(request: Request) {
         contentId !== routingRootedCharterId
           ? contentId
           : null;
+      // A mentioned charter is loaded as the charter (standing rules +
+      // phase), not as a mention capsule too — once, not twice.
       const requestedMentionIds: string[] = Array.isArray(body.mentionedContentIds)
-        ? body.mentionedContentIds.filter((id: unknown): id is string => typeof id === "string")
+        ? body.mentionedContentIds.filter(
+            (id: unknown): id is string =>
+              typeof id === "string" && id !== mentionedCharterId,
+          )
         : [];
+      if (conversationIdForAssoc && mentionedCharterId) {
+        void addAutoAssociation(
+          session.user.id,
+          conversationIdForAssoc,
+          mentionedCharterId,
+          "mention",
+        ).catch(() => null);
+      }
       const mentionedContentIds: string[] = boundAttachId
         ? [boundAttachId, ...requestedMentionIds.filter((id) => id !== boundAttachId)]
         : requestedMentionIds;
@@ -1617,6 +1925,9 @@ export async function POST(request: Request) {
                 // tiptapJson rides along so folder wiki-links inside a
                 // mentioned note can get the capsule treatment below.
                 notePayload: { select: { searchText: true, tiptapJson: true } },
+                // File mentions (e-books especially) render from their own
+                // payload instead of "(no text content available)".
+                filePayload: { select: { mimeType: true, searchText: true } },
               },
             });
             span.attr("found", result.length).summary(`${result.length} mentions`);
@@ -1744,13 +2055,60 @@ export async function POST(request: Request) {
             });
           }
 
+          // E-book mentions (and the open/bound book — it rides as the first
+          // implicit mention) get the reader's capsule: what the book is,
+          // where the user is in it, and what they highlighted.
+          const bookSections = new Map<string, string>();
+          try {
+            const { buildBookCapsule, isBookMimeType } = await import(
+              "@/lib/domain/reader/server/ai-capsule"
+            );
+            await Promise.all(
+              mentionedNodes
+                .filter(
+                  (node) =>
+                    (node.contentType === "file" &&
+                      isBookMimeType(node.filePayload?.mimeType)) ||
+                    // Library books kept as links (no free download);
+                    // the capsule returns null for ordinary links.
+                    node.contentType === "external",
+                )
+                .map(async (node) => {
+                  const capsule = await buildBookCapsule(session.user.id, node.id);
+                  if (capsule) bookSections.set(node.id, `### ${node.title}\n${capsule}`);
+                }),
+            );
+          } catch (bookError) {
+            logger.warn({
+              layer: "ai",
+              event: "ai_context:book_mention_caught",
+              summary: "book mention capsule failed — generic fallback",
+              error: bookError,
+            });
+          }
+
           const sections = mentionedNodes.map((node) => {
             const folderSection = folderSections.get(node.id);
             if (folderSection) return folderSection;
             const dataSection = dataSections.get(node.id);
             if (dataSection) return dataSection;
+            const bookSection = bookSections.get(node.id);
+            if (bookSection) return bookSection;
+            // Derive live from the JSON, never trust the materialized column:
+            // it may predate the private-content strip (or the atomic-inline
+            // fix) — the same reason read_content re-derives. A note whose
+            // author just commented out a passage must not have that passage
+            // ride into the prompt as its own implicit mention.
+            const live = node.notePayload?.tiptapJson
+              ? extractSearchTextFromTipTap(
+                  node.notePayload.tiptapJson as JSONContent,
+                ).trim()
+              : "";
             const text =
-              node.notePayload?.searchText || "(no text content available)";
+              live ||
+              node.notePayload?.searchText ||
+              node.filePayload?.searchText?.trim() ||
+              "(no text content available)";
             const props = rowPropSections.get(node.id);
             return `### ${node.title}\n${props ? `${props}\n\n` : ""}${text.slice(0, 2000)}`;
           });
@@ -1818,7 +2176,7 @@ export async function POST(request: Request) {
           const availabilityLine =
             enabledDataTools.length === 0
               ? "ALL database tools are DISABLED in the user's settings. Do not attempt to call any of them. If the user asks for database operations, tell them to enable the tools under Settings → AI → AI Tools → Databases."
-              : `Database tools available this turn: ${enabledDataTools.join(", ")}. For reading or changing ROWS AND CELLS, use these — never search_content/getCurrentNote, which describe a database from the OUTSIDE (title, columns) and will mislead you about row data.${
+              : `Database tools available this turn: ${enabledDataTools.join(", ")}. For FILTERED, sorted, or full-column row reads — and for every write — use these. (read_content returns this database's schema plus a short row preview, which is enough to see what is here; it cannot filter, sort, page, or write.)${
                   disabledDataTools.length > 0
                     ? ` DISABLED in the user's settings (never call these; tell the user to enable them under Settings → AI → AI Tools → Databases if needed): ${disabledDataTools.join(", ")}.`
                     : " Disregard any earlier statements in this conversation that they were unavailable; verify current values with query_database instead of trusting prior turns."
@@ -1890,7 +2248,7 @@ export async function POST(request: Request) {
       // Playbook progressive disclosure (AI v3.2 T3): inject standing rules
       // + the ACTIVE PHASE ONLY — never the whole playbook. `[[wiki-link]]`
       // references in that phase surface as a manifest the model traces on
-      // demand via getCurrentNote; sub-playbooks (a linked note OR folder that is
+      // demand via read_content; sub-playbooks (a linked note OR folder that is
       // itself marked as a playbook) are called out so the model follows
       // their own directives rather than treating them as passive reading.
       let charterContext = "";
@@ -1937,7 +2295,7 @@ export async function POST(request: Request) {
           ) {
             attachedCharterResolved = true;
             attachedPlaybookTitle = charterNode.title;
-            // Context diet (S7-C2): getCurrentNote answers this id with a
+            // Context diet (S7-C2): read_content answers this id with a
             // pointer — the body is already injected below.
             toolCtx.activeCharter = {
               contentId: explicitPlaybookId,
@@ -1975,6 +2333,22 @@ export async function POST(request: Request) {
               placeholderCount > 0
                 ? `\n\n**Unfilled template:** ${placeholderCount} phase heading${placeholderCount === 1 ? " is" : "s are"} still the starter placeholder ("[name the first phase]"). Tell the user before running anything, and never execute a placeholder phase — ask them to rename or delete it.`
                 : "";
+            // P12: a note that repeats itself is loaded ONCE and said so —
+            // the copies would otherwise read as phases (and cost their
+            // tokens on every turn).
+            const duplicateCopies = parsed.duplicatePhasesCollapsed ?? 0;
+            const duplicateNote =
+              duplicateCopies > 0
+                ? `\n\n**Duplicated note:** this charter's note repeats identical content ${duplicateCopies + 1} times (${duplicateCopies} duplicate ${duplicateCopies === 1 ? "copy" : "copies"} collapsed — likely a sync glitch). Only ONE copy is loaded; the copies are NOT extra phases. Mention it to the user once so they can clean the note.`
+                : "";
+            if (duplicateCopies > 0) {
+              logger.warn({
+                layer: "ai",
+                event: "charter:duplicate_content_collapsed",
+                summary: `charter note repeats its content ${duplicateCopies + 1}×; one copy loaded`,
+                attrs: { charterId: explicitPlaybookId, copies: duplicateCopies + 1 },
+              });
+            }
             if (parsed.phases.length > 0) {
               const rawIndex =
                 typeof body.activePhaseIndex === "number" ? body.activePhaseIndex : 0;
@@ -1988,8 +2362,9 @@ export async function POST(request: Request) {
               );
 
               // Reference manifest: title-resolve every [[link]] in the
-              // standing rules + active phase (wiki-links carry no id — see
-              // lib/domain/editor/extensions/wiki-link.ts).
+              // standing rules + active phase (a hand-typed wiki-link
+              // carries only its title; picker-made ones also carry
+              // `targetId` — see lib/domain/editor/extensions/wiki-link.ts).
               const allRefs = [
                 ...parsed.standingRules.references,
                 ...phase.references,
@@ -2009,8 +2384,8 @@ export async function POST(request: Request) {
                 referenceContentIds:
                   referenceContext.activeReferenceContentIds,
                 researchToolsAvailable:
-                  "search_web" in tools || "read_page" in tools,
-                referenceToolAvailable: "getCurrentNote" in tools,
+                  isAdvertised("search_web") || isAdvertised("read_page"),
+                referenceToolAvailable: isAdvertised("read_content"),
               });
               recordCompletedPhaseToolsFromMessages(
                 phaseCheckpointGate,
@@ -2034,7 +2409,7 @@ export async function POST(request: Request) {
               );
               charterContext =
                 `\n\n## Active Charter: "${charterNode.title}"\n` +
-                `This charter is ALREADY ATTACHED and loaded below — when the user asks to run "this charter" (or a bare "run it"/"go"), THIS is it. Do not search notes or read anything else to find it; act on the content already provided here.\n` +
+                `This charter is ALREADY ATTACHED${explicitPlaybookId === mentionedCharterId ? " (the user @-mentioned it)" : ""} and loaded below — when the user asks to run "this charter" (or a bare "run it"/"go"), THIS is it. Do not search notes or read anything else to find it; act on the content already provided here.\n` +
                 `Phase ${phaseIndex + 1} of ${parsed.phases.length}: "${phase.title}"\n\n` +
                 `**Phases:**\n${phaseToc}\n\n` +
                 (standingText
@@ -2042,7 +2417,8 @@ export async function POST(request: Request) {
                   : "") +
                 `**Current phase (the ONLY phase detail loaded):**\n${phaseText}${referenceContext.manifest}` +
                 ledgerNote +
-                placeholderNote;
+                placeholderNote +
+                duplicateNote;
             } else {
               // A valid marked playbook can be empty. Keep its explicit
               // identity in context instead of silently falling through to
@@ -2117,8 +2493,8 @@ export async function POST(request: Request) {
                 referenceContentIds:
                   referenceContext.activeReferenceContentIds,
                 researchToolsAvailable:
-                  "search_web" in tools || "read_page" in tools,
-                referenceToolAvailable: "getCurrentNote" in tools,
+                  isAdvertised("search_web") || isAdvertised("read_page"),
+                referenceToolAvailable: isAdvertised("read_content"),
               });
               recordCompletedPhaseToolsFromMessages(
                 phaseCheckpointGate,
@@ -2157,7 +2533,11 @@ export async function POST(request: Request) {
       // this turn so weaker models cannot search for the playbook that is
       // already loaded. Generic note search remains available for phase work.
       if (attachedCharterResolved || rootedCharterResolved) {
-        delete tools.search_charters;
+        // Un-advertised rather than deleted, per the advertisement model
+        // above: the model stops being offered it (which is the point — the
+        // charter is already loaded), and a stray call from history is a
+        // redundant read rather than a hard error.
+        advertised.delete("search_charters");
         // System context alone proved insufficient for weaker models: the
         // owner smoke trace showed a correctly injected Active Playbook, yet
         // DeepSeek still opened the rooted note first. Put the validated
@@ -2181,18 +2561,18 @@ export async function POST(request: Request) {
         rootedContentSection = attachedCharterResolved
           ? `\n\nThis chat was opened from **"${rootedContentTitle}"** (a ${rootedContentType ?? "content"}). It is optional working context, NOT the selected charter. The charter attached to the current user message and loaded in "Active Charter" is the procedure to execute. Do not read "${rootedContentTitle}" merely to identify, discover, or understand the charter.` +
             (readable
-              ? ` Read the rooted content with getCurrentNote (contentId: ${contentId}) only when the user's request or the active charter phase actually requires its contents.`
+              ? ` Read the rooted content with read_content (contentId: ${contentId}) only when the user's request or the active charter phase actually requires its contents.`
               : "")
           : rootedCharterResolved
             ? `\n\nThis chat is rooted in **"${rootedContentTitle}"** (a ${rootedContentType ?? "content"}), and the user explicitly asked to execute it as the Active Charter. Its validated instructions are already loaded; do not read or search for another charter.`
             : boundAttachId
               ? `\n\nThis chat is ATTACHED to **"${rootedContentTitle}"** (a ${rootedContentType ?? "content"}) — that is what this conversation is about, and its content is already loaded below under the referenced content (a side chat attaches whatever it lives under). When the user refers to "this file", "this note", "this database", "the current one", etc. without naming it, they mean "${rootedContentTitle}". Do not search for it.` +
                 (readable
-                  ? ` If the loaded content is truncated, getCurrentNote (contentId: ${contentId}) returns the full body.`
+                  ? ` If the loaded content is truncated, read_content (contentId: ${contentId}) returns the full body.`
                   : "")
               : `\n\nThis chat is rooted in **"${rootedContentTitle}"** (a ${rootedContentType ?? "content"}) — that is what this conversation is about. When the user refers to "this file", "this note", "the current one", "this charter", etc. without naming it, they mean "${rootedContentTitle}".` +
                 (readable
-                  ? ` Read its content with getCurrentNote (contentId: ${contentId}) when you need it.`
+                  ? ` Read its content with read_content (contentId: ${contentId}) when you need it.`
                   : "");
       }
 
@@ -2259,7 +2639,7 @@ export async function POST(request: Request) {
           : null;
       // The garden doc the user is actively VIEWING (focused content tab) — the
       // internal twin of currentPage. Lets the model resolve "this note/doc"
-      // without the user naming it, and read it with getCurrentNote(contentId).
+      // without the user naming it, and read it with read_content(contentId).
       const rawViewedContent = body.viewedContent;
       const viewedContentHint =
         rawViewedContent &&
@@ -2275,7 +2655,7 @@ export async function POST(request: Request) {
             }
           : null;
 
-      const toolsActive = Object.keys(tools).length > 0;
+      const toolsActive = advertised.size > 0;
       const validatedPlaybookId = attachedCharterResolved
         ? explicitPlaybookId
         : rootedCharterResolved
@@ -2285,7 +2665,7 @@ export async function POST(request: Request) {
         providerId: executedVendorId,
         modelId: activeModelId,
         userId: session.user.id,
-        toolNames: Object.keys(tools),
+        toolNames: [...advertised],
         charterId: validatedPlaybookId,
         charterContext,
       });
@@ -2301,12 +2681,12 @@ export async function POST(request: Request) {
             requested_provider: providerId,
             model: activeModelId,
             messages: modelMessages.length,
-            tools: tools ? Object.keys(tools).length : 0,
+            tools: advertised.size,
             // S2 debug surface: which tools actually attached, and whether
             // the native search tool made it in (gateway transports may
             // handle provider-defined tools differently than direct).
-            tool_names: Object.keys(tools).join(","),
-            native_search: "search_web" in tools,
+            tool_names: [...advertised].join(","),
+            native_search: isAdvertised("search_web"),
             executed_provider: executedVendorId,
             prompt_cache_enabled: promptCachePolicy.enabled,
             prompt_cache_scope: promptCachePolicy.scope,
@@ -2360,8 +2740,22 @@ export async function POST(request: Request) {
       // that function's return doubles as the "this turn had a reasoning
       // config" signal for describeReasoningConfig below, and a storage knob is
       // not a reasoning config.
+      // `forceReasoning`: @ai-sdk/openai only knows the o-series and gpt-5 as
+      // reasoning models; a newer family (gpt-6) is treated as plain chat —
+      // and with `store: false` that means the adapter never asks for
+      // `reasoning.encrypted_content`, so reasoning items go back id-only and
+      // the prompt cache cannot match anything past the first tool call
+      // (plan §10 L1: every gpt-6 run froze there). Forcing it also selects
+      // the `developer` system role and drops `temperature`.
       const storageProviderOptions: AIProviderOptions | undefined =
-        executedVendorId === "openai" ? { openai: { store: false } } : undefined;
+        executedVendorId === "openai"
+          ? {
+              openai: {
+                store: false,
+                ...(openaiModelReasons(activeModelId) ? { forceReasoning: true } : {}),
+              },
+            }
+          : undefined;
       const providerOptions = mergeAIProviderOptions(
         reasoningProviderOptions,
         storageProviderOptions,
@@ -2372,28 +2766,94 @@ export async function POST(request: Request) {
       // call so stopWhen, the per-segment diagnostics, and the finish-log
       // events all report the SAME cap (self-describing turns). Formula
       // rationale lives on the stopWhen comment below.
-      const stepCap =
+      // Steps this turn has ALREADY spent in earlier requests. A turn is not a
+      // request: every client-executed tool (co_browse_*, read_current_page,
+      // list_tabs, the browser readers) submits its result from the browser,
+      // which opens a new request with a fresh budget. A production turn ran
+      // 21 steps against a cap of 7 that way, including eight identical failing
+      // calls nothing stopped (2026-09-18). Spending the remainder of the cap
+      // rather than the whole cap makes the ceiling mean what it says.
+      const stepsAlreadySpent = countTurnSteps(
+        (body as { messages?: unknown[] }).messages ?? [],
+      );
+      // Item runs: `items × (research + deliverables + record) + overhead`
+      // (iteration-proposal.ts). With no deliverables this is the old
+      // `items × 4 + 8`; a fulfilment run declaring create_docx + update_row
+      // gets 6 per item instead of 4 — the two steps its tail actually needs.
+      // A charter turn WITHOUT a proposal is a one-item fulfilment run (§9,
+      // prod 62ac2b76): the proposal is scope and consent, not the thing
+      // that unlocks the budget. One job asked for plainly gets the same
+      // cap and reserved tail a proposed one-item run gets.
+      const charterTurn =
+        itemIterationBudget == null &&
+        researchPageBudget == null &&
+        (attachedCharterResolved || rootedCharterResolved);
+      // ONE PROMPT PER TURN (§10 L2): a bound charter's tools are part of
+      // the turn from its FIRST request — `CHARTER_TURN_TOOLS` is what every
+      // measured charter run summoned piecemeal, and each summon rewrote the
+      // tool list (a full cache flush) and, through activationsFromHistory,
+      // the next request's system prompt (wire probe 04:16:55). Added the
+      // same way on every request of the turn, so the list and the prompt
+      // agree across them.
+      if (attachedCharterResolved || rootedCharterResolved) {
+        for (const id of CHARTER_TURN_TOOLS) if (id in tools) activated.add(id);
+      }
+      const rawStepCap =
         itemIterationBudget != null
-          ? itemIterationBudget * 4 + 8
+          ? computeIterationStepCap({
+              itemBudget: itemIterationBudget,
+              deliverables: itemIterationDeliverables,
+              stepsPerItem: itemIterationStepsPerItem,
+            })
           : researchPageBudget != null
             ? researchPageBudget * 2 + 4
-            : editableContentId
-              ? 8
-              : 7;
+            : charterTurn
+              ? computeIterationStepCap({
+                  itemBudget: 1,
+                  deliverables: CHARTER_TURN_DELIVERABLES,
+                })
+              : editableContentId
+                ? 8
+                : 7;
+      // The tail this turn reserves: the run's declared deliverables, or the
+      // charter's write tools. Null for plain chat turns (no tail).
+      const tailDeliverables: readonly string[] | null =
+        itemIterationBudget != null
+          ? itemIterationDeliverables
+          : charterTurn
+            ? CHARTER_TURN_DELIVERABLES
+            : null;
+      const tailToolsForTurn = tailDeliverables
+        ? reservedTailTools(tailDeliverables, {
+            record: itemIterationBudget != null,
+            extra: charterTurn ? CHARTER_TAIL_EXTRA : [],
+          })
+        : [];
+      // What is left of the turn's cap for THIS request — with a floor, so
+      // an approval continuation can still perform the approved action,
+      // follow through, and answer (§9: a continuation used to inherit
+      // 8 → 3 → 1 and die on the step meant to write the document).
+      const stepCap = continuationStepCap({
+        rawStepCap,
+        stepsAlreadySpent,
+        tailDeliverables,
+      });
       const stepCapSource: StepCapSource =
         itemIterationBudget != null
           ? "item-iteration"
           : researchPageBudget != null
             ? "research"
-            : editableContentId
-              ? "editable"
-              : "base";
+            : charterTurn
+              ? "charter"
+              : editableContentId
+                ? "editable"
+                : "base";
       const reasoningConfigSummary = describeReasoningConfig(
         executedVendorId,
         reasoningProviderOptions !== undefined,
         itemIterationBudget != null,
       );
-      const activeToolCount = toolsActive ? Object.keys(tools).length : 0;
+      const activeToolCount = advertised.size;
 
       // Turn start — for the generation-duration shown in the assistant avatar
       // tooltip (attached on `finish` in messageMetadata below). Anchored here so
@@ -2418,7 +2878,48 @@ export async function POST(request: Request) {
         model: wrappedModel,
         messages: modelMessages,
         tools: toolsActive ? tools : undefined,
+        // Advertisement, not availability: only these schemas are serialized,
+        // but every tool in `tools` above remains executable. See the
+        // `advertised` set at assembly for why the difference matters.
+        activeTools: toolsActive ? [...advertised] : undefined,
         toolChoice: toolsActive ? "auto" : undefined,
+        // Spelling is not a capability question. The id namespace mixes
+        // camelCase (`create_note`) with snake_case (`query_database`), so a
+        // model settled into one convention emits the other and the SDK
+        // answers `NoSuchToolError`. Resolve the rename and let the call
+        // stand; anything beyond case/separators stays an honest error,
+        // because guessing which tool was meant can run the wrong one.
+        experimental_repairToolCall: async ({ toolCall, error }) => {
+          if (NoSuchToolError.isInstance(error)) {
+            const resolved = resolveToolNameAlias(
+              toolCall.toolName,
+              Object.keys(tools),
+            );
+            if (!resolved) return null;
+            logger.info({
+              layer: "ai",
+              event: "tools:name_repaired",
+              summary: "tool call repaired to its real id",
+              attrs: { called: toolCall.toolName, resolved },
+            });
+            return { ...toolCall, toolName: resolved };
+          }
+          // Arguments that are not valid JSON die before any schema sees
+          // them, so no amount of schema leniency catches this one: an
+          // unquoted bare word where a value belongs (`{"budget": large}`,
+          // production 2026-09-18) took a whole database read with it.
+          // Quoting it is conservative — a field whose type then disagrees
+          // is still rejected by its own schema.
+          const repairedInput = repairToolInputJson(toolCall.input);
+          if (!repairedInput) return null;
+          logger.info({
+            layer: "ai",
+            event: "tools:input_json_repaired",
+            summary: "unparseable tool arguments repaired",
+            attrs: { tool: toolCall.toolName },
+          });
+          return { ...toolCall, input: repairedInput };
+        },
         // Reasoning opt-in for Anthropic + Google (Session 6). Undefined
         // for OpenAI o-series (reasoning is automatic) and non-reasoning
         // chat models.
@@ -2437,7 +2938,7 @@ export async function POST(request: Request) {
         // finish N pages. The page budget is the depth lever; this is the safety
         // ceiling that follows it. Outside a research run, the normal 7/8 cap.
         // Item runs: each item ≈ read + record (+ optional re-read); +8
-        // overhead for list_tabs / propose / roll-up createNote /
+        // overhead for list_tabs / propose / roll-up create_note /
         // record_iteration_findings. The client item budget is the true
         // limiter (soft-stops new items); this ceiling must not cut off
         // before it. Cap value + provenance hoisted above (stepCap /
@@ -2461,10 +2962,117 @@ export async function POST(request: Request) {
         // added the columns") — a confabulated answer is strictly worse
         // than the silence this fixes. Telling it the loop is over makes
         // the honest report the only available move.
-        prepareStep: ({ stepNumber, messages: stepMessages }) => {
-          if (stepNumber < stepCap - 1) return {};
+        prepareStep: ({ stepNumber, messages: rawStepMessages }) => {
+          // One spelling for a tool call whether it was made in this request
+          // or resent from the transcript: the SDK's in-request messages
+          // carry `openai.itemId` (sent inline as `id`), the transcript has
+          // it stripped, and the provider cache saw two different items
+          // (plan §10 L1, wire probe 04:17:42). Reasoning keeps its id.
+          const stepMessages =
+            executedVendorId === "openai"
+              ? stripOpenAIItemIdsFromModelMessages(rawStepMessages)
+              : rawStepMessages;
+          // Summoned tools enter here: `activated` grew during the previous
+          // step's tool execution, and this is the only place a step's
+          // advertised set can be widened. Returned every step (not just when
+          // something was summoned) so the set is stated by one rule rather
+          // than inherited sometimes and overridden others.
+          const stepActiveTools = toolsActive
+            ? [...advertised, ...activated]
+            : undefined;
+          // Prompt-prefix diagnostic (ITERATION-RUN-HARNESS-FIXES §8), opt-in
+          // via AI_PROMPT_PREFIX_DIAG=1: names the first chunk where this
+          // step's prompt stops matching the previous one — the provider
+          // cache matches only that far. Prod ecf1d0e5 froze at 27k tokens.
+          if (process.env.AI_PROMPT_PREFIX_DIAG === "1") {
+            try {
+              const serialized = serializePromptForDiag({
+                system: systemPromptForDiag,
+                toolNames: stepActiveTools ?? Object.keys(tools),
+                messages: stepMessages,
+              });
+              const fingerprint = fingerprintPrompt(serialized);
+              const diagKey = conversationIdForAssoc ?? contentId ?? "anon";
+              const prev = promptPrefixDiagState.get(diagKey);
+              if (prev) {
+                const divergence = findPrefixDivergence(prev.fingerprint, fingerprint);
+                logger.info({
+                  layer: "ai",
+                  event: "ai:prompt_prefix",
+                  summary: divergence
+                    ? `prompt prefix diverges after ~${divergence.sharedTokensApprox} tokens (chunk ${divergence.chunkIndex})`
+                    : "prompt prefix stable — grew or unchanged",
+                  attrs: {
+                    conversation_id: diagKey,
+                    step: stepNumber,
+                    request_started_at: new Date(turnStartMs).toISOString(),
+                    prev_request_started_at: prev.requestStartedAt,
+                    same_request: prev.requestStartedAt === new Date(turnStartMs).toISOString(),
+                    prompt_chars: serialized.length,
+                    prev_prompt_chars: prev.serialized.length,
+                    ...(divergence
+                      ? {
+                          offset: divergence.offset,
+                          prev_excerpt: excerptAt(prev.serialized, divergence.offset),
+                          curr_excerpt: excerptAt(serialized, divergence.offset),
+                        }
+                      : {}),
+                  },
+                });
+              }
+              promptPrefixDiagState.set(diagKey, {
+                fingerprint,
+                serialized,
+                requestStartedAt: new Date(turnStartMs).toISOString(),
+              });
+              if (promptPrefixDiagState.size > 20) {
+                const oldest = promptPrefixDiagState.keys().next().value;
+                if (oldest !== undefined) promptPrefixDiagState.delete(oldest);
+              }
+            } catch {
+              // Diagnostic only — never touches the step.
+            }
+          }
+          if (stepNumber < stepCap - 1) {
+            if (!tailDeliverables) {
+              tailGate.active = false;
+              return { activeTools: stepActiveTools, messages: stepMessages };
+            }
+            // DELIVERABLE-TAIL RESERVATION (plan §6b, prod 5e5b739d): the
+            // final-step rule generalised. The last `tail` steps of an item
+            // run — or of a charter turn (§9) — keep only the deliverables
+            // + record/close tools callable, so research physically cannot
+            // consume them — and every step tells the model where it
+            // stands, since a budget it cannot see is a budget it cannot
+            // plan against.
+            const remaining = stepCap - stepNumber;
+            const tail = reservedTailSize(tailDeliverables);
+            const inTail = remaining <= tail + 1; // +1: the text-only last step
+            // The list stays whole; the tail is enforced when a tool runs
+            // (tailGate, §10 L2) so the cached prefix survives the tail.
+            tailGate.active = inTail;
+            tailGate.allowed = tailToolsForTurn;
+            tailGate.remaining = remaining;
+            if (inTail) stepsTracker.tailReservedSteps += 1;
+            return {
+              activeTools: stepActiveTools,
+              messages: [
+                ...stepMessages,
+                {
+                  role: "user" as const,
+                  content: stepsRemainingNotice({
+                    stepNumber,
+                    stepCap,
+                    deliverables: tailDeliverables,
+                    tailTools: tailToolsForTurn,
+                  }),
+                },
+              ],
+            };
+          }
           stepsTracker.finalStepReserved = true;
           return {
+            activeTools: stepActiveTools,
             toolChoice: "none" as const,
             messages: [
               ...stepMessages,
@@ -2478,19 +3086,27 @@ export async function POST(request: Request) {
             ],
           };
         },
-        system: buildSystemPrompt({
-          hasImageTools: "generate_image" in tools,
-          hasFlashcardTools: "list_decks" in tools,
-          hasWebSearch: "search_web" in tools,
-          hasCheckpointTool: "phase_checkpoint" in tools,
-          hasBrowserReadTool: READ_PAGE_HEADLESS_OR_BROWSER in tools,
-          hasTabLauncher: OPEN_TAB_AND_READ in tools,
-          hasCoBrowseTools: CO_BROWSE_OPEN in tools,
-          hasReadCurrentPage: READ_CURRENT_PAGE in tools,
-          hasResearchTools: "extract_structured" in tools,
-          hasListTabs: LIST_TABS in tools,
-          hasItemIteration: "propose_item_iteration" in tools,
-          hasDatabaseTools: "describe_database" in tools,
+        // SYSTEM-PROMPT FLAGS READ THE BASE POLICY, NOT SUMMONS. `isAdvertised`
+        // includes this turn's summons, restored into every later request from
+        // the transcript — so a summon at step 1 rewrote the NEXT request's
+        // system prompt, and a changed system prompt is a cold cache for the
+        // whole request (plan §10 L1). `isOffered` is the per-request policy
+        // (core + live modes + charter binding), the same on every request of
+        // a turn. A summoned tool teaches through its own description.
+        system: (systemPromptForDiag = buildSystemPrompt({
+          hasImageTools: isOffered("generate_image"),
+          hasFlashcardTools: isOffered("list_decks"),
+          hasWebSearch: isOffered("search_web"),
+          hasCheckpointTool: isOffered("phase_checkpoint"),
+          hasBrowserReadTool: isOffered(READ_PAGE_HEADLESS_OR_BROWSER),
+          hasTabLauncher: isOffered(OPEN_TAB_AND_READ),
+          hasCoBrowseTools: isOffered(CO_BROWSE_OPEN),
+          hasReadCurrentPage: isOffered(READ_CURRENT_PAGE),
+          hasResearchTools: isOffered("extract_structured"),
+          hasListTabs: isOffered(LIST_TABS),
+          hasItemIteration: isOffered("propose_item_iteration"),
+          hasDatabaseTools: isOffered("describe_database"),
+          toolMenu: toolMenu ?? undefined,
           viewedContentHint,
           // Runtime identity (v3.1): what this turn is ACTUALLY served by,
           // from live routing — so the model self-identifies from ground
@@ -2520,7 +3136,7 @@ export async function POST(request: Request) {
             renderPhaseCheckpointGateInstruction(phaseCheckpointGate),
           pageContextSection,
           currentPageHint,
-        }),
+        })),
         onStepFinish: (step) => {
           // Tokens-per-phase accumulator (v3.1 R5) — cheap, never throws.
           const stepUsage = (
@@ -2537,6 +3153,10 @@ export async function POST(request: Request) {
           runTokenCounter.input += stepUsage?.inputTokens ?? 0;
           runTokenCounter.output += stepUsage?.outputTokens ?? 0;
           runTokenCounter.cachedInput += stepUsage?.cachedInputTokens ?? 0;
+          if ((stepUsage?.inputTokens ?? 0) > runTokenCounter.maxStepInput) {
+            runTokenCounter.maxStepInput = stepUsage?.inputTokens ?? 0;
+            runTokenCounter.maxStepCachedInput = stepUsage?.cachedInputTokens ?? 0;
+          }
           const cacheCreation = (
             step as {
               providerMetadata?: {
@@ -2557,6 +3177,18 @@ export async function POST(request: Request) {
                   : null,
               tools: (step.toolCalls ?? []).map((call) => call.toolName),
               outputTokens: stepUsage?.outputTokens ?? null,
+              // Per-step context (not the segment sum) — the number the
+              // chat meter's step chain shows. See TurnStepSummary.
+              inputTokens: stepUsage?.inputTokens ?? null,
+              cachedInputTokens: stepUsage?.cachedInputTokens ?? null,
+              // Provider-run calls (native search) are billed per call and
+              // share `search_web` with the app-run backend (§10 L4a).
+              ...(() => {
+                const providerTools = (step.toolCalls ?? [])
+                  .filter((call) => (call as { providerExecuted?: boolean }).providerExecuted === true)
+                  .map((call) => call.toolName);
+                return providerTools.length > 0 ? { providerTools } : {};
+              })(),
             });
           } else {
             stepsTracker.truncated += 1;

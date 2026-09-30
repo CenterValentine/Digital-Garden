@@ -58,6 +58,7 @@ import {
   type NewContentMenuItem,
   type PageTemplateMenuData,
 } from "@/components/content/menu-items/new-content-menu";
+import { getExtensionCreateMenuItems } from "@/lib/extensions/client-registry";
 import { supportsCustomIcon } from "@/lib/domain/content/file-extension-utils";
 import {
   BOTTOM_LEFT_PANE_ID,
@@ -323,7 +324,8 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
     const newMenuItems = getNewContentMenuItems(
       callbacks,
       targetId,
-      pageTemplateData
+      pageTemplateData,
+      getExtensionCreateMenuItems()
     );
 
     sections.push({

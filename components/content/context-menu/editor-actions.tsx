@@ -662,6 +662,7 @@ export const editorActionProvider: ContextMenuActionProvider = (ctx) => {
     const targetTitle = wikiLinkEl.getAttribute("data-target-title");
     const targetId = wikiLinkEl.getAttribute("data-target-id");
     const headingSlug = wikiLinkEl.getAttribute("data-heading-slug");
+    const anchor = wikiLinkEl.getAttribute("data-anchor");
     // Default is EXPAND, so only an explicit "false" opts out.
     const isExpanded = wikiLinkEl.getAttribute("data-expand") !== "false";
 
@@ -699,7 +700,7 @@ export const editorActionProvider: ContextMenuActionProvider = (ctx) => {
             label: "Open",
             onClick: () => {
               window.dispatchEvent(
-                new CustomEvent("open-wiki-link", { detail: { targetId, targetTitle } })
+                new CustomEvent("open-wiki-link", { detail: { targetId, targetTitle, anchor } })
               );
             },
           },
@@ -859,6 +860,12 @@ export const editorActionProvider: ContextMenuActionProvider = (ctx) => {
         return;
       }
       if (!text) return;
+      // Inside a code block the clipboard is code, not markdown: insert it
+      // literally (a code block cannot hold the block nodes parsing yields).
+      if (editor.state.selection.$from.parent.type.spec.code) {
+        editor.view.dispatch(editor.state.tr.insertText(text.replace(/\r\n?/g, "\n")));
+        return;
+      }
       const parsed = markdownPasteToTiptap(text).content ?? [];
       if (parsed.length === 0) return;
       editor.chain().focus().insertContent(parsed).run();

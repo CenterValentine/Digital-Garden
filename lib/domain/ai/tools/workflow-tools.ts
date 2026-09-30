@@ -370,7 +370,7 @@ export function createWorkflowTools(ctx: ToolExecuteContext) {
     propose_workflow: tool({
       // Creating an automation is a mutating action with ongoing behavior
       // (its trigger may fire on future page captures) — approval-gated
-      // like createNote/create_docx. The approval card shows the graph
+      // like create_note/create_docx. The approval card shows the graph
       // JSON; after approval the created workflow opens on the canvas for
       // real review (the S6 gate).
       needsApproval: true,
@@ -420,7 +420,7 @@ export function createWorkflowTools(ctx: ToolExecuteContext) {
           return formatGraphIssues(structural.issues);
         }
 
-        // Parent resolution mirrors createNote: explicit > target folder >
+        // Parent resolution mirrors create_note: explicit > target folder >
         // chat's own parent > vault root ("chats serve their location").
         let explicitParentId: string | null = null;
         if (parentId) {
@@ -499,7 +499,7 @@ export function createWorkflowTools(ctx: ToolExecuteContext) {
         }
 
         // __notePayload with noun renders the clickable open-on-canvas card
-        // (same affordance family as createNote).
+        // (same affordance family as create_note).
         return JSON.stringify({
           __notePayload: true,
           kind: "created",

@@ -74,11 +74,23 @@ export async function openWorkspaceTab(
   if (!content) return null;
 
   const { h, v } = normalizeAffinity(affinity);
-  return prisma.contentWorkspaceTab.upsert({
-    where: { workspaceId_contentId: { workspaceId, contentId } },
-    create: { workspaceId, contentId, affinityH: h, affinityV: v },
-    update: { affinityH: h, affinityV: v },
-  });
+  // Bump the workspace's updatedAt alongside the row: other surfaces holding
+  // this workspace open reconcile on it (poll or 409-adopt) and the tab
+  // appears there. Callers whose ACTIVE workspace is the target open the tab
+  // locally instead of calling this — their own next save carries
+  // baseUpdatedAt and would 409 on the bump (see moveWorkspaceTab).
+  const [tab] = await prisma.$transaction([
+    prisma.contentWorkspaceTab.upsert({
+      where: { workspaceId_contentId: { workspaceId, contentId } },
+      create: { workspaceId, contentId, affinityH: h, affinityV: v },
+      update: { affinityH: h, affinityV: v },
+    }),
+    prisma.contentWorkspace.update({
+      where: { id: workspaceId },
+      data: { updatedAt: new Date() },
+    }),
+  ]);
+  return tab;
 }
 
 /**
@@ -94,9 +106,75 @@ export async function closeWorkspaceTab(
   const workspace = await findOwnedActiveWorkspace(ownerId, workspaceId);
   if (!workspace) return null;
 
-  return prisma.contentWorkspaceTab.deleteMany({
+  const result = await prisma.contentWorkspaceTab.deleteMany({
     where: { workspaceId, contentId },
   });
+  // Same rule as open: a membership change other surfaces must see bumps
+  // the workspace revision. Callers on this workspace close locally instead
+  // (their snapshot save carries it), so the bump never 409s the caller.
+  if (result.count > 0) {
+    await prisma.contentWorkspace.update({
+      where: { id: workspaceId },
+      data: { updatedAt: new Date() },
+    });
+  }
+  return result;
+}
+
+/**
+ * Move event: relocate one open tab from `fromWorkspaceId` to `toWorkspaceId`
+ * in a single transaction — upsert into the target's membership set, delete
+ * from the source's. Either side may be a workbench (a workbench IS a
+ * ContentWorkspace row), so "move a tab into that folder's bench" needs no
+ * special case here.
+ *
+ * Only the TARGET's `updatedAt` is bumped. Another surface holding the target
+ * open reconciles on that bump (poll or 409-adopt) and the tab appears there.
+ * The source is the caller's own active workspace: its next state save carries
+ * `baseUpdatedAt`, so bumping it here would 409 the user's own write. The
+ * source row is still deleted server-side rather than left to the caller's
+ * snapshot reconcile, so the move is complete on every surface — including
+ * ones whose persist path is additive-only (extension iframes).
+ *
+ * Returns null when either workspace isn't the owner's active one or the
+ * content isn't the owner's live content.
+ */
+export async function moveWorkspaceTab(
+  ownerId: string,
+  toWorkspaceId: string,
+  contentId: string,
+  fromWorkspaceId: string,
+  affinity?: unknown,
+) {
+  if (toWorkspaceId === fromWorkspaceId) return null;
+  const [target, source, content] = await Promise.all([
+    findOwnedActiveWorkspace(ownerId, toWorkspaceId),
+    findOwnedActiveWorkspace(ownerId, fromWorkspaceId),
+    prisma.contentNode.findFirst({
+      where: { id: contentId, ownerId, deletedAt: null },
+      select: { id: true },
+    }),
+  ]);
+  if (!target || !source || !content) return null;
+
+  const { h, v } = normalizeAffinity(affinity);
+  const [tab] = await prisma.$transaction([
+    prisma.contentWorkspaceTab.upsert({
+      where: {
+        workspaceId_contentId: { workspaceId: toWorkspaceId, contentId },
+      },
+      create: { workspaceId: toWorkspaceId, contentId, affinityH: h, affinityV: v },
+      update: { affinityH: h, affinityV: v },
+    }),
+    prisma.contentWorkspaceTab.deleteMany({
+      where: { workspaceId: fromWorkspaceId, contentId },
+    }),
+    prisma.contentWorkspace.update({
+      where: { id: toWorkspaceId },
+      data: { updatedAt: new Date() },
+    }),
+  ]);
+  return tab;
 }
 
 export async function listWorkspaceTabs(ownerId: string, workspaceId: string) {

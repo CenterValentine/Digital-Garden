@@ -20,6 +20,9 @@
  *   5. Every AdapterKind has a resolveChatModelFromConnection branch
  *   6. Database column types agree (product list ↔ AI-proposable list ↔ the
  *      proposal tools ↔ the create routes)
+ *   7. Run-loop tool schemas describe shape; execute judges (no enum / min /
+ *      max / refinements in propose_item_iteration, record_*, or the quest
+ *      column tool — see iteration-proposal.ts for the rule)
  *
  * Design notes:
  * - Tool definitions are SOURCE-SCANNED, not instantiated: the factory import
@@ -63,6 +66,11 @@ import {
   OPEN_TAB_AND_READ_DESCRIPTION,
 } from "../lib/domain/ai/tools/open-tab-and-read";
 import { buildSystemPrompt } from "../lib/domain/ai/system-prompt";
+import {
+  CORE_TOOL_IDS,
+  MODE_TOOL_IDS,
+  TOOL_MENU,
+} from "../lib/domain/ai/tools/menu";
 
 import {
   AI_PROPOSABLE_COLUMN_TYPES,
@@ -278,7 +286,7 @@ function extractDescription(
 ): string | null {
   const window = source.slice(from, from + 6000);
   // Boundary excludes needsApproval: approval-gated tools declare it BEFORE
-  // their description (createNote, the workflow tools), and it must not
+  // their description (create_note, the workflow tools), and it must not
   // terminate the search early.
   const boundary = window.search(/\b(inputSchema|execute)\s*:/);
   const scope = boundary === -1 ? window : window.slice(0, boundary);
@@ -374,6 +382,47 @@ for (const name of realToolNames) {
     fail(
       "gate3",
       `tool "${name}" is unclassified — add settings metadata (user-configurable) or add it to HARNESS_INTERNAL_TOOL_IDS in lib/domain/ai/tools/metadata.ts`,
+    );
+  }
+}
+
+// Naming convention. The namespace was mixed until 2026-09-17 — four camelCase
+// ids among sixty-one snake_case ones — which cost models a hard
+// `NoSuchToolError` whenever they guessed the majority convention for a
+// minority name. Held here so the next id cannot reintroduce the split.
+const TOOL_ID_PATTERN = /^[a-z][a-z0-9]*(_[a-z0-9]+)*$/;
+for (const name of realToolNames) {
+  if (!TOOL_ID_PATTERN.test(name)) {
+    fail(
+      "gate3",
+      `tool id "${name}" is not snake_case — rename it to match ${TOOL_ID_PATTERN}. Minting rules are in lib/domain/ai/tools/metadata.ts; a rename also needs a LEGACY_TOOL_IDS entry in lib/domain/ai/tools/repair.ts, or old charters and transcripts break quietly.`,
+    );
+  }
+}
+
+// Summon menu coverage. Only core and active-mode tools are advertised in
+// full; every other tool is reachable ONLY through its menu line, so a tool
+// with no entry is a tool the model can never discover — invisible rather than
+// merely unadvertised. The inverse (an entry with no tool) offers the model
+// something that cannot be summoned.
+for (const name of realToolNames) {
+  if (!TOOL_MENU[name]) {
+    fail(
+      "gate3",
+      `tool "${name}" has no TOOL_MENU entry in lib/domain/ai/tools/menu.ts — unadvertised tools are discoverable only through the menu, so this one can never be found`,
+    );
+  }
+}
+for (const id of Object.keys(TOOL_MENU)) {
+  if (!realToolNames.has(id)) {
+    fail("gate3", `TOOL_MENU lists "${id}" but no such tool exists — stale menu entry`);
+  }
+}
+for (const id of [...CORE_TOOL_IDS, ...Object.values(MODE_TOOL_IDS).flat()]) {
+  if (!realToolNames.has(id)) {
+    fail(
+      "gate3",
+      `"${id}" is named in CORE_TOOL_IDS/MODE_TOOL_IDS but no such tool exists — it would be advertised as nothing`,
     );
   }
 }
@@ -596,6 +645,111 @@ const IMPLEMENTED_NOT_PROPOSABLE = new Set(["person"]);
       "gate6",
       `only ${proposedColumnUses} references to \`proposedColumn\` in data-tools.ts — every propose_* tool that takes columns must use the shared schema`,
     );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Gate 7 — run-loop tool schemas describe shape; execute judges
+// ─────────────────────────────────────────────────────────────────────────
+//
+// THE RULE (stated in full in lib/domain/ai/tools/iteration-proposal.ts and
+// AI-ARCHITECTURE.md §5): the AI SDK validates a tool's Zod schema BEFORE
+// execute, and a miss there is fatal to the call — a raw issue list, no
+// teaching, the enumeration it carried gone. So the run-loop tools keep
+// refinements OUT of the schema: no `.enum()`, `.min()`, `.max()`, `.int()`,
+// `.regex()`, `.refine()`, `.length()`. Vocabularies resolve, bounds clamp
+// and nested shapes normalize in execute, which answers a genuine miss with a
+// RESULT the model fixes in one step.
+//
+// Prod fa475acc (2026-09-21): four propose_item_iteration calls in a row died
+// at the schema on four different shape misses — half a turn's step budget —
+// while every payload named the right database, items and columns. This gate
+// makes the next `.max(20)` a build failure instead of a stranded run.
+
+const RUN_LOOP_TOOLS = [
+  "propose_item_iteration",
+  "record_item_result",
+  "record_batch_checkpoint",
+  "record_iteration_findings",
+  "add_quest_ledger_column",
+  // The deliverable a fulfilment run ends with: a schema miss here loses the
+  // artifact on the turn's last step (prod f51fa2d8, 2026-09-29 — a finished
+  // resume sent as `content` instead of `markdown`). write-args.ts judges.
+  "create_docx",
+];
+const SCHEMA_REFINEMENT_RE = /\.(enum|min|max|int|regex|refine|superRefine|length|email|url|uuid|nonempty)\(/g;
+
+/**
+ * Code only: the schema comments legitimately SAY `.max()` when explaining
+ * why it is gone ("No `.max()` on the prose fields…"), and the rule comment
+ * above the proposal names every refinement it forbids. Strip `//` lines and
+ * block comments before scanning so prose about the rule cannot trip it.
+ */
+function withoutComments(source: string): string {
+  return source
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/^[ \t]*\/\/.*$/gm, "");
+}
+
+{
+  const registrySource = withoutComments(read("lib/domain/ai/tools/registry.ts"));
+  for (const name of RUN_LOOP_TOOLS) {
+    const start = registrySource.indexOf(`${name}: tool({`);
+    if (start < 0) {
+      fail("gate7", `${name} is missing from lib/domain/ai/tools/registry.ts — the run-loop tool list in this gate is stale`);
+      continue;
+    }
+    const executeAt = registrySource.indexOf("execute:", start);
+    if (executeAt < 0) {
+      fail("gate7", `${name} has no execute after its definition — cannot bound its schema block`);
+      continue;
+    }
+    const schemaBlock = registrySource.slice(start, executeAt);
+    for (const m of schemaBlock.matchAll(SCHEMA_REFINEMENT_RE)) {
+      fail(
+        "gate7",
+        `${name} carries \`.${m[1]}(\` in its input schema — run-loop schemas describe shape; resolve or clamp this in execute and answer a miss with a teaching result (see iteration-proposal.ts)`,
+      );
+    }
+    // Nested objects are the other half of the rule ("required keys inside
+    // a nested object"). Prod 23fd28d6 (2026-09-27): record_item_result's
+    // `capture: z.object({ cells: z.record() })` rejected a flat
+    // `{ Column: value }` map at the schema — nine correct cells lost to a
+    // nesting level — and this gate did not see it because it scanned for
+    // refinements only. One `.object(` per run-loop schema: the top level.
+    // Anything the model may nest is a `z.record(...)` normalized in execute.
+    const nestedObjects = [...schemaBlock.matchAll(/\.object\(/g)].length - 1;
+    if (nestedObjects > 0) {
+      fail(
+        "gate7",
+        `${name} nests ${nestedObjects} z.object(...) inside its input schema — a nested object's keys are required at the schema layer; make it z.record(z.string(), z.unknown()) and normalize the shape in execute (see normalizeCaptureArg in iteration-proposal.ts)`,
+      );
+    }
+  }
+  // The proposal's contract lives in the pure module so the check script can
+  // load it; the registry must use that one, and it must obey the same rule.
+  const proposalBlock = (() => {
+    const start = registrySource.indexOf("propose_item_iteration: tool({");
+    return start < 0 ? "" : registrySource.slice(start, registrySource.indexOf("execute:", start));
+  })();
+  if (!proposalBlock.includes("inputSchema: ITERATION_PROPOSAL_INPUT")) {
+    fail(
+      "gate7",
+      "propose_item_iteration must take its inputSchema from ITERATION_PROPOSAL_INPUT (lib/domain/ai/tools/iteration-proposal.ts) — the schema the proposal:shape:check fixtures run against",
+    );
+  }
+  const proposalSource = withoutComments(read("lib/domain/ai/tools/iteration-proposal.ts"));
+  const schemaStart = proposalSource.indexOf("const proposalItem");
+  const schemaEnd = proposalSource.indexOf("export type IterationProposalInput");
+  if (schemaStart < 0 || schemaEnd < 0) {
+    fail("gate7", "iteration-proposal.ts anchors (`const proposalItem` … `export type IterationProposalInput`) not found — update this gate with the schema's new bounds");
+  } else {
+    for (const m of proposalSource.slice(schemaStart, schemaEnd).matchAll(SCHEMA_REFINEMENT_RE)) {
+      fail(
+        "gate7",
+        `iteration-proposal.ts schema carries \`.${m[1]}(\` — the rule at the top of that file forbids it; move the judgement into a resolver`,
+      );
+    }
   }
 }
 

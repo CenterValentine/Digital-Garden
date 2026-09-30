@@ -1,5 +1,6 @@
 "use client";
 
+import type { LinkAnchorLister } from "@/lib/domain/content/link-anchor";
 import { createElement, useMemo } from "react";
 import type { ComponentType, ReactNode } from "react";
 import type { Extensions } from "@tiptap/core";
@@ -12,9 +13,12 @@ import {
   type ExtensionSettingsEntry,
 } from "@/lib/extensions";
 import { useExtensionActivationStore } from "@/state/extension-activation-store";
+import { useContentSidebarClaims } from "./content-sidebar";
 import type {
   ExtensionActionNavItem,
+  ExtensionContentSidebarPanel,
   ExtensionContentViewerMatch,
+  ExtensionCreateMenuItem,
   ExtensionContentViewerProps,
   ExtensionNavItem,
   ExtensionHeaderNavActionProps,
@@ -171,6 +175,60 @@ export function useExtensionContentViewer(
       )?.contentViewer,
     [input, runtimes]
   );
+}
+
+/**
+ * "+" menu contributions from enabled extensions. Non-hook (reads the
+ * activation store snapshot) so the plain menu builders can call it.
+ */
+export function getExtensionCreateMenuItems(): ExtensionCreateMenuItem[] {
+  return getClientEnabledExtensionRuntimes().flatMap((runtime) => {
+    const items = runtime.createMenuItems;
+    return typeof items === "function" ? items() : items ?? [];
+  });
+}
+
+/**
+ * The link menu's anchor lister: asks every enabled extension that lists
+ * anchors (lib/domain/content/link-anchor.ts), first answer wins.
+ */
+export const listExtensionLinkAnchors: LinkAnchorLister = async (target, query) => {
+  for (const runtime of getClientEnabledExtensionRuntimes()) {
+    const items = await runtime.linkAnchors?.(target, query);
+    if (items) return items;
+  }
+  return null;
+};
+
+/**
+ * Resolve a synthetic content id (e.g. `reader:library`) to the content type
+ * its owning enabled extension declared. Null for ordinary ContentNode ids.
+ */
+export function resolveExtensionVirtualContentType(
+  contentId: string
+): string | null {
+  for (const runtime of getClientEnabledExtensionRuntimes()) {
+    const match = runtime.virtualContent?.find((entry) =>
+      contentId.startsWith(entry.prefix)
+    );
+    if (match) return match.contentType;
+  }
+  return null;
+}
+
+/**
+ * The content-driven sidebar panel claimed for `contentId` (see
+ * lib/extensions/content-sidebar.ts), when its extension is enabled.
+ */
+export function useClaimedContentSidebarPanel(
+  contentId: string | null
+): ExtensionContentSidebarPanel | null {
+  const extensionId = useContentSidebarClaims((state) =>
+    contentId ? state.claims[contentId] ?? null : null
+  );
+  const runtimes = useEnabledExtensionRuntimes();
+  if (!extensionId) return null;
+  return runtimes.find((runtime) => runtime.id === extensionId)?.contentSidebarPanel ?? null;
 }
 
 export function useExtensionRightSidebarPanel(

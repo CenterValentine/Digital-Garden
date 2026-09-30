@@ -17,7 +17,10 @@ import { PropertiesPanel } from "../blocks/PropertiesPanel";
 import { useOutlineStore } from "@/state/outline-store";
 import { useContentStore } from "@/state/content-store";
 import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
-import { useExtensionRightSidebarPanel } from "@/lib/extensions/client-registry";
+import {
+  useClaimedContentSidebarPanel,
+  useExtensionRightSidebarPanel,
+} from "@/lib/extensions/client-registry";
 import { PublishTab } from "@/extensions/publishing/components/sidebar/PublishTab";
 import { StudioTab } from "@/extensions/studio/components/StudioTab";
 import { ContextTab } from "@/components/content/ai-context/ContextTab";
@@ -42,6 +45,7 @@ export function RightSidebarContent({ activeTab }: RightSidebarContentProps) {
   const selectedContentType = useContentStore((s) => s.selectedContentType);
   const activeView = useLeftPanelViewStore((state) => state.activeView);
   const ExtensionRightSidebarPanel = useExtensionRightSidebarPanel(activeView);
+  const claimedPanel = useClaimedContentSidebarPanel(selectedContentId);
 
   // Handle outline heading click — dispatches a CustomEvent that MarkdownEditor listens for
   const handleHeadingClick = (heading: OutlineHeading) => {
@@ -64,6 +68,14 @@ export function RightSidebarContent({ activeTab }: RightSidebarContentProps) {
   };
 
   const isChat = selectedContentType === "chat";
+
+  if (activeTab === "extension" && claimedPanel && selectedContentId) {
+    return (
+      <div className="flex-1 overflow-hidden">
+        {createElement(claimedPanel.component, { contentId: selectedContentId })}
+      </div>
+    );
+  }
 
   if (activeTab === "extension" && ExtensionRightSidebarPanel) {
     return (

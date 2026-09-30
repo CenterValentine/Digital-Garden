@@ -40,7 +40,7 @@ What each provider and model actually gets at runtime — derived from the code 
 | `gpt-4o` | 128,000 | 16,384 | text, vision, tools, streaming | medium | — | user setting | yes |
 | `gpt-4o-mini` | 128,000 | 16,384 | text, vision, tools, streaming | low | — | user setting | yes |
 | `gpt-4` | 8,192 | 8,192 | text, tools, streaming | high | — | user setting | — |
-| `o3-mini` | 200,000 | 100,000 | text, tools, streaming | medium | auto | fixed at 1 | yes |
+| `o3-mini` | 200,000 | 100,000 | text, tools, streaming | medium | auto | not sent (rejected by model) | yes |
 
 ### Google (`google`)
 

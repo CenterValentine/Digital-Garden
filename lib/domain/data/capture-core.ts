@@ -78,6 +78,25 @@ export function translateOptionValue(
 export function normalizeCellInput(column: DataColumn, raw: unknown): unknown {
   let value = raw;
   if (typeof value === "string") value = value.trim();
+  // One value for a LIST column is unambiguous (ITERATION-RUN-HARNESS-FIXES
+  // P5, prod 2026-09-27: `Resumes: "<docx id>"` on a file column died as
+  // "Expected a list" and cost a step). Ids may arrive as a comma/space
+  // list; an option label wraps as-is (translateOptionValue maps it).
+  if (
+    (column.type === "file" || column.type === "contentLink") &&
+    typeof value === "string" &&
+    value !== ""
+  ) {
+    value = value.split(/[\s,]+/).filter((s) => s.length > 0);
+  }
+  if (
+    column.type === "multiSelect" &&
+    typeof value === "string" &&
+    value !== "" &&
+    !column.config.splitOn
+  ) {
+    value = [value];
+  }
   if (column.type === "number" && typeof value === "string" && value !== "") {
     const n = Number(value);
     if (Number.isFinite(n)) value = n;
@@ -126,11 +145,64 @@ export interface CaptureConfig {
   dedupeColumnKey?: string;
   dedupeColumnName?: string;
   /**
+   * Capture columns written by MERGE (cell-merge.ts) rather than replace —
+   * alias/keyword columns that accumulate across runs. Names, as the model
+   * speaks them; resolved against `columns` at write time.
+   */
+  mergeColumns?: string[];
+  /**
    * P3 `source: "database-rows"`: item keys ARE row ids of this table —
    * capture writes stamp back to the row by id (update-only, never create)
    * instead of upserting by the dedupe identity.
    */
   rowKeyed?: boolean;
+  /**
+   * ISO stamp of the proposal approval (ITERATION-RUN-HARNESS-FIXES P3).
+   * A capture onto a row that was already written AFTER this moment keeps
+   * every non-empty cell — the fuller first write (update_row, or the user
+   * in the grid) is never clobbered by the item's closing record. Prod
+   * 2026-09-27: update_row wrote nine cells, then record_item_result's
+   * capture.cells rewrote eight of them shorter, and the short ones won.
+   */
+  approvedAt?: string;
+}
+
+/**
+ * Split a capture's prepared writes into the ones that land and the ones
+ * KEPT because the row was already written this sitting (P3). Pure, so the
+ * gate can pin it: `keepFilledSince` undefined, or the row untouched since
+ * then → everything lands; otherwise a write onto a NON-EMPTY current cell
+ * is kept (its column key is reported) and only empty cells are filled.
+ */
+export function partitionCaptureWrites(input: {
+  writes: Array<{ columnKey: string; value: unknown }>;
+  current: Record<string, unknown>;
+  rowUpdatedAt: Date | string | null | undefined;
+  keepFilledSince: Date | string | null | undefined;
+}): { writes: Array<{ columnKey: string; value: unknown }>; kept: string[] } {
+  const since = input.keepFilledSince ? new Date(input.keepFilledSince) : null;
+  const updated = input.rowUpdatedAt ? new Date(input.rowUpdatedAt) : null;
+  if (
+    !since ||
+    !updated ||
+    Number.isNaN(since.getTime()) ||
+    Number.isNaN(updated.getTime()) ||
+    updated.getTime() < since.getTime()
+  ) {
+    return { writes: input.writes, kept: [] };
+  }
+  const isFilled = (v: unknown): boolean =>
+    v !== undefined &&
+    v !== null &&
+    v !== "" &&
+    !(Array.isArray(v) && v.length === 0);
+  const writes: Array<{ columnKey: string; value: unknown }> = [];
+  const kept: string[] = [];
+  for (const w of input.writes) {
+    if (isFilled(input.current[w.columnKey])) kept.push(w.columnKey);
+    else writes.push(w);
+  }
+  return { writes, kept };
 }
 
 export function parseCaptureConfig(value: unknown): CaptureConfig | null {

@@ -17,7 +17,11 @@ import { queryTools } from "@/lib/domain/tools";
 import type { ContentType } from "@/lib/domain/tools";
 import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
 import { getExtensionManifestForView } from "@/lib/extensions";
-import { useIsExtensionEnabled } from "@/lib/extensions/client-registry";
+import {
+  resolveExtensionVirtualContentType,
+  useClaimedContentSidebarPanel,
+  useIsExtensionEnabled,
+} from "@/lib/extensions/client-registry";
 import {
   STUDIO_EXTENSION_ID,
   STUDIO_TAB_KEY,
@@ -73,8 +77,19 @@ export function RightSidebar({
   const setActiveTab = useRightSidebarStateStore((state) => state.setActiveTab);
 
   const studioEnabled = useIsExtensionEnabled(STUDIO_EXTENSION_ID);
+  // An extension viewer (e.g. the reader) can claim the sidebar for the
+  // content it renders; its panel then leads the rail as the "extension" tab.
+  const claimedPanel = useClaimedContentSidebarPanel(selectedContentId);
+  // Synthetic extension content (reader:library) is not a ContentNode: the
+  // generic tabs (context, tags, chat…) would query ids that don't exist.
+  const isVirtualContent = Boolean(
+    selectedContentId && resolveExtensionVirtualContentType(selectedContentId)
+  );
 
   const availableTabs = useMemo(() => {
+    if (isVirtualContent) {
+      return (claimedPanel ? ["extension"] : []) as RightSidebarTab[];
+    }
     const tabs = queryTools({
       surface: "sidebar-tab",
       contentType: (selectedContentType as ContentType) ?? undefined,
@@ -91,9 +106,12 @@ export function RightSidebar({
     if (selectedBlockId && !tabs.includes("properties")) {
       tabs.push("properties");
     }
+    if (claimedPanel && !tabs.includes("extension")) {
+      tabs.unshift("extension");
+    }
 
     return tabs;
-  }, [selectedContentType, selectedBlockId, studioEnabled, excludeTabs]);
+  }, [selectedContentType, selectedBlockId, studioEnabled, excludeTabs, claimedPanel, isVirtualContent]);
 
   // The saved tab is sacred: it ONLY changes via an explicit user action
   // (handleTabChange). Selecting a block shows the Properties panel as a LIVE,
@@ -108,14 +126,16 @@ export function RightSidebar({
     ) {
       return "properties";
     }
-    if (!savedTab && extensionManifest?.surfaces.includes("right-sidebar")) {
+    if (!savedTab && (claimedPanel || extensionManifest?.surfaces.includes("right-sidebar"))) {
       return resolveRightSidebarTab("extension", availableTabs);
     }
     return resolveRightSidebarTab(savedTab, availableTabs);
-  }, [availableTabs, dismissedBlockId, extensionManifest, savedTab, selectedBlockId]);
+  }, [availableTabs, claimedPanel, dismissedBlockId, extensionManifest, savedTab, selectedBlockId]);
 
   const handleTabChange = (tab: RightSidebarTab) => {
-    if (tab === "extension") return;
+    // The view-driven extension tab isn't a per-content choice; a claimed
+    // content panel is, so it persists like any other tab.
+    if (tab === "extension" && !claimedPanel) return;
     if (!selectedContentId) return;
     // If the user picks a tab while a block is selected, their choice wins over
     // the live Properties override (until they select a different block).
@@ -129,6 +149,7 @@ export function RightSidebar({
           so the user never clicks a tab that resolves to the wrong view. */}
       <RightSidebarHeader
         activeTab={activeTab}
+        availableTabs={availableTabs}
         onTabChange={handleTabChange}
         disabled={!rightPanelReady}
         disabledTabs={disabledTabs}

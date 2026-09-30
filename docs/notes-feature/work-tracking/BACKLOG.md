@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-09-12
+last_updated: 2026-09-29
 ---
 
 # Sprint Backlog
@@ -9,6 +9,99 @@ last_updated: 2026-09-12
 **Sprint Execution Protocol**: Before commencing any sprint, always ask the user for input before planning and executing — there may be additions or modifications.
 
 ---
+
+## E-reader — proposed (2026-09-29, plan `EREADER-PLAN.md`)
+
++ → Reader → [Scriptures, Books]. One reader shell (foliate-js for EPUB/PDF, a corpus renderer for scriptures), one annotation store keyed by Readium Locators, and a library of book-source adapters (OPDS, Gutendex, Open Library, upload). Books are file nodes in a user-chosen library folder. Blocked on owner answers to the plan's §10.
+
+- [x] **R0 Read an uploaded book** (built 2026-09-29; migration staged) — `createMenuItems` extension field, `extensions/reader/`, EPUB MIME + DRM gate, foliate-js viewer, `ReadingProgress`.
+- [x] **R1 Mark it up** (built 2026-09-29) — `ReaderAnnotation`, selection toolbar, in-reader annotations panel, send to note. *Still open:* `readerLink` TipTap node, right-sidebar tab.
+- [x] **R2 Library** (built 2026-09-29; + Wikisource, OAPEN, Google Books, Standard Ebooks preset) — OPDS / Gutendex / Open Library adapters, library dialog, acquire into folder, `BookMeta` + covers.
+- [ ] **R3 Scriptures in the reader** — scriptures plan P0/P1 feed a corpus source sharing the annotation store.
+- [ ] **R4 Bring in the rest** — ~~Kindle clippings + Readwise, Hardcover, Libby link~~ (built 2026-09-29); highlights → database, flashcards, AI tools, speed-reader EPUB, PDF in reader.
+- [ ] **Research (reader stub)** — third reader source after Scriptures: open-access papers (arXiv, PubMed Central, OpenAlex/Unpaywall, Semantic Scholar) through the same shell + annotation store.
+- [ ] **CSP for /content** — foliate-js wants a script-blocking CSP; the reader sanitizer is the interim defence.
+
+## Scriptures integration — parked (reader moved to `EREADER-PLAN.md`) (2026-09-28, plan `SCRIPTURES-INTEGRATION-PLAN.md`)
+
+LDS standard works as a shared read-only corpus (seeded from the public-domain `bcbooks/scriptures-json` at a pinned SHA), with study living in the user's own notes. Blocked on owner answers to the plan's §9 open questions (shared corpus tables; talk-clipping vs site terms).
+
+- [ ] **P0 Corpus** — shared `Scripture*` tables + migration, pinned seed script cross-checked against `beandog/lds-scriptures`, read API.
+- [ ] **P1 Read & cite** — `extensions/scriptures/`, reference parser (evaluate `scripture-guide` first), `scriptureRef` inline node, reader viewer, `ScriptureCitation` index.
+- [ ] **P2 Study** — `scriptureQuote` block, "Add study note" into a user-chosen folder (lazy), Citations sidebar tab, scripture search scope.
+- [ ] **P3 Mark & memorize** — offset-anchored highlights (`ScriptureAnnotation`), flashcard "Memorize".
+- [ ] **P4 Talks & AI** — user-initiated talk clipping (never bundled), footnote → citation parsing, Talks database, AI `read_scripture` grounding tools.
+
+## Iteration run harness — follow-ups (2026-09-27, from `feat/charter-run-harness`; plan `ITERATION-RUN-HARNESS-FIXES-PLAN.md`)
+
+- [ ] **Clean the *Apply for a job* charter note in production.** It holds four identical copies of its content (66 KB TipTap, last modified 2026-09-27 22:19 UTC, after the evaluated run). The parser now collapses the copies and the charter context says so, but the note itself still costs four copies to load in the editor and to sync. Hand-fix: delete three copies in the editor.
+- [ ] **Charter-named databases and private content.** `charterReferencedTableIds` reads the charter's wiki-links without running `stripPrivateContent`; a link inside a commented-out run still grants reach. Reach is not disclosure, so this was left as-is — revisit if the private-content seam list wants jurisdiction on it.
+- [ ] **Status-column regressions during a rows pass.** The evaluated run moved a Qualified opportunity back to Research Queue on its own judgment. Deliberately not guarded in the harness (D6) — the charter's wording owns pipeline state. If it recurs, the cheapest guard is a capture rule "a status column only moves forward within its group order unless the charter says otherwise".
+- [ ] **`durationMs` on turn metadata is server time only.** It sums per-request server durations and excludes client-executed tools (browser reads, `create_docx`); a five-minute turn reports ~72 s. Not wrong, but unlabelled — rename or add `wallClockMs` from the first request's `startedAt` to the last request's finish.
+- [ ] **Extension-side chrome detection.** `looksLikeNavigationChrome` runs server-side (P1/P2 material) and on the session-tab result; the extension's own reader could apply it before hydration settles and retry once with a longer settle when the body is chrome.
+- [ ] **Run cost levers (plan §10) — remaining.**
+  - L1, L2, L3a and L4a are built (#270; `feat/one-prompt-per-turn`). L3b was superseded by L2.
+  - Open decision **D8 (revised):** should charter turns on OpenAI use the app-run search backend instead of native search, so search is refusable, repeat-guarded and budgetable, at the cost of OpenAI's integrated citations?
+  - **Model watch:** a weekly routine reporting gaps between new model releases and our catalog, pricing, constraints, adapter and gateway rows to a GitHub Issue. Waits on the owner: provider keys as repo secrets, and Issue versus Wiki.
+  - **Cost forecast:** a per-task token and cost estimate before a run or charter turn, with actual next to forecast afterwards.
+
+## Move tab to workplace / workbench — follow-ups (2026-09-21, from `feat/move-tab-to-workspace`)
+
+- [ ] **`service.ts` is unreachable from `tsx` scripts.** The workplaces service imports `generateSlug` from the content barrel, which loads the TipTap server extensions, and `@tiptap/extension-code-block-lowlight`'s CJS build fails default-export interop against the nested code-block package under plain Node. `workspace-tab-move-smoke.ts` therefore covers `membership.ts` only; the `getWorkspace` tabs include + `contentMeta` naming of membership-only ids is typecheck- and browser-covered. Either import `generateSlug` from its own module in `service.ts` or give the barrel a Prisma-free, editor-free slug entry point.
+- [ ] **Move into a deeper-layer workbench folder before it exists.** The tab menu fetches each view workplace's root-layer folder list; folders at nesting depth 2–3 are destinations only once materialized (they then come from the store). The selector's scoped-tree fetch (`/api/content/content/tree?viewRootContentId=`) answers every layer in one call if deeper unmaterialized moves are wanted.
+- [ ] **Multi-tab move.** The menu moves the right-clicked tab only. A "Move N selected tabs" needs a tab-strip multi-selection that does not exist yet.
+- [ ] **Drop panel on the side-panel embed.** `PanelShellClient` mounts `WorkspaceSelector` directly, not through `WorkplacesShellNavigationControls`, so the drag-to-move panel does not exist there. Wrap that mount in `WorkspaceTabDropTarget` if the panel's narrow tab strip wants it.
+- [ ] **Undo after moving on to a third workplace.** Undoing a hold-drop (which switched to the target) after the user has since switched to a THIRD workplace moves membership back but cannot rewrite the target's `paneState` blob, which still lists the tab until that workplace next saves; on its next open the blob ∪ membership union resurrects the tab there. Rare inside a 10 s window; a fix needs a server-side blob scrub on `/tabs/move` (like `removeContentFromWorkspaces` does on delete).
+- [ ] **Touch has no HTML5 drag.** The drop panel is desktop-only by construction; on touch the context menu's "Move tab to" remains the path. A long-press → sheet variant would need the pointer-event hold pattern from the clear-tabs control.
+- [ ] **Extension side-panel closes never reach membership (pre-existing).** `closeWorkspaceTab` (`DELETE /tabs`) has no client caller and ext:* surfaces persist additively, so a close in the panel never removes the R1 row. Not introduced here — the move deletes its source row server-side precisely so it is complete on those surfaces — but traced while wiring this.
+
+## Proposal shape leniency — follow-ups (2026-09-21, from `feat/proposal-shape-leniency`)
+
+- [ ] **Stitch hrefs onto label-only items.** When a proposal's items are bare strings (no url) and the turn's last `co_browse_act collect` returned cards with hrefs, the harness could attach each matching card's href at proposal time — url-tier keys instead of label-tier, dedupe against the capture table possible. The model had the hrefs in prod `fa475acc` and sent strings anyway.
+- [ ] **Extend the describe-only rule beyond the run loop.** Gate 7 covers the five run-loop tools. `propose_database_columns` / `propose_linked_databases` / the flashcard proposal tools still carry schema refinements; each should get the same treatment (resolvers + teaching refusals) and join the gate's list.
+- [ ] **Step-chain fold attribution.** The chain shows `−N` where context shrank; naming *which* transform folded it (turn / distillation / dedupe / write input) needs the route to stamp per-step fold stats into the segment.
+
+## Context economics — follow-ups (2026-09-18, from `feat/context-economics`)
+
+PR A of `AI-CONTEXT-ECONOMICS-PLAN.md` shipped the fold-on-distillation/turn and the tool-part dedupe. Left deliberately:
+
+- [x] **PR B — pay for a page once, at the source.** Shipped 2026-09-18 on `feat/payload-economics` (stacked on PR A): `supersedeWriteInputs` (addresses kept, payload dropped, failed writes exempt; `propose_item_iteration` only after findings) and `coBrowsePageIdentity` (keyframe on origin+path, not the full URL). Plan §2.
+- [ ] **Write-tool bubbles could show an "input folded" badge.** Deliberately not built in PR B — the bubble's default view already leads with the receipt the model keeps (plan §2 B1) — but a badge would make the fold *visible* the way the perception chips are.
+- [ ] **Continuations after a reload persist as new rows.** `use-conversation-binding.ts` keys its PATCH-vs-POST decision on refs that a reload resets, so a turn continued after Stop + refresh lands as one row per continuation, each carrying the whole prefix (the evidence thread stored 144 kB of unique parts as 577 kB) and the turn's full `usage` — the session cost estimate counts such a turn once per row. Fix at write time in `appendMessage` (update the latest assistant row when the incoming parts share its leading `toolCallId` sequence), or carry the row's uuid into the continuation so the route's `isUuid` branch extends it; the latter touches the approval-resume path and needs a prod resume smoke. Plan §3.
+- [ ] **Compaction / summarisation as the fallback layer** under the folds — sized only after PR B, against a clean transcript.
+- [ ] **`scripts/pg-read.sh` dies silently when `DATABASE_URL_READONLY` is absent** — `set -e` kills it on the failing `grep` before its own "not set" message prints, and it resolves `.env.local` relative to the script's checkout, so a worktree copy of the script needs the worktree's `.env.local` to carry the variable (this worktree's is commented out). Print the message before the grep can fail.
+
+## Tool summoner — follow-ups (2026-09-17, from `feat/ai-tool-summoner`)
+
+The branch shipped P0-P4 of `AI-TOOL-SUMMONER-PLAN.md`. These were specified in it and deliberately not built.
+
+- [x] **Measurement harness** — `pnpm tools:prefix:measure`, reading a development-only `GET /api/dev/tool-prefix`. Shipped 2026-09-17. Stubbing the heavy modules was tried and rejected: `insert_block`'s description is generated from the block registry, populated by `registerBlock()` at import time of each TipTap block extension, so a stubbed run measures the largest tool as a fraction of itself. Breaking the require-cycles so plain `tsx` can load the graph remains open, and would also unblock unit tests over tool definitions.
+- [ ] **`repaired` badge on the collapsed tool chip** when `record_item_result` inferred a status. The `statusNote` is already in the tool result (visible on expand); the badge is disclosure at a glance, per "a silently applied correction reads as a bug".
+- [ ] **Predictive activation named in the run ledger** phase line, so the user can see *why* a tool was available without a summon chip.
+- [ ] **Advertised-tool tokens in the turn accumulator**, so the prefix cost is reported per turn rather than inferred.
+- [ ] *Known ceiling, may be unfixable:* a **name repair cannot surface in the UI**. `repairToolCall` rewrites the call before a tool part exists, so there is no stream hook — the chip shows the corrected name with no trace of the correction. Server-side `tools:name_repaired` logging may be the honest limit.
+- [ ] **Watch for off-task tool calls.** Tool absence used to keep a run focused; a menu gives that up. Mitigated by leading with the active mode's families, but this is the one place the change could plausibly regress behaviour.
+
+## `pg` pool silently falls back to production Neon (2026-09-17)
+
+Found while debugging a local dev failure, unrelated to the branch it surfaced on. `.env.local` carries the Vercel/Neon integration's libpq variables (`PGHOST`, `PGPASSWORD`, `PGDATABASE`, all pointing at Neon), and `lib/database/client.ts:156` builds its pool as `new Pool({ connectionString: databaseUrl })` with no explicit host — while `databaseUrl` has a `|| ""` fallback. `node-postgres` reads `PG*` as defaults, so an unset, empty or unparseable `DATABASE_URL` does not fail: it connects to **production**.
+
+- [ ] Throw on an empty/unparseable `DATABASE_URL` instead of defaulting, or pass an explicit host and `ssl: false` when `LOCAL_POSTGRES=1`. `scripts/check-db-target.ts` already guards the *declared* target; this is the same guard missing one layer down, at the pool.
+
+## Charter detach is per-device — needs a migration to follow the conversation (2026-09-18)
+
+**Requires a schema change.** `prisma/` is owner-protected, so this ships as a reviewable migration handoff (canonical SQL via `prisma migrate diff` + create-and-commit steps), not an agent-run `migrate dev`.
+
+Shipped in PR #249: dismissing the charter chip in a chat bound to that charter now actually detaches — the chip stays hidden AND the server stops binding it (`charterDetached` on the request body, honored where `boundCharterId` resolves). The dismissal persists per chat in `localStorage`, keyed `dg:charter-detached:conv:<id>` / `:content:<id>`, matching where the output target already lives.
+
+That makes it **per device**. The same conversation opened on another machine re-binds the charter, because the decision lives in the browser rather than on the conversation. Owner accepted this for now (2026-09-18) with the fix tracked here.
+
+- [ ] Add a nullable `charterDetached Boolean?` (or a broader `charterBinding` enum, if a third state ever appears) to `Conversation` — it sits beside `activeContextId` / `targetFolderId`, which are the same shape of per-conversation preference.
+- [ ] Chat route reads it when resolving `boundCharterId`, so the detach holds for a conversation regardless of which device opens it.
+- [ ] Engine writes it through the conversation API instead of `localStorage`; keep reading the old key once as a migration path so an existing dismissal is not silently undone on first load.
+- [ ] Transient chats (no `conversationId`) have no row to write to — they keep the `localStorage` path, which is correct: there is no conversation for the preference to belong to yet.
+
+Worth pairing with any other `Conversation` column that comes up, rather than spending a migration on one boolean.
 
 ## Duplicate relation columns in production (cleanup, 2026-09-13)
 
