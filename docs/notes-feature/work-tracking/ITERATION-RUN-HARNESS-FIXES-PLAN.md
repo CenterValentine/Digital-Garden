@@ -321,6 +321,14 @@ The visual review is the owner's handoff, not a gap.
 
 For gpt-6-sol, every search's retrieved content is billed at $2–2.50 / 1M and then re-read, cached, on every later step. Handing search to a cheaper model that returns a short summary could cost less in total. That's a delegation design, untested; backlogged.
 
+**OpenAI as a search service (owner-requested, same round):**
+- New backend `acquisition/search/openai.ts` delegates `search_web` to `gpt-5-search-api`, a Chat Completions search model: `web_search_options: { search_context_size: "low" }`, returning `url_citation` annotations.
+- The tool returns the model's cited answer (`untrustedAnswer`), one result per cited URL with its supporting sentence, and `searchCostUsd` from the call's token usage at $1.25 / $10 per 1M. The search's cost is therefore visible in the transcript for the delegation trial, although the chat meter doesn't fold it in.
+- **Saved-key reuse:** a search connection can store a pointer to the user's OpenAI AI connection instead of a copy of its key (`SearchKeyPayload.source = "ai-connection"`). The resolver reads that key at call time, so rotating the key in one place covers both. A removed connection is an honest error.
+- **Settings:** when an OpenAI AI connection exists (the lab's own endpoint, not an openai-compat one) and there's no OpenAI search yet, the Web Search card opens on "OpenAI — gpt-5-search-api" with "Use your saved OpenAI key" selected. "Use a different key" shows the key field. Rows read "OpenAI · gpt-5-search-api · key from your AI connection".
+- **Chat controls** names a search-model service by its model id (`gpt-5-search-api`), so it never reads as a second "OpenAI" beside the model's own search.
+- No migration (`provider` is a free-form string).
+
 **Gates:** `run-harness:check` round 4 (`read_content` in both tail shapes; search label only for native-search models; route honours the preference only with a connection, before the native branch; `searchBackend` on all 8 body and dependency sites). `proposal:shape:check` tail-notice fixture updated. Four mutations caught.
 
 ### L2 — keep the tool list constant for the turn

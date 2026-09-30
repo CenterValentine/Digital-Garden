@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/infrastructure/auth";
 import {
+  listReusableSearchKeys,
   listSearchConnections,
   upsertSearchConnection,
 } from "@/lib/features/search-connections";
@@ -18,8 +19,11 @@ export async function GET(request: NextRequest) {
   return withRouteTrace(request, { route: ROUTE_PATH }, async () => {
     try {
       const session = await requireAuth();
-      const data = await listSearchConnections(session.user.id);
-      return NextResponse.json({ success: true, data });
+      const [data, reusable] = await Promise.all([
+        listSearchConnections(session.user.id),
+        listReusableSearchKeys(session.user.id),
+      ]);
+      return NextResponse.json({ success: true, data, reusable });
     } catch (error) {
       return NextResponse.json(
         { success: false, error: (error as Error).message },
@@ -38,8 +42,13 @@ export async function POST(request: NextRequest) {
         apiKey?: unknown;
         label?: unknown;
         makeDefault?: unknown;
+        reuseAiConnection?: unknown;
       };
-      if (typeof body.provider !== "string" || typeof body.apiKey !== "string") {
+      const reuseAiConnection = body.reuseAiConnection === true;
+      if (
+        typeof body.provider !== "string" ||
+        (!reuseAiConnection && typeof body.apiKey !== "string")
+      ) {
         return NextResponse.json(
           { success: false, error: "provider and apiKey are required." },
           { status: 400 },
@@ -47,7 +56,8 @@ export async function POST(request: NextRequest) {
       }
       const view = await upsertSearchConnection(session.user.id, {
         provider: body.provider,
-        apiKey: body.apiKey,
+        apiKey: typeof body.apiKey === "string" ? body.apiKey : "",
+        reuseAiConnection,
         label: typeof body.label === "string" ? body.label : undefined,
         makeDefault:
           typeof body.makeDefault === "boolean" ? body.makeDefault : undefined,

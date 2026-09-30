@@ -18,6 +18,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
+import { SEARCH_BACKENDS_META } from "./acquisition/search/metadata";
 
 export type SearchBackendPreference = "native" | "app";
 
@@ -114,8 +115,10 @@ export function nativeSearchLabel(
 let searchServiceCache: Promise<string | null> | null = null;
 
 /**
- * The user's default search service name (e.g. "tavily"), or null when they
- * have none. Fetched once per page load and shared by every panel.
+ * The user's default search service as the chat controls name it — a
+ * search model by its model id (`gpt-5-search-api`, so it never reads as a
+ * second "OpenAI" beside the model's own search), otherwise its label
+ * ("Tavily") — or null when they have none. Fetched once per page load.
  */
 export function loadSearchServiceName(): Promise<string | null> {
   searchServiceCache ??= fetch("/api/ai/search-connections")
@@ -123,7 +126,9 @@ export function loadSearchServiceName(): Promise<string | null> {
     .then((json: { data?: Array<{ provider?: string; isDefault?: boolean }> } | null) => {
       const rows = json?.data ?? [];
       const row = rows.find((c) => c.isDefault) ?? rows[0];
-      return row?.provider ?? null;
+      if (!row?.provider) return null;
+      const meta = SEARCH_BACKENDS_META.find((m) => m.id === row.provider);
+      return meta?.model ?? meta?.label ?? row.provider;
     })
     .catch(() => {
       searchServiceCache = null;

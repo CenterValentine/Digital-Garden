@@ -325,6 +325,9 @@ import {
   withBudgetNotice,
 } from "../lib/domain/ai/tools/iteration-proposal";
 import { nativeSearchLabel } from "../lib/domain/ai/use-chat-search-backend";
+import { citationsToResults } from "../lib/domain/ai/acquisition/search/openai";
+import { getSearchProviderImpl } from "../lib/domain/ai/acquisition/search/registry";
+import { searchServiceDisplayName } from "../lib/domain/ai/acquisition/search/metadata";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import {
@@ -525,6 +528,38 @@ import JSZip from "jszip";
   const engineSrc4 = readFileSync(path.join(process.cwd(), "lib/domain/ai/use-conversation-engine.ts"), "utf8");
   const bodies = (engineSrc4.match(/modelPinned,\n\s*searchBackend,/g) ?? []).length;
   assert(bodies >= 8, `round 4: searchBackend rides every per-call body and its dependency list beside modelPinned (found ${bodies} of 8)`);
+}
+
+{
+  // §10 round 4 — OpenAI as a search service: its cited answer becomes one
+  // result per distinct URL, snippet = the supporting sentence without the
+  // inline citation markup; it is named by its model in the UI.
+  const content =
+    "LeanData is hiring a Technical Support Specialist. The role is remote in the US ([jobs.ashbyhq.com](https://jobs.ashbyhq.com/x)). Pay is listed. OTE is $70K–$90K ([jobs.ashbyhq.com](https://jobs.ashbyhq.com/x)).";
+  const citeStart = content.indexOf("The role");
+  const citeEnd = content.indexOf("Pay is") - 1;
+  const results = citationsToResults(
+    content,
+    [
+      { type: "url_citation", url_citation: { url: "https://jobs.ashbyhq.com/x", title: "LeanData — Technical Support", start_index: citeStart, end_index: citeEnd } },
+      { type: "url_citation", url_citation: { url: "https://jobs.ashbyhq.com/x", title: "dup", start_index: 0, end_index: 10 } },
+      { type: "url_citation", url_citation: { url: "https://leandata.com", title: "", start_index: 0, end_index: 40 } },
+    ],
+    6,
+  );
+  assert(
+    results.length === 2 &&
+      results[0].title === "LeanData — Technical Support" &&
+      results[0].snippet === "The role is remote in the US ." &&
+      results[1].title === "https://leandata.com",
+    `round 4: citations become one result per URL with the supporting sentence (got ${JSON.stringify(results)})`,
+  );
+  assert(citationsToResults(content, undefined, 6).length === 0, "round 4: no citations → no results (the answer still travels)");
+  assert(getSearchProviderImpl("openai")?.model === "gpt-5-search-api", "round 4: OpenAI is a registered search backend running gpt-5-search-api");
+  assert(
+    searchServiceDisplayName("openai") === "OpenAI · gpt-5-search-api" && searchServiceDisplayName("tavily") === "Tavily",
+    "round 4: a search model is named by its model; other services by their label",
+  );
 }
 
 {

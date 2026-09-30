@@ -309,7 +309,7 @@ export function ChatControlPanel({
                         { value: "native", label: nativeLabel, disabled: false },
                         {
                           value: "app",
-                          label: searchService ? capitalize(searchService) : "Search service",
+                          label: searchService ?? "Search service",
                           disabled: searchService === null,
                         },
                       ] as const
@@ -344,8 +344,4 @@ export function ChatControlPanel({
         )}
     </>
   );
-}
-
-function capitalize(word: string): string {
-  return word ? word[0].toUpperCase() + word.slice(1) : word;
 }

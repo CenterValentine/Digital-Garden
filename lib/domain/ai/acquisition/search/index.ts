@@ -18,6 +18,10 @@ import type { AppSearchResult } from "./types";
 export interface AppWebSearchOutcome {
   provider: string;
   results: AppSearchResult[];
+  /** A search model's cited answer (OpenAI backend). */
+  answer?: string;
+  /** What the backend call cost, when the backend can say (OpenAI backend). */
+  costUsd?: number;
 }
 
 /**
@@ -37,10 +41,12 @@ export async function appWebSearch(
   if (!impl) {
     throw new Error(`Unknown search backend "${opts.providerId}".`);
   }
-  const results = await impl.search(query, {
+  const response = await impl.search(query, {
     apiKey: opts.apiKey,
     maxResults: opts.maxResults,
     signal: opts.signal,
   });
-  return { provider: impl.id, results };
+  return Array.isArray(response)
+    ? { provider: impl.id, results: response }
+    : { provider: impl.id, ...response };
 }
