@@ -10,14 +10,8 @@ import {
   type ReaderAnnotationDto,
 } from "@/lib/domain/reader/types";
 import { readerApi } from "../lib/api";
+import { MARK_SWATCH, markValue, parseMark } from "../lib/marks";
 
-const SWATCH: Record<string, string> = {
-  yellow: "rgba(250, 204, 21, 0.7)",
-  green: "rgba(74, 222, 128, 0.7)",
-  blue: "rgba(96, 165, 250, 0.7)",
-  pink: "rgba(244, 114, 182, 0.7)",
-  purple: "rgba(192, 132, 252, 0.7)",
-};
 
 interface AnnotationsPanelProps {
   annotations: ReaderAnnotationDto[];
@@ -51,7 +45,7 @@ export function AnnotationsPanel({
   const sorted = useMemo(
     () =>
       [...annotations]
-        .filter((annotation) => !filter || annotation.color === filter || (filter === "bookmark" && annotation.kind === "bookmark"))
+        .filter((annotation) => !filter || parseMark(annotation.color).color === filter || (filter === "bookmark" && annotation.kind === "bookmark"))
         .sort((a, b) => position(a) - position(b)),
     [annotations, filter]
   );
@@ -93,7 +87,7 @@ export function AnnotationsPanel({
             title={color}
             onClick={() => setFilter(filter === color ? null : color)}
             className={`h-3.5 w-3.5 rounded-full border ${filter === color ? "border-foreground" : "border-transparent"}`}
-            style={{ background: SWATCH[color] }}
+            style={{ background: MARK_SWATCH[color] }}
           />
         ))}
         <button type="button" title="Bookmarks" onClick={() => setFilter(filter === "bookmark" ? null : "bookmark")} className={`rounded p-0.5 ${filter === "bookmark" ? "bg-black/10 dark:bg-white/10" : ""}`}>
@@ -114,12 +108,7 @@ export function AnnotationsPanel({
                   <Bookmark className="h-3.5 w-3.5" /> {annotation.locator.label ?? "Bookmark"}
                 </span>
               ) : (
-                <span
-                  className="line-clamp-4 border-l-2 pl-2"
-                  style={{ borderColor: SWATCH[annotation.color ?? "yellow"] ?? SWATCH.yellow }}
-                >
-                  {annotation.locator.text?.highlight}
-                </span>
+                <MarkQuote value={annotation.color} text={annotation.locator.text?.highlight} />
               )}
             </button>
             {editing === annotation.id ? (
@@ -151,9 +140,9 @@ export function AnnotationsPanel({
                     key={color}
                     type="button"
                     title={`Recolor ${color}`}
-                    onClick={() => onUpdate(annotation, { color })}
+                    onClick={() => onUpdate(annotation, { color: markValue(parseMark(annotation.color).style, color) })}
                     className="hidden h-2.5 w-2.5 rounded-full group-hover:inline-block"
-                    style={{ background: SWATCH[color] }}
+                    style={{ background: MARK_SWATCH[color] }}
                   />
                 ))}
               <button
@@ -186,5 +175,27 @@ export function AnnotationsPanel({
         ))}
       </div>
     </div>
+  );
+}
+
+/** The quoted passage, marked the way it is in the book (bar for highlights, underline for underlines). */
+function MarkQuote({ value, text }: { value: string | null; text?: string }) {
+  const { style, color } = parseMark(value);
+  if (style === "underline") {
+    return (
+      <span className="line-clamp-4 pl-2">
+        <span
+          className="underline decoration-2 underline-offset-4"
+          style={{ textDecorationColor: MARK_SWATCH[color] }}
+        >
+          {text}
+        </span>
+      </span>
+    );
+  }
+  return (
+    <span className="line-clamp-4 border-l-2 pl-2" style={{ borderColor: MARK_SWATCH[color] }}>
+      {text}
+    </span>
   );
 }

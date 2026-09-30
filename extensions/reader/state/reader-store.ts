@@ -51,27 +51,39 @@ interface ReaderSessionState {
   /** Keyed by the tab's content id (reader:library, or a book file id). */
   sidebarSelection: Record<string, ReaderSidebarSelection>;
   setSidebarSelection: (contentId: string, selection: ReaderSidebarSelection | null) => void;
-  /** Open books' highlights, keyed by book content id. */
-  bookNotes: Record<string, ReaderBookNotesBridge>;
-  setBookNotes: (contentId: string, bridge: ReaderBookNotesBridge | null) => void;
+  /** Open books, keyed by book content id. */
+  openBooks: Record<string, ReaderOpenBook>;
+  setOpenBook: (contentId: string, book: ReaderOpenBook | null) => void;
   /** Which half of the Book tab shows, per book. */
   sidebarView: Record<string, ReaderSidebarView>;
   setSidebarView: (contentId: string, view: ReaderSidebarView) => void;
 }
 
+/** A table-of-contents entry of the open book. */
+export interface ReaderTocItem {
+  label: string;
+  href: string;
+  subitems?: ReaderTocItem[];
+}
+
 /**
- * An open book's highlights, published by BookReader so the right sidebar's
- * Book tab can list and act on them (the reader has no side panel of its own).
+ * What an open book publishes for the right sidebar's Book tab: its
+ * highlights (with the actions on them) and its contents. The reader keeps no
+ * side panels of its own — the app's right sidebar is where these live.
  */
-export interface ReaderBookNotesBridge {
+export interface ReaderOpenBook {
   annotations: ReaderAnnotationDto[];
   go: (annotation: ReaderAnnotationDto) => void;
   remove: (annotation: ReaderAnnotationDto) => void;
   update: (annotation: ReaderAnnotationDto, input: { color?: string; body?: string | null }) => void;
   sent: (annotation: ReaderAnnotationDto) => void;
+  toc: ReaderTocItem[];
+  /** Chapter the reader is in now (highlighted in Contents). */
+  currentLabel?: string;
+  goToHref: (href: string) => void;
 }
 
-export type ReaderSidebarView = "notes" | "about";
+export type ReaderSidebarView = "notes" | "contents" | "settings" | "about";
 
 /** Ephemeral (not persisted) cross-component reader state. */
 export const useReaderSession = create<ReaderSessionState>()((set) => ({
@@ -85,13 +97,13 @@ export const useReaderSession = create<ReaderSessionState>()((set) => ({
       else delete next[contentId];
       return { sidebarSelection: next };
     }),
-  bookNotes: {},
-  setBookNotes: (contentId, bridge) =>
+  openBooks: {},
+  setOpenBook: (contentId, book) =>
     set((state) => {
-      const next = { ...state.bookNotes };
-      if (bridge) next[contentId] = bridge;
+      const next = { ...state.openBooks };
+      if (book) next[contentId] = book;
       else delete next[contentId];
-      return { bookNotes: next };
+      return { openBooks: next };
     }),
   sidebarView: {},
   setSidebarView: (contentId, view) =>

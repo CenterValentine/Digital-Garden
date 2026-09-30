@@ -118,6 +118,7 @@ import {
 import { tiptapToMarkdown, markdownToTiptapResult } from "@/lib/domain/content/markdown";
 import { useEditorInstanceStore } from "@/state/editor-instance-store";
 import { MarkdownSourceView } from "../editor/MarkdownSourceView";
+import { useContentFullscreenStore } from "@/state/content-fullscreen-store";
 
 interface ContentResponse {
   success: boolean;
@@ -282,6 +283,8 @@ interface PageTemplateResponse {
 export function MainPanelContent({ paneId, initialContent = null }: MainPanelContentProps) {
   const pathname = usePathname();
   const isEmbedMode = pathname?.startsWith("/embed/") ?? false;
+
+
   const { activeView, setActiveView } = useLeftPanelViewStore();
   const { position: notesPanelPosition } = useNotesPanelStore();
   const activePaneId = useContentStore((state) => state.activePaneId);
@@ -289,6 +292,30 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
   const selectedContentId = useContentStore((state) =>
     getPaneActiveContentId(state, paneId)
   );
+
+  // Full screen (content toolbar): this panel fills the window. Leaving the
+  // browser's full screen (Esc, F11), pressing Esc, switching content or
+  // unmounting leaves ours too.
+  const contentFullscreen = useContentFullscreenStore(
+    (s) => s.active && !!selectedContentId && s.contentId === selectedContentId
+  );
+  useEffect(() => {
+    if (!contentFullscreen) return;
+    const store = useContentFullscreenStore.getState;
+    const onFullscreenChange = () => {
+      if (!document.fullscreenElement && store().enteredBrowser) store().exit();
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !document.fullscreenElement && !event.defaultPrevented) store().exit();
+    };
+    document.addEventListener("fullscreenchange", onFullscreenChange);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("fullscreenchange", onFullscreenChange);
+      window.removeEventListener("keydown", onKey);
+      store().exit();
+    };
+  }, [contentFullscreen]);
   const activeTab = useContentStore((state) => getPaneActiveTab(state, paneId));
   const activeTabId = activeTab?.id ?? null;
   const isPageTemplateTab = activeTab?.contentType === "page-template";
@@ -2696,7 +2723,9 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
       activeToolIds={activeToolIds}
     >
       <div
-        className="flex h-full min-h-0 flex-col overflow-hidden"
+        className={`flex min-h-0 flex-col overflow-hidden ${
+          contentFullscreen ? "fixed inset-0 z-[200] bg-background" : "h-full"
+        }`}
         onPointerDownCapture={() => {
           if (activeTabId) {
             pinContentTab(activeTabId);

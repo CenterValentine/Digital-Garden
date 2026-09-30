@@ -7,7 +7,7 @@
  * Returns null when no toolbar tools are available.
  */
 
-import { BookmarkPlus, Code2, Download, Layers, Link2, Share2, Upload, Zap } from "lucide-react";
+import { BookmarkPlus, Code2, Download, Layers, Link2, Maximize2, Minimize2, Share2, Upload, Zap } from "lucide-react";
 import { useToolSurface } from "@/lib/domain/tools";
 import { useCallback, useEffect, useState, type ComponentType } from "react";
 import {
@@ -36,6 +36,8 @@ import { STUDIO_EXTENSION_ID } from "@/extensions/studio/manifest";
 import { AiContextToggleButton } from "@/extensions/studio/components/AiContextToggleButton";
 import { useRightPanelCollapseStore } from "@/state/right-panel-collapse-store";
 import { useRightSidebarStateStore } from "@/state/right-sidebar-state-store";
+import { useContentFullscreenStore } from "@/state/content-fullscreen-store";
+import { useContentToolbarItems } from "@/state/content-toolbar-contributions-store";
 
 /** Content types whose own text the toolbar "Listen" can narrate. */
 const READ_ALOUD_CONTENT_TYPES = new Set(["note", "file", "html", "code"]);
@@ -170,6 +172,16 @@ export function ContentToolbar({ contentId: contentIdProp }: ContentToolbarProps
     setRightSidebarTab(sourceContentId, "studio");
   }, [sourceContentId, setRightPanelCollapsed, setRightSidebarTab]);
 
+  // Full screen: every content type (the main panel fills the window).
+  const fullscreen = useContentFullscreenStore(
+    (s) => s.active && s.contentId === sourceContentId
+  );
+  const enterFullscreen = useContentFullscreenStore((s) => s.enter);
+  const exitFullscreen = useContentFullscreenStore((s) => s.exit);
+  const showFullscreen = !!sourceContentId;
+  // The viewer's own tools (the reader's contents/details/display/status…).
+  const viewerTools = useContentToolbarItems(sourceContentId);
+
   const openSpeedReader = useCallback(() => {
     if (!sourceContentId) return;
     window.dispatchEvent(
@@ -186,7 +198,9 @@ export function ContentToolbar({ contentId: contentIdProp }: ContentToolbarProps
     !canReadAloud &&
     !showSpeedRead &&
     !showSendToTab &&
-    !showStudio
+    !showStudio &&
+    !showFullscreen &&
+    viewerTools.length === 0
   ) {
     return null;
   }
@@ -197,6 +211,27 @@ export function ContentToolbar({ contentId: contentIdProp }: ContentToolbarProps
       role="toolbar"
       aria-label="Content actions"
     >
+      {viewerTools.map((item) =>
+        item.render ? (
+          <span key={item.id} className="flex shrink-0 items-center">
+            {item.render()}
+          </span>
+        ) : (
+          <button
+            key={item.id}
+            onClick={item.onClick}
+            className="flex shrink-0 items-center gap-1.5 rounded-md px-1.5 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            title={item.title}
+            aria-label={item.title}
+            type="button"
+          >
+            {item.icon}
+          </button>
+        )
+      )}
+      {viewerTools.length > 0 && (
+        <span className="mx-1 h-5 w-px shrink-0 bg-black/10 dark:bg-white/10" aria-hidden />
+      )}
       {showPublishPill && (
         <PublishStatusPill contentId={sourceContentId} />
       )}
@@ -266,6 +301,17 @@ export function ContentToolbar({ contentId: contentIdProp }: ContentToolbarProps
           type="button"
         >
           <Zap className="h-4 w-4" />
+        </button>
+      )}
+      {showFullscreen && (
+        <button
+          onClick={() => (fullscreen ? exitFullscreen() : sourceContentId && enterFullscreen(sourceContentId))}
+          className="flex shrink-0 items-center gap-1.5 rounded-md px-1.5 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          title={fullscreen ? "Exit full screen (Esc)" : "Full screen"}
+          aria-pressed={fullscreen}
+          type="button"
+        >
+          {fullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
         </button>
       )}
       {showSendToTab && (

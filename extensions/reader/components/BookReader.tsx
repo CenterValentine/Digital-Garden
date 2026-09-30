@@ -12,13 +12,10 @@ import {
   Info,
   List,
   Loader2,
-  Maximize2,
   MessageSquarePlus,
-  Minimize2,
   NotebookPen,
-  PanelRight,
   Settings2,
-  Zap,
+  Underline,
 } from "lucide-react";
 import type {
   FoliateAnnotation,
@@ -34,31 +31,29 @@ import {
   type ReaderLocator,
   type ReadingStatus,
 } from "@/lib/domain/reader/types";
-import { useIsExtensionEnabled } from "@/lib/extensions/client-registry";
-import { SPEED_READER_EXTENSION_ID } from "@/extensions/speed-reader/manifest";
 import {
   registerSpeedReaderPagedSource,
-  SPEED_READER_OPEN_EVENT,
-  type SpeedReaderOpenEventDetail,
   type SpeedReaderPage,
 } from "@/extensions/speed-reader/events";
-import { useRightPanelCollapseStore } from "@/state/right-panel-collapse-store";
-import { useRightSidebarStateStore } from "@/state/right-sidebar-state-store";
+import { useContentFullscreenStore } from "@/state/content-fullscreen-store";
+import { useContentToolbarContributions } from "@/state/content-toolbar-contributions-store";
 import { ReaderApiError, readerApi } from "../lib/api";
 import { attachSanitizer } from "../lib/sanitize";
 import { useReaderPreferences, type ReaderTheme } from "../state/reader-store";
-import { AnnotationsPanel } from "./AnnotationsPanel";
+import {
+  HIGHLIGHT_LAYER,
+  MARK_SWATCH,
+  markPaint,
+  markValue,
+  parseMark,
+  type MarkStyle,
+  type MarkTone,
+} from "../lib/marks";
+import { BookDetailsPanel } from "./BookDetailsPanel";
+import { ReaderBookSidebar } from "./ReaderBookSidebar";
 import { revealReaderSidebar } from "../lib/sidebar";
 import { notifyBooksChanged } from "../state/bookshelf-store";
-import { useReaderSession } from "../state/reader-store";
-
-export const HIGHLIGHT_CSS: Record<string, string> = {
-  yellow: "rgba(250, 204, 21, 0.45)",
-  green: "rgba(74, 222, 128, 0.4)",
-  blue: "rgba(96, 165, 250, 0.4)",
-  pink: "rgba(244, 114, 182, 0.4)",
-  purple: "rgba(192, 132, 252, 0.4)",
-};
+import { useReaderSession, type ReaderSidebarView } from "../state/reader-store";
 
 const THEME_COLORS: Record<Exclude<ReaderTheme, "system">, { bg: string; fg: string; link: string }> = {
   light: { bg: "#ffffff", fg: "#1f2328", link: "#0b62d6" },
@@ -72,6 +67,10 @@ function resolveTheme(theme: ReaderTheme): Exclude<ReaderTheme, "system"> {
     return "dark";
   }
   return "light";
+}
+
+function themeTone(theme: ReaderTheme): MarkTone {
+  return resolveTheme(theme) === "dark" ? "dark" : "light";
 }
 
 function bookCss(fontSizePct: number, lineHeight: number, theme: ReaderTheme): string {
@@ -123,25 +122,23 @@ export function BookReader({ contentId }: { contentId: string }) {
   const [toc, setToc] = useState<FoliateTocItem[]>([]);
   const [location, setLocation] = useState<{ fraction: number; label?: string }>({ fraction: 0 });
   const [annotations, setAnnotations] = useState<ReaderAnnotationDto[]>([]);
-  const [panel, setPanel] = useState<"none" | "toc" | "notes" | "settings">("none");
+  // Full screen hides the app's right sidebar; its Book views open as a drawer.
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [selection, setSelection] = useState<SelectionState | null>(null);
   const [noteDraft, setNoteDraft] = useState<string | null>(null);
   // Full-screen reading. The app's right sidebar is out of view then, so
   // highlights & notes open as a drawer inside the reader instead.
-  const [immersive, setImmersive] = useState(false);
+  // (Full screen itself is the content toolbar's — see content-fullscreen-store.)
+  const immersive = useContentFullscreenStore((state) => state.active && state.contentId === contentId);
   const immersiveRef = useRef(false);
-  const enteredFullscreenRef = useRef(false);
-  const speedReaderEnabled = useIsExtensionEnabled(SPEED_READER_EXTENSION_ID);
+  // Marks are painted for the page's tone; the draw handler reads it here.
+  const toneRef = useRef<MarkTone>("light");
 
   const fontSizePct = useReaderPreferences((state) => state.fontSizePct);
   const lineHeight = useReaderPreferences((state) => state.lineHeight);
   const theme = useReaderPreferences((state) => state.theme);
   const flow = useReaderPreferences((state) => state.flow);
   const highlightColor = useReaderPreferences((state) => state.highlightColor);
-  const setFontSizePct = useReaderPreferences((state) => state.setFontSizePct);
-  const setLineHeight = useReaderPreferences((state) => state.setLineHeight);
-  const setTheme = useReaderPreferences((state) => state.setTheme);
-  const setFlow = useReaderPreferences((state) => state.setFlow);
   const setHighlightColor = useReaderPreferences((state) => state.setHighlightColor);
 
   useEffect(() => {
@@ -204,6 +201,7 @@ export function BookReader({ contentId }: { contentId: string }) {
         attachSanitizer(book.transformTarget);
         if (cancelled) return;
 
+        toneRef.current = themeTone(useReaderPreferences.getState().theme);
         const view = document.createElement("foliate-view") as FoliateView;
         view.style.display = "block";
         view.style.height = "100%";
@@ -275,16 +273,21 @@ export function BookReader({ contentId }: { contentId: string }) {
               annotation: FoliateAnnotation;
             }>
           ).detail;
-          draw(Overlayer.highlight, {
-            color: HIGHLIGHT_CSS[annotation.color ?? "yellow"] ?? HIGHLIGHT_CSS.yellow,
-          });
+          const paint = markPaint(annotation.color, toneRef.current);
+          if (paint.style === "underline") {
+            draw(Overlayer.underline, { color: paint.color, width: 2, padding: 1 });
+          } else {
+            draw(Overlayer.highlight, { color: paint.color });
+          }
         });
 
         // Clicking a highlight shows the notes: in the app's right sidebar,
         // or the reader's own drawer while full screen.
         view.addEventListener("show-annotation", () => {
-          if (immersiveRef.current) setPanel("notes");
-          else revealReaderSidebar(contentId, "notes");
+          if (immersiveRef.current) {
+            useReaderSession.getState().setSidebarView(contentId, "notes");
+            setDrawerOpen(true);
+          } else revealReaderSidebar(contentId, "notes");
         });
 
         await view.open(book);
@@ -317,6 +320,23 @@ export function BookReader({ contentId }: { contentId: string }) {
     view.renderer.setAttribute("max-inline-size", "720px");
     view.renderer.setAttribute("gap", "6%");
   }, [fontSizePct, lineHeight, theme, flow, phase]);
+
+  // Mark colors follow the page's tone (light/sepia vs dark): set the
+  // highlight layer's blend, then repaint the marks already drawn.
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view || phase !== "ready") return;
+    const tone = themeTone(theme);
+    view.style.setProperty("--overlayer-highlight-opacity", HIGHLIGHT_LAYER[tone].opacity);
+    view.style.setProperty("--overlayer-highlight-blend-mode", HIGHLIGHT_LAYER[tone].blend);
+    if (toneRef.current === tone) return;
+    toneRef.current = tone;
+    for (const annotation of annotationsRef.current) {
+      const cfi = annotation.locator.locations.cfi;
+      if (!cfi || annotation.kind === "bookmark") continue;
+      void view.addAnnotation({ value: cfi, color: annotation.color ?? "yellow" }).catch(() => undefined);
+    }
+  }, [theme, phase]);
 
   // ── Actions ─────────────────────────────────────────────────────────────
   const clearSelection = useCallback(() => {
@@ -433,29 +453,42 @@ export function BookReader({ contentId }: { contentId: string }) {
     setAnnotations((current) => current.map((item) => (item.id === updated.id ? updated : item)));
   }, []);
 
-  // The right sidebar's Book tab lists this book's highlights & notes.
+  const goToHref = useCallback((href: string) => {
+    void viewRef.current?.goTo(href);
+  }, []);
+
+  // The right sidebar's Book tab shows this book's notes, contents and
+  // display settings — the reader keeps no side panels of its own.
   useEffect(() => {
-    useReaderSession.getState().setBookNotes(contentId, {
+    useReaderSession.getState().setOpenBook(contentId, {
       annotations,
       go: goToAnnotation,
       remove: (annotation) => void removeAnnotation(annotation),
       update: (annotation, input) => void updateAnnotation(annotation, input),
       sent: markSent,
+      toc,
+      currentLabel: location.label,
+      goToHref,
     });
-  }, [annotations, contentId, goToAnnotation, markSent, removeAnnotation, updateAnnotation]);
-  useEffect(() => () => useReaderSession.getState().setBookNotes(contentId, null), [contentId]);
+  }, [annotations, contentId, goToAnnotation, goToHref, location.label, markSent, removeAnnotation, toc, updateAnnotation]);
+  useEffect(() => () => useReaderSession.getState().setOpenBook(contentId, null), [contentId]);
 
-  const toggleNotes = useCallback(() => {
-    if (immersive) {
-      setPanel((current) => (current === "notes" ? "none" : "notes"));
-      return;
-    }
-    const collapse = useRightPanelCollapseStore.getState();
-    const tab = useRightSidebarStateStore.getState().activeTabByContentId[contentId];
-    const view = useReaderSession.getState().sidebarView[contentId] ?? "notes";
-    if (!collapse.isCollapsed && tab === "extension" && view === "notes") collapse.setCollapsed(true);
-    else revealReaderSidebar(contentId, "notes");
-  }, [contentId, immersive]);
+  /**
+   * Toolbar shortcuts: launch the app's right sidebar on the Book tab's view
+   * (the sidebar's own toggle collapses it). In full screen, where the
+   * sidebar is out of view, the same views open as a drawer.
+   */
+  const openSideView = useCallback(
+    (view: ReaderSidebarView) => {
+      if (immersive) {
+        useReaderSession.getState().setSidebarView(contentId, view);
+        setDrawerOpen(true);
+        return;
+      }
+      revealReaderSidebar(contentId, view);
+    },
+    [contentId, immersive]
+  );
 
   // Speed reading starts from the page on screen, one page at a time.
   useEffect(() => {
@@ -491,63 +524,10 @@ export function BookReader({ contentId }: { contentId: string }) {
     });
   }, [contentId, phase]);
 
-  const openSpeedReader = useCallback(() => {
-    window.dispatchEvent(
-      new CustomEvent<SpeedReaderOpenEventDetail>(SPEED_READER_OPEN_EVENT, {
-        detail: { sourceContentId: contentId, sourceTitle: meta?.title ?? null },
-      })
-    );
-  }, [contentId, meta?.title]);
 
-  const enterImmersive = useCallback(() => {
-    setImmersive(true);
-    setPanel("none");
-    const root = document.documentElement;
-    if (root.requestFullscreen && !document.fullscreenElement) {
-      root
-        .requestFullscreen()
-        .then(() => {
-          enteredFullscreenRef.current = true;
-        })
-        .catch(() => undefined); // Not allowed (iOS, iframes): the in-app full-window view still works.
-    }
-  }, []);
 
-  const exitImmersive = useCallback(() => {
-    setImmersive(false);
-    setPanel((current) => (current === "notes" ? "none" : current));
-    if (enteredFullscreenRef.current && document.fullscreenElement) {
-      void document.exitFullscreen().catch(() => undefined);
-    }
-    enteredFullscreenRef.current = false;
-  }, []);
 
-  useEffect(() => {
-    if (!immersive) return;
-    // Leaving browser full screen (Esc, F11) leaves the reader's too.
-    const onFullscreenChange = () => {
-      if (!document.fullscreenElement && enteredFullscreenRef.current) exitImmersive();
-    };
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !document.fullscreenElement) exitImmersive();
-    };
-    document.addEventListener("fullscreenchange", onFullscreenChange);
-    window.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("fullscreenchange", onFullscreenChange);
-      window.removeEventListener("keydown", onKey);
-    };
-  }, [exitImmersive, immersive]);
 
-  // Leaving the book while full screen: give the browser its window back.
-  useEffect(
-    () => () => {
-      if (enteredFullscreenRef.current && document.fullscreenElement) {
-        void document.exitFullscreen().catch(() => undefined);
-      }
-    },
-    []
-  );
 
   // Window-level arrow keys when focus is outside the book iframe.
   useEffect(() => {
@@ -564,112 +544,65 @@ export function BookReader({ contentId }: { contentId: string }) {
   }, []);
 
   const title = meta?.title ?? "Book";
-  const renderToc = (items: FoliateTocItem[], depth = 0) => (
-    <ul className={depth ? "ml-3 border-l border-black/10 pl-2 dark:border-white/10" : ""}>
-      {items.map((item) => (
-        <li key={`${item.href}-${item.label}`}>
-          <button
-            type="button"
-            onClick={() => {
-              void viewRef.current?.goTo(item.href);
-              setPanel("none");
-            }}
-            className="w-full truncate rounded px-2 py-1 text-left text-xs hover:bg-black/5 dark:hover:bg-white/5"
-          >
-            {item.label}
-          </button>
-          {item.subitems?.length ? renderToc(item.subitems, depth + 1) : null}
-        </li>
-      ))}
-    </ul>
-  );
+  const readingStatus = meta ? meta.readingStatus ?? "" : null;
+
+  // The reader's tools live in the shared content toolbar (no second toolbar):
+  // shortcuts into the right sidebar's Book views, a bookmark, and status.
+  useEffect(() => {
+    const setContributions = useContentToolbarContributions.getState().setContributions;
+    setContributions(contentId, [
+      { id: "reader-contents", title: "Contents", icon: <List className="h-4 w-4" />, onClick: () => openSideView("contents") },
+      { id: "reader-notes", title: "Highlights & notes", icon: <NotebookPen className="h-4 w-4" />, onClick: () => openSideView("notes") },
+      { id: "reader-about", title: "About this book", icon: <Info className="h-4 w-4" />, onClick: () => openSideView("about") },
+      { id: "reader-settings", title: "Display settings", icon: <Settings2 className="h-4 w-4" />, onClick: () => openSideView("settings") },
+      { id: "reader-bookmark", title: "Bookmark this page", icon: <Bookmark className="h-4 w-4" />, onClick: () => void addBookmark() },
+      ...(readingStatus === null
+        ? []
+        : [
+            {
+              id: "reader-status",
+              title: "Reading status",
+              render: () => (
+                <select
+                  aria-label="Reading status"
+                  value={readingStatus}
+                  onChange={(event) => void setStatus((event.target.value || null) as ReadingStatus | null)}
+                  className="h-7 rounded border border-black/10 bg-transparent px-1 text-xs dark:border-white/10"
+                >
+                  {STATUS_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              ),
+            },
+          ]),
+    ]);
+  }, [addBookmark, contentId, openSideView, readingStatus, setStatus]);
+  useEffect(() => () => useContentToolbarContributions.getState().setContributions(contentId, null), [contentId]);
+  const openBook = useReaderSession((state) => state.openBooks[contentId] ?? null);
+  const pageButton =
+    "inline-flex h-7 items-center gap-0.5 rounded px-1.5 text-xs hover:bg-black/5 hover:text-foreground dark:hover:bg-white/10";
+  const mark = (style: MarkStyle, color: (typeof READER_HIGHLIGHT_COLORS)[number]) => {
+    setHighlightColor(color);
+    void createAnnotation("highlight", markValue(style, color));
+  };
 
   return (
     <div
       data-reader-root
       tabIndex={-1}
-      className={`flex min-h-0 flex-col outline-none ${
-        immersive ? "fixed inset-0 z-[200] bg-background" : "h-full"
-      }`}
+      className="flex h-full min-h-0 flex-col outline-none"
     >
-      {/* Toolbar */}
-      <div className="flex items-center gap-1 border-b border-black/10 px-3 py-1.5 dark:border-white/10">
-        <button type="button" title="Contents" onClick={() => setPanel(panel === "toc" ? "none" : "toc")} className="rounded p-1.5 hover:bg-black/5 dark:hover:bg-white/10">
-          <List className="h-4 w-4" />
-        </button>
-        <div className="min-w-0 flex-1 px-1">
-          <div className="truncate text-sm font-medium">{title}</div>
-          {meta?.authors?.length ? (
-            <div className="truncate text-[11px] text-muted-foreground">{meta.authors.join(", ")}</div>
-          ) : null}
-        </div>
-        {meta && (
-          <select
-            aria-label="Reading status"
-            value={meta.readingStatus ?? ""}
-            onChange={(event) => void setStatus((event.target.value || null) as ReadingStatus | null)}
-            className="h-7 rounded border border-black/10 bg-transparent px-1 text-xs dark:border-white/10"
-          >
-            {STATUS_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        )}
-        <button
-          type="button"
-          title="About this book"
-          onClick={() => {
-            if (immersive) exitImmersive();
-            revealReaderSidebar(contentId, "about");
-          }}
-          className="rounded p-1.5 hover:bg-black/5 dark:hover:bg-white/10"
-        >
-          <Info className="h-4 w-4" />
-        </button>
-        <button type="button" title="Bookmark this page" onClick={() => void addBookmark()} className="rounded p-1.5 hover:bg-black/5 dark:hover:bg-white/10">
-          <Bookmark className="h-4 w-4" />
-        </button>
-        <button type="button" title="Reading settings" onClick={() => setPanel(panel === "settings" ? "none" : "settings")} className="rounded p-1.5 hover:bg-black/5 dark:hover:bg-white/10">
-          <Settings2 className="h-4 w-4" />
-        </button>
-        {speedReaderEnabled && (
-          <button type="button" title="Speed read from this page" onClick={openSpeedReader} className="rounded p-1.5 hover:bg-black/5 dark:hover:bg-white/10">
-            <Zap className="h-4 w-4" />
-          </button>
-        )}
-        <button
-          type="button"
-          title={immersive ? "Exit full screen (Esc)" : "Full screen"}
-          onClick={immersive ? exitImmersive : enterImmersive}
-          className="rounded p-1.5 hover:bg-black/5 dark:hover:bg-white/10"
-        >
-          {immersive ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
-        </button>
-        <button type="button" title="Highlights & notes" onClick={toggleNotes} className="relative rounded p-1.5 hover:bg-black/5 dark:hover:bg-white/10">
-          <PanelRight className="h-4 w-4" />
-          {annotations.length > 0 && (
-            <span className="absolute -right-0.5 -top-0.5 rounded-full bg-primary px-1 text-[9px] leading-tight text-primary-foreground">
-              {annotations.length}
-            </span>
-          )}
-        </button>
-      </div>
-
       <div className="relative flex min-h-0 flex-1">
-        {panel === "toc" && (
-          <aside className="w-64 shrink-0 overflow-auto border-r border-black/10 p-2 dark:border-white/10">
-            {toc.length ? renderToc(toc) : <p className="p-2 text-xs text-muted-foreground">No table of contents.</p>}
-          </aside>
-        )}
-
         <div className="relative min-w-0 flex-1">
           <button
             type="button"
             aria-label="Previous page"
+            title="Previous page (←)"
             onClick={() => void viewRef.current?.goLeft()}
-            className="absolute left-0 top-0 z-10 flex h-full w-10 items-center justify-center text-muted-foreground opacity-0 transition hover:opacity-100"
+            className="absolute left-0 top-0 z-10 flex h-full w-10 items-center justify-center text-muted-foreground opacity-40 transition hover:bg-black/5 hover:opacity-100 dark:hover:bg-white/5"
           >
             <ChevronLeft className="h-6 w-6" />
           </button>
@@ -677,8 +610,9 @@ export function BookReader({ contentId }: { contentId: string }) {
           <button
             type="button"
             aria-label="Next page"
+            title="Next page (→)"
             onClick={() => void viewRef.current?.goRight()}
-            className="absolute right-0 top-0 z-10 flex h-full w-10 items-center justify-center text-muted-foreground opacity-0 transition hover:opacity-100"
+            className="absolute right-0 top-0 z-10 flex h-full w-10 items-center justify-center text-muted-foreground opacity-40 transition hover:bg-black/5 hover:opacity-100 dark:hover:bg-white/5"
           >
             <ChevronRight className="h-6 w-6" />
           </button>
@@ -704,46 +638,57 @@ export function BookReader({ contentId }: { contentId: string }) {
               onMouseDown={(event) => event.preventDefault()}
             >
               {noteDraft === null ? (
-                <div className="flex items-center gap-1">
-                  {READER_HIGHLIGHT_COLORS.map((color) => (
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center gap-1">
+                    <Highlighter className="mx-0.5 h-3.5 w-3.5 text-muted-foreground" aria-hidden />
+                    {READER_HIGHLIGHT_COLORS.map((color) => (
+                      <button
+                        key={color}
+                        type="button"
+                        title={`Highlight ${color}`}
+                        onClick={() => mark("highlight", color)}
+                        className={`h-5 w-5 rounded-full border ${color === highlightColor ? "border-foreground" : "border-transparent"}`}
+                        style={{ background: MARK_SWATCH[color] }}
+                      />
+                    ))}
+                    <span className="mx-1 h-4 w-px bg-black/10 dark:bg-white/10" />
+                    <button type="button" title="Highlight with a note" onClick={() => setNoteDraft("")} className="rounded p-1 hover:bg-black/5 dark:hover:bg-white/10">
+                      <MessageSquarePlus className="h-4 w-4" />
+                    </button>
                     <button
-                      key={color}
                       type="button"
-                      title={`Highlight ${color}`}
+                      title="Copy with citation"
                       onClick={() => {
-                        setHighlightColor(color);
-                        void createAnnotation("highlight", color);
+                        const citation = `“${selection.text}” — ${title}${meta?.authors?.[0] ? `, ${meta.authors[0]}` : ""}`;
+                        void navigator.clipboard.writeText(citation).then(() => toast.success("Copied"));
+                        clearSelection();
                       }}
-                      className={`h-5 w-5 rounded-full border ${color === highlightColor ? "border-foreground" : "border-transparent"}`}
-                      style={{ background: HIGHLIGHT_CSS[color] }}
-                    />
-                  ))}
-                  <span className="mx-1 h-4 w-px bg-black/10 dark:bg-white/10" />
-                  <button type="button" title="Highlight with a note" onClick={() => setNoteDraft("")} className="rounded p-1 hover:bg-black/5 dark:hover:bg-white/10">
-                    <MessageSquarePlus className="h-4 w-4" />
-                  </button>
-                  <button
-                    type="button"
-                    title="Copy with citation"
-                    onClick={() => {
-                      const citation = `“${selection.text}” — ${title}${meta?.authors?.[0] ? `, ${meta.authors[0]}` : ""}`;
-                      void navigator.clipboard.writeText(citation).then(() => toast.success("Copied"));
-                      clearSelection();
-                    }}
-                    className="rounded p-1 hover:bg-black/5 dark:hover:bg-white/10"
-                  >
-                    <Copy className="h-4 w-4" />
-                  </button>
-                  <button type="button" title="Highlight" onClick={() => void createAnnotation("highlight", highlightColor)} className="rounded p-1 hover:bg-black/5 dark:hover:bg-white/10">
-                    <Highlighter className="h-4 w-4" />
-                  </button>
+                      className="rounded p-1 hover:bg-black/5 dark:hover:bg-white/10"
+                    >
+                      <Copy className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Underline className="mx-0.5 h-3.5 w-3.5 text-muted-foreground" aria-hidden />
+                    {READER_HIGHLIGHT_COLORS.map((color) => (
+                      <button
+                        key={color}
+                        type="button"
+                        title={`Underline ${color}`}
+                        onClick={() => mark("underline", color)}
+                        className="flex h-5 w-5 items-end justify-center rounded hover:bg-black/5 dark:hover:bg-white/10"
+                      >
+                        <span className="mb-1 h-0.5 w-3.5 rounded-full" style={{ background: MARK_SWATCH[color] }} />
+                      </button>
+                    ))}
+                  </div>
                 </div>
               ) : (
                 <form
                   className="flex w-72 flex-col gap-1 p-1"
                   onSubmit={(event) => {
                     event.preventDefault();
-                    void createAnnotation("note", highlightColor, noteDraft);
+                    void createAnnotation("note", markValue("highlight", parseMark(highlightColor).color), noteDraft);
                   }}
                 >
                   <textarea
@@ -768,54 +713,49 @@ export function BookReader({ contentId }: { contentId: string }) {
           )}
         </div>
 
-        {panel === "settings" && (
-          <aside className="w-64 shrink-0 space-y-4 overflow-auto border-l border-black/10 p-3 text-xs dark:border-white/10">
-            <label className="block">
-              <span className="text-muted-foreground">Text size — {fontSizePct}%</span>
-              <input type="range" min={70} max={200} step={5} value={fontSizePct} onChange={(event) => setFontSizePct(Number(event.target.value))} className="w-full" />
-            </label>
-            <label className="block">
-              <span className="text-muted-foreground">Line spacing — {lineHeight.toFixed(2)}</span>
-              <input type="range" min={1.1} max={2.2} step={0.05} value={lineHeight} onChange={(event) => setLineHeight(Number(event.target.value))} className="w-full" />
-            </label>
-            <div>
-              <span className="text-muted-foreground">Theme</span>
-              <div className="mt-1 grid grid-cols-2 gap-1">
-                {(["system", "light", "sepia", "dark"] as const).map((option) => (
-                  <button key={option} type="button" onClick={() => setTheme(option)} className={`rounded border px-2 py-1 capitalize ${theme === option ? "border-primary" : "border-black/10 dark:border-white/10"}`}>
-                    {option}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div>
-              <span className="text-muted-foreground">Layout</span>
-              <div className="mt-1 grid grid-cols-2 gap-1">
-                {(["paginated", "scrolled"] as const).map((option) => (
-                  <button key={option} type="button" onClick={() => setFlow(option)} className={`rounded border px-2 py-1 capitalize ${flow === option ? "border-primary" : "border-black/10 dark:border-white/10"}`}>
-                    {option}
-                  </button>
-                ))}
-              </div>
-            </div>
+        {/* Full screen only: the right sidebar's Book views, as a drawer. */}
+        {immersive && drawerOpen && openBook && (
+          <aside className="w-80 shrink-0 border-l border-black/10 dark:border-white/10">
+            <ReaderBookSidebar
+              contentId={contentId}
+              book={openBook}
+              onClose={() => setDrawerOpen(false)}
+              about={
+                meta ? (
+                  <BookDetailsPanel
+                    className="h-full rounded-none border-0"
+                    subject={{
+                      title: meta.title,
+                      authors: meta.authors,
+                      coverUrl: meta.coverUrl,
+                      summary: meta.description,
+                      publishedYear: meta.publishedYear,
+                      language: meta.language,
+                      license: meta.license,
+                      isbn: meta.isbn,
+                      publisher: meta.publisher,
+                    }}
+                    query={{
+                      title: meta.title,
+                      author: meta.authors[0],
+                      isbn: meta.isbn ?? undefined,
+                      openLibraryId: meta.openLibraryId ?? undefined,
+                      contentId,
+                    }}
+                  />
+                ) : null
+              }
+            />
           </aside>
-        )}
-
-        {immersive && panel === "notes" && (
-          <AnnotationsPanel
-            className="w-80 shrink-0 border-l border-black/10 dark:border-white/10"
-            annotations={annotations}
-            onGo={goToAnnotation}
-            onDelete={(annotation) => void removeAnnotation(annotation)}
-            onUpdate={(annotation, input) => void updateAnnotation(annotation, input)}
-            onSent={markSent}
-          />
         )}
       </div>
 
-      {/* Progress */}
-      <div className="flex items-center gap-2 border-t border-black/10 px-3 py-1 text-[11px] text-muted-foreground dark:border-white/10">
-        <span className="truncate">{location.label ?? ""}</span>
+      {/* Progress + adjacent-page navigation */}
+      <div className="flex items-center gap-2 border-t border-black/10 px-2 py-1 text-[11px] text-muted-foreground dark:border-white/10">
+        <button type="button" onClick={() => void viewRef.current?.goLeft()} className={pageButton} title="Previous page (←)">
+          <ChevronLeft className="h-3.5 w-3.5" /> Prev
+        </button>
+        <span className="max-w-[30%] truncate">{location.label ?? ""}</span>
         <input
           type="range"
           aria-label="Position in book"
@@ -823,9 +763,12 @@ export function BookReader({ contentId }: { contentId: string }) {
           max={1000}
           value={Math.round(location.fraction * 1000)}
           onChange={(event) => void viewRef.current?.goToFraction(Number(event.target.value) / 1000)}
-          className="flex-1"
+          className="min-w-0 flex-1"
         />
         <span>{Math.round(location.fraction * 100)}%</span>
+        <button type="button" onClick={() => void viewRef.current?.goRight()} className={pageButton} title="Next page (→)">
+          Next <ChevronRight className="h-3.5 w-3.5" />
+        </button>
       </div>
     </div>
   );

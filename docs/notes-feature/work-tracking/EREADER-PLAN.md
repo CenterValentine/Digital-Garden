@@ -355,3 +355,29 @@ hosts were unreachable from the build sandbox, so every source needs a live smok
   The reader registers the visible page; the speed reader reads it, stops with
   *Continue to next page* / *Re-read* / *Finish*, and can continue automatically
   (setting remembered). The page in the book turns along with it.
+
+### Added 2026-09-30 (second review round)
+
+- **One toolbar.** The reader's own toolbar row is gone. Its tools register into the
+  shared content toolbar (`state/content-toolbar-contributions-store.ts`):
+  - Contents, Highlights & notes, About and Display are **shortcuts** that open the
+    app's right sidebar on that Book view (the sidebar's own toggle collapses it).
+  - Bookmark and reading status are there as well.
+- **Full screen is the content toolbar's**, for every content type
+  (`state/content-fullscreen-store.ts`). The reader shows the sidebar's Book views as
+  a drawer while the sidebar is out of view.
+- **Display settings and contents live in the right sidebar.** The Book tab has four
+  views: Notes | Contents | Display | About (`ReaderBookSidebar`, reused as the
+  full-screen drawer).
+- **Underlines** in five colours beside highlights. The style rides in the
+  annotation's `color` ("underline:blue"), so there's no schema change.
+- **Marks per page tone** (`extensions/reader/lib/marks.ts`):
+  - Light and sepia pages: bright fills with `multiply`, and deep underlines.
+  - Dark pages: deep fills with `lighten` (the text keeps full brightness) and bright
+    underlines.
+  - Verified in Chromium on both tones.
+- **Prev / Next page buttons** in the footer, and the page-edge arrows are always
+  faintly visible.
+- **Speed Read** has one entry, the content toolbar's ⚡, and it reads the visible
+  page. Chromium check: the page text ends exactly at the page break, and `next()`
+  continues from there.

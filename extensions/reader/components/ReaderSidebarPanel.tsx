@@ -11,7 +11,7 @@ import {
   useAddLink,
 } from "../lib/use-acquire";
 import { useReaderSession } from "../state/reader-store";
-import { AnnotationsPanel } from "./AnnotationsPanel";
+import { ReaderBookSidebar } from "./ReaderBookSidebar";
 import {
   BookDetailsPanel,
   queryFromEntry,
@@ -34,55 +34,16 @@ export function ReaderSidebarPanel({ contentId }: { contentId: string }) {
   const addLink = useAddLink();
   const [placing, setPlacing] = useState(false);
   const inLibrary = contentId === READER_LIBRARY_CONTENT_ID;
-  const notes = useReaderSession((state) => state.bookNotes[contentId] ?? null);
-  const view = useReaderSession(
-    (state) => state.sidebarView[contentId] ?? "notes",
-  );
-  const setView = useReaderSession((state) => state.setSidebarView);
+  const openBook = useReaderSession((state) => state.openBooks[contentId] ?? null);
 
-  // An open book: its highlights & notes and its details share this tab.
-  if (!inLibrary && notes) {
-    const current = selection?.kind === "book" ? view : "notes";
-    const tabClass = (active: boolean) =>
-      `flex-1 rounded px-2 py-1 text-xs font-medium ${
-        active
-          ? "bg-black/10 text-foreground dark:bg-white/10"
-          : "text-muted-foreground hover:text-foreground"
-      }`;
+  // An open book: notes, contents, display settings and details share this tab.
+  if (!inLibrary && openBook) {
     return (
-      <div className="flex h-full min-h-0 flex-col">
-        <div className="flex gap-1 border-b border-black/10 p-1.5 dark:border-white/10">
-          <button
-            type="button"
-            onClick={() => setView(contentId, "notes")}
-            className={tabClass(current === "notes")}
-          >
-            Highlights & notes
-            {notes.annotations.length ? ` (${notes.annotations.length})` : ""}
-          </button>
-          <button
-            type="button"
-            disabled={selection?.kind !== "book"}
-            onClick={() => setView(contentId, "about")}
-            className={tabClass(current === "about")}
-          >
-            About
-          </button>
-        </div>
-        {current === "notes" ? (
-          <AnnotationsPanel
-            hideTitle
-            className="min-h-0 flex-1"
-            annotations={notes.annotations}
-            onGo={notes.go}
-            onDelete={notes.remove}
-            onUpdate={notes.update}
-            onSent={notes.sent}
-          />
-        ) : (
-          <div className="min-h-0 flex-1">{renderBookSelection()}</div>
-        )}
-      </div>
+      <ReaderBookSidebar
+        contentId={contentId}
+        book={openBook}
+        about={selection?.kind === "book" ? renderBookSelection() : null}
+      />
     );
   }
 
