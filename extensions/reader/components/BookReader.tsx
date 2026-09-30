@@ -35,7 +35,9 @@ import { ReaderApiError, readerApi } from "../lib/api";
 import { attachSanitizer } from "../lib/sanitize";
 import { useReaderPreferences, type ReaderTheme } from "../state/reader-store";
 import { AnnotationsPanel } from "./AnnotationsPanel";
-import { BookDetailsPanel } from "./BookDetailsPanel";
+import { revealReaderSidebar } from "../lib/sidebar";
+import { notifyBooksChanged } from "../state/bookshelf-store";
+import { useReaderSession } from "../state/reader-store";
 
 export const HIGHLIGHT_CSS: Record<string, string> = {
   yellow: "rgba(250, 204, 21, 0.45)",
@@ -86,6 +88,7 @@ const STATUS_OPTIONS: Array<{ value: ReadingStatus | ""; label: string }> = [
   { value: "want", label: "Want to read" },
   { value: "reading", label: "Reading" },
   { value: "finished", label: "Finished" },
+  { value: "reference", label: "Reference" },
 ];
 
 function readerLocFromUrl(): string | null {
@@ -107,7 +110,7 @@ export function BookReader({ contentId }: { contentId: string }) {
   const [toc, setToc] = useState<FoliateTocItem[]>([]);
   const [location, setLocation] = useState<{ fraction: number; label?: string }>({ fraction: 0 });
   const [annotations, setAnnotations] = useState<ReaderAnnotationDto[]>([]);
-  const [panel, setPanel] = useState<"none" | "toc" | "notes" | "settings" | "about">("none");
+  const [panel, setPanel] = useState<"none" | "toc" | "notes" | "settings">("none");
   const [selection, setSelection] = useState<SelectionState | null>(null);
   const [noteDraft, setNoteDraft] = useState<string | null>(null);
 
@@ -138,6 +141,8 @@ export function BookReader({ contentId }: { contentId: string }) {
         const info = await readerApi.book(contentId);
         if (cancelled) return;
         setMeta(info.meta);
+        // The right sidebar's Book tab shows this book's details.
+        useReaderSession.getState().setSidebarSelection(contentId, { kind: "book", book: info.meta });
         if (info.drmMessage) {
           setErrorMessage(info.drmMessage);
           setPhase("error");
@@ -387,6 +392,7 @@ export function BookReader({ contentId }: { contentId: string }) {
       try {
         const result = await readerApi.setStatus(contentId, status);
         setMeta((current) => (current ? { ...current, readingStatus: status } : current));
+        notifyBooksChanged();
         if (result.syncedToHardcover) toast.success("Status synced to Hardcover");
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "Could not update status");
@@ -457,7 +463,7 @@ export function BookReader({ contentId }: { contentId: string }) {
             ))}
           </select>
         )}
-        <button type="button" title="About this book" onClick={() => setPanel(panel === "about" ? "none" : "about")} className="rounded p-1.5 hover:bg-black/5 dark:hover:bg-white/10">
+        <button type="button" title="About this book" onClick={() => revealReaderSidebar(contentId)} className="rounded p-1.5 hover:bg-black/5 dark:hover:bg-white/10">
           <Info className="h-4 w-4" />
         </button>
         <button type="button" title="Bookmark this page" onClick={() => void addBookmark()} className="rounded p-1.5 hover:bg-black/5 dark:hover:bg-white/10">
@@ -618,31 +624,6 @@ export function BookReader({ contentId }: { contentId: string }) {
               </div>
             </div>
           </aside>
-        )}
-
-        {panel === "about" && meta && (
-          <BookDetailsPanel
-            className="w-80 shrink-0 rounded-none border-y-0 border-r-0"
-            subject={{
-              title: meta.title,
-              authors: meta.authors,
-              coverUrl: meta.coverUrl,
-              summary: meta.description,
-              publishedYear: meta.publishedYear,
-              language: meta.language,
-              license: meta.license,
-              isbn: meta.isbn,
-              publisher: meta.publisher,
-            }}
-            query={{
-              title: meta.title,
-              author: meta.authors[0],
-              isbn: meta.isbn ?? undefined,
-              openLibraryId: meta.openLibraryId ?? undefined,
-              contentId,
-            }}
-            onClose={() => setPanel("none")}
-          />
         )}
 
         {panel === "notes" && (

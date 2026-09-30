@@ -68,7 +68,12 @@ export type BookLicense =
   | "owned"
   | "unknown";
 
-export type ReadingStatus = "want" | "reading" | "finished";
+/**
+ * "reference" = a book kept to consult (dictionaries, manuals, scripture
+ * study aids), not one being read through. Local only — Hardcover has no
+ * equivalent shelf, so it isn't synced.
+ */
+export type ReadingStatus = "want" | "reading" | "finished" | "reference";
 
 export interface BookMetaDto {
   contentId: string;

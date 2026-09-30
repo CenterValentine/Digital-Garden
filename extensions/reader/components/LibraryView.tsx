@@ -12,22 +12,20 @@ import {
   Search,
   Trash2,
 } from "lucide-react";
-import { useContentStore } from "@/state/content-store";
 import type {
   BookMetaDto,
   BookSourceInfo,
   CatalogEntry,
   CatalogPage,
 } from "@/lib/domain/reader/types";
+import { READER_LIBRARY_CONTENT_ID } from "../manifest";
 import { readerApi } from "../lib/api";
-import { notifyBooksChanged } from "../state/bookshelf-store";
+import { revealReaderSidebar } from "../lib/sidebar";
+import { openBookTab, useAcquire } from "../lib/use-acquire";
+import { READER_BOOKS_CHANGED_EVENT } from "../state/bookshelf-store";
 import { useReaderSession } from "../state/reader-store";
-import {
-  BookDetailsPanel,
-  queryFromEntry,
-  subjectFromEntry,
-} from "./BookDetailsPanel";
-import { CatalogEntryCard } from "./CatalogEntryCard";
+import { BOOK_TILE_GRID, BookTile } from "./BookTile";
+import { FORMAT_LABELS } from "./CatalogEntryCard";
 import { ConnectionsPanel, ImportPanel } from "./IntegrationsPanel";
 
 type LibraryTab = "books" | "find" | "catalogs" | "import" | "connections";
@@ -46,6 +44,7 @@ const STATUS_LABELS: Record<string, string> = {
   want: "Want to read",
   reading: "Reading",
   finished: "Finished",
+  reference: "Reference",
 };
 
 /** Sources (Google Books especially) repeat a volume within and across pages. */
@@ -63,31 +62,19 @@ function uniqueEntries(entries: CatalogEntry[]): CatalogEntry[] {
   });
 }
 
-function openBook(contentId: string, title: string) {
-  useContentStore.getState().setSelectedContentId(contentId, {
-    title,
-    contentType: "file",
-    pin: true,
-  });
+function firstReadableIndex(entry: CatalogEntry): number {
+  return entry.acquisitions.findIndex((acquisition) => FORMAT_LABELS[acquisition.type.split(";")[0]]);
 }
 
-function useAcquire() {
-  const parentId = useReaderSession((state) => state.libraryTargetParentId);
+/** Show a book in the right sidebar's Book tab. */
+function useSelectInSidebar() {
+  const setSelection = useReaderSession((state) => state.setSidebarSelection);
   return useCallback(
-    async (sourceId: string, entry: CatalogEntry, acquisitionIndex: number) => {
-      try {
-        const result = await readerApi.acquire({ sourceId, entry, acquisitionIndex, parentId });
-        window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
-        notifyBooksChanged();
-        toast.success(result.duplicate ? "Already in your library" : "Added to your library", {
-          description: entry.title,
-          action: { label: "Read", onClick: () => openBook(result.contentId, entry.title) },
-        });
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Could not add this book");
-      }
+    (selection: Parameters<typeof setSelection>[1]) => {
+      setSelection(READER_LIBRARY_CONTENT_ID, selection);
+      revealReaderSidebar(READER_LIBRARY_CONTENT_ID);
     },
-    [parentId]
+    [setSelection]
   );
 }
 
@@ -105,14 +92,14 @@ function ResultsList({
   onNavigate?: (href: string, title: string) => void;
 }) {
   const acquire = useAcquire();
-  const [selected, setSelected] = useState<CatalogEntry | null>(null);
+  const select = useSelectInSidebar();
+  const selection = useReaderSession(
+    (state) => state.sidebarSelection[READER_LIBRARY_CONTENT_ID] ?? null
+  );
+  const selectedKey = selection?.kind === "entry" ? entryKey(selection.entry) : null;
   const entries = uniqueEntries(page.entries);
-  // A panel for an entry that scrolled out of a new result set closes itself.
-  const selectedEntry =
-    selected && entries.some((entry) => entryKey(entry) === entryKey(selected)) ? selected : null;
   return (
-    <div className="flex items-start gap-4">
-    <div className="min-w-0 flex-1 space-y-3">
+    <div className="space-y-3">
       {page.navigation.length > 0 && onNavigate && (
         <ul className="grid gap-1 sm:grid-cols-2">
           {page.navigation.map((nav) => (
@@ -134,20 +121,26 @@ function ResultsList({
           ))}
         </ul>
       )}
-      {page.entries.length > 0 && (
-        <div className="grid gap-3 lg:grid-cols-2">
-          {entries.map((entry) => (
-            <CatalogEntryCard
-              key={entryKey(entry)}
-              entry={entry}
-              selected={selectedEntry !== null && entryKey(selectedEntry) === entryKey(entry)}
-              onOpen={setSelected}
-              onAdd={(target, index) => acquire(sourceId, target, index)}
-            />
-          ))}
+      {entries.length > 0 && (
+        <div className={BOOK_TILE_GRID}>
+          {entries.map((entry) => {
+            const readable = firstReadableIndex(entry);
+            return (
+              <BookTile
+                key={entryKey(entry)}
+                title={entry.title}
+                authors={entry.authors}
+                coverUrl={entry.coverUrl}
+                badge={entry.license}
+                selected={selectedKey === entryKey(entry)}
+                onSelect={() => select({ kind: "entry", sourceId, entry })}
+                onQuickAdd={readable >= 0 ? () => acquire(sourceId, entry, readable) : undefined}
+              />
+            );
+          })}
         </div>
       )}
-      {page.entries.length === 0 && page.navigation.length === 0 && (
+      {entries.length === 0 && page.navigation.length === 0 && (
         <p className="text-sm text-muted-foreground">
           No books found. Try a specific title or author — very common words like &quot;the&quot; are
           ignored by most catalogs.
@@ -164,33 +157,35 @@ function ResultsList({
         </button>
       )}
     </div>
-      {selectedEntry && (
-        <BookDetailsPanel
-          key={entryKey(selectedEntry)}
-          className="sticky top-0 max-h-[calc(100vh-12rem)] w-80 shrink-0 xl:w-96"
-          subject={subjectFromEntry(selectedEntry)}
-          query={queryFromEntry(sourceId, selectedEntry)}
-          entry={selectedEntry}
-          onAdd={(target, index) => acquire(sourceId, target, index)}
-          onClose={() => setSelected(null)}
-        />
-      )}
-    </div>
   );
 }
 
 function MyBooks({ onFind }: { onFind: () => void }) {
-  const targetParentId = useReaderSession((state) => state.libraryTargetParentId);
-  const [placing, setPlacing] = useState(false);
   const [books, setBooks] = useState<BookMetaDto[] | null>(null);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [version, setVersion] = useState(0);
+  const select = useSelectInSidebar();
+  const selection = useReaderSession(
+    (state) => state.sidebarSelection[READER_LIBRARY_CONTENT_ID] ?? null
+  );
+  const selectedId = selection?.kind === "book" ? selection.book.contentId : null;
+
+  useEffect(() => {
+    const reload = () => setVersion((current) => current + 1);
+    window.addEventListener(READER_BOOKS_CHANGED_EVENT, reload);
+    return () => window.removeEventListener(READER_BOOKS_CHANGED_EVENT, reload);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
     readerApi
       .books()
-      .then((data) => !cancelled && setBooks(data.books))
+      .then((data) => {
+        if (!cancelled) {
+          setBooks(data.books);
+          setError(null);
+        }
+      })
       .catch((caught: unknown) => {
         if (cancelled) return;
         setError(caught instanceof Error ? caught.message : "Could not load your books");
@@ -199,9 +194,7 @@ function MyBooks({ onFind }: { onFind: () => void }) {
     return () => {
       cancelled = true;
     };
-  }, []);
-
-  const selectedBook = books?.find((book) => book.contentId === selectedId) ?? null;
+  }, [version]);
 
   if (!books) return <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />;
   if (error) return <p className="text-sm text-muted-foreground">{error}</p>;
@@ -225,105 +218,19 @@ function MyBooks({ onFind }: { onFind: () => void }) {
     );
   }
   return (
-    <div className="flex items-start gap-4">
-    <div className="grid min-w-0 flex-1 grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5">
+    <div className={BOOK_TILE_GRID}>
       {books.map((book) => (
-        <button
+        <BookTile
           key={book.contentId}
-          type="button"
-          onClick={() => setSelectedId(book.contentId)}
-          onDoubleClick={() => openBook(book.contentId, book.title)}
-          title="Click for details · double-click to read"
-          className={`group flex flex-col gap-1 rounded-md text-left ${
-            selectedId === book.contentId ? "ring-2 ring-primary ring-offset-2 ring-offset-background" : ""
-          }`}
-        >
-          <div className="aspect-[2/3] overflow-hidden rounded-md bg-black/5 shadow-sm transition group-hover:shadow-md dark:bg-white/5">
-            {book.coverUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element -- remote catalog covers, arbitrary hosts
-              <img
-                src={book.coverUrl}
-                alt=""
-                loading="lazy"
-                referrerPolicy="no-referrer"
-                className="h-full w-full object-cover"
-              />
-            ) : (
-              <div className="flex h-full flex-col items-center justify-center gap-2 p-3 text-center">
-                <BookOpen className="h-6 w-6 text-muted-foreground" />
-                <span className="line-clamp-3 text-xs font-medium">{book.title}</span>
-              </div>
-            )}
-          </div>
-          <span className="line-clamp-2 text-xs font-medium">{book.title}</span>
-          {book.authors.length > 0 && (
-            <span className="truncate text-[11px] text-muted-foreground">{book.authors.join(", ")}</span>
-          )}
-          {book.readingStatus && (
-            <span className="text-[11px] text-primary">{STATUS_LABELS[book.readingStatus]}</span>
-          )}
-        </button>
-      ))}
-    </div>
-      {selectedBook && (
-        <BookDetailsPanel
-          key={selectedBook.contentId}
-          className="sticky top-0 max-h-[calc(100vh-12rem)] w-80 shrink-0 xl:w-96"
-          subject={{
-            title: selectedBook.title,
-            authors: selectedBook.authors,
-            coverUrl: selectedBook.coverUrl,
-            summary: selectedBook.description,
-            publishedYear: selectedBook.publishedYear,
-            language: selectedBook.language,
-            license: selectedBook.license,
-            isbn: selectedBook.isbn,
-            publisher: selectedBook.publisher,
-          }}
-          query={{
-            title: selectedBook.title,
-            author: selectedBook.authors[0],
-            isbn: selectedBook.isbn ?? undefined,
-            openLibraryId: selectedBook.openLibraryId ?? undefined,
-            contentId: selectedBook.contentId,
-          }}
-          onRead={() => openBook(selectedBook.contentId, selectedBook.title)}
-          extraActions={
-            targetParentId ? (
-              <button
-                type="button"
-                disabled={placing}
-                onClick={async () => {
-                  setPlacing(true);
-                  try {
-                    const result = await readerApi.placeOnShelf({
-                      contentId: selectedBook.contentId,
-                      parentId: targetParentId,
-                      selectedId: null,
-                    });
-                    window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
-                    toast.success(
-                      result.outcome === "created"
-                        ? "Shortcut added to the folder"
-                        : result.outcome === "exists"
-                          ? "That folder already has a shortcut to this book"
-                          : "The book already lives in that folder"
-                    );
-                  } catch (error) {
-                    toast.error(error instanceof Error ? error.message : "Could not add the shortcut");
-                  } finally {
-                    setPlacing(false);
-                  }
-                }}
-                className="inline-flex h-8 items-center rounded border border-black/10 px-3 text-xs dark:border-white/10"
-              >
-                Add shortcut to folder
-              </button>
-            ) : null
-          }
-          onClose={() => setSelectedId(null)}
+          title={book.title}
+          authors={book.authors}
+          coverUrl={book.coverUrl}
+          status={book.readingStatus ? STATUS_LABELS[book.readingStatus] : null}
+          selected={selectedId === book.contentId}
+          onSelect={() => select({ kind: "book", book })}
+          onOpen={() => openBookTab(book.contentId, book.title)}
         />
-      )}
+      ))}
     </div>
   );
 }
@@ -787,8 +694,9 @@ export function LibraryView() {
           <BookOpen className="h-5 w-5" /> Library
         </h1>
         <p className="text-xs text-muted-foreground">
-          Books you add land in {targetParentId ? "the folder you chose" : "your Books folder"} as
-          ordinary files — read and mark them up here.
+          Books you add are saved as ordinary files{" "}
+          {targetParentId ? "in the folder you opened the Library from" : "at the top of your file tree"} —
+          read and mark them up here.
         </p>
         <nav className="mt-3 flex flex-wrap gap-1" role="tablist">
           {TABS.map((item) => (

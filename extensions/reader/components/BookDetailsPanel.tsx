@@ -34,7 +34,7 @@ export interface BookPanelSubject {
 interface BookDetailsPanelProps {
   subject: BookPanelSubject;
   query: BookDetailsQuery;
-  onClose: () => void;
+  onClose?: () => void;
   /** Catalog entry → offer Add (with the enriched description). */
   entry?: CatalogEntry;
   onAdd?: (entry: CatalogEntry, acquisitionIndex: number) => Promise<void>;
@@ -104,9 +104,11 @@ export function BookDetailsPanel({
         <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           About this book
         </span>
-        <button type="button" aria-label="Close" onClick={onClose} className="rounded p-1 hover:bg-black/5 dark:hover:bg-white/10">
-          <X className="h-4 w-4" />
-        </button>
+        {onClose && (
+          <button type="button" aria-label="Close" onClick={onClose} className="rounded p-1 hover:bg-black/5 dark:hover:bg-white/10">
+            <X className="h-4 w-4" />
+          </button>
+        )}
       </div>
       <div className="flex-1 space-y-3 overflow-auto p-4">
         <div className="flex gap-3">

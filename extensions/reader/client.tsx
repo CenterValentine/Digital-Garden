@@ -5,9 +5,11 @@ import {
   type BookMetaDto,
 } from "@/lib/domain/reader/types";
 import { useContentStore } from "@/state/content-store";
-import { useTreeStateStore } from "@/state/tree-state-store";
+import { resolveServerCreateParent } from "@/lib/domain/content/create-target";
 import { ReaderBookshelfController } from "./components/ReaderBookshelfController";
 import { ReaderContentViewer } from "./components/ReaderContentViewer";
+import { ReaderSidebarPanel } from "./components/ReaderSidebarPanel";
+import { READER_SIDEBAR_SVG_PATH } from "./lib/sidebar";
 import { readerApi } from "./lib/api";
 import {
   READER_EXTENSION_ID,
@@ -23,7 +25,8 @@ import { useReaderSession } from "./state/reader-store";
 const SHELF_MENU_LIMIT = 12;
 
 function openLibrary(parentId: string | null) {
-  useReaderSession.getState().setLibraryTargetParentId(parentId);
+  // Books added from the Library land where this "+" pointed.
+  useReaderSession.getState().setLibraryTargetParentId(resolveServerCreateParent(parentId));
   useContentStore.getState().setSelectedContentId(READER_LIBRARY_CONTENT_ID, {
     title: "Library",
     contentType: READER_VIRTUAL_CONTENT_TYPE,
@@ -40,17 +43,16 @@ function openBook(book: BookMetaDto) {
 }
 
 /**
- * Choosing a book from "+ → Reader → Books": drop a shortcut to it in the
- * folder the menu targets (the folder's own Add menu, else the tree
- * selection), then open it. The book file itself never moves.
+ * Choosing a book from "+ → Reader → Books": drop a shortcut to it where the
+ * "+" pointed (the tree's create rule: folder → inside, item → beside it,
+ * nothing → top of the tree / view root), then open it. The book file never
+ * moves.
  */
 async function placeBook(book: BookMetaDto, parentId: string | null) {
-  const selectedId = useTreeStateStore.getState().selectedIds[0] ?? null;
   try {
     const result = await readerApi.placeOnShelf({
       contentId: book.contentId,
-      parentId,
-      selectedId: parentId ? null : selectedId,
+      parentId: resolveServerCreateParent(parentId),
     });
     if (result.outcome === "created") {
       window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
@@ -142,6 +144,11 @@ export const readerExtensionRuntime: ExtensionRuntime = {
   virtualContent: [
     { prefix: READER_VIRTUAL_PREFIX, contentType: READER_VIRTUAL_CONTENT_TYPE },
   ],
+  contentSidebarPanel: {
+    label: "Book",
+    svgPath: READER_SIDEBAR_SVG_PATH,
+    component: ReaderSidebarPanel,
+  },
   createMenuItems: readerMenu,
   shellControllers: [ReaderBookshelfController],
   settingsDialog: ReaderSettingsDialog,

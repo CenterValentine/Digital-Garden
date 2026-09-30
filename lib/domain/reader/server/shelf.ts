@@ -11,45 +11,19 @@ import { prisma } from "@/lib/database/client";
 import { generateUniqueSlug } from "@/lib/domain/content";
 import { readerDb } from "../db";
 import { ReaderFetchError } from "./http";
+import { resolveFolderTarget } from "./library";
 
 export interface PlaceBookResult {
-  /** Folder the shortcut landed in; null when the book was only opened. */
+  /** Folder the shortcut landed in (null = top of the tree). */
   folderId: string | null;
   shortcutId: string | null;
-  /** "created" | "exists" (a shortcut already there) | "home" (the book lives there) | "opened" (no folder target). */
-  outcome: "created" | "exists" | "home" | "opened";
-}
-
-/**
- * Resolve the folder a "+" action targets: an explicit folder, else the
- * tree selection (a folder itself, or the selected item's parent) — the same
- * rule the tree's own create path uses (LeftSidebarContent.handleCreate).
- */
-async function resolveTargetFolder(
-  ownerId: string,
-  parentId: string | null,
-  selectedId: string | null
-): Promise<string | null> {
-  const candidateId = parentId ?? selectedId;
-  if (!candidateId) return null;
-  const node = await prisma.contentNode.findFirst({
-    where: { id: candidateId, ownerId, deletedAt: null },
-    select: { id: true, contentType: true, parentId: true },
-  });
-  if (!node) return null;
-  if (node.contentType === "folder") return node.id;
-  if (parentId) throw new ReaderFetchError("Books can only be placed in a folder", 400);
-  if (!node.parentId) return null;
-  const parent = await prisma.contentNode.findFirst({
-    where: { id: node.parentId, ownerId, deletedAt: null, contentType: "folder" },
-    select: { id: true },
-  });
-  return parent?.id ?? null;
+  /** "created" | "exists" (a shortcut already there) | "home" (the book lives there). */
+  outcome: "created" | "exists" | "home";
 }
 
 export async function placeBookShortcut(
   ownerId: string,
-  input: { contentId: string; parentId: string | null; selectedId: string | null }
+  input: { contentId: string; parentId: string | null }
 ): Promise<PlaceBookResult> {
   const book = await prisma.contentNode.findFirst({
     where: { id: input.contentId, ownerId, deletedAt: null, contentType: "file" },
@@ -57,8 +31,9 @@ export async function placeBookShortcut(
   });
   if (!book) throw new ReaderFetchError("Book not found", 404);
 
-  const folderId = await resolveTargetFolder(ownerId, input.parentId, input.selectedId);
-  if (!folderId) return { folderId: null, shortcutId: null, outcome: "opened" };
+  // The "+" target, resolved client-side with the tree's rule; a non-folder
+  // makes the shortcut its sibling, nothing means the top of the tree.
+  const folderId = await resolveFolderTarget(ownerId, input.parentId);
   if (folderId === book.parentId) return { folderId, shortcutId: null, outcome: "home" };
 
   const existing = await prisma.contentNode.findFirst({

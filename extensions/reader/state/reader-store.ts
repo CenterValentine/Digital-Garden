@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import type { BookMetaDto, CatalogEntry } from "@/lib/domain/reader/types";
 
 export type ReaderTheme = "system" | "light" | "sepia" | "dark";
 export type ReaderFlow = "paginated" | "scrolled";
@@ -38,14 +39,30 @@ export const useReaderPreferences = create<ReaderPreferencesState>()(
   )
 );
 
+/** What the right-sidebar Book panel shows for a given reader tab. */
+export type ReaderSidebarSelection =
+  | { kind: "entry"; sourceId: string; entry: CatalogEntry }
+  | { kind: "book"; book: BookMetaDto };
+
 interface ReaderSessionState {
   /** Folder chosen via "+ → Reader → Books" in a folder's Add menu. */
   libraryTargetParentId: string | null;
   setLibraryTargetParentId: (parentId: string | null) => void;
+  /** Keyed by the tab's content id (reader:library, or a book file id). */
+  sidebarSelection: Record<string, ReaderSidebarSelection>;
+  setSidebarSelection: (contentId: string, selection: ReaderSidebarSelection | null) => void;
 }
 
 /** Ephemeral (not persisted) cross-component reader state. */
 export const useReaderSession = create<ReaderSessionState>()((set) => ({
   libraryTargetParentId: null,
   setLibraryTargetParentId: (libraryTargetParentId) => set({ libraryTargetParentId }),
+  sidebarSelection: {},
+  setSidebarSelection: (contentId, selection) =>
+    set((state) => {
+      const next = { ...state.sidebarSelection };
+      if (selection) next[contentId] = selection;
+      else delete next[contentId];
+      return { sidebarSelection: next };
+    }),
 }));

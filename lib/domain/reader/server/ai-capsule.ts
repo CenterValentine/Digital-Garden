@@ -74,7 +74,15 @@ export async function buildBookCapsule(
     `Content id ${contentId}. read_content returns an excerpt of its text; the user reads and highlights it in Digital Garden's reader.`,
   ];
   if (meta.readingStatus) {
-    lines.push(`Reading status: ${meta.readingStatus === "want" ? "want to read" : meta.readingStatus}.`);
+    lines.push(
+      `Reading status: ${
+        meta.readingStatus === "want"
+          ? "want to read"
+          : meta.readingStatus === "reference"
+            ? "reference (kept to consult, not read straight through)"
+            : meta.readingStatus
+      }.`
+    );
   }
   if (progress) {
     const locator = progress.locator as ReaderLocator;

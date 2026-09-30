@@ -12,8 +12,10 @@ import {
   type ExtensionSettingsEntry,
 } from "@/lib/extensions";
 import { useExtensionActivationStore } from "@/state/extension-activation-store";
+import { useContentSidebarClaims } from "./content-sidebar";
 import type {
   ExtensionActionNavItem,
+  ExtensionContentSidebarPanel,
   ExtensionContentViewerMatch,
   ExtensionCreateMenuItem,
   ExtensionContentViewerProps,
@@ -199,6 +201,21 @@ export function resolveExtensionVirtualContentType(
     if (match) return match.contentType;
   }
   return null;
+}
+
+/**
+ * The content-driven sidebar panel claimed for `contentId` (see
+ * lib/extensions/content-sidebar.ts), when its extension is enabled.
+ */
+export function useClaimedContentSidebarPanel(
+  contentId: string | null
+): ExtensionContentSidebarPanel | null {
+  const extensionId = useContentSidebarClaims((state) =>
+    contentId ? state.claims[contentId] ?? null : null
+  );
+  const runtimes = useEnabledExtensionRuntimes();
+  if (!extensionId) return null;
+  return runtimes.find((runtime) => runtime.id === extensionId)?.contentSidebarPanel ?? null;
 }
 
 export function useExtensionRightSidebarPanel(

@@ -123,6 +123,14 @@ export interface ExtensionContentViewerProps
   paneId: WorkspacePaneId;
 }
 
+/** A right-sidebar tab an extension shows for content its viewer claimed. */
+export interface ExtensionContentSidebarPanel {
+  label: string;
+  /** 24×24 stroke path for the tab icon (RightSidebarHeader draws inline SVG). */
+  svgPath: string;
+  component: ComponentType<{ contentId: string }>;
+}
+
 export interface ExtensionRuntime {
   id: string;
   leftSidebarPanel?: ComponentType;
@@ -132,6 +140,8 @@ export interface ExtensionRuntime {
     input: ExtensionContentViewerMatch
   ) => boolean;
   rightSidebarPanel?: ComponentType;
+  /** Right-sidebar tab for content this extension's viewer claimed. */
+  contentSidebarPanel?: ExtensionContentSidebarPanel;
   /** Static items, or a builder read each time the menu opens (dynamic lists). */
   createMenuItems?: ExtensionCreateMenuItem[] | (() => ExtensionCreateMenuItem[]);
   virtualContent?: ExtensionVirtualContent[];

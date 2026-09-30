@@ -24,7 +24,7 @@ export const GET = readerRouteWithParams<{ contentId: string }, unknown>(
 );
 
 const patchSchema = z.object({
-  readingStatus: z.enum(["want", "reading", "finished"]).nullable(),
+  readingStatus: z.enum(["want", "reading", "finished", "reference"]).nullable(),
 });
 
 export const PATCH = readerRouteWithParams<{ contentId: string }, unknown>(

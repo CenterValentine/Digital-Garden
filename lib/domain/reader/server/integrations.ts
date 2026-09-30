@@ -401,7 +401,8 @@ export async function importReadwise(ownerId: string): Promise<HighlightImportSu
 
 // ── Hardcover ──────────────────────────────────────────────────────────────
 
-const HARDCOVER_STATUS: Record<ReadingStatus, number> = {
+/** Hardcover shelves; statuses without one (reference) stay local. */
+const HARDCOVER_STATUS: Partial<Record<ReadingStatus, number>> = {
   want: 1,
   reading: 2,
   finished: 3,
@@ -440,7 +441,7 @@ export async function setReadingStatus(
   if (!meta) throw new ReaderFetchError("Book not found", 404);
   await readerDb.bookMeta.update({ where: { contentId }, data: { readingStatus: status } });
 
-  const token = status ? await tokenFor(ownerId, "hardcover") : null;
+  const token = status && HARDCOVER_STATUS[status] ? await tokenFor(ownerId, "hardcover") : null;
   if (!token || !status) return { syncedToHardcover: false };
 
   let bookId = meta.hardcoverBookId ? Number(meta.hardcoverBookId) : null;
@@ -465,7 +466,7 @@ export async function setReadingStatus(
   await hardcoverQuery(
     token,
     "mutation ($bookId: Int!, $statusId: Int!) { insert_user_book(object: { book_id: $bookId, status_id: $statusId }) { id error } }",
-    { bookId, statusId: HARDCOVER_STATUS[status] }
+    { bookId, statusId: HARDCOVER_STATUS[status]! }
   );
   if (!meta.hardcoverBookId) {
     await readerDb.bookMeta.update({

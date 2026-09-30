@@ -1,10 +1,11 @@
 /**
  * The reader's library (server-only).
  *
- * A book is an ordinary file node; the library is a folder (Principle 1 —
- * EREADER-PLAN.md §1). Acquiring a book downloads a DRM-free file into the
- * folder the user picked (the "+" menu's target) or their `Books/` folder,
- * and writes a BookMeta side row.
+ * A book is an ordinary file node (Principle 1 — EREADER-PLAN.md §1).
+ * Acquiring a book downloads a DRM-free file to wherever the "+" pointed —
+ * the target folder, beside a selected item, or the top of the tree — and
+ * writes a BookMeta side row. "My books" is every file with BookMeta, wherever
+ * it lives.
  */
 
 import "server-only";
@@ -81,15 +82,27 @@ export async function ensureLibraryFolder(ownerId: string): Promise<string> {
   return created.id;
 }
 
-async function assertFolderTarget(ownerId: string, parentId: string): Promise<void> {
-  const parent = await prisma.contentNode.findFirst({
-    where: { id: parentId, ownerId, deletedAt: null },
-    select: { contentType: true },
-  });
-  if (!parent) throw new ReaderFetchError("Folder not found", 404);
-  if (parent.contentType !== "folder") {
-    throw new ReaderFetchError("Books can only be added to a folder", 400);
+/**
+ * Server half of the create-target rule (lib/domain/content/create-target.ts):
+ * a folder holds the book; any other item makes it a sibling (its folder);
+ * a missing / trashed target, or none, means the top of the tree.
+ */
+export async function resolveFolderTarget(
+  ownerId: string,
+  parentId: string | null | undefined
+): Promise<string | null> {
+  let candidate = parentId ?? null;
+  for (let hop = 0; candidate && hop < 3; hop++) {
+    const node: { id: string; contentType: string; parentId: string | null } | null =
+      await prisma.contentNode.findFirst({
+        where: { id: candidate, ownerId, deletedAt: null },
+        select: { id: true, contentType: true, parentId: true },
+      });
+    if (!node) return null;
+    if (node.contentType === "folder") return node.id;
+    candidate = node.parentId;
   }
+  return null;
 }
 
 function sanitizeFileName(title: string, extension: string): string {
@@ -180,8 +193,9 @@ export async function acquireBook(input: AcquireInput): Promise<AcquireResult> {
   if (entry.acquisitions.length === 0) {
     throw new ReaderFetchError("This book has no free download — open it at the source instead", 400);
   }
-  const parentId = input.parentId ?? (await ensureLibraryFolder(ownerId));
-  if (input.parentId) await assertFolderTarget(ownerId, input.parentId);
+  // Where the "+" pointed (resolved client-side with the tree's rule); no
+  // forced Books folder — the user's structure decides.
+  const parentId = await resolveFolderTarget(ownerId, input.parentId);
 
   const ordered = [
     ...entry.acquisitions.slice(input.acquisitionIndex ?? 0),
