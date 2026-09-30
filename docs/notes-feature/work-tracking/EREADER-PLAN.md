@@ -1,5 +1,5 @@
 ---
-status: building — R0, R1, R2 and the R4 imports/integrations built 2026-09-29 on `claude/inspiring-franklin-2g7h8l` (see §11). Owner must apply the staged reader migration. R3 (Scriptures) and Research are menu stubs.
+status: building — R0, R1, R2 and the R4 imports/integrations built 2026-09-29 on `claude/inspiring-franklin-2g7h8l` (see §11). Owner must apply the staged reader migration. R3 (Scriptures — LDS standard works) built 2026-09-30, see SCRIPTURES-INTEGRATION-PLAN.md §11 (its schema is staged separately). Research is a menu stub.
 created: 2026-09-29
 supersedes_in_part: SCRIPTURES-INTEGRATION-PLAN.md §4.4 and §5.1 (the scripture reader and its highlight store move here; the corpus, references and citation index stay there)
 ---
@@ -247,7 +247,7 @@ to a spot.
 | **R0: Read an uploaded book** | `createMenuItems` registry field + Reader submenu. `extensions/reader/` skeleton (both extension lists, `extensions:check`). EPUB MIME support plus the DRM gate. foliate-js viewer for EPUB file nodes. `ReadingProgress`. Typography settings. |
 | **R1: Mark it up** | `ReaderAnnotation` (highlight, note, bookmark). Selection toolbar. Annotations sidebar tab. `readerLink` inline node (TipTap checklist, Hocuspocus redeploy). Send to note. |
 | **R2: Library** | `BookSource` adapters: OPDS (with Gutenberg and OAPEN presets, plus custom catalogs), Gutendex, Open Library. Library dialog (search / browse / catalogs / upload). Acquire into the library folder. `BookMeta` and covers. Grid view as the library shelf. |
-| **R3: Scriptures in the reader** | Scriptures plan P0 (corpus) and P1 (references, citation index) feed a `CorpusRenderer` source that uses the same annotation store. Replaces scriptures plan §4.4 and §5.1. |
+| **R3: Scriptures in the reader** | Scriptures plan P0 (corpus) and P1 (references, citation index) feed a `CorpusRenderer` source that uses the same annotation store. Replaces scriptures plan §4.4 and §5.1. **Built 2026-09-30 (LDS) as `ScriptureReader` — scriptures plan §11; citation index still open.** |
 | **R4: Bring in the rest** | Kindle clippings and Readwise import. Hardcover sync. Libby availability link. Highlights → database. Memorize to flashcards. AI tools. Speed-reader EPUB source. PDF in the reader by default. |
 | **Later** | Library lending through Readium LCP / EDRLab WCP (Palace Project, OverDrive): certification plus licensing fees, a business decision first. Audiobooks (Readium supports them). |
 
