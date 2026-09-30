@@ -102,6 +102,8 @@ const constructs: Array<{ name: string; doc: JSONContent }> = [
   { name: "literal {.collapsed} heading text", doc: doc(h(2, "tricky {.collapsed}")) },
   // In-document heading link (wikiLink.headingSlug) inside a paragraph.
   { name: "wikiLink + headingSlug", doc: doc(p([t("see "), { type: "wikiLink", attrs: { targetTitle: "Setup", headingSlug: "setup" } }])) },
+  // Anchored link (wikiLink.anchor + anchorLabel): a book highlight.
+  { name: "wikiLink + anchor", doc: doc(p([t("as "), { type: "wikiLink", attrs: { targetId: "book1", targetTitle: "Pride and Prejudice", anchor: "annotation:abc123", anchorLabel: "It is a truth universally acknowledged" } }])) },
   { name: "table", doc: doc({ type: "table", content: [{ type: "tableRow", content: [tc("A"), tc("B")] }, { type: "tableRow", content: [tc("1"), tc("2")] }] }) },
   // Private (commented-out) content: the inline mark alone, nested in other
   // marks, a block, a block nested inside a blockquote, and the pathological

@@ -16,6 +16,12 @@ import { SuggestionOptions, SuggestionProps } from "@tiptap/suggestion";
 import tippy, { Instance as TippyInstance, GetReferenceClientRect } from "tippy.js";
 import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
 import { computeHeadingIds } from "@/lib/domain/content/heading-ids";
+import {
+  clipAnchorLabel,
+  listLinkAnchors,
+  type LinkAnchorItem,
+  type LinkAnchorTarget,
+} from "@/lib/domain/content/link-anchor";
 
 // Extends the fetcher's shape because note items are built by spreading it
 // (`{ kind: "note", ...note }`) — new fetcher fields flow through untouched.
@@ -30,7 +36,14 @@ interface WikiLinkHeadingItem {
   level: number;
 }
 
-type WikiLinkItem = WikiLinkNoteItem | WikiLinkHeadingItem;
+/** A spot inside a target (`[[Title#` step) — lib/domain/content/link-anchor.ts. */
+interface WikiLinkAnchorItem {
+  kind: "anchor";
+  target: LinkAnchorTarget;
+  anchor: LinkAnchorItem;
+}
+
+type WikiLinkItem = WikiLinkNoteItem | WikiLinkHeadingItem | WikiLinkAnchorItem;
 
 /** Item shape the app-layer fetcher returns (kind is added internally). */
 export interface WikiLinkSuggestionItem {
@@ -61,6 +74,10 @@ interface WikiLinkListProps {
   items: WikiLinkItem[];
   command: (item: WikiLinkItem) => void;
   status: WikiLinkSearchStatus;
+  /** Tab on a target: list the spots inside it (`[[Title#`). */
+  drill?: (item: WikiLinkNoteItem) => void;
+  /** Set while drilled into a target — shapes the empty state. */
+  drilledTitle?: string | null;
 }
 
 interface WikiLinkListRef {
@@ -109,6 +126,15 @@ export const WikiLinkList = forwardRef<WikiLinkListRef, WikiLinkListProps>((prop
         return true;
       }
 
+      // Tab drills into the highlighted target: its highlights, headings, …
+      if (event.key === "Tab" && !event.shiftKey) {
+        const item = props.items[selectedIndex];
+        if (item?.kind === "note" && !item.row && props.drill) {
+          props.drill(item);
+          return true;
+        }
+      }
+
       return false;
     },
   }));
@@ -140,17 +166,29 @@ export const WikiLinkList = forwardRef<WikiLinkListRef, WikiLinkListProps>((prop
 
     return (
       <div className="rounded-lg border border-white/10 bg-gray-900/95 p-3 shadow-xl backdrop-blur-sm">
-        <div className="text-sm text-gray-400">No matches found</div>
+        <div className="text-sm text-gray-400">
+          {props.drilledTitle
+            ? `Nothing to link inside “${props.drilledTitle}” yet`
+            : "No matches found"}
+        </div>
       </div>
     );
   }
+
+  const canDrill = Boolean(props.drill) && props.items.some((item) => item.kind === "note" && !item.row);
 
   return (
     <div className="rounded-lg border border-white/10 bg-gray-900/95 shadow-xl backdrop-blur-sm overflow-hidden">
       <div className="max-h-60 overflow-y-auto p-1">
         {props.items.map((item, index) => (
           <button
-            key={item.kind === "note" ? item.id : `#${item.slug}`}
+            key={
+              item.kind === "note"
+                ? item.id
+                : item.kind === "anchor"
+                  ? `^${item.anchor.anchor}`
+                  : `#${item.slug}`
+            }
             onClick={() => selectItem(index)}
             className={`w-full rounded px-3 py-2 text-left text-sm transition-colors ${
               index === selectedIndex
@@ -158,7 +196,23 @@ export const WikiLinkList = forwardRef<WikiLinkListRef, WikiLinkListProps>((prop
                 : "text-gray-300 hover:bg-white/5"
             }`}
           >
-            {item.kind === "heading" ? (
+            {item.kind === "anchor" ? (
+              <span className="flex items-start gap-2">
+                {item.anchor.color ? (
+                  <span
+                    aria-hidden
+                    className="mt-1.5 h-2 w-2 shrink-0 rounded-full"
+                    style={{ background: item.anchor.color }}
+                  />
+                ) : null}
+                <span className="min-w-0">
+                  <span className="line-clamp-2">{item.anchor.label}</span>
+                  {item.anchor.detail ? (
+                    <span className="block truncate text-[11px] text-gray-500">{item.anchor.detail}</span>
+                  ) : null}
+                </span>
+              </span>
+            ) : item.kind === "heading" ? (
               <span
                 className="flex items-center gap-2"
                 style={{ paddingLeft: `${(item.level - 1) * 8}px` }}
@@ -190,6 +244,11 @@ export const WikiLinkList = forwardRef<WikiLinkListRef, WikiLinkListProps>((prop
           </button>
         ))}
       </div>
+      {canDrill && (
+        <div className="border-t border-white/10 px-3 py-1 text-[10px] text-gray-500">
+          Tab — link to a passage inside
+        </div>
+      )}
     </div>
   );
 });
@@ -205,6 +264,10 @@ export function createWikiLinkSuggestion(
   let requestSeq = 0;
   let latestSettled = true;
   let latestFailed = false;
+  // `[[Title#` — the target being drilled into (set by Tab, or resolved from
+  // a typed title), and the label for its empty state.
+  let drilled: LinkAnchorTarget | null = null;
+  let drilledTitle: string | null = null;
 
   const currentStatus = (): WikiLinkSearchStatus =>
     !latestSettled ? "loading" : latestFailed ? "error" : "ready";
@@ -235,6 +298,43 @@ export function createWikiLinkSuggestion(
           }));
       }
 
+      // [[Title#… → the spots inside that target (a book's highlights, …),
+      // listed by whichever provider owns its kind of content.
+      const hashAt = query.indexOf("#");
+      if (hashAt > 0) {
+        const title = query.slice(0, hashAt);
+        const anchorQuery = query.slice(hashAt + 1).replace(/^\^/, "").trim().toLowerCase();
+        const requestId = ++requestSeq;
+        latestSettled = false;
+        try {
+          let target = drilled && drilled.title === title ? drilled : null;
+          if (!target) {
+            const matches = await fetchNotes(title);
+            const exact = matches.find(
+              (note) => !note.row && note.title.toLowerCase() === title.trim().toLowerCase()
+            );
+            target = exact ? { id: exact.id, title: exact.title, contentType: exact.contentType } : null;
+            drilled = target;
+          }
+          drilledTitle = target?.title ?? title;
+          const anchors = target ? await listLinkAnchors(target, anchorQuery) : [];
+          if (requestId === requestSeq) {
+            latestSettled = true;
+            latestFailed = false;
+          }
+          return target
+            ? anchors.map((anchor) => ({ kind: "anchor" as const, target, anchor }))
+            : [];
+        } catch {
+          if (requestId === requestSeq) {
+            latestSettled = true;
+            latestFailed = true;
+          }
+          return [];
+        }
+      }
+      drilledTitle = null;
+
       // Sequence the fetches so a slow earlier request can't overwrite a
       // later one's status: only the most recent request may settle it.
       const requestId = ++requestSeq;
@@ -258,6 +358,20 @@ export function createWikiLinkSuggestion(
     render: () => {
       let component: ReactRenderer<WikiLinkListRef> | undefined;
       let popup: TippyInstance[] | undefined;
+      let latest: SuggestionProps | undefined;
+
+      // Tab: rewrite the typed text to `[[Title#` — the suggestion re-queries
+      // and lists the spots inside that target.
+      const drill = (item: WikiLinkNoteItem) => {
+        if (!latest) return;
+        drilled = { id: item.id, title: item.title, contentType: item.contentType };
+        latest.editor
+          .chain()
+          .focus()
+          .insertContentAt(latest.range, `[[${item.title}#`)
+          .run();
+      };
+      const extraProps = () => ({ drill, drilledTitle });
 
       const destroyPopup = () => {
         popup?.[0]?.destroy();
@@ -267,8 +381,9 @@ export function createWikiLinkSuggestion(
       };
 
       const createPopup = (props: SuggestionProps, status: WikiLinkSearchStatus) => {
+        latest = props;
         component = new ReactRenderer(WikiLinkList, {
-          props: { ...props, status },
+          props: { ...props, status, ...extraProps() },
           editor: props.editor,
         });
 
@@ -302,7 +417,8 @@ export function createWikiLinkSuggestion(
             return;
           }
 
-          component.updateProps({ ...props, status: currentStatus() });
+          latest = props;
+          component.updateProps({ ...props, status: currentStatus(), ...extraProps() });
 
           if (props.clientRect) {
             popup?.[0]?.setProps({
@@ -324,7 +440,8 @@ export function createWikiLinkSuggestion(
         // access (live crash: "Cannot read properties of undefined
         // (reading 'ref')" on a keydown that raced onStart).
         onUpdate(props) {
-          component?.updateProps({ ...props, status: currentStatus() });
+          latest = props;
+          component?.updateProps({ ...props, status: currentStatus(), ...extraProps() });
 
           if (!props.clientRect) {
             return;
@@ -346,6 +463,9 @@ export function createWikiLinkSuggestion(
 
         onExit() {
           destroyPopup();
+          latest = undefined;
+          drilled = null;
+          drilledTitle = null;
         },
       };
     },
@@ -355,6 +475,21 @@ export function createWikiLinkSuggestion(
 
       // Delete the [[ trigger and any text typed
       const chain = editor.chain().focus().deleteRange(range);
+
+      if (item.kind === "anchor") {
+        chain
+          .insertContent({
+            type: "wikiLink",
+            attrs: {
+              targetId: item.target.id,
+              targetTitle: item.target.title,
+              anchor: item.anchor.anchor,
+              anchorLabel: clipAnchorLabel(item.anchor.label),
+            },
+          })
+          .run();
+        return;
+      }
 
       if (item.kind === "heading") {
         chain

@@ -2831,6 +2831,21 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             if (!f) return `${header}\n\n(file record missing)`;
             const size = `${Math.round(Number(f.fileSize) / 1024).toLocaleString("en-US")} KB`;
             const facts = `File: ${f.fileName} · ${f.mimeType} · ${size} · upload ${f.uploadStatus}`;
+            // E-books: the reader's capsule (metadata, position, highlights)
+            // plus a bounded excerpt — a whole novel's text would flood the
+            // context window.
+            const { buildBookCapsule, isBookMimeType } = await import(
+              "@/lib/domain/reader/server/ai-capsule"
+            );
+            if (isBookMimeType(f.mimeType)) {
+              const capsule = await buildBookCapsule(ctx.userId, contentId);
+              const text = f.searchText.trim();
+              const BOOK_EXCERPT_CHARS = 24_000;
+              const excerpt = text
+                ? `\n\nText excerpt (${Math.min(text.length, BOOK_EXCERPT_CHARS).toLocaleString("en-US")} of ${text.length.toLocaleString("en-US")} characters, from the start):\n${text.slice(0, BOOK_EXCERPT_CHARS)}`
+                : "\n\nNo extracted text is held for this book.";
+              return `${header}\n\n${facts}${capsule ? `\n\n${capsule}` : ""}${excerpt}`;
+            }
             const body = f.searchText.trim()
               ? `\n\nExtracted text:\n${f.searchText.trim()}`
               : "\n\nNo extracted text is held for this file. Attach it to the conversation if its contents are needed.";

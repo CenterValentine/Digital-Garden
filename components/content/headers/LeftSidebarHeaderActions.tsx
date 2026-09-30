@@ -13,10 +13,12 @@ import { Plus, ChevronRight } from "lucide-react";
 import { calculateMenuPosition, calculateSubmenuPosition } from "@/lib/core/menu-positioning";
 import {
   getNewContentMenuItems,
+  withMenuClose,
   type NewContentCallbacks,
   type NewContentMenuItem,
   type PageTemplateMenuData,
 } from "@/components/content/menu-items/new-content-menu";
+import { getExtensionCreateMenuItems } from "@/lib/extensions/client-registry";
 import { usePageTemplateStore } from "@/state/page-template-store";
 import { useContentStore } from "@/state/content-store";
 
@@ -444,7 +446,8 @@ export function LeftSidebarHeaderActions({
   const menuItems = getNewContentMenuItems(
     wrappedCallbacks,
     null,
-    pageTemplateData
+    pageTemplateData,
+    withMenuClose(getExtensionCreateMenuItems(), () => setShowMenu(false))
   );
 
   // Initial render without positioning (to measure dimensions)

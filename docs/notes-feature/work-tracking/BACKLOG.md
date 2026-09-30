@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-09-27
+last_updated: 2026-09-29
 ---
 
 # Sprint Backlog
@@ -9,6 +9,28 @@ last_updated: 2026-09-27
 **Sprint Execution Protocol**: Before commencing any sprint, always ask the user for input before planning and executing — there may be additions or modifications.
 
 ---
+
+## E-reader — proposed (2026-09-29, plan `EREADER-PLAN.md`)
+
++ → Reader → [Scriptures, Books]. One reader shell (foliate-js for EPUB/PDF, a corpus renderer for scriptures), one annotation store keyed by Readium Locators, and a library of book-source adapters (OPDS, Gutendex, Open Library, upload). Books are file nodes in a user-chosen library folder. Blocked on owner answers to the plan's §10.
+
+- [x] **R0 Read an uploaded book** (built 2026-09-29; migration staged) — `createMenuItems` extension field, `extensions/reader/`, EPUB MIME + DRM gate, foliate-js viewer, `ReadingProgress`.
+- [x] **R1 Mark it up** (built 2026-09-29) — `ReaderAnnotation`, selection toolbar, in-reader annotations panel, send to note. *Still open:* `readerLink` TipTap node, right-sidebar tab.
+- [x] **R2 Library** (built 2026-09-29; + Wikisource, OAPEN, Google Books, Standard Ebooks preset) — OPDS / Gutendex / Open Library adapters, library dialog, acquire into folder, `BookMeta` + covers.
+- [ ] **R3 Scriptures in the reader** — scriptures plan P0/P1 feed a corpus source sharing the annotation store.
+- [ ] **R4 Bring in the rest** — ~~Kindle clippings + Readwise, Hardcover, Libby link~~ (built 2026-09-29); highlights → database, flashcards, AI tools, speed-reader EPUB, PDF in reader.
+- [ ] **Research (reader stub)** — third reader source after Scriptures: open-access papers (arXiv, PubMed Central, OpenAlex/Unpaywall, Semantic Scholar) through the same shell + annotation store.
+- [ ] **CSP for /content** — foliate-js wants a script-blocking CSP; the reader sanitizer is the interim defence.
+
+## Scriptures integration — parked (reader moved to `EREADER-PLAN.md`) (2026-09-28, plan `SCRIPTURES-INTEGRATION-PLAN.md`)
+
+LDS standard works as a shared read-only corpus (seeded from the public-domain `bcbooks/scriptures-json` at a pinned SHA), with study living in the user's own notes. Blocked on owner answers to the plan's §9 open questions (shared corpus tables; talk-clipping vs site terms).
+
+- [ ] **P0 Corpus** — shared `Scripture*` tables + migration, pinned seed script cross-checked against `beandog/lds-scriptures`, read API.
+- [ ] **P1 Read & cite** — `extensions/scriptures/`, reference parser (evaluate `scripture-guide` first), `scriptureRef` inline node, reader viewer, `ScriptureCitation` index.
+- [ ] **P2 Study** — `scriptureQuote` block, "Add study note" into a user-chosen folder (lazy), Citations sidebar tab, scripture search scope.
+- [ ] **P3 Mark & memorize** — offset-anchored highlights (`ScriptureAnnotation`), flashcard "Memorize".
+- [ ] **P4 Talks & AI** — user-initiated talk clipping (never bundled), footnote → citation parsing, Talks database, AI `read_scripture` grounding tools.
 
 ## Iteration run harness — follow-ups (2026-09-27, from `feat/charter-run-harness`; plan `ITERATION-RUN-HARNESS-FIXES-PLAN.md`)
 

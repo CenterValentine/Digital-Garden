@@ -1888,6 +1888,9 @@ export async function POST(request: Request) {
                 // tiptapJson rides along so folder wiki-links inside a
                 // mentioned note can get the capsule treatment below.
                 notePayload: { select: { searchText: true, tiptapJson: true } },
+                // File mentions (e-books especially) render from their own
+                // payload instead of "(no text content available)".
+                filePayload: { select: { mimeType: true, searchText: true } },
               },
             });
             span.attr("found", result.length).summary(`${result.length} mentions`);
@@ -2015,11 +2018,45 @@ export async function POST(request: Request) {
             });
           }
 
+          // E-book mentions (and the open/bound book — it rides as the first
+          // implicit mention) get the reader's capsule: what the book is,
+          // where the user is in it, and what they highlighted.
+          const bookSections = new Map<string, string>();
+          try {
+            const { buildBookCapsule, isBookMimeType } = await import(
+              "@/lib/domain/reader/server/ai-capsule"
+            );
+            await Promise.all(
+              mentionedNodes
+                .filter(
+                  (node) =>
+                    (node.contentType === "file" &&
+                      isBookMimeType(node.filePayload?.mimeType)) ||
+                    // Library books kept as links (no free download);
+                    // the capsule returns null for ordinary links.
+                    node.contentType === "external",
+                )
+                .map(async (node) => {
+                  const capsule = await buildBookCapsule(session.user.id, node.id);
+                  if (capsule) bookSections.set(node.id, `### ${node.title}\n${capsule}`);
+                }),
+            );
+          } catch (bookError) {
+            logger.warn({
+              layer: "ai",
+              event: "ai_context:book_mention_caught",
+              summary: "book mention capsule failed — generic fallback",
+              error: bookError,
+            });
+          }
+
           const sections = mentionedNodes.map((node) => {
             const folderSection = folderSections.get(node.id);
             if (folderSection) return folderSection;
             const dataSection = dataSections.get(node.id);
             if (dataSection) return dataSection;
+            const bookSection = bookSections.get(node.id);
+            if (bookSection) return bookSection;
             // Derive live from the JSON, never trust the materialized column:
             // it may predate the private-content strip (or the atomic-inline
             // fix) — the same reason read_content re-derives. A note whose
@@ -2033,6 +2070,7 @@ export async function POST(request: Request) {
             const text =
               live ||
               node.notePayload?.searchText ||
+              node.filePayload?.searchText?.trim() ||
               "(no text content available)";
             const props = rowPropSections.get(node.id);
             return `### ${node.title}\n${props ? `${props}\n\n` : ""}${text.slice(0, 2000)}`;
