@@ -121,6 +121,9 @@ import { useEditorInstanceStore } from "@/state/editor-instance-store";
 import { MarkdownSourceView } from "../editor/MarkdownSourceView";
 import { useContentFullscreenStore } from "@/state/content-fullscreen-store";
 import { useContentAnchorStore } from "@/state/content-anchor-store";
+import { usePanelStore } from "@/state/panel-store";
+import { useIsMobile } from "@/components/common/useIsMobile";
+
 import { setLinkAnchorLister } from "@/lib/domain/content/link-anchor";
 
 interface ContentResponse {
@@ -283,6 +286,9 @@ interface PageTemplateResponse {
   error?: string;
 }
 
+/** Width of the collapsed left icon rail (ResizablePanels' hidden mode, w-12). */
+const LEFT_RAIL_WIDTH_PX = 48;
+
 export function MainPanelContent({ paneId, initialContent = null }: MainPanelContentProps) {
   const pathname = usePathname();
   const isEmbedMode = pathname?.startsWith("/embed/") ?? false;
@@ -302,6 +308,9 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
   const contentFullscreen = useContentFullscreenStore(
     (s) => s.active && !!selectedContentId && s.contentId === selectedContentId
   );
+  const leftSidebarVisible = usePanelStore((s) => s.leftSidebarVisible);
+  const isMobileLayout = useIsMobile();
+  const fullscreenLeftInset = leftSidebarVisible && !isMobileLayout ? LEFT_RAIL_WIDTH_PX : 0;
   useEffect(() => {
     if (!contentFullscreen) return;
     const store = useContentFullscreenStore.getState;
@@ -2740,8 +2749,11 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
     >
       <div
         className={`flex min-h-0 flex-col overflow-hidden ${
-          contentFullscreen ? "fixed inset-0 z-[200] bg-background" : "h-full"
+          contentFullscreen ? "fixed inset-y-0 right-0 z-[200] bg-background" : "h-full"
         }`}
+        // Full screen stops at the collapsed left rail (48px) so it never
+        // covers it; the expanded sidebar (and the right panel) may overlap.
+        style={contentFullscreen ? { left: fullscreenLeftInset } : undefined}
         onPointerDownCapture={() => {
           if (activeTabId) {
             pinContentTab(activeTabId);

@@ -340,7 +340,13 @@ export function BookReader({ contentId }: { contentId: string }) {
     view.renderer.setAttribute("flow", flow);
     view.renderer.setAttribute("max-inline-size", "720px");
     view.renderer.setAttribute("gap", "6%");
-  }, [fontSizePct, lineHeight, theme, flow, phase]);
+    // foliate reserves `margin` above and below the page (48px default) for a
+    // header/footer we don't use — in full screen the page takes nearly all of
+    // it. The view's own background is the page color, so what margin remains
+    // reads as page, not as a band of app chrome around it.
+    view.renderer.setAttribute("margin", immersive ? "12px" : "28px");
+    view.style.background = THEME_COLORS[resolveTheme(theme)].bg;
+  }, [fontSizePct, lineHeight, theme, flow, phase, immersive]);
 
   // Mark colors follow the page's tone (light/sepia vs dark): set the
   // highlight layer's blend, then repaint the marks already drawn.

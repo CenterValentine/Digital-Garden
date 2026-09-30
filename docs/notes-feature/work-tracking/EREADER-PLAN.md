@@ -456,3 +456,11 @@ hosts were unreachable from the build sandbox, so every source needs a live smok
     the page, **Next page** reads one more page and stops again, and **Keep
     reading** switches the mode on and continues.
   - The checkbox and the countdown line are gone.
+- **Full-screen fit (owner smoke).**
+  - The nav bar hides while content is full screen (`ConditionalNotesLayout`).
+  - The full-screen panel stops at the collapsed 48px left rail instead of sliding
+    under it. The expanded sidebar and the right panel may overlap it, as intended.
+  - The book claims the bands above and below the page: foliate's `margin` drops from
+    its 48px default to 12px in full screen and 28px otherwise, and the view is
+    painted in the page colour.
+  - Later: make sidecar notes friendlier in full screen.
