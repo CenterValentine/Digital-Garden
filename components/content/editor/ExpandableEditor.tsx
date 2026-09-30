@@ -22,6 +22,7 @@ import { cn } from "@/lib/core/utils";
 import { MarkdownEditor } from "./MarkdownEditor";
 import { ReadAloudButton } from "@/components/content/tts/ReadAloudButton";
 import { useNotesPanelStore } from "@/state/notes-panel-store";
+import { useViewportMemory } from "@/lib/domain/content/use-viewport-memory";
 import type { JSONContent } from "@tiptap/core";
 import type { WikiLinkClickTarget } from "@/lib/domain/editor/extensions/wiki-link";
 
@@ -99,6 +100,11 @@ export function ExpandableEditor({
   onSaveAsPageTemplate,
 }: ExpandableEditorProps) {
   const { isExpanded, toggleExpanded, position, togglePosition } = useNotesPanelStore();
+
+  // This drawer owns the "note" region for non-note content — the inner
+  // MarkdownEditor is in `compact` mode and defers to us (see its
+  // `useViewportMemory` call), so exactly one element writes this key.
+  const notesViewportRef = useViewportMemory(contentId, "note");
   const hasContent = hasNonEmptyContent(noteContent);
   const wordCount = hasContent ? getWordCount(noteContent) : 0;
 
@@ -189,6 +195,7 @@ export function ExpandableEditor({
       {/* Expandable Editor */}
       {isExpanded && (
         <div
+          ref={notesViewportRef}
           className="overflow-y-auto px-2 pb-1 pt-0"
           style={{ maxHeight: "35vh" }}
           onKeyDown={(e) => e.stopPropagation()}
