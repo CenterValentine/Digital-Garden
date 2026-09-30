@@ -79,6 +79,7 @@ import {
 } from "@/lib/domain/ai/providers/catalog";
 import {
   dedupeRepeatedToolParts,
+  stripOpenAIItemIdsFromModelMessages,
   stripOpenAIItemReferences,
   stripReasoningForResend,
   supersedeBulkReads,
@@ -103,7 +104,10 @@ import {
   type TurnSegment,
   type TurnStepSummary,
 } from "@/lib/domain/ai/turn-diagnostics";
-import { resolveModelTemperature } from "@/lib/domain/ai/model-constraints";
+import {
+  openaiModelReasons,
+  resolveModelTemperature,
+} from "@/lib/domain/ai/model-constraints";
 import {
   DEFAULT_OUTPUT_TARGET,
   getLatestUserMessageOutputTarget,
@@ -1577,6 +1581,13 @@ export async function POST(request: Request) {
       const activated = new Set<string>();
       const isAdvertised = (id: string) =>
         advertised.has(id) || activated.has(id);
+      // The base policy plus what a bound charter adds — never a summon. Read
+      // by the system-prompt flags so the prompt is the same on every request
+      // of a turn (see the buildSystemPrompt call).
+      const isOffered = (id: string) =>
+        advertised.has(id) ||
+        (id === "phase_checkpoint" &&
+          (attachedCharterResolved || rootedCharterResolved));
 
       // ADVERTISEMENT POLICY (AI-TOOL-SUMMONER-PLAN §3). Core tools are always
       // offered; a mode's tools are offered while that mode is live; everything
@@ -2654,8 +2665,22 @@ export async function POST(request: Request) {
       // that function's return doubles as the "this turn had a reasoning
       // config" signal for describeReasoningConfig below, and a storage knob is
       // not a reasoning config.
+      // `forceReasoning`: @ai-sdk/openai only knows the o-series and gpt-5 as
+      // reasoning models; a newer family (gpt-6) is treated as plain chat —
+      // and with `store: false` that means the adapter never asks for
+      // `reasoning.encrypted_content`, so reasoning items go back id-only and
+      // the prompt cache cannot match anything past the first tool call
+      // (plan §10 L1: every gpt-6 run froze there). Forcing it also selects
+      // the `developer` system role and drops `temperature`.
       const storageProviderOptions: AIProviderOptions | undefined =
-        executedVendorId === "openai" ? { openai: { store: false } } : undefined;
+        executedVendorId === "openai"
+          ? {
+              openai: {
+                store: false,
+                ...(openaiModelReasons(activeModelId) ? { forceReasoning: true } : {}),
+              },
+            }
+          : undefined;
       const providerOptions = mergeAIProviderOptions(
         reasoningProviderOptions,
         storageProviderOptions,
@@ -2688,6 +2713,16 @@ export async function POST(request: Request) {
         itemIterationBudget == null &&
         researchPageBudget == null &&
         (attachedCharterResolved || rootedCharterResolved);
+      // A bound charter makes `phase_checkpoint` part of the turn's tools
+      // from its first request — the model summoned it at step 1 of every
+      // measured charter run, and the summon then reached the NEXT request's
+      // system prompt (the checkpoint paragraph is gated on the tool), which
+      // changed the prompt between requests and cold-started the cache (plan
+      // §10 L1, wire probe 04:16:55). Added the same way on every request of
+      // the turn, so the tool list and the prompt agree across them.
+      if (attachedCharterResolved || rootedCharterResolved) {
+        if ("phase_checkpoint" in tools) activated.add("phase_checkpoint");
+      }
       const rawStepCap =
         itemIterationBudget != null
           ? computeIterationStepCap({
@@ -2852,7 +2887,16 @@ export async function POST(request: Request) {
         // added the columns") — a confabulated answer is strictly worse
         // than the silence this fixes. Telling it the loop is over makes
         // the honest report the only available move.
-        prepareStep: ({ stepNumber, messages: stepMessages }) => {
+        prepareStep: ({ stepNumber, messages: rawStepMessages }) => {
+          // One spelling for a tool call whether it was made in this request
+          // or resent from the transcript: the SDK's in-request messages
+          // carry `openai.itemId` (sent inline as `id`), the transcript has
+          // it stripped, and the provider cache saw two different items
+          // (plan §10 L1, wire probe 04:17:42). Reasoning keeps its id.
+          const stepMessages =
+            executedVendorId === "openai"
+              ? stripOpenAIItemIdsFromModelMessages(rawStepMessages)
+              : rawStepMessages;
           // Summoned tools enter here: `activated` grew during the previous
           // step's tool execution, and this is the only place a step's
           // advertised set can be widened. Returned every step (not just when
@@ -2915,7 +2959,7 @@ export async function POST(request: Request) {
             }
           }
           if (stepNumber < stepCap - 1) {
-            if (!tailDeliverables) return { activeTools: stepActiveTools };
+            if (!tailDeliverables) return { activeTools: stepActiveTools, messages: stepMessages };
             // DELIVERABLE-TAIL RESERVATION (plan §6b, prod 5e5b739d): the
             // final-step rule generalised. The last `tail` steps of an item
             // run — or of a charter turn (§9) — keep only the deliverables
@@ -2963,19 +3007,26 @@ export async function POST(request: Request) {
             ],
           };
         },
+        // SYSTEM-PROMPT FLAGS READ THE BASE POLICY, NOT SUMMONS. `isAdvertised`
+        // includes this turn's summons, restored into every later request from
+        // the transcript — so a summon at step 1 rewrote the NEXT request's
+        // system prompt, and a changed system prompt is a cold cache for the
+        // whole request (plan §10 L1). `isOffered` is the per-request policy
+        // (core + live modes + charter binding), the same on every request of
+        // a turn. A summoned tool teaches through its own description.
         system: (systemPromptForDiag = buildSystemPrompt({
-          hasImageTools: isAdvertised("generate_image"),
-          hasFlashcardTools: isAdvertised("list_decks"),
-          hasWebSearch: isAdvertised("search_web"),
-          hasCheckpointTool: isAdvertised("phase_checkpoint"),
-          hasBrowserReadTool: isAdvertised(READ_PAGE_HEADLESS_OR_BROWSER),
-          hasTabLauncher: isAdvertised(OPEN_TAB_AND_READ),
-          hasCoBrowseTools: isAdvertised(CO_BROWSE_OPEN),
-          hasReadCurrentPage: isAdvertised(READ_CURRENT_PAGE),
-          hasResearchTools: isAdvertised("extract_structured"),
-          hasListTabs: isAdvertised(LIST_TABS),
-          hasItemIteration: isAdvertised("propose_item_iteration"),
-          hasDatabaseTools: isAdvertised("describe_database"),
+          hasImageTools: isOffered("generate_image"),
+          hasFlashcardTools: isOffered("list_decks"),
+          hasWebSearch: isOffered("search_web"),
+          hasCheckpointTool: isOffered("phase_checkpoint"),
+          hasBrowserReadTool: isOffered(READ_PAGE_HEADLESS_OR_BROWSER),
+          hasTabLauncher: isOffered(OPEN_TAB_AND_READ),
+          hasCoBrowseTools: isOffered(CO_BROWSE_OPEN),
+          hasReadCurrentPage: isOffered(READ_CURRENT_PAGE),
+          hasResearchTools: isOffered("extract_structured"),
+          hasListTabs: isOffered(LIST_TABS),
+          hasItemIteration: isOffered("propose_item_iteration"),
+          hasDatabaseTools: isOffered("describe_database"),
           toolMenu: toolMenu ?? undefined,
           viewedContentHint,
           // Runtime identity (v3.1): what this turn is ACTUALLY served by,

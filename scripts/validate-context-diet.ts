@@ -43,7 +43,11 @@ import {
   supersedeWriteInputs,
   teachDeniedApprovals,
   writeInputFoldStates,
+  stripReasoningForResend,
+  stripOpenAIItemIdsFromModelMessages,
 } from "../lib/domain/ai/context-diet";
+import { openaiModelReasons } from "../lib/domain/ai/model-constraints";
+import type { ModelMessage } from "ai";
 import { coBrowsePageIdentity } from "../lib/domain/ai/co-browse-page-identity";
 
 const errors: string[] = [];
@@ -511,6 +515,72 @@ const isStub = (v: unknown, word: string): boolean =>
   );
 }
 
+// ── Gate 8: OpenAI reasoning rides the cache (plan §10 L1) ─────────────────
+//
+// Prod e5b899a2 (2026-09-30, gpt-6-sol, wire probe on): the body only grew
+// step to step, yet the cached-token count froze at the first tool call of
+// every request. The reasoning items were the missing piece — stripped from
+// the transcript, and never requested as encrypted content for a family the
+// adapter does not know. Three rules, each mutation-tested.
+
+{
+  const enc = (text = "", blob: string | null = "ENC") => ({
+    type: "reasoning",
+    text,
+    ...(blob ? { providerMetadata: { openai: { itemId: "rs_1", reasoningEncryptedContent: blob } } } : {}),
+  });
+  const msgs = [user(), assistant([enc(), { type: "text", text: "a" }]), assistant([enc("", null), { type: "text", text: "b" }])];
+  const kept = stripReasoningForResend(msgs, "openai");
+  assert(
+    kept[1].parts.length === 2 && kept[2].parts.length === 1,
+    "G8: for OpenAI a reasoning part WITH encrypted content is resent; one without is still dropped",
+  );
+  assert(
+    stripReasoningForResend(msgs, "deepseek")[1].parts.length === 1,
+    "G8: other vendors still drop every reasoning part (dead weight)",
+  );
+  assert(
+    stripReasoningForResend(msgs, "anthropic")[2].parts.length === 2,
+    "G8: Anthropic keeps its reasoning parts (signed thinking)",
+  );
+
+  const model: ModelMessage[] = [
+    { role: "user", content: "go" },
+    {
+      role: "assistant",
+      content: [
+        { type: "reasoning", text: "", providerOptions: { openai: { itemId: "rs_1", reasoningEncryptedContent: "ENC" } } },
+        { type: "text", text: "t", providerOptions: { openai: { itemId: "msg_1" } } },
+        { type: "tool-call", toolCallId: "c1", toolName: "x", input: {}, providerOptions: { openai: { itemId: "fc_1", phase: "final" } } },
+      ],
+    },
+  ];
+  const stripped = stripOpenAIItemIdsFromModelMessages(model);
+  const content = stripped[1].content as Array<{ type: string; providerOptions?: Record<string, Record<string, unknown>> }>;
+  assert(
+    content[0].providerOptions?.openai?.itemId === "rs_1" &&
+      content[1].providerOptions?.openai?.itemId === undefined &&
+      content[2].providerOptions?.openai?.itemId === undefined &&
+      content[2].providerOptions?.openai?.phase === "final",
+    "G8: the step's model messages lose openai.itemId on text and tool-call parts (sibling keys kept) and keep it on reasoning",
+  );
+  assert(stripOpenAIItemIdsFromModelMessages(stripped)[1] === stripped[1], "G8: the id strip is idempotent");
+  assert(
+    openaiModelReasons("gpt-6-sol") && openaiModelReasons("gpt-5.6-terra") && openaiModelReasons("o3") &&
+      !openaiModelReasons("gpt-5-chat-latest") && !openaiModelReasons("gpt-4.1"),
+    "G8: openaiModelReasons knows gpt-6 / gpt-5 / o-series and not the chat models",
+  );
+  const routeSrc8 = readFileSync(path.join(process.cwd(), "app/api/ai/chat/route.ts"), "utf8");
+  assert(
+    routeSrc8.includes("openaiModelReasons(activeModelId) ? { forceReasoning: true }") &&
+      routeSrc8.includes("stripOpenAIItemIdsFromModelMessages(rawStepMessages)") &&
+      /hasCheckpointTool: isOffered\("phase_checkpoint"\)/.test(routeSrc8) &&
+      !/buildSystemPrompt\(\{[\s\S]{0,1200}isAdvertised\(/.test(routeSrc8) &&
+      routeSrc8.includes('activated.add("phase_checkpoint")'),
+    "G8 wiring: the route forces reasoning for OpenAI reasoning families, strips item ids from each step's messages, reads system-prompt flags from isOffered (never a summon), and gives charter turns phase_checkpoint",
+  );
+}
+
 // ── Report ──────────────────────────────────────────────────────────────────
 
 if (errors.length > 0) {
@@ -518,4 +588,4 @@ if (errors.length > 0) {
   for (const e of errors) console.error(`  ${e}\n`);
   process.exit(1);
 }
-console.log("✓ context:diet:check — fold-on-distillation, fold-on-turn, dedupe, write inputs, page identity, purity, route wiring");
+console.log("✓ context:diet:check — fold-on-distillation, fold-on-turn, dedupe, write inputs, page identity, purity, route wiring, OpenAI reasoning rides the cache");

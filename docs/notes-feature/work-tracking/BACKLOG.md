@@ -18,7 +18,7 @@ last_updated: 2026-09-27
 - [ ] **`durationMs` on turn metadata is server time only.** It sums per-request server durations and excludes client-executed tools (browser reads, `create_docx`); a five-minute turn reports ~72 s. Not wrong, but unlabelled — rename or add `wallClockMs` from the first request's `startedAt` to the last request's finish.
 - [ ] **Extension-side chrome detection.** `looksLikeNavigationChrome` runs server-side (P1/P2 material) and on the session-tab result; the extension's own reader could apply it before hydration settles and retry once with a longer settle when the body is chrome.
 - [ ] **Run cost levers L1–L4 (plan §10, from prod `de65f6bb`, $1.35).**
-  - L1a: wire-level prompt tap (built on `feat/run-cache-levers`), then one flagged run to name the frozen cache prefix, which sits at the proposal-approval boundary in both measured runs.
+  - L1: DONE — the flagged run named it (reasoning items missing; fix on `feat/openai-reasoning-cache`). Verify on the next charter run: cached tokens climb inside a request.
   - L2: constant tool list for the turn; the tail is enforced at execute.
   - L3a: option-validation rejections name the column, value and allowed options.
   - L3b: `phase_checkpoint` stays in an item run's tail under a charter.
