@@ -205,35 +205,48 @@ function SearchView({ contentId, book }: { contentId: string; book: ReaderOpenBo
   const saved = useReaderSession((state) => state.searches[contentId] ?? null);
   const setSearch = useReaderSession((state) => state.setSearch);
   const [query, setQuery] = useState(saved?.query ?? "");
+  const [filters, setFilters] = useState<Record<string, string>>(() =>
+    Object.fromEntries(
+      (search.filters ?? []).map((filter) => [filter.id, saved?.filters?.[filter.id] ?? filter.options[0]?.value ?? ""])
+    )
+  );
   const [running, setRunning] = useState(false);
   const cancelRef = useRef<(() => void) | null>(null);
 
   useEffect(() => () => cancelRef.current?.(), []);
 
-  const run = (text: string) => {
+  const run = (text: string, activeFilters: Record<string, string>) => {
     const q = text.trim();
     cancelRef.current?.();
     if (!q) {
       search.clear?.();
       setSearch(contentId, null);
+      setRunning(false);
       return;
     }
     setRunning(true);
-    setSearch(contentId, { query: q, hits: [], done: false });
-    cancelRef.current = search.run(q, (hits, done, note) => {
-      setSearch(contentId, { query: q, hits, done, note });
-      if (done) setRunning(false);
-    });
+    setSearch(contentId, { query: q, hits: [], done: false, filters: activeFilters });
+    cancelRef.current = search.run(
+      q,
+      (hits, done, note) => {
+        setSearch(contentId, { query: q, hits, done, note, filters: activeFilters });
+        if (done) setRunning(false);
+      },
+      activeFilters
+    );
   };
 
   const hits = saved?.hits ?? [];
+  const matches = hits.filter((hit) => !hit.kind || hit.kind === "match").length;
+  const select =
+    "h-7 min-w-0 flex-1 rounded border border-black/10 bg-transparent px-1 text-[11px] dark:border-white/10";
   return (
     <div className="flex h-full min-h-0 flex-col">
       <form
-        className="border-b border-black/10 p-2 dark:border-white/10"
+        className="space-y-1.5 border-b border-black/10 p-2 dark:border-white/10"
         onSubmit={(event) => {
           event.preventDefault();
-          run(query);
+          run(query, filters);
         }}
       >
         <div className="relative">
@@ -250,16 +263,42 @@ function SearchView({ contentId, book }: { contentId: string; book: ReaderOpenBo
             <Loader2 className="absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 animate-spin text-muted-foreground" />
           )}
         </div>
+        {search.filters?.length ? (
+          <div className="flex gap-1">
+            {search.filters.map((filter) => (
+              <select
+                key={filter.id}
+                aria-label={filter.label}
+                title={filter.label}
+                value={filters[filter.id] ?? ""}
+                onChange={(event) => {
+                  const next = { ...filters, [filter.id]: event.target.value };
+                  setFilters(next);
+                  if (query.trim()) run(query, next);
+                }}
+                className={select}
+              >
+                {filter.options.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            ))}
+          </div>
+        ) : null}
       </form>
       <div className="min-h-0 flex-1 overflow-auto p-2 text-xs">
         {saved && (
           <p className="px-2 pb-2 text-muted-foreground">
             {saved.note ??
-              (hits.filter((hit) => hit.kind !== "jump").length === 0
+              (matches === 0
                 ? saved.done
-                  ? "No matches."
+                  ? hits.length
+                    ? "No verses match."
+                    : "No matches."
                   : "Searching…"
-                : `${hits.filter((hit) => hit.kind !== "jump").length} match${hits.length === 1 ? "" : "es"}${saved.done ? "" : "…"}`)}
+                : `${matches} match${matches === 1 ? "" : "es"}${saved.done ? "" : "…"}`)}
           </p>
         )}
         {hits.map((hit) => (
@@ -268,17 +307,30 @@ function SearchView({ contentId, book }: { contentId: string; book: ReaderOpenBo
             type="button"
             onClick={() => search.go(hit)}
             className={`mb-1 block w-full rounded px-2 py-1 text-left hover:bg-black/5 dark:hover:bg-white/5 ${
-              hit.kind === "jump" ? "border border-primary/30 bg-primary/5" : ""
+              hit.kind === "jump" || hit.kind === "place" ? "border border-primary/30 bg-primary/5" : ""
             }`}
           >
             <span className="font-medium">{hit.label}</span>
-            {hit.excerpt && (
+            {hit.detail && <span className="ml-1.5 text-muted-foreground">{hit.detail}</span>}
+            {hit.parts ? (
+              <span className="line-clamp-3 text-muted-foreground">
+                {excerptWindow(hit.parts).map((part, index) =>
+                  part.hit ? (
+                    <mark key={index} className={MARK_CLASS}>
+                      {part.text}
+                    </mark>
+                  ) : (
+                    <span key={index}>{part.text}</span>
+                  )
+                )}
+              </span>
+            ) : hit.excerpt ? (
               <span className="line-clamp-3 text-muted-foreground">
                 {hit.excerpt.pre}
-                <mark className="rounded-sm bg-yellow-300/60 px-0.5 text-foreground dark:bg-yellow-500/40">{hit.excerpt.match}</mark>
+                <mark className={MARK_CLASS}>{hit.excerpt.match}</mark>
                 {hit.excerpt.post}
               </span>
-            )}
+            ) : null}
           </button>
         ))}
       </div>
@@ -286,3 +338,26 @@ function SearchView({ contentId, book }: { contentId: string; book: ReaderOpenBo
   );
 }
 
+const MARK_CLASS = "rounded-sm bg-yellow-300/60 px-0.5 text-foreground dark:bg-yellow-500/40";
+
+/** Start the excerpt shortly before the first match, so a late match isn't clamped away. */
+function excerptWindow(parts: Array<{ text: string; hit: boolean }>): Array<{ text: string; hit: boolean }> {
+  const LEAD = 50;
+  let offset = 0;
+  for (const part of parts) {
+    if (part.hit) break;
+    offset += part.text.length;
+  }
+  if (offset <= LEAD) return parts;
+  let skip = offset - LEAD;
+  const out: Array<{ text: string; hit: boolean }> = [];
+  for (const part of parts) {
+    if (skip >= part.text.length) {
+      skip -= part.text.length;
+      continue;
+    }
+    out.push(skip > 0 ? { text: `…${part.text.slice(skip).replace(/^\S*\s/, "")}`, hit: part.hit } : part);
+    skip = 0;
+  }
+  return out;
+}

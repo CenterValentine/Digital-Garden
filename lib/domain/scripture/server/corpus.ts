@@ -8,10 +8,18 @@
 
 import "server-only";
 import { prisma } from "@/lib/database/client";
+import { Prisma } from "@/lib/database/generated/prisma";
 import { SCRIPTURE_CATALOG, catalogEntry, LDS_CORPUS_ID } from "../catalog";
 import { LDS_VOLUMES } from "../lds";
 import { ldsVolumeUrl, normalizeLdsVolume, type NormalizedBook, type NormalizedVerse, type RawLdsVolume } from "../adapters/lds";
-import { buildBookIndex, formatReference, parseReference, parseReferenceList, type BookIndex } from "../reference";
+import {
+  buildBookIndex,
+  formatReference,
+  normalizeBookKey,
+  parseReference,
+  parseReferenceList,
+  type BookIndex,
+} from "../reference";
 import type {
   ScriptureBookChapters,
   ScriptureBookInfo,
@@ -19,7 +27,10 @@ import type {
   ScriptureChapterDto,
   ScriptureContents,
   ScriptureCorpusInfo,
+  ScriptureBookMatch,
   ScriptureResolvedReference,
+  ScriptureSearchHit,
+  ScriptureSearchOptions,
   ScriptureSearchResult,
   ScriptureTradition,
   ScriptureVersification,
@@ -38,7 +49,8 @@ function toCorpusInfo(row: ScriptureCorpusRow): ScriptureCorpusInfo {
   return {
     id: row.id,
     tradition: row.tradition as ScriptureTradition,
-    title: row.title,
+    // The catalog names the collection (renames apply without a migration).
+    title: catalogEntry(row.id)?.title ?? row.title,
     language: row.language,
     sourceUrl: row.sourceUrl,
     license: row.license,
@@ -194,6 +206,12 @@ export async function installCorpus(corpusId: string): Promise<{ verseCount: num
           })),
         });
       }
+      // Full-text vectors for search (GIN-indexed; see ScriptureVerse).
+      await tx.$executeRaw`
+        UPDATE "ScriptureVerse"
+        SET "searchEnglish" = to_tsvector('english'::regconfig, "text"),
+            "searchSimple" = to_tsvector('simple'::regconfig, "text")
+        WHERE "corpusId" = ${corpusId}`;
       await tx.scriptureCorpus.update({ where: { id: corpusId }, data: { verseCount: verses.length } });
       return { verseCount: verses.length, alreadyInstalled: false };
     },
@@ -300,30 +318,126 @@ export async function resolveReferences(corpusId: string, text: string, maxVerse
   return resolved;
 }
 
+/** Markers ts_headline wraps around matched words (never in scripture text). */
+const HIT_OPEN = "\u0001";
+const HIT_CLOSE = "\u0002";
+
+/** Split a ts_headline result into plain and matched runs. */
+function highlightRuns(headline: string): Array<{ text: string; hit: boolean }> {
+  const runs: Array<{ text: string; hit: boolean }> = [];
+  for (const [index, piece] of headline.split(new RegExp(`[${HIT_OPEN}${HIT_CLOSE}]`)).entries()) {
+    if (piece) runs.push({ text: piece, hit: index % 2 === 1 });
+  }
+  return runs;
+}
+
+/** Books (and one-book volumes) whose names contain the query: "nephi" → 1–4 Nephi. */
+function matchBooks(books: ScriptureBookRow[], query: string): ScriptureBookMatch[] {
+  const key = normalizeBookKey(query);
+  if (key.length < 3) return [];
+  return books
+    .filter((book) =>
+      [book.name, book.fullTitle, book.volumeTitle, ...book.abbreviations].some((name) =>
+        normalizeBookKey(name).includes(key)
+      )
+    )
+    .slice(0, 8)
+    .map((book) => ({ slug: book.slug, name: book.name, volumeTitle: book.volumeTitle, chapterCount: book.chapterCount }));
+}
+
+interface SearchRow {
+  bookSlug: string;
+  chapter: number;
+  verse: number;
+  text: string;
+  headline: string | null;
+  total: bigint | number;
+}
+
 /**
- * Search a corpus. A query that parses as a reference returns that passage
- * first; otherwise (and additionally) a case-insensitive phrase match, in
- * canonical order.
+ * Search a corpus the way the Church's site does: words, not substrings
+ * ("Alma" no longer matches "Talmai"), in any order, with word forms, ranked
+ * by relevance — plus the passage when the query is a reference and the books
+ * whose names match. Postgres full-text search over stored, GIN-indexed
+ * vectors (ScriptureVerse.searchEnglish stems word forms for smart search;
+ * searchSimple keeps exact whole words), ranked with ts_rank, highlighted
+ * with ts_headline.
+ * If word search finds nothing (a query of only stop-words, a fragment), a
+ * plain substring match stands in and says so.
  */
-export async function searchCorpus(corpusId: string, query: string, limit = 50): Promise<ScriptureSearchResult> {
+export async function searchCorpus(
+  corpusId: string,
+  query: string,
+  options: ScriptureSearchOptions = {},
+  limit = 50
+): Promise<ScriptureSearchResult> {
   const q = query.trim();
-  if (!q) return { reference: null, hits: [], total: 0 };
+  const empty: ScriptureSearchResult = { reference: null, books: [], hits: [], total: 0, matchedBy: "words" };
+  if (!q) return empty;
   await requireCorpus(corpusId);
   const { index, books } = await bookIndex(corpusId);
   const bookBySlug = new Map(books.map((book) => [book.slug, book]));
+  const mode = options.mode ?? "smart";
+  const sort = options.sort ?? "relevance";
+  const volume = options.volume && books.some((book) => book.volume === options.volume) ? options.volume : null;
 
   let reference: ScriptureResolvedReference | null = null;
   const parsed = parseReference(q, index);
   if (parsed && parsed.chapter != null) {
     reference = (await resolveReferences(corpusId, q, 30))[0] ?? null;
   }
+  // A reference is a place, not words: return the passage and stop.
+  if (reference) return { ...empty, reference };
+  const bookMatches = matchBooks(volume ? books.filter((book) => book.volume === volume) : books, q);
 
-  const where = { corpusId, text: { contains: q, mode: "insensitive" } };
-  const [rows, total] = await Promise.all([
-    scriptureDb.verse.findMany({ where, orderBy: { ordinal: "asc" }, take: limit }),
-    scriptureDb.verse.count({ where }),
-  ]);
-  const hits = rows.map((row) => {
+  const config = mode === "smart" ? "english" : "simple";
+  const tsQuery =
+    mode === "exact"
+      ? Prisma.sql`phraseto_tsquery(${config}::regconfig, ${q})`
+      : mode === "all"
+        ? Prisma.sql`plainto_tsquery(${config}::regconfig, ${q})`
+        : mode === "any"
+          ? Prisma.sql`websearch_to_tsquery(${config}::regconfig, ${q.split(/\s+/).filter(Boolean).join(" or ")})`
+          : Prisma.sql`websearch_to_tsquery(${config}::regconfig, ${q})`;
+  const volumeFilter = volume
+    ? Prisma.sql`AND v."bookSlug" IN (SELECT b.slug FROM "ScriptureBook" b WHERE b."corpusId" = ${corpusId} AND b.volume = ${volume})`
+    : Prisma.empty;
+  const order = sort === "relevance" ? Prisma.sql`m.rank DESC, m.ordinal ASC` : Prisma.sql`m.ordinal ASC`;
+  // The stored, GIN-indexed vector for this config (filled on install).
+  const vector = config === "english" ? Prisma.raw(`v."searchEnglish"`) : Prisma.raw(`v."searchSimple"`);
+  const headlineOptions = `StartSel=${HIT_OPEN}, StopSel=${HIT_CLOSE}, HighlightAll=true`;
+
+  const rows = await prisma.$queryRaw<SearchRow[]>`
+    WITH query AS (SELECT ${tsQuery} AS tsq),
+    m AS (
+      SELECT v."bookSlug", v.chapter, v.verse, v.text, v.ordinal,
+             ts_rank(${vector}, query.tsq) AS rank
+      FROM "ScriptureVerse" v, query
+      WHERE v."corpusId" = ${corpusId} ${volumeFilter}
+        AND ${vector} @@ query.tsq
+    )
+    SELECT m."bookSlug", m.chapter, m.verse, m.text,
+           ts_headline(${config}::regconfig, m.text, query.tsq, ${headlineOptions}) AS headline,
+           count(*) OVER () AS total
+    FROM m, query
+    ORDER BY ${order}
+    LIMIT ${limit}`;
+
+  let matchedBy: ScriptureSearchResult["matchedBy"] = "words";
+  let found: SearchRow[] = rows;
+  if (!found.length && mode !== "exact") {
+    // Nothing as words (only stop-words, a fragment): plain substring instead.
+    matchedBy = "substring";
+    const pattern = `%${q.replace(/[\\%_]/g, (char) => `\\${char}`)}%`;
+    found = await prisma.$queryRaw<SearchRow[]>`
+      SELECT v."bookSlug", v.chapter, v.verse, v.text, NULL AS headline, count(*) OVER () AS total
+      FROM "ScriptureVerse" v
+      WHERE v."corpusId" = ${corpusId} ${volumeFilter} AND v.text ILIKE ${pattern}
+      ORDER BY v.ordinal ASC
+      LIMIT ${limit}`;
+  }
+
+  const hits = found.map<ScriptureSearchHit>((row) => {
     const book = bookBySlug.get(row.bookSlug);
     return {
       bookSlug: row.bookSlug,
@@ -335,9 +449,10 @@ export async function searchCorpus(corpusId: string, query: string, limit = 50):
         { bookSlug: row.bookSlug, chapter: row.chapter, verseStart: row.verse, verseEnd: row.verse },
         () => (book ? shortName(book) : row.bookSlug)
       ),
+      ...(row.headline ? { highlights: highlightRuns(row.headline) } : {}),
     };
   });
-  return { reference, hits, total };
+  return { reference, books: bookMatches, hits, total: Number(found[0]?.total ?? 0), matchedBy };
 }
 
 /** A book's chapters as cards: verse counts and each chapter's first verse. */

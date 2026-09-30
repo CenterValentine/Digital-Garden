@@ -2,7 +2,7 @@
  * A collection's volumes and books, known without a fetch (client-safe).
  *
  * The "+" menu is built synchronously when it opens, so it can only offer
- * "The Standard Works › Book of Mormon › Alma › 32" for a collection whose book
+ * "Gospel Library › Book of Mormon › Alma › 32" for a collection whose book
  * table ships with the code. LDS does (lib/domain/scripture/lds.ts); a
  * collection without one is still offered, just without the drill-down.
  */

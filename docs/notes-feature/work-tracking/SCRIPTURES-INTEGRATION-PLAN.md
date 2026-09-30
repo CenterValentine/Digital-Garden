@@ -419,10 +419,23 @@ ordinals ("First Nephi"), unambiguous prefixes ("Hela"), ranges, lists ("John 3:
   foil per volume, `lib/domain/scripture/covers.ts`) — official edition artwork is
   someone else's design, so it isn't copied or hotlinked.
 - **Reader** (`reader:scripture/<corpus>`, `ScriptureReader`): chapter view in the
-  reader's theme/typography; contents beside the text (volumes → books → chapter grid;
-  hold/⌥-click opens the right rail); a "Alma 32:21 or a phrase" box that jumps to a
-  reference or searches (reference first, then phrase matches in canonical order);
-  ←/→ and prev/next across book boundaries; progress bar over the whole corpus.
+  reader's theme/typography; a narrow contents aside beside the text (only the volume
+  you're in is expanded; hold/⌥-click opens the right rail); the breadcrumb on its own
+  line starting at the volume (home icon → covers); ←/→ and prev/next across book
+  boundaries; progress bar over the whole corpus. The collection is titled "Gospel
+  Library" (catalog title wins over the stored row; the id stays `lds-standard-works`).
+- **Search** lives in the right-sidebar rail (both readers — a `ReaderSearchCapability`
+  in the reader store: placeholder, filters, a streaming `run`, `go`). The secondary
+  toolbar's search icon opens it. Scripture search (`searchCorpus`), modelled on the
+  Gospel Library site: a reference ("Alma 32:21") jumps; a book name ("nephi", "Alma")
+  lists the matching books first as places; words go through Postgres full-text
+  search on stored, GIN-indexed vectors (`ScriptureVerse.searchEnglish` stemmed /
+  `searchSimple` exact — migration `20260930180000_scripture_search_vectors`, filled
+  at install and backfilled by the migration; ~10 ms vs ~800 ms unindexed).
+  Filters: **Smart** (stemmed, `"phrases"`, `or`, `-not`), **Exact phrase**, **All
+  words**, **Any word**; a volume; **Best match** (`ts_rank`) or **In order**. Matches
+  are highlighted (`ts_headline`); a stopword-only query falls back to substring. The
+  book reader's search (foliate) offers whole-words and match-case filters.
 - **Marks**: select text (or click a verse number for the whole verse) → the shared
   `MarkPopover` — highlight/underline in five colours, note, copy with citation. Same
   right-sidebar Book rail (notes, contents, display), same send-to-note ("<Book> — Notes"
@@ -431,7 +444,7 @@ ordinals ("First Nephi"), unambiguous prefixes ("Hela"), ranges, lists ("John 3:
 - **Links**: `[[Alma 32:21` in the link menu offers the passage in each enabled
   collection (with a verse preview) and inserts a `verse:` anchored link to the
   collection's tab, shown as "Alma 32:21" — the generic `LinkAnchorSuggester` in
-  `lib/domain/content/link-anchor.ts`. `[[The Standard Works#` lists your scripture
+  `lib/domain/content/link-anchor.ts`. `[[Gospel Library#` lists your scripture
   highlights as passage links. Clicking opens the tab at the verses.
 
 ### 11.5 Other traditions — what a second corpus needs

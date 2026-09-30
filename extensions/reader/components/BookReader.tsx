@@ -480,7 +480,25 @@ export function BookReader({ contentId }: { contentId: string }) {
   const search = useMemo<ReaderSearchCapability>(
     () => ({
       placeholder: "Search this book",
-      run: (query, onHits) => {
+      filters: [
+        {
+          id: "words",
+          label: "How words match",
+          options: [
+            { value: "part", label: "Anywhere" },
+            { value: "whole", label: "Whole words" },
+          ],
+        },
+        {
+          id: "case",
+          label: "Letter case",
+          options: [
+            { value: "ignore", label: "Any case" },
+            { value: "match", label: "Match case" },
+          ],
+        },
+      ],
+      run: (query, onHits, filters) => {
         let cancelled = false;
         const view = viewRef.current;
         if (!view) {
@@ -490,7 +508,11 @@ export function BookReader({ contentId }: { contentId: string }) {
         void (async () => {
           const hits: ReaderSearchHit[] = [];
           try {
-            for await (const result of view.search({ query })) {
+            for await (const result of view.search({
+              query,
+              matchWholeWords: filters.words === "whole",
+              matchCase: filters.case === "match",
+            })) {
               if (cancelled) return;
               if (result === "done") break;
               if (!("subitems" in result)) continue;

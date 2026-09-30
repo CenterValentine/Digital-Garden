@@ -31,7 +31,7 @@ export interface ScriptureCrumb {
   onClick?: () => void;
 }
 
-/** "The Standard Works › Book of Mormon › Alma › 32" — every step but the last goes back up. */
+/** "Book of Mormon › Alma › 32" — every step but the last goes back up. */
 export function ScriptureCrumbs({
   items,
   compact = false,

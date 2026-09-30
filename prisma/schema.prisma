@@ -2864,10 +2864,17 @@ model ScriptureVerse {
   // Global reading order within the corpus (navigation, ranges, search order).
   ordinal  Int
   text     String
+  // Full-text search vectors, filled on install (and backfilled by the
+  // migration): "english" stems word forms (smart search), "simple" keeps
+  // exact whole words (exact / all / any). GIN-indexed.
+  searchEnglish Unsupported("tsvector")?
+  searchSimple  Unsupported("tsvector")?
   corpus   ScriptureCorpus @relation(fields: [corpusId], references: [id], onDelete: Cascade)
 
   @@unique([corpusId, bookSlug, chapter, verse])
   @@index([corpusId, ordinal])
+  @@index([searchEnglish], type: Gin)
+  @@index([searchSimple], type: Gin)
 }
 
 /// A user's enabled collections (the text itself is shared).

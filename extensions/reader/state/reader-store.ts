@@ -58,8 +58,8 @@ interface ReaderSessionState {
   sidebarView: Record<string, ReaderSidebarView>;
   setSidebarView: (contentId: string, view: ReaderSidebarView) => void;
   /** Last search per open item, so switching sidebar views doesn't lose it. */
-  searches: Record<string, { query: string; hits: ReaderSearchHit[]; done: boolean; note?: string }>;
-  setSearch: (contentId: string, search: { query: string; hits: ReaderSearchHit[]; done: boolean; note?: string } | null) => void;
+  searches: Record<string, { query: string; hits: ReaderSearchHit[]; done: boolean; note?: string; filters?: Record<string, string> }>;
+  setSearch: (contentId: string, search: { query: string; hits: ReaderSearchHit[]; done: boolean; note?: string; filters?: Record<string, string> } | null) => void;
 }
 
 /** A table-of-contents entry of the open book. */
@@ -94,14 +94,31 @@ export interface ReaderSearchHit {
   /** Where ("Alma 32:21", a chapter title). */
   label: string;
   excerpt?: { pre: string; match: string; post: string };
-  /** A jump that isn't a text match ("Go to Alma 32:21"). */
-  kind?: "match" | "jump";
+  /** The text as plain and matched runs — every matched word marked. */
+  parts?: Array<{ text: string; hit: boolean }>;
+  /** Secondary line ("Book of Mormon · 63 chapters"). */
+  detail?: string;
+  /** "jump": go to a typed reference; "place": a book/section by name; else a text match. */
+  kind?: "match" | "jump" | "place";
+}
+
+/** A choice the Search view shows under the box (match mode, scope, order). */
+export interface ReaderSearchFilter {
+  id: string;
+  label: string;
+  /** First option is the default. */
+  options: Array<{ value: string; label: string }>;
 }
 
 export interface ReaderSearchCapability {
   placeholder: string;
+  filters?: ReaderSearchFilter[];
   /** Run a search; `onHits` may be called repeatedly as results stream in. */
-  run: (query: string, onHits: (hits: ReaderSearchHit[], done: boolean, note?: string) => void) => () => void;
+  run: (
+    query: string,
+    onHits: (hits: ReaderSearchHit[], done: boolean, note?: string) => void,
+    filters: Record<string, string>
+  ) => () => void;
   go: (hit: ReaderSearchHit) => void;
   /** Clear marks a search left on the page. */
   clear?: () => void;

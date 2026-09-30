@@ -42,7 +42,8 @@ export const SCRIPTURE_CATALOG: ScriptureCatalogEntry[] = [
   {
     id: LDS_CORPUS_ID,
     tradition: "lds",
-    title: "The Standard Works",
+    // Named for the owner's usage (2026-09-30); the text is the standard works.
+    title: "Gospel Library",
     description:
       "Old Testament (KJV), New Testament (KJV), Book of Mormon, Doctrine and Covenants, and Pearl of Great Price — the verse text of the current editions.",
     language: "en",

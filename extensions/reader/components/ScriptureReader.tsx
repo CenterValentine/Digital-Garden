@@ -37,6 +37,8 @@ import {
   type ScriptureChapterDto,
   type ScriptureContents,
   type ScriptureRef,
+  type ScriptureSearchMode,
+  type ScriptureSearchSort,
 } from "@/lib/domain/scripture/types";
 import {
   buildBookIndex,
@@ -239,6 +241,8 @@ export function ScriptureReader({
   } | null>(null);
   const [aside, setAside] = useState<"contents" | null>(null);
   const [openBookSlug, setOpenBookSlug] = useState<string | null>(null);
+  // Contents panel: only the volume you're in starts expanded.
+  const [openVolumes, setOpenVolumes] = useState<Set<string>>(new Set());
   const [drawerOpen, setDrawerOpen] = useState(false);
   // Browsing (volumes → books → chapters) until a chapter opens; null = reading.
   const [browse, setBrowse] = useState<ScriptureBrowseLevel | null>({
@@ -763,8 +767,39 @@ export function ScriptureReader({
    */
   const search = useMemo<ReaderSearchCapability>(
     () => ({
-      placeholder: "Alma 32:21 or a phrase",
-      run: (query, onHits) => {
+      placeholder: "Alma 32:21, a book, or words",
+      filters: [
+        {
+          id: "mode",
+          label: "How words match",
+          options: [
+            { value: "smart", label: "Smart" },
+            { value: "exact", label: "Exact phrase" },
+            { value: "all", label: "All words" },
+            { value: "any", label: "Any word" },
+          ],
+        },
+        {
+          id: "volume",
+          label: "Where",
+          options: [
+            { value: "", label: "Everywhere" },
+            ...(contents?.volumes.map((volume) => ({
+              value: volume.slug,
+              label: volume.title,
+            })) ?? []),
+          ],
+        },
+        {
+          id: "sort",
+          label: "Order",
+          options: [
+            { value: "relevance", label: "Best match" },
+            { value: "canonical", label: "In order" },
+          ],
+        },
+      ],
+      run: (query, onHits, filters) => {
         let cancelled = false;
         const ref = parseReference(query, index);
         const jump: ReaderSearchHit[] =
@@ -779,9 +814,20 @@ export function ScriptureReader({
             : [];
         onHits(jump, false);
         scriptureApi
-          .search(corpusId, query)
+          .search(corpusId, query, {
+            mode: (filters.mode as ScriptureSearchMode) || "smart",
+            volume: filters.volume || null,
+            sort: (filters.sort as ScriptureSearchSort) || "relevance",
+          })
           .then((result) => {
             if (cancelled) return;
+            // A book named like the query opens at its chapter cards.
+            const places = result.books.map<ReaderSearchHit>((book) => ({
+              id: `book:${book.slug}`,
+              label: book.name,
+              detail: `${book.volumeTitle} · ${book.chapterCount} ${book.chapterCount === 1 ? "chapter" : "chapters"}`,
+              kind: "place",
+            }));
             const hits = result.hits.map<ReaderSearchHit>((hit) => ({
               id: formatVerseHref({
                 bookSlug: hit.bookSlug,
@@ -790,14 +836,22 @@ export function ScriptureReader({
                 verseEnd: hit.verse,
               }),
               label: hit.reference,
-              excerpt: excerptAround(hit.text, query),
+              ...(hit.highlights
+                ? { parts: hit.highlights }
+                : { excerpt: excerptAround(hit.text, query) }),
             }));
-            onHits(
-              [...jump, ...hits],
-              true,
+            const notes = [
               result.total > result.hits.length
                 ? `First ${result.hits.length} of ${result.total} verses`
-                : undefined,
+                : null,
+              result.matchedBy === "substring" && result.total
+                ? "No whole-word matches — showing text that contains it"
+                : null,
+            ].filter(Boolean);
+            onHits(
+              [...jump, ...places, ...hits],
+              true,
+              notes.length ? notes.join(" · ") : undefined,
             );
           })
           .catch(() => !cancelled && onHits(jump, true, "Search failed."));
@@ -806,11 +860,21 @@ export function ScriptureReader({
         };
       },
       go: (hit) => {
+        if (hit.id.startsWith("book:")) {
+          const slug = hit.id.slice("book:".length);
+          const entry = contents?.volumes
+            .flatMap((volume) => volume.books)
+            .find((b) => b.slug === slug);
+          if (entry && entry.chapterCount === 1)
+            void goTo({ bookSlug: slug, chapter: 1 });
+          else applyBrowse({ level: "book", bookSlug: slug });
+          return;
+        }
         const ref = parseVerseHref(hit.id.replace(/^jump:/, ""));
         if (ref) void goToRef(ref);
       },
     }),
-    [corpusId, goToRef, index, label],
+    [applyBrowse, contents, corpusId, goTo, goToRef, index, label],
   );
 
   useEffect(() => {
@@ -978,6 +1042,7 @@ export function ScriptureReader({
                 return;
               }
               setOpenBookSlug(book?.slug ?? null);
+              setOpenVolumes(new Set(book ? [book.volume] : []));
               setAside((current) =>
                 current === "contents" ? null : "contents",
               );
@@ -1004,7 +1069,7 @@ export function ScriptureReader({
               href={gospelLibraryUrl(chapter.book.slug, chapter.chapter)}
               target="_blank"
               rel="noreferrer"
-              title="Open this chapter in Gospel Library (footnotes, chapter headings)"
+              title="Open this chapter on churchofjesuschrist.org (footnotes, chapter headings)"
               className={iconButton}
             >
               <ExternalLink className="h-4 w-4" />
@@ -1071,7 +1136,7 @@ export function ScriptureReader({
         {/* Contents beside the text (the owner's navigation exception; the
             same contents are in the right sidebar's rail, with Search). */}
         {aside && contents && (
-          <aside className="absolute inset-y-0 left-0 z-30 flex w-[min(18rem,85%)] flex-col border-r border-black/10 bg-background shadow-xl sm:static sm:z-auto sm:w-64 sm:shrink-0 sm:shadow-none dark:border-white/10">
+          <aside className="absolute inset-y-0 left-0 z-30 flex w-[min(16rem,80%)] flex-col border-r border-black/10 bg-background shadow-xl sm:static sm:z-auto sm:w-52 sm:shrink-0 sm:shadow-none dark:border-white/10">
             <div className="flex items-center justify-between border-b border-black/10 px-3 py-1.5 text-xs font-medium dark:border-white/10">
               Contents
               <button
@@ -1085,62 +1150,78 @@ export function ScriptureReader({
             </div>
             <div className="min-h-0 flex-1 overflow-auto p-2 text-xs">
               {contents.volumes.map((volume) => (
-                <div key={volume.slug} className="mb-2">
-                  <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                    {volume.title}
-                  </div>
-                  {volume.books.map((entry) => (
-                    <div key={entry.slug}>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (entry.chapterCount === 1) {
-                            void goTo({ bookSlug: entry.slug, chapter: 1 });
-                            setAside(null);
-                          } else
-                            setOpenBookSlug((current) =>
-                              current === entry.slug ? null : entry.slug,
-                            );
-                        }}
-                        className={`w-full truncate rounded px-2 py-1 text-left hover:bg-black/5 dark:hover:bg-white/5 ${
-                          entry.slug === book?.slug
-                            ? "font-semibold text-primary"
-                            : ""
-                        }`}
-                      >
-                        {entry.name}
-                      </button>
-                      {openBookSlug === entry.slug &&
-                        entry.chapterCount > 1 && (
-                          <div className="grid grid-cols-6 gap-0.5 px-2 pb-2 pt-1">
-                            {Array.from(
-                              { length: entry.chapterCount },
-                              (_, i) => i + 1,
-                            ).map((number) => (
-                              <button
-                                key={number}
-                                type="button"
-                                onClick={() => {
-                                  void goTo({
-                                    bookSlug: entry.slug,
-                                    chapter: number,
-                                  });
-                                  setAside(null);
-                                }}
-                                className={`rounded py-1 text-center tabular-nums hover:bg-black/5 dark:hover:bg-white/10 ${
-                                  entry.slug === book?.slug &&
-                                  number === chapter?.chapter
-                                    ? "bg-primary text-primary-foreground"
-                                    : ""
-                                }`}
-                              >
-                                {number}
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                    </div>
-                  ))}
+                <div key={volume.slug} className="mb-1">
+                  <button
+                    type="button"
+                    aria-expanded={openVolumes.has(volume.slug)}
+                    onClick={() =>
+                      setOpenVolumes((current) => {
+                        const next = new Set(current);
+                        if (next.has(volume.slug)) next.delete(volume.slug);
+                        else next.add(volume.slug);
+                        return next;
+                      })
+                    }
+                    className="flex w-full items-center gap-1 rounded px-1 py-1 text-left text-[10px] font-semibold uppercase tracking-wide text-muted-foreground hover:bg-black/5 dark:hover:bg-white/5"
+                  >
+                    <ChevronRight
+                      className={`h-3 w-3 shrink-0 transition-transform ${openVolumes.has(volume.slug) ? "rotate-90" : ""}`}
+                    />
+                    <span className="truncate">{volume.title}</span>
+                  </button>
+                  {openVolumes.has(volume.slug) &&
+                    volume.books.map((entry) => (
+                      <div key={entry.slug}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (entry.chapterCount === 1) {
+                              void goTo({ bookSlug: entry.slug, chapter: 1 });
+                              setAside(null);
+                            } else
+                              setOpenBookSlug((current) =>
+                                current === entry.slug ? null : entry.slug,
+                              );
+                          }}
+                          className={`w-full truncate rounded px-2 py-1 text-left hover:bg-black/5 dark:hover:bg-white/5 ${
+                            entry.slug === book?.slug
+                              ? "font-semibold text-primary"
+                              : ""
+                          }`}
+                        >
+                          {entry.name}
+                        </button>
+                        {openBookSlug === entry.slug &&
+                          entry.chapterCount > 1 && (
+                            <div className="grid grid-cols-6 gap-0.5 px-2 pb-2 pt-1">
+                              {Array.from(
+                                { length: entry.chapterCount },
+                                (_, i) => i + 1,
+                              ).map((number) => (
+                                <button
+                                  key={number}
+                                  type="button"
+                                  onClick={() => {
+                                    void goTo({
+                                      bookSlug: entry.slug,
+                                      chapter: number,
+                                    });
+                                    setAside(null);
+                                  }}
+                                  className={`rounded py-1 text-center tabular-nums hover:bg-black/5 dark:hover:bg-white/10 ${
+                                    entry.slug === book?.slug &&
+                                    number === chapter?.chapter
+                                      ? "bg-primary text-primary-foreground"
+                                      : ""
+                                  }`}
+                                >
+                                  {number}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                      </div>
+                    ))}
                 </div>
               ))}
             </div>

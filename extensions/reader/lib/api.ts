@@ -27,6 +27,7 @@ import type {
   ScriptureContents,
   ScriptureCorpusInfo,
   ScriptureResolvedReference,
+  ScriptureSearchOptions,
   ScriptureSearchResult,
   ScriptureSessionDto,
 } from "@/lib/domain/scripture/types";
@@ -179,10 +180,15 @@ export const scriptureApi = {
     call<ScriptureChapterDto>(
       `/api/reader/scriptures/${encodeURIComponent(corpusId)}/chapter?${new URLSearchParams({ book, chapter: String(chapter) }).toString()}`
     ),
-  search: (corpusId: string, q: string) =>
-    call<ScriptureSearchResult>(
-      `/api/reader/scriptures/${encodeURIComponent(corpusId)}/search?q=${encodeURIComponent(q)}`
-    ),
+  search: (corpusId: string, q: string, options: ScriptureSearchOptions = {}) => {
+    const params = new URLSearchParams({ q });
+    if (options.mode) params.set("mode", options.mode);
+    if (options.volume) params.set("volume", options.volume);
+    if (options.sort) params.set("sort", options.sort);
+    return call<ScriptureSearchResult>(
+      `/api/reader/scriptures/${encodeURIComponent(corpusId)}/search?${params.toString()}`
+    );
+  },
   resolve: (corpusId: string, ref: string) =>
     call<{ references: ScriptureResolvedReference[] }>(
       `/api/reader/scriptures/${encodeURIComponent(corpusId)}/resolve?ref=${encodeURIComponent(ref)}`

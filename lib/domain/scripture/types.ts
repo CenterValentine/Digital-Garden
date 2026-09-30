@@ -111,6 +111,34 @@ export interface ScriptureSearchHit {
   verse: number;
   text: string;
   reference: string;
+  /** The verse split into plain and matched runs (every matched word marked). */
+  highlights?: Array<{ text: string; hit: boolean }>;
+}
+
+/**
+ * How words match (Church-site style search):
+ *   smart — every word, any order, word forms ("commandments" ~ "commandment");
+ *           quotes, -exclude and `or` work
+ *   exact — the words as a phrase, in order (whole words)
+ *   all   — every word, whole words, exact forms
+ *   any   — any of the words
+ */
+export type ScriptureSearchMode = "smart" | "exact" | "all" | "any";
+export type ScriptureSearchSort = "relevance" | "canonical";
+
+export interface ScriptureSearchOptions {
+  mode?: ScriptureSearchMode;
+  /** Limit to one volume ("bofm", "dc-testament", …). */
+  volume?: string | null;
+  sort?: ScriptureSearchSort;
+}
+
+/** A book whose name matches the query ("nephi" → 1–4 Nephi). */
+export interface ScriptureBookMatch {
+  slug: string;
+  name: string;
+  volumeTitle: string;
+  chapterCount: number;
 }
 
 /** A parsed reference with its verse text (links, quotes, AI). */
@@ -123,8 +151,12 @@ export interface ScriptureResolvedReference {
 export interface ScriptureSearchResult {
   /** The passage, when the query parses as a reference ("Alma 32:21"). */
   reference: ScriptureResolvedReference | null;
+  /** Books whose names match — offered above the verses. */
+  books: ScriptureBookMatch[];
   hits: ScriptureSearchHit[];
   total: number;
+  /** "substring" when word search found nothing and a plain text match stood in. */
+  matchedBy: "words" | "substring";
 }
 
 /** A parsed reference: a book plus an optional chapter and verse range. */
