@@ -1,5 +1,5 @@
 ---
-status: building — R3 (LDS standard works in the reader) built 2026-09-30 on `claude/inspiring-franklin-2g7h8l`, see §11. Schema STAGED (owner applies). Citation index, `scriptureRef`/`scriptureQuote` nodes, talks, flashcards and AI remain open.
+status: building — R3 (LDS standard works in the reader) built 2026-09-30 on `claude/inspiring-franklin-2g7h8l`, see §11. Schema migrated: `prisma/migrations/20260930120000_scripture_corpus`. Citation index, `scriptureRef`/`scriptureQuote` nodes, talks, flashcards and AI remain open.
 created: 2026-09-28
 depends_on: none (P0 needs an owner-run migration: shared corpus tables)
 ---
@@ -344,7 +344,7 @@ The owner's call (2026-09-30): build the LDS standard works out completely and s
 whether the shape is a good model for other traditions. It is one pipeline with the
 tradition as data; the pieces below are the template a second tradition follows.
 
-### 11.1 Model (staged — `scripture-schema-additions.prisma` + `scripture-migration.sql`)
+### 11.1 Model (`prisma/migrations/20260930120000_scripture_corpus`)
 
 | Table | Holds | Keys |
 |---|---|---|
@@ -356,8 +356,8 @@ tradition as data; the pieces below are the template a second tradition follows.
 Global and read-only (open question 1 answered: yes). The owner installs a collection
 once (`POST /api/reader/scriptures/install`, owner-only); users enable. Install is
 idempotent: `verseCount` is written last, so a zero count means a half-finished
-install and gets rebuilt. Until the owner applies the schema, every scripture route
-answers 503 with the apply instructions and the `+` menu shows only "Browse traditions…".
+install and gets rebuilt. Until a database has run `migrate deploy`, every scripture route
+answers 503 with that instruction and the `+` menu shows only "Browse traditions…".
 
 Annotations, bookmarks and progress reuse the reader tables with
 `targetKey = scripture:<corpusId>`; a locator's `href` is `<book>/<chapter>[/<v>[-<v>]]`

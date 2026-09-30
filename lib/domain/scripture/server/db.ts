@@ -1,13 +1,10 @@
 /**
  * Scripture persistence facade (server-only).
  *
- * TODO(scripture-migration): `prisma/` is human-owned, so the four corpus
- * tables are staged in docs/notes-feature/work-tracking/scripture-schema-
- * additions.prisma (+ scripture-migration.sql). Until the owner applies them
- * and regenerates the client, these delegates don't exist and every route
- * answers 503 READER_NOT_MIGRATED with the apply instructions (same contract
- * as lib/domain/reader/db.ts). Afterwards, swap these hand-typed delegates for
- * the generated `prisma.scriptureCorpus` etc.
+ * The tables are migrated (prisma/migrations/20260930120000_scripture_corpus).
+ * The facade stays as the one seam: typed rows, and a database that hasn't
+ * run `migrate deploy` yet answers 503 READER_NOT_MIGRATED instead of
+ * crashing (same contract as lib/domain/reader/db.ts).
  */
 
 import "server-only";
@@ -17,7 +14,7 @@ import { ReaderNotMigratedError } from "@/lib/domain/reader/db";
 export class ScriptureNotMigratedError extends ReaderNotMigratedError {
   constructor(model: string) {
     super(model);
-    this.message = `Scripture tables are not migrated yet (missing ${model}). Apply docs/notes-feature/work-tracking/scripture-schema-additions.prisma (see scripture-migration.sql).`;
+    this.message = `Scripture tables are not migrated yet (missing ${model}). Run \`npx prisma migrate deploy\` (migration 20260930120000_scripture_corpus).`;
   }
 }
 
