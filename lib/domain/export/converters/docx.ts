@@ -4,12 +4,21 @@
  * Covers the block/mark subset that text documents (notes, resumes,
  * dossiers) actually use: paragraphs, headings 1–6, bullet/ordered lists
  * (both render as bullets — Word numbering config is deferred), block
- * quotes, code blocks, and bold/italic/underline/strike/code marks.
+ * quotes, code blocks, bold/italic/underline/strike/code marks, and links
+ * (real hyperlinks — the URL used to be dropped and only the label kept,
+ * so a resume's "LinkedIn" went out pointing nowhere; plan §10 round 3).
  * Unknown nodes degrade to their extracted text instead of being dropped,
  * matching the editor's unsupported-content philosophy.
  */
 
-import { Document, HeadingLevel, Packer, Paragraph, TextRun } from "docx";
+import {
+  Document,
+  ExternalHyperlink,
+  HeadingLevel,
+  Packer,
+  Paragraph,
+  TextRun,
+} from "docx";
 import type {
   DocumentConverter,
   ConversionOptions,
@@ -46,27 +55,56 @@ function marksToState(node: JSONContent): MarkState {
   return state;
 }
 
-function inlineRuns(node: JSONContent): TextRun[] {
-  const runs: TextRun[] = [];
+/** The href of a text node's link mark, if it has one. */
+function linkHref(node: JSONContent): string | null {
+  const mark = node.marks?.find((m) => m.type === "link");
+  const href = mark?.attrs?.href;
+  return typeof href === "string" && href.trim() ? href.trim() : null;
+}
+
+type InlineChild = TextRun | ExternalHyperlink;
+
+function inlineRuns(node: JSONContent): InlineChild[] {
+  const runs: InlineChild[] = [];
+  // Consecutive text nodes under the SAME link (a label split by a bold
+  // mark, say) become one hyperlink, not several adjacent ones.
+  let pending: { href: string; runs: TextRun[] } | null = null;
+  const flush = () => {
+    if (pending) {
+      runs.push(new ExternalHyperlink({ link: pending.href, children: pending.runs }));
+      pending = null;
+    }
+  };
   for (const child of node.content ?? []) {
     if (child.type === "text") {
       const state = marksToState(child);
-      runs.push(
-        new TextRun({
-          text: child.text ?? "",
-          bold: state.bold,
-          italics: state.italics,
-          underline: state.underline ? {} : undefined,
-          strike: state.strike,
-          font: state.code ? "Courier New" : undefined,
-        })
-      );
+      const href = linkHref(child);
+      const run = new TextRun({
+        text: child.text ?? "",
+        bold: state.bold,
+        italics: state.italics,
+        underline: state.underline || href ? {} : undefined,
+        strike: state.strike,
+        font: state.code ? "Courier New" : undefined,
+        ...(href ? { style: "Hyperlink" } : {}),
+      });
+      if (href) {
+        if (pending && pending.href !== href) flush();
+        pending ??= { href, runs: [] };
+        pending.runs.push(run);
+        continue;
+      }
+      flush();
+      runs.push(run);
     } else if (child.type === "hardBreak") {
+      flush();
       runs.push(new TextRun({ text: "", break: 1 }));
     } else if (child.content) {
+      flush();
       runs.push(...inlineRuns(child));
     }
   }
+  flush();
   return runs;
 }
 

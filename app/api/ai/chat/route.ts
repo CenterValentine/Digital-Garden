@@ -23,6 +23,7 @@
 
 import {
   streamText,
+  generateText,
   convertToModelMessages,
   stepCountIs,
   NoSuchToolError,
@@ -64,9 +65,12 @@ import {
   buildPromptCachePolicy,
   mergeAIProviderOptions,
   summarizePromptCacheUsage,
+  withAnthropicCacheBreakpoint,
   type AIProviderOptions,
   type PromptCacheUsageLike,
 } from "@/lib/domain/ai/prompt-cache";
+import { trimToLastStepStart } from "@/lib/domain/ai/cache-volley";
+import { computeTurnCost } from "@/lib/features/ai-connections/usage/pricing";
 import {
   resolveChatModel,
   resolveChatModelFromConnection,
@@ -91,6 +95,7 @@ import {
   CHARTER_TAIL_EXTRA,
   CHARTER_TURN_TOOLS,
   tailRefusalNotice,
+  withBudgetNotice,
   CHARTER_TURN_DELIVERABLES,
   computeIterationStepCap,
   continuationStepCap,
@@ -504,7 +509,12 @@ export async function POST(request: Request) {
       const body = await request.json();
 
       // AI SDK v6 sends messages as UIMessage[] with `parts` arrays
-      const messages: UIMessage[] = body.messages ?? [];
+      // Cache volley (§10 round 3): the transcript is cut at the pending
+      // approval step's start — the prefix the continuation will extend.
+      const warmOnly = body.warmOnly === true;
+      const messages: UIMessage[] = warmOnly
+        ? trimToLastStepStart(body.messages ?? [])
+        : (body.messages ?? []);
       const contentId: string | undefined = body.contentId;
 
       if (!Array.isArray(messages) || messages.length === 0) {
@@ -1721,10 +1731,21 @@ export async function POST(request: Request) {
       // flush. Tools with no server execute (provider-native search, the
       // browser readers) cannot be refused here — the steps notice names the
       // tail tools for those.
-      const tailGate: { active: boolean; allowed: readonly string[]; remaining: number } = {
+      const tailGate: {
+        active: boolean;
+        allowed: readonly string[];
+        remaining: number;
+        /** The budget line for the NEXT step, carried on this step's first result. */
+        notice: string | null;
+        noticeStep: number;
+        noticeCarriedForStep: number;
+      } = {
         active: false,
         allowed: [],
         remaining: 0,
+        notice: null,
+        noticeStep: -1,
+        noticeCarriedForStep: -1,
       };
       for (const [name, entry] of Object.entries(
         tools as Record<string, { execute?: unknown } | undefined>,
@@ -1745,7 +1766,19 @@ export async function POST(request: Request) {
               remaining: tailGate.remaining,
             });
           }
-          return original(input, options);
+          const output = await original(input, options);
+          // THE BUDGET RIDES THE RESULT (§10 round 3). A trailing harness
+          // USER message on every step froze the provider cache at the
+          // user's own message — every run with the notice froze there,
+          // and ecf1d0e5's requests without it cached normally. A line
+          // inside a tool result becomes ordinary history that never
+          // changes, so the prompt only grows. Once per step.
+          if (tailGate.notice && tailGate.noticeCarriedForStep !== tailGate.noticeStep) {
+            const carried = withBudgetNotice(output, tailGate.notice);
+            if (carried !== output) tailGate.noticeCarriedForStep = tailGate.noticeStep;
+            return carried;
+          }
+          return output;
         };
       }
 
@@ -2874,6 +2907,146 @@ export async function POST(request: Request) {
       // but the plumbing must exist before the pricing formula does).
       let turnCacheWriteTokens = 0;
 
+      // SYSTEM-PROMPT FLAGS READ THE BASE POLICY, NOT SUMMONS. `isAdvertised`
+      // includes this turn's summons, restored into every later request from
+      // the transcript — so a summon at step 1 rewrote the NEXT request's
+      // system prompt, and a changed system prompt is a cold cache for the
+      // whole request (plan §10 L1). `isOffered` is the per-request policy
+      // (core + live modes + charter binding), the same on every request of
+      // a turn. A summoned tool teaches through its own description.
+      systemPromptForDiag = buildSystemPrompt({
+        hasImageTools: isOffered("generate_image"),
+        hasFlashcardTools: isOffered("list_decks"),
+        hasWebSearch: isOffered("search_web"),
+        hasCheckpointTool: isOffered("phase_checkpoint"),
+        hasBrowserReadTool: isOffered(READ_PAGE_HEADLESS_OR_BROWSER),
+        hasTabLauncher: isOffered(OPEN_TAB_AND_READ),
+        hasCoBrowseTools: isOffered(CO_BROWSE_OPEN),
+        hasReadCurrentPage: isOffered(READ_CURRENT_PAGE),
+        hasResearchTools: isOffered("extract_structured"),
+        hasListTabs: isOffered(LIST_TABS),
+        hasItemIteration: isOffered("propose_item_iteration"),
+        hasDatabaseTools: isOffered("describe_database"),
+        toolMenu: toolMenu ?? undefined,
+        viewedContentHint,
+        // Runtime identity (v3.1): what this turn is ACTUALLY served by,
+        // from live routing — so the model self-identifies from ground
+        // truth. Prefer the connection's preset template name (matches
+        // the picker: "Moonshot (Kimi)"), then the catalog, then the raw
+        // id.
+        runtimeProviderName:
+          (activeConnection?.presetId
+            ? lookupTemplate(activeConnection.presetId)?.name
+            : undefined) ??
+          lookupTemplate(providerId)?.name ??
+          PROVIDER_CATALOG.find((p) => p.id === providerId)?.name ??
+          providerId,
+        runtimeModelId: activeModelId,
+        openWorkflowTitle,
+        editableContentId,
+        isChatContent,
+        chatContentId: isChatContent ? contentId : undefined,
+        autoPronounceDefault,
+        userContextSection,
+        mentionedContext,
+        charterContext,
+        rootedContentSection,
+        outputTargetSection: renderOutputTargetInstruction(outputTarget),
+        hasAttachedCharter: attachedCharterResolved,
+        checkpointIntegritySection:
+          renderPhaseCheckpointGateInstruction(phaseCheckpointGate),
+        pageContextSection,
+        currentPageHint,
+      });
+
+      // CACHE VOLLEY (§10 round 3). The chat engine sends this once while an
+      // approval waits, shortly before the provider cache would expire. The
+      // transcript was cut at the approval step's start (see `warmOnly` at
+      // the body parse), so this prompt is the prefix the continuation will
+      // extend, built by the same path. One call, a 16-token reply ceiling,
+      // no tool runs, nothing persisted — its only effect is a cache reuse,
+      // which refreshes the prefix's lifetime.
+      if (warmOnly) {
+        const anthropicThinking =
+          executedVendorId === "anthropic" &&
+          !!(reasoningProviderOptions as { anthropic?: { thinking?: unknown } } | undefined)
+            ?.anthropic?.thinking;
+        if (anthropicThinking) {
+          // A one-token reply is below the thinking budget, and changing the
+          // thinking settings would itself invalidate the cached messages.
+          logger.info({
+            layer: "ai",
+            event: "ai:cache_volley",
+            summary: "cache volley skipped — Anthropic extended thinking is on",
+            attrs: { model: activeModelId, skipped: "thinking" },
+          });
+          return Response.json({ ok: false, skipped: "thinking" });
+        }
+        const warmTools = Object.fromEntries(
+          Object.entries(tools).map(([name, t]) => [
+            name,
+            { ...(t as Record<string, unknown>), execute: undefined },
+          ]),
+        ) as typeof tools;
+        const warmMessages =
+          executedVendorId === "openai"
+            ? stripOpenAIItemIdsFromModelMessages(modelMessages)
+            : executedVendorId === "anthropic"
+              ? withAnthropicCacheBreakpoint(modelMessages)
+              : modelMessages;
+        try {
+          const warm = await generateText({
+            model: wrappedModel,
+            system: systemPromptForDiag,
+            messages: warmMessages,
+            tools: toolsActive ? warmTools : undefined,
+            activeTools: toolsActive ? [...advertised, ...activated] : undefined,
+            toolChoice: toolsActive ? "auto" : undefined,
+            maxOutputTokens: 16,
+            ...(providerOptions && { providerOptions }),
+          });
+          const cacheCreation = (
+            warm.providerMetadata as { anthropic?: { cacheCreationInputTokens?: unknown } } | undefined
+          )?.anthropic?.cacheCreationInputTokens;
+          const cost = computeTurnCost(
+            {
+              inputTokens: warm.usage.inputTokens ?? 0,
+              outputTokens: warm.usage.outputTokens ?? 0,
+              cachedInputTokens: warm.usage.cachedInputTokens ?? 0,
+              cacheWriteTokens: typeof cacheCreation === "number" ? cacheCreation : 0,
+            },
+            activeModelId,
+            executedVendorId,
+          );
+          logger.info({
+            layer: "ai",
+            event: "ai:cache_volley",
+            summary: `cache volley — ${warm.usage.cachedInputTokens ?? 0} of ${warm.usage.inputTokens ?? 0} input tokens served from cache`,
+            attrs: {
+              model: activeModelId,
+              input_tokens: warm.usage.inputTokens ?? 0,
+              cached_input_tokens: warm.usage.cachedInputTokens ?? 0,
+              cost_usd: cost?.usd ?? -1,
+            },
+          });
+          return Response.json({
+            ok: true,
+            inputTokens: warm.usage.inputTokens ?? 0,
+            cachedInputTokens: warm.usage.cachedInputTokens ?? 0,
+            costUsd: cost?.usd ?? null,
+          });
+        } catch (error) {
+          logger.warn({
+            layer: "ai",
+            event: "ai:cache_volley",
+            summary: "cache volley failed — the continuation will simply start cold",
+            attrs: { model: activeModelId },
+            error,
+          });
+          return Response.json({ ok: false });
+        }
+      }
+
       const result = streamText({
         model: wrappedModel,
         messages: modelMessages,
@@ -2968,10 +3141,15 @@ export async function POST(request: Request) {
           // carry `openai.itemId` (sent inline as `id`), the transcript has
           // it stripped, and the provider cache saw two different items
           // (plan §10 L1, wire probe 04:17:42). Reasoning keeps its id.
+          // Anthropic caches only up to a marked breakpoint: the last message
+          // of every step is marked, so each step reads the previous one's
+          // prefix and writes its own (§10 round 3 — Claude was never cached).
           const stepMessages =
             executedVendorId === "openai"
               ? stripOpenAIItemIdsFromModelMessages(rawStepMessages)
-              : rawStepMessages;
+              : executedVendorId === "anthropic"
+                ? withAnthropicCacheBreakpoint(rawStepMessages)
+                : rawStepMessages;
           // Summoned tools enter here: `activated` grew during the previous
           // step's tool execution, and this is the only place a step's
           // advertised set can be widened. Returned every step (not just when
@@ -3036,6 +3214,7 @@ export async function POST(request: Request) {
           if (stepNumber < stepCap - 1) {
             if (!tailDeliverables) {
               tailGate.active = false;
+              tailGate.notice = null;
               return { activeTools: stepActiveTools, messages: stepMessages };
             }
             // DELIVERABLE-TAIL RESERVATION (plan §6b, prod 5e5b739d): the
@@ -3054,21 +3233,17 @@ export async function POST(request: Request) {
             tailGate.allowed = tailToolsForTurn;
             tailGate.remaining = remaining;
             if (inTail) stepsTracker.tailReservedSteps += 1;
-            return {
-              activeTools: stepActiveTools,
-              messages: [
-                ...stepMessages,
-                {
-                  role: "user" as const,
-                  content: stepsRemainingNotice({
-                    stepNumber,
-                    stepCap,
-                    deliverables: tailDeliverables,
-                    tailTools: tailToolsForTurn,
-                  }),
-                },
-              ],
-            };
+            // The budget line for the step AFTER this one, carried on this
+            // step's first tool result (see the tool wrapper) — never a
+            // trailing message: the prompt must only grow (§10 round 3).
+            tailGate.notice = stepsRemainingNotice({
+              stepNumber: stepNumber + 1,
+              stepCap,
+              deliverables: tailDeliverables,
+              tailTools: tailToolsForTurn,
+            });
+            tailGate.noticeStep = stepNumber;
+            return { activeTools: stepActiveTools, messages: stepMessages };
           }
           stepsTracker.finalStepReserved = true;
           return {
@@ -3086,57 +3261,7 @@ export async function POST(request: Request) {
             ],
           };
         },
-        // SYSTEM-PROMPT FLAGS READ THE BASE POLICY, NOT SUMMONS. `isAdvertised`
-        // includes this turn's summons, restored into every later request from
-        // the transcript — so a summon at step 1 rewrote the NEXT request's
-        // system prompt, and a changed system prompt is a cold cache for the
-        // whole request (plan §10 L1). `isOffered` is the per-request policy
-        // (core + live modes + charter binding), the same on every request of
-        // a turn. A summoned tool teaches through its own description.
-        system: (systemPromptForDiag = buildSystemPrompt({
-          hasImageTools: isOffered("generate_image"),
-          hasFlashcardTools: isOffered("list_decks"),
-          hasWebSearch: isOffered("search_web"),
-          hasCheckpointTool: isOffered("phase_checkpoint"),
-          hasBrowserReadTool: isOffered(READ_PAGE_HEADLESS_OR_BROWSER),
-          hasTabLauncher: isOffered(OPEN_TAB_AND_READ),
-          hasCoBrowseTools: isOffered(CO_BROWSE_OPEN),
-          hasReadCurrentPage: isOffered(READ_CURRENT_PAGE),
-          hasResearchTools: isOffered("extract_structured"),
-          hasListTabs: isOffered(LIST_TABS),
-          hasItemIteration: isOffered("propose_item_iteration"),
-          hasDatabaseTools: isOffered("describe_database"),
-          toolMenu: toolMenu ?? undefined,
-          viewedContentHint,
-          // Runtime identity (v3.1): what this turn is ACTUALLY served by,
-          // from live routing — so the model self-identifies from ground
-          // truth. Prefer the connection's preset template name (matches
-          // the picker: "Moonshot (Kimi)"), then the catalog, then the raw
-          // id.
-          runtimeProviderName:
-            (activeConnection?.presetId
-              ? lookupTemplate(activeConnection.presetId)?.name
-              : undefined) ??
-            lookupTemplate(providerId)?.name ??
-            PROVIDER_CATALOG.find((p) => p.id === providerId)?.name ??
-            providerId,
-          runtimeModelId: activeModelId,
-          openWorkflowTitle,
-          editableContentId,
-          isChatContent,
-          chatContentId: isChatContent ? contentId : undefined,
-          autoPronounceDefault,
-          userContextSection,
-          mentionedContext,
-          charterContext,
-          rootedContentSection,
-          outputTargetSection: renderOutputTargetInstruction(outputTarget),
-          hasAttachedCharter: attachedCharterResolved,
-          checkpointIntegritySection:
-            renderPhaseCheckpointGateInstruction(phaseCheckpointGate),
-          pageContextSection,
-          currentPageHint,
-        })),
+        system: systemPromptForDiag,
         onStepFinish: (step) => {
           // Tokens-per-phase accumulator (v3.1 R5) — cheap, never throws.
           const stepUsage = (

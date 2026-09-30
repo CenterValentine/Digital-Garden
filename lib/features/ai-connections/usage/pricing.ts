@@ -434,12 +434,30 @@ export function computeTurnCost(
     ? Math.max(0, input - cached)
     : input;
 
-  const breakdown: TurnCostBreakdown = {
-    input: per1M(uncachedInput, rates.input),
-    cachedInput: per1M(cached, rates.cachedInput),
-    cacheWrite: per1M(cacheWrite, rates.cacheWrite),
-    output: per1M(output, rates.output),
-  };
+  // Unreported cache writes (§10 round 3). OpenAI GPT-5.6 and later bill
+  // cache writes at 1.25× input ("For GPT-5.6 and later, cache writes cost
+  // 1.25× the standard, uncached input-token rate" — prompt-caching guide,
+  // 2026-09-30), and the SDK reports no write count for OpenAI. Every
+  // uncached prompt token is written to the cache, so on a row that carries
+  // a write rate, uncached input is billed as written — the meter used to
+  // bill it at 1× and under-report these models by up to a quarter of their
+  // uncached input. A provider that reports writes (Anthropic) is priced
+  // from its own count as before.
+  const unreportedWrites =
+    inputIncludesCached(providerId) && cacheWrite === 0 && rates.cacheWrite > 0;
+  const breakdown: TurnCostBreakdown = unreportedWrites
+    ? {
+        input: 0,
+        cachedInput: per1M(cached, rates.cachedInput),
+        cacheWrite: per1M(uncachedInput, rates.cacheWrite),
+        output: per1M(output, rates.output),
+      }
+    : {
+        input: per1M(uncachedInput, rates.input),
+        cachedInput: per1M(cached, rates.cachedInput),
+        cacheWrite: per1M(cacheWrite, rates.cacheWrite),
+        output: per1M(output, rates.output),
+      };
   const searches = Math.max(0, usage.webSearchCalls ?? 0);
   if (searches > 0) breakdown.webSearch = searches * webSearchCallUsd(modelId, providerId);
   const usd =

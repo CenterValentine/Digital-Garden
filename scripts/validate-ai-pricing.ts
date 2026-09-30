@@ -153,7 +153,9 @@ const approx = (actual: number, expected: number, label: string) => {
   assert.equal(c.priceVersion, PRICING_VERSION);
 }
 
-// OpenAI semantics: inputTokens INCLUDES cached. terra @ 2/12, cached 0.2.
+// OpenAI semantics: inputTokens INCLUDES cached. terra @ 2/12, cached 0.2,
+// cache write 2.5 — GPT-5.6+ bill writes at 1.25× input and the SDK reports
+// none, so the 6,000 uncached tokens are priced as written (§10 round 3).
 {
   const c = computeTurnCost(
     { inputTokens: 10_000, cachedInputTokens: 4_000, outputTokens: 1_000 },
@@ -163,9 +165,23 @@ const approx = (actual: number, expected: number, label: string) => {
   assert.ok(c, "openai fixture priced");
   approx(
     c.usd,
-    (6_000 * 2 + 4_000 * 0.2 + 1_000 * 12) / 1_000_000,
+    (6_000 * 2.5 + 4_000 * 0.2 + 1_000 * 12) / 1_000_000,
     "openai: includes-cached semantics",
   );
+}
+
+// A model with no write rate (pre-5.6: gpt-5.5 @ 5 in / 0.5 cached) still
+// bills uncached input at 1× — writes are inferred only where a row says
+// the model bills them.
+{
+  const legacy = computeTurnCost(
+    { inputTokens: 10_000, cachedInputTokens: 4_000, outputTokens: 0 },
+    "gpt-5.5",
+    "openai",
+  );
+  assert.ok(legacy, "gpt-5.5 priced");
+  assert.equal(legacy.breakdown.cacheWrite, 0, "no write rate → no inferred writes");
+  approx(legacy.breakdown.input, (6_000 * 5) / 1_000_000, "no write rate → uncached input at 1×");
 }
 
 // Long-context tier: terra above 272K bills the whole request at tier rates.
@@ -178,13 +194,16 @@ const approx = (actual: number, expected: number, label: string) => {
   assert.ok(c, "long-context fixture priced");
   approx(
     c.usd,
-    (300_000 * 4 + 1_000 * 18) / 1_000_000,
+    // Tier write rate 5 (1.25 × 4): uncached input on GPT-5.6+ is written.
+    (300_000 * 5 + 1_000 * 18) / 1_000_000,
     "openai: >272K request bills at long-context tier",
   );
 }
 
 // gpt-6 family (verified 2026-09-29): every id the connection's fetched
 // list offers resolves to a row, and the rates are the pricing page's.
+// Uncached input bills at the WRITE rate (1.25× input, unreported by the
+// SDK — §10 round 3), so each row's input rate is pinned through it.
 {
   for (const id of ["gpt-6-astra", "gpt-6-sol", "gpt-6-luna", "openai/gpt-6-sol", "gpt-6-sol-2026-09-22"]) {
     assert.ok(priceFor(id), `gpt-6: ${id} resolves to a price row`);
@@ -197,8 +216,8 @@ const approx = (actual: number, expected: number, label: string) => {
   assert.ok(sol, "gpt-6-sol fixture priced");
   approx(
     sol.usd,
-    (60_000 * 2 + 40_000 * 0.2 + 5_000 * 10) / 1_000_000,
-    "gpt-6-sol: 2 / 0.20 / 10 per 1M",
+    (60_000 * 2.5 + 40_000 * 0.2 + 5_000 * 10) / 1_000_000,
+    "gpt-6-sol: 2 (written 2.5) / 0.20 / 10 per 1M",
   );
   const astra = computeTurnCost(
     { inputTokens: 10_000, outputTokens: 1_000 },
@@ -206,7 +225,7 @@ const approx = (actual: number, expected: number, label: string) => {
     "openai",
   );
   assert.ok(astra, "gpt-6-astra fixture priced");
-  approx(astra.usd, (10_000 * 10 + 1_000 * 50) / 1_000_000, "gpt-6-astra: 10 / 50 per 1M");
+  approx(astra.usd, (10_000 * 12.5 + 1_000 * 50) / 1_000_000, "gpt-6-astra: 10 (written 12.5) / 50 per 1M");
   // Under the 272K line — a 1M prompt would (correctly) bill at the tier.
   const luna = computeTurnCost(
     { inputTokens: 100_000, cachedInputTokens: 50_000, outputTokens: 10_000 },
@@ -214,13 +233,13 @@ const approx = (actual: number, expected: number, label: string) => {
     "openai",
   );
   assert.ok(luna, "gpt-6-luna fixture priced");
-  approx(luna.usd, (50_000 * 0.1 + 50_000 * 0.01 + 10_000 * 0.5) / 1_000_000, "gpt-6-luna: 0.10 / 0.01 / 0.50 per 1M");
+  approx(luna.usd, (50_000 * 0.125 + 50_000 * 0.01 + 10_000 * 0.5) / 1_000_000, "gpt-6-luna: 0.10 (written 0.125) / 0.01 / 0.50 per 1M");
   const sol56 = computeTurnCost({ inputTokens: 100_000, outputTokens: 0 }, "gpt-5.6-sol", "openai");
   assert.ok(sol56, "gpt-5.6-sol fixture priced");
-  approx(sol56.usd, 0.4, "gpt-5.6-sol: input cut to 4 per 1M at the gpt-6 launch");
+  approx(sol56.usd, 0.5, "gpt-5.6-sol: input cut to 4 per 1M at the gpt-6 launch (written 5)");
   const lunaLong = computeTurnCost({ inputTokens: 300_000, outputTokens: 0 }, "gpt-6-luna", "openai");
   assert.ok(lunaLong, "gpt-6-luna long-context fixture priced");
-  approx(lunaLong.usd, (300_000 * 0.2) / 1_000_000, "gpt-6-luna: a >272K call bills at the long-context tier");
+  approx(lunaLong.usd, (300_000 * 0.25) / 1_000_000, "gpt-6-luna: a >272K call bills at the long-context tier (written 0.25)");
 }
 
 // A multi-step request whose SUM crosses 272K but whose largest step does
@@ -241,7 +260,7 @@ const approx = (actual: number, expected: number, label: string) => {
   assert.ok(c, "multi-step fixture priced");
   approx(
     c.usd,
-    (200_000 * 2 + 100_000 * 0.2 + 1_000 * 12) / 1_000_000,
+    (200_000 * 2.5 + 100_000 * 0.2 + 1_000 * 12) / 1_000_000, // uncached input written at 2.5
     "openai: a multi-step request keys the tier off its largest step, not the sum",
   );
   // And a step that itself crosses the line still tiers.
@@ -253,7 +272,7 @@ const approx = (actual: number, expected: number, label: string) => {
   assert.ok(big, "big-step fixture priced");
   approx(
     big.usd,
-    (300_000 * 4 + 1_000 * 18) / 1_000_000,
+    (300_000 * 5 + 1_000 * 18) / 1_000_000, // tier write rate 5
     "openai: a single step above 272K bills at the tier",
   );
 }
