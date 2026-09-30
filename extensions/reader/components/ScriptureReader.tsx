@@ -991,6 +991,26 @@ export function ScriptureReader({
         ? `${book.name}${book.chapterCount > 1 ? ` ${chapter.chapter}` : ""}`
         : contents.corpus.title;
   const showBrowse = applyBrowse;
+  // Where you are, for the contents panel: the browse level while browsing,
+  // else the chapter's book. The panel opens that volume and book for you.
+  const here = useMemo(() => {
+    if (browse?.level === "volume") return { volume: browse.volume, bookSlug: null };
+    const slug = browse ? (browse.level === "book" ? browse.bookSlug : null) : (book?.slug ?? null);
+    if (!slug) return null;
+    const entry = contents?.volumes
+      .flatMap((volume) => volume.books)
+      .find((candidate) => candidate.slug === slug);
+    return entry ? { volume: entry.volume, bookSlug: entry.slug } : null;
+  }, [browse, book?.slug, contents]);
+  const hereKey = here ? `${here.volume}/${here.bookSlug ?? ""}` : "";
+  const [expandedFor, setExpandedFor] = useState(hereKey);
+  if (expandedFor !== hereKey) {
+    // Moving somewhere new re-expands the path (and folds the rest); toggles
+    // made while you stay put are left alone.
+    setExpandedFor(hereKey);
+    setOpenVolumes(new Set(here ? [here.volume] : []));
+    setOpenBookSlug(here?.bookSlug ?? null);
+  }
   const headerPath = pathTo(browse, book ?? null, contents, showBrowse);
   const openBook = useReaderSession(
     (state) => state.openBooks[contentId] ?? null,
@@ -1041,8 +1061,8 @@ export function ScriptureReader({
                 openSideView("contents");
                 return;
               }
-              setOpenBookSlug(book?.slug ?? null);
-              setOpenVolumes(new Set(book ? [book.volume] : []));
+              setOpenBookSlug(here?.bookSlug ?? null);
+              setOpenVolumes(new Set(here ? [here.volume] : []));
               setAside((current) =>
                 current === "contents" ? null : "contents",
               );
@@ -1184,7 +1204,7 @@ export function ScriptureReader({
                               );
                           }}
                           className={`w-full truncate rounded px-2 py-1 text-left hover:bg-black/5 dark:hover:bg-white/5 ${
-                            entry.slug === book?.slug
+                            entry.slug === here?.bookSlug
                               ? "font-semibold text-primary"
                               : ""
                           }`}

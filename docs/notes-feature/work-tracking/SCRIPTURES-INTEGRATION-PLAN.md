@@ -419,8 +419,8 @@ ordinals ("First Nephi"), unambiguous prefixes ("Hela"), ranges, lists ("John 3:
   foil per volume, `lib/domain/scripture/covers.ts`) — official edition artwork is
   someone else's design, so it isn't copied or hotlinked.
 - **Reader** (`reader:scripture/<corpus>`, `ScriptureReader`): chapter view in the
-  reader's theme/typography; a narrow contents aside beside the text (only the volume
-  you're in is expanded; hold/⌥-click opens the right rail); the breadcrumb on its own
+  reader's theme/typography; a narrow contents aside beside the text (it follows where you
+  are — browsing or reading — opening that volume and book and folding the rest; hold/⌥-click opens the right rail); the breadcrumb on its own
   line starting at the volume (home icon → covers); ←/→ and prev/next across book
   boundaries; progress bar over the whole corpus. The collection is titled "Gospel
   Library" (catalog title wins over the stored row; the id stays `lds-standard-works`).
