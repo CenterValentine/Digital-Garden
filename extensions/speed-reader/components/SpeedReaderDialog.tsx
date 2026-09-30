@@ -8,6 +8,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
+import { FastForward, RotateCcw, StepForward, X } from "lucide-react";
 import { Controls } from "./Controls";
 import { WordDisplay } from "./WordDisplay";
 import { SessionSummary } from "./SessionSummary";
@@ -28,8 +29,6 @@ import {
   type SpeedReaderPagedSource,
 } from "../events";
 
-/** How long the page-end overlay shows before auto-continue turns the page. */
-const AUTO_CONTINUE_DELAY_MS = 1800;
 /** Exit animation of the page-end overlay; the page turns once it's done. */
 const PAGE_END_EXIT_MS = 200;
 
@@ -55,8 +54,11 @@ export function SpeedReaderDialog() {
   const [showPdfCompatWarning, setShowPdfCompatWarning] = useState(false);
   // Paged source (the e-reader): read the visible page, then the next on request.
   const pagedSourceRef = useRef<SpeedReaderPagedSource | null>(null);
+  const [isPaged, setIsPaged] = useState(false);
   const [pageLabel, setPageLabel] = useState<string | null>(null);
   const [advancing, setAdvancing] = useState(false);
+  // Guards the automatic page turn against a second trigger while it's in flight.
+  const advancingRef = useRef(false);
   // The page-end overlay is animating out (then the chosen action runs).
   const [pageEndLeaving, setPageEndLeaving] = useState(false);
   // Words from pages already finished this session (paged sources).
@@ -91,7 +93,9 @@ export function SpeedReaderDialog() {
   );
 
   const total = chunks.length;
-  const currentChunk = chunks[position] ?? null;
+  // During an automatic page turn, hold the page's last word rather than
+  // flashing blank until the next page's words arrive.
+  const currentChunk = chunks[position] ?? (advancing ? chunks[chunks.length - 1] ?? null : null);
 
   const clearTimer = useCallback(() => {
     if (timerRef.current !== null) {
@@ -112,6 +116,7 @@ export function SpeedReaderDialog() {
     setProgress(null);
     setPendingContentId(null);
     pagedSourceRef.current = null;
+    setIsPaged(false);
     setPageLabel(null);
     setAdvancing(false);
     finishedPagesWordsRef.current = 0;
@@ -234,6 +239,7 @@ export function SpeedReaderDialog() {
       finishedPagesWordsRef.current = 0;
       const pagedSource = contentId ? getSpeedReaderPagedSource(contentId) : null;
       pagedSourceRef.current = pagedSource;
+      setIsPaged(Boolean(pagedSource));
       setPageLabel(null);
       if (pagedSource) {
         // The e-reader: start from the page on screen, not the top of the book.
@@ -350,23 +356,27 @@ export function SpeedReaderDialog() {
     if (pagedSourceRef.current) {
       // End of the page: stop here (or roll on), never past what was asked.
       finishedPagesWordsRef.current += total;
-      // Auto-continue still passes through the page-end overlay (briefly), so
-      // the checkbox stays reachable to turn it back off.
-      setPhase("pageEnd");
+      // Continue automatically: straight into the next page, no card — the
+      // controls' Stop button is the way out. Otherwise stop and offer the card.
+      if (useSpeedReaderStore.getState().autoContinuePages) void continueToNextPage({ fromCard: false });
+      else setPhase("pageEnd");
       return;
     }
     recordAndSummarize(total);
   }
 
   /** Paged source: turn the host's page and keep reading. */
-  async function continueToNextPage() {
+  async function continueToNextPage({ fromCard }: { fromCard: boolean }) {
     const source = pagedSourceRef.current;
-    if (!source) return;
+    if (!source || advancingRef.current) return;
+    advancingRef.current = true;
     setAdvancing(true);
     try {
-      // Let the overlay bow out before the words come back.
-      setPageEndLeaving(true);
-      await wait(PAGE_END_EXIT_MS);
+      // From the card: let it bow out before the words come back.
+      if (fromCard) {
+        setPageEndLeaving(true);
+        await wait(PAGE_END_EXIT_MS);
+      }
       let page = await source.next();
       for (let skipped = 0; page && !page.text.trim() && skipped < 5; skipped++) {
         page = await source.next();
@@ -383,6 +393,7 @@ export function SpeedReaderDialog() {
       setPhase("error");
       setErrorMessage(err instanceof Error ? err.message : "Could not turn the page");
     } finally {
+      advancingRef.current = false;
       setAdvancing(false);
       setPageEndLeaving(false);
     }
@@ -412,13 +423,6 @@ export function SpeedReaderDialog() {
     setPhase("done");
   }
 
-  // Auto-continue: hold the page-end overlay a moment, then roll on.
-  useEffect(() => {
-    if (phase !== "pageEnd" || !autoContinuePages) return;
-    const timer = setTimeout(() => void continueToNextPage(), AUTO_CONTINUE_DELAY_MS);
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- continueToNextPage reads refs + stable setters only
-  }, [phase, autoContinuePages]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -587,11 +591,12 @@ export function SpeedReaderDialog() {
             theme={theme}
             wordsSoFar={finishedPagesWordsRef.current}
             advancing={advancing}
-            autoContinue={autoContinuePages}
-            onAutoContinueChange={setAutoContinuePages}
             leaving={pageEndLeaving}
-            autoDelayMs={AUTO_CONTINUE_DELAY_MS}
-            onContinue={() => void continueToNextPage()}
+            onNextPage={() => void continueToNextPage({ fromCard: true })}
+            onKeepReading={() => {
+              setAutoContinuePages(true);
+              void continueToNextPage({ fromCard: true });
+            }}
             onRereadPage={() => void leavePageEnd(restart)}
             onFinish={() => void leavePageEnd(() => recordAndSummarize(finishedPagesWordsRef.current))}
           />
@@ -654,6 +659,7 @@ export function SpeedReaderDialog() {
         <Controls
           playing={phase === "playing"}
           onTogglePlay={togglePlay}
+          onStopAutoContinue={isPaged && autoContinuePages ? () => setAutoContinuePages(false) : undefined}
           onRestart={restart}
           onStepBack={stepBack}
           onStepForward={stepForward}
@@ -784,27 +790,27 @@ interface PageEndStateProps {
   theme: ReturnType<typeof resolveTheme>;
   /** Animating out (the chosen action runs when it's done). */
   leaving: boolean;
-  /** Auto-continue's hold, drawn as a countdown line. */
-  autoDelayMs: number;
   wordsSoFar: number;
   advancing: boolean;
-  autoContinue: boolean;
-  onAutoContinueChange: (on: boolean) => void;
-  onContinue: () => void;
+  /** Read the next page, then stop here again. */
+  onNextPage: () => void;
+  /** Turn on "continue automatically" and read on until stopped. */
+  onKeepReading: () => void;
   onRereadPage: () => void;
   onFinish: () => void;
 }
 
-/** End of a paged source's page: continue, re-read, or finish the session. */
+/**
+ * End of a paged source's page (only when "keep reading" is off): one more
+ * page, keep reading until stopped, re-read (↺), or finish (✕).
+ */
 function PageEndState({
   theme,
   leaving,
-  autoDelayMs,
   wordsSoFar,
   advancing,
-  autoContinue,
-  onAutoContinueChange,
-  onContinue,
+  onNextPage,
+  onKeepReading,
   onRereadPage,
   onFinish,
 }: PageEndStateProps) {
@@ -815,82 +821,72 @@ function PageEndState({
   };
   return (
     <div className="flex h-full w-full items-center justify-center px-6">
-    <div
-      className={`relative flex flex-col items-center gap-5 overflow-hidden rounded-xl px-8 py-6 text-center shadow-xl motion-reduce:animate-none ${
-        leaving
-          ? "animate-out fade-out zoom-out-95 fill-mode-forwards duration-200 ease-in"
-          : "animate-in fade-in zoom-in-95 slide-in-from-bottom-3 duration-300 ease-out"
-      }`}
-      style={{
-        color: theme.textPrimary,
-        background: theme.surface,
-        border: `1px solid ${theme.controlBorder}`,
-        backdropFilter: "blur(6px)",
-        WebkitBackdropFilter: "blur(6px)",
-      }}
-    >
-      <div>
-        <div className="text-sm uppercase tracking-widest" style={{ color: theme.textMuted }}>
-          {autoContinue ? "Turning to the next page…" : "End of page"}
-        </div>
-        <div className="mt-1 text-sm" style={{ color: theme.textMuted }}>
-          {wordsSoFar.toLocaleString()} words so far
-        </div>
-      </div>
-      <div className="flex flex-wrap justify-center gap-2">
+      <div
+        className={`relative flex flex-col items-center gap-5 overflow-hidden rounded-xl px-8 pb-6 pt-5 text-center shadow-xl motion-reduce:animate-none ${
+          leaving
+            ? "animate-out fade-out zoom-out-95 fill-mode-forwards duration-200 ease-in"
+            : "animate-in fade-in zoom-in-95 slide-in-from-bottom-3 duration-300 ease-out"
+        }`}
+        style={{
+          color: theme.textPrimary,
+          background: theme.surface,
+          border: `1px solid ${theme.controlBorder}`,
+          backdropFilter: "blur(6px)",
+          WebkitBackdropFilter: "blur(6px)",
+        }}
+      >
         <button
           type="button"
-          autoFocus
-          disabled={advancing}
-          onClick={onContinue}
-          className="rounded-md px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
-          style={{ background: theme.orpAccent }}
+          onClick={onFinish}
+          aria-label="Finish"
+          title="Finish — see your session summary"
+          className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-md"
+          style={{ color: theme.textMuted }}
         >
-          {advancing ? "Turning the page…" : "Continue to next page"}
+          <X className="h-4 w-4" />
         </button>
-        <button type="button" onClick={onRereadPage} className="rounded-md px-4 py-2 text-sm font-medium" style={secondary}>
-          Re-read this page
-        </button>
-        <button type="button" onClick={onFinish} className="rounded-md px-4 py-2 text-sm font-medium" style={secondary}>
-          Finish
-        </button>
+        <div className="px-6">
+          <div className="text-sm uppercase tracking-widest" style={{ color: theme.textMuted }}>
+            Page finished
+          </div>
+          <div className="mt-1 text-sm" style={{ color: theme.textMuted }}>
+            {wordsSoFar.toLocaleString()} words so far
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          <button
+            type="button"
+            onClick={onRereadPage}
+            aria-label="Re-read this page"
+            title="Re-read this page"
+            className="flex h-10 w-10 items-center justify-center rounded-md"
+            style={secondary}
+          >
+            <RotateCcw className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            autoFocus
+            disabled={advancing}
+            onClick={onNextPage}
+            title="Read the next page, then stop here again"
+            className="flex h-10 items-center gap-1.5 rounded-md px-4 text-sm font-medium disabled:opacity-60"
+            style={secondary}
+          >
+            <StepForward className="h-4 w-4" /> Next page
+          </button>
+          <button
+            type="button"
+            disabled={advancing}
+            onClick={onKeepReading}
+            title="Keep turning pages until you press Stop"
+            className="flex h-10 items-center gap-1.5 rounded-md px-4 text-sm font-medium text-white disabled:opacity-60"
+            style={{ background: theme.orpAccent }}
+          >
+            <FastForward className="h-4 w-4" /> Keep reading
+          </button>
+        </div>
       </div>
-      <label className="flex items-center gap-2 text-sm" style={{ color: theme.textMuted }}>
-        <input
-          type="checkbox"
-          checked={autoContinue}
-          onChange={(event) => onAutoContinueChange(event.target.checked)}
-        />
-        Continue automatically to the next page
-      </label>
-      {autoContinue && !leaving && <CountdownLine theme={theme} durationMs={autoDelayMs} />}
     </div>
-    </div>
-  );
-}
-
-/**
- * A hairline along the card's bottom edge that fills over the auto-continue
- * hold, so the brief pause reads as intentional rather than a stall.
- * Remounts (restarts) whenever auto-continue is switched back on.
- */
-function CountdownLine({ theme, durationMs }: { theme: ReturnType<typeof resolveTheme>; durationMs: number }) {
-  const [running, setRunning] = useState(false);
-  useEffect(() => {
-    // Start from empty on the next frame so the transition has a from-state.
-    const frame = requestAnimationFrame(() => setRunning(true));
-    return () => cancelAnimationFrame(frame);
-  }, []);
-  return (
-    <span
-      aria-hidden
-      className="absolute bottom-0 left-0 h-0.5 w-full origin-left ease-linear"
-      style={{
-        background: theme.orpAccent,
-        transform: `scaleX(${running ? 1 : 0})`,
-        transitionProperty: "transform",
-        transitionDuration: `${durationMs}ms`,
-      }}
-    />
   );
 }

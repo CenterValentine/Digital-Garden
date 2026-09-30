@@ -438,3 +438,21 @@ hosts were unreachable from the build sandbox, so every source needs a live smok
   references, scripture verses, PDF pages, media timestamps.
 - **Possible limit (unverified):** inside a bulleted list, Tab may indent the list item instead of
   drilling in. Type `#` after the title instead.
+- **Speed reader page end, owner redesign.** The card was distracting for someone
+  speed reading, so:
+  - **Keep reading mode:** the reader rolls straight into the next page with no card,
+    holding the last word so there's no blank flash. A **Stop** button beside Pause
+    switches the mode off; the current page finishes and the card returns.
+  - **The card:** ✕ finishes and shows the summary, ↺ re-reads the page, **Next
+    page** reads one more page and stops again, and **Keep reading** switches the
+    mode on and continues.
+  - The checkbox and the countdown line are gone.
+- **Speed reader page end, owner redesign.** The card was distracting for someone
+  speed reading, so:
+  - **Keep reading mode:** the reader rolls straight into the next page with no card,
+    holding the last word so there's no blank flash. A **Stop** button beside Pause
+    switches the mode off; the current page finishes and the card returns.
+  - **The card ("Page finished"):** ✕ finishes and shows the summary, ↺ re-reads
+    the page, **Next page** reads one more page and stops again, and **Keep
+    reading** switches the mode on and continues.
+  - The checkbox and the countdown line are gone.
