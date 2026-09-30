@@ -2,12 +2,12 @@
  * Scripture corpus service (server-only): catalog, install, enable, read,
  * search, resolve references.
  *
- * One shared copy of each corpus; users only enable. Install is owner-only
- * (route-enforced) and idempotent: `verseCount` is written last, so a corpus
- * whose count is 0 is a half-finished install and gets rebuilt.
+ * One shared copy of each corpus; each user adds the collections they want
+ * to their own menu (installing on first use — see installCorpus).
  */
 
 import "server-only";
+import { prisma } from "@/lib/database/client";
 import { SCRIPTURE_CATALOG, catalogEntry, LDS_CORPUS_ID } from "../catalog";
 import { LDS_VOLUMES } from "../lds";
 import { ldsVolumeUrl, normalizeLdsVolume, type NormalizedBook, type NormalizedVerse, type RawLdsVolume } from "../adapters/lds";
@@ -105,7 +105,7 @@ export async function setCorpusEnabled(userId: string, corpusId: string, enabled
   }
   const corpus = await scriptureDb.corpus.findUnique({ where: { id: corpusId } });
   if (!corpus || corpus.verseCount === 0) {
-    throw new ScriptureError("That collection isn't installed yet — the owner installs it first.", 409);
+    throw new ScriptureError("That collection isn't loaded yet — use Add in the scripture catalog.", 409);
   }
   await scriptureDb.userCorpus.upsert({
     where: { userId_corpusId: { userId, corpusId } },
@@ -120,10 +120,20 @@ async function fetchJson(url: string): Promise<unknown> {
   return response.json();
 }
 
+/** Longest an install may hold its transaction (fetch happens before it). */
+const INSTALL_TX_TIMEOUT_MS = 120_000;
+
 /**
- * Load a corpus into the shared tables. LDS is the only adapter so far; the
- * catalog marks the rest "planned". Safe to re-run: a finished install is a
- * no-op, a half-finished one is rebuilt.
+ * Load a corpus into the shared tables. Any signed-in user may: the text is
+ * pinned public-domain data, so an install can't change what gets written —
+ * it only makes the collection available. LDS is the only adapter so far; the
+ * catalog marks the rest "planned".
+ *
+ * Concurrency: the write runs in ONE transaction holding a per-corpus
+ * advisory lock. Simultaneous installs queue; the second finds the first's
+ * finished corpus and returns. A failure rolls back — readers never see a
+ * half-filled collection. (`verseCount` is still written last, so a corpus
+ * left at 0 by anything else is rebuilt.)
  */
 export async function installCorpus(corpusId: string): Promise<{ verseCount: number; alreadyInstalled: boolean }> {
   const entry = catalogEntry(corpusId);
@@ -135,7 +145,8 @@ export async function installCorpus(corpusId: string): Promise<{ verseCount: num
 
   if (corpusId !== LDS_CORPUS_ID) throw new ScriptureError("No adapter for that collection yet.", 501);
 
-  // Fetch and normalize everything before touching the database.
+  // Fetch and normalize everything before touching the database (and before
+  // taking the lock — the network is the slow part).
   const books: NormalizedBook[] = [];
   const verses: NormalizedVerse[] = [];
   const versions: string[] = [];
@@ -146,39 +157,47 @@ export async function installCorpus(corpusId: string): Promise<{ verseCount: num
     versions.push(`${volume.slug}@${normalized.version}`);
   }
 
-  // Start clean (a half-finished install leaves rows behind).
-  await scriptureDb.verse.deleteMany({ where: { corpusId } });
-  await scriptureDb.book.deleteMany({ where: { corpusId } });
-  await scriptureDb.corpus.upsert({
-    where: { id: corpusId },
-    create: {
-      id: corpusId,
-      tradition: entry.tradition,
-      title: entry.title,
-      language: entry.language,
-      sourceUrl: entry.sourceUrl,
-      license: entry.license,
-      versification: entry.versification,
-      version: versions.join(" "),
-      verseCount: 0,
+  return prisma.$transaction(
+    async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`scripture-install:${corpusId}`}))`;
+      // Someone else may have finished while we waited for the lock.
+      const current = await tx.scriptureCorpus.findUnique({ where: { id: corpusId } });
+      if (current && current.verseCount > 0) return { verseCount: current.verseCount, alreadyInstalled: true };
+
+      await tx.scriptureVerse.deleteMany({ where: { corpusId } });
+      await tx.scriptureBook.deleteMany({ where: { corpusId } });
+      await tx.scriptureCorpus.upsert({
+        where: { id: corpusId },
+        create: {
+          id: corpusId,
+          tradition: entry.tradition,
+          title: entry.title,
+          language: entry.language,
+          sourceUrl: entry.sourceUrl,
+          license: entry.license,
+          versification: entry.versification,
+          version: versions.join(" "),
+          verseCount: 0,
+        },
+        update: { version: versions.join(" "), verseCount: 0 },
+      });
+      await tx.scriptureBook.createMany({
+        data: books.map((book, ordinal) => ({ ...book, corpusId, ordinal })),
+      });
+      for (let start = 0; start < verses.length; start += VERSE_BATCH) {
+        await tx.scriptureVerse.createMany({
+          data: verses.slice(start, start + VERSE_BATCH).map((verse, offset) => ({
+            ...verse,
+            corpusId,
+            ordinal: start + offset,
+          })),
+        });
+      }
+      await tx.scriptureCorpus.update({ where: { id: corpusId }, data: { verseCount: verses.length } });
+      return { verseCount: verses.length, alreadyInstalled: false };
     },
-    update: { version: versions.join(" "), verseCount: 0 },
-  });
-  await scriptureDb.book.createMany({
-    data: books.map((book, ordinal) => ({ ...book, corpusId, ordinal })),
-  });
-  for (let start = 0; start < verses.length; start += VERSE_BATCH) {
-    await scriptureDb.verse.createMany({
-      data: verses.slice(start, start + VERSE_BATCH).map((verse, offset) => ({
-        ...verse,
-        corpusId,
-        ordinal: start + offset,
-      })),
-    });
-  }
-  // Written last: marks the install complete.
-  await scriptureDb.corpus.update({ where: { id: corpusId }, data: { verseCount: verses.length } });
-  return { verseCount: verses.length, alreadyInstalled: false };
+    { timeout: INSTALL_TX_TIMEOUT_MS, maxWait: INSTALL_TX_TIMEOUT_MS }
+  );
 }
 
 // ── Reading ─────────────────────────────────────────────────────────────

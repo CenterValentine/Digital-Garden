@@ -150,10 +150,10 @@ export const readerApi = {
     call<HighlightImportSummary>("/api/reader/import/readwise", { method: "POST" }),
 };
 
-/** Scriptures: shared corpora the owner installs and each user enables. */
+/** Scriptures: shared corpora; each user adds the ones they want (the first add loads the text). */
 export const scriptureApi = {
   catalog: () =>
-    call<{ items: ScriptureCatalogItem[]; canInstall: boolean }>("/api/reader/scriptures/catalog"),
+    call<{ items: ScriptureCatalogItem[] }>("/api/reader/scriptures/catalog"),
   enabled: () =>
     call<{ corpora: ScriptureCorpusInfo[]; migrated: boolean }>("/api/reader/scriptures/enabled"),
   install: (corpusId: string) =>

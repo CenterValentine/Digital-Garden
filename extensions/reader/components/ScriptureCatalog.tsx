@@ -23,14 +23,13 @@ export function openScriptureTab(corpusId: string, title: string): void {
 }
 
 /**
- * Scripture collections across traditions: the owner installs a collection
- * once (shared, read-only text); each user enables the ones they want in
- * their "+ → Reader → Scriptures" menu. Shown in Reader settings and as the
- * "Browse traditions…" tab — one component, two mounts.
+ * Scripture collections across traditions. Each user adds the ones they want
+ * to their own "+ → Reader → Scriptures" menu; the first add of a collection
+ * loads its text (stored once, shared, read-only). Shown in Reader settings
+ * and as the "Browse traditions…" tab — one component, two mounts.
  */
 export function ScriptureCatalog() {
   const [items, setItems] = useState<ScriptureCatalogItem[] | null>(null);
-  const [canInstall, setCanInstall] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
 
@@ -38,7 +37,6 @@ export function ScriptureCatalog() {
     try {
       const result = await scriptureApi.catalog();
       setItems(result.items);
-      setCanInstall(result.canInstall);
       setError(null);
     } catch (caught) {
       setError(
@@ -130,42 +128,46 @@ export function ScriptureCatalog() {
                   </div>
                   <div className="flex shrink-0 flex-wrap items-center gap-1.5">
                     {busy === item.id && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
-                    {item.status === "available" && !item.installed && canInstall && (
+                    {item.status === "available" && !item.enabled && (
                       <button
                         type="button"
                         disabled={busy !== null}
-                        title="Loads the text once for everyone in this Digital Garden"
-                        onClick={() => void run(item, () => scriptureApi.install(item.id), `${item.title} installed`)}
+                        title={
+                          item.installed
+                            ? "Add to your + → Reader → Scriptures menu"
+                            : "Add to your menu — the first add loads the text (about half a minute)"
+                        }
+                        onClick={() =>
+                          void run(
+                            item,
+                            () => (item.installed ? scriptureApi.setEnabled(item.id, true) : scriptureApi.install(item.id)),
+                            `${item.title} added to your menu`
+                          )
+                        }
                         className={`${action} bg-primary text-primary-foreground`}
                       >
-                        {busy === item.id ? "Installing…" : "Install"}
+                        {busy === item.id ? (item.installed ? "Adding…" : "Loading text…") : "Add"}
                       </button>
                     )}
-                    {item.status === "available" && !item.installed && !canInstall && (
-                      <span className="text-[11px] text-muted-foreground">Not installed yet — ask an admin</span>
-                    )}
-                    {item.installed && (
+                    {item.enabled && (
                       <>
                         <button
                           type="button"
                           disabled={busy !== null}
+                          title="Remove from your menu (your highlights and notes are kept)"
                           onClick={() =>
-                            void run(
-                              item,
-                              () => scriptureApi.setEnabled(item.id, !item.enabled),
-                              item.enabled ? `${item.title} removed from your menu` : `${item.title} added to your menu`
-                            )
+                            void run(item, () => scriptureApi.setEnabled(item.id, false), `${item.title} removed from your menu`)
                           }
                           className={action}
                         >
-                          {item.enabled ? "Disable" : "Enable"}
+                          Remove
                         </button>
                         <button type="button" onClick={() => openScriptureTab(item.id, item.title)} className={action}>
                           <BookOpen className="h-3.5 w-3.5" /> Open
                         </button>
                       </>
                     )}
-                    {!item.installed && item.homepage && (
+                    {!item.enabled && item.homepage && (
                       <a href={item.homepage} target="_blank" rel="noreferrer" className={action}>
                         <ExternalLink className="h-3.5 w-3.5" /> Read online
                       </a>

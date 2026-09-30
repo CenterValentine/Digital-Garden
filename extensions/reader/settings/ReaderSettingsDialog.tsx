@@ -58,7 +58,7 @@ export default function ReaderSettingsDialog() {
 
       <SettingSection
         title="Scriptures"
-        description="Canonical texts across traditions. The owner installs a collection once for this Digital Garden; enable the ones you want under + → Reader → Scriptures. Highlights, notes and verse links work as they do in books."
+        description="Canonical texts across traditions. Add the ones you want to + → Reader → Scriptures — highlights, notes and verse links work as they do in books."
       >
         <ScriptureCatalog />
       </SettingSection>

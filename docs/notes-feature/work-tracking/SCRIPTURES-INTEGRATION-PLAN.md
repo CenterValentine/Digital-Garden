@@ -353,10 +353,16 @@ tradition as data; the pieces below are the template a second tradition follows.
 | `ScriptureVerse` | the text, book/chapter/verse + a corpus-wide `ordinal` | corpusId + bookSlug + chapter + verse; corpusId + ordinal |
 | `UserScriptureCorpus` | which installed collections a user enabled | userId + corpusId |
 
-Global and read-only (open question 1 answered: yes). The owner installs a collection
-once (`POST /api/reader/scriptures/install`, owner-only); users enable. Install is
-idempotent: `verseCount` is written last, so a zero count means a half-finished
-install and gets rebuilt. Until a database has run `migrate deploy`, every scripture route
+Global and read-only (open question 1 answered: yes). **Each user adds the
+collections they want** (owner decision, 2026-09-30): "Add" in the catalog
+(`POST /api/reader/scriptures/install`, any signed-in user) loads the text the
+first time anyone adds it, then enables it for that user; "Remove" only takes it off
+their menu. Why no role gate: the text is pinned public-domain data, so an install
+can't change what gets written. The one real hazard, concurrent installs, is closed
+by running the write in one transaction under a per-corpus advisory lock — a second
+add waits, then finds the corpus loaded; a failure rolls back, so no reader sees a
+half-filled collection. Anything destructive later (remove a corpus for everyone,
+re-pin a version) stays admin-only. Until a database has run `migrate deploy`, every scripture route
 answers 503 with that instruction and the `+` menu shows only "Browse traditions…".
 
 Annotations, bookmarks and progress reuse the reader tables with
@@ -384,8 +390,10 @@ ordinals ("First Nephi"), unambiguous prefixes ("Hela"), ranges, lists ("John 3:
 
 ### 11.4 Surfaces
 
-- **+ → Reader → Scriptures**: enabled collections, then "Browse traditions…" (the
-  catalog tab; the same component is Settings → Reader → Scriptures).
+- **+ → Reader → Scriptures**: your added collections, then "Browse traditions…"
+  (the catalog tab; the same component is Settings → Reader → Scriptures). The
+  catalog shows addable collections as cards and folds planned / link-only
+  traditions into one "More traditions" list.
 - **Reader** (`reader:scripture/<corpus>`, `ScriptureReader`): chapter view in the
   reader's theme/typography; contents beside the text (volumes → books → chapter grid;
   hold/⌥-click opens the right rail); a "Alma 32:21 or a phrase" box that jumps to a
