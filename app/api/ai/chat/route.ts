@@ -89,6 +89,8 @@ import {
 } from "@/lib/domain/ai/context-diet";
 import {
   CHARTER_TAIL_EXTRA,
+  CHARTER_TURN_TOOLS,
+  tailRefusalNotice,
   CHARTER_TURN_DELIVERABLES,
   computeIterationStepCap,
   continuationStepCap,
@@ -1586,8 +1588,8 @@ export async function POST(request: Request) {
       // of a turn (see the buildSystemPrompt call).
       const isOffered = (id: string) =>
         advertised.has(id) ||
-        (id === "phase_checkpoint" &&
-          (attachedCharterResolved || rootedCharterResolved));
+        ((attachedCharterResolved || rootedCharterResolved) &&
+          CHARTER_TURN_TOOLS.includes(id));
 
       // ADVERTISEMENT POLICY (AI-TOOL-SUMMONER-PLAN §3). Core tools are always
       // offered; a mode's tools are offered while that mode is live; everything
@@ -1711,6 +1713,41 @@ export async function POST(request: Request) {
       // Core by construction: a menu the model cannot act on is worse than no
       // menu, so the one tool that acts on it is never itself summonable.
       advertised.add(SUMMON_TOOL_ID);
+
+      // RESERVED TAIL, ENFORCED AT EXECUTE (§10 L2). prepareStep marks the
+      // tail's steps; a server-run tool called there that is not a tail
+      // tool is answered with a refusal instead of running. The tail used to
+      // HIDE those tools, and every change to the tool list is a full cache
+      // flush. Tools with no server execute (provider-native search, the
+      // browser readers) cannot be refused here — the steps notice names the
+      // tail tools for those.
+      const tailGate: { active: boolean; allowed: readonly string[]; remaining: number } = {
+        active: false,
+        allowed: [],
+        remaining: 0,
+      };
+      for (const [name, entry] of Object.entries(
+        tools as Record<string, { execute?: unknown } | undefined>,
+      )) {
+        if (!entry || typeof entry.execute !== "function") continue;
+        const original = entry.execute as (input: unknown, options: unknown) => unknown;
+        entry.execute = async (input: unknown, options: unknown) => {
+          if (tailGate.active && !tailGate.allowed.includes(name)) {
+            logger.info({
+              layer: "ai",
+              event: "ai:tail_refused",
+              summary: `${name} called in the reserved tail — refused`,
+              attrs: { tool: name, remaining: tailGate.remaining },
+            });
+            return tailRefusalNotice({
+              tool: name,
+              tailTools: tailGate.allowed,
+              remaining: tailGate.remaining,
+            });
+          }
+          return original(input, options);
+        };
+      }
 
       // Restore this TURN's earlier summons. A turn is not a request: every
       // client-executed tool (co_browse_*, read_current_page, list_tabs, the
@@ -2751,15 +2788,15 @@ export async function POST(request: Request) {
         itemIterationBudget == null &&
         researchPageBudget == null &&
         (attachedCharterResolved || rootedCharterResolved);
-      // A bound charter makes `phase_checkpoint` part of the turn's tools
-      // from its first request — the model summoned it at step 1 of every
-      // measured charter run, and the summon then reached the NEXT request's
-      // system prompt (the checkpoint paragraph is gated on the tool), which
-      // changed the prompt between requests and cold-started the cache (plan
-      // §10 L1, wire probe 04:16:55). Added the same way on every request of
-      // the turn, so the tool list and the prompt agree across them.
+      // ONE PROMPT PER TURN (§10 L2): a bound charter's tools are part of
+      // the turn from its FIRST request — `CHARTER_TURN_TOOLS` is what every
+      // measured charter run summoned piecemeal, and each summon rewrote the
+      // tool list (a full cache flush) and, through activationsFromHistory,
+      // the next request's system prompt (wire probe 04:16:55). Added the
+      // same way on every request of the turn, so the list and the prompt
+      // agree across them.
       if (attachedCharterResolved || rootedCharterResolved) {
-        if ("phase_checkpoint" in tools) activated.add("phase_checkpoint");
+        for (const id of CHARTER_TURN_TOOLS) if (id in tools) activated.add(id);
       }
       const rawStepCap =
         itemIterationBudget != null
@@ -2997,7 +3034,10 @@ export async function POST(request: Request) {
             }
           }
           if (stepNumber < stepCap - 1) {
-            if (!tailDeliverables) return { activeTools: stepActiveTools, messages: stepMessages };
+            if (!tailDeliverables) {
+              tailGate.active = false;
+              return { activeTools: stepActiveTools, messages: stepMessages };
+            }
             // DELIVERABLE-TAIL RESERVATION (plan §6b, prod 5e5b739d): the
             // final-step rule generalised. The last `tail` steps of an item
             // run — or of a charter turn (§9) — keep only the deliverables
@@ -3008,13 +3048,14 @@ export async function POST(request: Request) {
             const remaining = stepCap - stepNumber;
             const tail = reservedTailSize(tailDeliverables);
             const inTail = remaining <= tail + 1; // +1: the text-only last step
-            const narrowed =
-              inTail && stepActiveTools
-                ? stepActiveTools.filter((t) => tailToolsForTurn.includes(t))
-                : stepActiveTools;
+            // The list stays whole; the tail is enforced when a tool runs
+            // (tailGate, §10 L2) so the cached prefix survives the tail.
+            tailGate.active = inTail;
+            tailGate.allowed = tailToolsForTurn;
+            tailGate.remaining = remaining;
             if (inTail) stepsTracker.tailReservedSteps += 1;
             return {
-              activeTools: narrowed,
+              activeTools: stepActiveTools,
               messages: [
                 ...stepMessages,
                 {
@@ -3140,6 +3181,14 @@ export async function POST(request: Request) {
               // chat meter's step chain shows. See TurnStepSummary.
               inputTokens: stepUsage?.inputTokens ?? null,
               cachedInputTokens: stepUsage?.cachedInputTokens ?? null,
+              // Provider-run calls (native search) are billed per call and
+              // share `search_web` with the app-run backend (§10 L4a).
+              ...(() => {
+                const providerTools = (step.toolCalls ?? [])
+                  .filter((call) => (call as { providerExecuted?: boolean }).providerExecuted === true)
+                  .map((call) => call.toolName);
+                return providerTools.length > 0 ? { providerTools } : {};
+              })(),
             });
           } else {
             stepsTracker.truncated += 1;

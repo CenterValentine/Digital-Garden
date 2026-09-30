@@ -308,7 +308,7 @@ console.log(
 
 // ── §8 — cost metering and the prefix diagnostic ─────────────────────────────
 
-import { computeTurnCost } from "../lib/features/ai-connections/usage/pricing";
+import { computeTurnCost, webSearchCallUsd } from "../lib/features/ai-connections/usage/pricing";
 import {
   fingerprintPrompt,
   findPrefixDivergence,
@@ -317,6 +317,11 @@ import {
   fingerprintWireBody,
   findWireDivergence,
 } from "../lib/domain/ai/prompt-prefix-diag";
+import { summarizeRejections, unknownOptionError } from "../lib/domain/data/cells";
+import {
+  CHARTER_TURN_TOOLS,
+  tailRefusalNotice,
+} from "../lib/domain/ai/tools/iteration-proposal";
 
 {
   // The fold hands the calculator the request's largest STEP: nine steps
@@ -410,12 +415,89 @@ import {
   assert(fingerprintWireBody({ model: "x" }) === null, "§10: a body without input/messages is ignored");
 }
 
+{
+  // §10 L3a — a rejection names the column, the value and the choices; the
+  // footer groups identical rejections instead of repeating them.
+  const column = {
+    id: "c1",
+    key: "c1",
+    name: "Gap Category",
+    type: "select",
+    config: {
+      options: [
+        { id: "o1", label: "Capability" },
+        { id: "o2", label: "Credential" },
+        { id: "o3", label: "Domain knowledge" },
+      ],
+    },
+  } as unknown as Parameters<typeof unknownOptionError>[0];
+  const msg = unknownOptionError(column, "Technical capability");
+  assert(
+    msg.includes('"Gap Category"') && msg.includes('"Technical capability"') && msg.includes("Capability, Credential, Domain knowledge") && msg.includes('Closest: "Capability"'),
+    `§10 L3a: the rejection names column, value, choices and the one near match (got ${msg})`,
+  );
+  assert(!unknownOptionError(column, "zzz").includes("Closest"), "§10 L3a: no near match, no guess");
+  const many = { ...column, config: { options: Array.from({ length: 15 }, (_, i) => ({ id: `o${i}`, label: `L${i}` })) } } as typeof column;
+  assert(unknownOptionError(many, "x").includes("(+3 more)"), "§10 L3a: long option lists are capped with a count");
+  const summary = summarizeRejections(["a", "a", "a", "b", "a", "b"]);
+  assert(summary === "- a (×4)\n- b (×2)", `§10 L3a: identical rejections group with a count (got ${JSON.stringify(summary)})`);
+}
+
+{
+  // §10 L2 — one prompt per turn: the charter turn's tool set covers the
+  // deliverables and the tail's close, and a tail refusal names the tail.
+  for (const id of [...CHARTER_TURN_DELIVERABLES, ...CHARTER_TAIL_EXTRA, "record_item_result", "update_rows"]) {
+    assert(CHARTER_TURN_TOOLS.includes(id), `§10 L2: CHARTER_TURN_TOOLS carries ${id} from the first request`);
+  }
+  const refusal = tailRefusalNotice({ tool: "search_content", tailTools: ["create_docx", "update_row", "summon"], remaining: 1 });
+  assert(
+    refusal.includes("search_content") && refusal.includes("create_docx, update_row") && !refusal.includes("summon") && refusal.includes("1 step remain"),
+    `§10 L2: the tail refusal names the tool, the steps left and the tail tools (got ${refusal})`,
+  );
+}
+
+{
+  // §10 L4a — provider-run searches are billed per call; the app-run backend
+  // (same name, no providerTools) is not. gpt-6-sol: $0.01 per call.
+  const segmentWith = (providerTools: string[] | undefined) => ({
+    modelRoute: { source: "default", providerId: "openai", modelId: "gpt-6-sol" },
+    usage: { inputTokens: 10000, outputTokens: 100, totalTokens: 10100, reasoningTokens: 0, cachedInputTokens: 0 },
+    durationMs: 1000,
+    finishReason: "stop",
+    segment: {
+      startedAt: `2026-09-30T00:00:0${providerTools ? providerTools.length : 0}.000Z`,
+      steps: [
+        { tools: ["search_web", "search_web", "query_database"], finishReason: "tool-calls", outputTokens: 50, inputTokens: 5000, cachedInputTokens: 0, ...(providerTools ? { providerTools } : {}) },
+        { tools: [], finishReason: "stop", outputTokens: 50, inputTokens: 5000, cachedInputTokens: 0 },
+      ],
+      usage: { inputTokens: 10000, outputTokens: 100, totalTokens: 10100 },
+      stepCap: 16,
+      capSource: "charter",
+      stepsUsed: 2,
+      durationMs: 1000,
+      finishReason: "stop",
+    },
+  });
+  const usdOf = (raw: Record<string, unknown>) =>
+    ((mergeTurnUsageMetadata(new Map(), "m", raw, []) as Record<string, unknown>).cost as { usd?: number; breakdown?: { webSearch?: number } } | undefined);
+  const native = usdOf(segmentWith(["search_web", "search_web"]));
+  const appRun = usdOf(segmentWith(undefined));
+  assert(
+    native?.usd !== undefined && appRun?.usd !== undefined && Math.abs(native.usd - appRun.usd - 0.02) < 1e-9 && native.breakdown?.webSearch === 0.02,
+    `§10 L4a: two provider-run searches add $0.02 on gpt-6-sol; app-run searches add nothing (got native ${native?.usd}, app ${appRun?.usd})`,
+  );
+  assert(
+    webSearchCallUsd("gpt-4.1", "openai") === 0.025 && webSearchCallUsd("gpt-6-sol", "openai") === 0.01 && webSearchCallUsd("claude-opus-5-5", "anthropic") === 0,
+    "§10 L4a: per-call fee — OpenAI reasoning $0.01, other OpenAI $0.025, unverified vendors 0",
+  );
+}
+
 if (errors.length > 0) {
   console.error(`\n✖ run-harness:check (§8) failed — ${errors.length} problem(s):\n`);
   for (const e of errors) console.error(`  ${e}\n`);
   process.exit(1);
 }
-console.log("✓ run-harness:check §8/§10 — per-step long-context tier; prefix diagnostic locates a mid-prompt change; wire tap names the diverging body part");
+console.log("✓ run-harness:check §8/§10 — per-step long-context tier; prefix diagnostic locates a mid-prompt change; wire tap names the diverging body part; rejections teach; the tail refuses instead of hiding; provider-run searches are metered");
 
 // ── write-args — the document body under any sibling key ─────────────────────
 

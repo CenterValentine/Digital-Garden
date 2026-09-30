@@ -39,13 +39,11 @@ LDS standard works as a shared read-only corpus (seeded from the public-domain `
 - [ ] **Status-column regressions during a rows pass.** The evaluated run moved a Qualified opportunity back to Research Queue on its own judgment. Deliberately not guarded in the harness (D6) — the charter's wording owns pipeline state. If it recurs, the cheapest guard is a capture rule "a status column only moves forward within its group order unless the charter says otherwise".
 - [ ] **`durationMs` on turn metadata is server time only.** It sums per-request server durations and excludes client-executed tools (browser reads, `create_docx`); a five-minute turn reports ~72 s. Not wrong, but unlabelled — rename or add `wallClockMs` from the first request's `startedAt` to the last request's finish.
 - [ ] **Extension-side chrome detection.** `looksLikeNavigationChrome` runs server-side (P1/P2 material) and on the session-tab result; the extension's own reader could apply it before hydration settles and retry once with a longer settle when the body is chrome.
-- [ ] **Run cost levers L1–L4 (plan §10, from prod `de65f6bb`, $1.35).**
-  - L1: DONE — the flagged run named it (reasoning items missing; fix on `feat/openai-reasoning-cache`). Verify on the next charter run: cached tokens climb inside a request.
-  - L2: constant tool list for the turn; the tail is enforced at execute.
-  - L3a: option-validation rejections name the column, value and allowed options.
-  - L3b: `phase_checkpoint` stays in an item run's tail under a charter.
-  - L4: meter and budget provider-native web search.
-  - Decisions D7 and D8 are open.
+- [ ] **Run cost levers (plan §10) — remaining.**
+  - L1, L2, L3a and L4a are built (#270; `feat/one-prompt-per-turn`). L3b was superseded by L2.
+  - Open decision **D8 (revised):** should charter turns on OpenAI use the app-run search backend instead of native search, so search is refusable, repeat-guarded and budgetable, at the cost of OpenAI's integrated citations?
+  - **Model watch:** a weekly routine reporting gaps between new model releases and our catalog, pricing, constraints, adapter and gateway rows to a GitHub Issue. Waits on the owner: provider keys as repo secrets, and Issue versus Wiki.
+  - **Cost forecast:** a per-task token and cost estimate before a run or charter turn, with actual next to forecast afterwards.
 
 ## Move tab to workplace / workbench — follow-ups (2026-09-21, from `feat/move-tab-to-workspace`)
 
