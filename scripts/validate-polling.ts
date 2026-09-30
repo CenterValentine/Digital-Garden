@@ -158,6 +158,18 @@ const REGISTRY: Declared[] = [
       "streams can be told when the user goes idle. Runs only while subscribed. Pull-based consumers should call " +
       "getEngagement() at their own tick and cost nothing.",
   },
+  {
+    file: "lib/features/tts/controller.ts",
+    policy: "ui-only",
+    networkUnrelated: true,
+    note:
+      "One timer: a 10s speechSynthesis pause/resume nudge, the standard workaround for Chrome silently stopping a " +
+      "long utterance after ~15s. Purely local — it touches only the browser's speech engine and returns early unless " +
+      "status is 'playing' AND engine is 'webspeech', so it is armed only while the fallback voice is actually " +
+      "speaking and is cleared on pause/stop. The file's fetches all go through getSpeechBlob, driven by the user " +
+      "pressing play, by a seek, or by an audio 'ended' event at a chunk boundary — never by this timer. Traced " +
+      "2026-09-26 alongside the chunked-read work (#65).",
+  },
 
   // ── Known, not yet audited ─────────────────────────────────────────────────
   // These files contain BOTH timers and network calls, so they cannot be

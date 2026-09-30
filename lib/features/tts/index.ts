@@ -17,8 +17,15 @@ export {
 export {
   getSpeechBlob,
   SpeechSynthesisError,
+  type SpeechResult,
   type SynthesizeOptions,
 } from "./synthesize";
+export {
+  chunkForSpeech,
+  findSplitPoint,
+  MAX_CHUNK_CHARS,
+  TARGET_CHUNK_CHARS,
+} from "./chunk-text";
 export {
   isWebSpeechAvailable,
   getWebSpeechVoices,
