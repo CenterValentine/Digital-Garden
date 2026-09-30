@@ -12,10 +12,13 @@ import {
   Info,
   List,
   Loader2,
+  Maximize2,
   MessageSquarePlus,
+  Minimize2,
   NotebookPen,
   PanelRight,
   Settings2,
+  Zap,
 } from "lucide-react";
 import type {
   FoliateAnnotation,
@@ -31,6 +34,16 @@ import {
   type ReaderLocator,
   type ReadingStatus,
 } from "@/lib/domain/reader/types";
+import { useIsExtensionEnabled } from "@/lib/extensions/client-registry";
+import { SPEED_READER_EXTENSION_ID } from "@/extensions/speed-reader/manifest";
+import {
+  registerSpeedReaderPagedSource,
+  SPEED_READER_OPEN_EVENT,
+  type SpeedReaderOpenEventDetail,
+  type SpeedReaderPage,
+} from "@/extensions/speed-reader/events";
+import { useRightPanelCollapseStore } from "@/state/right-panel-collapse-store";
+import { useRightSidebarStateStore } from "@/state/right-sidebar-state-store";
 import { ReaderApiError, readerApi } from "../lib/api";
 import { attachSanitizer } from "../lib/sanitize";
 import { useReaderPreferences, type ReaderTheme } from "../state/reader-store";
@@ -113,6 +126,12 @@ export function BookReader({ contentId }: { contentId: string }) {
   const [panel, setPanel] = useState<"none" | "toc" | "notes" | "settings">("none");
   const [selection, setSelection] = useState<SelectionState | null>(null);
   const [noteDraft, setNoteDraft] = useState<string | null>(null);
+  // Full-screen reading. The app's right sidebar is out of view then, so
+  // highlights & notes open as a drawer inside the reader instead.
+  const [immersive, setImmersive] = useState(false);
+  const immersiveRef = useRef(false);
+  const enteredFullscreenRef = useRef(false);
+  const speedReaderEnabled = useIsExtensionEnabled(SPEED_READER_EXTENSION_ID);
 
   const fontSizePct = useReaderPreferences((state) => state.fontSizePct);
   const lineHeight = useReaderPreferences((state) => state.lineHeight);
@@ -128,6 +147,10 @@ export function BookReader({ contentId }: { contentId: string }) {
   useEffect(() => {
     annotationsRef.current = annotations;
   }, [annotations]);
+
+  useEffect(() => {
+    immersiveRef.current = immersive;
+  }, [immersive]);
 
   // ── Open the book ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -257,7 +280,12 @@ export function BookReader({ contentId }: { contentId: string }) {
           });
         });
 
-        view.addEventListener("show-annotation", () => setPanel("notes"));
+        // Clicking a highlight shows the notes: in the app's right sidebar,
+        // or the reader's own drawer while full screen.
+        view.addEventListener("show-annotation", () => {
+          if (immersiveRef.current) setPanel("notes");
+          else revealReaderSidebar(contentId, "notes");
+        });
 
         await view.open(book);
         if (cancelled) return;
@@ -401,6 +429,126 @@ export function BookReader({ contentId }: { contentId: string }) {
     [contentId]
   );
 
+  const markSent = useCallback((updated: ReaderAnnotationDto) => {
+    setAnnotations((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+  }, []);
+
+  // The right sidebar's Book tab lists this book's highlights & notes.
+  useEffect(() => {
+    useReaderSession.getState().setBookNotes(contentId, {
+      annotations,
+      go: goToAnnotation,
+      remove: (annotation) => void removeAnnotation(annotation),
+      update: (annotation, input) => void updateAnnotation(annotation, input),
+      sent: markSent,
+    });
+  }, [annotations, contentId, goToAnnotation, markSent, removeAnnotation, updateAnnotation]);
+  useEffect(() => () => useReaderSession.getState().setBookNotes(contentId, null), [contentId]);
+
+  const toggleNotes = useCallback(() => {
+    if (immersive) {
+      setPanel((current) => (current === "notes" ? "none" : "notes"));
+      return;
+    }
+    const collapse = useRightPanelCollapseStore.getState();
+    const tab = useRightSidebarStateStore.getState().activeTabByContentId[contentId];
+    const view = useReaderSession.getState().sidebarView[contentId] ?? "notes";
+    if (!collapse.isCollapsed && tab === "extension" && view === "notes") collapse.setCollapsed(true);
+    else revealReaderSidebar(contentId, "notes");
+  }, [contentId, immersive]);
+
+  // Speed reading starts from the page on screen, one page at a time.
+  useEffect(() => {
+    if (phase !== "ready") return;
+    const visiblePage = (): SpeedReaderPage | null => {
+      const last = viewRef.current?.lastLocation;
+      const text = last?.range?.toString().trim();
+      return text ? { text, label: last?.tocItem?.label } : null;
+    };
+    return registerSpeedReaderPagedSource(contentId, {
+      current: async () => visiblePage(),
+      next: async () => {
+        const view = viewRef.current;
+        if (!view) return null;
+        const before = view.lastLocation?.cfi;
+        const relocated = new Promise<void>((resolve) => {
+          const timeout = setTimeout(resolve, 2000);
+          view.addEventListener(
+            "relocate",
+            () => {
+              clearTimeout(timeout);
+              resolve();
+            },
+            { once: true }
+          );
+        });
+        await view.next();
+        await relocated;
+        // Didn't move: the end of the book.
+        if (view.lastLocation?.cfi === before) return null;
+        return visiblePage() ?? { text: "", label: view.lastLocation?.tocItem?.label };
+      },
+    });
+  }, [contentId, phase]);
+
+  const openSpeedReader = useCallback(() => {
+    window.dispatchEvent(
+      new CustomEvent<SpeedReaderOpenEventDetail>(SPEED_READER_OPEN_EVENT, {
+        detail: { sourceContentId: contentId, sourceTitle: meta?.title ?? null },
+      })
+    );
+  }, [contentId, meta?.title]);
+
+  const enterImmersive = useCallback(() => {
+    setImmersive(true);
+    setPanel("none");
+    const root = document.documentElement;
+    if (root.requestFullscreen && !document.fullscreenElement) {
+      root
+        .requestFullscreen()
+        .then(() => {
+          enteredFullscreenRef.current = true;
+        })
+        .catch(() => undefined); // Not allowed (iOS, iframes): the in-app full-window view still works.
+    }
+  }, []);
+
+  const exitImmersive = useCallback(() => {
+    setImmersive(false);
+    setPanel((current) => (current === "notes" ? "none" : current));
+    if (enteredFullscreenRef.current && document.fullscreenElement) {
+      void document.exitFullscreen().catch(() => undefined);
+    }
+    enteredFullscreenRef.current = false;
+  }, []);
+
+  useEffect(() => {
+    if (!immersive) return;
+    // Leaving browser full screen (Esc, F11) leaves the reader's too.
+    const onFullscreenChange = () => {
+      if (!document.fullscreenElement && enteredFullscreenRef.current) exitImmersive();
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !document.fullscreenElement) exitImmersive();
+    };
+    document.addEventListener("fullscreenchange", onFullscreenChange);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("fullscreenchange", onFullscreenChange);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [exitImmersive, immersive]);
+
+  // Leaving the book while full screen: give the browser its window back.
+  useEffect(
+    () => () => {
+      if (enteredFullscreenRef.current && document.fullscreenElement) {
+        void document.exitFullscreen().catch(() => undefined);
+      }
+    },
+    []
+  );
+
   // Window-level arrow keys when focus is outside the book iframe.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -437,7 +585,13 @@ export function BookReader({ contentId }: { contentId: string }) {
   );
 
   return (
-    <div data-reader-root tabIndex={-1} className="flex h-full min-h-0 flex-col outline-none">
+    <div
+      data-reader-root
+      tabIndex={-1}
+      className={`flex min-h-0 flex-col outline-none ${
+        immersive ? "fixed inset-0 z-[200] bg-background" : "h-full"
+      }`}
+    >
       {/* Toolbar */}
       <div className="flex items-center gap-1 border-b border-black/10 px-3 py-1.5 dark:border-white/10">
         <button type="button" title="Contents" onClick={() => setPanel(panel === "toc" ? "none" : "toc")} className="rounded p-1.5 hover:bg-black/5 dark:hover:bg-white/10">
@@ -463,7 +617,15 @@ export function BookReader({ contentId }: { contentId: string }) {
             ))}
           </select>
         )}
-        <button type="button" title="About this book" onClick={() => revealReaderSidebar(contentId)} className="rounded p-1.5 hover:bg-black/5 dark:hover:bg-white/10">
+        <button
+          type="button"
+          title="About this book"
+          onClick={() => {
+            if (immersive) exitImmersive();
+            revealReaderSidebar(contentId, "about");
+          }}
+          className="rounded p-1.5 hover:bg-black/5 dark:hover:bg-white/10"
+        >
           <Info className="h-4 w-4" />
         </button>
         <button type="button" title="Bookmark this page" onClick={() => void addBookmark()} className="rounded p-1.5 hover:bg-black/5 dark:hover:bg-white/10">
@@ -472,7 +634,20 @@ export function BookReader({ contentId }: { contentId: string }) {
         <button type="button" title="Reading settings" onClick={() => setPanel(panel === "settings" ? "none" : "settings")} className="rounded p-1.5 hover:bg-black/5 dark:hover:bg-white/10">
           <Settings2 className="h-4 w-4" />
         </button>
-        <button type="button" title="Highlights & notes" onClick={() => setPanel(panel === "notes" ? "none" : "notes")} className="relative rounded p-1.5 hover:bg-black/5 dark:hover:bg-white/10">
+        {speedReaderEnabled && (
+          <button type="button" title="Speed read from this page" onClick={openSpeedReader} className="rounded p-1.5 hover:bg-black/5 dark:hover:bg-white/10">
+            <Zap className="h-4 w-4" />
+          </button>
+        )}
+        <button
+          type="button"
+          title={immersive ? "Exit full screen (Esc)" : "Full screen"}
+          onClick={immersive ? exitImmersive : enterImmersive}
+          className="rounded p-1.5 hover:bg-black/5 dark:hover:bg-white/10"
+        >
+          {immersive ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+        </button>
+        <button type="button" title="Highlights & notes" onClick={toggleNotes} className="relative rounded p-1.5 hover:bg-black/5 dark:hover:bg-white/10">
           <PanelRight className="h-4 w-4" />
           {annotations.length > 0 && (
             <span className="absolute -right-0.5 -top-0.5 rounded-full bg-primary px-1 text-[9px] leading-tight text-primary-foreground">
@@ -626,15 +801,14 @@ export function BookReader({ contentId }: { contentId: string }) {
           </aside>
         )}
 
-        {panel === "notes" && (
+        {immersive && panel === "notes" && (
           <AnnotationsPanel
+            className="w-80 shrink-0 border-l border-black/10 dark:border-white/10"
             annotations={annotations}
             onGo={goToAnnotation}
             onDelete={(annotation) => void removeAnnotation(annotation)}
             onUpdate={(annotation, input) => void updateAnnotation(annotation, input)}
-            onSent={(updated) =>
-              setAnnotations((current) => current.map((item) => (item.id === updated.id ? updated : item)))
-            }
+            onSent={markSent}
           />
         )}
       </div>

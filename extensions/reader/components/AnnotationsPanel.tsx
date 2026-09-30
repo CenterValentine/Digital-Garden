@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Bookmark, FileText, NotebookPen, Send, Trash2 } from "lucide-react";
+import { syncTreeQuietly } from "@/lib/features/content/tree-optimistic";
 import { useContentStore } from "@/state/content-store";
 import {
   READER_HIGHLIGHT_COLORS,
@@ -24,13 +25,24 @@ interface AnnotationsPanelProps {
   onDelete: (annotation: ReaderAnnotationDto) => void;
   onUpdate: (annotation: ReaderAnnotationDto, input: { color?: string; body?: string | null }) => void;
   onSent: (annotation: ReaderAnnotationDto) => void;
+  /** Hide the "Highlights & notes" title (the host already labels it). */
+  hideTitle?: boolean;
+  className?: string;
 }
 
 function position(annotation: ReaderAnnotationDto): number {
   return annotation.locator.locations.totalProgression ?? Number.POSITIVE_INFINITY;
 }
 
-export function AnnotationsPanel({ annotations, onGo, onDelete, onUpdate, onSent }: AnnotationsPanelProps) {
+export function AnnotationsPanel({
+  annotations,
+  onGo,
+  onDelete,
+  onUpdate,
+  onSent,
+  hideTitle,
+  className,
+}: AnnotationsPanelProps) {
   const [filter, setFilter] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
@@ -49,7 +61,7 @@ export function AnnotationsPanel({ annotations, onGo, onDelete, onUpdate, onSent
     try {
       const result = await readerApi.sendToNote(annotation.id);
       onSent({ ...annotation, noteContentId: result.noteContentId });
-      window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
+      syncTreeQuietly();
       toast.success(result.created ? "Created your notes for this book" : "Added to your notes", {
         action: {
           label: "Open",
@@ -68,9 +80,9 @@ export function AnnotationsPanel({ annotations, onGo, onDelete, onUpdate, onSent
   };
 
   return (
-    <aside className="flex w-80 shrink-0 flex-col border-l border-black/10 dark:border-white/10">
+    <div className={`flex min-h-0 flex-col ${className ?? "h-full"}`}>
       <div className="flex items-center gap-1 border-b border-black/10 p-2 dark:border-white/10">
-        <span className="mr-auto text-xs font-semibold">Highlights & notes</span>
+        <span className="mr-auto text-xs font-semibold">{hideTitle ? "" : "Highlights & notes"}</span>
         <button type="button" onClick={() => setFilter(null)} className={`rounded px-1.5 text-[11px] ${filter === null ? "bg-black/10 dark:bg-white/10" : ""}`}>
           All
         </button>
@@ -173,6 +185,6 @@ export function AnnotationsPanel({ annotations, onGo, onDelete, onUpdate, onSent
           </div>
         ))}
       </div>
-    </aside>
+    </div>
   );
 }

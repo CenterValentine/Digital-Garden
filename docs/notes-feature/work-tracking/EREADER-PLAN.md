@@ -335,3 +335,23 @@ hosts were unreachable from the build sandbox, so every source needs a live smok
 - Fixes from the smoke: Gutenberg search results, Wikisource `page=`, non-zip
   downloads, duplicate result keys / stale responses, OAPEN title-less records,
   Standard Ebooks sign-in, readable upstream errors.
+
+### Added 2026-09-30 (PR review round)
+
+- **Optimistic tree rows** — books, link books and bookshelf shortcuts show in the
+  file tree the moment you add them, like any inline create, instead of a full
+  skeleton refetch. Outside surfaces use `lib/features/content/tree-optimistic.ts`
+  (`dg:tree-optimistic` insert → resolve/remove, then a quiet reconcile) and
+  `dg:tree-sync` (quiet refetch, no skeleton).
+- **Highlights & notes live in the app's right sidebar** — the Book tab now has
+  *Highlights & notes* | *About*; the reader has no side panel of its own. The
+  toolbar button toggles the sidebar on the notes view; clicking a highlight in
+  the text opens it.
+- **Full-screen reading** — toolbar Maximize: the reader fills the window (and
+  the browser goes full screen where allowed). The sidebar is out of view there,
+  so notes open as a drawer; Esc leaves.
+- **Speed read from the page on screen** — the speed reader accepts a *paged
+  source* (`registerSpeedReaderPagedSource`, `extensions/speed-reader/events.ts`).
+  The reader registers the visible page; the speed reader reads it, stops with
+  *Continue to next page* / *Re-read* / *Finish*, and can continue automatically
+  (setting remembered). The page in the book turns along with it.

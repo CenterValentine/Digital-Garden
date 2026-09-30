@@ -22,11 +22,14 @@ import {
   type LoadProgress,
 } from "../lib/load-source";
 import {
+  getSpeedReaderPagedSource,
   SPEED_READER_OPEN_EVENT,
   type SpeedReaderOpenEventDetail,
+  type SpeedReaderPagedSource,
 } from "../events";
 
-type Phase = "idle" | "loading" | "ready" | "playing" | "paused" | "done" | "error";
+/** "pageEnd" = a paged source's page is finished; offer the next one. */
+type Phase = "idle" | "loading" | "ready" | "playing" | "paused" | "pageEnd" | "done" | "error";
 
 export function SpeedReaderDialog() {
   const [open, setOpen] = useState(false);
@@ -41,6 +44,13 @@ export function SpeedReaderDialog() {
   const [allowOcr, setAllowOcr] = useState(false);
   const [pendingContentId, setPendingContentId] = useState<string | null>(null);
   const [showPdfCompatWarning, setShowPdfCompatWarning] = useState(false);
+  // Paged source (the e-reader): read the visible page, then the next on request.
+  const pagedSourceRef = useRef<SpeedReaderPagedSource | null>(null);
+  const [pageLabel, setPageLabel] = useState<string | null>(null);
+  const [advancing, setAdvancing] = useState(false);
+  // Words from pages already finished this session (paged sources).
+  const finishedPagesWordsRef = useRef(0);
+  const [summaryWords, setSummaryWords] = useState(0);
 
   const sessionStartRef = useRef<number | null>(null);
   const accumulatedReadingMsRef = useRef(0);
@@ -59,6 +69,8 @@ export function SpeedReaderDialog() {
   const orpColor = useSpeedReaderStore((s) => s.orpColor);
   const pdfCompatMode = useSpeedReaderStore((s) => s.pdfCompatMode);
   const setPdfCompatMode = useSpeedReaderStore((s) => s.setPdfCompatMode);
+  const autoContinuePages = useSpeedReaderStore((s) => s.autoContinuePages);
+  const setAutoContinuePages = useSpeedReaderStore((s) => s.setAutoContinuePages);
   const recordSession = useSpeedReaderMetricsStore((s) => s.recordSession);
 
   const prefersDark = usePrefersDark();
@@ -88,6 +100,10 @@ export function SpeedReaderDialog() {
     setWarning(null);
     setProgress(null);
     setPendingContentId(null);
+    pagedSourceRef.current = null;
+    setPageLabel(null);
+    setAdvancing(false);
+    finishedPagesWordsRef.current = 0;
     sessionStartRef.current = null;
     accumulatedReadingMsRef.current = 0;
     lastResumeAtRef.current = null;
@@ -130,6 +146,44 @@ export function SpeedReaderDialog() {
     []
   );
 
+  /** Paged source: tokenize a page. False when it has no readable words. */
+  const showPage = useCallback((page: { text: string; label?: string }) => {
+    setRawText(page.text);
+    const text = useSpeedReaderStore.getState().pdfCompatMode ? normalizePdfText(page.text) : page.text;
+    const tokenized = tokenize(text);
+    if (tokenized.length === 0) return false;
+    setChunks(tokenized);
+    setPosition(0);
+    setPageLabel(page.label ?? null);
+    return true;
+  }, []);
+
+  const beginPagedLoad = useCallback(
+    async (source: SpeedReaderPagedSource) => {
+      setPhase("loading");
+      setErrorMessage(null);
+      setWarning(null);
+      setProgress({ stage: "extracting", detail: "Reading this page…" });
+      try {
+        // An empty page (a cover, an image) → try the following one.
+        let page = await source.current();
+        for (let skipped = 0; page && !page.text.trim() && skipped < 5; skipped++) {
+          page = await source.next();
+        }
+        if (!page || !showPage(page)) {
+          setPhase("error");
+          setErrorMessage("There's no readable text on this page.");
+          return;
+        }
+        setPhase("ready");
+      } catch (err) {
+        setPhase("error");
+        setErrorMessage(err instanceof Error ? err.message : "Could not read this page");
+      }
+    },
+    [showPage]
+  );
+
   // Re-tokenize from already-fetched rawText when PDF compat mode is applied.
   const applyPdfCompatToggle = useCallback(
     (nextMode: boolean) => {
@@ -166,7 +220,15 @@ export function SpeedReaderDialog() {
       setOpen(true);
       setSourceTitle(detail?.sourceTitle ?? null);
       setAllowOcr(false);
-      if (contentId) {
+      finishedPagesWordsRef.current = 0;
+      const pagedSource = contentId ? getSpeedReaderPagedSource(contentId) : null;
+      pagedSourceRef.current = pagedSource;
+      setPageLabel(null);
+      if (pagedSource) {
+        // The e-reader: start from the page on screen, not the top of the book.
+        setPendingContentId(null);
+        void beginPagedLoad(pagedSource);
+      } else if (contentId) {
         setPendingContentId(contentId);
         void beginLoad(contentId, { withOcr: false, pdfCompat: useSpeedReaderStore.getState().pdfCompatMode });
       } else {
@@ -176,7 +238,7 @@ export function SpeedReaderDialog() {
     };
     window.addEventListener(SPEED_READER_OPEN_EVENT, handler);
     return () => window.removeEventListener(SPEED_READER_OPEN_EVENT, handler);
-  }, [beginLoad]);
+  }, [beginLoad, beginPagedLoad]);
 
   // Auto-start: when content finishes loading and autoStart is on, start
   // playing after a 1 s delay so the reader isn't launched mid-sentence.
@@ -274,8 +336,44 @@ export function SpeedReaderDialog() {
       accumulatedReadingMsRef.current += Date.now() - lastResumeAtRef.current;
       lastResumeAtRef.current = null;
     }
+    if (pagedSourceRef.current) {
+      // End of the page: stop here (or roll on), never past what was asked.
+      finishedPagesWordsRef.current += total;
+      if (useSpeedReaderStore.getState().autoContinuePages) void continueToNextPage();
+      else setPhase("pageEnd");
+      return;
+    }
+    recordAndSummarize(total);
+  }
+
+  /** Paged source: turn the host's page and keep reading. */
+  async function continueToNextPage() {
+    const source = pagedSourceRef.current;
+    if (!source) return;
+    setAdvancing(true);
+    try {
+      let page = await source.next();
+      for (let skipped = 0; page && !page.text.trim() && skipped < 5; skipped++) {
+        page = await source.next();
+      }
+      if (!page || !showPage(page)) {
+        recordAndSummarize(finishedPagesWordsRef.current); // end of the book
+        return;
+      }
+      lastResumeAtRef.current = Date.now();
+      // Seamless page turns: no crescendo ramp between pages.
+      rampStartRef.current = null;
+      setPhase("playing");
+    } catch (err) {
+      setPhase("error");
+      setErrorMessage(err instanceof Error ? err.message : "Could not turn the page");
+    } finally {
+      setAdvancing(false);
+    }
+  }
+
+  function recordAndSummarize(wordsRead: number) {
     const durationMs = accumulatedReadingMsRef.current;
-    const wordsRead = total;
     if (durationMs > 1000 && wordsRead > 0) {
       const avgWpm = Math.round((wordsRead / durationMs) * 60_000);
       recordSession({
@@ -286,6 +384,7 @@ export function SpeedReaderDialog() {
         sourceTitle: sourceTitle ?? undefined,
       });
     }
+    setSummaryWords(wordsRead);
     setPhase("done");
   }
 
@@ -300,6 +399,8 @@ export function SpeedReaderDialog() {
         e.preventDefault();
         closeDialog();
       } else if (e.code === "Space") {
+        // End of a page: Space presses the focused "Continue" button instead.
+        if (phase === "pageEnd") return;
         e.preventDefault();
         togglePlay();
       } else if (e.key.toLowerCase() === "r") {
@@ -352,6 +453,11 @@ export function SpeedReaderDialog() {
               style={{ color: theme.textPrimary }}
             >
               {sourceTitle}
+              {pageLabel && (
+                <span className="ml-2 font-normal" style={{ color: theme.textMuted }}>
+                  · {pageLabel}
+                </span>
+              )}
             </div>
           )}
         </div>
@@ -429,13 +535,25 @@ export function SpeedReaderDialog() {
             />
           </>
         )}
+        {phase === "pageEnd" && (
+          <PageEndState
+            theme={theme}
+            wordsSoFar={finishedPagesWordsRef.current}
+            advancing={advancing}
+            autoContinue={autoContinuePages}
+            onAutoContinueChange={setAutoContinuePages}
+            onContinue={() => void continueToNextPage()}
+            onRereadPage={restart}
+            onFinish={() => recordAndSummarize(finishedPagesWordsRef.current)}
+          />
+        )}
         {phase === "done" && (
           <SessionSummary
-            wordsRead={total}
+            wordsRead={summaryWords}
             durationMs={accumulatedReadingMsRef.current}
             avgWpm={
               accumulatedReadingMsRef.current > 0
-                ? Math.round((total / accumulatedReadingMsRef.current) * 60_000)
+                ? Math.round((summaryWords / accumulatedReadingMsRef.current) * 60_000)
                 : 0
             }
             theme={theme}
@@ -609,6 +727,76 @@ function ErrorState({
           Close
         </button>
       </div>
+    </div>
+  );
+}
+
+interface PageEndStateProps {
+  theme: ReturnType<typeof resolveTheme>;
+  wordsSoFar: number;
+  advancing: boolean;
+  autoContinue: boolean;
+  onAutoContinueChange: (on: boolean) => void;
+  onContinue: () => void;
+  onRereadPage: () => void;
+  onFinish: () => void;
+}
+
+/** End of a paged source's page: continue, re-read, or finish the session. */
+function PageEndState({
+  theme,
+  wordsSoFar,
+  advancing,
+  autoContinue,
+  onAutoContinueChange,
+  onContinue,
+  onRereadPage,
+  onFinish,
+}: PageEndStateProps) {
+  const secondary = {
+    background: theme.controlBg,
+    border: `1px solid ${theme.controlBorder}`,
+    color: theme.textPrimary,
+  };
+  return (
+    <div
+      className="flex h-full w-full flex-col items-center justify-center gap-5 px-6 text-center"
+      style={{ color: theme.textPrimary }}
+    >
+      <div>
+        <div className="text-sm uppercase tracking-widest" style={{ color: theme.textMuted }}>
+          End of page
+        </div>
+        <div className="mt-1 text-sm" style={{ color: theme.textMuted }}>
+          {wordsSoFar.toLocaleString()} words so far
+        </div>
+      </div>
+      <div className="flex flex-wrap justify-center gap-2">
+        <button
+          type="button"
+          autoFocus
+          disabled={advancing}
+          onClick={onContinue}
+          className="rounded-md px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+          style={{ background: theme.orpAccent }}
+        >
+          {advancing ? "Turning the page…" : "Continue to next page"}
+        </button>
+        <button type="button" onClick={onRereadPage} className="rounded-md px-4 py-2 text-sm font-medium" style={secondary}>
+          Re-read this page
+        </button>
+        <button type="button" onClick={onFinish} className="rounded-md px-4 py-2 text-sm font-medium" style={secondary}>
+          Finish
+        </button>
+      </div>
+      <label className="flex items-center gap-2 text-sm" style={{ color: theme.textMuted }}>
+        <input
+          type="checkbox"
+          checked={autoContinue}
+          onChange={(event) => onAutoContinueChange(event.target.checked)}
+        />
+        Continue automatically to the next page
+      </label>
     </div>
   );
 }

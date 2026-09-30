@@ -64,6 +64,12 @@ const SHORTCUT_ELIGIBLE_TYPES = new Set([
 import type { PickerTarget } from "@/components/content/pickers/ContentTreePicker";
 import { clientLogger } from "@/lib/core/logger/client";
 import { warmUpMobileKeyboard } from "@/lib/core/mobile-keyboard";
+import {
+  TREE_OPTIMISTIC_EVENT,
+  TREE_SYNC_EVENT,
+  type OptimisticTreeRow,
+  type TreeOptimisticDetail,
+} from "@/lib/features/content/tree-optimistic";
 
 interface TreeApiResponse {
   success: boolean;
@@ -123,6 +129,57 @@ function parsePeopleVirtualParentId(parentId: string | null): Pick<CreateTarget,
   return {
     peopleGroupId: null,
     personId: null,
+  };
+}
+
+function treeContainsId(nodes: TreeNode[], id: string): boolean {
+  return nodes.some((node) => node.id === id || treeContainsId(node.children ?? [], id));
+}
+
+function removeTreeNodeById(nodes: TreeNode[], id: string): TreeNode[] {
+  return nodes
+    .filter((node) => node.id !== id)
+    .map((node) => (node.children?.length ? { ...node, children: removeTreeNodeById(node.children, id) } : node));
+}
+
+function renameTreeNodeId(nodes: TreeNode[], fromId: string, toId: string): TreeNode[] {
+  return nodes.map((node) =>
+    node.id === fromId
+      ? { ...node, id: toId }
+      : node.children?.length
+        ? { ...node, children: renameTreeNodeId(node.children, fromId, toId) }
+        : node
+  );
+}
+
+/** Placeholder row for a create made outside the tree (tree-optimistic.ts). */
+function optimisticTreeNode(tempId: string, row: OptimisticTreeRow, treeParentId: string | null): TreeNode {
+  const now = new Date();
+  return {
+    id: tempId,
+    title: row.title,
+    slug: "",
+    contentType: row.contentType,
+    parentId: treeParentId,
+    displayOrder: 0,
+    customIcon: null,
+    iconColor: null,
+    isPublished: false,
+    children: [],
+    createdAt: now,
+    updatedAt: now,
+    deletedAt: null,
+    file: row.mimeType
+      ? { fileName: row.title, mimeType: row.mimeType, fileSize: "0", uploadStatus: "uploading" }
+      : undefined,
+    shortcut: row.shortcutTarget
+      ? {
+          targetId: row.shortcutTarget.id,
+          targetContentType: row.shortcutTarget.contentType,
+          targetTitle: row.shortcutTarget.title,
+          targetDeleted: false,
+        }
+      : undefined,
   };
 }
 
@@ -456,10 +513,11 @@ export function LeftSidebarContent({
     setScopeOverride(key === "parentView" || key === "root" ? key : null);
   };
 
-  // Fetch tree data
-  const fetchTree = useCallback(async () => {
+  // Fetch tree data. `quiet` keeps the current tree on screen (no skeleton)
+  // while the refetch runs — used to reconcile after an optimistic row.
+  const loadTree = useCallback(async (quiet: boolean) => {
     try {
-      setIsLoading(true);
+      if (!quiet) setIsLoading(true);
       setError(null);
 
       const url = new URL("/api/content/content/tree", window.location.origin);
@@ -501,11 +559,13 @@ export function LeftSidebarContent({
         attrs: { workspace_id: activeWorkspaceId ?? "none" },
         error: err,
       });
-      setError(err instanceof Error ? err.message : "Failed to load file tree");
+      // A quiet reconcile that fails keeps the tree it already shows.
+      if (!quiet) setError(err instanceof Error ? err.message : "Failed to load file tree");
     } finally {
-      setIsLoading(false);
+      if (!quiet) setIsLoading(false);
     }
   }, [activeWorkspaceId, effectiveViewRootContentId]);
+  const fetchTree = useCallback(() => loadTree(false), [loadTree]);
 
   // Initial load and refresh when trigger or active workspace changes.
   // Gated on `workspaceStoreReady` so we don't double-fetch (once for
@@ -713,6 +773,61 @@ export function LeftSidebarContent({
     window.addEventListener("dg:tree-expand", handleExpandRequest);
     return () => window.removeEventListener("dg:tree-expand", handleExpandRequest);
   }, []);
+
+  // Optimistic rows for creates made outside the tree (the reader's Library
+  // and bookshelf): show the row now, swap in the real id when the server
+  // answers, then reconcile quietly — no skeleton flash.
+  useEffect(() => {
+    const handleOptimistic = (event: Event) => {
+      const detail = (event as CustomEvent<TreeOptimisticDetail>).detail;
+      if (!detail) return;
+      if (detail.action === "insert") {
+        const serverParent = detail.row.parentId;
+        const treeParentId =
+          !serverParent || serverParent === scopedRootParentId ? null : serverParent;
+        setTreeData((current) => {
+          if (!current) return current;
+          // A parent outside the visible tree: nothing to show until it's opened.
+          if (treeParentId && !treeContainsId(current, treeParentId)) return current;
+          const node = optimisticTreeNode(detail.tempId, detail.row, treeParentId);
+          if (!treeParentId) return [node, ...current];
+          const insertUnder = (nodes: TreeNode[]): TreeNode[] =>
+            nodes.map((candidate) =>
+              candidate.id === treeParentId
+                ? { ...candidate, children: [node, ...(candidate.children ?? [])] }
+                : candidate.children?.length
+                  ? { ...candidate, children: insertUnder(candidate.children) }
+                  : candidate
+            );
+          return insertUnder(current);
+        });
+        if (treeParentId) setExpandNodeId(treeParentId);
+        return;
+      }
+      if (detail.action === "remove") {
+        setTreeData((current) => (current ? removeTreeNodeById(current, detail.tempId) : current));
+        return;
+      }
+      const { tempId, realId } = detail;
+      setTreeData((current) => {
+        if (!current) return current;
+        // Nothing new (duplicate), or the real row already arrived: drop the placeholder.
+        if (!realId || treeContainsId(current, realId)) return removeTreeNodeById(current, tempId);
+        return renameTreeNodeId(current, tempId, realId);
+      });
+      void loadTree(true);
+    };
+
+    // `dg:tree-sync`: a quiet refetch for outside writes that don't need a
+    // placeholder row (unlike `dg:tree-refresh`, no skeleton).
+    const handleSync = () => void loadTree(true);
+    window.addEventListener(TREE_OPTIMISTIC_EVENT, handleOptimistic);
+    window.addEventListener(TREE_SYNC_EVENT, handleSync);
+    return () => {
+      window.removeEventListener(TREE_OPTIMISTIC_EVENT, handleOptimistic);
+      window.removeEventListener(TREE_SYNC_EVENT, handleSync);
+    };
+  }, [scopedRootParentId, loadTree]);
 
   // Imperative reveal request from outside the tree (main-panel path
   // breadcrumb): open the node's ancestors, scroll to it, and select it —

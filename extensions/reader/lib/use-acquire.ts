@@ -2,7 +2,8 @@
 
 import { useCallback } from "react";
 import { toast } from "sonner";
-import type { CatalogEntry } from "@/lib/domain/reader/types";
+import type { BookMetaDto, CatalogEntry } from "@/lib/domain/reader/types";
+import { withOptimisticTreeRow } from "@/lib/features/content/tree-optimistic";
 import { useContentStore } from "@/state/content-store";
 import { notifyBooksChanged } from "../state/bookshelf-store";
 import { useReaderSession } from "../state/reader-store";
@@ -22,8 +23,11 @@ export function useAddLink() {
   return useCallback(
     async (sourceId: string, entry: CatalogEntry) => {
       try {
-        const result = await readerApi.addLink({ sourceId, entry, parentId });
-        window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
+        const result = await withOptimisticTreeRow(
+          { title: entry.title, contentType: "external", parentId },
+          () => readerApi.addLink({ sourceId, entry, parentId }),
+          (added) => (added.duplicate ? null : added.contentId)
+        );
         notifyBooksChanged();
         toast.success(result.duplicate ? "Already in your library" : "Added to your library as a link", {
           description: entry.title,
@@ -43,8 +47,17 @@ export function useAcquire() {
   return useCallback(
     async (sourceId: string, entry: CatalogEntry, acquisitionIndex: number) => {
       try {
-        const result = await readerApi.acquire({ sourceId, entry, acquisitionIndex, parentId });
-        window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
+        // The row shows at the + target at once; the download fills it in.
+        const result = await withOptimisticTreeRow(
+          {
+            title: entry.title,
+            contentType: "file",
+            parentId,
+            mimeType: entry.acquisitions[acquisitionIndex]?.type.split(";")[0],
+          },
+          () => readerApi.acquire({ sourceId, entry, acquisitionIndex, parentId }),
+          (added) => (added.duplicate ? null : added.contentId)
+        );
         notifyBooksChanged();
         toast.success(result.duplicate ? "Already in your library" : "Added to your library", {
           description: entry.title,
@@ -55,5 +68,26 @@ export function useAcquire() {
       }
     },
     [parentId]
+  );
+}
+
+/**
+ * Drop a shortcut to a library book at `parentId` (server space), with an
+ * optimistic row. "exists"/"home" create nothing, so the placeholder goes.
+ */
+export function placeShortcut(book: BookMetaDto, parentId: string | null) {
+  return withOptimisticTreeRow(
+    {
+      title: book.title,
+      contentType: "shortcut",
+      parentId,
+      shortcutTarget: {
+        id: book.contentId,
+        contentType: book.kind === "link" ? "external" : "file",
+        title: book.title,
+      },
+    },
+    () => readerApi.placeOnShelf({ contentId: book.contentId, parentId }),
+    (placed) => (placed.outcome === "created" ? placed.shortcutId : null)
   );
 }

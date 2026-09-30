@@ -10,7 +10,7 @@ import { ReaderBookshelfController } from "./components/ReaderBookshelfControlle
 import { ReaderContentViewer } from "./components/ReaderContentViewer";
 import { ReaderSidebarPanel } from "./components/ReaderSidebarPanel";
 import { READER_SIDEBAR_SVG_PATH } from "./lib/sidebar";
-import { readerApi } from "./lib/api";
+import { placeShortcut } from "./lib/use-acquire";
 import {
   READER_EXTENSION_ID,
   READER_LIBRARY_CONTENT_ID,
@@ -50,12 +50,8 @@ function openBook(book: BookMetaDto) {
  */
 async function placeBook(book: BookMetaDto, parentId: string | null) {
   try {
-    const result = await readerApi.placeOnShelf({
-      contentId: book.contentId,
-      parentId: resolveServerCreateParent(parentId),
-    });
+    const result = await placeShortcut(book, resolveServerCreateParent(parentId));
     if (result.outcome === "created") {
-      window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
       toast.success(`Shortcut to “${book.title}” added`);
     }
   } catch (error) {
