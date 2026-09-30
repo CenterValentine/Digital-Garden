@@ -10,7 +10,9 @@ import { ReaderBookshelfController } from "./components/ReaderBookshelfControlle
 import { ReaderContentViewer } from "./components/ReaderContentViewer";
 import { ReaderSidebarPanel } from "./components/ReaderSidebarPanel";
 import { withOptimisticTreeRow } from "@/lib/features/content/tree-optimistic";
-import { SCRIPTURE_RESOURCE_TYPE, type ScriptureCorpusInfo } from "@/lib/domain/scripture/types";
+import { SCRIPTURE_RESOURCE_TYPE, VERSE_ANCHOR_KIND, type ScriptureCorpusInfo } from "@/lib/domain/scripture/types";
+import { staticScriptureTable } from "@/lib/domain/scripture/tables";
+import { useContentAnchorStore } from "@/state/content-anchor-store";
 import { scriptureApi } from "./lib/api";
 import { READER_SIDEBAR_SVG_PATH } from "./lib/sidebar";
 import { readerLinkAnchors } from "./lib/link-anchors";
@@ -82,7 +84,12 @@ function openScriptureCatalog() {
  * "+ → Reader → Scriptures → <collection>": a session in the tree where the
  * "+" pointed (the tree's create rule, as for books), then open it.
  */
-async function placeScriptureSession(corpus: ScriptureCorpusInfo, parentId: string | null) {
+async function placeScriptureSession(
+  corpus: ScriptureCorpusInfo,
+  parentId: string | null,
+  /** Where the new session opens ("verse:alma/32", "scripture-view:book/alma"); covers if omitted. */
+  startAt?: string
+) {
   const serverParentId = resolveServerCreateParent(parentId);
   try {
     const session = await withOptimisticTreeRow(
@@ -90,6 +97,8 @@ async function placeScriptureSession(corpus: ScriptureCorpusInfo, parentId: stri
       () => scriptureApi.createSession({ corpusId: corpus.id, parentId: serverParentId }),
       (created) => created.contentId
     );
+    // The session's reader takes this on open (lib/domain/content/link-anchor.ts).
+    if (startAt) useContentAnchorStore.getState().request(session.contentId, startAt);
     useContentStore.getState().setSelectedContentId(session.contentId, {
       title: session.title,
       contentType: "external",
@@ -100,16 +109,103 @@ async function placeScriptureSession(corpus: ScriptureCorpusInfo, parentId: stri
   }
 }
 
+/** Chapters listed one per row up to this many; longer books group them by tens. */
+const CHAPTERS_LISTED = 20;
+const CHAPTER_GROUP = 10;
+
+/**
+ * "+ → Reader → Scriptures → <collection>": hover drills volumes → books →
+ * chapters; every pick adds a session where the "+" pointed and opens it
+ * there (a session is the whole collection — you move on from wherever it
+ * opens). Books with hundreds of chapters (Psalms 150, D&C 138) group them
+ * by tens so no submenu is a wall of rows.
+ */
+function scriptureCollectionItem(corpus: ScriptureCorpusInfo): ExtensionCreateMenuItem {
+  const place = (startAt?: string) => ({ parentId }: { parentId: string | null }) =>
+    void placeScriptureSession(corpus, parentId, startAt);
+  const table = staticScriptureTable(corpus.id);
+  const base = {
+    id: `reader-scripture-${corpus.id}`,
+    label: truncate(corpus.title, 44),
+    iconName: "BookMarked",
+    title: `Add a ${corpus.title} session here — its own name, icon and reading place`,
+  };
+  if (!table) return { ...base, onSelect: place() };
+
+  const chapterItem = (bookSlug: string, label: string, chapter: number): ExtensionCreateMenuItem => ({
+    id: `reader-scripture-${corpus.id}-${bookSlug}-${chapter}`,
+    label: `${label} ${chapter}`,
+    iconName: "Bookmark",
+    onSelect: place(`${VERSE_ANCHOR_KIND}:${bookSlug}/${chapter}`),
+  });
+
+  const bookItem = (
+    book: { slug: string; name: string; chapters: number },
+    chapterLabel: string
+  ): ExtensionCreateMenuItem => {
+    const id = `reader-scripture-${corpus.id}-${book.slug}`;
+    if (book.chapters === 1) {
+      return { id, label: book.name, iconName: "BookOpen", onSelect: place(`${VERSE_ANCHOR_KIND}:${book.slug}/1`) };
+    }
+    const numbers = Array.from({ length: book.chapters }, (_, index) => index + 1);
+    const chapters: ExtensionCreateMenuItem[] =
+      book.chapters <= CHAPTERS_LISTED
+        ? numbers.map((chapter) => chapterItem(book.slug, chapterLabel, chapter))
+        : Array.from({ length: Math.ceil(book.chapters / CHAPTER_GROUP) }, (_, group) => {
+            const first = group * CHAPTER_GROUP + 1;
+            const last = Math.min(first + CHAPTER_GROUP - 1, book.chapters);
+            return {
+              id: `${id}-${first}-${last}`,
+              label: `${chapterLabel}s ${first}–${last}`,
+              iconName: "Layers",
+              submenu: numbers.slice(first - 1, last).map((chapter) => chapterItem(book.slug, chapterLabel, chapter)),
+            };
+          });
+    return {
+      id,
+      label: book.name,
+      iconName: "BookOpen",
+      submenu: [
+        {
+          id: `${id}-all`,
+          label: `All ${chapterLabel.toLowerCase()}s`,
+          iconName: "Library",
+          title: `Open ${book.name} at its ${chapterLabel.toLowerCase()} cards`,
+          onSelect: place(`scripture-view:book/${book.slug}`),
+        },
+        ...chapters,
+      ],
+    };
+  };
+
+  return {
+    ...base,
+    submenu: [
+      {
+        id: `${base.id}-covers`,
+        label: "Open at the covers",
+        iconName: "BookMarked",
+        onSelect: place(),
+      },
+      ...table.map<ExtensionCreateMenuItem>((volume) =>
+        // A one-book volume (D&C) skips straight to that book's sections.
+        volume.books.length === 1
+          ? { ...bookItem(volume.books[0], volume.chapterLabel), id: `${base.id}-${volume.slug}`, label: volume.title, iconName: "Library" }
+          : {
+              id: `${base.id}-${volume.slug}`,
+              label: volume.title,
+              iconName: "Library",
+              submenu: volume.books.map((book) => bookItem(book, volume.chapterLabel)),
+            }
+      ),
+    ],
+  };
+}
+
 function scriptureMenu(): ExtensionCreateMenuItem[] {
   const { scriptures } = useReaderBookshelf.getState();
   return [
-    ...scriptures.map<ExtensionCreateMenuItem>((corpus) => ({
-      id: `reader-scripture-${corpus.id}`,
-      label: truncate(corpus.title, 44),
-      iconName: "BookMarked",
-      title: `Add a ${corpus.title} session here — its own name, icon and reading place`,
-      onSelect: ({ parentId }) => void placeScriptureSession(corpus, parentId),
-    })),
+    ...scriptures.map(scriptureCollectionItem),
     {
       id: "reader-scripture-catalog",
       label: scriptures.length ? "Browse traditions…" : "Browse traditions to enable…",

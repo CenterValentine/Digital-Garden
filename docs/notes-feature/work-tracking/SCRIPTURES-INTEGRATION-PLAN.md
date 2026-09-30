@@ -404,6 +404,13 @@ ordinals ("First Nephi"), unambiguous prefixes ("Hela"), ranges, lists ("John 3:
   notes stay per collection (`scripture:<corpus>`), shared by every session — marks
   are about the verse. The viewer match gained `externalResourceType` (generic: any
   extension can claim a kind of link node, as `mimeType` does for files).
+- **Menu drill-down**: hovering the collection in "+ → Reader → Scriptures" lists
+  "Open at the covers", then volumes → books → chapters; any pick adds a session
+  there and opens it at that spot (a session is still the whole collection). Books
+  over 20 chapters group them by tens ("Chapters 141–150" — Psalms has 150, D&C 138
+  sections) so no submenu is a wall of rows. Needs a book table that ships with the
+  code (`lib/domain/scripture/tables.ts`; LDS has one) because the menu is built
+  synchronously; other collections get a plain entry.
 - **Browse** (the default way in, `ScriptureBrowse`): volumes as bound-book covers →
   a volume's books → a book's chapter cards (verse count, opening line, your mark
   count; `GET …/[corpus]/book`) → verses, with breadcrumbs back up at every level
