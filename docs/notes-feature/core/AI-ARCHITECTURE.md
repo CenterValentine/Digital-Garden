@@ -276,8 +276,15 @@ requested.
 (`supportsOpenAIPromptCaching` per model). The cache key is
 `digest(userId, playbookId, playbookContext, tool set)` — insensitive to tool
 *order*, rotated by playbook edits and phase advances, isolated per user.
-Anthropic is deliberately NOT opted into paid cache writes (policy decision recorded
-in `validate-prompt-cache.ts`). DeepSeek caches automatically server-side — its hit
+Anthropic is cached through a moving breakpoint: `withAnthropicCacheBreakpoint`
+marks the last message of every step (ephemeral, 5-minute lifetime; writes 1.25×,
+reads 0.1×). This reverses the 3.2.2 "no paid cache writes" policy (2026-09-30):
+an agentic turn re-reads its prefix every step, so the read discount dominates.
+While an approval is pending, the chat engine sends ONE cache volley shortly before
+a short-lived cache would lapse (`cache-volley.ts`: Anthropic and pre-5.6 OpenAI;
+GPT-5.6+ caches live 30 minutes and need none). The route builds the volley through
+its normal path, with the transcript cut at the approval step (`warmOnly`), so its
+prefix is the one the continuation extends. DeepSeek caches automatically server-side — its hit
 rate is visible only via `cachedInputTokens` in persisted usage (#156). The system
 prompt is ordered cache-friendly: stable playbook context precedes run-specific
 sections (`buildSystemPrompt` section ordering).

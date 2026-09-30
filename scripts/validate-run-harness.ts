@@ -321,7 +321,17 @@ import { summarizeRejections, unknownOptionError } from "../lib/domain/data/cell
 import {
   CHARTER_TURN_TOOLS,
   tailRefusalNotice,
+  withBudgetNotice,
 } from "../lib/domain/ai/tools/iteration-proposal";
+import {
+  cacheLifetimeMinutes,
+  cacheVolleyDelayMs,
+  pendingApprovalKey,
+  trimToLastStepStart,
+} from "../lib/domain/ai/cache-volley";
+import { docxHtmlToCheckText } from "../lib/domain/ai/docx-check-text";
+import { DOCXConverter } from "../lib/domain/export/converters/docx";
+import JSZip from "jszip";
 
 {
   // The fold hands the calculator the request's largest STEP: nine steps
@@ -352,7 +362,9 @@ import {
   };
   const folded = mergeTurnUsageMetadata(new Map(), "m", raw, []) as Record<string, unknown>;
   const cost = (folded.cost as { usd?: number } | undefined)?.usd ?? null;
-  const expected = ((369558 - 200561) * 2 + 200561 * 0.2 + 2806 * 12) / 1_000_000;
+  // Uncached input is billed as cache-written at 1.25× (terra write 2.5) —
+  // GPT-5.6+ writes, unreported by the SDK (§10 round 3).
+  const expected = ((369558 - 200561) * 2.5 + 200561 * 0.2 + 2806 * 12) / 1_000_000;
   assert(
     cost !== null && Math.abs(cost - expected) < 1e-6,
     `§8: a multi-step request is priced at base rates when no step crosses the tier (got ${cost}, expected ${expected.toFixed(4)})`,
@@ -492,12 +504,100 @@ import {
   );
 }
 
+{
+  // §10 round 3 — the step budget rides the result, not a trailing message.
+  assert(withBudgetNotice("done", "[N]") === "done\n\n[N]", "round 3: a string result carries the budget line");
+  const obj = withBudgetNotice({ ok: true }, "[N]") as Record<string, unknown>;
+  assert(obj.ok === true && obj.harnessNotice === "[N]", "round 3: a plain object result carries harnessNotice");
+  const arr = [1];
+  assert(withBudgetNotice(arr, "[N]") === arr && withBudgetNotice(null, "[N]") === null, "round 3: arrays and null pass through untouched");
+}
+
+{
+  // §10 round 3 — cache volley: only where the cache would lapse inside the
+  // 10-minute window; one key per pending approval; the transcript is cut
+  // at the approval step's start.
+  assert(cacheLifetimeMinutes("anthropic", "claude-sonnet-5") === 5, "volley: Anthropic lives 5 min");
+  assert(cacheLifetimeMinutes("openai", "gpt-6-sol") === 30 && cacheLifetimeMinutes("openai", "gpt-5.6-terra") === 30, "volley: GPT-5.6+ live 30 min");
+  assert(cacheLifetimeMinutes("openai", "gpt-5.5") === 5 && cacheLifetimeMinutes("openai", "gpt-4.1") === 5 && cacheLifetimeMinutes(undefined, "openai/gpt-4o") === 5, "volley: older OpenAI caching models live 5 min");
+  assert(cacheLifetimeMinutes("deepseek", "deepseek-chat") === null, "volley: no controllable cache, no lifetime");
+  assert(cacheVolleyDelayMs("anthropic", "claude-sonnet-5") === 4 * 60_000, "volley: Anthropic fires at 4 min");
+  assert(cacheVolleyDelayMs("openai", "gpt-6-sol") === null, "volley: GPT-6 needs none (30-min cache)");
+  const approvalMsgs = [
+    { id: "u", role: "user", parts: [{ type: "text", text: "go" }] },
+    {
+      id: "a",
+      role: "assistant",
+      parts: [
+        { type: "step-start" },
+        { type: "tool-query_database", state: "output-available", toolCallId: "c1" },
+        { type: "step-start" },
+        { type: "reasoning", text: "" },
+        { type: "tool-propose_item_iteration", state: "approval-requested", toolCallId: "c2", approval: { id: "ap1" } },
+      ],
+    },
+  ] as unknown as Parameters<typeof pendingApprovalKey>[0];
+  assert(pendingApprovalKey(approvalMsgs) === "a:ap1", `volley: pending approvals key the volley (got ${pendingApprovalKey(approvalMsgs)})`);
+  const trimmed = trimToLastStepStart(approvalMsgs);
+  assert(
+    trimmed.length === 2 && trimmed[1].parts.length === 2 && (trimmed[1].parts[1] as { toolCallId?: string }).toolCallId === "c1",
+    "volley: the transcript is cut at the approval step's start (earlier steps kept, the pending call gone)",
+  );
+  assert(pendingApprovalKey(trimmed) === null, "volley: the cut transcript has nothing pending");
+  const onlyApprovalStep = [approvalMsgs[0], { ...approvalMsgs[1], parts: approvalMsgs[1].parts.slice(2) }] as typeof approvalMsgs;
+  assert(trimToLastStepStart(onlyApprovalStep).length === 1, "volley: a message that is only the approval step is dropped whole");
+}
+
+{
+  // §10 round 3 — the model checks a DOCX against the FILE: breaks kept,
+  // link targets visible, bullets marked.
+  const text = docxHtmlToCheckText(
+    '<h1>David</h1><p>La Verkin | <a href="mailto:x@y.com">x@y.com</a><br /><a href="https://www.linkedin.com/in/x">LinkedIn</a></p><ul><li>One &amp; two</li></ul>',
+  );
+  assert(
+    text === "David\nLa Verkin | x@y.com [→ mailto:x@y.com]\nLinkedIn [→ https://www.linkedin.com/in/x]\n• One & two",
+    `round 3: DOCX check text keeps breaks, shows link targets, marks bullets (got ${JSON.stringify(text)})`,
+  );
+}
+
+void (async () => {
+  // §10 round 3 — the converter writes links as real hyperlinks (the URL
+  // used to be dropped, leaving "LinkedIn" pointing nowhere) and keeps
+  // hard breaks as breaks.
+  const doc = {
+    type: "doc",
+    content: [
+      {
+        type: "paragraph",
+        content: [
+          { type: "text", text: "Email" },
+          { type: "hardBreak" },
+          { type: "text", text: "LinkedIn", marks: [{ type: "link", attrs: { href: "https://www.linkedin.com/in/x" } }] },
+        ],
+      },
+    ],
+  };
+  const r = await new DOCXConverter().convert(doc, { format: "docx", settings: {} as never });
+  const zip = await JSZip.loadAsync(Buffer.from(r.files[0].content as Buffer));
+  const xml = await zip.file("word/document.xml")!.async("string");
+  const rels = await zip.file("word/_rels/document.xml.rels")!.async("string");
+  assert(
+    (xml.match(/<w:hyperlink /g) ?? []).length === 1 && rels.includes('Target="https://www.linkedin.com/in/x"') && xml.includes("<w:br/>"),
+    "round 3: a link mark becomes a hyperlink with its target; a hard break stays a break",
+  );
+  if (errors.length > 0) {
+    console.error(`\n✖ run-harness:check (round 3 DOCX) failed — ${errors.length} problem(s):\n`);
+    for (const e of errors) console.error(`  ${e}\n`);
+    process.exit(1);
+  }
+})();
+
 if (errors.length > 0) {
   console.error(`\n✖ run-harness:check (§8) failed — ${errors.length} problem(s):\n`);
   for (const e of errors) console.error(`  ${e}\n`);
   process.exit(1);
 }
-console.log("✓ run-harness:check §8/§10 — per-step long-context tier; prefix diagnostic locates a mid-prompt change; wire tap names the diverging body part; rejections teach; the tail refuses instead of hiding; provider-run searches are metered");
+console.log("✓ run-harness:check §8/§10 — per-step long-context tier; prefix diagnostic locates a mid-prompt change; wire tap names the diverging body part; rejections teach; the tail refuses instead of hiding; provider-run searches are metered; the budget rides results; the volley fires only where the cache would lapse; DOCX checks read the file");
 
 // ── write-args — the document body under any sibling key ─────────────────────
 

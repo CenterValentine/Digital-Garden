@@ -499,6 +499,9 @@ const isStub = (v: unknown, word: string): boolean =>
       routeSrc.includes("reservedTailSize(tailDeliverables)") &&
       routeSrc.includes("if (!tailDeliverables) {") &&
       routeSrc.includes("tailGate.active = inTail") &&
+      routeSrc.includes("tailGate.notice = stepsRemainingNotice({") &&
+      routeSrc.includes("withBudgetNotice(output, tailGate.notice)") &&
+      !/tailGate\.noticeStep = stepNumber;\s*return \{\s*activeTools: stepActiveTools,\s*messages: \[/.test(routeSrc) &&
       routeSrc.includes("return tailRefusalNotice({") &&
       !routeSrc.includes("stepActiveTools.filter((t) => tailToolsForTurn.includes(t))") &&
       routeSrc.includes("stepsRemainingNotice({") &&
@@ -580,8 +583,12 @@ const isStub = (v: unknown, word: string): boolean =>
       /hasCheckpointTool: isOffered\("phase_checkpoint"\)/.test(routeSrc8) &&
       !/buildSystemPrompt\(\{[\s\S]{0,1200}isAdvertised\(/.test(routeSrc8) &&
       routeSrc8.includes("for (const id of CHARTER_TURN_TOOLS) if (id in tools) activated.add(id)") &&
-      routeSrc8.includes("CHARTER_TURN_TOOLS.includes(id)"),
-    "G8 wiring: the route forces reasoning for OpenAI reasoning families, strips item ids from each step's messages, reads system-prompt flags from isOffered (never a summon), and gives charter turns their whole tool set from the first request (isOffered agrees)",
+      routeSrc8.includes("CHARTER_TURN_TOOLS.includes(id)") &&
+      routeSrc8.includes("withAnthropicCacheBreakpoint(rawStepMessages)") &&
+      routeSrc8.includes("withAnthropicCacheBreakpoint(modelMessages)") &&
+      routeSrc8.includes("trimToLastStepStart(body.messages ?? [])") &&
+      routeSrc8.includes("system: systemPromptForDiag,"),
+    "G8 wiring: the route forces reasoning for OpenAI reasoning families, strips item ids from each step's messages, reads system-prompt flags from isOffered (never a summon), gives charter turns their whole tool set from the first request (isOffered agrees), marks an Anthropic breakpoint on every step and on the volley, cuts a volley's transcript at the approval step, and shares ONE system prompt between the stream and the volley",
   );
 }
 
