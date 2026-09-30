@@ -74,6 +74,7 @@ import {
   ScriptureBrowse,
   ScriptureCrumbs,
   type ScriptureBrowseLevel,
+  type ScriptureCrumb,
 } from "./ScriptureBrowse";
 import { ReaderBookSidebar } from "./ReaderBookSidebar";
 
@@ -783,16 +784,22 @@ export function ScriptureReader({
   const book = chapter?.book;
   const prev = chapter?.prev ?? null;
   const next = chapter?.next ?? null;
-  const title =
-    book && !browse
-      ? `${book.name}${book.chapterCount > 1 ? ` ${chapter.chapter}` : ""}`
-      : (contents?.corpus.title ?? "Scriptures");
+  // The toolbar names where you are (serif — the collection's voice); its
+  // second line is the way back up. No headings repeat it on the page.
+  const title = !contents
+    ? "Scriptures"
+    : browse
+      ? browseTitle(browse, contents)
+      : book
+        ? `${book.name}${book.chapterCount > 1 ? ` ${chapter.chapter}` : ""}`
+        : contents.corpus.title;
   const showBrowse = (level: ScriptureBrowseLevel) => {
     browseRef.current = level;
     setBrowse(level);
     setSelection(null);
     pageRef.current?.scrollTo({ top: 0 });
   };
+  const headerPath = pathTo(browse, book ?? null, contents, showBrowse);
   const openBook = useReaderSession(
     (state) => state.openBooks[contentId] ?? null,
   );
@@ -848,12 +855,14 @@ export function ScriptureReader({
           <List className="h-4 w-4" />
         </button>
         <div className="min-w-0 flex-1 px-1">
-          <div className="truncate text-sm font-medium">{title}</div>
-          <div className="truncate text-[11px] text-muted-foreground">
-            {browse
-              ? browseSubtitle(browse, contents)
-              : `${contents?.corpus.title ?? ""}${book ? ` · ${book.volumeTitle}` : ""}`}
+          <div className="truncate font-serif text-base font-semibold leading-tight">
+            {title}
           </div>
+          {headerPath.length > 0 && (
+            <div className="mt-0.5 truncate">
+              <ScriptureCrumbs items={headerPath} compact />
+            </div>
+          )}
         </div>
         <form
           onSubmit={(event) => void submitQuery(event)}
@@ -1066,37 +1075,6 @@ export function ScriptureReader({
                     lineHeight,
                   }}
                 >
-                  <div className="mb-5">
-                    <ScriptureCrumbs
-                      items={[
-                        {
-                          label: contents?.corpus.title ?? "Scriptures",
-                          onClick: () => showBrowse({ level: "home" }),
-                        },
-                        {
-                          label: chapter.book.volumeTitle,
-                          onClick: () =>
-                            showBrowse({
-                              level: "volume",
-                              volume: chapter.book.volume,
-                            }),
-                        },
-                        ...(chapter.book.chapterCount > 1
-                          ? [
-                              {
-                                label: chapter.book.name,
-                                onClick: () =>
-                                  showBrowse({
-                                    level: "book",
-                                    bookSlug: chapter.book.slug,
-                                  }),
-                              },
-                              { label: String(chapter.chapter) },
-                            ]
-                          : [{ label: chapter.book.name }]),
-                      ]}
-                    />
-                  </div>
                   <header className="mb-6 text-center">
                     {chapter.chapter === 1 &&
                       chapter.book.fullTitle !== chapter.book.name && (
@@ -1310,22 +1288,60 @@ export function ScriptureReader({
   );
 }
 
-/** The toolbar's second line while browsing: where in the collection you are. */
-function browseSubtitle(
+/** The toolbar title while browsing: the level you're on. */
+function browseTitle(
   level: ScriptureBrowseLevel,
-  contents: ScriptureContents | null,
+  contents: ScriptureContents,
 ): string {
-  if (level.level === "home") return "Choose a volume";
+  if (level.level === "home") return contents.corpus.title;
   if (level.level === "volume") {
     return (
-      contents?.volumes.find((volume) => volume.slug === level.volume)?.title ??
-      ""
+      contents.volumes.find((volume) => volume.slug === level.volume)?.title ??
+      contents.corpus.title
     );
   }
-  const book = contents?.volumes
-    .flatMap((volume) => volume.books)
-    .find((entry) => entry.slug === level.bookSlug);
-  return book ? `${book.volumeTitle} · ${book.name}` : "";
+  return (
+    contents.volumes
+      .flatMap((volume) => volume.books)
+      .find((entry) => entry.slug === level.bookSlug)?.name ??
+    contents.corpus.title
+  );
+}
+
+/** The levels above where you are, each a way back up (empty at the top). */
+function pathTo(
+  browse: ScriptureBrowseLevel | null,
+  readingBook: ScriptureBookInfo | null,
+  contents: ScriptureContents | null,
+  go: (level: ScriptureBrowseLevel) => void,
+): ScriptureCrumb[] {
+  if (!contents) return [];
+  const home: ScriptureCrumb = {
+    label: contents.corpus.title,
+    onClick: () => go({ level: "home" }),
+  };
+  const books = contents.volumes.flatMap((volume) => volume.books);
+  const volumeCrumb = (book: ScriptureBookInfo): ScriptureCrumb => ({
+    label: book.volumeTitle,
+    onClick: () => go({ level: "volume", volume: book.volume }),
+  });
+  if (browse?.level === "home") return [];
+  if (browse?.level === "volume") return [home];
+  if (browse?.level === "book") {
+    const book = books.find((entry) => entry.slug === browse.bookSlug);
+    return book ? [home, volumeCrumb(book)] : [home];
+  }
+  if (!readingBook) return [home];
+  return readingBook.chapterCount > 1
+    ? [
+        home,
+        volumeCrumb(readingBook),
+        {
+          label: readingBook.name,
+          onClick: () => go({ level: "book", bookSlug: readingBook.slug }),
+        },
+      ]
+    : [home, volumeCrumb(readingBook)];
 }
 
 function anchorRef(anchor: LinkAnchor): ScriptureRef | null {
