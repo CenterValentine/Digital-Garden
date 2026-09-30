@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Bookmark, FileText, NotebookPen, Send, Trash2 } from "lucide-react";
+import { Bookmark, FileText, Highlighter, NotebookPen, Send, Trash2, Underline } from "lucide-react";
 import { syncTreeQuietly } from "@/lib/features/content/tree-optimistic";
 import { useContentStore } from "@/state/content-store";
 import {
@@ -10,7 +10,7 @@ import {
   type ReaderAnnotationDto,
 } from "@/lib/domain/reader/types";
 import { readerApi } from "../lib/api";
-import { MARK_SWATCH, markValue, parseMark } from "../lib/marks";
+import { MARK_SWATCH, markValue, parseMark, type MarkStyle } from "../lib/marks";
 
 
 interface AnnotationsPanelProps {
@@ -37,7 +37,9 @@ export function AnnotationsPanel({
   hideTitle,
   className,
 }: AnnotationsPanelProps) {
+  // Color (or "bookmark") filter, combinable with a mark-style filter.
   const [filter, setFilter] = useState<string | null>(null);
+  const [styleFilter, setStyleFilter] = useState<MarkStyle | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState<string | null>(null);
@@ -45,9 +47,15 @@ export function AnnotationsPanel({
   const sorted = useMemo(
     () =>
       [...annotations]
-        .filter((annotation) => !filter || parseMark(annotation.color).color === filter || (filter === "bookmark" && annotation.kind === "bookmark"))
+        .filter((annotation) => {
+          if (filter === "bookmark") return annotation.kind === "bookmark";
+          if (!filter && !styleFilter) return true;
+          if (annotation.kind === "bookmark") return false;
+          const mark = parseMark(annotation.color);
+          return (!filter || mark.color === filter) && (!styleFilter || mark.style === styleFilter);
+        })
         .sort((a, b) => position(a) - position(b)),
-    [annotations, filter]
+    [annotations, filter, styleFilter]
   );
 
   const send = async (annotation: ReaderAnnotationDto) => {
@@ -77,9 +85,36 @@ export function AnnotationsPanel({
     <div className={`flex min-h-0 flex-col ${className ?? "h-full"}`}>
       <div className="flex items-center gap-1 border-b border-black/10 p-2 dark:border-white/10">
         <span className="mr-auto text-xs font-semibold">{hideTitle ? "" : "Highlights & notes"}</span>
-        <button type="button" onClick={() => setFilter(null)} className={`rounded px-1.5 text-[11px] ${filter === null ? "bg-black/10 dark:bg-white/10" : ""}`}>
+        <button
+          type="button"
+          onClick={() => {
+            setFilter(null);
+            setStyleFilter(null);
+          }}
+          className={`rounded px-1.5 text-[11px] ${filter === null && styleFilter === null ? "bg-black/10 dark:bg-white/10" : ""}`}
+        >
           All
         </button>
+        {(
+          [
+            ["highlight", "Highlights only", Highlighter],
+            ["underline", "Underlines only", Underline],
+          ] as const
+        ).map(([style, label, Icon]) => (
+          <button
+            key={style}
+            type="button"
+            title={label}
+            aria-pressed={styleFilter === style}
+            onClick={() => {
+              setStyleFilter(styleFilter === style ? null : style);
+              if (filter === "bookmark") setFilter(null);
+            }}
+            className={`rounded p-0.5 ${styleFilter === style ? "bg-black/10 dark:bg-white/10" : ""}`}
+          >
+            <Icon className="h-3.5 w-3.5" />
+          </button>
+        ))}
         {READER_HIGHLIGHT_COLORS.map((color) => (
           <button
             key={color}
@@ -90,7 +125,10 @@ export function AnnotationsPanel({
             style={{ background: MARK_SWATCH[color] }}
           />
         ))}
-        <button type="button" title="Bookmarks" onClick={() => setFilter(filter === "bookmark" ? null : "bookmark")} className={`rounded p-0.5 ${filter === "bookmark" ? "bg-black/10 dark:bg-white/10" : ""}`}>
+        <button type="button" title="Bookmarks" onClick={() => {
+          setFilter(filter === "bookmark" ? null : "bookmark");
+          setStyleFilter(null);
+        }} className={`rounded p-0.5 ${filter === "bookmark" ? "bg-black/10 dark:bg-white/10" : ""}`}>
           <Bookmark className="h-3.5 w-3.5" />
         </button>
       </div>

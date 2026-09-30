@@ -36,7 +36,6 @@ import {
   type SpeedReaderPage,
 } from "@/extensions/speed-reader/events";
 import { useContentFullscreenStore } from "@/state/content-fullscreen-store";
-import { useContentToolbarContributions } from "@/state/content-toolbar-contributions-store";
 import { ReaderApiError, readerApi } from "../lib/api";
 import { attachSanitizer } from "../lib/sanitize";
 import { useReaderPreferences, type ReaderTheme } from "../state/reader-store";
@@ -50,7 +49,7 @@ import {
   type MarkTone,
 } from "../lib/marks";
 import { BookDetailsPanel } from "./BookDetailsPanel";
-import { ReaderBookSidebar } from "./ReaderBookSidebar";
+import { ContentsView, ReaderBookSidebar } from "./ReaderBookSidebar";
 import { revealReaderSidebar } from "../lib/sidebar";
 import { notifyBooksChanged } from "../state/bookshelf-store";
 import { useReaderSession, type ReaderSidebarView } from "../state/reader-store";
@@ -103,6 +102,9 @@ const STATUS_OPTIONS: Array<{ value: ReadingStatus | ""; label: string }> = [
   { value: "reference", label: "Reference" },
 ];
 
+/** Press-and-hold on Contents opens it in the right sidebar. */
+const CONTENTS_HOLD_MS = 450;
+
 function readerLocFromUrl(): string | null {
   if (typeof window === "undefined") return null;
   return new URLSearchParams(window.location.search).get("readerLoc");
@@ -124,6 +126,11 @@ export function BookReader({ contentId }: { contentId: string }) {
   const [annotations, setAnnotations] = useState<ReaderAnnotationDto[]>([]);
   // Full screen hides the app's right sidebar; its Book views open as a drawer.
   const [drawerOpen, setDrawerOpen] = useState(false);
+  // Contents: click toggles the TOC beside the page; a long press (or a
+  // modifier-click) opens it in the right sidebar instead.
+  const [tocOpen, setTocOpen] = useState(false);
+  const contentsHoldTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const contentsHeldRef = useRef(false);
   const [selection, setSelection] = useState<SelectionState | null>(null);
   const [noteDraft, setNoteDraft] = useState<string | null>(null);
   // Full-screen reading. The app's right sidebar is out of view then, so
@@ -478,6 +485,11 @@ export function BookReader({ contentId }: { contentId: string }) {
    * (the sidebar's own toggle collapses it). In full screen, where the
    * sidebar is out of view, the same views open as a drawer.
    */
+  const cancelContentsHold = useCallback(() => {
+    if (contentsHoldTimer.current) clearTimeout(contentsHoldTimer.current);
+    contentsHoldTimer.current = null;
+  }, []);
+
   const openSideView = useCallback(
     (view: ReaderSidebarView) => {
       if (immersive) {
@@ -489,6 +501,17 @@ export function BookReader({ contentId }: { contentId: string }) {
     },
     [contentId, immersive]
   );
+
+  const startContentsHold = useCallback(() => {
+    contentsHeldRef.current = false;
+    cancelContentsHold();
+    contentsHoldTimer.current = setTimeout(() => {
+      contentsHeldRef.current = true;
+      setTocOpen(false);
+      openSideView("contents");
+    }, CONTENTS_HOLD_MS);
+  }, [cancelContentsHold, openSideView]);
+  useEffect(() => cancelContentsHold, [cancelContentsHold]);
 
   // Speed reading starts from the page on screen, one page at a time.
   useEffect(() => {
@@ -544,44 +567,9 @@ export function BookReader({ contentId }: { contentId: string }) {
   }, []);
 
   const title = meta?.title ?? "Book";
-  const readingStatus = meta ? meta.readingStatus ?? "" : null;
 
-  // The reader's tools live in the shared content toolbar (no second toolbar):
-  // shortcuts into the right sidebar's Book views, a bookmark, and status.
-  useEffect(() => {
-    const setContributions = useContentToolbarContributions.getState().setContributions;
-    setContributions(contentId, [
-      { id: "reader-contents", title: "Contents", icon: <List className="h-4 w-4" />, onClick: () => openSideView("contents") },
-      { id: "reader-notes", title: "Highlights & notes", icon: <NotebookPen className="h-4 w-4" />, onClick: () => openSideView("notes") },
-      { id: "reader-about", title: "About this book", icon: <Info className="h-4 w-4" />, onClick: () => openSideView("about") },
-      { id: "reader-settings", title: "Display settings", icon: <Settings2 className="h-4 w-4" />, onClick: () => openSideView("settings") },
-      { id: "reader-bookmark", title: "Bookmark this page", icon: <Bookmark className="h-4 w-4" />, onClick: () => void addBookmark() },
-      ...(readingStatus === null
-        ? []
-        : [
-            {
-              id: "reader-status",
-              title: "Reading status",
-              render: () => (
-                <select
-                  aria-label="Reading status"
-                  value={readingStatus}
-                  onChange={(event) => void setStatus((event.target.value || null) as ReadingStatus | null)}
-                  className="h-7 rounded border border-black/10 bg-transparent px-1 text-xs dark:border-white/10"
-                >
-                  {STATUS_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              ),
-            },
-          ]),
-    ]);
-  }, [addBookmark, contentId, openSideView, readingStatus, setStatus]);
-  useEffect(() => () => useContentToolbarContributions.getState().setContributions(contentId, null), [contentId]);
   const openBook = useReaderSession((state) => state.openBooks[contentId] ?? null);
+  const iconButton = "rounded p-1.5 hover:bg-black/5 dark:hover:bg-white/10";
   const pageButton =
     "inline-flex h-7 items-center gap-0.5 rounded px-1.5 text-xs hover:bg-black/5 hover:text-foreground dark:hover:bg-white/10";
   const mark = (style: MarkStyle, color: (typeof READER_HIGHLIGHT_COLORS)[number]) => {
@@ -595,7 +583,86 @@ export function BookReader({ contentId }: { contentId: string }) {
       tabIndex={-1}
       className="flex h-full min-h-0 flex-col outline-none"
     >
+      {/* Secondary toolbar: book-specific affordances only (anything that
+          generalizes across content types — full screen, speed read — is the
+          content toolbar's). The view buttons are shortcuts into the right
+          sidebar's Book views. */}
+      <div className="flex items-center gap-1 border-b border-black/10 px-3 py-1.5 dark:border-white/10">
+        <button
+          type="button"
+          title="Contents — hold (or ⌥/⇧/⌘-click) to open in the right sidebar"
+          aria-pressed={tocOpen}
+          onPointerDown={startContentsHold}
+          onPointerUp={cancelContentsHold}
+          onPointerLeave={cancelContentsHold}
+          onClick={(event) => {
+            if (contentsHeldRef.current) {
+              contentsHeldRef.current = false;
+              return; // the hold already opened the sidebar
+            }
+            if (event.altKey || event.shiftKey || event.metaKey || event.ctrlKey) {
+              openSideView("contents");
+              return;
+            }
+            setTocOpen((open) => !open);
+          }}
+          className={`${iconButton} ${tocOpen ? "bg-black/10 dark:bg-white/10" : ""}`}
+        >
+          <List className="h-4 w-4" />
+        </button>
+        <div className="min-w-0 flex-1 px-1">
+          <div className="truncate text-sm font-medium">{title}</div>
+          {meta?.authors?.length ? (
+            <div className="truncate text-[11px] text-muted-foreground">{meta.authors.join(", ")}</div>
+          ) : null}
+        </div>
+        {meta && (
+          <select
+            aria-label="Reading status"
+            value={meta.readingStatus ?? ""}
+            onChange={(event) => void setStatus((event.target.value || null) as ReadingStatus | null)}
+            className="h-7 rounded border border-black/10 bg-transparent px-1 text-xs dark:border-white/10"
+          >
+            {STATUS_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        )}
+        <button type="button" title="About this book" onClick={() => openSideView("about")} className={iconButton}>
+          <Info className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          title="Highlights & notes"
+          onClick={() => openSideView("notes")}
+          className={`relative ${iconButton}`}
+        >
+          <NotebookPen className="h-4 w-4" />
+          {annotations.length > 0 && (
+            <span className="absolute -right-0.5 -top-0.5 rounded-full bg-primary px-1 text-[9px] leading-tight text-primary-foreground">
+              {annotations.length}
+            </span>
+          )}
+        </button>
+        <button type="button" title="Display settings" onClick={() => openSideView("settings")} className={iconButton}>
+          <Settings2 className="h-4 w-4" />
+        </button>
+        <button type="button" title="Bookmark this page" onClick={() => void addBookmark()} className={iconButton}>
+          <Bookmark className="h-4 w-4" />
+        </button>
+      </div>
+
       <div className="relative flex min-h-0 flex-1">
+        {/* Table of contents beside the page (the one in-viewer panel the owner
+            kept: navigating a book wants the TOC next to the text). The same
+            view is in the right sidebar's Book rail. */}
+        {tocOpen && openBook && (
+          <aside className="w-64 shrink-0 border-r border-black/10 dark:border-white/10">
+            <ContentsView book={openBook} onNavigate={() => setTocOpen(false)} />
+          </aside>
+        )}
         <div className="relative min-w-0 flex-1">
           <button
             type="button"

@@ -37,7 +37,6 @@ import { AiContextToggleButton } from "@/extensions/studio/components/AiContextT
 import { useRightPanelCollapseStore } from "@/state/right-panel-collapse-store";
 import { useRightSidebarStateStore } from "@/state/right-sidebar-state-store";
 import { useContentFullscreenStore } from "@/state/content-fullscreen-store";
-import { useContentToolbarItems } from "@/state/content-toolbar-contributions-store";
 
 /** Content types whose own text the toolbar "Listen" can narrate. */
 const READ_ALOUD_CONTENT_TYPES = new Set(["note", "file", "html", "code"]);
@@ -179,8 +178,6 @@ export function ContentToolbar({ contentId: contentIdProp }: ContentToolbarProps
   const enterFullscreen = useContentFullscreenStore((s) => s.enter);
   const exitFullscreen = useContentFullscreenStore((s) => s.exit);
   const showFullscreen = !!sourceContentId;
-  // The viewer's own tools (the reader's contents/details/display/status…).
-  const viewerTools = useContentToolbarItems(sourceContentId);
 
   const openSpeedReader = useCallback(() => {
     if (!sourceContentId) return;
@@ -199,8 +196,7 @@ export function ContentToolbar({ contentId: contentIdProp }: ContentToolbarProps
     !showSpeedRead &&
     !showSendToTab &&
     !showStudio &&
-    !showFullscreen &&
-    viewerTools.length === 0
+    !showFullscreen
   ) {
     return null;
   }
@@ -211,27 +207,6 @@ export function ContentToolbar({ contentId: contentIdProp }: ContentToolbarProps
       role="toolbar"
       aria-label="Content actions"
     >
-      {viewerTools.map((item) =>
-        item.render ? (
-          <span key={item.id} className="flex shrink-0 items-center">
-            {item.render()}
-          </span>
-        ) : (
-          <button
-            key={item.id}
-            onClick={item.onClick}
-            className="flex shrink-0 items-center gap-1.5 rounded-md px-1.5 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            title={item.title}
-            aria-label={item.title}
-            type="button"
-          >
-            {item.icon}
-          </button>
-        )
-      )}
-      {viewerTools.length > 0 && (
-        <span className="mx-1 h-5 w-px shrink-0 bg-black/10 dark:bg-white/10" aria-hidden />
-      )}
       {showPublishPill && (
         <PublishStatusPill contentId={sourceContentId} />
       )}

@@ -28,6 +28,9 @@ import {
   type SpeedReaderPagedSource,
 } from "../events";
 
+/** How long the page-end overlay shows before auto-continue turns the page. */
+const AUTO_CONTINUE_DELAY_MS = 1800;
+
 /** "pageEnd" = a paged source's page is finished; offer the next one. */
 type Phase = "idle" | "loading" | "ready" | "playing" | "paused" | "pageEnd" | "done" | "error";
 
@@ -339,8 +342,9 @@ export function SpeedReaderDialog() {
     if (pagedSourceRef.current) {
       // End of the page: stop here (or roll on), never past what was asked.
       finishedPagesWordsRef.current += total;
-      if (useSpeedReaderStore.getState().autoContinuePages) void continueToNextPage();
-      else setPhase("pageEnd");
+      // Auto-continue still passes through the page-end overlay (briefly), so
+      // the checkbox stays reachable to turn it back off.
+      setPhase("pageEnd");
       return;
     }
     recordAndSummarize(total);
@@ -388,6 +392,14 @@ export function SpeedReaderDialog() {
     setPhase("done");
   }
 
+  // Auto-continue: hold the page-end overlay a moment, then roll on.
+  useEffect(() => {
+    if (phase !== "pageEnd" || !autoContinuePages) return;
+    const timer = setTimeout(() => void continueToNextPage(), AUTO_CONTINUE_DELAY_MS);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- continueToNextPage reads refs + stable setters only
+  }, [phase, autoContinuePages]);
+
   // Keyboard shortcuts
   useEffect(() => {
     if (!open) return;
@@ -428,11 +440,16 @@ export function SpeedReaderDialog() {
       aria-modal="true"
       aria-label="Speed reader"
       className="fixed inset-0 z-[260] flex flex-col"
-      style={{ background: theme.background }}
+      style={{ background: phase === "pageEnd" ? "transparent" : theme.background }}
     >
+      {/* End of a page: the dialog turns see-through so the book's page shows
+          behind the choice. */}
+      {phase === "pageEnd" && (
+        <div aria-hidden className="pointer-events-none absolute inset-0" style={{ background: theme.background, opacity: 0.55 }} />
+      )}
       {/* Header */}
       <div
-        className="flex shrink-0 items-center justify-between px-4 py-3"
+        className="relative flex shrink-0 items-center justify-between px-4 py-3"
         style={{
           background: theme.surface,
           borderBottom: `1px solid ${theme.controlBorder}`,
@@ -759,13 +776,20 @@ function PageEndState({
     color: theme.textPrimary,
   };
   return (
+    <div className="flex h-full w-full items-center justify-center px-6">
     <div
-      className="flex h-full w-full flex-col items-center justify-center gap-5 px-6 text-center"
-      style={{ color: theme.textPrimary }}
+      className="flex flex-col items-center gap-5 rounded-xl px-8 py-6 text-center shadow-xl"
+      style={{
+        color: theme.textPrimary,
+        background: theme.surface,
+        border: `1px solid ${theme.controlBorder}`,
+        backdropFilter: "blur(6px)",
+        WebkitBackdropFilter: "blur(6px)",
+      }}
     >
       <div>
         <div className="text-sm uppercase tracking-widest" style={{ color: theme.textMuted }}>
-          End of page
+          {autoContinue ? "Turning to the next page…" : "End of page"}
         </div>
         <div className="mt-1 text-sm" style={{ color: theme.textMuted }}>
           {wordsSoFar.toLocaleString()} words so far
@@ -797,6 +821,7 @@ function PageEndState({
         />
         Continue automatically to the next page
       </label>
+    </div>
     </div>
   );
 }

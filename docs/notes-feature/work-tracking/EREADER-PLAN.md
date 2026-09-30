@@ -381,3 +381,28 @@ hosts were unreachable from the build sandbox, so every source needs a live smok
 - **Speed Read** has one entry, the content toolbar's ⚡, and it reads the visible
   page. Chromium check: the page text ends exactly at the page break, and `next()`
   continues from there.
+
+### Added 2026-09-30 (third review round)
+
+- **The reader's header row is back, as a secondary toolbar.** It holds the contents,
+  title/author, status, details, notes, display and bookmark controls. The rule, now in
+  CLAUDE.md: secondary toolbars are fine for content-specific affordances that can't
+  be generalized; generalizable ones (full screen, speed read) stay in the content
+  toolbar. The view buttons are shortcuts into the right sidebar. The short-lived
+  content-toolbar contribution slot was removed.
+- **The Book tab's views are an icon rail** (notes with a count badge, contents,
+  display, about), styled like the sidebar's own tab rail.
+- **Speed reader page end:**
+  - The dialog turns see-through, so the book page shows behind a floating card.
+  - Auto-continue now also passes through that card, for about 1.8 s. The checkbox
+    stays reachable to switch it back off.
+- **Contents**, per the owner:
+  - Clicking it opens the table of contents **on the left of the page**, as it was
+    originally.
+  - Holding it (450 ms) or ⌥/⇧/⌘-clicking it opens Contents in the right sidebar
+    instead.
+  - Contents is also the **first** item of the sidebar's Book rail.
+  - CLAUDE.md records this as an accepted exception to the no-panel-inside-a-panel
+    rule.
+- **Notes filters:** *Highlights only* and *Underlines only* toggles, combinable with
+  a colour filter.

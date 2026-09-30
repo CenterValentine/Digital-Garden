@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { X } from "lucide-react";
+import { Info, List, NotebookPen, Settings2, X, type LucideIcon } from "lucide-react";
 import {
   useReaderPreferences,
   useReaderSession,
@@ -11,11 +11,12 @@ import {
 } from "../state/reader-store";
 import { AnnotationsPanel } from "./AnnotationsPanel";
 
-const VIEWS: Array<{ id: ReaderSidebarView; label: string }> = [
-  { id: "notes", label: "Notes" },
-  { id: "contents", label: "Contents" },
-  { id: "settings", label: "Display" },
-  { id: "about", label: "About" },
+/** Icon rail, styled like the sidebar's own tab rail above it. */
+const VIEWS: Array<{ id: ReaderSidebarView; label: string; icon: LucideIcon }> = [
+  { id: "contents", label: "Contents", icon: List },
+  { id: "notes", label: "Highlights & notes", icon: NotebookPen },
+  { id: "settings", label: "Display settings", icon: Settings2 },
+  { id: "about", label: "About this book", icon: Info },
 ];
 
 /**
@@ -43,23 +44,29 @@ export function ReaderBookSidebar({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="flex gap-0.5 border-b border-black/10 p-1.5 dark:border-white/10" role="tablist">
-        {VIEWS.map(({ id, label }) => (
+      <div className="flex items-stretch border-b border-black/10 dark:border-white/10" role="tablist">
+        {VIEWS.map(({ id, label, icon: Icon }) => (
           <button
             key={id}
             type="button"
             role="tab"
             aria-selected={view === id}
+            aria-label={label}
+            title={label}
             disabled={id === "about" && !about}
             onClick={() => setView(contentId, id)}
-            className={`flex-1 truncate rounded px-1.5 py-1 text-xs font-medium disabled:opacity-40 ${
+            className={`relative flex flex-1 items-center justify-center py-2 transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
               view === id
-                ? "bg-black/10 text-foreground dark:bg-white/10"
-                : "text-muted-foreground hover:text-foreground"
+                ? "border-b-2 border-gold-primary text-gold-primary"
+                : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
             }`}
           >
-            {label}
-            {id === "notes" && book.annotations.length ? ` (${book.annotations.length})` : ""}
+            <Icon className="h-4 w-4" />
+            {id === "notes" && book.annotations.length > 0 && (
+              <span className="absolute right-[calc(50%-18px)] top-1 rounded-full bg-primary px-1 text-[9px] leading-tight text-primary-foreground">
+                {book.annotations.length}
+              </span>
+            )}
           </button>
         ))}
         {onClose && (
@@ -67,7 +74,7 @@ export function ReaderBookSidebar({
             type="button"
             aria-label="Close"
             onClick={onClose}
-            className="rounded p-1 text-muted-foreground hover:bg-black/5 hover:text-foreground dark:hover:bg-white/10"
+            className="px-2 text-muted-foreground hover:text-foreground"
           >
             <X className="h-3.5 w-3.5" />
           </button>
@@ -93,7 +100,8 @@ export function ReaderBookSidebar({
   );
 }
 
-function ContentsView({ book }: { book: ReaderOpenBook }) {
+/** The book's table of contents (sidebar view, and the reader's left panel). */
+export function ContentsView({ book, onNavigate }: { book: ReaderOpenBook; onNavigate?: () => void }) {
   if (!book.toc.length) {
     return <p className="p-3 text-xs text-muted-foreground">This book has no table of contents.</p>;
   }
@@ -103,7 +111,10 @@ function ContentsView({ book }: { book: ReaderOpenBook }) {
         <li key={`${item.href}-${item.label}`}>
           <button
             type="button"
-            onClick={() => book.goToHref(item.href)}
+            onClick={() => {
+              book.goToHref(item.href);
+              onNavigate?.();
+            }}
             className={`w-full truncate rounded px-2 py-1 text-left text-xs hover:bg-black/5 dark:hover:bg-white/5 ${
               item.label === book.currentLabel ? "font-semibold text-primary" : ""
             }`}
