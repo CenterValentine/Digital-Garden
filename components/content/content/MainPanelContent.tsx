@@ -592,6 +592,7 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
       setContentCustomIcon(null);
       setContentIconColor(null);
       setContentType("person-profile");
+      setContentTypeFor(selectedContentId);
       setOwnedByNote(null);
       return;
     }
@@ -607,6 +608,7 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
       setContentCustomIcon(null);
       setContentIconColor(null);
       setContentType("dm-thread");
+      setContentTypeFor(selectedContentId);
       setOwnedByNote(null);
       return;
     }
@@ -639,6 +641,7 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
       setNoteContent(null);
       setNoteTitle("");
       setContentType(null);
+      setContentTypeFor(selectedContentId);
       setContentData(null);
       setOwnedByNote(null);
       return;
@@ -689,6 +692,7 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
           setContentParentId(null);
           setContentIsPublished(false);
           setContentType("page-template");
+          setContentTypeFor(selectedContentId);
           setContentCustomIcon(result.customIcon ?? null);
           setContentIconColor(result.iconColor ?? null);
           setOwnedByNote(null);
@@ -2462,6 +2466,14 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
   // paragraph blocks) rather than a bare "Loading…" so the structure reads as
   // arriving. Shares the same skeleton as the page-level Suspense fallback.
   if (isLoading) {
+    return <EditorSkeleton />;
+  }
+
+  // The type/data state still describes the PREVIOUS item (the first render
+  // after a switch runs before the load effect): no viewer may draw the new
+  // id with it — a link viewer auto-fetched the old URL's preview under the
+  // new id, the book reader opened a session. Errors still show.
+  if (!error && contentTypeFor !== selectedContentId) {
     return <EditorSkeleton />;
   }
 

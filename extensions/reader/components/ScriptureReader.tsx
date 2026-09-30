@@ -15,6 +15,7 @@ import {
   Bookmark,
   ChevronLeft,
   ChevronRight,
+  Home,
   ExternalLink,
   List,
   Loader2,
@@ -487,7 +488,9 @@ export function ScriptureReader({
         : undefined;
   useEffect(() => {
     if (phase !== "ready" || !locationAnchor) return;
-    useNavigationHistoryStore.getState().recordLocation(contentId, paneId, locationAnchor, locationLabel);
+    useNavigationHistoryStore
+      .getState()
+      .recordLocation(contentId, paneId, locationAnchor, locationLabel);
   }, [contentId, locationAnchor, locationLabel, paneId, phase]);
 
   // ── Selection → marks ───────────────────────────────────────────────────
@@ -897,111 +900,136 @@ export function ScriptureReader({
       className="flex h-full min-h-0 flex-col outline-none"
     >
       {/* Secondary toolbar: scripture-specific affordances (full screen and
-          speed read are the content toolbar's). */}
-      <div className="flex items-center gap-1 border-b border-black/10 px-3 py-1.5 dark:border-white/10">
-        <button
-          type="button"
-          title="Contents — hold (or ⌥/⇧/⌘-click) to open in the right sidebar"
-          aria-pressed={aside === "contents"}
-          onPointerDown={startContentsHold}
-          onPointerUp={cancelContentsHold}
-          onPointerLeave={cancelContentsHold}
-          onClick={(event) => {
-            if (contentsHeldRef.current) {
-              contentsHeldRef.current = false;
-              return;
-            }
-            if (
-              event.altKey ||
-              event.shiftKey ||
-              event.metaKey ||
-              event.ctrlKey
-            ) {
-              openSideView("contents");
-              return;
-            }
-            setOpenBookSlug(book?.slug ?? null);
-            setAside((current) => (current === "contents" ? null : "contents"));
-          }}
-          className={`${iconButton} ${aside === "contents" ? "bg-black/10 dark:bg-white/10" : ""}`}
-        >
-          <List className="h-4 w-4" />
-        </button>
-        <div className="min-w-0 flex-1 px-1">
-          <div className="truncate font-serif text-base font-semibold leading-tight">
-            {title}
-          </div>
-          {headerPath.length > 0 && (
-            <div className="mt-0.5 truncate">
-              <ScriptureCrumbs items={headerPath} compact />
+          speed read are the content toolbar's). The path back up gets its own
+          line under it, so it never competes with the search box. */}
+      <div className="border-b border-black/10 dark:border-white/10">
+        <div className="flex items-center gap-1 px-3 py-1.5">
+          <button
+            type="button"
+            title="Contents — hold (or ⌥/⇧/⌘-click) to open in the right sidebar"
+            aria-pressed={aside === "contents"}
+            onPointerDown={startContentsHold}
+            onPointerUp={cancelContentsHold}
+            onPointerLeave={cancelContentsHold}
+            onClick={(event) => {
+              if (contentsHeldRef.current) {
+                contentsHeldRef.current = false;
+                return;
+              }
+              if (
+                event.altKey ||
+                event.shiftKey ||
+                event.metaKey ||
+                event.ctrlKey
+              ) {
+                openSideView("contents");
+                return;
+              }
+              setOpenBookSlug(book?.slug ?? null);
+              setAside((current) =>
+                current === "contents" ? null : "contents",
+              );
+            }}
+            className={`${iconButton} ${aside === "contents" ? "bg-black/10 dark:bg-white/10" : ""}`}
+          >
+            <List className="h-4 w-4" />
+          </button>
+          <div className="min-w-0 flex-1 px-1">
+            <div className="truncate font-serif text-base font-semibold leading-tight">
+              {title}
             </div>
+          </div>
+          <form
+            onSubmit={(event) => void submitQuery(event)}
+            className="relative hidden sm:block"
+          >
+            <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Alma 32:21 or a phrase"
+              aria-label="Go to a reference or search"
+              className="h-7 w-52 rounded border border-black/10 bg-transparent pl-7 pr-2 text-xs dark:border-white/10"
+            />
+          </form>
+          {/* Phones: the search box lives in the search panel. */}
+          <button
+            type="button"
+            title="Go to a reference or search"
+            aria-pressed={aside === "search"}
+            onClick={() =>
+              setAside((current) => (current === "search" ? null : "search"))
+            }
+            className={`${iconButton} sm:hidden`}
+          >
+            <Search className="h-4 w-4" />
+          </button>
+          {corpusId === LDS_CORPUS_ID && chapter && !browse && (
+            <a
+              href={gospelLibraryUrl(chapter.book.slug, chapter.chapter)}
+              target="_blank"
+              rel="noreferrer"
+              title="Open this chapter in Gospel Library (footnotes, chapter headings)"
+              className={iconButton}
+            >
+              <ExternalLink className="h-4 w-4" />
+            </a>
           )}
-        </div>
-        <form
-          onSubmit={(event) => void submitQuery(event)}
-          className="relative hidden sm:block"
-        >
-          <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Alma 32:21 or a phrase"
-            aria-label="Go to a reference or search"
-            className="h-7 w-52 rounded border border-black/10 bg-transparent pl-7 pr-2 text-xs dark:border-white/10"
-          />
-        </form>
-        {/* Phones: the search box lives in the search panel. */}
-        <button
-          type="button"
-          title="Go to a reference or search"
-          aria-pressed={aside === "search"}
-          onClick={() =>
-            setAside((current) => (current === "search" ? null : "search"))
-          }
-          className={`${iconButton} sm:hidden`}
-        >
-          <Search className="h-4 w-4" />
-        </button>
-        {corpusId === LDS_CORPUS_ID && chapter && !browse && (
-          <a
-            href={gospelLibraryUrl(chapter.book.slug, chapter.chapter)}
-            target="_blank"
-            rel="noreferrer"
-            title="Open this chapter in Gospel Library (footnotes, chapter headings)"
+          <button
+            type="button"
+            title="Highlights & notes"
+            onClick={() => openSideView("notes")}
+            className={`relative ${iconButton}`}
+          >
+            <NotebookPen className="h-4 w-4" />
+            {annotations.length > 0 && (
+              <span className="absolute -right-0.5 -top-0.5 rounded-full bg-primary px-1 text-[9px] leading-tight text-primary-foreground">
+                {annotations.length}
+              </span>
+            )}
+          </button>
+          <button
+            type="button"
+            title="Display settings"
+            onClick={() => openSideView("settings")}
             className={iconButton}
           >
-            <ExternalLink className="h-4 w-4" />
-          </a>
+            <Settings2 className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            title="Bookmark this chapter"
+            onClick={() => void addBookmark()}
+            className={iconButton}
+          >
+            <Bookmark className="h-4 w-4" />
+          </button>
+        </div>
+        {browse?.level !== "home" && contents && (
+          <div className="flex min-w-0 items-center gap-1.5 overflow-hidden px-3 pb-1.5 pl-[2.9rem]">
+            {/* The collection itself is implied: home is an icon, the path starts at the volume. */}
+            <button
+              type="button"
+              title={`All of ${contents.corpus.title}`}
+              aria-label={`All of ${contents.corpus.title}`}
+              onClick={() => showBrowse({ level: "home" })}
+              className="shrink-0 rounded p-0.5 text-muted-foreground hover:bg-black/5 hover:text-foreground dark:hover:bg-white/10"
+            >
+              <Home className="h-3.5 w-3.5" />
+            </button>
+            {headerPath.length > 0 && (
+              <>
+                <ChevronRight
+                  className="h-3 w-3 shrink-0 text-muted-foreground opacity-60"
+                  aria-hidden
+                />
+                <div className="min-w-0 truncate">
+                  <ScriptureCrumbs items={headerPath} compact />
+                </div>
+              </>
+            )}
+          </div>
         )}
-        <button
-          type="button"
-          title="Highlights & notes"
-          onClick={() => openSideView("notes")}
-          className={`relative ${iconButton}`}
-        >
-          <NotebookPen className="h-4 w-4" />
-          {annotations.length > 0 && (
-            <span className="absolute -right-0.5 -top-0.5 rounded-full bg-primary px-1 text-[9px] leading-tight text-primary-foreground">
-              {annotations.length}
-            </span>
-          )}
-        </button>
-        <button
-          type="button"
-          title="Display settings"
-          onClick={() => openSideView("settings")}
-          className={iconButton}
-        >
-          <Settings2 className="h-4 w-4" />
-        </button>
-        <button
-          type="button"
-          title="Bookmark this chapter"
-          onClick={() => void addBookmark()}
-          className={iconButton}
-        >
-          <Bookmark className="h-4 w-4" />
-        </button>
       </div>
 
       <div className="relative flex min-h-0 flex-1">
@@ -1419,32 +1447,28 @@ function pathTo(
   go: (level: ScriptureBrowseLevel) => void,
 ): ScriptureCrumb[] {
   if (!contents) return [];
-  const home: ScriptureCrumb = {
-    label: contents.corpus.title,
-    onClick: () => go({ level: "home" }),
-  };
   const books = contents.volumes.flatMap((volume) => volume.books);
   const volumeCrumb = (book: ScriptureBookInfo): ScriptureCrumb => ({
     label: book.volumeTitle,
     onClick: () => go({ level: "volume", volume: book.volume }),
   });
-  if (browse?.level === "home") return [];
-  if (browse?.level === "volume") return [home];
+  // The collection is implied (home icon); the path starts at the volume.
+  if (!browse && readingBook) {
+    return readingBook.chapterCount > 1
+      ? [
+          volumeCrumb(readingBook),
+          {
+            label: readingBook.name,
+            onClick: () => go({ level: "book", bookSlug: readingBook.slug }),
+          },
+        ]
+      : [volumeCrumb(readingBook)];
+  }
   if (browse?.level === "book") {
     const book = books.find((entry) => entry.slug === browse.bookSlug);
-    return book ? [home, volumeCrumb(book)] : [home];
+    return book ? [volumeCrumb(book)] : [];
   }
-  if (!readingBook) return [home];
-  return readingBook.chapterCount > 1
-    ? [
-        home,
-        volumeCrumb(readingBook),
-        {
-          label: readingBook.name,
-          onClick: () => go({ level: "book", bookSlug: readingBook.slug }),
-        },
-      ]
-    : [home, volumeCrumb(readingBook)];
+  return [];
 }
 
 /** Anchor kind for the reader's browse views in the Back/Forward history. */
@@ -1452,11 +1476,14 @@ const VIEW_ANCHOR_KIND = "scripture-view";
 
 function browseAnchor(level: ScriptureBrowseLevel): string {
   if (level.level === "home") return `${VIEW_ANCHOR_KIND}:home`;
-  if (level.level === "volume") return `${VIEW_ANCHOR_KIND}:volume/${level.volume}`;
+  if (level.level === "volume")
+    return `${VIEW_ANCHOR_KIND}:volume/${level.volume}`;
   return `${VIEW_ANCHOR_KIND}:book/${level.bookSlug}`;
 }
 
-function browseLevelFromAnchor(anchor: LinkAnchor): ScriptureBrowseLevel | null {
+function browseLevelFromAnchor(
+  anchor: LinkAnchor,
+): ScriptureBrowseLevel | null {
   if (anchor.kind !== VIEW_ANCHOR_KIND) return null;
   if (anchor.id === "home") return { level: "home" };
   const [kind, slug] = anchor.id.split("/");
