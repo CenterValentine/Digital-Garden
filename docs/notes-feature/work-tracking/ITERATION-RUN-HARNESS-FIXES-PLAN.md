@@ -289,6 +289,40 @@ The visual review is the owner's handoff, not a gap.
 - Matrix regenerated; the generator now probes Anthropic breakpoints.
 - Six mutations caught.
 
+### Round 4 (2026-09-30, prod `36237eb8` → branch `feat/search-choice-and-tail-check`)
+
+**Run (after #272):** gpt-6-sol, LeanData, one turn, $0.61 on the corrected meter (about $0.53 on the old one).
+- **Cache fixed:** 85% of input served from cache, up from 58%. Cached tokens climb every step (22.7k → 52.6k).
+- **Budget line:** carried on 11 tool results.
+- **DOCX links:** real hyperlinks, shown in the stored text as `label [→ url]`.
+- **The 6-minute approval wait stayed warm.** That's gpt-6's 30-minute lifetime, so no volley was needed.
+- **Web search is now the largest thing we can still control:** 12 calls, $0.12, 20% of the bill.
+- **Leftovers:**
+  - The model still said it "could not … test its text extraction". The charter doesn't say so yet, and the tail refused `read_content`.
+  - `insert_rows` refused a dedupe key without naming the columns (one guessed retry).
+  - One request started at the first-message prefix (22.7k) rather than about 39k. Requests 1 and 3 matched, so it's an isolated miss.
+
+**Built:**
+- **`read_content` is a tail tool** (`TAIL_VERIFY`): checking a deliverable is part of producing it. The in-tail notice now names it.
+- **A dedupe-key miss names the columns** and says nothing was inserted.
+- **Per-chat web-search choice** (owner decision D8 → default stays the model's own search). "Chat controls" gains a "Web search" row: *OpenAI* (or Claude, Google, Grok) versus *your search service*.
+  - It shows only when the chat's model has its own search (`nativeSearchLabel`).
+  - The service option is disabled, with a hint, when the user has no search connection.
+  - Stored per chat (`use-chat-search-backend.ts`, conversation key then content key) and carried on every request body.
+  - The route honours `searchBackend: "app"` only when a connection exists, and attaches the app-run tool under the same `search_web` name, so it is repeat-guarded, refusable in the tail, and priced by that service.
+- **The Chat controls panel opens at its button.** Placement assumed the 420px maximum height, so the panel opened about 200px above its trigger. It now uses `anchorMenuAbove`: bottom edge pinned above the trigger, growing upward.
+
+**The prompt-prefix diagnostic (owner question): keep the code, turn the variable off.** With `AI_PROMPT_PREFIX_DIAG` unset it costs one env read per step. It is the only tool that sees the request OpenAI actually receives, and it found this arc's two causes. The standard alternative is AI SDK telemetry (`experimental_telemetry`, OpenTelemetry spans). That records whole prompts per call, but it doesn't compute where two prompts diverge, and it adds tracing infrastructure and prompt-privacy exposure. The better upgrade is a per-conversation owner toggle that writes the divergence summary into the turn's own metadata, so a run is diagnosable from the database instead of a Vercel log export. It's backlogged, not built.
+
+**OpenAI's cheaper search (owner question):** the pricing page (2026-09-30) lists three options.
+- The `web_search` tool: $10 / 1k calls, with retrieved content billed as input at the model's rate. That's what we use.
+- Web search preview on non-reasoning models: $25 / 1k calls, content free.
+- A dedicated `gpt-5-search-api` model: $1.25 / $0.125 / $10 per 1M, with no per-call fee listed.
+
+For gpt-6-sol, every search's retrieved content is billed at $2–2.50 / 1M and then re-read, cached, on every later step. Handing search to a cheaper model that returns a short summary could cost less in total. That's a delegation design, untested; backlogged.
+
+**Gates:** `run-harness:check` round 4 (`read_content` in both tail shapes; search label only for native-search models; route honours the preference only with a connection, before the native branch; `searchBackend` on all 8 body and dependency sites). `proposal:shape:check` tail-notice fixture updated. Four mutations caught.
+
 ### L2 — keep the tool list constant for the turn
 
 Adding or removing a tool rewrites everything after the tool definitions, so every mid-turn change is a full cache flush. Today it costs 5–9¢ a time; after L1 it costs the whole prompt.

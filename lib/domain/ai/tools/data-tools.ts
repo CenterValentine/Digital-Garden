@@ -1344,7 +1344,9 @@ export function createDataTools(ctx: ToolExecuteContext) {
           if (input.dedupeBy) {
             dedupeColumn = findColumn(live, input.dedupeBy);
             if (!dedupeColumn) {
-              return `No column named "${input.dedupeBy}" to dedupe by.`;
+              // Name the choices (prod 36237eb8: a bare refusal cost a
+              // guessed retry — "Name" was "Gap Name"). Nothing inserted.
+              return `Nothing inserted — no column named "${input.dedupeBy}" to dedupe by. Columns here: ${live.map((c) => c.name).join(", ")}.`;
             }
             const existing = await prisma.dataRow.findMany({
               where: { tableId: databaseId, deletedAt: null },

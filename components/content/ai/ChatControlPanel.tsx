@@ -23,15 +23,17 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Feather, SlidersHorizontal, X } from "lucide-react";
-import {
-  calculateMenuPosition,
-  type CalculatedPosition,
-} from "@/lib/core/menu-positioning";
+import { anchorMenuAbove } from "@/lib/core/menu-positioning";
 import { TargetFolderChip } from "./TargetFolderChip";
 import { OutputTargetChip } from "./OutputTargetChip";
 import { ModelPinToggle } from "./ModelPinToggle";
 import { ChatContextPicker } from "./ChatContextPicker";
 import type { OutputTarget } from "@/lib/domain/ai/output-target";
+import {
+  loadSearchServiceName,
+  nativeSearchLabel,
+  type SearchBackendPreference,
+} from "@/lib/domain/ai/use-chat-search-backend";
 
 const PANEL_WIDTH = 340;
 const PANEL_MAX_HEIGHT = 420;
@@ -52,6 +54,11 @@ interface ChatControlPanelProps {
   activeContextId: string | null;
   onContextChange: (next: string | null) => void;
   busy?: boolean;
+  /** The chat's provider/model — the web-search row shows only when it has its own search. */
+  providerId?: string | null;
+  modelId?: string | null;
+  searchBackend?: SearchBackendPreference;
+  onSearchBackendChange?: (next: SearchBackendPreference) => void;
 }
 
 function PanelRow({
@@ -93,9 +100,30 @@ export function ChatControlPanel({
   activeContextId,
   onContextChange,
   busy = false,
+  providerId = null,
+  modelId = null,
+  searchBackend = "native",
+  onSearchBackendChange,
 }: ChatControlPanelProps) {
   const [open, setOpen] = useState(false);
-  const [position, setPosition] = useState<CalculatedPosition | null>(null);
+  const [position, setPosition] = useState<{
+    left: number;
+    bottom: number;
+    maxHeight: number;
+  } | null>(null);
+  const nativeLabel = nativeSearchLabel(providerId, modelId);
+  // undefined = not loaded yet; null = the user has no search connection.
+  const [searchService, setSearchService] = useState<string | null | undefined>(undefined);
+  useEffect(() => {
+    if (!open || !nativeLabel || searchService !== undefined) return;
+    let live = true;
+    void loadSearchServiceName().then((name) => {
+      if (live) setSearchService(name);
+    });
+    return () => {
+      live = false;
+    };
+  }, [open, nativeLabel, searchService]);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
   const [portalReady, setPortalReady] = useState(false);
@@ -108,17 +136,13 @@ export function ChatControlPanel({
   const toggle = useCallback(() => {
     setOpen((current) => {
       if (current) return false;
+      // Pinned by its BOTTOM edge just above the trigger and grown upward
+      // (owner, 2026-09-30: the panel opened ~200px above its button —
+      // placement assumed the 420px maximum height, and the real panel is
+      // about half that). No height guess, no gap.
       const rect = triggerRef.current?.getBoundingClientRect();
       if (rect) {
-        setPosition(
-          calculateMenuPosition({
-            triggerPosition: { x: rect.left, y: rect.top - 6 },
-            menuDimensions: { width: PANEL_WIDTH, height: PANEL_MAX_HEIGHT },
-            viewportPadding: 8,
-            preferredPlacementX: "right",
-            preferredPlacementY: "top",
-          }),
-        );
+        setPosition(anchorMenuAbove(rect, PANEL_WIDTH, { gap: 6 }));
       }
       return true;
     });
@@ -197,10 +221,10 @@ export function ChatControlPanel({
             style={{
               position: "fixed",
               zIndex: 130,
-              top: position.y,
-              left: position.x,
+              bottom: position.bottom,
+              left: position.left,
               width: PANEL_WIDTH,
-              maxHeight: PANEL_MAX_HEIGHT,
+              maxHeight: Math.min(PANEL_MAX_HEIGHT, position.maxHeight),
             }}
             className="flex flex-col overflow-hidden rounded-xl border border-black/10 bg-white shadow-2xl dark:border-white/10 dark:bg-[#1c1c1e]"
           >
@@ -266,10 +290,62 @@ export function ChatControlPanel({
                   disabled={busy}
                 />
               </PanelRow>
+              {nativeLabel && onSearchBackendChange ? (
+                <PanelRow
+                  label="Web search"
+                  hint={
+                    searchService === null
+                      ? `${nativeLabel}'s own search. Add a search connection in Settings to route this chat's searches through it instead.`
+                      : `${nativeLabel}: the model's own search (integrated citations). Search service: your connection — duplicate searches are caught and a budget can apply.`
+                  }
+                >
+                  <div
+                    role="radiogroup"
+                    aria-label="Web search"
+                    className="inline-flex overflow-hidden rounded-md border border-black/10 text-[11px] dark:border-white/10"
+                  >
+                    {(
+                      [
+                        { value: "native", label: nativeLabel, disabled: false },
+                        {
+                          value: "app",
+                          label: searchService ? capitalize(searchService) : "Search service",
+                          disabled: searchService === null,
+                        },
+                      ] as const
+                    ).map((option) => {
+                      const selected =
+                        searchBackend === option.value ||
+                        (option.value === "native" && searchService === null);
+                      return (
+                        <button
+                          key={option.value}
+                          type="button"
+                          role="radio"
+                          aria-checked={selected}
+                          disabled={option.disabled}
+                          onClick={() => onSearchBackendChange(option.value)}
+                          className={
+                            selected
+                              ? "px-2 py-1 font-medium bg-black/[0.07] text-gray-900 dark:bg-white/15 dark:text-gray-50"
+                              : "px-2 py-1 text-gray-500 hover:bg-black/[0.04] disabled:cursor-not-allowed disabled:opacity-40 dark:text-gray-400 dark:hover:bg-white/5"
+                          }
+                        >
+                          {option.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </PanelRow>
+              ) : null}
             </div>
           </div>,
           document.body,
         )}
     </>
   );
+}
+
+function capitalize(word: string): string {
+  return word ? word[0].toUpperCase() + word.slice(1) : word;
 }

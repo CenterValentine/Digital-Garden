@@ -352,10 +352,21 @@ export function reservedTailTools(
     ...new Set([
       ...deliverables,
       ...(record ? TAIL_ALWAYS : ["summon"]),
+      ...TAIL_VERIFY,
       ...(options.extra ?? []),
     ]),
   ];
 }
+
+/**
+ * Checking a deliverable is part of producing it: `read_content` on a
+ * document just written returns its text as read from the file, which is how
+ * the model verifies a resume the way a parser will read it. The deliverable
+ * is written inside the tail, so the check must be callable there — before
+ * this the tail refused it (plan §10 round 4, prod 36237eb8: "I could not …
+ * test its text extraction").
+ */
+export const TAIL_VERIFY = ["read_content"] as const;
 
 /** How many of the turn's last steps are held for the tail: deliverables + record + close. */
 export function reservedTailSize(deliverables: readonly string[]): number {

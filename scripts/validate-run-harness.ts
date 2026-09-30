@@ -320,9 +320,13 @@ import {
 import { summarizeRejections, unknownOptionError } from "../lib/domain/data/cells";
 import {
   CHARTER_TURN_TOOLS,
+  reservedTailTools,
   tailRefusalNotice,
   withBudgetNotice,
 } from "../lib/domain/ai/tools/iteration-proposal";
+import { nativeSearchLabel } from "../lib/domain/ai/use-chat-search-backend";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import {
   cacheLifetimeMinutes,
   cacheVolleyDelayMs,
@@ -502,6 +506,25 @@ import JSZip from "jszip";
     webSearchCallUsd("gpt-4.1", "openai") === 0.025 && webSearchCallUsd("gpt-6-sol", "openai") === 0.01 && webSearchCallUsd("claude-opus-5-5", "anthropic") === 0,
     "§10 L4a: per-call fee — OpenAI reasoning $0.01, other OpenAI $0.025, unverified vendors 0",
   );
+}
+
+{
+  // §10 round 4 — the model can check what it wrote inside the tail; the
+  // web-search preference applies only to models with their own search, and
+  // travels on every request body.
+  assert(reservedTailTools(["create_docx"]).includes("read_content"), "round 4: read_content is a tail tool (check the document just written)");
+  assert(reservedTailTools(["create_docx"], { record: false, extra: ["phase_checkpoint"] }).includes("read_content"), "round 4: charter-turn tails keep read_content too");
+  assert(nativeSearchLabel("openai", "gpt-6-sol") === "OpenAI" && nativeSearchLabel("vercel-gateway", "anthropic/claude-sonnet-5") === "Claude", "round 4: models with their own search are named");
+  assert(nativeSearchLabel("deepseek", "deepseek-chat") === null && nativeSearchLabel(null, null) === null, "round 4: no own search → no web-search control");
+  const routeSrc4 = readFileSync(path.join(process.cwd(), "app/api/ai/chat/route.ts"), "utf8");
+  assert(
+    /body\.searchBackend === "app" &&\s*!!nativeSearch &&\s*searchEnabled &&\s*\(await userHasSearchConnection\(session\.user\.id\)\)/.test(routeSrc4) &&
+      routeSrc4.indexOf("if (preferAppSearch)") < routeSrc4.indexOf("} else if (nativeSearch && searchEnabled)"),
+    "round 4: the route honours the app-search preference only with a connection, before the native branch",
+  );
+  const engineSrc4 = readFileSync(path.join(process.cwd(), "lib/domain/ai/use-conversation-engine.ts"), "utf8");
+  const bodies = (engineSrc4.match(/modelPinned,\n\s*searchBackend,/g) ?? []).length;
+  assert(bodies >= 8, `round 4: searchBackend rides every per-call body and its dependency list beside modelPinned (found ${bodies} of 8)`);
 }
 
 {

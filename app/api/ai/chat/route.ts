@@ -1668,7 +1668,20 @@ export async function POST(request: Request) {
       // Native search attaches AFTER the run narrowing above, so it must be
       // advertised explicitly — otherwise it would sit in `tools` unannounced
       // and the model would never know it could search.
-      if (nativeSearch && searchEnabled) {
+      // Per-chat preference (owner, 2026-09-30): the model's own search by
+      // default; "app" routes through the user's search connection even when
+      // the model has its own — repeat-guarded, refusable in the reserved
+      // tail, priced by that service. Honoured only when a connection exists.
+      const preferAppSearch =
+        body.searchBackend === "app" &&
+        !!nativeSearch &&
+        searchEnabled &&
+        (await userHasSearchConnection(session.user.id));
+      if (preferAppSearch) {
+        (tools as Record<string, unknown>)["search_web"] =
+          createAppWebSearchTool(session.user.id);
+        advertised.add("search_web");
+      } else if (nativeSearch && searchEnabled) {
         // Big-four: provider-native search (integrated, well-cited).
         (tools as Record<string, unknown>)["search_web"] = nativeSearch;
         advertised.add("search_web");
