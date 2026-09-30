@@ -21,6 +21,7 @@
     "note-edit:check": "tsx scripts/validate-note-edit-ops.ts",
     "extensions:check": "tsx scripts/validate-extensions.ts",
     "reader:check": "tsx scripts/validate-reader.ts",
+    "create-target:check": "tsx scripts/validate-create-target.ts",
     "charters:check": "tsx scripts/validate-charter-parser.ts",
     "capture:check": "tsx scripts/validate-capture.ts",
     "output-targets:check": "tsx scripts/validate-output-target.ts",
