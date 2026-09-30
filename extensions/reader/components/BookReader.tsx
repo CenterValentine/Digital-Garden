@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   AlertTriangle,
@@ -10,6 +10,7 @@ import {
   Info,
   List,
   Loader2,
+  Search,
   NotebookPen,
   Settings2,
 } from "lucide-react";
@@ -38,7 +39,12 @@ import { ANNOTATION_ANCHOR_KIND } from "../lib/link-anchors";
 import { ReaderApiError, readerApi } from "../lib/api";
 import { attachSanitizer } from "../lib/sanitize";
 import { resolveTheme, themeTone, THEME_COLORS } from "../lib/theme";
-import { useReaderPreferences, type ReaderTheme } from "../state/reader-store";
+import {
+  useReaderPreferences,
+  type ReaderSearchCapability,
+  type ReaderSearchHit,
+  type ReaderTheme,
+} from "../state/reader-store";
 import {
   HIGHLIGHT_LAYER,
   markPaint,
@@ -83,6 +89,9 @@ const STATUS_OPTIONS: Array<{ value: ReadingStatus | ""; label: string }> = [
   { value: "finished", label: "Finished" },
   { value: "reference", label: "Reference" },
 ];
+
+/** Stop collecting search results here (a common word can match thousands of times). */
+const SEARCH_HIT_LIMIT = 300;
 
 /** Press-and-hold on Contents opens it in the right sidebar. */
 const CONTENTS_HOLD_MS = 450;
@@ -282,7 +291,10 @@ export function BookReader({ contentId }: { contentId: string }) {
 
         // Clicking a highlight shows the notes: in the app's right sidebar,
         // or the reader's own drawer while full screen.
-        view.addEventListener("show-annotation", () => {
+        view.addEventListener("show-annotation", (event) => {
+          // Search-hit markers aren't notes (foliate prefixes their values).
+          const value = (event as CustomEvent<{ value?: string }>).detail?.value ?? "";
+          if (value.startsWith("foliate-search:")) return;
           if (immersiveRef.current) {
             useReaderSession.getState().setSidebarView(contentId, "notes");
             setDrawerOpen(true);
@@ -461,6 +473,51 @@ export function BookReader({ contentId }: { contentId: string }) {
     void viewRef.current?.goTo(href);
   }, []);
 
+  /**
+   * Full-text search for the sidebar's Search view: foliate searches every
+   * section, marking hits on the page; results stream in per chapter.
+   */
+  const search = useMemo<ReaderSearchCapability>(
+    () => ({
+      placeholder: "Search this book",
+      run: (query, onHits) => {
+        let cancelled = false;
+        const view = viewRef.current;
+        if (!view) {
+          onHits([], true, "The book is still opening.");
+          return () => undefined;
+        }
+        void (async () => {
+          const hits: ReaderSearchHit[] = [];
+          try {
+            for await (const result of view.search({ query })) {
+              if (cancelled) return;
+              if (result === "done") break;
+              if (!("subitems" in result)) continue;
+              for (const item of result.subitems) {
+                if (hits.length >= SEARCH_HIT_LIMIT) break;
+                hits.push({ id: item.cfi, label: result.label || "Match", excerpt: item.excerpt });
+              }
+              onHits([...hits], false);
+              if (hits.length >= SEARCH_HIT_LIMIT) break;
+            }
+            if (!cancelled) {
+              onHits(hits, true, hits.length >= SEARCH_HIT_LIMIT ? `First ${SEARCH_HIT_LIMIT} matches` : undefined);
+            }
+          } catch {
+            if (!cancelled) onHits(hits, true, "Search failed in this book.");
+          }
+        })();
+        return () => {
+          cancelled = true;
+        };
+      },
+      go: (hit) => void viewRef.current?.goTo(hit.id),
+      clear: () => viewRef.current?.clearSearch(),
+    }),
+    []
+  );
+
   // The right sidebar's Book tab shows this book's notes, contents and
   // display settings — the reader keeps no side panels of its own.
   useEffect(() => {
@@ -473,8 +530,9 @@ export function BookReader({ contentId }: { contentId: string }) {
       toc,
       currentLabel: location.label,
       goToHref,
+      search,
     });
-  }, [annotations, contentId, goToAnnotation, goToHref, location.label, markSent, removeAnnotation, toc, updateAnnotation]);
+  }, [annotations, contentId, goToAnnotation, goToHref, location.label, markSent, removeAnnotation, search, toc, updateAnnotation]);
   useEffect(() => () => useReaderSession.getState().setOpenBook(contentId, null), [contentId]);
 
   /**
@@ -639,6 +697,9 @@ export function BookReader({ contentId }: { contentId: string }) {
         )}
         <button type="button" title="About this book" onClick={() => openSideView("about")} className={iconButton}>
           <Info className="h-4 w-4" />
+        </button>
+        <button type="button" title="Search this book" onClick={() => openSideView("search")} className={iconButton}>
+          <Search className="h-4 w-4" />
         </button>
         <button
           type="button"

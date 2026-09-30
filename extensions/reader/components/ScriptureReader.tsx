@@ -7,7 +7,6 @@ import {
   useMemo,
   useRef,
   useState,
-  type FormEvent,
 } from "react";
 import { toast } from "sonner";
 import {
@@ -38,7 +37,6 @@ import {
   type ScriptureChapterDto,
   type ScriptureContents,
   type ScriptureRef,
-  type ScriptureSearchResult,
 } from "@/lib/domain/scripture/types";
 import {
   buildBookIndex,
@@ -68,6 +66,8 @@ import { resolveTheme, themeTone, THEME_COLORS } from "../lib/theme";
 import {
   useReaderPreferences,
   useReaderSession,
+  type ReaderSearchCapability,
+  type ReaderSearchHit,
   type ReaderSidebarView,
   type ReaderTocItem,
 } from "../state/reader-store";
@@ -110,6 +110,28 @@ function shortName(
 
 function chapterText(chapter: ScriptureChapterDto): string {
   return chapter.verses.map((verse) => verse.text).join(" ");
+}
+
+/** A search excerpt around the first case-insensitive occurrence of the query. */
+function excerptAround(
+  text: string,
+  query: string,
+): { pre: string; match: string; post: string } {
+  const at = text.toLowerCase().indexOf(query.trim().toLowerCase());
+  if (at < 0)
+    return {
+      pre: "",
+      match: "",
+      post: text.length > 160 ? `${text.slice(0, 159)}…` : text,
+    };
+  const end = at + query.trim().length;
+  const pre = text.slice(Math.max(0, at - 60), at);
+  const post = text.slice(end, end + 90);
+  return {
+    pre: `${at > 60 ? "…" : ""}${pre}`,
+    match: text.slice(at, end),
+    post: `${post}${end + 90 < text.length ? "…" : ""}`,
+  };
 }
 
 /** Keep the selection popover (≤ 18rem wide, centered on x) inside the page. */
@@ -215,11 +237,8 @@ export function ScriptureReader({
     start: number;
     end: number;
   } | null>(null);
-  const [aside, setAside] = useState<"contents" | "search" | null>(null);
+  const [aside, setAside] = useState<"contents" | null>(null);
   const [openBookSlug, setOpenBookSlug] = useState<string | null>(null);
-  const [query, setQuery] = useState("");
-  const [results, setResults] = useState<ScriptureSearchResult | null>(null);
-  const [searching, setSearching] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   // Browsing (volumes → books → chapters) until a chapter opens; null = reading.
   const [browse, setBrowse] = useState<ScriptureBrowseLevel | null>({
@@ -738,6 +757,62 @@ export function ScriptureReader({
     [contents],
   );
 
+  /**
+   * The sidebar's Search view: a typed reference ("Alma 32:21") is offered as
+   * a jump first; phrase matches follow in canonical order.
+   */
+  const search = useMemo<ReaderSearchCapability>(
+    () => ({
+      placeholder: "Alma 32:21 or a phrase",
+      run: (query, onHits) => {
+        let cancelled = false;
+        const ref = parseReference(query, index);
+        const jump: ReaderSearchHit[] =
+          ref && ref.chapter != null
+            ? [
+                {
+                  id: `jump:${formatVerseHref(ref)}`,
+                  label: `Go to ${label(ref)}`,
+                  kind: "jump",
+                },
+              ]
+            : [];
+        onHits(jump, false);
+        scriptureApi
+          .search(corpusId, query)
+          .then((result) => {
+            if (cancelled) return;
+            const hits = result.hits.map<ReaderSearchHit>((hit) => ({
+              id: formatVerseHref({
+                bookSlug: hit.bookSlug,
+                chapter: hit.chapter,
+                verseStart: hit.verse,
+                verseEnd: hit.verse,
+              }),
+              label: hit.reference,
+              excerpt: excerptAround(hit.text, query),
+            }));
+            onHits(
+              [...jump, ...hits],
+              true,
+              result.total > result.hits.length
+                ? `First ${result.hits.length} of ${result.total} verses`
+                : undefined,
+            );
+          })
+          .catch(() => !cancelled && onHits(jump, true, "Search failed."));
+        return () => {
+          cancelled = true;
+        };
+      },
+      go: (hit) => {
+        const ref = parseVerseHref(hit.id.replace(/^jump:/, ""));
+        if (ref) void goToRef(ref);
+      },
+    }),
+    [corpusId, goToRef, index, label],
+  );
+
   useEffect(() => {
     useReaderSession.getState().setOpenBook(contentId, {
       annotations,
@@ -748,6 +823,7 @@ export function ScriptureReader({
       toc,
       currentLabel: chapter?.book.name,
       goToHref,
+      search,
     });
   }, [
     annotations,
@@ -757,6 +833,7 @@ export function ScriptureReader({
     goToHref,
     markSent,
     removeAnnotation,
+    search,
     toc,
     updateAnnotation,
   ]);
@@ -833,31 +910,6 @@ export function ScriptureReader({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [goTo]);
-
-  // ── Go to a reference, or search ───────────────────────────────────────
-  const submitQuery = useCallback(
-    async (event: FormEvent) => {
-      event.preventDefault();
-      const q = query.trim();
-      if (!q) return;
-      const ref = parseReference(q, index);
-      if (ref) {
-        await goToRef(ref);
-        setAside((current) => (current === "search" ? null : current));
-        return;
-      }
-      setAside("search");
-      setSearching(true);
-      try {
-        setResults(await scriptureApi.search(corpusId, q));
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Search failed");
-      } finally {
-        setSearching(false);
-      }
-    },
-    [corpusId, goToRef, index, query],
-  );
 
   // ── Render ─────────────────────────────────────────────────────────────
   const colors = THEME_COLORS[resolveTheme(theme)];
@@ -939,28 +991,11 @@ export function ScriptureReader({
               {title}
             </div>
           </div>
-          <form
-            onSubmit={(event) => void submitQuery(event)}
-            className="relative hidden sm:block"
-          >
-            <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-            <input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Alma 32:21 or a phrase"
-              aria-label="Go to a reference or search"
-              className="h-7 w-52 rounded border border-black/10 bg-transparent pl-7 pr-2 text-xs dark:border-white/10"
-            />
-          </form>
-          {/* Phones: the search box lives in the search panel. */}
           <button
             type="button"
-            title="Go to a reference or search"
-            aria-pressed={aside === "search"}
-            onClick={() =>
-              setAside((current) => (current === "search" ? null : "search"))
-            }
-            className={`${iconButton} sm:hidden`}
+            title="Search — a reference (Alma 32:21) or a phrase"
+            onClick={() => openSideView("search")}
+            className={iconButton}
           >
             <Search className="h-4 w-4" />
           </button>
@@ -1033,12 +1068,12 @@ export function ScriptureReader({
       </div>
 
       <div className="relative flex min-h-0 flex-1">
-        {/* Contents / search beside the text (the owner's navigation
-            exception; the same contents are in the right sidebar's rail). */}
+        {/* Contents beside the text (the owner's navigation exception; the
+            same contents are in the right sidebar's rail, with Search). */}
         {aside && contents && (
           <aside className="absolute inset-y-0 left-0 z-30 flex w-[min(18rem,85%)] flex-col border-r border-black/10 bg-background shadow-xl sm:static sm:z-auto sm:w-64 sm:shrink-0 sm:shadow-none dark:border-white/10">
             <div className="flex items-center justify-between border-b border-black/10 px-3 py-1.5 text-xs font-medium dark:border-white/10">
-              {aside === "contents" ? "Contents" : "Search"}
+              Contents
               <button
                 type="button"
                 aria-label="Close"
@@ -1048,118 +1083,66 @@ export function ScriptureReader({
                 <X className="h-3.5 w-3.5" />
               </button>
             </div>
-            {aside === "search" && (
-              <form
-                onSubmit={(event) => void submitQuery(event)}
-                className="border-b border-black/10 p-2 sm:hidden dark:border-white/10"
-              >
-                <input
-                  autoFocus
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Alma 32:21 or a phrase"
-                  aria-label="Go to a reference or search"
-                  className="h-8 w-full rounded border border-black/10 bg-transparent px-2 text-sm dark:border-white/10"
-                />
-              </form>
-            )}
             <div className="min-h-0 flex-1 overflow-auto p-2 text-xs">
-              {aside === "contents" ? (
-                contents.volumes.map((volume) => (
-                  <div key={volume.slug} className="mb-2">
-                    <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                      {volume.title}
-                    </div>
-                    {volume.books.map((entry) => (
-                      <div key={entry.slug}>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (entry.chapterCount === 1) {
-                              void goTo({ bookSlug: entry.slug, chapter: 1 });
-                              setAside(null);
-                            } else
-                              setOpenBookSlug((current) =>
-                                current === entry.slug ? null : entry.slug,
-                              );
-                          }}
-                          className={`w-full truncate rounded px-2 py-1 text-left hover:bg-black/5 dark:hover:bg-white/5 ${
-                            entry.slug === book?.slug
-                              ? "font-semibold text-primary"
-                              : ""
-                          }`}
-                        >
-                          {entry.name}
-                        </button>
-                        {openBookSlug === entry.slug &&
-                          entry.chapterCount > 1 && (
-                            <div className="grid grid-cols-6 gap-0.5 px-2 pb-2 pt-1">
-                              {Array.from(
-                                { length: entry.chapterCount },
-                                (_, i) => i + 1,
-                              ).map((number) => (
-                                <button
-                                  key={number}
-                                  type="button"
-                                  onClick={() => {
-                                    void goTo({
-                                      bookSlug: entry.slug,
-                                      chapter: number,
-                                    });
-                                    setAside(null);
-                                  }}
-                                  className={`rounded py-1 text-center tabular-nums hover:bg-black/5 dark:hover:bg-white/10 ${
-                                    entry.slug === book?.slug &&
-                                    number === chapter?.chapter
-                                      ? "bg-primary text-primary-foreground"
-                                      : ""
-                                  }`}
-                                >
-                                  {number}
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                      </div>
-                    ))}
+              {contents.volumes.map((volume) => (
+                <div key={volume.slug} className="mb-2">
+                  <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    {volume.title}
                   </div>
-                ))
-              ) : searching ? (
-                <div className="flex justify-center p-4">
-                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                </div>
-              ) : results ? (
-                <>
-                  <p className="px-2 pb-2 text-muted-foreground">
-                    {results.total === 0
-                      ? "No verses match."
-                      : results.total > results.hits.length
-                        ? `First ${results.hits.length} of ${results.total} verses`
-                        : `${results.total} verse${results.total === 1 ? "" : "s"}`}
-                  </p>
-                  {results.hits.map((hit) => (
-                    <button
-                      key={`${hit.bookSlug}-${hit.chapter}-${hit.verse}`}
-                      type="button"
-                      onClick={() => {
-                        void goTo(
-                          { bookSlug: hit.bookSlug, chapter: hit.chapter },
-                          { start: hit.verse, end: hit.verse },
-                        );
-                        // On a phone the panel covers the text: get out of the way.
-                        if (window.matchMedia("(max-width: 639px)").matches)
-                          setAside(null);
-                      }}
-                      className="mb-1 block w-full rounded px-2 py-1 text-left hover:bg-black/5 dark:hover:bg-white/5"
-                    >
-                      <span className="font-medium">{hit.reference}</span>
-                      <span className="line-clamp-2 text-muted-foreground">
-                        {hit.text}
-                      </span>
-                    </button>
+                  {volume.books.map((entry) => (
+                    <div key={entry.slug}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (entry.chapterCount === 1) {
+                            void goTo({ bookSlug: entry.slug, chapter: 1 });
+                            setAside(null);
+                          } else
+                            setOpenBookSlug((current) =>
+                              current === entry.slug ? null : entry.slug,
+                            );
+                        }}
+                        className={`w-full truncate rounded px-2 py-1 text-left hover:bg-black/5 dark:hover:bg-white/5 ${
+                          entry.slug === book?.slug
+                            ? "font-semibold text-primary"
+                            : ""
+                        }`}
+                      >
+                        {entry.name}
+                      </button>
+                      {openBookSlug === entry.slug &&
+                        entry.chapterCount > 1 && (
+                          <div className="grid grid-cols-6 gap-0.5 px-2 pb-2 pt-1">
+                            {Array.from(
+                              { length: entry.chapterCount },
+                              (_, i) => i + 1,
+                            ).map((number) => (
+                              <button
+                                key={number}
+                                type="button"
+                                onClick={() => {
+                                  void goTo({
+                                    bookSlug: entry.slug,
+                                    chapter: number,
+                                  });
+                                  setAside(null);
+                                }}
+                                className={`rounded py-1 text-center tabular-nums hover:bg-black/5 dark:hover:bg-white/10 ${
+                                  entry.slug === book?.slug &&
+                                  number === chapter?.chapter
+                                    ? "bg-primary text-primary-foreground"
+                                    : ""
+                                }`}
+                              >
+                                {number}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                    </div>
                   ))}
-                </>
-              ) : null}
+                </div>
+              ))}
             </div>
           </aside>
         )}
