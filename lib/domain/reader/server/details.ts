@@ -18,7 +18,8 @@
 import "server-only";
 import { readerDb } from "../db";
 import type { BookDetails, BookDetailsQuery } from "../types";
-import { readerFetchJson } from "./http";
+import { cleanDescription, parseGutenbergSummary } from "../details-parse";
+import { readerFetch, readerFetchJson } from "./http";
 import { googleBooksKey } from "./sources";
 
 const CACHE_LIMIT = 500;
@@ -33,35 +34,6 @@ function remember(key: string, details: BookDetails): BookDetails {
   return details;
 }
 
-/** Strip HTML and boilerplate; null when nothing useful remains. */
-export function cleanDescription(raw: unknown): string | null {
-  const value =
-    typeof raw === "string"
-      ? raw
-      : raw && typeof raw === "object" && "value" in raw
-        ? String((raw as { value: unknown }).value)
-        : null;
-  if (!value) return null;
-  const text = value
-    .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<\/p>/gi, "\n\n")
-    .replace(/<[^>]+>/g, "")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;|&apos;/g, "'")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    // Open Library appends source links / "See also" blocks in markdown.
-    .replace(/\n-{3,}[\s\S]*$/, "")
-    .replace(/\(\[source\]\[\d+\]\)/gi, "")
-    .replace(/\[\d+\]:\s*\S+/g, "")
-    .replace(/[ \t]+\n/g, "\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
-  return text.length >= 40 ? text.slice(0, 6000) : null;
-}
-
 interface Candidate {
   description: string | null;
   source: string;
@@ -71,6 +43,20 @@ interface Candidate {
   publishedYear?: number | null;
   isbn?: string | null;
   coverUrl?: string | null;
+}
+
+interface Lookup {
+  label: string;
+  candidate: Candidate | null;
+  failed: boolean;
+}
+
+async function lookup(label: string, work: () => Promise<Candidate | null>): Promise<Lookup> {
+  try {
+    return { label, candidate: await work(), failed: false };
+  } catch {
+    return { label, candidate: null, failed: true };
+  }
 }
 
 async function safe<T>(work: () => Promise<T>): Promise<T | null> {
@@ -134,7 +120,7 @@ async function gutendexBook(id: string): Promise<Candidate | null> {
   if (!/^\d+$/.test(id)) return null;
   const book = await readerFetchJson<{ summaries?: string[]; subjects?: string[]; bookshelves?: string[] }>(
     `https://gutendex.com/books/${id}`,
-    { timeoutMs: 15_000 }
+    { timeoutMs: 8_000 }
   );
   return {
     description: cleanDescription(book.summaries?.[0]),
@@ -144,6 +130,16 @@ async function gutendexBook(id: string): Promise<Candidate | null> {
       .filter((subject, index, all) => all.indexOf(subject) === index)
       .slice(0, 12),
   };
+}
+
+async function gutenbergPage(id: string): Promise<Candidate | null> {
+  if (!/^\d+$/.test(id)) return null;
+  const page = await readerFetch(`https://www.gutenberg.org/ebooks/${id}`, {
+    accept: "text/html",
+    timeoutMs: 10_000,
+  });
+  const { summary, subjects } = parseGutenbergSummary(page.body.toString("utf8"));
+  return { description: summary, source: "Project Gutenberg", subjects };
 }
 
 // ── Google Books ───────────────────────────────────────────────────────────
@@ -199,8 +195,10 @@ async function wikisourceSummary(title: string): Promise<Candidate | null> {
 
 // ── Merge ──────────────────────────────────────────────────────────────────
 
-function merge(candidates: Array<Candidate | null>): BookDetails {
-  const present = candidates.filter((candidate): candidate is Candidate => Boolean(candidate));
+function merge(lookups: Lookup[]): BookDetails {
+  const present = lookups
+    .map((entry) => entry.candidate)
+    .filter((candidate): candidate is Candidate => Boolean(candidate));
   const best = present
     .filter((candidate) => candidate.description)
     .sort((a, b) => (b.description?.length ?? 0) - (a.description?.length ?? 0))[0];
@@ -219,6 +217,8 @@ function merge(candidates: Array<Candidate | null>): BookDetails {
     publishedYear: first("publishedYear") as number | null,
     isbn: first("isbn") as string | null,
     coverUrl: first("coverUrl") as string | null,
+    checked: [...new Set(lookups.map((entry) => entry.label))],
+    failed: [...new Set(lookups.filter((entry) => entry.failed).map((entry) => entry.label))],
   };
 }
 
@@ -246,30 +246,36 @@ export async function getBookDetails(
 
   if (!details) {
     const key = await googleBooksKey(ownerId);
-    const primary: Array<Promise<Candidate | null>> = [];
+    // Everything in parallel: the panel shouldn't wait on a slow source
+    // before trying the next one.
+    const lookups: Array<Promise<Lookup>> = [];
     const gutenberg = gutenbergId(query);
-    if (gutenberg) primary.push(safe(() => gutendexBook(gutenberg)));
+    if (gutenberg) {
+      lookups.push(lookup("Project Gutenberg", () => gutenbergPage(gutenberg)));
+      lookups.push(lookup("Gutendex", () => gutendexBook(gutenberg)));
+    }
     if (query.sourceId === "openlibrary" && query.entryId) {
-      primary.push(safe(() => openLibraryWork(query.entryId!)));
+      lookups.push(lookup("Open Library", () => openLibraryWork(query.entryId!)));
     } else if (query.openLibraryId) {
-      primary.push(safe(() => openLibraryWork(query.openLibraryId!)));
+      lookups.push(lookup("Open Library", () => openLibraryWork(query.openLibraryId!)));
+    } else {
+      lookups.push(lookup("Open Library", () => openLibraryLookup(query)));
     }
     if (query.sourceId === "google-books" && query.entryId) {
-      primary.push(safe(() => googleVolume(query.entryId!, key)));
+      lookups.push(lookup("Google Books", () => googleVolume(query.entryId!, key)));
+    } else if (key) {
+      lookups.push(lookup("Google Books", () => googleLookup(query, key)));
     }
-    if (query.sourceId === "wikisource") primary.push(safe(() => wikisourceSummary(query.title)));
+    if (query.sourceId === "wikisource") {
+      lookups.push(lookup("Wikisource", () => wikisourceSummary(query.title)));
+    }
 
-    let candidates = await Promise.all(primary);
-    if (!candidates.some((candidate) => candidate?.description)) {
-      candidates = [
-        ...candidates,
-        ...(await Promise.all([
-          safe(() => openLibraryLookup(query)),
-          key ? safe(() => googleLookup(query, key)) : Promise.resolve(null),
-        ])),
-      ];
-    }
-    details = remember(cacheKey, merge(candidates));
+    const merged = merge(await Promise.all(lookups));
+    // Only remember a result that's final: a lookup that timed out or
+    // errored must be retried next time, not cached as "no description".
+    details = merged.description || merged.failed.length === 0
+      ? remember(cacheKey, merged)
+      : merged;
   }
 
   if (query.contentId && details.description) {

@@ -20,6 +20,7 @@ import {
   parseOpenSearchTemplate,
 } from "../lib/domain/reader/server/opds";
 import { inspectEpub } from "../lib/domain/reader/server/epub";
+import { cleanDescription, parseGutenbergSummary } from "../lib/domain/reader/details-parse";
 import {
   kindleClippingId,
   normalizeBookTitle,
@@ -299,6 +300,29 @@ async function main() {
       normalizeBookTitle("Meditations (Penguin Classics)"),
       normalizeBookTitle("Meditations")
     );
+  });
+
+  await check("Gutenberg book page: Summary row + subjects", () => {
+    const html = `<table class="bibrec">
+      <tr><th>Author</th><td><a href="/ebooks/author/68">Austen, Jane, 1775-1817</a></td></tr>
+      <tr><th>Summary</th><td>"Pride and Prejudice" by Jane Austen is a romantic novel written in the early 19th century. The story follows Elizabeth Bennet as she navigates manners, upbringing and marriage. (This is an automatically generated summary.)</td></tr>
+      <tr><th>Subject</th><td><a href="/ebooks/subject/1">Courtship -- Fiction</a></td></tr>
+      <tr><th>Subject</th><td><a href="/ebooks/subject/2">Sisters -- Fiction</a></td></tr>
+    </table>`;
+    const parsed = parseGutenbergSummary(html);
+    assert.match(parsed.summary ?? "", /^"Pride and Prejudice" by Jane Austen is a romantic novel/);
+    assert.doesNotMatch(parsed.summary ?? "", /automatically generated/);
+    assert.deepEqual(parsed.subjects, ["Courtship", "Sisters"]);
+    assert.deepEqual(parseGutenbergSummary("<table></table>"), { summary: null, subjects: [] });
+  });
+
+  await check("cleanDescription: HTML, Open Library link footers, too-short text", () => {
+    assert.equal(
+      cleanDescription("<p>A long enough description of the book that is worth showing.</p>----------\n[1]: https://x"),
+      "A long enough description of the book that is worth showing."
+    );
+    assert.equal(cleanDescription({ value: "Another long enough description, from an OL object value." }), "Another long enough description, from an OL object value.");
+    assert.equal(cleanDescription("too short"), null);
   });
 
   console.log(`reader:check passed (${checks} checks)`);

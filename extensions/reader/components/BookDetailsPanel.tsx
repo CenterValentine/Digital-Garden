@@ -202,7 +202,13 @@ export function BookDetailsPanel({
               <Loader2 className="h-3.5 w-3.5 animate-spin" /> Looking up a description…
             </p>
           ) : (
-            <p className="text-xs text-muted-foreground">No description found for this book.</p>
+            <p className="text-xs text-muted-foreground">
+              No description found
+              {details?.checked.length ? ` — checked ${details.checked.join(", ")}` : ""}.
+              {details?.failed.length
+                ? ` ${details.failed.join(", ")} didn't respond; reopen the book later to retry.`
+                : ""}
+            </p>
           )}
         </section>
 

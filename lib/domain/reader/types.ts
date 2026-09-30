@@ -204,6 +204,10 @@ export interface BookDetails {
   publishedYear: number | null;
   isbn: string | null;
   coverUrl: string | null;
+  /** Sources consulted (for "No description found — checked …"). */
+  checked: string[];
+  /** Sources that failed (timeout / error) — the result wasn't cached. */
+  failed: string[];
 }
 
 /** What the client knows about a book when it asks for details. */
