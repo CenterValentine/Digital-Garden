@@ -338,7 +338,7 @@ import {
 } from "../lib/domain/ai/cache-volley";
 import { docxHtmlToCheckText } from "../lib/domain/ai/docx-check-text";
 import { DOCXConverter } from "../lib/domain/export/converters/docx";
-import { AUTO_CLOSED_CHECKPOINT_NEXT, charterAutoApproves } from "../lib/domain/ai/charters/auto-approve";
+import { AUTO_CLOSED_CHECKPOINT_NEXT, autoApprovedToolsFrom, toolAutoApproves } from "../lib/domain/ai/tools/approval-policy";
 import { BULK_READ_DEFAULT_TOKENS, effectiveBulkReadThreshold } from "../lib/features/settings/validation";
 import JSZip from "jszip";
 
@@ -633,16 +633,35 @@ void (async () => {
 }
 
 {
-  // §10 round 6 — charter auto-approval lifts exactly the formalities, and
-  // only in a charter chat with the setting on.
-  const on = { charterActive: true, autoApprove: true };
-  const off = { charterActive: true, autoApprove: false };
-  const noCharter = { charterActive: false, autoApprove: true };
-  assert(charterAutoApproves(on, { kind: "create" }) && charterAutoApproves(on, { kind: "bulk-read" }), "round 6: creates and reads run without a card when on");
-  assert(charterAutoApproves(on, { kind: "overwrite", targetCreatedInThisChat: true }) && !charterAutoApproves(on, { kind: "overwrite", targetCreatedInThisChat: false }), "round 6: only a document this chat created is overwritten without asking");
-  assert(charterAutoApproves(on, { kind: "checkpoint", finalPhase: true }) && !charterAutoApproves(on, { kind: "checkpoint", finalPhase: false }), "round 6: only the final checkpoint closes without asking");
-  assert(!charterAutoApproves(off, { kind: "create" }) && !charterAutoApproves(noCharter, { kind: "create" }), "round 6: setting off, or no charter → everything still asks");
-  assert(!/APPROVED/.test(AUTO_CLOSED_CHECKPOINT_NEXT) && /setting/.test(AUTO_CLOSED_CHECKPOINT_NEXT), "round 6: an auto-closed checkpoint never claims the user approved it");
+  // §10 round 6c — per-tool approvals: the user turns off a tool's card;
+  // the exceptions stay (overwrites of pre-existing files, checkpoints
+  // between phases, run proposals).
+  const all = autoApprovedToolsFrom({
+    create_docx: { autoApprove: true },
+    create_note: { autoApprove: true, enabled: true },
+    phase_checkpoint: { autoApprove: true },
+    propose_item_iteration: { autoApprove: true },
+    search_web: { enabled: false },
+  });
+  assert(
+    [...all].sort().join(",") === "create_docx,create_note,phase_checkpoint",
+    `round 6c: only the auto-approvable tools are read from toolConfig (got ${[...all].join(",")})`,
+  );
+  assert(autoApprovedToolsFrom({ create_docx: { autoApprove: false } }).size === 0 && autoApprovedToolsFrom(undefined).size === 0, "round 6c: explicit false or no config → ask");
+  assert(toolAutoApproves(all, { tool: "create_docx" }) && toolAutoApproves(all, { tool: "create_note" }), "round 6c: creates run without a card when set");
+  assert(
+    toolAutoApproves(all, { tool: "create_docx", overwrite: { targetCreatedInThisChat: true } }) &&
+      !toolAutoApproves(all, { tool: "create_docx", overwrite: { targetCreatedInThisChat: false } }),
+    "round 6c: an overwrite skips the card only for a document this chat created",
+  );
+  assert(
+    toolAutoApproves(all, { tool: "phase_checkpoint", finalPhase: true }) &&
+      !toolAutoApproves(all, { tool: "phase_checkpoint", finalPhase: false }),
+    "round 6c: only the final checkpoint closes without a pause",
+  );
+  const onlyNotes = autoApprovedToolsFrom({ create_note: { autoApprove: true } });
+  assert(!toolAutoApproves(onlyNotes, { tool: "create_docx" }) && !toolAutoApproves(undefined, { tool: "create_note" }), "round 6c: each tool is its own switch; none set → ask");
+  assert(!/APPROVED/.test(AUTO_CLOSED_CHECKPOINT_NEXT) && /setting/.test(AUTO_CLOSED_CHECKPOINT_NEXT), "round 6c: an auto-closed checkpoint never claims the user approved it");
 
   const registrySrc = readFileSync(path.join(process.cwd(), "lib/domain/ai/tools/registry.ts"), "utf8");
   const between = (from: string, to: string) => registrySrc.slice(registrySrc.indexOf(from), registrySrc.indexOf(to, registrySrc.indexOf(from)));
@@ -650,21 +669,21 @@ void (async () => {
   const note = between("    create_note: tool({", "description:");
   const checkpoint = between("    phase_checkpoint: tool({", "description:");
   const propose = between("    propose_item_iteration: tool({", "inputSchema");
-  assert(
-    /kind: "overwrite"/.test(docx) && /contentCreatedInThisChat\(ctx, overwriteId\)/.test(docx) && /kind: "create"/.test(docx),
-    "round 6: create_docx asks unless the policy lifts it — creates, and overwrites of this chat's own documents",
-  );
-  assert(/charterAutoApproves\(/.test(note) && /kind: "create"/.test(note), "round 6: create_note asks unless the policy lifts it");
-  assert(/finalPhase: ctx.charterFinalPhase === true/.test(checkpoint), "round 6: the checkpoint's card is lifted only for the final phase");
-  assert(/needsApproval: true/.test(propose), "round 6: a run proposal always asks (scope and item budget are a decision)");
-  const dataSrc = readFileSync(path.join(process.cwd(), "lib/domain/ai/tools/data-tools.ts"), "utf8");
-  assert(/kind: "bulk-read"/.test(dataSrc), "round 6: large database reads honour the setting");
+  assert(/tool: "create_docx"/.test(docx) && /contentCreatedInThisChat\(ctx, overwriteId\)/.test(docx), "round 6c: create_docx reads the policy, overwrite-aware");
+  assert(/toolAutoApproves\(ctx.autoApprovedTools, \{ tool: "create_note" \}\)/.test(note), "round 6c: create_note reads the policy");
+  assert(/finalPhase: ctx.charterFinalPhase === true/.test(checkpoint), "round 6c: the checkpoint's pause is lifted only for the final phase");
+  assert(/needsApproval: true/.test(propose), "round 6c: a run proposal always asks (scope and item budget are a decision)");
   const routeSrc6 = readFileSync(path.join(process.cwd(), "app/api/ai/chat/route.ts"), "utf8");
   assert(
-    routeSrc6.includes("charterAutoApprove: aiSettings.charterAutoApprove === true") &&
+    routeSrc6.includes("autoApprovedTools: autoApprovedToolsFrom(") &&
       routeSrc6.includes("toolCtx.charterFinalPhase = phaseIndex === parsed.phases.length - 1") &&
       routeSrc6.includes("toolCtx.charterFinalPhase = parsed.phases.length <= 1"),
-    "round 6: the route passes the setting and marks the final phase on both charter paths",
+    "round 6c: the route passes the user's approvals and marks the final phase on both charter paths",
+  );
+  const hookSrc = readFileSync(path.join(process.cwd(), "components/content/ai/use-tool-approvals.ts"), "utf8");
+  assert(
+    hookSrc.includes("autoApprove: on }") && !/delete entry\.autoApprove/.test(hookSrc),
+    "round 6c: the toggle writes an explicit true/false — the settings PATCH deep-merges, so a deleted key could never switch off",
   );
 }
 
@@ -678,10 +697,10 @@ void (async () => {
   assert(effectiveBulkReadThreshold(500) === 1_000 && effectiveBulkReadThreshold(500_000) === 100_000, "round 6b: stored values clamp to 1k–100k");
   const panelSrc = readFileSync(path.join(process.cwd(), "components/content/ai/ChatControlPanel.tsx"), "utf8");
   assert(
-    panelSrc.includes("setAISettings({ charterAutoApprove: checked })") &&
+    panelSrc.includes("useToolApprovals()") &&
       panelSrc.includes("setAISettings({ bulkReadTokenThreshold: clamped })") &&
       panelSrc.includes("effectiveBulkReadThreshold(aiSettings?.bulkReadTokenThreshold)"),
-    "round 6b: Chat controls writes both approval settings through the settings store and shows the effective threshold",
+    "round 6b: Chat controls carries the per-tool approvals and the read threshold, through the settings store",
   );
   const dataSrc6b = readFileSync(path.join(process.cwd(), "lib/domain/ai/tools/data-tools.ts"), "utf8");
   assert(dataSrc6b.includes("return effectiveBulkReadThreshold(settings?.ai?.bulkReadTokenThreshold);"), "round 6b: the server reads the effective threshold");

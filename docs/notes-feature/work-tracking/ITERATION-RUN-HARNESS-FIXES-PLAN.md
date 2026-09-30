@@ -379,6 +379,15 @@ For gpt-6-sol, every search's retrieved content is billed at $2–2.50 / 1M and 
 - **A stored 6,000 counts as the old default**, not a choice (`effectiveBulkReadThreshold`). Whole-snapshot saves had persisted it; production's only account held exactly 6000. This follows the stored-4096 maxTokens precedent.
 - Pinned-read allowance stays 2× the threshold, now 50k.
 
+**Round 6c (owner, same day) — per-tool approvals replace the charter switch:**
+- The owner's two questions, "why approve creating what I asked for?" and "does a single-phase checkpoint need the checkpoint?", led to per-tool toggles in `ai.toolConfig[id].autoApprove`. They're shown in Chat controls and Settings → AI through one hook (`use-tool-approvals.ts`), apply in every chat, and use the policy in `tools/approval-policy.ts`:
+  - `create_docx`: a new document skips the card; an overwrite skips it only for a document this chat created.
+  - `create_note`: a new note skips the card.
+  - `phase_checkpoint`: only the **final** phase's pause is lifted. The call still writes the Run Ledger and runs the integrity gate.
+- `ai.charterAutoApprove` is gone (never shipped). Bulk reads are governed by the threshold alone.
+- The toggles write an **explicit** true/false. The settings PATCH deep-merges, so a deleted key could never switch off (the trap the tool table's `enabled` hit on 2026-08-28).
+- The tool table's "all defaults" pruning now counts `autoApprove`, so editing a tool there no longer drops the setting.
+
 **Gate:** `run-harness:check` round 6 (policy table; the wiring of each predicate; proposal always asks; route passes the setting and marks the final phase on both charter paths). Four mutations caught.
 
 ### L2 — keep the tool list constant for the turn

@@ -65,6 +65,7 @@ import {
   BASE_TOOL_METADATA,
 } from "@/lib/domain/ai/tools/metadata";
 import { useSettingsStore } from "@/state/settings-store";
+import { useToolApprovals } from "@/components/content/ai/use-tool-approvals";
 import {
   BULK_READ_DEFAULT_TOKENS,
   BULK_READ_MAX_TOKENS,
@@ -80,6 +81,8 @@ const BULK_READ_DEFAULT = BULK_READ_DEFAULT_TOKENS;
 
 interface ToolConfigEntry {
   enabled?: boolean;
+  /** Run without an approval card (tools/approval-policy.ts). */
+  autoApprove?: boolean;
   routeOverride?: { presetId: string; modelId: string };
 }
 
@@ -101,7 +104,7 @@ export default function AISettingsPage() {
   // the catalog-resolved maximum instead of a silent truncation cap.
   const maxTokens = ai?.maxTokens === 4096 ? null : (ai?.maxTokens ?? null);
   const bulkReadThreshold = effectiveBulkReadThreshold(ai?.bulkReadTokenThreshold);
-  const charterAutoApprove = ai?.charterAutoApprove ?? false;
+  const toolApprovals = useToolApprovals();
   const typingEffect = ai?.typingEffect ?? true;
   const showAiHighlight = ai?.showAiHighlight ?? true;
   const showReasoning = ai?.showReasoning ?? true;
@@ -179,8 +182,13 @@ export default function AISettingsPage() {
   const handleToolConfigChange = (toolId: string, next: ToolConfigEntry) => {
     // Strip the entry when it returns to all-defaults so the JSON doesn't
     // accumulate noise.
+    // autoApprove counts too — without it, editing a tool's other fields
+    // here would silently drop its approval setting (an explicit false is a
+    // value, not a default, for the same deep-merge reason as `enabled`).
     const isDefault =
-      next.enabled === undefined && next.routeOverride === undefined;
+      next.enabled === undefined &&
+      next.routeOverride === undefined &&
+      next.autoApprove === undefined;
     const out: Record<string, ToolConfigEntry> = { ...toolConfig };
     if (isDefault) delete out[toolId];
     else out[toolId] = next;
@@ -302,19 +310,15 @@ export default function AISettingsPage() {
           />
         </SettingRow>
 
-        <SettingRow
-          label="Approve charter deliverables automatically"
-          description="In a chat running a charter: create the documents and notes it asks for, rewrite a document the chat created, read its databases, and close its final checkpoint — without asking. Run proposals, checkpoints between phases, and overwrites of files you made still ask."
-          htmlFor="ai-charter-auto-approve"
-        >
-          <Switch
-            id="ai-charter-auto-approve"
-            checked={charterAutoApprove}
-            onCheckedChange={(checked) =>
-              void generation.track(setAISettings({ charterAutoApprove: checked }))
-            }
-          />
-        </SettingRow>
+        {toolApprovals.map((row) => (
+          <SettingRow key={row.id} label={row.label} description={row.hint} htmlFor={`ai-auto-approve-${row.id}`}>
+            <Switch
+              id={`ai-auto-approve-${row.id}`}
+              checked={row.checked}
+              onCheckedChange={(checked) => void generation.track(row.onChange(checked))}
+            />
+          </SettingRow>
+        ))}
 
         <SettingRow
           label="Typing animation"

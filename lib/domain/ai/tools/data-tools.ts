@@ -96,7 +96,6 @@ import {
 } from "@/lib/domain/data";
 import type { ToolExecuteContext } from "./types";
 import { summarizeRejections } from "@/lib/domain/data/cells";
-import { charterAutoApproves } from "@/lib/domain/ai/charters/auto-approve";
 import {
   BULK_READ_DEFAULT_TOKENS,
   effectiveBulkReadThreshold,
@@ -834,17 +833,6 @@ export function createDataTools(ctx: ToolExecuteContext) {
         // and shrinking what was left of its cap). Under the charter
         // ceiling no prompt; a genuinely large read still asks.
         if (ctx.activeCharter && budget <= CHARTER_RUN_READ_CEILING) return false;
-        // The user's charter auto-approval (§10 round 6) lifts the prompt
-        // entirely inside a charter chat; execute still refuses a read past
-        // the executed model's ceiling.
-        if (
-          charterAutoApproves(
-            { charterActive: !!ctx.activeCharter, autoApprove: ctx.charterAutoApprove === true },
-            { kind: "bulk-read" },
-          )
-        ) {
-          return false;
-        }
         return budget > (await bulkReadThresholdFor(ctx.userId));
       },
       execute: async (input) => {

@@ -35,6 +35,7 @@ import {
   type SearchBackendPreference,
 } from "@/lib/domain/ai/use-chat-search-backend";
 import { Switch } from "@/components/client/ui/switch";
+import { useToolApprovals } from "./use-tool-approvals";
 import { useSettingsStore } from "@/state/settings-store";
 import {
   BULK_READ_MAX_TOKENS,
@@ -124,7 +125,7 @@ export function ChatControlPanel({
   // through the same store as Settings → AI so the two never disagree.
   const aiSettings = useSettingsStore((state) => state.ai);
   const setAISettings = useSettingsStore((state) => state.setAISettings);
-  const charterAutoApprove = aiSettings?.charterAutoApprove ?? false;
+  const toolApprovals = useToolApprovals();
   const readThreshold = effectiveBulkReadThreshold(aiSettings?.bulkReadTokenThreshold);
   const [readThresholdDraft, setReadThresholdDraft] = useState<string | null>(null);
   const commitReadThreshold = () => {
@@ -313,20 +314,15 @@ export function ChatControlPanel({
                   disabled={busy}
                 />
               </PanelRow>
-              <PanelRow
-                label="Auto-approve charter"
-                hint={
-                  charterAutoApprove
-                    ? "On — in a charter chat, its documents, notes, database reads and final checkpoint run without asking. Run proposals, checkpoints between phases, and overwrites of your own files still ask. Applies to every chat."
-                    : "Off — a charter chat asks before creating documents and notes, large reads, and its final checkpoint. Turn on to skip what the charter already asked for. Applies to every chat."
-                }
-              >
-                <Switch
-                  checked={charterAutoApprove}
-                  onCheckedChange={(checked) => void setAISettings({ charterAutoApprove: checked })}
-                  aria-label="Auto-approve charter deliverables"
-                />
-              </PanelRow>
+              {toolApprovals.map((row) => (
+                <PanelRow key={row.id} label={row.label} hint={`${row.hint} Applies to every chat (also in Settings → AI).`}>
+                  <Switch
+                    checked={row.checked}
+                    onCheckedChange={(checked) => void row.onChange(checked)}
+                    aria-label={row.label}
+                  />
+                </PanelRow>
+              ))}
               <PanelRow
                 label="Ask before reads over"
                 hint="Database reads estimated above this many tokens ask for approval; smaller ones run. Applies to every chat (also in Settings → AI)."

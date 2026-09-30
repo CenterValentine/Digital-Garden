@@ -108,10 +108,6 @@ const aiSettingsSchema = z
     // Database reads larger than this (estimated tokens) pause for the
     // user's approval; the card shows the estimate (AI-BULK-ROW-READING-PLAN D3).
     bulkReadTokenThreshold: z.number().min(1_000).max(100_000).optional(),
-    // In a chat running a charter: create the documents and notes it asks
-    // for, read its databases, and close its final checkpoint without an
-    // approval card (charters/auto-approve.ts). Off by default.
-    charterAutoApprove: z.boolean().optional(),
     streamingEnabled: z.boolean().optional(),
     // Subtle typewriter reveal of streaming responses. Default on.
     typingEffect: z.boolean().optional(),
@@ -133,6 +129,9 @@ const aiSettingsSchema = z
         z
           .object({
             enabled: z.boolean().optional(),
+            // Run without an approval card (create_docx, create_note, the
+            // final phase_checkpoint — tools/approval-policy.ts). Absent = ask.
+            autoApprove: z.boolean().optional(),
             routeOverride: z
               .object({
                 presetId: z.string(),
@@ -577,7 +576,6 @@ export const DEFAULT_SETTINGS: UserSettings = {
     // numeric default here silently truncated reasoning-heavy models.
     maxTokens: null,
     bulkReadTokenThreshold: BULK_READ_DEFAULT_TOKENS,
-    charterAutoApprove: false,
     streamingEnabled: true,
     typingEffect: true,
     conversationHistory: true,

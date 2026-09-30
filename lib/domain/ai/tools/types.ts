@@ -33,11 +33,12 @@ export interface ToolExecuteContext {
    */
   activeCharter?: { contentId: string; title: string };
   /**
-   * The user's `ai.charterAutoApprove` setting, and whether the charter's
-   * current phase is its last — read by the approval predicates of the
-   * tools a charter run pauses on (charters/auto-approve.ts).
+   * Tool ids the user set to run without an approval card
+   * (`ai.toolConfig[id].autoApprove`), and whether the charter's current
+   * phase is its last — read by the approval predicates in
+   * tools/approval-policy.ts.
    */
-  charterAutoApprove?: boolean;
+  autoApprovedTools?: ReadonlySet<string>;
   charterFinalPhase?: boolean;
   /**
    * The bound Conversation entity id (sidebar multi-conv / full-page chat).

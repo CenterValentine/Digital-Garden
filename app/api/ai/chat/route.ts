@@ -292,6 +292,7 @@ import type {
 } from "@/lib/domain/ai/model-directive";
 import { renderCharterSection } from "@/lib/domain/ai/charters/render";
 import { buildCharterIngest } from "@/lib/domain/ai/charters/ingest";
+import { autoApprovedToolsFrom } from "@/lib/domain/ai/tools/approval-policy";
 import type { ParsedCharter } from "@/lib/domain/ai/charters/parse";
 import { getServerExtensions } from "@/lib/domain/editor/extensions-server";
 import {
@@ -1470,9 +1471,12 @@ export async function POST(request: Request) {
         // Filled in AFTER playbook resolution below (tools close over this
         // object, so a later property assignment is visible at execute time).
         activeCharter: undefined as { contentId: string; title: string } | undefined,
-        // Charter auto-approval (§10 round 6): the user's setting, and
-        // whether the charter's current phase is its last (set below).
-        charterAutoApprove: aiSettings.charterAutoApprove === true,
+        // Per-tool approvals (§10 round 6c): the tools the user set to run
+        // without a card, and whether the charter's current phase is its
+        // last (set below).
+        autoApprovedTools: autoApprovedToolsFrom(
+          (aiSettings as { toolConfig?: unknown }).toolConfig,
+        ),
         charterFinalPhase: false,
         // Executed model identity (cost metering): lets ledger stamps
         // price the run's tokens. Bare id + vendor, post-resolution.

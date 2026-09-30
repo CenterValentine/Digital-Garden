@@ -122,8 +122,8 @@ import { ensureFolderContextFresh } from "@/lib/domain/ai-context/gate";
 import { assembleFolderCapsule } from "@/lib/domain/ai-context/capsule";
 import {
   AUTO_CLOSED_CHECKPOINT_NEXT,
-  charterAutoApproves,
-} from "@/lib/domain/ai/charters/auto-approve";
+  toolAutoApproves,
+} from "./approval-policy";
 import {
   READ_PAGE_HEADLESS_OR_BROWSER_DESCRIPTION,
   readPageInBrowserInputSchema,
@@ -2121,14 +2121,14 @@ export function createBaseTools(ctx: ToolExecuteContext) {
       // is not ready, execute immediately and return a corrective tool result
       // so the model can continue working instead of surfacing a false
       // approval card.
-      // The final phase's checkpoint closes without a card when the user's
-      // charter auto-approval is on (§10 round 6); intermediate ones ask.
+      // The final phase's checkpoint closes without a pause when the user
+      // set it to (§10 round 6c); checkpoints between phases always ask.
       needsApproval: () =>
         getPhaseCheckpointGateStatus(ctx.phaseCheckpointGate).ready &&
-        !charterAutoApproves(
-          { charterActive: !!ctx.activeCharter, autoApprove: ctx.charterAutoApprove === true },
-          { kind: "checkpoint", finalPhase: ctx.charterFinalPhase === true },
-        ),
+        !toolAutoApproves(ctx.autoApprovedTools, {
+          tool: "phase_checkpoint",
+          finalPhase: ctx.charterFinalPhase === true,
+        }),
       description:
         "Call at EVERY phase boundary of a multi-phase procedure/charter. Pauses for the user's verdict (approve / revise / approve-with-tweaks) and records the phase in the Run Ledger note. " +
         "This is a completion signal, never a planning shortcut: do not call it until the phase's required research, linked-note reads, analysis, and outputs have actually been completed. The runtime rejects checkpoints that lack verifiable required tool activity. " +
@@ -2246,10 +2246,10 @@ export function createBaseTools(ctx: ToolExecuteContext) {
               ledger.created ? "created" : "updated",
               "run ledger",
             )),
-            nextAction: charterAutoApproves(
-              { charterActive: !!ctx.activeCharter, autoApprove: ctx.charterAutoApprove === true },
-              { kind: "checkpoint", finalPhase: ctx.charterFinalPhase === true },
-            )
+            nextAction: toolAutoApproves(ctx.autoApprovedTools, {
+              tool: "phase_checkpoint",
+              finalPhase: ctx.charterFinalPhase === true,
+            })
               ? AUTO_CLOSED_CHECKPOINT_NEXT
               : "APPROVED. Continue IMMEDIATELY with the next phase in this same response — announce it in one line, then proceed. If this was the FINAL phase, give a short completion summary instead (artifacts + where they were saved).",
           };
@@ -2372,20 +2372,20 @@ export function createBaseTools(ctx: ToolExecuteContext) {
     }),
     create_docx: tool({
       // Document creation is a mutating action — same HITL gate as
-      // create_note (AI v3 core S4b / A4). In a charter chat with the
-      // user's auto-approval on, the charter's own deliverables run without
-      // a card: a new document always, an overwrite only of a document this
-      // chat created (charters/auto-approve.ts).
+      // create_note (AI v3 core S4b / A4) — unless the user set this tool to
+      // run without a card (§10 round 6c). An overwrite skips the card only
+      // for a document this chat created (tools/approval-policy.ts).
       needsApproval: async (rawArgs) => {
-        const approval = { charterActive: !!ctx.activeCharter, autoApprove: ctx.charterAutoApprove === true };
         const overwriteId =
           typeof (rawArgs as { overwriteContentId?: unknown }).overwriteContentId === "string"
             ? ((rawArgs as { overwriteContentId: string }).overwriteContentId.trim() || null)
             : null;
-        if (!overwriteId) return !charterAutoApproves(approval, { kind: "create" });
-        return !charterAutoApproves(approval, {
-          kind: "overwrite",
-          targetCreatedInThisChat: await contentCreatedInThisChat(ctx, overwriteId),
+        if (!ctx.autoApprovedTools?.has("create_docx")) return true;
+        return !toolAutoApproves(ctx.autoApprovedTools, {
+          tool: "create_docx",
+          ...(overwriteId
+            ? { overwrite: { targetCreatedInThisChat: await contentCreatedInThisChat(ctx, overwriteId) } }
+            : {}),
         });
       },
       description:
@@ -2986,13 +2986,10 @@ export function createBaseTools(ctx: ToolExecuteContext) {
       // File creation is a mutating action: pause the tool loop for user
       // approval before executing (AI SDK v6 native HITL). The chat surface
       // renders the approval card; execution resumes via
-      // addToolApprovalResponse. A charter chat with the user's
-      // auto-approval on creates its notes without a card (§10 round 6).
+      // addToolApprovalResponse — unless the user set this tool to run
+      // without a card (§10 round 6c).
       needsApproval: () =>
-        !charterAutoApproves(
-          { charterActive: !!ctx.activeCharter, autoApprove: ctx.charterAutoApprove === true },
-          { kind: "create" },
-        ),
+        !toolAutoApproves(ctx.autoApprovedTools, { tool: "create_note" }),
       description:
         "Create a NEW note in the user's Digital Garden. Use this only when the user EXPLICITLY asks for a new file. " +
         "Ambiguous phrasings to watch for: 'update the note in this chat', 'add to this conversation's notes', 'put X in the note' — these do NOT mean 'create a new note'. They typically refer to an existing note. When the phrasing is ambiguous, ASK the user whether to create a new note or update an existing one before calling this tool. " +
