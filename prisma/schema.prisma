@@ -155,6 +155,7 @@ model ContentNode {
   // ShortcutPayload.target, which Prisma needs to resolve the named relation.
   shortcutsToThis      ShortcutPayload[]     @relation("ShortcutTarget")
   bookMeta             BookMeta?
+  workMeta             WorkMeta?
 
   history                      ContentHistory[]
   sourceLinks                  ContentLink[]             @relation("SourceContent")
@@ -608,6 +609,7 @@ model User {
   readerCatalogs      ReaderCatalog[]
   readerConnections   ReaderConnection[]
   scriptureCorpora    UserScriptureCorpus[]
+  workMetas           WorkMeta[]
 
   @@index([email])
 }
@@ -2918,4 +2920,67 @@ model ReaderConnection {
   owner          User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 
   @@unique([ownerId, provider])
+}
+
+/// A research Work's metadata beside its content node — the research
+/// counterpart of BookMeta (RESEARCH-READER-PLAN.md §3). The node is a stored
+/// copy (file), or an external link node for Works fetched on demand or not
+/// readable here (§7.2). Type-specific fields live in `face` (faces.ts).
+model WorkMeta {
+  contentId      String   @id @db.Uuid
+  ownerId        String   @db.Uuid
+  /// Canonical key ("doi:10.…") — "already in your library?" lookups.
+  workKey        String   @db.VarChar(500)
+  /// Every "scheme:value" key the Work answers to (DOI, PMID, arXiv, …).
+  identifierKeys String[]
+  /// "article" | "preprint" | "trial" | "case" | … (open list, types.ts)
+  type           String   @db.VarChar(40)
+  title          String   @db.VarChar(1000)
+  authors        String[]
+  year           Int?
+  venue          String?  @db.VarChar(500)
+  abstract       String?
+  /// WorkIdentifiers JSON ({ doi: [...], pmid: [...] }).
+  identifiers    Json     @default("{}")
+  face           Json     @default("{}")
+  /// "cc-by" | "cc0" | "public-domain" | … | null — gates publishing (§9.7).
+  license        String?  @db.VarChar(60)
+  /// How the text is read: "stored" | "on-demand" | "link" (§7.2).
+  copyPolicy     String   @default("link") @db.VarChar(20)
+  /// The copy read on demand (when not stored).
+  copyUrl        String?
+  /// Retraction / correction notice, when one exists.
+  retraction     Json?
+  /// "want" | "reading" | "finished" | "reference" | null
+  readingStatus  String?  @db.VarChar(20)
+  /// How it arrived: "search" | "identifier" | "zotero" | "bibtex" | …
+  sourceAdapter  String   @default("search") @db.VarChar(80)
+  /// Sources that described it (provenance chips).
+  provenance     String[]
+  /// Zotero item key when synced from Zotero (§7.4).
+  zoteroKey      String?  @db.VarChar(40)
+  createdAt      DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @db.Timestamptz(6)
+
+  content ContentNode @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  owner   User        @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@unique([ownerId, zoteroKey])
+  @@index([ownerId])
+  @@index([ownerId, workKey])
+  @@index([identifierKeys], type: Gin)
+}
+
+/// Shared cache of resolved Works (public metadata only — never per-user
+/// data), one row per identifier key the Work answers to, so a later lookup
+/// by DOI, PMID or arXiv id all hit (§9.5: protects the shared API quotas).
+model WorkCache {
+  key       String   @id @db.VarChar(500)
+  workKey   String   @db.VarChar(500)
+  work      Json
+  sources   String[]
+  fetchedAt DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([workKey])
+  @@index([fetchedAt])
 }

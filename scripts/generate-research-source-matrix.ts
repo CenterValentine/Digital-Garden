@@ -1,0 +1,137 @@
+/**
+ * Generates docs/notes-feature/core/RESEARCH-SOURCE-MATRIX.md from the research
+ * source catalog and adapter registry — what every BUILT source can do.
+ *
+ * Generate: pnpm research:matrix
+ * CI check: pnpm research:matrix:check   (fails when the doc is stale, or when
+ *           the catalog and the adapter registry disagree)
+ *
+ * Same pattern as `ai:matrix`: the doc is derived from the code that decides
+ * behaviour, so it can't drift. The plan's §5 registry is the roadmap; this is
+ * what exists.
+ */
+
+import { readFileSync, writeFileSync } from "node:fs";
+import path from "node:path";
+import { RESEARCH_ADAPTERS } from "../lib/domain/research/adapters";
+import { RESEARCH_SCOPES } from "../lib/domain/research/scopes";
+import { RESEARCH_SOURCES } from "../lib/domain/research/sources";
+
+const ROOT = path.resolve(__dirname, "..");
+const OUTPUT_REL = "docs/notes-feature/core/RESEARCH-SOURCE-MATRIX.md";
+
+// ── Drift: catalog ⇔ registry ⇔ declared roles ────────────────────────────
+const problems: string[] = [];
+const catalogIds = new Set(RESEARCH_SOURCES.map((source) => source.id));
+const adapterIds = new Set(RESEARCH_ADAPTERS.map((adapter) => adapter.info.id));
+for (const id of catalogIds) if (!adapterIds.has(id)) problems.push(`source "${id}" is in RESEARCH_SOURCES but has no adapter`);
+for (const id of adapterIds) if (!catalogIds.has(id)) problems.push(`adapter "${id}" is not in RESEARCH_SOURCES`);
+for (const adapter of RESEARCH_ADAPTERS) {
+  const { id, roles } = adapter.info;
+  const methods: Array<[string, boolean, boolean]> = [
+    ["discover/search", roles.includes("discover"), Boolean(adapter.search)],
+    ["resolve/resolve", roles.includes("resolve"), Boolean(adapter.resolve)],
+  ];
+  for (const [label, declared, implemented] of methods) {
+    if (declared !== implemented) problems.push(`${id}: role ${label} declared=${declared} implemented=${implemented}`);
+  }
+  const enrich = adapter.info.enriches;
+  for (const [kind, method] of [
+    ["references", adapter.references],
+    ["citedBy", adapter.citedBy],
+    ["related", adapter.related],
+  ] as const) {
+    if (enrich.includes(kind) !== Boolean(method)) {
+      problems.push(`${id}: enrichment "${kind}" declared=${enrich.includes(kind)} implemented=${Boolean(method)}`);
+    }
+  }
+}
+for (const scope of RESEARCH_SCOPES) {
+  for (const source of scope.sources) {
+    if (!catalogIds.has(source)) problems.push(`scope "${scope.id}" names unknown source "${source}"`);
+  }
+}
+if (problems.length) {
+  console.error("research:matrix FAILED — catalog and adapters disagree:\n  " + problems.join("\n  "));
+  process.exit(1);
+}
+
+// ── Render ────────────────────────────────────────────────────────────────
+const lines: string[] = [];
+const out = (line = "") => lines.push(line);
+const list = (values: readonly string[]) => (values.length ? values.join(", ") : "—");
+
+out("<!-- GENERATED FILE — DO NOT EDIT BY HAND.");
+out("     Regenerate: pnpm research:matrix");
+out("     CI guard:   pnpm research:matrix:check");
+out("     Source:     scripts/generate-research-source-matrix.ts -->");
+out();
+out("# Research Source Matrix");
+out();
+out(
+  "What each **built** research source does at runtime, derived from `lib/domain/research/sources.ts` and the adapter registry. The roadmap of every source considered (with value ratings) is `work-tracking/RESEARCH-READER-PLAN.md` §5."
+);
+out();
+out("## Sources");
+out();
+out("| Source | Roles | Access | Whose key | Rate limit | Resolves | Enriches | Default on |");
+out("|---|---|---|---|---|---|---|---|");
+for (const source of RESEARCH_SOURCES) {
+  out(
+    `| [${source.label}](${source.homepage}) (\`${source.id}\`) | ${list(source.roles)} | ${source.access}${
+      source.costNote ? ` (${source.costNote})` : ""
+    } | ${source.keyPolicy}${source.appKeyEnv ? ` · \`${source.appKeyEnv}\`` : ""} | ${source.rateLimit.requests}/${
+      source.rateLimit.perSeconds
+    }s | ${list(source.resolves)} | ${list(source.enriches)} | ${source.defaultOn ? "yes" : "no"} |`
+  );
+}
+out();
+out("## Search facets honoured");
+out();
+out("A facet a source ignores is greyed for that source in the UI, never silently dropped.");
+out();
+out("| Source | Facets | Types returned |");
+out("|---|---|---|");
+for (const source of RESEARCH_SOURCES) {
+  out(`| ${source.label} | ${list(source.facets)} | ${list(source.types)} |`);
+}
+out();
+out("## Scopes");
+out();
+out("| Scope | Pack | Status | Sources | Types | Field |");
+out("|---|---|---|---|---|---|");
+for (const scope of RESEARCH_SCOPES) {
+  out(
+    `| ${scope.label} (\`${scope.id}\`) | ${scope.pack ?? "core"} | ${scope.status} | ${
+      scope.local ? "your library" : list(scope.sources)
+    } | ${list(scope.types)} | ${scope.field ?? "—"} |`
+  );
+}
+out();
+out("## Terms");
+out();
+for (const source of RESEARCH_SOURCES) out(`- **${source.label}:** ${source.terms}`);
+out();
+out("---");
+out();
+out("*Regenerated by `pnpm research:matrix`; `pnpm research:matrix:check` fails when this doc is stale or the catalog and adapters disagree.*");
+out();
+
+const rendered = lines.join("\n");
+const outputAbs = path.join(ROOT, OUTPUT_REL);
+if (process.argv.includes("--check")) {
+  let existing = "";
+  try {
+    existing = readFileSync(outputAbs, "utf8");
+  } catch {
+    // missing → stale
+  }
+  if (existing !== rendered) {
+    console.error(`research:matrix:check FAILED — ${OUTPUT_REL} is stale (or missing). Run \`pnpm research:matrix\` and commit the result.`);
+    process.exit(1);
+  }
+  console.log(`research:matrix:check passed — ${OUTPUT_REL} matches the code.`);
+} else {
+  writeFileSync(outputAbs, rendered);
+  console.log(`Wrote ${OUTPUT_REL}`);
+}

@@ -1,5 +1,5 @@
 ---
-status: proposed — owner decisions (§7) and codebase review (§9) recorded 2026-10-01; awaiting approval
+status: approved 2026-10-01 — V1.0 building (foundation, schema, first four sources)
 created: 2026-09-30
 parent: EREADER-PLAN.md (R-Research — the third reader source after Books and Scriptures)
 scope: research discovery, open-access full text, library import, paper reading, AI research, domain packs
