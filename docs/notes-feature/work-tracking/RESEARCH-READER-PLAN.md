@@ -1,5 +1,5 @@
 ---
-status: proposed — owner decisions recorded 2026-10-01 (§7)
+status: proposed — owner decisions (§7) and codebase review (§9) recorded 2026-10-01; awaiting approval
 created: 2026-09-30
 parent: EREADER-PLAN.md (R-Research — the third reader source after Books and Scriptures)
 scope: research discovery, open-access full text, library import, paper reading, AI research, domain packs
@@ -106,12 +106,12 @@ the PDF*. **The source is provenance, not navigation.**
 
 | Surface | Where | What |
 |---|---|---|
-| **Find** | Main-panel tab "Research". Opened from + → Reader → Research, or "Research in this folder" on a folder's context menu. | Search box with scope, facets row, and merged results streaming in. A **source strip** shows which sources answered, which were slow or failed, and which paid sources are off until you click (*"Also ask Google Scholar — uses your SerpAPI key"*). |
+| **Find** | Main-panel tab "Research". Opened from + → Reader → Research. The + menu opened on a folder already passes that folder (`parentId`), which scopes the search and the destination to it. No new file-tree context-menu hook is needed. | Search box with scope, facets row, and merged results streaming in. A **source strip** shows which sources answered, which were slow or failed, and which paid sources are off until you click (*"Also ask Google Scholar — uses your SerpAPI key"*). |
 | **Preview** | Right sidebar → **Work** view | Selecting a result shows its details, abstract / TLDR, access ladder, references, cited-by and related works. **Add to folder** and **Open**. There's no preview pane inside the Find tab. |
 | **Read** | Main panel reader | Reflowable HTML when we can get it: JATS from PMC / Europe PMC, arXiv HTML, publisher HTML. Otherwise an annotated PDF (pdf.js). Same themes, marks, speed read and full screen as books. |
 | **Secondary toolbar** (paper-specific) | Under the content toolbar | Sections, figures, the reflow ⇄ PDF toggle, and a references jump. Each is a shortcut into a sidebar view, not a private panel. |
 | **Sidebar rail for an open paper** | Right sidebar | Existing views: Contents · Search · Notes · Display. New views: **Details · References · Cited by · Related · Claims**. Clicking a citation marker in the text opens that reference in the rail, with Add / Open. |
-| **The project** | The folder itself | Folder view with Papers columns (authors, year, venue, type, access, status). Saved-search nodes show "12 new". AI reports are notes. The Claims database sits beside them. |
+| **The project** | The folder itself | A **Papers** view: a query-mode database whose rows *are* the folder's paper nodes, so nothing is copied, with read-only meta columns from `WorkMeta` (authors, year, venue, type, access, status) — §9.4. Saved-search nodes show "12 new". AI reports are notes. The Claims database sits beside them. |
 | **Settings** | Settings → Reader → Research | **Packs** (a catalog like scripture traditions), **Connections** (API keys: Semantic Scholar, CORE, Zotero, Exa, SerpAPI…), **Institution** (OpenURL / EZproxy), and a contact-email policy for the "polite pools". |
 
 ```
@@ -133,10 +133,14 @@ the PDF*. **The source is provenance, not navigation.**
 Some types need their own reading experience, not just a card face:
 
 - **Statutes and regulations** (US Code, CFR, EUR-Lex, legislation.gov.uk) are
-  hierarchical, versioned and cited by unit. That's the **scripture corpus shape**:
-  browse title → part → section, with unit-level anchors and links like
-  `[[26 USC 501(c)(3)`. We reuse the corpus reader pattern and don't invent a
-  new one.
+  hierarchical, versioned and cited by unit, like scripture, but the scripture
+  model doesn't stretch to fit them (§9.3). It is a fixed volume → book →
+  numbered chapter → numbered verse, stored locally. Statutes have arbitrary
+  depth and string ids (`1026.19`, `501(c)(3)`), and are fetched remotely and
+  versioned. They get a **generic hierarchical-corpus interface and a small
+  statute viewer** built from the reader's shell pieces (themes, marks, sidebar,
+  anchors), with links like `[[26 USC 501(c)(3)`. Scriptures can move onto that
+  interface later.
 - **Datasets and statistical series** (FRED, World Bank, OWID) get a chart
   preview. "Add" can drop a chart or table block into a note, not only a link node.
 - **Archival images** (IIIF from LoC, Europeana, Gallica, museums) get an
@@ -218,7 +222,7 @@ we're not doing now — is tracked in `BACKLOG.md` under "Research reader — V1
 
 | Phase | Contents |
 |---|---|
-| **V1.0 — Research core** (owner: "all of 1–4") | **Discover:** OpenAlex, Semantic Scholar, Crossref. **Resolve / full text:** Unpaywall, arXiv, Europe PMC + PMC OA, bioRxiv/medRxiv, CORE, DOAJ. **Enrich:** S2 references / cited-by / related / TLDR, OpenCitations, Crossref retractions. **Import:** Zotero (Zotero is the source of truth: collections → folders, plus Zotero's PDF annotations read-only, plus "Save to Zotero" create-only push — §7.4), BibTeX / RIS / CSL-JSON files, Hypothesis, DOI/URL paste. **Reader:** JATS/HTML reflow + annotated PDF (pdf.js), Work sidebar views, the Claims action. **Find tab** with scopes, the identifier-aware box and the access ladder. Institution setting (OpenURL / EZproxy). **Packs: Biomedicine, CS & ML.** **Law stub:** the Law scope shows in the pack catalog as "coming in V1.1", and pasted legal citations / docket URLs resolve to external link nodes (CourtListener / govinfo). **AI:** paper context bundle, research tools, chat with the open paper, explain-selection, summaries, plain-English → filters (§8). |
+| **V1.0 — Research core** (owner: "all of 1–4") | **Discover:** OpenAlex, Semantic Scholar, Crossref. **Resolve / full text:** Unpaywall, arXiv, Europe PMC + PMC OA, bioRxiv/medRxiv, CORE, DOAJ. **Enrich:** S2 references / cited-by / related / TLDR, OpenCitations, Crossref retractions. **Import:** Zotero (Zotero is the source of truth: collections → folders, plus Zotero's PDF annotations read-only, plus "Save to Zotero" create-only push — §7.4), BibTeX / RIS / CSL-JSON files, Hypothesis, DOI/URL paste. **Reader:** JATS/HTML reflow + annotated PDF (pdf.js), Work sidebar views, the Claims action. **Find tab** with scopes, the identifier-aware box and the access ladder. Institution setting (OpenURL / EZproxy). **Packs: Biomedicine, CS & ML.** **Law stub (a probe):** the Law scope shows in the pack catalog as "coming in V1.1". A pasted case citation resolves through CourtListener to a **case** Work, saved as a link node. **One CFR section** opens through the generic hierarchical-corpus interface over the eCFR API (§9.3). **Paid-source probe:** Google Scholar via SerpAPI (BYOK), to exercise the cost gate. **Foundations from the first PR:** the source capability matrix + its CI check; a Work model that never assumes a paper (multi-valued identifiers, open type list, per-type schema); region locators in the locator type, with Zotero image annotations as real data (listed, not drawn, until V1.2); a test-only check that one book source (Open Library) satisfies the adapter contract; the shared text-quote re-anchoring module (§9.1); and the quota / caching / key policy (§9.5). **AI:** paper context bundle, research tools, chat with the open paper, explain-selection, summaries, plain-English → filters (§8). |
 | **V1.1** | **Ask mode:** port the deep-research loop onto AI SDK v6; use the provider's built-in web search first, with Exa / Tavily / Parallel / Perplexity as BYOK connections. **Screening** and **Ask this folder** (§8). **Following:** saved-search nodes with "new since", citation alerts. **Pack: Law (US)** (full). |
 | **V1.2** | **Packs:** Patents, Data & statistics, Archives & humanities. **Also:** citation-graph folder view, citation node + bibliography block in notes (§7a). |
 | **V1.3+ (backlog)** | **Packs:** Physics / Astro / Math, Economics & social science, Education, Earth & environment, EU / UK law. **Also:** paid PDF parsers (BYOK), scite / Consensus if their APIs fit, provider-managed deep research as a "delegate" option, SPECTER2 semantic similarity over your own library (needs pgvector — not enabled today). |
@@ -693,3 +697,131 @@ outside assistants. It mostly reuses these tools; the real work is OAuth.
 creating rows) go through the existing proposal and approval steps. Research
 tools get a fixture gate with recorded adapter responses, no network — the
 pattern of `proposal:shape:check`.
+
+---
+
+## 9. Review against the codebase (2026-10-01)
+
+The plan was checked against the code as it stands. Nothing here changes the
+direction. Each finding corrects an assumption or adds V1.0 foundations.
+
+### 9.1 Annotation parity needs text-quote re-anchoring (V1.0)
+
+`BookReader` anchors marks **by CFI only**, and a CFI that no longer resolves is
+dropped silently (`addAnnotation(...).catch(() => undefined)`). There is no
+text-quote fallback, so Kindle / Readwise imports can't be drawn in the text
+today either.
+
+Papers fetched on demand, and Hypothesis / Zotero imports, rely on re-finding a
+quote. So V1.0 builds **one shared re-anchoring module**: exact quote +
+prefix / suffix, then fuzzy, as Hypothesis does. Every viewer uses it as the
+fallback after its native locator (CFI / page) fails. Books gain in-text
+display of imported highlights as a side effect.
+
+### 9.2 Reflowed papers render through foliate-js; PDFs get one shared viewer
+
+- **Reflowed papers.** `view.open(book)` in foliate-js accepts any object with
+  `sections[]`, `toc` and `metadata`, not only parsed files. Reflowed papers
+  (JATS, arXiv HTML, publisher HTML) become a **synthetic foliate book**, one
+  section per article section. That inherits, almost for free:
+  - the EPUB sanitizer (`extensions/reader/lib/sanitize.ts`) and iframe isolation;
+  - themes, CFI marks, in-book search, TOC, speed read and progress.
+
+  This is how annotation parity holds for the reflowed path.
+- **PDFs.** The installed `foliate-js@1.0.1` has **no PDF module**, so PDFs get a
+  pdf.js viewer (EmbedPDF or react-pdf-highlighter for the highlight layer). It
+  is **one viewer for the whole reader**, and it also closes the existing "PDF in
+  reader" backlog item for books.
+
+### 9.3 Statutes need a generic hierarchical corpus, not the scripture model
+
+The scripture model is fixed:
+
+- the API is `ScriptureContents` → volumes → books → integer chapters → integer
+  verses;
+- the tables are `ScriptureBook` / `ScriptureVerse`, installed locally.
+
+CFR and the US Code have arbitrary depth, string unit ids, and remote, versioned
+text. The V1.0 Law probe defines a **hierarchical-corpus interface** (tree nodes
+with string ids, leaf units with paragraph anchors, a remote loader, an optional
+point-in-time date) and a minimal statute viewer. **Law V1.1 is larger than first
+estimated because of this.** Scriptures can adopt the interface later; they don't
+have to.
+
+### 9.4 Papers and Claims use the existing database model
+
+The app already has the pieces:
+
+- **query-mode tables** (`DataPayload.mode = "query"`), whose rows *are* matching
+  ContentNodes with nothing copied — Principle 1 exactly;
+- **`contentLink` columns** pointing at ContentNodes.
+
+So:
+
+- **Papers** = a query-mode table. It needs two small extensions: a **folder
+  scope** in `ContentQuery` (today it's tags + content types only), and
+  **read-only meta columns** sourced from a typed side row (`WorkMeta`; the same
+  mechanism gives Books a table from `BookMeta`).
+- **Claims** = an inline table with a `contentLink` column to the paper. A claim's
+  provenance needs the *passage*, so a `contentLink` cell gains an optional
+  **anchor** (`annotation:<id>`), the same contract wiki-links use. That's a JSON
+  cell change, not a schema change.
+
+This replaces the earlier "folder view with Papers columns". Folder list views
+have no metadata columns.
+
+### 9.5 Shared quotas, keys and schedules
+
+- **Quotas.** The app-level keys (OpenAlex — now key-based with a daily
+  allowance — plus Semantic Scholar and CORE) are **shared by every user**.
+  V1.0 needs:
+  - a shared `WorkCache`;
+  - per-user rate limiting at the federation layer;
+  - optional **per-user keys** that override the app key.
+- **Where keys live.** Use the existing stores; don't add a third:
+  - **`ReaderConnection`** (encrypted, keyed by provider; it already holds
+    Readwise / Hardcover / Google Books) for Zotero, Hypothesis and per-user
+    S2 / CORE / OpenAlex keys;
+  - **`SearchConnection`** (Tavily / Brave) for Exa / Serper / SerpAPI, so Ask
+    mode's existing per-user search resolver picks them up.
+- **Schedules.** Every cron in `vercel.json` is daily. Zotero sync and
+  saved-search "new since" therefore run **when opened** (Zotero's
+  `since=<version>` makes that cheap), with a daily cron as the backstop. No
+  frequent polling.
+
+### 9.6 Fetch on demand must respect function response limits
+
+Proxying a 5–20 MB PDF through a Vercel function can hit the platform's
+response-size limit (verify current limits for streamed responses). V1.0 picks
+the transport per source:
+
+- **direct client fetch** where the source allows CORS;
+- otherwise a **short-lived transient object** in our storage (TTL-deleted,
+  never a content node), which keeps the "not persisted as user content" policy.
+
+### 9.7 Licence gates publishing, as it does for books
+
+`BookMeta.license` already gates publishing. `WorkMeta` carries the licence
+from Unpaywall / Europe PMC / arXiv, and the publishing and public-file-link
+seams must **refuse a stored copy that isn't redistributable**. A
+non-redistributable paper stored in the user's private storage is fine; making
+it public isn't.
+
+### 9.8 Smaller corrections
+
+- **`[[10.1038/…` create-on-insert.** `LinkAnchorSuggester` returns *existing*
+  targets, so creating a Work's node when a link is picked needs a small contract
+  extension (an `onPick` resolve step). That's V1.1. Papers already in the
+  library link today.
+- **Where a book ends and a Work begins.** A *book* found in Research goes
+  through the existing Books acquire path (`BookMeta`). `WorkMeta` covers every
+  other type. Unifying them is backlog.
+- **No migrations for the new annotation kinds.** `ReaderAnnotation.source` is a
+  free `VarChar(20)` ("hypothesis", "zotero" fit) and `locator` is JSON (region
+  selectors fit).
+- **The citation node (V1.2) is a TipTap schema change:** a `Server*` variant,
+  collaboration registration, a `TIPTAP_SCHEMA_VERSION` minor bump, and a
+  Hocuspocus redeploy after merge.
+- **AI chat on the virtual Research tab** needs the virtual-id audit noted in
+  `SCRIPTURES-INTEGRATION-PLAN.md` §11.6 before chat is offered there. Chat on a
+  paper node is unaffected.

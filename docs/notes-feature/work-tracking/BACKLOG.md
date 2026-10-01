@@ -68,6 +68,10 @@ reason. Ratings and access notes are in the plan's §5 registry.
 - [ ] **Digital Garden as an MCP server** (app-wide). Expose the library, highlights and claims to Claude Desktop / ChatGPT / Cursor; mostly reuses the research tools, the real work is OAuth.
 - [ ] Listen to a paper summary (TTS) and flashcards from a paper.
 
+**Unification (from the plan's §9 review)**
+- [ ] One metadata side row for books and Works (`BookMeta` → `WorkMeta` type `book`) once both are stable.
+- [ ] Move scriptures onto the generic hierarchical-corpus interface built for statutes.
+
 **Zotero**
 - [ ] Two-way edit sync and annotation write-back. Deliberately not planned: metadata / move / delete conflicts, and Zotero's page-rect anchors vs our text-quote anchors. V1 is one-way sync + create-only "Save to Zotero".
 
