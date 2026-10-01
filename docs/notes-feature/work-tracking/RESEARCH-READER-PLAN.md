@@ -220,7 +220,7 @@ we're not doing now — is tracked in `BACKLOG.md` under "Research reader — V1
 |---|---|
 | **V1.0 — Research core** (owner: "all of 1–4") | **Discover:** OpenAlex, Semantic Scholar, Crossref. **Resolve / full text:** Unpaywall, arXiv, Europe PMC + PMC OA, bioRxiv/medRxiv, CORE, DOAJ. **Enrich:** S2 references / cited-by / related / TLDR, OpenCitations, Crossref retractions. **Import:** Zotero (Zotero is the source of truth: collections → folders, plus Zotero's PDF annotations read-only, plus "Save to Zotero" create-only push — §7.4), BibTeX / RIS / CSL-JSON files, Hypothesis, DOI/URL paste. **Reader:** JATS/HTML reflow + annotated PDF (pdf.js), Work sidebar views, the Claims action. **Find tab** with scopes, the identifier-aware box and the access ladder. Institution setting (OpenURL / EZproxy). **Packs: Biomedicine, CS & ML.** **Law stub:** the Law scope shows in the pack catalog as "coming in V1.1", and pasted legal citations / docket URLs resolve to external link nodes (CourtListener / govinfo). **AI:** paper context bundle, research tools, chat with the open paper, explain-selection, summaries, plain-English → filters (§8). |
 | **V1.1** | **Ask mode:** port the deep-research loop onto AI SDK v6; use the provider's built-in web search first, with Exa / Tavily / Parallel / Perplexity as BYOK connections. **Screening** and **Ask this folder** (§8). **Following:** saved-search nodes with "new since", citation alerts. **Pack: Law (US)** (full). |
-| **V1.2** | **Packs:** Patents, Data & statistics, Archives & humanities. **Also:** citation-graph folder view, citation formatting in notes (CSL). |
+| **V1.2** | **Packs:** Patents, Data & statistics, Archives & humanities. **Also:** citation-graph folder view, citation node + bibliography block in notes (§7a). |
 | **V1.3+ (backlog)** | **Packs:** Physics / Astro / Math, Economics & social science, Education, Earth & environment, EU / UK law. **Also:** paid PDF parsers (BYOK), scite / Consensus if their APIs fit, provider-managed deep research as a "delegate" option, SPECTER2 semantic similarity over your own library (needs pgvector — not enabled today). |
 
 **Why these packs first.** Biomedicine and CS & ML reuse the scholarly face and
@@ -595,6 +595,54 @@ Record the specific gap in the code when building each.
    server-configured project address, never the user's own email.
 
 ---
+
+## 7a. Annotations and citations (owner requirement: parity with books and scriptures)
+
+**Requirement.** Papers get everything books and scriptures have. A paper is a
+content node, so its marks use the same store (`ReaderAnnotation`, `targetKey:
+content:<id>`) and inherit all of this unchanged:
+
+- highlights, underlines, notes and bookmarks;
+- the sidebar Notes view;
+- send-to-note, with a link back to the passage;
+- `[[Paper title#` listing highlights as `annotation:` anchors, with the link
+  opening at the passage;
+- the AI context bundle;
+- Claims rows that keep their source anchor.
+
+**Per-viewer work** is to take an anchor and draw marks:
+
+- **Reflowed** (JATS / arXiv HTML / publisher HTML): section href + offsets +
+  text quote, the EPUB approach.
+- **PDF:** page index + text quote, re-found on the pdf.js text layer.
+- **Fetched on demand:** text quote with prefix / suffix (W3C TextQuoteSelector,
+  fuzzy match as Hypothesis does), so marks survive a re-fetch.
+
+**Additions** (open anchor contract, no schema change):
+
+- `section:` and `figure:` anchors from structured full text.
+- Identifier link suggestions (`[[10.1038/…`, `[[arXiv:…`) that resolve the Work
+  and create its node when the link is inserted.
+
+**Limits:**
+
+- External-link-only Works can't be marked in-app; they are linked and noted.
+- Hypothesis and Zotero imports list in Notes, and anchor once their quote is
+  found. Zotero's are read-only.
+- Scanned PDFs and IIIF images need region locators; that comes with the
+  Archives pack (V1.2).
+
+**Citing while writing — V1.2:**
+
+- A **citation inline node** in notes: a wiki-link to a Work, optionally to an
+  annotation anchor, rendered "(Smith 2021)".
+- A **bibliography block** that collects a note's cited Works and formats them
+  (citation-js; Zotero's Web API for Zotero users).
+- Export carries the formatting.
+
+The existing Google Drive integration opens Office files in Google's editors.
+It has no citation support, so Zotero users keep Zotero's Word / Docs plugins.
+Whether Zotero's Docs integration works inside our embedded editor is untested.
 
 ## 8. AI: what's feasible with low upkeep
 
