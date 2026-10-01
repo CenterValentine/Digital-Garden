@@ -213,12 +213,15 @@ them.
 
 ## 4. Phases
 
+This plan covers **V1.0–V1.2**. Everything marked V1.3+ — including the AI ideas in §8 that
+we're not doing now — is tracked in `BACKLOG.md` under "Research reader — V1.3 and beyond".
+
 | Phase | Contents |
 |---|---|
 | **V1.0 — Research core** (owner: "all of 1–4") | **Discover:** OpenAlex, Semantic Scholar, Crossref. **Resolve / full text:** Unpaywall, arXiv, Europe PMC + PMC OA, bioRxiv/medRxiv, CORE, DOAJ. **Enrich:** S2 references / cited-by / related / TLDR, OpenCitations, Crossref retractions. **Import:** Zotero (Zotero is the source of truth: collections → folders, plus Zotero's PDF annotations read-only, plus "Save to Zotero" create-only push — §7.4), BibTeX / RIS / CSL-JSON files, Hypothesis, DOI/URL paste. **Reader:** JATS/HTML reflow + annotated PDF (pdf.js), Work sidebar views, the Claims action. **Find tab** with scopes, the identifier-aware box and the access ladder. Institution setting (OpenURL / EZproxy). **Packs: Biomedicine, CS & ML.** **Law stub:** the Law scope shows in the pack catalog as "coming in V1.1", and pasted legal citations / docket URLs resolve to external link nodes (CourtListener / govinfo). **AI:** paper context bundle, research tools, chat with the open paper, explain-selection, summaries, plain-English → filters (§8). |
 | **V1.1** | **Ask mode:** port the deep-research loop onto AI SDK v6; use the provider's built-in web search first, with Exa / Tavily / Parallel / Perplexity as BYOK connections. **Screening** and **Ask this folder** (§8). **Following:** saved-search nodes with "new since", citation alerts. **Pack: Law (US)** (full). |
 | **V1.2** | **Packs:** Patents, Data & statistics, Archives & humanities. **Also:** citation-graph folder view, citation formatting in notes (CSL). |
-| **Later** | **Packs:** Physics / Astro / Math, Economics & social science, Education, Earth & environment, EU / UK law. **Also:** paid PDF parsers (BYOK), scite / Consensus if their APIs fit, provider-managed deep research as a "delegate" option, SPECTER2 semantic similarity over your own library (needs pgvector — not enabled today). |
+| **V1.3+ (backlog)** | **Packs:** Physics / Astro / Math, Economics & social science, Education, Earth & environment, EU / UK law. **Also:** paid PDF parsers (BYOK), scite / Consensus if their APIs fit, provider-managed deep research as a "delegate" option, SPECTER2 semantic similarity over your own library (needs pgvector — not enabled today). |
 
 **Why these packs first.** Biomedicine and CS & ML reuse the scholarly face and
 have the best free APIs in the registry, so they cost the least to add. Law
@@ -241,7 +244,7 @@ the faces pattern is proven.
   - **$** paid, the user brings their own key
   - **I** institutional pricing
   - **L** no usable API, so link-out only
-- **Phase:** V1.0 / V1.1 / V1.2 / Later / Link / Skip.
+- **Phase:** V1.0 / V1.1 / V1.2 / V1.3+ (tracked in `BACKLOG.md`) / Link / Skip.
 
 ### 5.1 Scholarly discovery indexes
 
@@ -255,12 +258,12 @@ the faces pattern is proven.
 | **DataCite** | DOIs for datasets, software, theses | ★★★ | F | V1.2 | Joins with the Data pack. |
 | **ORCID public API** | Author identity, works lists | ★★★ | K | V1.1 | "All works by this author" and disambiguation. |
 | **ROR** | Institution identity | ★★ | F | V1.2 | Normalizes affiliation facets. |
-| **OpenAIRE Graph** | EU research graph: projects, funding, data↔paper links | ★★★ | F | Later | Overlaps with OpenAlex. Its strength is European funder links. |
+| **OpenAIRE Graph** | EU research graph: projects, funding, data↔paper links | ★★★ | F | V1.3+ | Overlaps with OpenAlex. Its strength is European funder links. |
 | **Lens.org** | Scholarly works + patents in one API | ★★★ | K/$ | V1.2 | Access by application. Most valuable for scholarly↔patent links in the Patents pack. |
 | **Dimensions** | Grants, trials, policy docs, patents | ★★★ | I | Link | API access is institutional or research-programme only. The free web app is linkable. |
 | **Scopus / Web of Science** | Curated citation indexes | ★★ | I | Skip | Institutional pricing, and OpenAlex + S2 cover the need. |
 | **Google Scholar** (via SerpAPI / Serper) | The broadest recall, including grey literature | ★★★ | $ | V1.1 | No official API. Offer it as an opt-in paid source in the source strip, with the per-call cost shown. |
-| **BASE** (Bielefeld) | 400M+ records from repositories | ★★ | K | Later | Needs the server's IP registered — verify the terms. Largely covered by CORE + OpenAlex. |
+| **BASE** (Bielefeld) | 400M+ records from repositories | ★★ | K | V1.3+ | Needs the server's IP registered — verify the terms. Largely covered by CORE + OpenAlex. |
 | **Microsoft Academic** | — | — | — | Skip | Retired in 2021. OpenAlex is its successor. |
 
 ### 5.2 Open-access full text and resolvers
@@ -275,8 +278,8 @@ the faces pattern is proven.
 | **DOAJ** | 20k+ vetted OA journals; licence metadata | ★★★ | F | V1.0 | Quality signal: "in DOAJ" badge. |
 | **Internet Archive Scholar** (fatcat) | Preserved copies of vanished OA papers | ★★★ | F | V1.1 | Last rung before "abstract only". |
 | **Zenodo** | Papers, data, software with DOIs | ★★★ | F | V1.2 | Data pack. |
-| **OSF Preprints** (PsyArXiv, SocArXiv, EdArXiv…) | Social-science and psychology preprints | ★★★ | F | Later | Econ / Social pack. |
-| **HAL** | French national repository | ★★ | F | Later | |
+| **OSF Preprints** (PsyArXiv, SocArXiv, EdArXiv…) | Social-science and psychology preprints | ★★★ | F | V1.3+ | Econ / Social pack. |
+| **HAL** | French national repository | ★★ | F | V1.3+ | |
 | **Figshare**, **Dryad** | Datasets and supplements | ★★ | F | V1.2 | Data pack. |
 | **Sci-Hub / LibGen / Anna's Archive** | — | — | — | **Skip** | Copyright infringement. Never integrated or linked. The access ladder uses legal routes only (OA, preprint, the user's library, request). |
 
@@ -289,18 +292,18 @@ the faces pattern is proven.
 | **DBLP** | Computer-science bibliography, CC0 | ★★★★ | F | V1.0 | CS & ML pack. Clean venue data. |
 | **Hugging Face Papers** | Daily ML papers, linked models, datasets and code | ★★★ | F | V1.0 | CS & ML pack. Papers with Code was retired into this in 2025. |
 | **ACL Anthology** | NLP papers (data on GitHub) | ★★★ | F | V1.2 | CS & ML pack add-on. |
-| **IEEE Xplore API** | Engineering metadata | ★★ | K / I | Later | Full text needs a subscription. Metadata is mostly in OpenAlex. |
+| **IEEE Xplore API** | Engineering metadata | ★★ | K / I | V1.3+ | Full text needs a subscription. Metadata is mostly in OpenAlex. |
 | **ACM Digital Library** | CS | ★★ | L | Link | No public API. OpenAlex + DBLP cover the metadata. |
-| **ChemRxiv** | Chemistry | ★★ | F | Later | |
-| **NASA ADS** | Astronomy and physics; full-text search, citations | ★★★★ | K | Later | Physics / Astro pack. Excellent. |
-| **INSPIRE-HEP** | Particle physics | ★★★ | F | Later | Physics pack. |
-| **zbMATH Open** | Mathematics reviews and metadata (open since 2021) | ★★★ | F | Later | Math pack. |
+| **ChemRxiv** | Chemistry | ★★ | F | V1.3+ | |
+| **NASA ADS** | Astronomy and physics; full-text search, citations | ★★★★ | K | V1.3+ | Physics / Astro pack. Excellent. |
+| **INSPIRE-HEP** | Particle physics | ★★★ | F | V1.3+ | Physics pack. |
+| **zbMATH Open** | Mathematics reviews and metadata (open since 2021) | ★★★ | F | V1.3+ | Math pack. |
 | **MathSciNet** | Math reviews | ★★ | I | Link | |
-| **OEIS** | Integer sequences | ★★ | F | Later | Math-pack delight. |
-| **RePEc / IDEAS** | Economics working papers | ★★★ | F (bulk) | Later | No live search API. Harvest RePEc metadata. |
+| **OEIS** | Integer sequences | ★★ | F | V1.3+ | Math-pack delight. |
+| **RePEc / IDEAS** | Economics working papers | ★★★ | F (bulk) | V1.3+ | No live search API. Harvest RePEc metadata. |
 | **NBER**, **SSRN** | Econ / law / social-science working papers | ★★ | L | Link | No API. Items appear through OpenAlex / Crossref anyway. |
-| **ERIC API** | Education research | ★★★ | F | Later | Education pack. |
-| **PhilPapers** | Philosophy | ★★ | L / K | Later | Limited API. |
+| **ERIC API** | Education research | ★★★ | F | V1.3+ | Education pack. |
+| **PhilPapers** | Philosophy | ★★ | L / K | V1.3+ | Limited API. |
 
 ### 5.4 Enrichment and quality signals
 
@@ -310,7 +313,7 @@ the faces pattern is proven.
 | **S2 citation contexts + intents** | *How* a paper is cited (background / method / result) | ★★★★ | K | V1.0 | Shown in the "Cited by" view. |
 | **iCite** (NIH) | Relative citation ratio, clinical citations, open citation data | ★★★ | F | V1.0 | Biomedicine pack. |
 | **PubTator3** (NCBI) | Entity annotations (genes, chemicals, diseases, variants) | ★★★ | F | V1.1 | Biomedicine pack: entity chips in the reader. |
-| **scite** | Smart Citations (supporting / contrasting) | ★★★★ | $ / I | Later | Individual plans exist; API access is institutional — verify. Excellent if the API becomes reachable. |
+| **scite** | Smart Citations (supporting / contrasting) | ★★★★ | $ / I | V1.3+ | Individual plans exist; API access is institutional — verify. Excellent if the API becomes reachable. |
 | **Altmetric** | Attention (news, policy, social) | ★★ | I | Skip | Institutional. The free badge embed can be a link. |
 
 ### 5.5 Library import and sync
@@ -320,7 +323,7 @@ the faces pattern is proven.
 | **Zotero Web API** | The user's existing library: collections → folders, items, notes, attachments, tags | ★★★★★ | K (OAuth) | V1.0 one-way, V1.2 two-way | Principle 1's main case: *project the library they already keep*. File download works for their own synced storage. |
 | **BibTeX / BibLaTeX / RIS / CSL-JSON / EndNote XML import** | Every other manager (Mendeley, Paperpile, EndNote, JabRef, ReadCube) via export | ★★★★ | F | V1.0 | Parse with **citation-js** (MIT). |
 | **Hypothesis API** | The user's web / PDF annotations (W3C Web Annotation) | ★★★★ | K | V1.0 | Same anchoring model as ours (TextQuote + TextPosition). They import as `ReaderAnnotation` with `source: "hypothesis"`. |
-| **Mendeley API** | Library sync | ★★ | K | Later | Elsevier restricts new app registrations — verify. BibTeX export covers the need. |
+| **Mendeley API** | Library sync | ★★ | K | V1.3+ | Elsevier restricts new app registrations — verify. BibTeX export covers the need. |
 | **Paperpile, EndNote, ReadCube Papers** | — | ★ | L | Import via file | No public APIs. |
 | **Readwise** | Highlights including papers | ★★★ | K | Built | Already imported by the reader (R4). |
 | **Kindle clippings** | — | — | — | Built | Books only. |
@@ -329,7 +332,7 @@ the faces pattern is proven.
 
 | Tool | What it does | Value | Licence | Phase | Notes |
 |---|---|---|---|---|---|
-| **Zotero translation-server** | URL / DOI / ISBN / PMID → full metadata using Zotero's 600+ site translators | ★★★ | AGPL (would be a separate service) | Later, only if needed | **No new servers (§7.3).** Citation meta tags + DOI sniffing + Crossref cover most pages; it only adds the long tail of odd sites. |
+| **Zotero translation-server** | URL / DOI / ISBN / PMID → full metadata using Zotero's 600+ site translators | ★★★ | AGPL (would be a separate service) | V1.3+, only if needed | **No new servers (§7.3).** Citation meta tags + DOI sniffing + Crossref cover most pages; it only adds the long tail of odd sites. |
 | **citation-js** | Parse and emit BibTeX, RIS, CSL-JSON, Wikidata; resolve DOIs | ★★★★★ | MIT | V1.0 | Runs in-process, TypeScript-friendly. |
 | **citeproc-js** + **CSL styles repo** (~10k styles) | Format citations and bibliographies in any style | ★★★★ | CPAL-1.0 / AGPL dual | V1.2 | **Check licence fit before bundling.** CPAL has attribution terms. Styles are CC-BY-SA. |
 | **reporters-db / courts-db** (Free Law Project) | Legal reporter abbreviations and court data as JSON | ★★★★ | BSD | V1.1 | Law pack citation grammar in TypeScript, the way we did scripture references. |
@@ -345,13 +348,13 @@ the faces pattern is proven.
 | **JATS → HTML** (e.g. Curvenote's `jats-xml`) | Reflow PMC / Europe PMC / eLife articles | ★★★★★ | MIT (verify package) | V1.0 | Reflow beats PDF for themes, speed read, accessibility, mobile and stable anchors. |
 | **arXiv HTML** (LaTeXML) | Reflow for arXiv papers | ★★★★ | F | V1.0 | Falls back to PDF when HTML conversion failed. |
 | **Readability** (`@mozilla/readability`, already a dependency) | Reflow publisher HTML and web pages | ★★★ | Apache 2 | V1.0 | |
-| **GROBID** | PDF → TEI: title, sections, **parsed reference list**, citation markers | ★★★ | Apache 2 (Java, Docker) | Later, only if needed | **No new servers (§7.3).** Reflowed sources, Semantic Scholar's reference lists, PDF outlines and on-demand AI extraction cover it. |
-| **Docling** (IBM) | PDF / DOCX / PPTX → structured doc, tables, figures | ★★★★ | MIT | Later | Stronger on tables. Alternative or complement to GROBID. |
-| **PaperMage** (Ai2) | Scholarly PDF structure | ★★★ | Apache 2 | Later | |
+| **GROBID** | PDF → TEI: title, sections, **parsed reference list**, citation markers | ★★★ | Apache 2 (Java, Docker) | V1.3+, only if needed | **No new servers (§7.3).** Reflowed sources, Semantic Scholar's reference lists, PDF outlines and on-demand AI extraction cover it. |
+| **Docling** (IBM) | PDF / DOCX / PPTX → structured doc, tables, figures | ★★★★ | MIT | V1.3+ | Stronger on tables. Alternative or complement to GROBID. |
+| **PaperMage** (Ai2) | Scholarly PDF structure | ★★★ | Apache 2 | V1.3+ | |
 | **Unstructured** | General document partitioning | ★★ | Apache 2 | Skip | Docling covers the need. |
-| **Mathpix** | Best math / equation OCR → LaTeX / Markdown | ★★★★ | $ | Later (BYOK) | For math-heavy scans. |
-| **Mistral OCR** | Fast, cheap PDF → Markdown (~$1 / 1k pages) | ★★★ | $ | Later (BYOK) | |
-| **LlamaParse**, **Reducto** | Managed parsing | ★★ | $ | Later | |
+| **Mathpix** | Best math / equation OCR → LaTeX / Markdown | ★★★★ | $ | V1.3+ (BYOK) | For math-heavy scans. |
+| **Mistral OCR** | Fast, cheap PDF → Markdown (~$1 / 1k pages) | ★★★ | $ | V1.3+ (BYOK) | |
+| **LlamaParse**, **Reducto** | Managed parsing | ★★ | $ | V1.3+ | |
 | **Native PDF input** (Claude, Gemini) | The model reads the PDF directly | ★★★★ | via the user's AI connection | V1.1 | Already in the AI capability matrix. Used by Ask mode for single-paper Q&A. |
 | **Marker** | PDF → Markdown | ★★ | GPL + weights with commercial limits | Skip | Licence. |
 | **Nougat** (Meta) | Academic PDF → Markdown | ★★ | Weights CC-BY-NC | Skip | Non-commercial weights. |
@@ -363,18 +366,18 @@ the faces pattern is proven.
 | Service | What it adds | Value | Access | Phase | Notes |
 |---|---|---|---|---|---|
 | **Provider built-in search** (Anthropic web search + web fetch, OpenAI web search, Gemini Google-search grounding) | Search with zero extra keys for users with an AI connection | ★★★★★ | via AI connection | V1.1 | First choice. AI SDK v6 exposes these as provider tools. |
-| **OpenAI deep-research models**, **Gemini Deep Research agent** | Fully managed multi-step research | ★★★ | via AI connection | Later | Offered as "delegate to provider". Our loop remains the default so citations resolve to Works. |
+| **OpenAI deep-research models**, **Gemini Deep Research agent** | Fully managed multi-step research | ★★★ | via AI connection | V1.3+ | Offered as "delegate to provider". Our loop remains the default so citations resolve to Works. |
 | **Exa** | Neural search tuned for papers and long-form; research endpoint | ★★★★ | $ | V1.1 | Best paid fit for research. |
 | **Tavily** | Search built for AI, with a monthly free allowance | ★★★★ | K / $ | V1.1 | Easy starter key. |
 | **Parallel** | Search + Task API (deep research with citations) | ★★★★ | $ | V1.1 | |
 | **Perplexity Sonar** (incl. deep research) | Answer + citations | ★★★ | $ | V1.1 | Answers are opaque — show its citations as Works. |
 | **Brave Search API** | Independent web index | ★★★ | K / $ | V1.1 | Free tier terms changed over time — verify. |
 | **Serper**, **SerpAPI** | Google results, including Scholar | ★★★ | $ | V1.1 | Also powers the Google Scholar source (§5.1). |
-| **Kagi**, **You.com**, **Linkup** | Alternative indexes | ★★ | $ | Later | |
+| **Kagi**, **You.com**, **Linkup** | Alternative indexes | ★★ | $ | V1.3+ | |
 | **Firecrawl** | Crawl / scrape → Markdown | ★★★ | $ (hosted) / AGPL self-host | V1.1 | Readability covers single pages. Firecrawl is for site-wide crawls. |
 | **Jina Reader** (`r.jina.ai`) | URL → clean Markdown | ★★★ | K | V1.1 | Fallback reader for hostile pages. |
-| **Crawl4AI** | Open-source crawler | ★★ | Apache 2 | Later | Self-host option. |
-| **SearXNG** | Self-hosted metasearch | ★★ | AGPL | Later | Zero-key option for self-hosters. |
+| **Crawl4AI** | Open-source crawler | ★★ | Apache 2 | V1.3+ | Self-host option. |
+| **SearXNG** | Self-hosted metasearch | ★★ | AGPL | V1.3+ | Zero-key option for self-hosters. |
 
 **AI SDK fit.** The AI SDK tools registry lists drop-in tools for several of these
 (Exa, Tavily, Parallel, Firecrawl, Perplexity search) — verify package names at
@@ -417,9 +420,9 @@ and a **citation style**.
 | NIH RePORTER API | Grants and their publications | ★★★ | F |
 | openFDA, DailyMed, RxNorm | Drug labels, adverse events, drug names | ★★★ | F |
 | MeSH (NLM) | Controlled vocabulary for facets | ★★★ | F |
-| UMLS | Concept mapping | ★★ | K (licence agreement) — Later |
+| UMLS | Concept mapping | ★★ | K (licence agreement) — V1.3+ |
 | Cochrane Library | Systematic reviews | ★★★ | L (link) |
-| WHO ICTRP | International trials | ★★ | L / limited — Later |
+| WHO ICTRP | International trials | ★★ | L / limited — V1.3+ |
 
 **CS & ML — V1.0:** arXiv (cs/stat), OpenReview (with reviews), DBLP, Hugging
 Face Papers (models, datasets, code), Semantic Scholar, GitHub (a code link on
@@ -444,7 +447,7 @@ reporter citations (`410 U.S. 113`), `26 U.S.C. § 501(c)(3)`, `12 C.F.R. 1026.1
 Public Law numbers, docket numbers. Style: Bluebook-like CSL (limited
 community styles — verify coverage).
 
-**Law (EU / UK) — Later:** EUR-Lex (web service + Cellar SPARQL),
+**Law (EU / UK) — V1.3+:** EUR-Lex (web service + Cellar SPARQL),
 legislation.gov.uk (open API), the National Archives' *Find Case Law* (open),
 CanLII (API by request), BAILII (link).
 
@@ -455,7 +458,7 @@ CanLII (API by request), BAILII (link).
 | **USPTO Open Data Portal** (incl. PatentsView) | US grants and applications, claims, CPC, assignees, citations | ★★★★★ | K |
 | **EPO Open Patent Services** | Worldwide bibliographic data, families (INPADOC), legal status | ★★★★ | K (free weekly quota) |
 | **Lens.org** | Patents ↔ scholarly citations | ★★★★ | K / $ |
-| **Google Patents Public Datasets** | Global full text via BigQuery | ★★ | $ (per-query) — Later |
+| **Google Patents Public Datasets** | Global full text via BigQuery | ★★ | $ (per-query) — V1.3+ |
 | **WIPO PATENTSCOPE** | PCT applications | ★★ | $ / L |
 
 Face: patent (claims tree, family, status timeline). Grammar: `US 10,123,456 B2`,
@@ -476,7 +479,7 @@ Biodiversity Heritage Library (K), Wikisource / Wikidata (F, already used),
 Perseus / Scaife (CTS, classics), GDELT (news events, F), JSTOR (L).
 Faces: archival item (IIIF image-first), newspaper page (OCR + image).
 
-**Later packs:**
+**V1.3+ packs (backlog):**
 
 - **Physics / Astro / Math:** NASA ADS, INSPIRE-HEP, zbMATH Open, OEIS, arXiv.
 - **Economics & social science:** RePEc harvest, OSF preprints, IPUMS, NBER / SSRN
@@ -561,6 +564,30 @@ Record the specific gap in the code when building each.
      re-resolved through Unpaywall when the file lives on WebDAV or a local disk.
    - **"Save to Zotero":** create-only — push a Work found here into a chosen
      Zotero collection. This is the one write worth having; it can't conflict.
+   - **What Zotero covers vs. what's ours.** Zotero manages a library: capture
+     (browser connector, 600+ translators), metadata, PDF / EPUB / snapshot
+     reading with annotations, retraction flags, "Find Available PDF", RSS feeds,
+     group libraries, and citing in Word / Google Docs. **Much of that lives in the
+     desktop client, not the Web API we can use.** Translators, add-by-identifier,
+     PDF finding and retraction checks are client-only. The Web API gives us items,
+     collections, tags, notes, annotations, stored files, indexed full text, and
+     **formatted citations / bibliographies in any CSL style**.
+
+     Not in Zotero at all, and so ours:
+     - discovery and federated search with scopes;
+     - enrichment (references, cited-by, related, TLDRs, citation contexts);
+     - reflowed JATS reading;
+     - text-quote anchors, links into notes, send-to-note;
+     - Claims rows (Principle 2);
+     - domain-pack faces (statute browsing, IIIF, data charts, patent claims trees),
+       although Zotero has item *types* for case, statute, bill, patent and dataset;
+     - citation alerts;
+     - AI;
+     - and, above all, users who don't use Zotero. Zotero is one sync partner, not
+       the backend.
+   - **Offload to Zotero for its users:** browser capture, citing in Word / Docs,
+     and citation formatting through the Web API (which sidesteps the citeproc-js
+     licence question for those users). Users without Zotero get citation-js styles.
    - **Not planned:** two-way edit sync (conflicts on metadata, moves and deletes),
      and writing annotations back (Zotero's PDF annotations use page rectangles,
      ours use text quotes).
@@ -611,7 +638,7 @@ Everything else reuses what exists:
 - **Consuming MCP servers for research:** quality varies, many are local-only,
   results are untyped, and each is a new prompt-injection surface.
 
-**Later and app-wide:** Digital Garden as an MCP *server*, exposing the library to
+**V1.3+, app-wide:** Digital Garden as an MCP *server*, exposing the library to
 outside assistants. It mostly reuses these tools; the real work is OAuth.
 
 **Safety.** Paper and web text are untrusted. Tools that write (adding works,
