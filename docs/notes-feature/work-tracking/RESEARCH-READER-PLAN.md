@@ -1,5 +1,5 @@
 ---
-status: proposed — for owner review (2026-09-30)
+status: proposed — owner decisions recorded 2026-10-01 (§7)
 created: 2026-09-30
 parent: EREADER-PLAN.md (R-Research — the third reader source after Books and Scriptures)
 scope: research discovery, open-access full text, library import, paper reading, AI research, domain packs
@@ -215,10 +215,10 @@ them.
 
 | Phase | Contents |
 |---|---|
-| **V1.0 — Research core** (owner: "all of 1–4") | **Discover:** OpenAlex, Semantic Scholar, Crossref. **Resolve / full text:** Unpaywall, arXiv, Europe PMC + PMC OA, bioRxiv/medRxiv, CORE, DOAJ. **Enrich:** S2 references / cited-by / related / TLDR, OpenCitations, Crossref retractions. **Import:** Zotero (one-way, collections → folders), BibTeX / RIS / CSL-JSON files, Hypothesis, DOI/URL paste. **Reader:** JATS/HTML reflow + annotated PDF (pdf.js), Work sidebar views, the Claims action. **Find tab** with scopes, the identifier-aware box and the access ladder. Institution setting (OpenURL / EZproxy). **Packs: Biomedicine, CS & ML.** |
-| **V1.1** | **Ask mode:** port the deep-research loop onto AI SDK v6; use the provider's built-in web search first, with Exa / Tavily / Parallel / Perplexity as BYOK connections. **Services:** GROBID (references and section structure for any PDF), Zotero translation-server (metadata from any URL). **Following:** saved-search nodes with "new since", citation alerts. **Pack: Law (US).** |
-| **V1.2** | **Packs:** Patents, Data & statistics, Archives & humanities. **Also:** citation-graph folder view, two-way Zotero sync, citation formatting in notes (CSL). |
-| **Later** | **Packs:** Physics / Astro / Math, Economics & social science, Education, Earth & environment, EU / UK law. **Also:** paid PDF parsers (BYOK), scite / Consensus if their APIs fit, SPECTER2 semantic similarity over your own library (needs pgvector — not enabled today). |
+| **V1.0 — Research core** (owner: "all of 1–4") | **Discover:** OpenAlex, Semantic Scholar, Crossref. **Resolve / full text:** Unpaywall, arXiv, Europe PMC + PMC OA, bioRxiv/medRxiv, CORE, DOAJ. **Enrich:** S2 references / cited-by / related / TLDR, OpenCitations, Crossref retractions. **Import:** Zotero (Zotero is the source of truth: collections → folders, plus Zotero's PDF annotations read-only, plus "Save to Zotero" create-only push — §7.4), BibTeX / RIS / CSL-JSON files, Hypothesis, DOI/URL paste. **Reader:** JATS/HTML reflow + annotated PDF (pdf.js), Work sidebar views, the Claims action. **Find tab** with scopes, the identifier-aware box and the access ladder. Institution setting (OpenURL / EZproxy). **Packs: Biomedicine, CS & ML.** **Law stub:** the Law scope shows in the pack catalog as "coming in V1.1", and pasted legal citations / docket URLs resolve to external link nodes (CourtListener / govinfo). **AI:** paper context bundle, research tools, chat with the open paper, explain-selection, summaries, plain-English → filters (§8). |
+| **V1.1** | **Ask mode:** port the deep-research loop onto AI SDK v6; use the provider's built-in web search first, with Exa / Tavily / Parallel / Perplexity as BYOK connections. **Screening** and **Ask this folder** (§8). **Following:** saved-search nodes with "new since", citation alerts. **Pack: Law (US)** (full). |
+| **V1.2** | **Packs:** Patents, Data & statistics, Archives & humanities. **Also:** citation-graph folder view, citation formatting in notes (CSL). |
+| **Later** | **Packs:** Physics / Astro / Math, Economics & social science, Education, Earth & environment, EU / UK law. **Also:** paid PDF parsers (BYOK), scite / Consensus if their APIs fit, provider-managed deep research as a "delegate" option, SPECTER2 semantic similarity over your own library (needs pgvector — not enabled today). |
 
 **Why these packs first.** Biomedicine and CS & ML reuse the scholarly face and
 have the best free APIs in the registry, so they cost the least to add. Law
@@ -329,7 +329,7 @@ the faces pattern is proven.
 
 | Tool | What it does | Value | Licence | Phase | Notes |
 |---|---|---|---|---|---|
-| **Zotero translation-server** | URL / DOI / ISBN / PMID → full metadata using Zotero's 600+ site translators | ★★★★★ | AGPL (run unmodified as a separate service) | V1.1 | Saves writing hundreds of scrapers. Deploy like Hocuspocus (Cloud Run). |
+| **Zotero translation-server** | URL / DOI / ISBN / PMID → full metadata using Zotero's 600+ site translators | ★★★ | AGPL (would be a separate service) | Later, only if needed | **No new servers (§7.3).** Citation meta tags + DOI sniffing + Crossref cover most pages; it only adds the long tail of odd sites. |
 | **citation-js** | Parse and emit BibTeX, RIS, CSL-JSON, Wikidata; resolve DOIs | ★★★★★ | MIT | V1.0 | Runs in-process, TypeScript-friendly. |
 | **citeproc-js** + **CSL styles repo** (~10k styles) | Format citations and bibliographies in any style | ★★★★ | CPAL-1.0 / AGPL dual | V1.2 | **Check licence fit before bundling.** CPAL has attribution terms. Styles are CC-BY-SA. |
 | **reporters-db / courts-db** (Free Law Project) | Legal reporter abbreviations and court data as JSON | ★★★★ | BSD | V1.1 | Law pack citation grammar in TypeScript, the way we did scripture references. |
@@ -345,7 +345,7 @@ the faces pattern is proven.
 | **JATS → HTML** (e.g. Curvenote's `jats-xml`) | Reflow PMC / Europe PMC / eLife articles | ★★★★★ | MIT (verify package) | V1.0 | Reflow beats PDF for themes, speed read, accessibility, mobile and stable anchors. |
 | **arXiv HTML** (LaTeXML) | Reflow for arXiv papers | ★★★★ | F | V1.0 | Falls back to PDF when HTML conversion failed. |
 | **Readability** (`@mozilla/readability`, already a dependency) | Reflow publisher HTML and web pages | ★★★ | Apache 2 | V1.0 | |
-| **GROBID** | PDF → TEI: title, sections, **parsed reference list**, citation markers | ★★★★★ | Apache 2 (Docker) | V1.1 | Turns any PDF into clickable references and a section TOC. Runs as a Cloud Run sidecar. |
+| **GROBID** | PDF → TEI: title, sections, **parsed reference list**, citation markers | ★★★ | Apache 2 (Java, Docker) | Later, only if needed | **No new servers (§7.3).** Reflowed sources, Semantic Scholar's reference lists, PDF outlines and on-demand AI extraction cover it. |
 | **Docling** (IBM) | PDF / DOCX / PPTX → structured doc, tables, figures | ★★★★ | MIT | Later | Stronger on tables. Alternative or complement to GROBID. |
 | **PaperMage** (Ai2) | Scholarly PDF structure | ★★★ | Apache 2 | Later | |
 | **Unstructured** | General document partitioning | ★★ | Apache 2 | Skip | Docling covers the need. |
@@ -363,7 +363,7 @@ the faces pattern is proven.
 | Service | What it adds | Value | Access | Phase | Notes |
 |---|---|---|---|---|---|
 | **Provider built-in search** (Anthropic web search + web fetch, OpenAI web search, Gemini Google-search grounding) | Search with zero extra keys for users with an AI connection | ★★★★★ | via AI connection | V1.1 | First choice. AI SDK v6 exposes these as provider tools. |
-| **OpenAI deep-research models**, **Gemini Deep Research agent** | Fully managed multi-step research | ★★★★ | via AI connection | V1.1 | Offered as "delegate to provider". Our loop remains the default so citations resolve to Works. |
+| **OpenAI deep-research models**, **Gemini Deep Research agent** | Fully managed multi-step research | ★★★ | via AI connection | Later | Offered as "delegate to provider". Our loop remains the default so citations resolve to Works. |
 | **Exa** | Neural search tuned for papers and long-form; research endpoint | ★★★★ | $ | V1.1 | Best paid fit for research. |
 | **Tavily** | Search built for AI, with a monthly free allowance | ★★★★ | K / $ | V1.1 | Easy starter key. |
 | **Parallel** | Search + Task API (deep research with citations) | ★★★★ | $ | V1.1 | |
@@ -391,10 +391,10 @@ haven't built.
 | **nickscamara/open-deep-research** | Next.js + AI SDK + Firecrawl deep research | ★★★★ | MIT | UI and streaming reference. |
 | **jina-ai/node-DeepResearch** | TypeScript search-read-reason loop with token budgets | ★★★★ | Apache 2 | Budget and "beast mode" patterns. |
 | **LearningCircuit/local-deep-research** | Research over arXiv / PubMed / SearXNG, local-first | ★★★ | MIT | Academic-source routing ideas. |
-| **GPT Researcher** | Mature multi-agent researcher; has an MCP server | ★★★★ | Apache 2 | Reference design, or a Python sidecar if ever needed. |
+| **GPT Researcher** | Mature multi-agent researcher; has an MCP server | ★★★★ | Apache 2 | Reference design only (no new servers, §7.3). |
 | **LangChain open_deep_research** | Supervisor + researcher graph | ★★★ | MIT | Reference design. |
 | **Stanford STORM / Co-STORM** | Writes cited, Wikipedia-style articles through perspective-guided questioning | ★★★★ | MIT | The **"literature review note"** output format. |
-| **PaperQA2** (FutureHouse) | High-accuracy cited Q&A over a PDF set; beats humans on its benchmarks | ★★★★★ | Apache 2 | "Ask this folder" — Q&A over the papers in a project. Python sidecar or a port of its RCS (rerank-contextual-summarize) method. |
+| **PaperQA2** (FutureHouse) | High-accuracy cited Q&A over a PDF set; beats humans on its benchmarks | ★★★★★ | Apache 2 | "Ask this folder" — port its RCS (rerank-contextual-summarize) method (§8). |
 | **Ai2 OpenScholar**, **ScholarQA / Asta** | Open scientific-literature synthesis | ★★★★ | Apache 2 | Method reference; open weights. |
 | **HF smolagents open_deep_research** | Open reproduction of deep research | ★★★ | Apache 2 | Reference. |
 | **Khoj** | Personal AI over your docs, with research mode | ★★ | AGPL | Reference only. |
@@ -501,8 +501,8 @@ Faces: archival item (IIIF image-first), newspaper page (OCR + image).
 | Need | Adopt | Instead of |
 |---|---|---|
 | Parse / emit bibliographic formats | citation-js | Hand-written BibTeX / RIS parsers |
-| Metadata from arbitrary URLs | Zotero translation-server | Per-site scrapers |
-| PDF structure and references | GROBID (+ Docling for tables) | Heuristic PDF parsing |
+| Metadata from arbitrary URLs | Citation meta-tag parsing (`citation_*`, Dublin Core, schema.org JSON-LD, COinS) + DOI sniffing → Crossref; translation-server only if the long tail matters | Per-site scrapers |
+| PDF structure and references | Reflowed full text first; Semantic Scholar reference lists; the PDF's own outline (pdf.js); on-demand AI extraction; GROBID only if the gap proves real | Heuristic PDF parsing, or running a new server |
 | PDF rendering + text layer | pdf.js (+ EmbedPDF or react-pdf-highlighter) | A custom renderer |
 | Reflowed articles | JATS → HTML library, arXiv HTML, Readability | PDF-only reading |
 | Legal citation grammar data | reporters-db / courts-db (+ eyecite fixtures) | Hand-curated reporter lists |
@@ -523,18 +523,98 @@ Record the specific gap in the code when building each.
 
 ---
 
-## 7. Open questions (owner)
+## 7. Owner decisions (2026-10-01)
 
-1. **Pack order after V1.0.** The proposal is Law (US) in V1.1, then Patents, Data &
-   statistics, and Archives & humanities in V1.2. Swap any of them?
-2. **Stored copies vs links.** Store open-access PDFs / JATS in the user's storage,
-   as books are? That makes them durable, searchable and speed-readable. Or keep
-   links with a cached text layer? The proposal is **store when the licence allows**
-   (CC-BY, public domain, arXiv's own-copy use) and **link otherwise**.
-3. **Sidecar services** (GROBID, translation-server) on Cloud Run, like Hocuspocus.
-   They cost money when warm; `min-instances=0` keeps idle cost near zero, at the
-   price of a cold start on first use.
-4. **Contact email for polite pools** (Crossref, Unpaywall, OpenAlex). Use a
-   server-configured project address, not each user's email.
-5. **Zotero two-way sync** in V1.2, or stay one-way (Zotero stays the source of
-   truth)?
+1. **Packs.** Biomedicine and CS & ML in V1.0. **Law (US) is stubbed in V1.0**: it
+   appears in the pack catalog as "coming in V1.1", and legal citations or docket
+   URLs pasted into the search box become external link nodes. It ships in full in
+   V1.1. Patents, Data & statistics and Archives & humanities come in V1.2.
+2. **Copies.** A paper is **stored when its licence allows** (CC-BY, public
+   domain, the user's own copy of an arXiv paper). Otherwise it is **fetched on
+   demand** through the SSRF-guarded fetch each time it's opened, and never
+   persisted. Highlights anchor by text quote, so they survive a re-fetch, and the
+   Internet Archive is the fallback if the source vanishes. When it can't be read
+   in-app at all, it is an **external link node**, the same as unavailable library
+   books. Every exception in §2.4 falls back the same way.
+3. **No new servers.** Everything runs in the existing Next.js / Vercel app, plus
+   the existing durable run machinery for long AI jobs. GROBID needs Java and
+   2–4 GB of memory, so it can't run in a serverless function. The other candidate,
+   translation-server, is built to run as a long-lived service. Both are replaced:
+   - **References and structure:** reflowed full text (JATS, arXiv HTML) carries
+     its own; Semantic Scholar serves reference lists for most papers; pdf.js reads
+     a PDF's own outline; and an on-demand AI pass (models that read PDFs natively)
+     covers the rest.
+   - **Metadata from a URL:** publisher pages carry `citation_*` meta tags (Google
+     Scholar requires them), Dublin Core, schema.org JSON-LD or COinS, and most
+     expose a DOI that resolves through Crossref. An AI pass is the last resort.
+
+   The cost is in-text citation linking for arbitrary PDFs that Semantic Scholar
+   doesn't index, and the long tail of sites without metadata tags. Revisit only
+   if users hit those gaps.
+4. **Zotero.** Zotero stays the source of truth for library metadata and
+   collections. Digital Garden owns what is made here (annotations, notes, claims),
+   keyed by the Zotero item key so it survives every re-sync.
+   - **V1.0:** API-key connection; incremental one-way sync using Zotero's
+     `since=<version>` (polled — Zotero has no webhooks); collections → folders.
+     Zotero's PDF annotations are imported read-only (`source: "zotero"`). Files
+     stream on demand from Zotero storage, are cached only under §7.2, and are
+     re-resolved through Unpaywall when the file lives on WebDAV or a local disk.
+   - **"Save to Zotero":** create-only — push a Work found here into a chosen
+     Zotero collection. This is the one write worth having; it can't conflict.
+   - **Not planned:** two-way edit sync (conflicts on metadata, moves and deletes),
+     and writing annotations back (Zotero's PDF annotations use page rectangles,
+     ours use text quotes).
+5. **Contact email for polite pools** (Crossref, Unpaywall, OpenAlex): a
+   server-configured project address, never the user's own email.
+
+---
+
+## 8. AI: what's feasible with low upkeep
+
+**The rule.** Research adds exactly two things to the existing AI stack:
+- **Research tools** (`search_works`, `get_work`, `get_full_text`,
+  `references_of` / `cited_by`, `add_work_to_folder`): thin wrappers over the same
+  adapters the UI uses.
+- **A Work context bundle**, like the book one (`ai-capsule.ts`).
+
+Everything else reuses what exists:
+- BYOK connections and `FEATURE_REGISTRY` routes with fallback chains;
+- web search (provider-native, else Tavily / Brave);
+- native PDF reading (else extracted text);
+- the run harness roles, iteration proposals, extraction-to-database, and the
+  approval steps;
+- the AI drift CI gates, which cover the new tools automatically.
+
+**Everything works without AI**; AI only speeds it up.
+
+| Feature | How | Effort | Phase |
+|---|---|---|---|
+| Chat with the open paper | Context bundle + full-text tool, or native PDF | S | V1.0 |
+| Explain / define a selection | A mark-popover action, sent to chat | S | V1.0 |
+| Summaries | Semantic Scholar TLDR first; AI summary on demand (cheap route), cached with model + prompt version | S | V1.0 |
+| Plain English → scope + filters | Structured output; falls back to plain search with no AI connection | S–M | V1.0 |
+| Highlight → Claims row | Extraction-to-database with a fixed Claims table | M | V1.0–1.1 |
+| Screening (include / exclude against criteria) | Iteration proposals, cheap route, user approves | M | V1.1 |
+| Ask this folder | Postgres full-text search over chunked full text, then rerank + summarize (PaperQA2's method), no vector DB | M | V1.1 |
+| Ask mode (deep research → report note) | Port dzhng/deep-research onto the run harness roles with the research tools + existing web search | L | V1.1 |
+| Citation check | Compare a note's claim against the anchored passage | M | V1.2 |
+
+**Not doing, and why:**
+- **Our own models** (GPU hosting).
+- **Python AI sidecars:** port the methods instead.
+- **Embeddings / pgvector now:** re-embedding churn and another model table to
+  keep in sync. Full-text search + rerank is enough at personal scale.
+- **Provider deep-research APIs as the primary path:** opaque, costly, citations
+  are URLs.
+- **Agent frameworks.**
+- **Fine-tuning.**
+- **Consuming MCP servers for research:** quality varies, many are local-only,
+  results are untyped, and each is a new prompt-injection surface.
+
+**Later and app-wide:** Digital Garden as an MCP *server*, exposing the library to
+outside assistants. It mostly reuses these tools; the real work is OAuth.
+
+**Safety.** Paper and web text are untrusted. Tools that write (adding works,
+creating rows) go through the existing proposal and approval steps. Research
+tools get a fixture gate with recorded adapter responses, no network — the
+pattern of `proposal:shape:check`.
