@@ -258,6 +258,8 @@ function ChatViewerInner({
     handleModelChange,
     modelPinned,
     setModelPinned,
+    searchBackend,
+    setSearchBackend,
     mentionResults,
     handleMentionSearch,
     handleResolveMention,
@@ -1018,6 +1020,10 @@ function ChatViewerInner({
               hasOrigin={false}
               modelPinned={modelPinned}
               onModelPinnedChange={setModelPinned}
+              providerId={providerId}
+              modelId={modelId}
+              searchBackend={searchBackend}
+              onSearchBackendChange={setSearchBackend}
               activeContextId={activeContextId}
               onContextChange={handleContextChange}
               busy={isActive}

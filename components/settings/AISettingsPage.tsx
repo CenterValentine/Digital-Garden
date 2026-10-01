@@ -65,15 +65,24 @@ import {
   BASE_TOOL_METADATA,
 } from "@/lib/domain/ai/tools/metadata";
 import { useSettingsStore } from "@/state/settings-store";
+import { useToolApprovals } from "@/components/content/ai/use-tool-approvals";
+import {
+  BULK_READ_DEFAULT_TOKENS,
+  BULK_READ_MAX_TOKENS,
+  BULK_READ_MIN_TOKENS,
+  effectiveBulkReadThreshold,
+} from "@/lib/features/settings/validation";
 
 const MAX_TOKENS_MIN = 1;
 const MAX_TOKENS_MAX = 200_000;
-const BULK_READ_MIN = 1_000;
-const BULK_READ_MAX = 100_000;
-const BULK_READ_DEFAULT = 6_000;
+const BULK_READ_MIN = BULK_READ_MIN_TOKENS;
+const BULK_READ_MAX = BULK_READ_MAX_TOKENS;
+const BULK_READ_DEFAULT = BULK_READ_DEFAULT_TOKENS;
 
 interface ToolConfigEntry {
   enabled?: boolean;
+  /** Run without an approval card (tools/approval-policy.ts). */
+  autoApprove?: boolean;
   routeOverride?: { presetId: string; modelId: string };
 }
 
@@ -94,7 +103,8 @@ export default function AISettingsPage() {
   // deliberate choice) — normalize it to "unset" so legacy settings pick up
   // the catalog-resolved maximum instead of a silent truncation cap.
   const maxTokens = ai?.maxTokens === 4096 ? null : (ai?.maxTokens ?? null);
-  const bulkReadThreshold = ai?.bulkReadTokenThreshold ?? BULK_READ_DEFAULT;
+  const bulkReadThreshold = effectiveBulkReadThreshold(ai?.bulkReadTokenThreshold);
+  const toolApprovals = useToolApprovals();
   const typingEffect = ai?.typingEffect ?? true;
   const showAiHighlight = ai?.showAiHighlight ?? true;
   const showReasoning = ai?.showReasoning ?? true;
@@ -172,8 +182,13 @@ export default function AISettingsPage() {
   const handleToolConfigChange = (toolId: string, next: ToolConfigEntry) => {
     // Strip the entry when it returns to all-defaults so the JSON doesn't
     // accumulate noise.
+    // autoApprove counts too — without it, editing a tool's other fields
+    // here would silently drop its approval setting (an explicit false is a
+    // value, not a default, for the same deep-merge reason as `enabled`).
     const isDefault =
-      next.enabled === undefined && next.routeOverride === undefined;
+      next.enabled === undefined &&
+      next.routeOverride === undefined &&
+      next.autoApprove === undefined;
     const out: Record<string, ToolConfigEntry> = { ...toolConfig };
     if (isDefault) delete out[toolId];
     else out[toolId] = next;
@@ -294,6 +309,16 @@ export default function AISettingsPage() {
             }}
           />
         </SettingRow>
+
+        {toolApprovals.map((row) => (
+          <SettingRow key={row.id} label={row.label} description={row.hint} htmlFor={`ai-auto-approve-${row.id}`}>
+            <Switch
+              id={`ai-auto-approve-${row.id}`}
+              checked={row.checked}
+              onCheckedChange={(checked) => void generation.track(row.onChange(checked))}
+            />
+          </SettingRow>
+        ))}
 
         <SettingRow
           label="Typing animation"
