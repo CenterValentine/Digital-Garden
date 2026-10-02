@@ -79,6 +79,22 @@ export interface ContentSelectionOptions {
    * explicit placement. Omit for the classic preview-replacement behavior.
    */
   beforeTabId?: string | null;
+  /**
+   * Open the content WITHOUT moving focus to its pane (default: focus follows,
+   * as every other open path does).
+   *
+   * Used by the file tree's side-by-side open: the point of putting content in
+   * the opposite pane is that the pane you are reading in stays yours, and
+   * stealing focus would undo that on the very next click — the following tree
+   * click would compute "opposite" from the pane we just moved to and land back
+   * on the document you were protecting.
+   *
+   * The pane still shows the content (its own `activeTabId` is set, and each
+   * pane renders `getPaneActiveContentId` independently), so this does not hide
+   * what was opened — it only declines to claim the cursor, the right sidebar
+   * and the toolbar, all of which follow `selectedContentId`.
+   */
+  focusPane?: boolean;
 }
 
 interface WorkspaceRestoreOptions {
@@ -275,6 +291,57 @@ function getVisiblePaneIds(layoutMode: WorkspaceLayoutMode) {
 
 function isPaneVisible(layoutMode: WorkspaceLayoutMode, paneId: WorkspacePaneId) {
   return getVisiblePaneIds(layoutMode).includes(paneId);
+}
+
+const HORIZONTAL_PARTNER: Record<WorkspacePaneId, WorkspacePaneId> = {
+  [TOP_LEFT_PANE_ID]: TOP_RIGHT_PANE_ID,
+  [TOP_RIGHT_PANE_ID]: TOP_LEFT_PANE_ID,
+  [BOTTOM_LEFT_PANE_ID]: BOTTOM_RIGHT_PANE_ID,
+  [BOTTOM_RIGHT_PANE_ID]: BOTTOM_LEFT_PANE_ID,
+};
+
+const VERTICAL_PARTNER: Record<WorkspacePaneId, WorkspacePaneId> = {
+  [TOP_LEFT_PANE_ID]: BOTTOM_LEFT_PANE_ID,
+  [BOTTOM_LEFT_PANE_ID]: TOP_LEFT_PANE_ID,
+  [TOP_RIGHT_PANE_ID]: BOTTOM_RIGHT_PANE_ID,
+  [BOTTOM_RIGHT_PANE_ID]: TOP_RIGHT_PANE_ID,
+};
+
+/**
+ * The pane to open new content into so it lands BESIDE what you are reading
+ * rather than replacing it.
+ *
+ * One rule covers every layout: take the horizontal partner when it is visible,
+ * otherwise the vertical one, otherwise stay put. That falls out as —
+ *
+ *   single           → itself (nothing to open beside; caller behaves as before)
+ *   dual-vertical    → top-left ↔ top-right
+ *   dual-horizontal  → top-left ↔ bottom-left
+ *   quad             → top-left ↔ top-right, bottom-left ↔ bottom-right
+ *
+ * Quad pairs horizontally rather than diagonally (owner call, 2026-10-02): the
+ * new content sits on the same row as its source, which is the arrangement you
+ * want when the reason for opening it was to read the two together.
+ *
+ * Pure and total — returns a visible pane for any input, so callers never need
+ * to re-check `isPaneVisible`.
+ */
+export function resolveOppositePane(
+  layoutMode: WorkspaceLayoutMode,
+  activePaneId: WorkspacePaneId
+): WorkspacePaneId {
+  const visible = getVisiblePaneIds(layoutMode);
+  // An activePaneId can outlive a layout change; clamp before pairing or we'd
+  // pair off a pane that isn't on screen.
+  const from = visible.includes(activePaneId) ? activePaneId : visible[0];
+
+  const horizontal = HORIZONTAL_PARTNER[from];
+  if (visible.includes(horizontal)) return horizontal;
+
+  const vertical = VERTICAL_PARTNER[from];
+  if (visible.includes(vertical)) return vertical;
+
+  return from;
 }
 
 function getActiveTab(state: Pick<ContentState, "activePaneId" | "panes" | "tabs">) {
@@ -1420,15 +1487,23 @@ export const useContentStore = create<ContentState>((set, get) => ({
         }
       }
 
+      // `focusPane: false` is all-or-nothing on purpose. Moving the selection
+      // without moving the pane would split the two apart: `getActiveTab` reads
+      // the ACTIVE pane's tab, so the toolbar and right sidebar would target a
+      // document the focused pane isn't showing, and the workspace would
+      // persist an activeContentId belonging to no focused pane.
+      const takeFocus = options.focusPane !== false;
+
       return {
         panes: nextPanes,
         tabs: nextTabs,
-        activePaneId: paneId,
-        selectedContentId: id,
-        selectedContentType:
-          options.contentType ??
-          nextTabs[nextPane.activeTabId ?? ""]?.contentType ??
-          null,
+        activePaneId: takeFocus ? paneId : state.activePaneId,
+        selectedContentId: takeFocus ? id : state.selectedContentId,
+        selectedContentType: takeFocus
+          ? options.contentType ??
+            nextTabs[nextPane.activeTabId ?? ""]?.contentType ??
+            null
+          : state.selectedContentType,
         openContentIds: getVisibleOpenContentIds(
           state.layoutMode,
           nextPanes,

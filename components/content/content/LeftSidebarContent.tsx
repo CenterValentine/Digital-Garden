@@ -18,7 +18,7 @@ import { FileUploadDialog } from "../dialogs/FileUploadDialog";
 import { IconSelector } from "../IconSelector";
 import { LeftSidebarStatusBar } from "../LeftSidebarStatusBar";
 import { RootNodeHeader, type RootScopeOption } from "../file-tree/RootNodeHeader";
-import { useContentStore } from "@/state/content-store";
+import { useContentStore, resolveOppositePane } from "@/state/content-store";
 import { useSearchStore } from "@/state/search-store";
 import { useTreeStateStore } from "@/state/tree-state-store";
 import { useCharterIdsStore } from "@/state/charter-ids-store";
@@ -1360,6 +1360,26 @@ export function LeftSidebarContent({
     const firstNode = nodes[0];
     if (!firstNode) return;
 
+    // Side-by-side open (owner call, 2026-10-02). In a split layout a tree
+    // click puts content in the pane OPPOSITE the one you are working in,
+    // instead of replacing what you are reading — the complaint was that
+    // opening a second document cost you the first.
+    //
+    // `focusPane: false` is the other half: see ContentSelectionOptions, but
+    // in short, taking focus would move activePaneId to the target, so the
+    // NEXT tree click would compute "opposite" from there and land back on the
+    // document we just protected.
+    //
+    // In `single` the opposite IS the active pane, so we send nothing and the
+    // behavior is exactly what it was. Read imperatively — this is an event
+    // handler, and a reactive layoutMode would only add a stale-closure risk.
+    const { layoutMode, activePaneId } = useContentStore.getState();
+    const oppositePaneId = resolveOppositePane(layoutMode, activePaneId);
+    const sideBySide =
+      oppositePaneId === activePaneId
+        ? {}
+        : { paneId: oppositePaneId, focusPane: false };
+
     // A mirror row is a projection of content that lives elsewhere. Its own id
     // is synthetic and path-scoped, so opening it means opening the REAL id —
     // otherwise the tab would hold an id no fetch can resolve.
@@ -1367,6 +1387,7 @@ export function LeftSidebarContent({
       setSelectedContentId(firstNode.mirrorOf, {
         title: firstNode.title,
         contentType: firstNode.contentType,
+        ...sideBySide,
       });
       return;
     }
@@ -1381,11 +1402,13 @@ export function LeftSidebarContent({
         setSelectedContentId(target.targetId, {
           title: target.targetTitle ?? firstNode.title,
           contentType: target.targetContentType ?? undefined,
+          ...sideBySide,
         });
       } else {
         setSelectedContentId(firstNode.id, {
           title: firstNode.title,
           contentType: "shortcut",
+          ...sideBySide,
         });
       }
       return;
@@ -1395,6 +1418,7 @@ export function LeftSidebarContent({
       setSelectedContentId(firstNode.id, {
         title: firstNode.title,
         contentType: "person-profile",
+        ...sideBySide,
       });
       return;
     }
@@ -1406,6 +1430,7 @@ export function LeftSidebarContent({
     setSelectedContentId(firstNode.id, {
       title: firstNode.title,
       contentType: firstNode.contentType,
+      ...sideBySide,
     });
   };
 
