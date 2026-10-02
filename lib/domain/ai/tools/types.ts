@@ -33,6 +33,14 @@ export interface ToolExecuteContext {
    */
   activeCharter?: { contentId: string; title: string };
   /**
+   * Tool ids the user set to run without an approval card
+   * (`ai.toolConfig[id].autoApprove`), and whether the charter's current
+   * phase is its last — read by the approval predicates in
+   * tools/approval-policy.ts.
+   */
+  autoApprovedTools?: ReadonlySet<string>;
+  charterFinalPhase?: boolean;
+  /**
    * The bound Conversation entity id (sidebar multi-conv / full-page chat).
    * AI v3 core S3: lets tools associate created/read content with the
    * conversation (dual association — node + target folder).
@@ -58,6 +66,9 @@ export interface ToolExecuteContext {
     input?: number;
     output?: number;
     cachedInput?: number;
+    /** Largest single step's prompt — decides the long-context tier. */
+    maxStepInput?: number;
+    maxStepCachedInput?: number;
   };
   /**
    * Usage from the turn's EARLIER segments (approval continuations start a

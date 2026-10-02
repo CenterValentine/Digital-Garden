@@ -11,7 +11,7 @@ What each provider and model actually gets at runtime — derived from the code 
 
 | Provider | web_search | PDF attachments | Reasoning config (route) | App-managed prompt cache | Adapter branch |
 |---|---|---|---|---|---|
-| anthropic | provider-native | native ingestion | enabled-mode models get thinking config | none | yes |
+| anthropic | provider-native | native ingestion | enabled-mode models get thinking config | breakpoint on every step (`withAnthropicCacheBreakpoint`) | yes |
 | openai | provider-native | text extraction | none needed (auto-emits) | per-model (`supportsOpenAIPromptCaching`) | yes |
 | google | provider-native | native ingestion | enabled-mode models get thinking config | none | yes |
 | xai | provider-native | text extraction | — | none | yes |
@@ -27,20 +27,20 @@ What each provider and model actually gets at runtime — derived from the code 
 
 | Model | Context | Max output | Capabilities | Cost | Reasoning | Temperature | Cached |
 |---|---|---|---|---|---|---|---|
-| `claude-sonnet-4` | 200,000 | 64,000 | text, vision, tools, streaming | medium | enabled (budget 5,000) | user setting | — |
-| `claude-sonnet-3-5` | 200,000 | 8,192 | text, vision, tools, streaming | medium | — | user setting | — |
-| `claude-opus-4` | 200,000 | 32,000 | text, vision, tools, streaming | high | — | user setting | — |
-| `claude-haiku-4-5` | 200,000 | 64,000 | text, vision, tools, streaming | low | — | user setting | — |
-| `claude-haiku-3-5` | 200,000 | 8,192 | text, tools, streaming | low | — | user setting | — |
+| `claude-sonnet-4` | 200,000 | 64,000 | text, vision, tools, streaming | medium | enabled (budget 5,000) | user setting | yes · no volley (thinking) |
+| `claude-sonnet-3-5` | 200,000 | 8,192 | text, vision, tools, streaming | medium | — | user setting | yes · approval volley |
+| `claude-opus-4` | 200,000 | 32,000 | text, vision, tools, streaming | high | — | user setting | yes · approval volley |
+| `claude-haiku-4-5` | 200,000 | 64,000 | text, vision, tools, streaming | low | — | user setting | yes · approval volley |
+| `claude-haiku-3-5` | 200,000 | 8,192 | text, tools, streaming | low | — | user setting | yes · approval volley |
 
 ### OpenAI (`openai`)
 
 | Model | Context | Max output | Capabilities | Cost | Reasoning | Temperature | Cached |
 |---|---|---|---|---|---|---|---|
-| `gpt-4o` | 128,000 | 16,384 | text, vision, tools, streaming | medium | — | user setting | yes |
-| `gpt-4o-mini` | 128,000 | 16,384 | text, vision, tools, streaming | low | — | user setting | yes |
+| `gpt-4o` | 128,000 | 16,384 | text, vision, tools, streaming | medium | — | user setting | yes · approval volley |
+| `gpt-4o-mini` | 128,000 | 16,384 | text, vision, tools, streaming | low | — | user setting | yes · approval volley |
 | `gpt-4` | 8,192 | 8,192 | text, tools, streaming | high | — | user setting | — |
-| `o3-mini` | 200,000 | 100,000 | text, tools, streaming | medium | auto | fixed at 1 | yes |
+| `o3-mini` | 200,000 | 100,000 | text, tools, streaming | medium | auto | not sent (rejected by model) | yes · approval volley |
 
 ### Google (`google`)
 

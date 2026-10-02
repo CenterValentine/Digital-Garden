@@ -245,10 +245,19 @@ export class MarkdownConverter implements DocumentConverter {
               const href = mark.attrs?.href || "";
               text = `[${text}](${href})`;
             }
+            // Private (commented-out) text exports as an Obsidian comment —
+            // the file is the author's, so the comment travels with it.
+            if (mark.type === "privateText") text = `%%${text}%%`;
           }
         }
 
         return text;
+      }
+
+      case "privateBlock": {
+        // Obsidian multi-line comment: `%%` fence lines around the body.
+        const body = this.serializeChildren(node, settings);
+        return body ? `%%\n${body}\n%%` : "";
       }
 
       case "codeBlock": {
@@ -358,10 +367,12 @@ export class MarkdownConverter implements DocumentConverter {
       case "wikiLink": {
         const target = node.attrs?.targetTitle || "";
         const display = node.attrs?.displayText || "";
+        // Anchored link (lib/domain/content/link-anchor.ts) → Obsidian's `#^` form.
+        const anchor = node.attrs?.anchor ? `#^${node.attrs.anchor}` : "";
 
         if (settings.wikiLinkStyle === "[[]]") {
           // Obsidian style
-          const result = display ? `[[${target}|${display}]]` : `[[${target}]]`;
+          const result = display ? `[[${target}${anchor}|${display}]]` : `[[${target}${anchor}]]`;
 
           if (settings.preserveSemantics) {
             const contentId = node.attrs?.contentId || "";

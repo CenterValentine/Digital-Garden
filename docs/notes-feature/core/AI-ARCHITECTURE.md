@@ -178,6 +178,11 @@ exist so that class cannot recur; drift **gate 7** enforces the first one.
    of shapes the model has actually sent — never `.enum()`, `.min()`, `.max()`,
    `.int()`, `.regex()`, `.refine()`, or required keys inside a nested object.
    Vocabularies resolve, bounds clamp, nested objects normalize — in execute.
+   Gate 7 checks both halves: refinements, and any `z.object(` nested inside a
+   run-loop schema (prod `23fd28d6`, 2026-09-27: `capture: z.object({ cells })`
+   rejected a flat `{ Column: value }` map that was semantically complete; it is
+   now a `z.record` read by `normalizeCaptureArg` either way —
+   `ITERATION-RUN-HARNESS-FIXES-PLAN.md` P4).
 2. **A miss costs one step, never the enumeration.** When execute genuinely cannot
    proceed it returns a *result* — `ok: false`, a `refusal` saying what was received
    and what is accepted, a `nextAction` — that the model fixes in one call. It never
@@ -271,11 +276,26 @@ requested.
 (`supportsOpenAIPromptCaching` per model). The cache key is
 `digest(userId, playbookId, playbookContext, tool set)` — insensitive to tool
 *order*, rotated by playbook edits and phase advances, isolated per user.
-Anthropic is deliberately NOT opted into paid cache writes (policy decision recorded
-in `validate-prompt-cache.ts`). DeepSeek caches automatically server-side — its hit
+Anthropic is cached through a moving breakpoint: `withAnthropicCacheBreakpoint`
+marks the last message of every step (ephemeral, 5-minute lifetime; writes 1.25×,
+reads 0.1×). This reverses the 3.2.2 "no paid cache writes" policy (2026-09-30):
+an agentic turn re-reads its prefix every step, so the read discount dominates.
+While an approval is pending, the chat engine sends ONE cache volley shortly before
+a short-lived cache would lapse (`cache-volley.ts`: Anthropic and pre-5.6 OpenAI;
+GPT-5.6+ caches live 30 minutes and need none). The route builds the volley through
+its normal path, with the transcript cut at the approval step (`warmOnly`), so its
+prefix is the one the continuation extends. DeepSeek caches automatically server-side — its hit
 rate is visible only via `cachedInputTokens` in persisted usage (#156). The system
 prompt is ordered cache-friendly: stable playbook context precedes run-specific
 sections (`buildSystemPrompt` section ordering).
+
+### Provider seam principles (2026-09-30)
+
+Owner-endorsed after the gpt-6 cache freeze (ITERATION-RUN-HARNESS-FIXES §10). They are absolutes, not heuristics:
+
+- **One prompt per turn.** The system prompt and the tool list are fixed at a turn's first request; the requests of one turn differ by appended history only. A charter's turn-scoped data (the current phase, the item's rows) may differ between turns, never between the requests of one. Anything that would change the prompt mid-turn is present from the first request or waits for the next turn. In code: system-prompt flags read `isOffered` (base policy + charter binding, never a summon); a bound charter advertises `CHARTER_TURN_TOOLS` from its first request; the reserved tail is enforced when a tool runs (`tailGate` → `tailRefusalNotice`), never by narrowing `activeTools`. A request that departs from this is a full cache miss.
+- **Provider state in the transcript is not ours to diet.** Parts a provider authored for its own round-trip — Anthropic's signed thinking, OpenAI's encrypted reasoning under `store: false` — are carried back whatever their size. Context diet removes only content we generated or fetched. (`stripReasoningForResend` keeps both; the cache freeze was this rule broken.)
+- **A model we allow is a model we own.** An id that can reach a provider has our own capability row driving the adapter (`openaiModelReasons` → `forceReasoning`, `resolveModelTemperature`, the pricing row); the adapter's built-in model list is never the source of truth. New releases are watched against these rows rather than discovered in production.
 
 ---
 

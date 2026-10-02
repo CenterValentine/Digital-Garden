@@ -17,6 +17,15 @@ export interface NavigationHistoryItem {
   timestamp: number;
   title?: string;
   contentType?: string;
+  /**
+   * Where inside the content this step was — a `"<kind>:<id>"` anchor, the
+   * same contract as wiki-link anchors (lib/domain/content/link-anchor.ts).
+   * Viewers with their own views (the scripture reader: covers → volume →
+   * book → chapter) record one per view, so Back walks those views too.
+   */
+  anchor?: string;
+  /** The view's own name for the history list ("Alma 32"); `title` stays the content's. */
+  label?: string;
 }
 
 export interface PaneHistoryState {
@@ -27,8 +36,14 @@ export interface PaneHistoryState {
 interface NavigationHistoryStore {
   byPaneId: Record<string, PaneHistoryState>;
   addToHistory: (contentId: string | null, paneId?: string | null, meta?: { title?: string; contentType?: string }) => void;
-  goBack: (paneId?: string | null) => string | null;
-  goForward: (paneId?: string | null) => string | null;
+  /**
+   * A viewer moved to a view inside `contentId`. The first view recorded for
+   * the current entry names that entry's spot; each later, different view is
+   * a new step. Ignored unless `contentId` is the pane's current entry.
+   */
+  recordLocation: (contentId: string, paneId: string | null | undefined, anchor: string, label?: string) => void;
+  goBack: (paneId?: string | null) => NavigationHistoryItem | null;
+  goForward: (paneId?: string | null) => NavigationHistoryItem | null;
   getPaneHistory: (paneId?: string | null) => PaneHistoryState;
   getBackHistory: (paneId?: string | null) => NavigationHistoryItem[];
   clearHistory: (paneId?: string | null) => void;
@@ -103,6 +118,8 @@ export const useNavigationHistoryStore = create<NavigationHistoryStore>()(
               timestamp: Date.now(),
               title: meta?.title ?? paneState.history[paneState.currentIndex]?.title,
               contentType: meta?.contentType ?? paneState.history[paneState.currentIndex]?.contentType,
+              anchor: paneState.history[paneState.currentIndex]?.anchor,
+              label: paneState.history[paneState.currentIndex]?.label,
             };
 
             return {
@@ -140,6 +157,36 @@ export const useNavigationHistoryStore = create<NavigationHistoryStore>()(
         });
       },
 
+      recordLocation: (contentId, paneId, anchor, label) => {
+        const resolvedPaneId = resolvePaneId(paneId);
+        set((state) => {
+          const paneState = getPaneState(state.byPaneId, resolvedPaneId);
+          const current = paneState.history[paneState.currentIndex];
+          if (!current || current.contentId !== contentId || current.anchor === anchor) return state;
+          let history: NavigationHistoryItem[];
+          let currentIndex: number;
+          if (!current.anchor) {
+            // The content's first view: it names where this entry already is.
+            history = [...paneState.history];
+            history[paneState.currentIndex] = { ...current, anchor, label };
+            currentIndex = paneState.currentIndex;
+          } else {
+            const next: NavigationHistoryItem = {
+              contentId,
+              timestamp: Date.now(),
+              title: current.title,
+              contentType: current.contentType,
+              anchor,
+              label,
+            };
+            history = [...paneState.history.slice(0, paneState.currentIndex + 1), next];
+            if (history.length > MAX_HISTORY_ITEMS) history = history.slice(history.length - MAX_HISTORY_ITEMS);
+            currentIndex = history.length - 1;
+          }
+          return { byPaneId: { ...state.byPaneId, [resolvedPaneId]: { history, currentIndex } } };
+        });
+      },
+
       goBack: (paneId) => {
         const resolvedPaneId = resolvePaneId(paneId);
         const paneState = getPaneState(get().byPaneId, resolvedPaneId);
@@ -155,7 +202,7 @@ export const useNavigationHistoryStore = create<NavigationHistoryStore>()(
             },
           },
         }));
-        return paneState.history[newIndex]?.contentId ?? null;
+        return paneState.history[newIndex] ?? null;
       },
 
       goForward: (paneId) => {
@@ -173,7 +220,7 @@ export const useNavigationHistoryStore = create<NavigationHistoryStore>()(
             },
           },
         }));
-        return paneState.history[newIndex]?.contentId ?? null;
+        return paneState.history[newIndex] ?? null;
       },
 
       getPaneHistory: (paneId) => getPaneState(get().byPaneId, paneId),

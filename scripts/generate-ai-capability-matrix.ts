@@ -30,6 +30,7 @@ import { PROVIDER_CATALOG, getModelMeta } from "../lib/domain/ai/providers/catal
 import { CONNECTION_TEMPLATES } from "../lib/features/ai-connections/templates";
 import { resolveModelTemperature } from "../lib/domain/ai/model-constraints";
 import { supportsOpenAIPromptCaching } from "../lib/domain/ai/prompt-cache";
+import { cacheVolleyDelayMs } from "../lib/domain/ai/cache-volley";
 
 const ROOT = path.resolve(__dirname, "..");
 const OUTPUT_REL = "docs/notes-feature/core/AI-CAPABILITY-MATRIX.md";
@@ -46,6 +47,11 @@ function must<T>(value: T | null | undefined, what: string): T {
 // ── Source-scanned facts ──────────────────────────────────────────────────
 
 const routeSource = read("app/api/ai/chat/route.ts");
+// Probed, not assumed: Anthropic is cached only while the route marks a
+// breakpoint on every step (§10 round 3).
+const anthropicBreakpoints = routeSource.includes(
+  "withAnthropicCacheBreakpoint(rawStepMessages)",
+);
 
 const nativeSearchBlock = must(
   routeSource.match(/NATIVE_TOOL_VENDORS = new Set\(\[([\s\S]*?)\]\)/),
@@ -127,9 +133,11 @@ for (const provider of PROVIDER_CATALOG) {
   const cache =
     provider.id === "openai"
       ? "per-model (`supportsOpenAIPromptCaching`)"
-      : provider.id === "deepseek"
-        ? "none (provider caches automatically server-side)"
-        : "none";
+      : provider.id === "anthropic" && anthropicBreakpoints
+        ? "breakpoint on every step (`withAnthropicCacheBreakpoint`)"
+        : provider.id === "deepseek"
+          ? "none (provider caches automatically server-side)"
+          : "none";
   const adapter = registrySource.includes(`case "${provider.id}":`)
     ? "yes"
     : "**MISSING**";
@@ -154,10 +162,24 @@ for (const provider of PROVIDER_CATALOG) {
     const reasoning = m.reasoning
       ? m.reasoning + (m.thinkingBudgetTokens ? ` (budget ${fmtNumber(m.thinkingBudgetTokens)})` : "")
       : "—";
+    const resolvedTemperature = resolveModelTemperature(m.id, 0.123);
     const temperature =
-      resolveModelTemperature(m.id, 0.123) === 1 ? "fixed at 1" : "user setting";
+      resolvedTemperature === undefined
+        ? "not sent (rejected by model)"
+        : resolvedTemperature === 1
+          ? "fixed at 1"
+          : "user setting";
     const cached =
-      provider.id === "openai" && supportsOpenAIPromptCaching(m.id) ? "yes" : "—";
+      (provider.id === "openai" && supportsOpenAIPromptCaching(m.id)) ||
+      (provider.id === "anthropic" && anthropicBreakpoints)
+        ? `yes${
+            cacheVolleyDelayMs(provider.id, m.id) === null
+              ? ""
+              : provider.id === "anthropic" && m.reasoning === "enabled"
+                ? " · no volley (thinking)"
+                : " · approval volley"
+          }`
+        : "—";
     out(
       `| \`${m.id}\` | ${fmtNumber(m.contextWindow)} | ${fmtNumber(m.maxOutput)} | ${m.capabilities.join(", ")} | ${m.costTier} | ${reasoning} | ${temperature} | ${cached} |`,
     );

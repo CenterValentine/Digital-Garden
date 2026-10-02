@@ -40,7 +40,7 @@ import {
 export const DIAGNOSTICS_VERSION = 1;
 
 /** Where the turn's `stopWhen` step cap came from. */
-export type StepCapSource = "item-iteration" | "research" | "editable" | "base";
+export type StepCapSource = "item-iteration" | "research" | "charter" | "editable" | "base";
 
 /** Where the applied output-token ceiling came from. */
 export type MaxTokensSource = "user" | "catalog" | "provider-default";
@@ -80,6 +80,13 @@ export interface TurnStepSummary {
    */
   inputTokens: number | null;
   cachedInputTokens: number | null;
+  /**
+   * Tool calls the PROVIDER executed this step (native web search). Kept
+   * apart from `tools` because a native search and the app-run backend share
+   * the name `search_web`, and only the provider's is billed per call.
+   * Absent on rows persisted before §10 L4a and on steps with none.
+   */
+  providerTools?: string[];
 }
 
 export interface TurnSegmentUsage {
@@ -296,6 +303,7 @@ function strOrNull(v: unknown): string | null {
 const CAP_SOURCES: readonly StepCapSource[] = [
   "item-iteration",
   "research",
+  "charter",
   "editable",
   "base",
 ];
@@ -327,6 +335,13 @@ export function readTurnSegment(raw: unknown): TurnSegment | null {
             outputTokens: numOrNull(st.outputTokens),
             inputTokens: numOrNull(st.inputTokens),
             cachedInputTokens: numOrNull(st.cachedInputTokens),
+            ...(Array.isArray(st.providerTools)
+              ? {
+                  providerTools: st.providerTools.filter(
+                    (t): t is string => typeof t === "string",
+                  ),
+                }
+              : {}),
           },
         ];
       })
@@ -518,7 +533,32 @@ export function mergeTurnUsageMetadata(
   // seed path folds persisted rows back in on load) — its segments restore
   // wholesale and must never re-append. Raw per-request SDK blobs never
   // carry the stamp; their `segment` record appends (deduped by startedAt).
-  const isMergedBlob = typeof incoming?.diagnosticsVersion === "number";
+  //
+  // EXCEPT a live continuation (ITERATION-RUN-HARNESS-FIXES P13, prod
+  // 23fd28d6 2026-09-27: 1 segment recorded for a 6-request turn). The
+  // binding hook writes the folded blob back into message state after
+  // request 1 so the avatar meter grows; the SDK then deep-merges request
+  // 2's raw metadata OVER that stamped blob. The result carries BOTH the
+  // stamp and a fresh `segment` — a live request wearing a merged blob's
+  // coat. The `segment` key is the tell: the fold strips it from every
+  // blob it returns, so a stamped blob that still has one was just
+  // produced by the SDK. Treat it as raw: append its segment and price
+  // its own usage (the persisted `cost` beside it is request 1's, already
+  // counted — re-adding it doubled the dollars per request).
+  const hasRawSegment =
+    incoming?.segment !== undefined && incoming?.segment !== null;
+  const isMergedBlob =
+    typeof incoming?.diagnosticsVersion === "number" && !hasRawSegment;
+  if (!isMergedBlob) {
+    request.persistedCostUsd = undefined;
+    request.persistedCostBreakdown = undefined;
+    request.persistedCostVersion = undefined;
+    request.persistedUnpriced = undefined;
+    // A live request is ONE request, whatever `requestCount` the inherited
+    // stamp carries (prod ecf1d0e5, 2026-09-28: 4 requests reported as 8 —
+    // each continuation added the running total back: 1, 2, 4, 8).
+    request.requestCount = 1;
+  }
   if (entry.lastRequestSig !== sig) {
     entry.inputTokens += request.inputTokens;
     entry.outputTokens += request.outputTokens;
@@ -543,6 +583,9 @@ export function mergeTurnUsageMetadata(
         entry.costBreakdown.cachedInput += b.cachedInput ?? 0;
         entry.costBreakdown.cacheWrite += b.cacheWrite ?? 0;
         entry.costBreakdown.output += b.output ?? 0;
+        if (b.webSearch) {
+          entry.costBreakdown.webSearch = (entry.costBreakdown.webSearch ?? 0) + b.webSearch;
+        }
       }
       if (request.persistedCostVersion) {
         entry.costPriceVersion = request.persistedCostVersion;
@@ -564,6 +607,27 @@ export function mergeTurnUsageMetadata(
         : typeof route.providerId === "string"
           ? route.providerId
           : undefined;
+      // The tier is per API call: hand the calculator the request's largest
+      // step (the segment log carries per-step prompts) so a nine-step
+      // request is never priced as one 369k prompt.
+      const stepsForTier = readTurnSegment(
+        (incoming as { segment?: unknown } | undefined)?.segment,
+      )?.steps;
+      let maxStepInputTokens = 0;
+      let maxStepCachedInputTokens = 0;
+      // Provider-run searches carry a per-call fee (§10 L4a).
+      const webSearchCalls = (stepsForTier ?? []).reduce(
+        (n, step) =>
+          n + (step.providerTools ?? []).filter((t) => t === "search_web").length,
+        0,
+      );
+      for (const step of stepsForTier ?? []) {
+        const input = step.inputTokens ?? 0;
+        if (input > maxStepInputTokens) {
+          maxStepInputTokens = input;
+          maxStepCachedInputTokens = step.cachedInputTokens ?? 0;
+        }
+      }
       const cost = modelId
         ? computeTurnCost(
             {
@@ -571,6 +635,10 @@ export function mergeTurnUsageMetadata(
               outputTokens: request.outputTokens,
               cachedInputTokens: request.cachedInputTokens,
               cacheWriteTokens: request.cacheWriteTokens,
+              ...(maxStepInputTokens > 0
+                ? { maxStepInputTokens, maxStepCachedInputTokens }
+                : {}),
+              ...(webSearchCalls > 0 ? { webSearchCalls } : {}),
             },
             modelId,
             vendor,
@@ -582,6 +650,10 @@ export function mergeTurnUsageMetadata(
         entry.costBreakdown.cachedInput += cost.breakdown.cachedInput;
         entry.costBreakdown.cacheWrite += cost.breakdown.cacheWrite;
         entry.costBreakdown.output += cost.breakdown.output;
+        if (cost.breakdown.webSearch) {
+          entry.costBreakdown.webSearch =
+            (entry.costBreakdown.webSearch ?? 0) + cost.breakdown.webSearch;
+        }
         entry.costPriceVersion = cost.priceVersion;
       } else {
         entry.unpriced = true;

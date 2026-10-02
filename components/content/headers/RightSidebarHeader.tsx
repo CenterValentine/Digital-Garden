@@ -19,7 +19,10 @@ import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
 import { queryTools } from "@/lib/domain/tools";
 import type { ToolDefinition, ContentType } from "@/lib/domain/tools";
 import { getExtensionManifestForView } from "@/lib/extensions";
-import { useIsExtensionEnabled } from "@/lib/extensions/client-registry";
+import {
+  useClaimedContentSidebarPanel,
+  useIsExtensionEnabled,
+} from "@/lib/extensions/client-registry";
 import {
   STUDIO_EXTENSION_ID,
   STUDIO_TAB_KEY,
@@ -65,6 +68,11 @@ const TAB_TITLES: Record<string, string> = {
 
 interface RightSidebarHeaderProps {
   activeTab: RightSidebarTab;
+  /**
+   * The tabs RightSidebar resolved (claimed extension panel, virtual content
+   * rules). When given, the header renders exactly these.
+   */
+  availableTabs?: RightSidebarTab[];
   onTabChange: (tab: RightSidebarTab) => void;
   /**
    * Sideview tabs are non-interactive until the active sidepanel has loaded
@@ -85,6 +93,7 @@ interface RightSidebarHeaderProps {
 
 export function RightSidebarHeader({
   activeTab,
+  availableTabs,
   onTabChange,
   disabled = false,
   disabledTabs,
@@ -93,11 +102,19 @@ export function RightSidebarHeader({
   const { toggleCollapsed } = useRightPanelCollapseStore();
   const handleCollapseToggle = onToggleCollapse ?? toggleCollapsed;
   const selectedContentType = useContentStore((state) => state.selectedContentType);
+  const selectedContentId = useContentStore((state) => state.selectedContentId);
+  const claimedPanel = useClaimedContentSidebarPanel(selectedContentId);
   const selectedBlockId = useBlockStore((s) => s.selectedBlockId);
   const activeView = useLeftPanelViewStore((state) => state.activeView);
   const extensionManifest = getExtensionManifestForView(activeView);
 
-  const extensionTool = extensionManifest?.surfaces.includes("right-sidebar")
+  const extensionTool = claimedPanel
+    ? ({
+        id: "claimed-content-sidebar",
+        label: claimedPanel.label,
+        tabKey: "extension",
+      } as ToolDefinition)
+    : extensionManifest?.surfaces.includes("right-sidebar")
     ? ({
         id: `${extensionManifest.id}-right-sidebar`,
         label: extensionManifest.label,
@@ -128,9 +145,19 @@ export function RightSidebarHeader({
     } as ToolDefinition);
   }
 
+  if (claimedPanel && extensionTool) {
+    // A claimed content panel leads the rail.
+    tabs.splice(tabs.indexOf(extensionTool), 1);
+    tabs.unshift(extensionTool);
+  }
+
   const uniqueTabs = tabs.filter((tool, index, list) => {
     const tabKey = tool.tabKey as RightSidebarTab | undefined;
-    return Boolean(tabKey) && list.findIndex((candidate) => candidate.tabKey === tabKey) === index;
+    return (
+      Boolean(tabKey) &&
+      list.findIndex((candidate) => candidate.tabKey === tabKey) === index &&
+      (!availableTabs || availableTabs.includes(tabKey as RightSidebarTab))
+    );
   });
 
   return (
@@ -140,7 +167,8 @@ export function RightSidebarHeader({
           const tabKey = tool.tabKey as RightSidebarTab | undefined;
           if (!tabKey) return null;
 
-          const svgPath = TAB_SVG_PATHS[tabKey];
+          const claimed = tabKey === "extension" && claimedPanel;
+          const svgPath = claimed ? claimedPanel.svgPath : TAB_SVG_PATHS[tabKey];
           if (!svgPath) return null;
 
           const tabDisabled = disabled || (disabledTabs?.includes(tabKey) ?? false);
@@ -157,7 +185,7 @@ export function RightSidebarHeader({
                   ? "border-b-2 border-gold-primary text-gold-primary"
                   : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
               }`}
-              title={TAB_TITLES[tabKey] ?? tool.label}
+              title={claimed ? claimedPanel.label : TAB_TITLES[tabKey] ?? tool.label}
               type="button"
             >
               <svg

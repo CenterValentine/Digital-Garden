@@ -27,6 +27,11 @@ import { useContextMenuStore } from "@/state/context-menu-store";
 import { usePageTemplateStore } from "@/state/page-template-store";
 import type { TreeNode, ContentType } from "@/lib/domain/content/types";
 import { findTreeNodeById } from "@/lib/domain/content/tree-drop-target";
+import {
+  registerCreateTargetResolver,
+  resolveCreateParent,
+  toServerParent,
+} from "@/lib/domain/content/create-target";
 import { resolveDropForwardTarget } from "@/lib/features/content/shortcut-mirror";
 import { ContentTreePicker } from "@/components/content/pickers/ContentTreePicker";
 
@@ -59,6 +64,12 @@ const SHORTCUT_ELIGIBLE_TYPES = new Set([
 import type { PickerTarget } from "@/components/content/pickers/ContentTreePicker";
 import { clientLogger } from "@/lib/core/logger/client";
 import { warmUpMobileKeyboard } from "@/lib/core/mobile-keyboard";
+import {
+  TREE_OPTIMISTIC_EVENT,
+  TREE_SYNC_EVENT,
+  type OptimisticTreeRow,
+  type TreeOptimisticDetail,
+} from "@/lib/features/content/tree-optimistic";
 
 interface TreeApiResponse {
   success: boolean;
@@ -121,6 +132,57 @@ function parsePeopleVirtualParentId(parentId: string | null): Pick<CreateTarget,
   };
 }
 
+function treeContainsId(nodes: TreeNode[], id: string): boolean {
+  return nodes.some((node) => node.id === id || treeContainsId(node.children ?? [], id));
+}
+
+function removeTreeNodeById(nodes: TreeNode[], id: string): TreeNode[] {
+  return nodes
+    .filter((node) => node.id !== id)
+    .map((node) => (node.children?.length ? { ...node, children: removeTreeNodeById(node.children, id) } : node));
+}
+
+function renameTreeNodeId(nodes: TreeNode[], fromId: string, toId: string): TreeNode[] {
+  return nodes.map((node) =>
+    node.id === fromId
+      ? { ...node, id: toId }
+      : node.children?.length
+        ? { ...node, children: renameTreeNodeId(node.children, fromId, toId) }
+        : node
+  );
+}
+
+/** Placeholder row for a create made outside the tree (tree-optimistic.ts). */
+function optimisticTreeNode(tempId: string, row: OptimisticTreeRow, treeParentId: string | null): TreeNode {
+  const now = new Date();
+  return {
+    id: tempId,
+    title: row.title,
+    slug: "",
+    contentType: row.contentType,
+    parentId: treeParentId,
+    displayOrder: 0,
+    customIcon: null,
+    iconColor: null,
+    isPublished: false,
+    children: [],
+    createdAt: now,
+    updatedAt: now,
+    deletedAt: null,
+    file: row.mimeType
+      ? { fileName: row.title, mimeType: row.mimeType, fileSize: "0", uploadStatus: "uploading" }
+      : undefined,
+    shortcut: row.shortcutTarget
+      ? {
+          targetId: row.shortcutTarget.id,
+          targetContentType: row.shortcutTarget.contentType,
+          targetTitle: row.shortcutTarget.title,
+          targetDeleted: false,
+        }
+      : undefined,
+  };
+}
+
 function patchTreeNodeTitle(
   nodes: TreeNode[],
   contentId: string,
@@ -146,6 +208,23 @@ function patchTreeNodeTitle(
         ? patchTreeNodeTitle(node.references, contentId, newTitle)
         : node.references,
     };
+  });
+}
+
+/**
+ * Tree-space parent for a "+" create (null = top of the current tree). The one
+ * rule every create path shares — see lib/domain/content/create-target.ts.
+ */
+function resolveTreeParent(
+  explicitParentId: string | null | undefined,
+  treeData: TreeNode[] | null | undefined,
+  viewRootId: string | null
+): string | null {
+  return resolveCreateParent({
+    explicitParentId,
+    selectedIds: useTreeStateStore.getState().selectedIds,
+    findNode: (id) => (treeData ? findTreeNodeById(treeData, id) : null),
+    viewRootId,
   });
 }
 
@@ -379,6 +458,18 @@ export function LeftSidebarContent({
   // drops aimed at the top of a filtered tree land at the real vault root,
   // invisibly outside the view the user is looking at.
   const scopedRootParentId = effectiveViewRootContentId;
+  // Surfaces outside the tree (the reader's bookshelf, …) resolve "+" targets
+  // with the tree's live rule.
+  useEffect(() => {
+    registerCreateTargetResolver((explicitParentId) =>
+      toServerParent(
+        resolveTreeParent(explicitParentId, treeData, scopedRootParentId),
+        scopedRootParentId
+      )
+    );
+    return () => registerCreateTargetResolver(null);
+  }, [treeData, scopedRootParentId]);
+
   const rootDropTarget = useMemo(
     () =>
       scopedRootParentId
@@ -422,10 +513,11 @@ export function LeftSidebarContent({
     setScopeOverride(key === "parentView" || key === "root" ? key : null);
   };
 
-  // Fetch tree data
-  const fetchTree = useCallback(async () => {
+  // Fetch tree data. `quiet` keeps the current tree on screen (no skeleton)
+  // while the refetch runs — used to reconcile after an optimistic row.
+  const loadTree = useCallback(async (quiet: boolean) => {
     try {
-      setIsLoading(true);
+      if (!quiet) setIsLoading(true);
       setError(null);
 
       const url = new URL("/api/content/content/tree", window.location.origin);
@@ -467,11 +559,13 @@ export function LeftSidebarContent({
         attrs: { workspace_id: activeWorkspaceId ?? "none" },
         error: err,
       });
-      setError(err instanceof Error ? err.message : "Failed to load file tree");
+      // A quiet reconcile that fails keeps the tree it already shows.
+      if (!quiet) setError(err instanceof Error ? err.message : "Failed to load file tree");
     } finally {
-      setIsLoading(false);
+      if (!quiet) setIsLoading(false);
     }
   }, [activeWorkspaceId, effectiveViewRootContentId]);
+  const fetchTree = useCallback(() => loadTree(false), [loadTree]);
 
   // Initial load and refresh when trigger or active workspace changes.
   // Gated on `workspaceStoreReady` so we don't double-fetch (once for
@@ -680,6 +774,61 @@ export function LeftSidebarContent({
     return () => window.removeEventListener("dg:tree-expand", handleExpandRequest);
   }, []);
 
+  // Optimistic rows for creates made outside the tree (the reader's Library
+  // and bookshelf): show the row now, swap in the real id when the server
+  // answers, then reconcile quietly — no skeleton flash.
+  useEffect(() => {
+    const handleOptimistic = (event: Event) => {
+      const detail = (event as CustomEvent<TreeOptimisticDetail>).detail;
+      if (!detail) return;
+      if (detail.action === "insert") {
+        const serverParent = detail.row.parentId;
+        const treeParentId =
+          !serverParent || serverParent === scopedRootParentId ? null : serverParent;
+        setTreeData((current) => {
+          if (!current) return current;
+          // A parent outside the visible tree: nothing to show until it's opened.
+          if (treeParentId && !treeContainsId(current, treeParentId)) return current;
+          const node = optimisticTreeNode(detail.tempId, detail.row, treeParentId);
+          if (!treeParentId) return [node, ...current];
+          const insertUnder = (nodes: TreeNode[]): TreeNode[] =>
+            nodes.map((candidate) =>
+              candidate.id === treeParentId
+                ? { ...candidate, children: [node, ...(candidate.children ?? [])] }
+                : candidate.children?.length
+                  ? { ...candidate, children: insertUnder(candidate.children) }
+                  : candidate
+            );
+          return insertUnder(current);
+        });
+        if (treeParentId) setExpandNodeId(treeParentId);
+        return;
+      }
+      if (detail.action === "remove") {
+        setTreeData((current) => (current ? removeTreeNodeById(current, detail.tempId) : current));
+        return;
+      }
+      const { tempId, realId } = detail;
+      setTreeData((current) => {
+        if (!current) return current;
+        // Nothing new (duplicate), or the real row already arrived: drop the placeholder.
+        if (!realId || treeContainsId(current, realId)) return removeTreeNodeById(current, tempId);
+        return renameTreeNodeId(current, tempId, realId);
+      });
+      void loadTree(true);
+    };
+
+    // `dg:tree-sync`: a quiet refetch for outside writes that don't need a
+    // placeholder row (unlike `dg:tree-refresh`, no skeleton).
+    const handleSync = () => void loadTree(true);
+    window.addEventListener(TREE_OPTIMISTIC_EVENT, handleOptimistic);
+    window.addEventListener(TREE_SYNC_EVENT, handleSync);
+    return () => {
+      window.removeEventListener(TREE_OPTIMISTIC_EVENT, handleOptimistic);
+      window.removeEventListener(TREE_SYNC_EVENT, handleSync);
+    };
+  }, [scopedRootParentId, loadTree]);
+
   // Imperative reveal request from outside the tree (main-panel path
   // breadcrumb): open the node's ancestors, scroll to it, and select it —
   // the tree-side half of "select this node as if clicked in the tree".
@@ -705,19 +854,7 @@ export function LeftSidebarContent({
         event.detail;
       if (!treeData) return;
 
-      let parentId = requestedParentId;
-      if (parentId === null) {
-        const { selectedIds: treeSelectedIds } = useTreeStateStore.getState();
-        if (treeSelectedIds.length === 1) {
-          const selectedNode = findTreeNodeById(treeData, treeSelectedIds[0]);
-          if (selectedNode) {
-            parentId =
-              selectedNode.contentType === "folder"
-                ? selectedNode.id
-                : selectedNode.parentId || null;
-          }
-        }
-      }
+      const parentId = resolveTreeParent(requestedParentId, treeData, scopedRootParentId);
 
       const tempId = `temp-${Date.now()}-${Math.random()}`;
       const tempNode: TreeNode = {
@@ -785,7 +922,7 @@ export function LeftSidebarContent({
         handleCreateFromTemplate as EventListener,
       );
     };
-  }, [treeData]);
+  }, [treeData, scopedRootParentId]);
 
 
   // Apply move operation to tree structure (for optimistic updates)
@@ -1288,33 +1425,13 @@ export function LeftSidebarContent({
     target: PickerTarget,
     explicitParentId: string | null,
   ) => {
-    let parentId: string | null = explicitParentId ?? scopedRootParentId;
-    const { selectedIds: treeSelectedIds } = useTreeStateStore.getState();
-
-    if (parentId === null && treeData && treeSelectedIds.length === 1) {
-      const selectedNode = findTreeNodeById(treeData, treeSelectedIds[0]);
-      if (selectedNode) {
-        parentId =
-          selectedNode.contentType === "folder"
-            ? selectedNode.id
-            : selectedNode.parentId;
-      }
-    }
-
-    if (parentId) {
-      const parentNode = findTreeNodeById(treeData ?? [], parentId);
-      if (parentNode?.contentType === "shortcut") {
-        parentId = parentNode.parentId;
-      } else if (!parentNode) {
-        // The derived parent is not in the tree, which means the selected row
-        // was orphan-promoted: deleting a folder does NOT delete its children,
-        // so a live node can keep a parentId naming a trashed folder, and the
-        // tree renders it at root instead. Writing to that id fails with
-        // "Cannot add content to deleted parent". Root is both what the server
-        // will accept and where the user actually sees the row.
-        parentId = null;
-      }
-    }
+    // Same rule as every other create (lib/domain/content/create-target.ts);
+    // a shortcut target resolves to its parent, an orphaned parent to the top
+    // of the current tree (the view root in a scoped view).
+    const parentId = toServerParent(
+      resolveTreeParent(explicitParentId, treeData, scopedRootParentId),
+      scopedRootParentId
+    );
 
     try {
       const response = await fetch("/api/content/content", {
@@ -1417,36 +1534,13 @@ export function LeftSidebarContent({
         // creates (parentId null) derive it from the tree selection, and
         // in a view-scoped tree an unselected create belongs to the view
         // root rather than the vault root.
-        let parentId: string | null =
-          externalLinkDialog.parentId ?? scopedRootParentId;
-        const { selectedIds: treeSelectedIds } = useTreeStateStore.getState();
-
-        if (parentId === null && treeData && treeSelectedIds.length === 1) {
-          const findNode = (nodes: TreeNode[]): TreeNode | null => {
-            for (const node of nodes) {
-              if (node.id === treeSelectedIds[0]) return node;
-              if (node.children) {
-                const found = findNode(node.children);
-                if (found) return found;
-              }
-            }
-            return null;
-          };
-
-          const selectedNode = findNode(treeData);
-          if (selectedNode) {
-            parentId = selectedNode.contentType === "folder" ? selectedNode.id : selectedNode.parentId;
-          }
-        }
-
-        // Same orphan hazard as the shortcut path: deleting a folder leaves
-        // its children live, holding a parentId that names the tombstone, and
-        // the tree shows them at root. Deriving that id here made the create
-        // fail with "Cannot add content to deleted parent" — reproduced on a
-        // note whose folder was trashed in July.
-        if (parentId && !findTreeNodeById(treeData ?? [], parentId)) {
-          parentId = null;
-        }
+        // One create rule (lib/domain/content/create-target.ts): explicit
+        // target, else the selection, else the top of the current tree — the
+        // view root in a scoped view, never a trashed folder's id.
+        const parentId = toServerParent(
+          resolveTreeParent(externalLinkDialog.parentId, treeData, scopedRootParentId),
+          scopedRootParentId
+        );
 
         // Create via API
         const response = await fetch("/api/content/content", {
@@ -2703,40 +2797,10 @@ ${workbenchWarning}`
 
     if (!treeData) return;
 
-    // Determine parentId based on current selection (from persisted tree state)
-    let parentId = requestedParentId;
-
-    // Only override if we were passed null (from + button)
-    if (parentId === null) {
-      // Get current selection from tree state store
-      const { selectedIds: treeSelectedIds } = useTreeStateStore.getState();
-
-      if (treeSelectedIds.length === 1) {
-        // Find the selected node
-        const findNode = (nodes: TreeNode[]): TreeNode | null => {
-          for (const node of nodes) {
-            if (node.id === treeSelectedIds[0]) return node;
-            if (node.children) {
-              const found = findNode(node.children);
-              if (found) return found;
-            }
-          }
-          return null;
-        };
-
-        const selectedNode = findNode(treeData);
-
-        if (selectedNode) {
-          // If selected node is a folder, create inside it
-          // Otherwise, create as sibling (same parent)
-          if (selectedNode.contentType === "folder") {
-            parentId = selectedNode.id;
-          } else {
-            parentId = selectedNode.parentId;
-          }
-        }
-      }
-    }
+    // Explicit target, else the selection (folder → inside, item → beside),
+    // else the top of the current tree. Tree space: server writes remap null
+    // to the view root below.
+    const parentId = resolveTreeParent(requestedParentId, treeData, scopedRootParentId);
 
     const createTarget = getCreateTarget(parentId, treeData);
     if ((createTarget.peopleGroupId || createTarget.personId) && !["folder", "note"].includes(type)) {

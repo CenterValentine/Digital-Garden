@@ -44,6 +44,9 @@ import { ContentPathBreadcrumb } from "./ContentPathBreadcrumb";
 import { EditorSkeleton } from "@/components/content/skeletons/EditorSkeleton";
 import { useTreeStateStore } from "@/state/tree-state-store";
 import {
+  listExtensionLinkAnchors,
+  suggestExtensionLinkAnchors,
+  resolveExtensionVirtualContentType,
   useExtensionContentViewer,
   useExtensionMainWorkspace,
 } from "@/lib/extensions/client-registry";
@@ -117,6 +120,12 @@ import {
 import { tiptapToMarkdown, markdownToTiptapResult } from "@/lib/domain/content/markdown";
 import { useEditorInstanceStore } from "@/state/editor-instance-store";
 import { MarkdownSourceView } from "../editor/MarkdownSourceView";
+import { useContentFullscreenStore } from "@/state/content-fullscreen-store";
+import { useContentAnchorStore } from "@/state/content-anchor-store";
+import { usePanelStore } from "@/state/panel-store";
+import { useIsMobile } from "@/components/common/useIsMobile";
+
+import { setLinkAnchorLister, setLinkAnchorSuggester } from "@/lib/domain/content/link-anchor";
 
 interface ContentResponse {
   success: boolean;
@@ -157,6 +166,7 @@ interface ContentResponse {
     external?: {
       url: string;
       subtype: string | null;
+      resourceType?: string | null;
       preview: Record<string, unknown>;
     };
     chat?: {
@@ -181,6 +191,9 @@ interface ContentResponse {
       engine: string;
       definition: Record<string, unknown>;
       enabled: boolean;
+    };
+    file?: {
+      mimeType: string;
     };
   };
   error?: {
@@ -275,9 +288,14 @@ interface PageTemplateResponse {
   error?: string;
 }
 
+/** Width of the collapsed left icon rail (ResizablePanels' hidden mode, w-12). */
+const LEFT_RAIL_WIDTH_PX = 48;
+
 export function MainPanelContent({ paneId, initialContent = null }: MainPanelContentProps) {
   const pathname = usePathname();
   const isEmbedMode = pathname?.startsWith("/embed/") ?? false;
+
+
   const { activeView, setActiveView } = useLeftPanelViewStore();
   const { position: notesPanelPosition } = useNotesPanelStore();
   const activePaneId = useContentStore((state) => state.activePaneId);
@@ -285,6 +303,33 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
   const selectedContentId = useContentStore((state) =>
     getPaneActiveContentId(state, paneId)
   );
+
+  // Full screen (content toolbar): this panel fills the window. Leaving the
+  // browser's full screen (Esc, F11), pressing Esc, switching content or
+  // unmounting leaves ours too.
+  const contentFullscreen = useContentFullscreenStore(
+    (s) => s.active && !!selectedContentId && s.contentId === selectedContentId
+  );
+  const leftSidebarVisible = usePanelStore((s) => s.leftSidebarVisible);
+  const isMobileLayout = useIsMobile();
+  const fullscreenLeftInset = leftSidebarVisible && !isMobileLayout ? LEFT_RAIL_WIDTH_PX : 0;
+  useEffect(() => {
+    if (!contentFullscreen) return;
+    const store = useContentFullscreenStore.getState;
+    const onFullscreenChange = () => {
+      if (!document.fullscreenElement && store().enteredBrowser) store().exit();
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !document.fullscreenElement && !event.defaultPrevented) store().exit();
+    };
+    document.addEventListener("fullscreenchange", onFullscreenChange);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("fullscreenchange", onFullscreenChange);
+      window.removeEventListener("keydown", onKey);
+      store().exit();
+    };
+  }, [contentFullscreen]);
   const activeTab = useContentStore((state) => getPaneActiveTab(state, paneId));
   const activeTabId = activeTab?.id ?? null;
   const isPageTemplateTab = activeTab?.contentType === "page-template";
@@ -324,6 +369,18 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
   const [contentCustomIcon, setContentCustomIcon] = useState<string | null>(null);
   const [contentIconColor, setContentIconColor] = useState<string | null>(null);
   const [contentType, setContentType] = useState<string | null>(null);
+  // File payload MIME type — lets an extension claim a file viewer by format
+  // (e.g. the reader owns application/epub+zip).
+  const [contentMimeType, setContentMimeType] = useState<string | null>(null);
+  // External payload resourceType — lets an extension claim a kind of link
+  // node (the reader owns resourceType "scripture": scripture sessions).
+  const [contentExternalResourceType, setContentExternalResourceType] = useState<string | null>(null);
+  // Which content id the type fields above describe. They update only when
+  // that content's load commits, so between a switch and the new load they
+  // still describe the PREVIOUS item — extension viewers must not match the
+  // new id on them (an EPUB's "file"+mime opened the next item — a scripture
+  // session, a note — in the book reader: "This book could not be found").
+  const [contentTypeFor, setContentTypeFor] = useState<string | null>(null);
   const [contentParentId, setContentParentId] = useState<string | null>(null);
   const [contentIsPublished, setContentIsPublished] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- TODO(any-epic-phase-3d): payload is a discriminated union (folder/note/external/chat/viz/data/hope/workflow) — model as `ContentPayload` union in api-types.ts and switch each viewer branch to a narrowed value
@@ -535,6 +592,7 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
       setContentCustomIcon(null);
       setContentIconColor(null);
       setContentType("person-profile");
+      setContentTypeFor(selectedContentId);
       setOwnedByNote(null);
       return;
     }
@@ -550,6 +608,26 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
       setContentCustomIcon(null);
       setContentIconColor(null);
       setContentType("dm-thread");
+      setContentTypeFor(selectedContentId);
+      setOwnedByNote(null);
+      return;
+    }
+
+    // Extension-owned synthetic ids (e.g. reader:library) — no ContentNode
+    // fetch; the owning extension's content viewer drives its own data.
+    const virtualContentType = resolveExtensionVirtualContentType(selectedContentId);
+    if (virtualContentType) {
+      setIsLoading(false);
+      setError(null);
+      setNoteContent(null);
+      setContentParentId(null);
+      setContentData(null);
+      setContentMimeType(null);
+      setContentExternalResourceType(null);
+      setContentCustomIcon(null);
+      setContentIconColor(null);
+      setContentType(virtualContentType);
+      setContentTypeFor(selectedContentId);
       setOwnedByNote(null);
       return;
     }
@@ -563,6 +641,7 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
       setNoteContent(null);
       setNoteTitle("");
       setContentType(null);
+      setContentTypeFor(selectedContentId);
       setContentData(null);
       setOwnedByNote(null);
       return;
@@ -613,6 +692,7 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
           setContentParentId(null);
           setContentIsPublished(false);
           setContentType("page-template");
+          setContentTypeFor(selectedContentId);
           setContentCustomIcon(result.customIcon ?? null);
           setContentIconColor(result.iconColor ?? null);
           setOwnedByNote(null);
@@ -718,6 +798,9 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
         setContentParentId(result.data.parentId);
         setContentIsPublished(Boolean(result.data.isPublished));
         setContentType(result.data.contentType);
+        setContentMimeType(result.data.file?.mimeType ?? null);
+        setContentExternalResourceType(result.data.external?.resourceType ?? null);
+        setContentTypeFor(selectedContentId);
         setContentCustomIcon(result.data.customIcon ?? null);
         setContentIconColor(result.data.iconColor ?? null);
         setOwnedByNote(result.data.ownedByNote ?? null);
@@ -1443,12 +1526,20 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
     setSourceDraft("");
   }, [selectedContentId]);
 
+  // The link menu's `[[Title#` step lists spots inside a target through the
+  // enabled extensions (the reader: book highlights). Installed, never
+  // cleared — every pane installs the same lister.
+  useEffect(() => {
+    setLinkAnchorLister(listExtensionLinkAnchors);
+    setLinkAnchorSuggester(suggestExtensionLinkAnchors);
+  }, []);
+
   // Wiki-link click handler — resolves by stable id first, then by title.
   // Renaming a note used to orphan every inbound link (title-only lookup, and
   // a miss did nothing at all, which read as a dead click).
   const handleWikiLinkClick = useCallback(
     async (target: WikiLinkClickTarget) => {
-      const { targetId, targetTitle, headingSlug, heal, markBroken } = target;
+      const { targetId, targetTitle, headingSlug, anchor, heal, markBroken } = target;
 
       // In-document heading link: same-document navigation, no lookup. The
       // scroll-to-heading listener expands any fold hiding the target. A
@@ -1458,6 +1549,15 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
         window.dispatchEvent(
           new CustomEvent("scroll-to-heading", { detail: { slug: headingSlug } })
         );
+        return;
+      }
+
+      // An extension's virtual content (a scripture collection): no node to
+      // resolve — open its tab, and its viewer takes the anchor.
+      const virtualContentType = targetId ? resolveExtensionVirtualContentType(targetId) : null;
+      if (targetId && virtualContentType) {
+        if (anchor) useContentAnchorStore.getState().request(targetId, anchor);
+        setSelectedContentId(targetId, { title: targetTitle, contentType: virtualContentType, paneId });
         return;
       }
 
@@ -1482,6 +1582,10 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
         heal(resolved.id);
       }
 
+      // Anchored link: the target's viewer takes this on open and jumps there
+      // (lib/domain/content/link-anchor.ts).
+      if (anchor) useContentAnchorStore.getState().request(resolved.id, anchor);
+
       setSelectedContentId(resolved.id, {
         title: resolved.title,
         contentType: resolved.contentType,
@@ -1497,17 +1601,19 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
   // this path resolves but doesn't write back.
   useEffect(() => {
     const handleOpen = (e: Event) => {
-      const { targetId, targetTitle, headingSlug } = (
+      const { targetId, targetTitle, headingSlug, anchor } = (
         e as CustomEvent<{
           targetId?: string | null;
           targetTitle: string;
           headingSlug?: string | null;
+          anchor?: string | null;
         }>
       ).detail;
       void handleWikiLinkClick({
         targetId: targetId ?? null,
         targetTitle,
         headingSlug: headingSlug ?? null,
+        anchor: anchor ?? null,
         heal: () => {},
         markBroken: () => {},
       });
@@ -2311,10 +2417,21 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
 
   // Extension workspace — shown in pane 1 when an extension view is active
   const ExtensionMainWorkspace = useExtensionMainWorkspace(activeView);
-  const ExtensionContentViewer = useExtensionContentViewer({
-    selectedContentId,
-    contentType,
-  });
+  const extensionViewerMatch = useMemo(
+    () =>
+      // Type facts about another item never claim this one (see contentTypeFor).
+      // Synthetic ids (reader:…) still match on their prefix.
+      contentTypeFor === selectedContentId
+        ? {
+            selectedContentId,
+            contentType,
+            mimeType: contentMimeType,
+            externalResourceType: contentExternalResourceType,
+          }
+        : { selectedContentId, contentType: null, mimeType: null, externalResourceType: null },
+    [selectedContentId, contentTypeFor, contentType, contentMimeType, contentExternalResourceType]
+  );
+  const ExtensionContentViewer = useExtensionContentViewer(extensionViewerMatch);
 
   // Inbox core view — full-panel takeover in the primary pane
   if (activeView === "inbox" && paneId === "top-left") {
@@ -2352,6 +2469,14 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
     return <EditorSkeleton />;
   }
 
+  // The type/data state still describes the PREVIOUS item (the first render
+  // after a switch runs before the load effect): no viewer may draw the new
+  // id with it — a link viewer auto-fetched the old URL's preview under the
+  // new id, the book reader opened a session. Errors still show.
+  if (!error && contentTypeFor !== selectedContentId) {
+    return <EditorSkeleton />;
+  }
+
   // Render content based on type
   let contentElement: React.ReactNode;
   const isReadOnlyPageTemplate =
@@ -2378,8 +2503,8 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
     contentElement = (
       <ExtensionContentViewer
         paneId={paneId}
+        {...extensionViewerMatch}
         selectedContentId={selectedContentId}
-        contentType={contentType}
       />
     );
   } else if (contentType === "file" && selectedContentId) {
@@ -2646,7 +2771,11 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
 
   // For non-note content types, append the expandable notes editor
   // This lets any content type (file, folder, external, etc.) have attached notes
+  const isVirtualExtensionContent = Boolean(
+    selectedContentId && resolveExtensionVirtualContentType(selectedContentId)
+  );
   const isNonNoteContent =
+    !isVirtualExtensionContent &&
     contentType &&
     contentType !== "note" &&
     contentType !== "page-template" &&
@@ -2666,7 +2795,12 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
       activeToolIds={activeToolIds}
     >
       <div
-        className="flex h-full min-h-0 flex-col overflow-hidden"
+        className={`flex min-h-0 flex-col overflow-hidden ${
+          contentFullscreen ? "fixed inset-y-0 right-0 z-[200] bg-background" : "h-full"
+        }`}
+        // Full screen stops at the collapsed left rail (48px) so it never
+        // covers it; the expanded sidebar (and the right panel) may overlap.
+        style={contentFullscreen ? { left: fullscreenLeftInset } : undefined}
         onPointerDownCapture={() => {
           if (activeTabId) {
             pinContentTab(activeTabId);
@@ -2680,6 +2814,7 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
       >
         {selectedContentId &&
           !selectedContentId.startsWith("person:") &&
+          !isVirtualExtensionContent &&
           contentType !== "page-template" &&
           !isEmbedMode && <ContentToolbar contentId={selectedContentId} />}
 

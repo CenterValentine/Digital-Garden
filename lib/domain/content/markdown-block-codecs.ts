@@ -96,6 +96,68 @@ const headingCodec: BlockMarkdownCodec = {
   },
 };
 
+/**
+ * Private block ⇄ Obsidian comment fence:
+ *
+ *   %%
+ *
+ *   body
+ *
+ *   %%
+ *
+ * Blank lines around the delimiters make marked emit them as their own
+ * `<p>%%</p>` paragraphs, which reTag folds back into `div[data-private=block]`.
+ * A private block nested inside another container (blockquote, list item) is
+ * serialised by the `dgPrivateBlock` turndown rule to the same shape, and the
+ * same reTag reconstructs it wherever it appears — the regex is unanchored.
+ */
+const privateBlockCodec: BlockMarkdownCodec = {
+  type: "privateBlock",
+  toMarkdown(node, serializeInner) {
+    const inner = serializeInner(node.content ?? []).trim();
+    return inner ? `%%\n\n${inner}\n\n%%` : null;
+  },
+  reTag(html) {
+    return html.replace(
+      /<p>%%<\/p>\s*([\s\S]*?)\s*<p>%%<\/p>/g,
+      '<div data-private="block">$1</div>',
+    );
+  },
+};
+
+/**
+ * Private text ⇄ `%%inline comment%%`.
+ *
+ * Serialize side is the `dgPrivateText` turndown rule (an inline mark has no
+ * block-level codec slot); this entry exists for its parse-side half. marked
+ * leaves `%%…%%` as literal text, so reTag wraps it in `span[data-private=text]`
+ * — everywhere except inside code, where `%%` is content (Mermaid's `%%{init}%%`
+ * lives in code blocks). Literal `%%x%%` in ordinary prose re-parses as private
+ * text, fails self-verify, and fences: lossless, just opaque, for that input.
+ */
+const privateTextCodec: BlockMarkdownCodec = {
+  type: "privateText",
+  toMarkdown() {
+    return null; // turndown tier handles the mark
+  },
+  reTag(html) {
+    return outsideCode(html, (segment) =>
+      segment.replace(
+        /%%((?:(?!%%)[^\n])+?)%%/g,
+        '<span data-private="text">$1</span>',
+      ),
+    );
+  },
+};
+
+/** Apply `fn` to every part of `html` that is not inside <pre> or <code>. */
+function outsideCode(html: string, fn: (segment: string) => string): string {
+  return html
+    .split(/(<pre[\s\S]*?<\/pre>|<code[\s\S]*?<\/code>)/g)
+    .map((part, i) => (i % 2 === 1 ? part : fn(part)))
+    .join("");
+}
+
 /** Text content for an element body: the three characters HTML reserves. */
 function escapeText(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -186,7 +248,13 @@ const accordionCodec: BlockMarkdownCodec = {
   },
 };
 
-export const BLOCK_CODECS: BlockMarkdownCodec[] = [calloutCodec, headingCodec, accordionCodec];
+export const BLOCK_CODECS: BlockMarkdownCodec[] = [
+  calloutCodec,
+  headingCodec,
+  privateBlockCodec,
+  privateTextCodec,
+  accordionCodec,
+];
 
 const CODEC_BY_TYPE = new Map(BLOCK_CODECS.map((c) => [c.type, c]));
 

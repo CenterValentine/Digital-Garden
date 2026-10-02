@@ -15,6 +15,7 @@ import { useSnippetStore } from "@/state/snippet-store";
 import { useEditorInstanceStore } from "@/state/editor-instance-store";
 import { instantiateTemplateContent } from "@/lib/domain/editor/template-instantiation";
 import { resolveWikiLinkTarget } from "@/lib/domain/editor/wiki-link-resolve";
+import { resolveExtensionVirtualContentType } from "@/lib/extensions/client-registry";
 import { markdownPasteToTiptap } from "@/lib/domain/content/markdown";
 import { clipboardBlockedGuidance } from "@/lib/domain/content/markdown-detect";
 import { triggerBlobDownload } from "@/lib/core/download";
@@ -604,7 +605,12 @@ async function resolveWikiLinkAndOpen(
 ) {
   const { layoutMode, openContentInPane, setLayoutMode } = useContentStore.getState();
 
-  const match = await resolveWikiLinkTarget(ref);
+  // An extension's virtual content (a scripture collection) has no node.
+  const virtualContentType = ref.targetId ? resolveExtensionVirtualContentType(ref.targetId) : null;
+  const match =
+    ref.targetId && virtualContentType
+      ? { id: ref.targetId, title: ref.targetTitle, contentType: virtualContentType }
+      : await resolveWikiLinkTarget(ref);
   if (!match) { toast.error(`"${ref.targetTitle}" not found`); return; }
 
   const visible = new Set(getVisiblePaneIds(layoutMode));
@@ -662,6 +668,7 @@ export const editorActionProvider: ContextMenuActionProvider = (ctx) => {
     const targetTitle = wikiLinkEl.getAttribute("data-target-title");
     const targetId = wikiLinkEl.getAttribute("data-target-id");
     const headingSlug = wikiLinkEl.getAttribute("data-heading-slug");
+    const anchor = wikiLinkEl.getAttribute("data-anchor");
     // Default is EXPAND, so only an explicit "false" opts out.
     const isExpanded = wikiLinkEl.getAttribute("data-expand") !== "false";
 
@@ -699,7 +706,7 @@ export const editorActionProvider: ContextMenuActionProvider = (ctx) => {
             label: "Open",
             onClick: () => {
               window.dispatchEvent(
-                new CustomEvent("open-wiki-link", { detail: { targetId, targetTitle } })
+                new CustomEvent("open-wiki-link", { detail: { targetId, targetTitle, anchor } })
               );
             },
           },
@@ -859,6 +866,12 @@ export const editorActionProvider: ContextMenuActionProvider = (ctx) => {
         return;
       }
       if (!text) return;
+      // Inside a code block the clipboard is code, not markdown: insert it
+      // literally (a code block cannot hold the block nodes parsing yields).
+      if (editor.state.selection.$from.parent.type.spec.code) {
+        editor.view.dispatch(editor.state.tr.insertText(text.replace(/\r\n?/g, "\n")));
+        return;
+      }
       const parsed = markdownPasteToTiptap(text).content ?? [];
       if (parsed.length === 0) return;
       editor.chain().focus().insertContent(parsed).run();

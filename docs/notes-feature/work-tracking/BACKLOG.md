@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-09-21
+last_updated: 2026-09-29
 ---
 
 # Sprint Backlog
@@ -9,6 +9,46 @@ last_updated: 2026-09-21
 **Sprint Execution Protocol**: Before commencing any sprint, always ask the user for input before planning and executing — there may be additions or modifications.
 
 ---
+
+## E-reader — proposed (2026-09-29, plan `EREADER-PLAN.md`)
+
++ → Reader → [Scriptures, Books]. One reader shell (foliate-js for EPUB/PDF, a corpus renderer for scriptures), one annotation store keyed by Readium Locators, and a library of book-source adapters (OPDS, Gutendex, Open Library, upload). Books are file nodes in a user-chosen library folder. Blocked on owner answers to the plan's §10.
+
+- [x] **R0 Read an uploaded book** (built 2026-09-29; migration staged) — `createMenuItems` extension field, `extensions/reader/`, EPUB MIME + DRM gate, foliate-js viewer, `ReadingProgress`.
+- [x] **R1 Mark it up** (built 2026-09-29) — `ReaderAnnotation`, selection toolbar, in-reader annotations panel, send to note. *Still open:* `readerLink` TipTap node, right-sidebar tab.
+- [x] **R2 Library** (built 2026-09-29; + Wikisource, OAPEN, Google Books, Standard Ebooks preset) — OPDS / Gutendex / Open Library adapters, library dialog, acquire into folder, `BookMeta` + covers.
+- [ ] **R3 Scriptures in the reader** — scriptures plan P0/P1 feed a corpus source sharing the annotation store.
+- [ ] **R4 Bring in the rest** — ~~Kindle clippings + Readwise, Hardcover, Libby link~~ (built 2026-09-29); highlights → database, flashcards, AI tools, speed-reader EPUB, PDF in reader.
+- [ ] **Research (reader stub)** — third reader source after Scriptures: open-access papers (arXiv, PubMed Central, OpenAlex/Unpaywall, Semantic Scholar) through the same shell + annotation store.
+- [ ] **CSP for /content** — foliate-js wants a script-blocking CSP; the reader sanitizer is the interim defence.
+
+## Scriptures integration — parked (reader moved to `EREADER-PLAN.md`) (2026-09-28, plan `SCRIPTURES-INTEGRATION-PLAN.md`)
+
+LDS standard works as a shared read-only corpus (seeded from the public-domain `bcbooks/scriptures-json` at a pinned SHA), with study living in the user's own notes. Blocked on owner answers to the plan's §9 open questions (shared corpus tables; talk-clipping vs site terms).
+
+- [ ] **P0 Corpus** — shared `Scripture*` tables + migration, pinned seed script cross-checked against `beandog/lds-scriptures`, read API.
+- [ ] **P1 Read & cite** — `extensions/scriptures/`, reference parser (evaluate `scripture-guide` first), `scriptureRef` inline node, reader viewer, `ScriptureCitation` index.
+- [ ] **P2 Study** — `scriptureQuote` block, "Add study note" into a user-chosen folder (lazy), Citations sidebar tab, scripture search scope.
+- [ ] **P3 Mark & memorize** — offset-anchored highlights (`ScriptureAnnotation`), flashcard "Memorize".
+- [ ] **P4 Talks & AI** — user-initiated talk clipping (never bundled), footnote → citation parsing, Talks database, AI `read_scripture` grounding tools.
+
+## Iteration run harness — follow-ups (2026-09-27, from `feat/charter-run-harness`; plan `ITERATION-RUN-HARNESS-FIXES-PLAN.md`)
+
+- [ ] **Clean the *Apply for a job* charter note in production.** It holds four identical copies of its content (66 KB TipTap, last modified 2026-09-27 22:19 UTC, after the evaluated run). The parser now collapses the copies and the charter context says so, but the note itself still costs four copies to load in the editor and to sync. Hand-fix: delete three copies in the editor.
+- [ ] **Charter-named databases and private content.** `charterReferencedTableIds` reads the charter's wiki-links without running `stripPrivateContent`; a link inside a commented-out run still grants reach. Reach is not disclosure, so this was left as-is — revisit if the private-content seam list wants jurisdiction on it.
+- [ ] **Status-column regressions during a rows pass.** The evaluated run moved a Qualified opportunity back to Research Queue on its own judgment. Deliberately not guarded in the harness (D6) — the charter's wording owns pipeline state. If it recurs, the cheapest guard is a capture rule "a status column only moves forward within its group order unless the charter says otherwise".
+- [ ] **`durationMs` on turn metadata is server time only.** It sums per-request server durations and excludes client-executed tools (browser reads, `create_docx`); a five-minute turn reports ~72 s. Not wrong, but unlabelled — rename or add `wallClockMs` from the first request's `startedAt` to the last request's finish.
+- [ ] **Extension-side chrome detection.** `looksLikeNavigationChrome` runs server-side (P1/P2 material) and on the session-tab result; the extension's own reader could apply it before hydration settles and retry once with a longer settle when the body is chrome.
+- [ ] **Run cost levers (plan §10) — remaining.**
+  - L1, L2, L3a and L4a are built (#270, #271). L3b was superseded by L2. Round 3 is on `fix/docx-cache-volley`: budget on tool results, DOCX hyperlinks and file-extracted check text, GPT-5.6+ write pricing, gpt-6 cache key, Anthropic breakpoints, and the approval volley.
+  - **Verify on the next run:** `cachedInputTokens` climbs inside a request now that the trailing notice is gone. If it still freezes, export `ai:prompt_wire` again.
+  - **Prefix diagnostic → per-conversation owner toggle** that writes the divergence summary into the turn's metadata (readable with pg-read), replacing the env var and the Vercel log export. Keep the env var until then (unset).
+  - **Search delegation trial:** the OpenAI search backend is built (#273). Run one charter job with Chat controls → Web search set to `gpt-5-search-api`, then compare against `36237eb8` (native: 12 searches, $0.12 in fees). Compare `searchCostUsd` summed from the transcript plus the chat meter, and research quality. The per-search fee question ("search actions incur a tool call cost") is settled by the first OpenAI bill.
+  - **Fold backend search cost into the chat meter:** `searchCostUsd` rides the tool result but isn't added to the turn's cost.
+  - **DOCX layout render (optional):** a DOCX → PDF tool (OnlyOffice conversion) returning the page count and an image of page one, for a true layout check. Until then the charter hands visual review to the owner.
+  - Open decision **D8 (revised):** should charter turns on OpenAI use the app-run search backend instead of native search, so search is refusable, repeat-guarded and budgetable, at the cost of OpenAI's integrated citations?
+  - **Model watch:** a weekly routine reporting gaps between new model releases and our catalog, pricing, constraints, adapter and gateway rows to a GitHub Issue. Waits on the owner: provider keys as repo secrets, and Issue versus Wiki.
+  - **Cost forecast:** a per-task token and cost estimate before a run or charter turn, with actual next to forecast afterwards.
 
 ## Move tab to workplace / workbench — follow-ups (2026-09-21, from `feat/move-tab-to-workspace`)
 

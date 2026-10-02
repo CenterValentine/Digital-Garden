@@ -135,6 +135,20 @@ const TOOL_REGISTRY: ToolDefinition[] = [
     isToggle: true,
   },
   {
+    // Comment out prose: the selection stays in the note for the author and
+    // is stripped from AI context, the public page and the search index.
+    // Cmd+/ is the universal "toggle comment" chord.
+    id: "private",
+    label: "Private",
+    iconName: "EyeOff",
+    surfaces: ["toolbelt"],
+    contentTypes: ["note"],
+    order: 45,
+    group: "text-format",
+    shortcut: "Cmd+/",
+    isToggle: true,
+  },
+  {
     id: "link",
     label: "Link",
     iconName: "Link",

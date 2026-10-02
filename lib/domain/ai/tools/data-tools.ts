@@ -31,6 +31,7 @@ import { logger } from "@/lib/core/logger";
 import { canAlterSchema, canWrite } from "@/lib/domain/data/server/access";
 import { loadRowPage } from "@/lib/domain/data/server/queries";
 import {
+  charterReferencedTableIds,
   charterRegistryAuthorizes,
   findColumn,
   normalizeCellInput,
@@ -45,6 +46,8 @@ import {
   GROUPABLE_TYPES,
   READ_LIFETIMES,
   allBulkColumns,
+  cellDisplayValue,
+  columnProfile,
   formatRows,
   groupCountsLine,
   indexTierColumns,
@@ -81,6 +84,7 @@ import {
   AI_PROPOSABLE_COLUMN_TYPES,
   ROLLUP_FNS,
   cellToText,
+  deriveRowTitle,
   operatorsForType,
   type CellValue,
   type DataColumn,
@@ -91,6 +95,12 @@ import {
   type FilterOperator,
 } from "@/lib/domain/data";
 import type { ToolExecuteContext } from "./types";
+import { summarizeRejections } from "@/lib/domain/data/cells";
+import {
+  BULK_READ_DEFAULT_TOKENS,
+  effectiveBulkReadThreshold,
+} from "@/lib/features/settings/validation";
+
 
 const DEFAULT_LIMIT = 100;
 /** The token budget is the governor; the page is a safety rail (plan D1 scale). */
@@ -99,8 +109,13 @@ const MAX_LIMIT = 1000;
 const BULK_CLIP_CHARS = 120;
 /** Index-tier relation rendering: one short linked title, then "+N more". */
 const INDEX_RELATION_RENDER = { maxLinkedTitles: 1, linkedTitleClip: 40 } as const;
-/** Default threshold when the user has not set one (plan D3). */
-export const DEFAULT_BULK_READ_THRESHOLD = 6_000;
+/** Default threshold when the user has not set one (plan D3; 25k since 2026-09-30). */
+export const DEFAULT_BULK_READ_THRESHOLD = BULK_READ_DEFAULT_TOKENS;
+/**
+ * Bulk reads up to this many tokens need no approval inside a charter turn
+ * (the attachment is the consent). Above it the user's threshold applies.
+ */
+export const CHARTER_RUN_READ_CEILING = 15_000;
 /** Share of the executed model's window one read may take (plan §4.5). */
 const BULK_READ_CEILING_SHARE = 0.1;
 const BULK_READ_CEILING_FALLBACK = 20_000;
@@ -130,10 +145,7 @@ function numberOf(v: unknown): number | null {
 
 export async function bulkReadThresholdFor(userId: string): Promise<number> {
   const settings = await getUserSettings(userId).catch(() => null);
-  const n = settings?.ai?.bulkReadTokenThreshold;
-  return typeof n === "number" && Number.isFinite(n) && n > 0
-    ? n
-    : DEFAULT_BULK_READ_THRESHOLD;
+  return effectiveBulkReadThreshold(settings?.ai?.bulkReadTokenThreshold);
 }
 
 export function bulkReadCeilingFor(modelId: string | undefined): number {
@@ -548,6 +560,8 @@ async function applyRowUpdates(
   const errors: string[] = [];
   const touchedRowIds: string[] = [];
   const rowLabel = new Map<string, string>();
+  // P5: a coercion the normalizer applied is reported, never silent.
+  const normalizations: string[] = [];
 
   for (const update of updates) {
     const entries = Object.entries(update.cells ?? {});
@@ -607,6 +621,11 @@ async function applyRowUpdates(
         raw === null || raw === ""
           ? undefined
           : normalizeCellInput(column, raw);
+      if (typeof raw === "string" && Array.isArray(value)) {
+        normalizations.push(
+          `${column.name} wrapped as a ${value.length === 1 ? "one-item" : `${value.length}-item`} list`,
+        );
+      }
       const write: CellWrite = { rowId, columnKey: column.key, value };
       // Merge (owner scenario 2026-09-21): an alias/keyword column must
       // ACCUMULATE — "GTM" + "Revenue Ops" → "GTM, Revenue Ops" — without a
@@ -654,9 +673,7 @@ async function applyRowUpdates(
   }
   const failed = result.results.filter((r) => r.status === "error");
   if (failed.length > 0) {
-    return `Not updated — validation rejected: ${failed
-      .map((f) => f.message)
-      .join("; ")}. Nothing changed (all-or-nothing).`;
+    return `Not updated — validation rejected (nothing changed, all-or-nothing):\n${summarizeRejections(failed.map((f) => f.message))}`;
   }
 
   // Links last, and only once every cell write succeeded.
@@ -692,7 +709,9 @@ async function applyRowUpdates(
     questLedgers > 0
       ? ` ${questLedgers} row${questLedgers === 1 ? " is a quest" : "s are quests"} now — quest ledgers were minted under the charter.`
       : "";
-  return `${cellPart}${linkPart}${questPart} The user sees the change in the grid and can undo it there.`;
+  const normalizedPart =
+    normalizations.length > 0 ? ` (normalized: ${normalizations.join("; ")})` : "";
+  return `${cellPart}${normalizedPart}${linkPart}${questPart} The user sees the change in the grid and can undo it there.`;
 }
 
 export function createDataTools(ctx: ToolExecuteContext) {
@@ -808,6 +827,12 @@ export function createDataTools(ctx: ToolExecuteContext) {
       needsApproval: async (input) => {
         const budget = numberOf(input.budget);
         if (budget === null) return false;
+        // A charter run's attachment is consent for its evidence reads (§9,
+        // prod 62ac2b76 2026-09-29: five approval clicks for 9–11k-token
+        // reads of Experiences/Sources/Claims, each one splitting the turn
+        // and shrinking what was left of its cap). Under the charter
+        // ceiling no prompt; a genuinely large read still asks.
+        if (ctx.activeCharter && budget <= CHARTER_RUN_READ_CEILING) return false;
         return budget > (await bulkReadThresholdFor(ctx.userId));
       },
       execute: async (input) => {
@@ -1010,10 +1035,16 @@ export function createDataTools(ctx: ToolExecuteContext) {
           let lifetimeOrigin: "charter" | "requested" | "default" = validLifetime
             ? "requested"
             : "default";
+          // Charter-NAMED tables count as charter-linked here too (§9): the
+          // evidence library the charter's Inputs list names is read once
+          // per RUN and carried across jobs and continuations, not
+          // re-read every turn (prod 62ac2b76: its read was `turn`, folded
+          // at "continue", read again).
           if (
             ctx.activeCharter &&
             validLifetime !== "turn" &&
-            (await charterRegistryAuthorizes(ctx, databaseId))
+            ((await charterRegistryAuthorizes(ctx, databaseId)) ||
+              (await charterReferencedTableIds(ctx)).includes(databaseId))
           ) {
             lifetime = validLifetime === "chat" ? "chat" : "run";
             lifetimeOrigin = validLifetime === "chat" ? "requested" : "charter";
@@ -1030,7 +1061,67 @@ export function createDataTools(ctx: ToolExecuteContext) {
           const budget = Math.min(requestedBudget ?? threshold, ceiling);
           const approved = requestedBudget !== null && requestedBudget > threshold;
 
+          // P8: `columns: "all"` is a preview only when nothing says the
+          // caller wants the cells whole. A budget or rowIds says exactly
+          // that (prod 2026-09-27: a one-row "all" read with budget 5000
+          // came back at ~377 tokens, every long cell clipped, and cost a
+          // second call). The over-budget ladder below still clips a read
+          // that does not fit.
+          if (selection === "all" && (rowIds || requestedBudget !== null)) {
+            for (const c of shown) fullColumns.add(c.id);
+          }
+
           const footers: string[] = [];
+          // P9: zero rows teach the column instead of ending the thought.
+          // The model guessed `Interest Level is 0` on a 6–9 column and got
+          // a bare header back; the second call was a sort it could have
+          // made first had the range been in front of it. Only on the empty
+          // path, over a bounded unfiltered sample.
+          const searchTerm = typeof input.search === "string" ? input.search.trim() : "";
+          if (rows.length === 0 && (conditions.length > 0 || searchTerm)) {
+            try {
+              const sample = await loadRowPage({
+                tableId: databaseId,
+                view: { filters: { op: "and", children: [] }, sorts: [] } as unknown as DataView,
+                columns: live,
+                cursor: null,
+                limit: MAX_LIMIT,
+                viewerId: ctx.userId,
+              });
+              const lines: string[] = [];
+              // A search miss teaches the table's size (prod ecf1d0e5,
+              // 2026-09-28: `search: "ticketing"` on a one-row table came
+              // back as a bare header; the next call re-read the table).
+              if (searchTerm) {
+                lines.push(
+                  `search "${searchTerm}" matched no row (the table holds ${sample.total} row${sample.total === 1 ? "" : "s"}${sample.total > 0 && sample.total <= 3 ? `: ${sample.rows.map((r) => deriveRowTitle(live, r.data) || "Untitled").join(", ")}` : ""})`,
+                );
+              }
+              const seenCols = new Set<string>();
+              for (const cond of conditions) {
+                const column = live.find((c) => c.id === cond.columnId);
+                if (!column || seenCols.has(column.id)) continue;
+                seenCols.add(column.id);
+                const profile = columnProfile(sample.rows, column);
+                if (profile.min !== undefined && profile.filled > 0) {
+                  lines.push(
+                    `${column.name} holds ${profile.min} … ${profile.max} (${profile.filled} of ${profile.total} rows filled${sample.total > sample.rows.length ? ", sampled" : ""})`,
+                  );
+                } else if (profile.counts && profile.counts.length > 0) {
+                  lines.push(
+                    `${column.name} values with rows: ${profile.counts.map(([l, n]) => `${l} (${n})`).join(", ")}`,
+                  );
+                } else if (profile.filled === 0) {
+                  lines.push(`${column.name} is empty in every row`);
+                }
+              }
+              if (lines.length > 0) {
+                footers.push(`[0 rows matched. ${lines.join(" · ")}. Adjust the filter to these values, or sort by the column instead.]`);
+              }
+            } catch {
+              // Teaching footer only — never fails the read.
+            }
+          }
           // Named columns: say what else is here, so the model never
           // spends a describe_database call re-learning names it could
           // have read off the capsule (prod smoke 2026-09-15: one filtered
@@ -1090,6 +1181,23 @@ export function createDataTools(ctx: ToolExecuteContext) {
             }
           }
           footers.unshift(...digestFooters);
+
+          // P8: when the preview clip actually bit, say so and say the way
+          // out — the header alone reads like a full result.
+          if (selection === "all" && fullColumns.size === 0) {
+            const clipped = rows.some((r) =>
+              shown.some(
+                (c) =>
+                  c.type !== "relation" &&
+                  cellDisplayValue(r, c).length > BULK_CLIP_CHARS,
+              ),
+            );
+            if (clipped) {
+              footers.push(
+                `[Cells clipped at ${BULK_CLIP_CHARS} chars (columns: "all" is a preview) — name the columns you need, or pass rowIds or a budget, for full text.]`,
+              );
+            }
+          }
 
           const full = formatRows({ rows, columns: shown, live, render, suffixByRow });
           const emit = (
@@ -1237,7 +1345,9 @@ export function createDataTools(ctx: ToolExecuteContext) {
           if (input.dedupeBy) {
             dedupeColumn = findColumn(live, input.dedupeBy);
             if (!dedupeColumn) {
-              return `No column named "${input.dedupeBy}" to dedupe by.`;
+              // Name the choices (prod 36237eb8: a bare refusal cost a
+              // guessed retry — "Name" was "Gap Name"). Nothing inserted.
+              return `Nothing inserted — no column named "${input.dedupeBy}" to dedupe by. Columns here: ${live.map((c) => c.name).join(", ")}.`;
             }
             const existing = await prisma.dataRow.findMany({
               where: { tableId: databaseId, deletedAt: null },
@@ -1371,10 +1481,7 @@ export function createDataTools(ctx: ToolExecuteContext) {
           }
           if (failed.length > 0) {
             parts.push(
-              `${failed.length} cell${failed.length === 1 ? "" : "s"} rejected by validation (rows created without them): ${failed
-                .slice(0, 5)
-                .map((f) => f.message)
-                .join("; ")}`
+              `${failed.length} cell${failed.length === 1 ? "" : "s"} rejected by validation (rows created without them) — fix with update_rows:\n${summarizeRejections(failed.map((f) => f.message))}`
             );
           }
           parts.push(

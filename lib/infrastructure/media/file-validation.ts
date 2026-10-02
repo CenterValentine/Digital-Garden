@@ -33,6 +33,13 @@ const SUPPORTED_MIME_TYPES = [
   'application/vnd.ms-excel', // .xls
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
 
+  // E-books (opened by the reader extension)
+  'application/epub+zip',
+  'application/x-mobipocket-ebook',
+  'application/vnd.amazon.ebook',
+  'application/x-fictionbook+xml',
+  'application/vnd.comicbook+zip',
+
   // Images
   'image/jpeg',
   'image/png',
@@ -181,6 +188,11 @@ function mimeToExtension(mimeType: string): string | null {
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
     'application/vnd.ms-excel': 'xls',
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
+    'application/epub+zip': 'epub',
+    'application/x-mobipocket-ebook': 'mobi',
+    'application/vnd.amazon.ebook': 'azw3',
+    'application/x-fictionbook+xml': 'fb2',
+    'application/vnd.comicbook+zip': 'cbz',
 
     // Images
     'image/jpeg': 'jpg',

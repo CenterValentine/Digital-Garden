@@ -23,6 +23,7 @@
 
 import {
   streamText,
+  generateText,
   convertToModelMessages,
   stepCountIs,
   NoSuchToolError,
@@ -45,6 +46,7 @@ import {
 import {
   SUMMON_TOOL_ID,
   createSummonTool,
+  estimateToolSchemaTokens,
 } from "@/lib/domain/ai/tools/summon";
 import { isResumableConfigured } from "@/lib/domain/ai/resumable/redis";
 import { getStreamContext } from "@/lib/domain/ai/resumable/context";
@@ -54,6 +56,7 @@ import {
   getActiveStreamId,
 } from "@/lib/domain/ai/resumable/association";
 import type { JSONContent } from "@tiptap/core";
+import { extractSearchTextFromTipTap } from "@/lib/domain/content/search-text";
 import { requireAuth } from "@/lib/infrastructure/auth";
 import { getUserSettings } from "@/lib/features/settings";
 import { getChatContextBody } from "@/lib/features/chat-contexts";
@@ -62,9 +65,12 @@ import {
   buildPromptCachePolicy,
   mergeAIProviderOptions,
   summarizePromptCacheUsage,
+  withAnthropicCacheBreakpoint,
   type AIProviderOptions,
   type PromptCacheUsageLike,
 } from "@/lib/domain/ai/prompt-cache";
+import { trimToLastStepStart } from "@/lib/domain/ai/cache-volley";
+import { computeTurnCost } from "@/lib/features/ai-connections/usage/pricing";
 import {
   resolveChatModel,
   resolveChatModelFromConnection,
@@ -77,6 +83,7 @@ import {
 } from "@/lib/domain/ai/providers/catalog";
 import {
   dedupeRepeatedToolParts,
+  stripOpenAIItemIdsFromModelMessages,
   stripOpenAIItemReferences,
   stripReasoningForResend,
   supersedeBulkReads,
@@ -85,12 +92,18 @@ import {
   teachDeniedApprovals,
 } from "@/lib/domain/ai/context-diet";
 import {
+  CHARTER_TAIL_EXTRA,
+  CHARTER_TURN_TOOLS,
+  tailRefusalNotice,
+  withBudgetNotice,
+  CHARTER_TURN_DELIVERABLES,
   computeIterationStepCap,
+  continuationStepCap,
   reservedTailSize,
   reservedTailTools,
   stepsRemainingNotice,
 } from "@/lib/domain/ai/tools/iteration-proposal";
-import { DEFAULT_BULK_READ_THRESHOLD } from "@/lib/domain/ai/tools/data-tools";
+import { effectiveBulkReadThreshold } from "@/lib/features/settings/validation";
 import {
   MAX_STEP_SUMMARIES,
   type MaxTokensSource,
@@ -98,7 +111,10 @@ import {
   type TurnSegment,
   type TurnStepSummary,
 } from "@/lib/domain/ai/turn-diagnostics";
-import { resolveModelTemperature } from "@/lib/domain/ai/model-constraints";
+import {
+  openaiModelReasons,
+  resolveModelTemperature,
+} from "@/lib/domain/ai/model-constraints";
 import {
   DEFAULT_OUTPUT_TARGET,
   getLatestUserMessageOutputTarget,
@@ -208,6 +224,7 @@ import type {
 } from "@/lib/features/ai-connections";
 import {
   applyMiddleware,
+  unsupportedParameterMiddleware,
   defaultSettingsMiddleware,
   rateLimitRetryMiddleware,
 } from "@/lib/domain/ai/middleware";
@@ -237,6 +254,18 @@ import { effectiveCapabilities } from "@/lib/domain/ai/features/capabilities";
 import { prisma } from "@/lib/database/client";
 import type { Prisma } from "@/lib/database/generated/prisma";
 import { logger, spanPayload, startSpan, withRouteTrace, withSpan } from "@/lib/core/logger";
+import {
+  REPEAT_GUARDED_TOOLS,
+  repeatedCallKey,
+  repeatedCallNotice,
+} from "@/lib/domain/ai/tools/repeat-guard";
+import {
+  excerptAt,
+  findPrefixDivergence,
+  fingerprintPrompt,
+  serializePromptForDiag,
+  type PrefixFingerprint,
+} from "@/lib/domain/ai/prompt-prefix-diag";
 import { readRunLedgerCaptureConfig } from "@/lib/domain/ai/run-ledger";
 import { MASTER_LEDGER_META_KEY, parseQuestInfo } from "@/lib/domain/ai/quests";
 import { after } from "next/server";
@@ -262,6 +291,9 @@ import type {
   ResolvedModelRoute,
 } from "@/lib/domain/ai/model-directive";
 import { renderCharterSection } from "@/lib/domain/ai/charters/render";
+import { buildCharterIngest } from "@/lib/domain/ai/charters/ingest";
+import { autoApprovedToolsFrom } from "@/lib/domain/ai/tools/approval-policy";
+import type { ParsedCharter } from "@/lib/domain/ai/charters/parse";
 import { getServerExtensions } from "@/lib/domain/editor/extensions-server";
 import {
   isCharterMetadata,
@@ -285,6 +317,30 @@ import {
 } from "@/lib/domain/ai/charters/output-directives";
 
 const ROUTE_PATH = "/api/ai/chat";
+
+/**
+ * The first @-mentioned node that is a charter (marked note/folder), or
+ * null. Bounded to the mention cap; one metadata read per candidate.
+ */
+async function firstCharterMention(
+  userId: string,
+  mentioned: unknown,
+): Promise<string | null> {
+  if (!Array.isArray(mentioned)) return null;
+  const ids = mentioned
+    .filter((id): id is string => typeof id === "string" && id.length > 0)
+    .slice(0, 6);
+  for (const id of ids) {
+    if (await isCharterNodeId(userId, id)) return id;
+  }
+  return null;
+}
+
+/** Last fingerprinted prompt per conversation for the opt-in prefix diagnostic (bounded). */
+const promptPrefixDiagState = new Map<
+  string,
+  { fingerprint: PrefixFingerprint; serialized: string; requestStartedAt: string }
+>();
 
 /**
  * Gate + capsule for ONE folder reference — a chat mention pill, a playbook
@@ -357,11 +413,16 @@ async function resolveCharterReferenceContext(
   const uniqueTitles = Array.from(
     new Set(references.map((reference) => reference.targetTitle)),
   );
+  // Databases resolve too (ITERATION-RUN-HARNESS-FIXES P1): a charter that
+  // says "look at everything in [[Career Evidence Library]]" used to get
+  // "not found in your notes" back — true of notes, false of the vault —
+  // and the tools then refused the table. Now the manifest names the tool
+  // and the id, and jurisdiction admits it (resolve.ts).
   const referenceNodes = await prisma.contentNode.findMany({
     where: {
       ownerId: userId,
       title: { in: uniqueTitles },
-      contentType: { in: ["note", "folder"] },
+      contentType: { in: ["note", "folder", "data"] },
       deletedAt: null,
     },
     select: {
@@ -378,18 +439,24 @@ async function resolveCharterReferenceContext(
   const activeReferenceContentIds = Array.from(
     new Set(
       referenceNodes
-        // Folders are capsule-consumed (below), never read_content-read —
-        // keep them out of the checkpoint gate's reference expectations.
+        // Folders are capsule-consumed (below) and databases are
+        // query_database-read — never read_content-read; keep both out of
+        // the checkpoint gate's reference expectations.
         .filter(
           (node) =>
-            activeTitles.has(node.title) && node.contentType !== "folder",
+            activeTitles.has(node.title) &&
+            node.contentType !== "folder" &&
+            node.contentType !== "data",
         )
         .map((node) => node.id),
     ),
   );
   const lines = uniqueTitles.map((title) => {
     const found = byTitle.get(title);
-    if (!found) return `- [[${title}]] — not found in your notes`;
+    if (!found) return `- [[${title}]] — not found in your notes or databases`;
+    if (found.contentType === "data") {
+      return `- [[${title}]] — DATABASE (query_database databaseId: ${found.id}; reachable in this charter's runs without a mention)`;
+    }
     if (found.contentType === "folder") {
       // Folder refs behave like chat folder mentions (capsule-plan
       // follow-up): active-phase folders get their capsule injected below;
@@ -445,7 +512,12 @@ export async function POST(request: Request) {
       const body = await request.json();
 
       // AI SDK v6 sends messages as UIMessage[] with `parts` arrays
-      const messages: UIMessage[] = body.messages ?? [];
+      // Cache volley (§10 round 3): the transcript is cut at the pending
+      // approval step's start — the prefix the continuation will extend.
+      const warmOnly = body.warmOnly === true;
+      const messages: UIMessage[] = warmOnly
+        ? trimToLastStepStart(body.messages ?? [])
+        : (body.messages ?? []);
       const contentId: string | undefined = body.contentId;
 
       if (!Array.isArray(messages) || messages.length === 0) {
@@ -475,7 +547,7 @@ export async function POST(request: Request) {
       // Pinned bulk reads (AI-BULK-ROW-READING-PLAN §4.6) may hold twice
       // the user's approval threshold, newest first.
       const bulkReadPinnedAllowance =
-        2 * (aiSettings.bulkReadTokenThreshold ?? DEFAULT_BULK_READ_THRESHOLD);
+        2 * effectiveBulkReadThreshold(aiSettings.bulkReadTokenThreshold);
       // Auto-pronounce: when on (default), the model is told to attach spoken
       // audio to non-English vocab cards by default. The proposal gate still
       // gates the actual TTS spend, so "default on" never auto-bills.
@@ -515,13 +587,23 @@ export async function POST(request: Request) {
       // would have been a lie — the model would still have been handed the
       // charter (owner report 2026-09-18).
       const charterDetached = body.charterDetached === true;
+      // A charter the user @-MENTIONS is the charter (prod 6d0b0e30,
+      // 2026-09-29: "fulfil the charter's instructions … @[Apply for a job]"
+      // reached the model as a plain note — no charter context, no charter
+      // reach, and the model read the charter with read_content). Only when
+      // nothing else names one: the picker and the binding still win, and a
+      // dismissed chip stays dismissed.
+      const mentionedCharterId =
+        typeof body.charterId !== "string"
+          ? await firstCharterMention(session.user.id, body.mentionedContentIds)
+          : null;
       const boundCharterId =
         !charterDetached &&
         typeof body.charterId !== "string" &&
         contentId &&
         (await isCharterNodeId(session.user.id, contentId))
           ? contentId
-          : null;
+          : mentionedCharterId;
       const routingExplicitCharterId =
         typeof body.charterId === "string" ? body.charterId : boundCharterId;
       const routingRootedCharterId =
@@ -971,10 +1053,11 @@ export async function POST(request: Request) {
           ? "gateway"
           : "direct";
 
-      // Fixed-temperature models (v3.1 R4): reasoning/thinking models
-      // (OpenAI o-series, Moonshot Kimi thinking line) reject any
-      // temperature but 1 with a 4xx. Clamp before it reaches the
-      // middleware AND the streamText call — both send temperature.
+      // Constrained-temperature models (v3.1 R4): Kimi's thinking line
+      // accepts only 1; OpenAI's o-series and gpt-6 family reject the
+      // parameter outright (`undefined` = not sent). Resolved before it
+      // reaches the middleware; unknown models that refuse are caught by
+      // unsupportedParameterMiddleware below.
       const effectiveTemperature = resolveModelTemperature(
         activeModelId,
         temperature,
@@ -1025,6 +1108,11 @@ export async function POST(request: Request) {
                 apiKey,
               });
           return applyMiddleware(model, [
+            // Innermost (wraps the raw provider model): when a model
+            // rejects a parameter by name, retry once without it and
+            // remember — the maintained constraint list is always one
+            // release behind (prod 2026-09-29, gpt-6-astra vs temperature).
+            unsupportedParameterMiddleware(),
             defaultSettingsMiddleware({
               temperature: effectiveTemperature,
               maxTokens,
@@ -1318,7 +1406,17 @@ export async function POST(request: Request) {
       // step's usage; phase_checkpoint stamps the running total into the
       // Run Ledger. Input/output split added by cost metering so ledger
       // stamps can carry a $ estimate (totals alone can't be priced).
-      const runTokenCounter = { total: 0, input: 0, output: 0, cachedInput: 0 };
+      const runTokenCounter = {
+        total: 0,
+        input: 0,
+        output: 0,
+        cachedInput: 0,
+        maxStepInput: 0,
+        maxStepCachedInput: 0,
+      };
+      // Captured from the streamText call below so the prefix diagnostic in
+      // prepareStep can fingerprint what the provider actually sees.
+      let systemPromptForDiag = "";
       // Turn-cumulative usage (BACKLOG 2026-09-04): an approval continuation
       // is a NEW request whose accumulator starts at zero, but the turn's
       // earlier segments ride back in on the trailing assistant message's
@@ -1373,6 +1471,13 @@ export async function POST(request: Request) {
         // Filled in AFTER playbook resolution below (tools close over this
         // object, so a later property assignment is visible at execute time).
         activeCharter: undefined as { contentId: string; title: string } | undefined,
+        // Per-tool approvals (§10 round 6c): the tools the user set to run
+        // without a card, and whether the charter's current phase is its
+        // last (set below).
+        autoApprovedTools: autoApprovedToolsFrom(
+          (aiSettings as { toolConfig?: unknown }).toolConfig,
+        ),
+        charterFinalPhase: false,
         // Executed model identity (cost metering): lets ledger stamps
         // price the run's tokens. Bare id + vendor, post-resolution.
         executedModel: {
@@ -1498,6 +1603,13 @@ export async function POST(request: Request) {
       const activated = new Set<string>();
       const isAdvertised = (id: string) =>
         advertised.has(id) || activated.has(id);
+      // The base policy plus what a bound charter adds — never a summon. Read
+      // by the system-prompt flags so the prompt is the same on every request
+      // of a turn (see the buildSystemPrompt call).
+      const isOffered = (id: string) =>
+        advertised.has(id) ||
+        ((attachedCharterResolved || rootedCharterResolved) &&
+          CHARTER_TURN_TOOLS.includes(id));
 
       // ADVERTISEMENT POLICY (AI-TOOL-SUMMONER-PLAN §3). Core tools are always
       // offered; a mode's tools are offered while that mode is live; everything
@@ -1566,7 +1678,20 @@ export async function POST(request: Request) {
       // Native search attaches AFTER the run narrowing above, so it must be
       // advertised explicitly — otherwise it would sit in `tools` unannounced
       // and the model would never know it could search.
-      if (nativeSearch && searchEnabled) {
+      // Per-chat preference (owner, 2026-09-30): the model's own search by
+      // default; "app" routes through the user's search connection even when
+      // the model has its own — repeat-guarded, refusable in the reserved
+      // tail, priced by that service. Honoured only when a connection exists.
+      const preferAppSearch =
+        body.searchBackend === "app" &&
+        !!nativeSearch &&
+        searchEnabled &&
+        (await userHasSearchConnection(session.user.id));
+      if (preferAppSearch) {
+        (tools as Record<string, unknown>)["search_web"] =
+          createAppWebSearchTool(session.user.id);
+        advertised.add("search_web");
+      } else if (nativeSearch && searchEnabled) {
         // Big-four: provider-native search (integrated, well-cited).
         (tools as Record<string, unknown>)["search_web"] = nativeSearch;
         advertised.add("search_web");
@@ -1586,15 +1711,99 @@ export async function POST(request: Request) {
       // ── The summoner (AI-TOOL-SUMMONER-PLAN §3) ────────────────────────
       // Registered last, so `registered` covers every tool this turn has —
       // including the conditional browser/editor/search families above.
+      // Repeat guard (§9): a byte-identical search within this request is
+      // answered with a pointer to the first result. Wraps only app-run
+      // tools that have an execute (provider-native search has none).
+      const repeatedCalls = new Map<string, number>();
+      for (const name of REPEAT_GUARDED_TOOLS) {
+        const entry = (tools as Record<string, { execute?: unknown } | undefined>)[name];
+        if (!entry || typeof entry.execute !== "function") continue;
+        const original = entry.execute as (input: unknown, options: unknown) => unknown;
+        entry.execute = async (input: unknown, options: unknown) => {
+          const key = repeatedCallKey(name, input);
+          const first = repeatedCalls.get(key);
+          if (first !== undefined) {
+            logger.info({
+              layer: "ai",
+              event: "ai:repeated_call_guarded",
+              summary: `${name} repeated with identical input — answered from the first result`,
+              attrs: { tool: name, first_step: first, step: stepsTracker.used + 1 },
+            });
+            return repeatedCallNotice(name, first);
+          }
+          repeatedCalls.set(key, stepsTracker.used + 1);
+          return original(input, options);
+        };
+      }
       const registered = new Set(Object.keys(tools));
       (tools as Record<string, unknown>)[SUMMON_TOOL_ID] = createSummonTool({
         registered,
         activated,
         isAdvertised,
+        schemaTokensFor: (id) =>
+          estimateToolSchemaTokens((tools as Record<string, unknown>)[id]),
       });
       // Core by construction: a menu the model cannot act on is worse than no
       // menu, so the one tool that acts on it is never itself summonable.
       advertised.add(SUMMON_TOOL_ID);
+
+      // RESERVED TAIL, ENFORCED AT EXECUTE (§10 L2). prepareStep marks the
+      // tail's steps; a server-run tool called there that is not a tail
+      // tool is answered with a refusal instead of running. The tail used to
+      // HIDE those tools, and every change to the tool list is a full cache
+      // flush. Tools with no server execute (provider-native search, the
+      // browser readers) cannot be refused here — the steps notice names the
+      // tail tools for those.
+      const tailGate: {
+        active: boolean;
+        allowed: readonly string[];
+        remaining: number;
+        /** The budget line for the NEXT step, carried on this step's first result. */
+        notice: string | null;
+        noticeStep: number;
+        noticeCarriedForStep: number;
+      } = {
+        active: false,
+        allowed: [],
+        remaining: 0,
+        notice: null,
+        noticeStep: -1,
+        noticeCarriedForStep: -1,
+      };
+      for (const [name, entry] of Object.entries(
+        tools as Record<string, { execute?: unknown } | undefined>,
+      )) {
+        if (!entry || typeof entry.execute !== "function") continue;
+        const original = entry.execute as (input: unknown, options: unknown) => unknown;
+        entry.execute = async (input: unknown, options: unknown) => {
+          if (tailGate.active && !tailGate.allowed.includes(name)) {
+            logger.info({
+              layer: "ai",
+              event: "ai:tail_refused",
+              summary: `${name} called in the reserved tail — refused`,
+              attrs: { tool: name, remaining: tailGate.remaining },
+            });
+            return tailRefusalNotice({
+              tool: name,
+              tailTools: tailGate.allowed,
+              remaining: tailGate.remaining,
+            });
+          }
+          const output = await original(input, options);
+          // THE BUDGET RIDES THE RESULT (§10 round 3). A trailing harness
+          // USER message on every step froze the provider cache at the
+          // user's own message — every run with the notice froze there,
+          // and ecf1d0e5's requests without it cached normally. A line
+          // inside a tool result becomes ordinary history that never
+          // changes, so the prompt only grows. Once per step.
+          if (tailGate.notice && tailGate.noticeCarriedForStep !== tailGate.noticeStep) {
+            const carried = withBudgetNotice(output, tailGate.notice);
+            if (carried !== output) tailGate.noticeCarriedForStep = tailGate.noticeStep;
+            return carried;
+          }
+          return output;
+        };
+      }
 
       // Restore this TURN's earlier summons. A turn is not a request: every
       // client-executed tool (co_browse_*, read_current_page, list_tabs, the
@@ -1714,9 +1923,22 @@ export async function POST(request: Request) {
         contentId !== routingRootedCharterId
           ? contentId
           : null;
+      // A mentioned charter is loaded as the charter (standing rules +
+      // phase), not as a mention capsule too — once, not twice.
       const requestedMentionIds: string[] = Array.isArray(body.mentionedContentIds)
-        ? body.mentionedContentIds.filter((id: unknown): id is string => typeof id === "string")
+        ? body.mentionedContentIds.filter(
+            (id: unknown): id is string =>
+              typeof id === "string" && id !== mentionedCharterId,
+          )
         : [];
+      if (conversationIdForAssoc && mentionedCharterId) {
+        void addAutoAssociation(
+          session.user.id,
+          conversationIdForAssoc,
+          mentionedCharterId,
+          "mention",
+        ).catch(() => null);
+      }
       const mentionedContentIds: string[] = boundAttachId
         ? [boundAttachId, ...requestedMentionIds.filter((id) => id !== boundAttachId)]
         : requestedMentionIds;
@@ -1759,6 +1981,9 @@ export async function POST(request: Request) {
                 // tiptapJson rides along so folder wiki-links inside a
                 // mentioned note can get the capsule treatment below.
                 notePayload: { select: { searchText: true, tiptapJson: true } },
+                // File mentions (e-books especially) render from their own
+                // payload instead of "(no text content available)".
+                filePayload: { select: { mimeType: true, searchText: true } },
               },
             });
             span.attr("found", result.length).summary(`${result.length} mentions`);
@@ -1886,13 +2111,60 @@ export async function POST(request: Request) {
             });
           }
 
+          // E-book mentions (and the open/bound book — it rides as the first
+          // implicit mention) get the reader's capsule: what the book is,
+          // where the user is in it, and what they highlighted.
+          const bookSections = new Map<string, string>();
+          try {
+            const { buildBookCapsule, isBookMimeType } = await import(
+              "@/lib/domain/reader/server/ai-capsule"
+            );
+            await Promise.all(
+              mentionedNodes
+                .filter(
+                  (node) =>
+                    (node.contentType === "file" &&
+                      isBookMimeType(node.filePayload?.mimeType)) ||
+                    // Library books kept as links (no free download);
+                    // the capsule returns null for ordinary links.
+                    node.contentType === "external",
+                )
+                .map(async (node) => {
+                  const capsule = await buildBookCapsule(session.user.id, node.id);
+                  if (capsule) bookSections.set(node.id, `### ${node.title}\n${capsule}`);
+                }),
+            );
+          } catch (bookError) {
+            logger.warn({
+              layer: "ai",
+              event: "ai_context:book_mention_caught",
+              summary: "book mention capsule failed — generic fallback",
+              error: bookError,
+            });
+          }
+
           const sections = mentionedNodes.map((node) => {
             const folderSection = folderSections.get(node.id);
             if (folderSection) return folderSection;
             const dataSection = dataSections.get(node.id);
             if (dataSection) return dataSection;
+            const bookSection = bookSections.get(node.id);
+            if (bookSection) return bookSection;
+            // Derive live from the JSON, never trust the materialized column:
+            // it may predate the private-content strip (or the atomic-inline
+            // fix) — the same reason read_content re-derives. A note whose
+            // author just commented out a passage must not have that passage
+            // ride into the prompt as its own implicit mention.
+            const live = node.notePayload?.tiptapJson
+              ? extractSearchTextFromTipTap(
+                  node.notePayload.tiptapJson as JSONContent,
+                ).trim()
+              : "";
             const text =
-              node.notePayload?.searchText || "(no text content available)";
+              live ||
+              node.notePayload?.searchText ||
+              node.filePayload?.searchText?.trim() ||
+              "(no text content available)";
             const props = rowPropSections.get(node.id);
             return `### ${node.title}\n${props ? `${props}\n\n` : ""}${text.slice(0, 2000)}`;
           });
@@ -2036,6 +2308,9 @@ export async function POST(request: Request) {
       // itself marked as a playbook) are called out so the model follows
       // their own directives rather than treating them as passive reading.
       let charterContext = "";
+      // The charter parsed on either context path below — its `Ingest in
+      // full:` tables are loaded once both paths have run (§10 round 5).
+      let charterParsedForIngest: ParsedCharter | null = null;
       let attachedCharterResolved = false;
       let rootedCharterResolved = false;
       let attachedPlaybookTitle = "";
@@ -2088,6 +2363,7 @@ export async function POST(request: Request) {
             const parsed = parseCharter(
               charterNode.notePayload.tiptapJson as JSONContent,
             );
+            charterParsedForIngest = parsed;
             // LEDGER AWARENESS (owner directive 2026-09-11). The master
             // ledger is minted at mark and referenced to this charter, but
             // no prompt string ever said so — "create the charter's
@@ -2117,6 +2393,22 @@ export async function POST(request: Request) {
               placeholderCount > 0
                 ? `\n\n**Unfilled template:** ${placeholderCount} phase heading${placeholderCount === 1 ? " is" : "s are"} still the starter placeholder ("[name the first phase]"). Tell the user before running anything, and never execute a placeholder phase — ask them to rename or delete it.`
                 : "";
+            // P12: a note that repeats itself is loaded ONCE and said so —
+            // the copies would otherwise read as phases (and cost their
+            // tokens on every turn).
+            const duplicateCopies = parsed.duplicatePhasesCollapsed ?? 0;
+            const duplicateNote =
+              duplicateCopies > 0
+                ? `\n\n**Duplicated note:** this charter's note repeats identical content ${duplicateCopies + 1} times (${duplicateCopies} duplicate ${duplicateCopies === 1 ? "copy" : "copies"} collapsed — likely a sync glitch). Only ONE copy is loaded; the copies are NOT extra phases. Mention it to the user once so they can clean the note.`
+                : "";
+            if (duplicateCopies > 0) {
+              logger.warn({
+                layer: "ai",
+                event: "charter:duplicate_content_collapsed",
+                summary: `charter note repeats its content ${duplicateCopies + 1}×; one copy loaded`,
+                attrs: { charterId: explicitPlaybookId, copies: duplicateCopies + 1 },
+              });
+            }
             if (parsed.phases.length > 0) {
               const rawIndex =
                 typeof body.activePhaseIndex === "number" ? body.activePhaseIndex : 0;
@@ -2125,13 +2417,15 @@ export async function POST(request: Request) {
                 parsed.phases.length - 1,
               );
               const phase = parsed.phases[phaseIndex];
+              toolCtx.charterFinalPhase = phaseIndex === parsed.phases.length - 1;
               charterOutputDirectives.push(
                 ...extractCharterOutputDirectives(parsed, [phaseIndex]),
               );
 
               // Reference manifest: title-resolve every [[link]] in the
-              // standing rules + active phase (wiki-links carry no id — see
-              // lib/domain/editor/extensions/wiki-link.ts).
+              // standing rules + active phase (a hand-typed wiki-link
+              // carries only its title; picker-made ones also carry
+              // `targetId` — see lib/domain/editor/extensions/wiki-link.ts).
               const allRefs = [
                 ...parsed.standingRules.references,
                 ...phase.references,
@@ -2176,7 +2470,7 @@ export async function POST(request: Request) {
               );
               charterContext =
                 `\n\n## Active Charter: "${charterNode.title}"\n` +
-                `This charter is ALREADY ATTACHED and loaded below — when the user asks to run "this charter" (or a bare "run it"/"go"), THIS is it. Do not search notes or read anything else to find it; act on the content already provided here.\n` +
+                `This charter is ALREADY ATTACHED${explicitPlaybookId === mentionedCharterId ? " (the user @-mentioned it)" : ""} and loaded below — when the user asks to run "this charter" (or a bare "run it"/"go"), THIS is it. Do not search notes or read anything else to find it; act on the content already provided here.\n` +
                 `Phase ${phaseIndex + 1} of ${parsed.phases.length}: "${phase.title}"\n\n` +
                 `**Phases:**\n${phaseToc}\n\n` +
                 (standingText
@@ -2184,7 +2478,8 @@ export async function POST(request: Request) {
                   : "") +
                 `**Current phase (the ONLY phase detail loaded):**\n${phaseText}${referenceContext.manifest}` +
                 ledgerNote +
-                placeholderNote;
+                placeholderNote +
+                duplicateNote;
             } else {
               // A valid marked playbook can be empty. Keep its explicit
               // identity in context instead of silently falling through to
@@ -2224,7 +2519,11 @@ export async function POST(request: Request) {
             const parsed = parseCharter(
               rootedNode.notePayload.tiptapJson as JSONContent,
             );
+            charterParsedForIngest = parsed;
             rootedCharterResolved = true;
+            // Rooted execution shows every phase at once, so only a
+            // one-phase charter's checkpoint is known to be the last.
+            toolCtx.charterFinalPhase = parsed.phases.length <= 1;
             attachedPlaybookTitle = rootedNode.title;
             // Context diet (S7-C2): same pointer rule for rooted execution.
             toolCtx.activeCharter = {
@@ -2290,6 +2589,37 @@ export async function POST(request: Request) {
             summary:
               "explicit rooted playbook injection failed — continuing without it",
             error: rootedPlaybookError,
+          });
+        }
+      }
+
+      // INGEST IN FULL (§10 round 5, owner decision 2026-09-30). A charter
+      // that names a database with `Ingest in full: [[…]]` gets it — every
+      // row, every column, and the tables it links to — in its context, so
+      // the model reads the whole profile instead of choosing what to read.
+      // Appended to the charter context: part of the system prompt, the
+      // same on every request of the turn, cached after the first step.
+      if (charterParsedForIngest && charterContext) {
+        try {
+          const ingested = await buildCharterIngest(session.user.id, charterParsedForIngest);
+          if (ingested) {
+            charterContext += ingested.text;
+            logger.info({
+              layer: "ai",
+              event: "charter:ingested",
+              summary: `ingested ${ingested.tables.length} database(s) in full — ~${ingested.tokens} tokens`,
+              attrs: {
+                tables: ingested.tables.map((t) => `${t.title}:${t.rows}${t.truncatedAfter !== undefined ? `(cut@${t.truncatedAfter})` : ""}`).join(", "),
+                tokens: ingested.tokens,
+              },
+            });
+          }
+        } catch (ingestError) {
+          logger.warn({
+            layer: "ai",
+            event: "charter:ingest_failed",
+            summary: "charter ingestion failed — continuing without the ingested section",
+            error: ingestError,
           });
         }
       }
@@ -2506,8 +2836,22 @@ export async function POST(request: Request) {
       // that function's return doubles as the "this turn had a reasoning
       // config" signal for describeReasoningConfig below, and a storage knob is
       // not a reasoning config.
+      // `forceReasoning`: @ai-sdk/openai only knows the o-series and gpt-5 as
+      // reasoning models; a newer family (gpt-6) is treated as plain chat —
+      // and with `store: false` that means the adapter never asks for
+      // `reasoning.encrypted_content`, so reasoning items go back id-only and
+      // the prompt cache cannot match anything past the first tool call
+      // (plan §10 L1: every gpt-6 run froze there). Forcing it also selects
+      // the `developer` system role and drops `temperature`.
       const storageProviderOptions: AIProviderOptions | undefined =
-        executedVendorId === "openai" ? { openai: { store: false } } : undefined;
+        executedVendorId === "openai"
+          ? {
+              openai: {
+                store: false,
+                ...(openaiModelReasons(activeModelId) ? { forceReasoning: true } : {}),
+              },
+            }
+          : undefined;
       const providerOptions = mergeAIProviderOptions(
         reasoningProviderOptions,
         storageProviderOptions,
@@ -2532,6 +2876,24 @@ export async function POST(request: Request) {
       // (iteration-proposal.ts). With no deliverables this is the old
       // `items × 4 + 8`; a fulfilment run declaring create_docx + update_row
       // gets 6 per item instead of 4 — the two steps its tail actually needs.
+      // A charter turn WITHOUT a proposal is a one-item fulfilment run (§9,
+      // prod 62ac2b76): the proposal is scope and consent, not the thing
+      // that unlocks the budget. One job asked for plainly gets the same
+      // cap and reserved tail a proposed one-item run gets.
+      const charterTurn =
+        itemIterationBudget == null &&
+        researchPageBudget == null &&
+        (attachedCharterResolved || rootedCharterResolved);
+      // ONE PROMPT PER TURN (§10 L2): a bound charter's tools are part of
+      // the turn from its FIRST request — `CHARTER_TURN_TOOLS` is what every
+      // measured charter run summoned piecemeal, and each summon rewrote the
+      // tool list (a full cache flush) and, through activationsFromHistory,
+      // the next request's system prompt (wire probe 04:16:55). Added the
+      // same way on every request of the turn, so the list and the prompt
+      // agree across them.
+      if (attachedCharterResolved || rootedCharterResolved) {
+        for (const id of CHARTER_TURN_TOOLS) if (id in tools) activated.add(id);
+      }
       const rawStepCap =
         itemIterationBudget != null
           ? computeIterationStepCap({
@@ -2541,22 +2903,47 @@ export async function POST(request: Request) {
             })
           : researchPageBudget != null
             ? researchPageBudget * 2 + 4
-            : editableContentId
-              ? 8
-              : 7;
-      // At least one step, always: a turn that has already spent its budget
-      // must still be able to answer in prose (the final-step reservation
-      // below is what makes that answer honest), never be cut to zero steps
-      // and return an empty message.
-      const stepCap = Math.max(1, rawStepCap - stepsAlreadySpent);
+            : charterTurn
+              ? computeIterationStepCap({
+                  itemBudget: 1,
+                  deliverables: CHARTER_TURN_DELIVERABLES,
+                })
+              : editableContentId
+                ? 8
+                : 7;
+      // The tail this turn reserves: the run's declared deliverables, or the
+      // charter's write tools. Null for plain chat turns (no tail).
+      const tailDeliverables: readonly string[] | null =
+        itemIterationBudget != null
+          ? itemIterationDeliverables
+          : charterTurn
+            ? CHARTER_TURN_DELIVERABLES
+            : null;
+      const tailToolsForTurn = tailDeliverables
+        ? reservedTailTools(tailDeliverables, {
+            record: itemIterationBudget != null,
+            extra: charterTurn ? CHARTER_TAIL_EXTRA : [],
+          })
+        : [];
+      // What is left of the turn's cap for THIS request — with a floor, so
+      // an approval continuation can still perform the approved action,
+      // follow through, and answer (§9: a continuation used to inherit
+      // 8 → 3 → 1 and die on the step meant to write the document).
+      const stepCap = continuationStepCap({
+        rawStepCap,
+        stepsAlreadySpent,
+        tailDeliverables,
+      });
       const stepCapSource: StepCapSource =
         itemIterationBudget != null
           ? "item-iteration"
           : researchPageBudget != null
             ? "research"
-            : editableContentId
-              ? "editable"
-              : "base";
+            : charterTurn
+              ? "charter"
+              : editableContentId
+                ? "editable"
+                : "base";
       const reasoningConfigSummary = describeReasoningConfig(
         executedVendorId,
         reasoningProviderOptions !== undefined,
@@ -2582,6 +2969,146 @@ export async function POST(request: Request) {
       // Anthropic today — the app sets no cache_control breakpoints —
       // but the plumbing must exist before the pricing formula does).
       let turnCacheWriteTokens = 0;
+
+      // SYSTEM-PROMPT FLAGS READ THE BASE POLICY, NOT SUMMONS. `isAdvertised`
+      // includes this turn's summons, restored into every later request from
+      // the transcript — so a summon at step 1 rewrote the NEXT request's
+      // system prompt, and a changed system prompt is a cold cache for the
+      // whole request (plan §10 L1). `isOffered` is the per-request policy
+      // (core + live modes + charter binding), the same on every request of
+      // a turn. A summoned tool teaches through its own description.
+      systemPromptForDiag = buildSystemPrompt({
+        hasImageTools: isOffered("generate_image"),
+        hasFlashcardTools: isOffered("list_decks"),
+        hasWebSearch: isOffered("search_web"),
+        hasCheckpointTool: isOffered("phase_checkpoint"),
+        hasBrowserReadTool: isOffered(READ_PAGE_HEADLESS_OR_BROWSER),
+        hasTabLauncher: isOffered(OPEN_TAB_AND_READ),
+        hasCoBrowseTools: isOffered(CO_BROWSE_OPEN),
+        hasReadCurrentPage: isOffered(READ_CURRENT_PAGE),
+        hasResearchTools: isOffered("extract_structured"),
+        hasListTabs: isOffered(LIST_TABS),
+        hasItemIteration: isOffered("propose_item_iteration"),
+        hasDatabaseTools: isOffered("describe_database"),
+        toolMenu: toolMenu ?? undefined,
+        viewedContentHint,
+        // Runtime identity (v3.1): what this turn is ACTUALLY served by,
+        // from live routing — so the model self-identifies from ground
+        // truth. Prefer the connection's preset template name (matches
+        // the picker: "Moonshot (Kimi)"), then the catalog, then the raw
+        // id.
+        runtimeProviderName:
+          (activeConnection?.presetId
+            ? lookupTemplate(activeConnection.presetId)?.name
+            : undefined) ??
+          lookupTemplate(providerId)?.name ??
+          PROVIDER_CATALOG.find((p) => p.id === providerId)?.name ??
+          providerId,
+        runtimeModelId: activeModelId,
+        openWorkflowTitle,
+        editableContentId,
+        isChatContent,
+        chatContentId: isChatContent ? contentId : undefined,
+        autoPronounceDefault,
+        userContextSection,
+        mentionedContext,
+        charterContext,
+        rootedContentSection,
+        outputTargetSection: renderOutputTargetInstruction(outputTarget),
+        hasAttachedCharter: attachedCharterResolved,
+        checkpointIntegritySection:
+          renderPhaseCheckpointGateInstruction(phaseCheckpointGate),
+        pageContextSection,
+        currentPageHint,
+      });
+
+      // CACHE VOLLEY (§10 round 3). The chat engine sends this once while an
+      // approval waits, shortly before the provider cache would expire. The
+      // transcript was cut at the approval step's start (see `warmOnly` at
+      // the body parse), so this prompt is the prefix the continuation will
+      // extend, built by the same path. One call, a 16-token reply ceiling,
+      // no tool runs, nothing persisted — its only effect is a cache reuse,
+      // which refreshes the prefix's lifetime.
+      if (warmOnly) {
+        const anthropicThinking =
+          executedVendorId === "anthropic" &&
+          !!(reasoningProviderOptions as { anthropic?: { thinking?: unknown } } | undefined)
+            ?.anthropic?.thinking;
+        if (anthropicThinking) {
+          // A one-token reply is below the thinking budget, and changing the
+          // thinking settings would itself invalidate the cached messages.
+          logger.info({
+            layer: "ai",
+            event: "ai:cache_volley",
+            summary: "cache volley skipped — Anthropic extended thinking is on",
+            attrs: { model: activeModelId, skipped: "thinking" },
+          });
+          return Response.json({ ok: false, skipped: "thinking" });
+        }
+        const warmTools = Object.fromEntries(
+          Object.entries(tools).map(([name, t]) => [
+            name,
+            { ...(t as Record<string, unknown>), execute: undefined },
+          ]),
+        ) as typeof tools;
+        const warmMessages =
+          executedVendorId === "openai"
+            ? stripOpenAIItemIdsFromModelMessages(modelMessages)
+            : executedVendorId === "anthropic"
+              ? withAnthropicCacheBreakpoint(modelMessages)
+              : modelMessages;
+        try {
+          const warm = await generateText({
+            model: wrappedModel,
+            system: systemPromptForDiag,
+            messages: warmMessages,
+            tools: toolsActive ? warmTools : undefined,
+            activeTools: toolsActive ? [...advertised, ...activated] : undefined,
+            toolChoice: toolsActive ? "auto" : undefined,
+            maxOutputTokens: 16,
+            ...(providerOptions && { providerOptions }),
+          });
+          const cacheCreation = (
+            warm.providerMetadata as { anthropic?: { cacheCreationInputTokens?: unknown } } | undefined
+          )?.anthropic?.cacheCreationInputTokens;
+          const cost = computeTurnCost(
+            {
+              inputTokens: warm.usage.inputTokens ?? 0,
+              outputTokens: warm.usage.outputTokens ?? 0,
+              cachedInputTokens: warm.usage.cachedInputTokens ?? 0,
+              cacheWriteTokens: typeof cacheCreation === "number" ? cacheCreation : 0,
+            },
+            activeModelId,
+            executedVendorId,
+          );
+          logger.info({
+            layer: "ai",
+            event: "ai:cache_volley",
+            summary: `cache volley — ${warm.usage.cachedInputTokens ?? 0} of ${warm.usage.inputTokens ?? 0} input tokens served from cache`,
+            attrs: {
+              model: activeModelId,
+              input_tokens: warm.usage.inputTokens ?? 0,
+              cached_input_tokens: warm.usage.cachedInputTokens ?? 0,
+              cost_usd: cost?.usd ?? -1,
+            },
+          });
+          return Response.json({
+            ok: true,
+            inputTokens: warm.usage.inputTokens ?? 0,
+            cachedInputTokens: warm.usage.cachedInputTokens ?? 0,
+            costUsd: cost?.usd ?? null,
+          });
+        } catch (error) {
+          logger.warn({
+            layer: "ai",
+            event: "ai:cache_volley",
+            summary: "cache volley failed — the continuation will simply start cold",
+            attrs: { model: activeModelId },
+            error,
+          });
+          return Response.json({ ok: false });
+        }
+      }
 
       const result = streamText({
         model: wrappedModel,
@@ -2671,7 +3198,21 @@ export async function POST(request: Request) {
         // added the columns") — a confabulated answer is strictly worse
         // than the silence this fixes. Telling it the loop is over makes
         // the honest report the only available move.
-        prepareStep: ({ stepNumber, messages: stepMessages }) => {
+        prepareStep: ({ stepNumber, messages: rawStepMessages }) => {
+          // One spelling for a tool call whether it was made in this request
+          // or resent from the transcript: the SDK's in-request messages
+          // carry `openai.itemId` (sent inline as `id`), the transcript has
+          // it stripped, and the provider cache saw two different items
+          // (plan §10 L1, wire probe 04:17:42). Reasoning keeps its id.
+          // Anthropic caches only up to a marked breakpoint: the last message
+          // of every step is marked, so each step reads the previous one's
+          // prefix and writes its own (§10 round 3 — Claude was never cached).
+          const stepMessages =
+            executedVendorId === "openai"
+              ? stripOpenAIItemIdsFromModelMessages(rawStepMessages)
+              : executedVendorId === "anthropic"
+                ? withAnthropicCacheBreakpoint(rawStepMessages)
+                : rawStepMessages;
           // Summoned tools enter here: `activated` grew during the previous
           // step's tool execution, and this is the only place a step's
           // advertised set can be widened. Returned every step (not just when
@@ -2680,37 +3221,92 @@ export async function POST(request: Request) {
           const stepActiveTools = toolsActive
             ? [...advertised, ...activated]
             : undefined;
+          // Prompt-prefix diagnostic (ITERATION-RUN-HARNESS-FIXES §8), opt-in
+          // via AI_PROMPT_PREFIX_DIAG=1: names the first chunk where this
+          // step's prompt stops matching the previous one — the provider
+          // cache matches only that far. Prod ecf1d0e5 froze at 27k tokens.
+          if (process.env.AI_PROMPT_PREFIX_DIAG === "1") {
+            try {
+              const serialized = serializePromptForDiag({
+                system: systemPromptForDiag,
+                toolNames: stepActiveTools ?? Object.keys(tools),
+                messages: stepMessages,
+              });
+              const fingerprint = fingerprintPrompt(serialized);
+              const diagKey = conversationIdForAssoc ?? contentId ?? "anon";
+              const prev = promptPrefixDiagState.get(diagKey);
+              if (prev) {
+                const divergence = findPrefixDivergence(prev.fingerprint, fingerprint);
+                logger.info({
+                  layer: "ai",
+                  event: "ai:prompt_prefix",
+                  summary: divergence
+                    ? `prompt prefix diverges after ~${divergence.sharedTokensApprox} tokens (chunk ${divergence.chunkIndex})`
+                    : "prompt prefix stable — grew or unchanged",
+                  attrs: {
+                    conversation_id: diagKey,
+                    step: stepNumber,
+                    request_started_at: new Date(turnStartMs).toISOString(),
+                    prev_request_started_at: prev.requestStartedAt,
+                    same_request: prev.requestStartedAt === new Date(turnStartMs).toISOString(),
+                    prompt_chars: serialized.length,
+                    prev_prompt_chars: prev.serialized.length,
+                    ...(divergence
+                      ? {
+                          offset: divergence.offset,
+                          prev_excerpt: excerptAt(prev.serialized, divergence.offset),
+                          curr_excerpt: excerptAt(serialized, divergence.offset),
+                        }
+                      : {}),
+                  },
+                });
+              }
+              promptPrefixDiagState.set(diagKey, {
+                fingerprint,
+                serialized,
+                requestStartedAt: new Date(turnStartMs).toISOString(),
+              });
+              if (promptPrefixDiagState.size > 20) {
+                const oldest = promptPrefixDiagState.keys().next().value;
+                if (oldest !== undefined) promptPrefixDiagState.delete(oldest);
+              }
+            } catch {
+              // Diagnostic only — never touches the step.
+            }
+          }
           if (stepNumber < stepCap - 1) {
-            if (itemIterationBudget == null) return { activeTools: stepActiveTools };
+            if (!tailDeliverables) {
+              tailGate.active = false;
+              tailGate.notice = null;
+              return { activeTools: stepActiveTools, messages: stepMessages };
+            }
             // DELIVERABLE-TAIL RESERVATION (plan §6b, prod 5e5b739d): the
             // final-step rule generalised. The last `tail` steps of an item
-            // run keep only the run's deliverables + record + close tools
-            // callable, so research physically cannot consume them — and
-            // every step tells the model where it stands, since a budget it
-            // cannot see is a budget it cannot plan against.
+            // run — or of a charter turn (§9) — keep only the deliverables
+            // + record/close tools callable, so research physically cannot
+            // consume them — and every step tells the model where it
+            // stands, since a budget it cannot see is a budget it cannot
+            // plan against.
             const remaining = stepCap - stepNumber;
-            const tail = reservedTailSize(itemIterationDeliverables);
+            const tail = reservedTailSize(tailDeliverables);
             const inTail = remaining <= tail + 1; // +1: the text-only last step
-            const tailTools = reservedTailTools(itemIterationDeliverables);
-            const narrowed =
-              inTail && stepActiveTools
-                ? stepActiveTools.filter((t) => tailTools.includes(t))
-                : stepActiveTools;
+            // The list stays whole; the tail is enforced when a tool runs
+            // (tailGate, §10 L2) so the cached prefix survives the tail.
+            tailGate.active = inTail;
+            tailGate.allowed = tailToolsForTurn;
+            tailGate.remaining = remaining;
             if (inTail) stepsTracker.tailReservedSteps += 1;
-            return {
-              activeTools: narrowed,
-              messages: [
-                ...stepMessages,
-                {
-                  role: "user" as const,
-                  content: stepsRemainingNotice({
-                    stepNumber,
-                    stepCap,
-                    deliverables: itemIterationDeliverables,
-                  }),
-                },
-              ],
-            };
+            // The budget line for the step AFTER this one, carried on this
+            // step's first tool result (see the tool wrapper) — never a
+            // trailing message: the prompt must only grow (§10 round 3).
+            tailGate.notice = stepsRemainingNotice({
+              stepNumber: stepNumber + 1,
+              stepCap,
+              deliverables: tailDeliverables,
+              tailTools: tailToolsForTurn,
+            });
+            tailGate.noticeStep = stepNumber;
+            return { activeTools: stepActiveTools, messages: stepMessages };
           }
           stepsTracker.finalStepReserved = true;
           return {
@@ -2728,50 +3324,7 @@ export async function POST(request: Request) {
             ],
           };
         },
-        system: buildSystemPrompt({
-          hasImageTools: isAdvertised("generate_image"),
-          hasFlashcardTools: isAdvertised("list_decks"),
-          hasWebSearch: isAdvertised("search_web"),
-          hasCheckpointTool: isAdvertised("phase_checkpoint"),
-          hasBrowserReadTool: isAdvertised(READ_PAGE_HEADLESS_OR_BROWSER),
-          hasTabLauncher: isAdvertised(OPEN_TAB_AND_READ),
-          hasCoBrowseTools: isAdvertised(CO_BROWSE_OPEN),
-          hasReadCurrentPage: isAdvertised(READ_CURRENT_PAGE),
-          hasResearchTools: isAdvertised("extract_structured"),
-          hasListTabs: isAdvertised(LIST_TABS),
-          hasItemIteration: isAdvertised("propose_item_iteration"),
-          hasDatabaseTools: isAdvertised("describe_database"),
-          toolMenu: toolMenu ?? undefined,
-          viewedContentHint,
-          // Runtime identity (v3.1): what this turn is ACTUALLY served by,
-          // from live routing — so the model self-identifies from ground
-          // truth. Prefer the connection's preset template name (matches
-          // the picker: "Moonshot (Kimi)"), then the catalog, then the raw
-          // id.
-          runtimeProviderName:
-            (activeConnection?.presetId
-              ? lookupTemplate(activeConnection.presetId)?.name
-              : undefined) ??
-            lookupTemplate(providerId)?.name ??
-            PROVIDER_CATALOG.find((p) => p.id === providerId)?.name ??
-            providerId,
-          runtimeModelId: activeModelId,
-          openWorkflowTitle,
-          editableContentId,
-          isChatContent,
-          chatContentId: isChatContent ? contentId : undefined,
-          autoPronounceDefault,
-          userContextSection,
-          mentionedContext,
-          charterContext,
-          rootedContentSection,
-          outputTargetSection: renderOutputTargetInstruction(outputTarget),
-          hasAttachedCharter: attachedCharterResolved,
-          checkpointIntegritySection:
-            renderPhaseCheckpointGateInstruction(phaseCheckpointGate),
-          pageContextSection,
-          currentPageHint,
-        }),
+        system: systemPromptForDiag,
         onStepFinish: (step) => {
           // Tokens-per-phase accumulator (v3.1 R5) — cheap, never throws.
           const stepUsage = (
@@ -2788,6 +3341,10 @@ export async function POST(request: Request) {
           runTokenCounter.input += stepUsage?.inputTokens ?? 0;
           runTokenCounter.output += stepUsage?.outputTokens ?? 0;
           runTokenCounter.cachedInput += stepUsage?.cachedInputTokens ?? 0;
+          if ((stepUsage?.inputTokens ?? 0) > runTokenCounter.maxStepInput) {
+            runTokenCounter.maxStepInput = stepUsage?.inputTokens ?? 0;
+            runTokenCounter.maxStepCachedInput = stepUsage?.cachedInputTokens ?? 0;
+          }
           const cacheCreation = (
             step as {
               providerMetadata?: {
@@ -2812,6 +3369,14 @@ export async function POST(request: Request) {
               // chat meter's step chain shows. See TurnStepSummary.
               inputTokens: stepUsage?.inputTokens ?? null,
               cachedInputTokens: stepUsage?.cachedInputTokens ?? null,
+              // Provider-run calls (native search) are billed per call and
+              // share `search_web` with the app-run backend (§10 L4a).
+              ...(() => {
+                const providerTools = (step.toolCalls ?? [])
+                  .filter((call) => (call as { providerExecuted?: boolean }).providerExecuted === true)
+                  .map((call) => call.toolName);
+                return providerTools.length > 0 ? { providerTools } : {};
+              })(),
             });
           } else {
             stepsTracker.truncated += 1;

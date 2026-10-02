@@ -142,6 +142,89 @@ export function resolveDeliverables(
 }
 
 /**
+ * The deliverables that ARE the capture write. With captureTo declared,
+ * `capture.cells` on record_item_result lands the row; a separate
+ * update_row for the same cells is a second write of the same data, and
+ * the later one wins (ITERATION-RUN-HARNESS-FIXES P3, prod 2026-09-27:
+ * update_row wrote nine cells, the closing capture rewrote eight of them
+ * shorter). One set of cells, one code path.
+ */
+export const CAPTURE_WRITE_TOOLS: readonly DeliverableTool[] = ["update_row", "update_rows"];
+
+/** Drop the row-write deliverables when capture is on; report what was dropped. */
+export function stripCaptureDeliverables(
+  deliverables: readonly DeliverableTool[],
+  captureOn: boolean,
+): { deliverables: DeliverableTool[]; stripped: DeliverableTool[] } {
+  if (!captureOn) return { deliverables: [...deliverables], stripped: [] };
+  const stripped = deliverables.filter((d) => CAPTURE_WRITE_TOOLS.includes(d));
+  return {
+    deliverables: deliverables.filter((d) => !CAPTURE_WRITE_TOOLS.includes(d)),
+    stripped,
+  };
+}
+
+/**
+ * URL identity for "is this read one of the run's items?" (P6): host
+ * lowercased, no `www.`, no hash, no trailing slash. A tracking-parameter
+ * difference still matches nothing — that is the conservative side (a
+ * non-item read gets research guidance, never a false "record it").
+ */
+export function normalizeItemUrl(url: string): string {
+  try {
+    const u = new URL(url.trim());
+    const host = u.host.toLowerCase().replace(/^www\./, "");
+    const path = u.pathname.replace(/\/+$/, "");
+    return `${host}${path}${u.search}`;
+  } catch {
+    return url.trim().toLowerCase().replace(/#.*$/, "").replace(/\/+$/, "");
+  }
+}
+
+/** Keys a flat `capture` object may carry that are NOT column names. */
+const CAPTURE_META_KEYS = new Set([
+  "cells",
+  "admission",
+  "database",
+  "databaseId",
+  "table",
+  "tableId",
+  "rowId",
+  "dedupeValue",
+]);
+
+/**
+ * `record_item_result.capture` as the model may send it (P4): the
+ * documented `{ cells: { Column: value } }`, or the flat `{ Column: value }`
+ * map that died at the schema in prod 2026-09-27 ("capture.cells expected
+ * record, received undefined" — nine correct cells lost to a nesting
+ * level). The schema is a plain record; this reads either shape and says
+ * which it read. Returns `cells: null` when there is nothing to write.
+ */
+export function normalizeCaptureArg(raw: unknown): {
+  cells: Record<string, unknown> | null;
+  note?: string;
+} {
+  if (raw === null || raw === undefined) return { cells: null };
+  if (typeof raw !== "object" || Array.isArray(raw)) {
+    return { cells: null, note: "capture ignored — expected an object of column → value" };
+  }
+  const obj = raw as Record<string, unknown>;
+  const nested = obj.cells;
+  if (nested && typeof nested === "object" && !Array.isArray(nested)) {
+    const cells = nested as Record<string, unknown>;
+    return Object.keys(cells).length > 0 ? { cells } : { cells: null };
+  }
+  const flat: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (CAPTURE_META_KEYS.has(k)) continue;
+    flat[k] = v;
+  }
+  if (Object.keys(flat).length === 0) return { cells: null };
+  return { cells: flat, note: "capture was sent flat (column → value) — read as capture.cells" };
+}
+
+/**
  * Steps per item: research allowance + the item's tail (deliverables +
  * record_item_result). With no deliverables this is 4 — exactly the old
  * screening formula — so screening runs are unchanged.
@@ -166,14 +249,150 @@ export function computeIterationStepCap(input: {
   return items * stepsPerItemFor(input.deliverables, input.stepsPerItem) + RUN_OVERHEAD_STEPS;
 }
 
-/** The tools the reserved tail keeps callable: the deliverables plus the record/close tools. */
-export function reservedTailTools(deliverables: readonly string[]): string[] {
-  return [...new Set([...deliverables, ...TAIL_ALWAYS])];
+/**
+ * A CHARTER turn without a proposal is sized like a one-item fulfilment run
+ * (ITERATION-RUN-HARNESS-FIXES §9, prod 62ac2b76 2026-09-29): the user
+ * asked for one job, the prompt's "one item is not an iteration" rule made
+ * the model skip the proposal, and the turn fell to the 8-step chat cap
+ * with nothing reserved for writing — fifteen steps of reading across two
+ * turns and six user replies, no artifact. The proposal is scope and
+ * consent; it must not be what unlocks the budget. These are the write
+ * tools a charter's per-item work ends in; the cap is
+ * `1 × (research + these + 1) + overhead` = 16, tail 6.
+ */
+export const CHARTER_TURN_DELIVERABLES: readonly DeliverableTool[] = [
+  "create_docx",
+  "create_note",
+  "update_row",
+  "insert_rows",
+];
+
+/** Tools a charter turn's tail keeps beside the deliverables (its close). */
+export const CHARTER_TAIL_EXTRA = ["phase_checkpoint"] as const;
+
+/**
+ * ONE PROMPT PER TURN (ITERATION-RUN-HARNESS-FIXES §10 L2): a charter turn
+ * advertises the tools its work uses from its FIRST request, so neither a
+ * summon nor the reserved tail changes the tool list mid-turn — every change
+ * to the list rewrites everything after the tool definitions, which the
+ * provider cache then bills in full. The set is what every measured charter
+ * run summoned (dce6cf56, ecf1d0e5, de65f6bb, e5b899a2): the evidence reads,
+ * the one-item run loop, the deliverables, and the checkpoint. Anything
+ * outside it is still one summon away. Tools not registered this turn are
+ * skipped by the caller.
+ */
+export const CHARTER_TURN_TOOLS: readonly string[] = [
+  "query_database",
+  "describe_database",
+  "read_content",
+  "propose_item_iteration",
+  "record_item_result",
+  "record_iteration_findings",
+  "create_docx",
+  "create_note",
+  "update_note",
+  "update_row",
+  "update_rows",
+  "insert_rows",
+  "phase_checkpoint",
+  "read_page_headless_or_browser",
+];
+
+/**
+ * The answer a tool gets when it is called inside the reserved tail but is
+ * not one of the tail's tools. The tail used to HIDE those tools, which
+ * changed the tool list and cold-started the cache on the tail's first step
+ * (prod de65f6bb s23: 11k of schemas dropped, zero cached). Refusing at
+ * execute keeps the list constant and costs the model one step it is told
+ * how to spend.
+ */
+/**
+ * Carry the step budget on a tool result instead of a trailing harness
+ * message (§10 round 3). Strings get the line appended; plain objects get a
+ * `harnessNotice` field; anything else (arrays, streams, null) is returned
+ * unchanged — the next result carries it.
+ */
+export function withBudgetNotice(output: unknown, notice: string): unknown {
+  if (typeof output === "string") return `${output}\n\n${notice}`;
+  if (
+    output &&
+    typeof output === "object" &&
+    !Array.isArray(output) &&
+    !(Symbol.asyncIterator in output) &&
+    Object.getPrototypeOf(output) === Object.prototype
+  ) {
+    return { ...(output as Record<string, unknown>), harnessNotice: notice };
+  }
+  return output;
 }
+
+export function tailRefusalNotice(input: {
+  tool: string;
+  tailTools: readonly string[];
+  remaining: number;
+}): string {
+  const tools = input.tailTools.filter((t) => t !== "summon");
+  return (
+    `[Harness — not run. ${input.tool} is outside the reserved tail: ${input.remaining} step${input.remaining === 1 ? "" : "s"} ` +
+    `remain for ${tools.join(", ")}. Produce the deliverables with what you have, record any gap, and close.]`
+  );
+}
+
+/**
+ * The tools the reserved tail keeps callable: the deliverables plus the
+ * record/close tools (item runs) or the charter's close tools (charter
+ * turns). `summon` always, so a deliverable not yet activated can be.
+ */
+export function reservedTailTools(
+  deliverables: readonly string[],
+  options: { record?: boolean; extra?: readonly string[] } = {},
+): string[] {
+  const record = options.record ?? true;
+  return [
+    ...new Set([
+      ...deliverables,
+      ...(record ? TAIL_ALWAYS : ["summon"]),
+      ...TAIL_VERIFY,
+      ...(options.extra ?? []),
+    ]),
+  ];
+}
+
+/**
+ * Checking a deliverable is part of producing it: `read_content` on a
+ * document just written returns its text as read from the file, which is how
+ * the model verifies a resume the way a parser will read it. The deliverable
+ * is written inside the tail, so the check must be callable there — before
+ * this the tail refused it (plan §10 round 4, prod 36237eb8: "I could not …
+ * test its text extraction").
+ */
+export const TAIL_VERIFY = ["read_content"] as const;
 
 /** How many of the turn's last steps are held for the tail: deliverables + record + close. */
 export function reservedTailSize(deliverables: readonly string[]): number {
   return deliverables.length + 2;
+}
+
+/**
+ * The step cap for THIS request of a turn (§9, prod 62ac2b76 / f51fa2d8):
+ * the turn's cap minus what earlier requests spent — but an approval
+ * continuation never opens with fewer steps than its tail needs plus the
+ * text answer. Before this, a continuation inherited whatever was left
+ * (8 → 3 → 1) and an approved action died on the step that was supposed
+ * to perform it. A fresh request (nothing spent) gets the full cap; a
+ * plain chat continuation gets at least three.
+ */
+export function continuationStepCap(input: {
+  rawStepCap: number;
+  stepsAlreadySpent: number;
+  tailDeliverables: readonly string[] | null;
+}): number {
+  const remaining = input.rawStepCap - input.stepsAlreadySpent;
+  if (input.stepsAlreadySpent <= 0) return Math.max(1, remaining);
+  const floor = input.tailDeliverables
+    ? reservedTailSize(input.tailDeliverables) + 1
+    : 3;
+  return Math.max(floor, remaining);
 }
 
 /**
@@ -185,10 +404,12 @@ export function stepsRemainingNotice(input: {
   stepNumber: number;
   stepCap: number;
   deliverables: readonly string[];
+  /** The tail's tool list when it differs from the item-run default. */
+  tailTools?: readonly string[];
 }): string {
   const remaining = Math.max(0, input.stepCap - input.stepNumber);
   const tail = reservedTailSize(input.deliverables);
-  const tools = reservedTailTools(input.deliverables).filter((t) => t !== "summon");
+  const tools = (input.tailTools ?? reservedTailTools(input.deliverables)).filter((t) => t !== "summon");
   const reservedNote =
     remaining <= tail
       ? `The remaining steps are RESERVED for the deliverables — only ${tools.join(", ")} are available now; produce the artifacts with what you have, record any gap, and close.`

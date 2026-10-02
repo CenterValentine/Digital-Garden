@@ -90,6 +90,11 @@ import {
 import type { SuggestionItem } from "@/components/content/ai/ChatSuggestionMenu";
 import { useSettingsStore } from "@/state/settings-store";
 import { compactToolOutputs } from "@/lib/domain/ai/compact-tool-outputs";
+import { cacheVolleyDelayMs, pendingApprovalKey } from "@/lib/domain/ai/cache-volley";
+import {
+  useChatSearchBackend,
+  type SearchBackendPreference,
+} from "@/lib/domain/ai/use-chat-search-backend";
 import {
   getAttachedPageContext,
   getCurrentPageHint,
@@ -110,6 +115,7 @@ import {
   type FolderContextMentionData,
 } from "@/lib/domain/ai-context/mention-part";
 import { stopPendingToolCalls } from "@/lib/domain/ai/repair-dangling-tools";
+import { normalizeItemUrl } from "@/lib/domain/ai/tools/iteration-proposal";
 import { getContentWriteRefreshTargets } from "@/lib/domain/ai/content-write-receipts";
 
 export type { OutputTarget } from "@/lib/domain/ai/output-target";
@@ -533,6 +539,12 @@ export interface UseConversationEngineResult {
   modelPinned: boolean;
   /** Pin/unpin the current model for this conversation. */
   setModelPinned: (pinned: boolean) => void;
+  /**
+   * Web search for this chat: the model's own search (`native`, default) or
+   * the user's search connection (`app`). The server re-checks both.
+   */
+  searchBackend: SearchBackendPreference;
+  setSearchBackend: (next: SearchBackendPreference) => void;
 
   // ── suggestions ──
   mentionResults: SuggestionItem[];
@@ -1232,12 +1244,20 @@ function deriveActiveItemIteration(
   batchSize: number | null;
   /** itemsRecorded value at the last record_batch_checkpoint (0 = none yet). */
   itemsAtLastCheckpoint: number;
+  /**
+   * The approved items' URLs, normalized (P6). A read of one of THESE is an
+   * item; any other read during the run is research and must not be told
+   * to "record this as an unreadable item" (prod 2026-09-27: a 403 on
+   * seatgeek.com/about was answered with exactly that).
+   */
+  itemUrls: Set<string>;
 } | null {
   let active: {
     itemBudget: number;
     itemsRecorded: number;
     batchSize: number | null;
     itemsAtLastCheckpoint: number;
+    itemUrls: Set<string>;
   } | null = null;
   for (const m of messages) {
     if (m.role !== "assistant") continue;
@@ -1248,9 +1268,20 @@ function deriveActiveItemIteration(
         p.state === "output-available"
       ) {
         const out = p.output as
-          | { ok?: boolean; itemBudget?: number; batchSize?: number | null }
+          | {
+              ok?: boolean;
+              itemBudget?: number;
+              batchSize?: number | null;
+              items?: Array<{ url?: unknown }>;
+            }
           | undefined;
         if (out?.ok && typeof out.itemBudget === "number" && out.itemBudget > 0) {
+          const itemUrls = new Set<string>();
+          for (const item of Array.isArray(out.items) ? out.items : []) {
+            if (typeof item?.url === "string" && item.url.trim()) {
+              itemUrls.add(normalizeItemUrl(item.url));
+            }
+          }
           active = {
             itemBudget: out.itemBudget,
             itemsRecorded: 0,
@@ -1259,6 +1290,7 @@ function deriveActiveItemIteration(
                 ? out.batchSize
                 : null,
             itemsAtLastCheckpoint: 0,
+            itemUrls,
           };
         }
       } else if (
@@ -1515,6 +1547,11 @@ export function useConversationEngine({
   // silently pinning on every switch was itself surprising). The picker uses
   // the raw handleModelChange; the footer pin button drives setModelPinned.
   const setModelPinned = persistModelPin;
+  // ── web search preference (plan §10 round 4) ──
+  const [searchBackend, setSearchBackend] = useChatSearchBackend(
+    conversationId,
+    contentId,
+  );
 
   // ── @ mention search (150ms debounce) ──
   const [mentionResults, setMentionResults] = useState<SuggestionItem[]>([]);
@@ -2557,6 +2594,15 @@ export function useConversationEngine({
       // read tools only (a read is how the NEXT item starts) so mid-item acting
       // is never broken. Fail-open: no active iteration → path skipped entirely.
       const iteration = deriveActiveItemIteration(chat.messages);
+      // P6: an item read is a read of one of the APPROVED items; every other
+      // read during a run (employer research, a guide) is not an item and
+      // gets research guidance instead of "record it unreadable". A run
+      // whose items carry no URLs (label-keyed) keeps the old behaviour —
+      // there is nothing to compare against.
+      const isItemRead =
+        !!iteration &&
+        (iteration.itemUrls.size === 0 ||
+          iteration.itemUrls.has(normalizeItemUrl(url)));
       if (iteration && iteration.itemsRecorded >= iteration.itemBudget) {
         chat.addToolResult({
           tool: toolName,
@@ -2604,7 +2650,8 @@ export function useConversationEngine({
         let escalationNote: string | undefined;
         if (isBrowserRead && !researchRunRef.current) {
           const currentLen = outcome.content?.content?.trim().length ?? 0;
-          if (!outcome.ok || currentLen < 800) {
+          // Navigation chrome (P7) is thin whatever its length.
+          if (!outcome.ok || currentLen < 800 || outcome.content?.contentNote) {
             const launched = await launchTabAndRead(url);
             const launchedLen = launched.content?.content?.trim().length ?? 0;
             if (launched.ok && launchedLen > currentLen) {
@@ -2633,10 +2680,12 @@ export function useConversationEngine({
           // it and the ledger under-counts (observed live: a 190-char page dropped
           // from a 10-item run). Structural backstop to the prompt's "record every
           // attempt" rule.
-          const thin = (c.content?.trim().length ?? 0) < 500;
+          const thin = (c.content?.trim().length ?? 0) < 500 || !!c.contentNote;
           const iterationNote =
             iteration && thin
-              ? "This page has no substantial job description (near-empty). It is still an attempted item — call record_item_result with status=unreadable and a one-line reason BEFORE reading the next tab. Do not skip it."
+              ? isItemRead
+                ? "This page has no substantial job description (near-empty or navigation only). It is still an attempted item — call record_item_result with status=unreadable and a one-line reason BEFORE reading the next tab. Do not skip it."
+                : "This page has no substantial content (near-empty or navigation only). It is NOT one of the run's items — do not record it as one; note the gap and continue. If it was employer research, search_web (when available) can find official sources."
               : undefined;
           chat.addToolResult({
             tool: toolName,
@@ -2653,6 +2702,9 @@ export function useConversationEngine({
               // The escalation summary (if any) — the model relays it so the user
               // sees the steps (normal read → visible-tab open) it actually took.
               ...(escalationNote ? { escalationNote } : {}),
+              // P7: the body is a link list, not the article — say so, in
+              // its own field, so the model never reads a menu as content.
+              ...(c.contentNote ? { contentNote: c.contentNote } : {}),
               ...(iterationNote ? { iterationNote } : {}),
             },
           });
@@ -2666,8 +2718,12 @@ export function useConversationEngine({
                 : `Could not read the page: ${outcome.reason ?? "unknown error"}.${escalationNote ? ` ${escalationNote}` : ""}`) +
               // A failed read during an iteration is still an attempted item —
               // record it, don't silently skip (keeps the ledger complete).
+              // A failed RESEARCH read is not an item (P6): say what it is
+              // and what to do instead.
               (iteration
-                ? " This is an attempted iteration item — call record_item_result with status=unreadable (or blocked) for it before moving to the next tab."
+                ? isItemRead
+                  ? " This is an attempted iteration item — call record_item_result with status=unreadable (or blocked) for it before moving to the next tab."
+                  : " This URL is NOT one of the run's items — do not record it as one. If it was research (an employer page, a guide), record what is missing as a gap on the current item and continue; search_web (when available) can find official sources when a page is blocked."
                 : ""),
           });
         }
@@ -2845,6 +2901,50 @@ export function useConversationEngine({
     resumeStream,
   } = chat;
 
+  // ── cache volley (ITERATION-RUN-HARNESS-FIXES §10 round 3) ──
+  // A turn stopped on a pending approval keeps its prompt in the provider's
+  // cache only for the cache's lifetime (Anthropic 5 min, older OpenAI 5–10).
+  // ONE volley shortly before that lapses re-reads the cached prefix, which
+  // refreshes it, so an approval answered within ~10 minutes still resumes
+  // warm. Providers whose cache outlives the window (GPT-5.6+, 30 min) and
+  // providers with no controllable cache get none (`cacheVolleyDelayMs`).
+  // Cancelled when the approval is answered, the chat changes, or the
+  // surface unmounts; never repeated for the same pending approvals.
+  const volleyedApprovalsRef = useRef<Set<string>>(new Set());
+  // When each pending approval was first seen — the delay is measured from
+  // there, so an unrelated re-render cannot restart the clock past expiry.
+  const pendingSinceRef = useRef<Map<string, number>>(new Map());
+  useEffect(() => {
+    if (status !== "ready") return;
+    const key = pendingApprovalKey(messages);
+    if (!key || volleyedApprovalsRef.current.has(key)) return;
+    const last = messages[messages.length - 1];
+    const route = (last?.metadata as { modelRoute?: { providerId?: string; modelId?: string } } | undefined)
+      ?.modelRoute;
+    const delay = cacheVolleyDelayMs(route?.providerId ?? providerId, route?.modelId ?? modelId);
+    if (delay === null) return;
+    const baseline = lastSentBodies.get(conversationKey);
+    if (!baseline) return;
+    const now = Date.now();
+    const since = pendingSinceRef.current.get(key) ?? now;
+    pendingSinceRef.current.set(key, since);
+    const timer = setTimeout(() => {
+      volleyedApprovalsRef.current.add(key);
+      void fetch("/api/ai/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...baseline,
+          id: conversationKey,
+          messages: compactToolOutputs(messages),
+          trigger: "submit-message",
+          warmOnly: true,
+        }),
+      }).catch(() => null);
+    }, Math.max(0, delay - (now - since)));
+    return () => clearTimeout(timer);
+  }, [status, messages, providerId, modelId, conversationKey]);
+
   // ── active playbook: derived phase index (AI v3.2 T3) ──
   // Phase index is DERIVED from the message history, not manually
   // incremented — the count of phase_checkpoint tool calls that have
@@ -2947,6 +3047,7 @@ export function useConversationEngine({
       // Model pin (AI 3.4): true ⇒ the user's pick is the ladder's top rung
       // and playbook phase directives are ignored for this conversation.
       modelPinned,
+      searchBackend,
       // Agentic Browsing Phase 0: is the browser extension reachable right now?
       // Gates the client-executed read_page_in_browser tool. Read at send time.
       browserExtensionAvailable: isExtensionAcquireAvailable(),
@@ -2969,6 +3070,7 @@ export function useConversationEngine({
     resolvedPhaseIndex,
     outputTarget,
     modelPinned,
+    searchBackend,
   ]);
 
   // ── resumable streams (AI 3.3) ──
@@ -3243,6 +3345,7 @@ export function useConversationEngine({
           // Model pin (AI 3.4) — see handleSend for why every per-call
           // body must carry it.
           modelPinned,
+          searchBackend,
         },
       },
     );
@@ -3256,6 +3359,7 @@ export function useConversationEngine({
     modelId,
     outputTarget,
     modelPinned,
+    searchBackend,
   ]);
 
   // ── send ──
@@ -3419,6 +3523,7 @@ export function useConversationEngine({
           // resolver baseline is consulted, so a flag that lives only in
           // the resolver never reaches the server after a real send.
           modelPinned,
+          searchBackend,
           // Agentic Browsing Phase 0 — same per-call-body requirement as above.
           browserExtensionAvailable: isExtensionAcquireAvailable(),
           // Slice 5c co-browse gate — same per-call-body requirement.
@@ -3447,6 +3552,7 @@ export function useConversationEngine({
     resolvedPhaseIndex,
     outputTarget,
     modelPinned,
+    searchBackend,
     clearFollowUps,
   ]);
 
@@ -3475,6 +3581,7 @@ export function useConversationEngine({
       // Model pin (AI 3.4) — see handleSend for why every per-call body
       // must carry it.
       modelPinned,
+      searchBackend,
     }),
     [
       contentId,
@@ -3486,6 +3593,7 @@ export function useConversationEngine({
       resolvedPhaseIndex,
       outputTarget,
       modelPinned,
+      searchBackend,
     ],
   );
 
@@ -3601,6 +3709,8 @@ export function useConversationEngine({
     handleModelChange,
     modelPinned,
     setModelPinned,
+    searchBackend,
+    setSearchBackend,
     mentionResults,
     handleMentionSearch,
     handleResolveMention,

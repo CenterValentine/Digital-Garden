@@ -672,6 +672,10 @@ const RUN_LOOP_TOOLS = [
   "record_batch_checkpoint",
   "record_iteration_findings",
   "add_quest_ledger_column",
+  // The deliverable a fulfilment run ends with: a schema miss here loses the
+  // artifact on the turn's last step (prod f51fa2d8, 2026-09-29 — a finished
+  // resume sent as `content` instead of `markdown`). write-args.ts judges.
+  "create_docx",
 ];
 const SCHEMA_REFINEMENT_RE = /\.(enum|min|max|int|regex|refine|superRefine|length|email|url|uuid|nonempty)\(/g;
 
@@ -705,6 +709,20 @@ function withoutComments(source: string): string {
       fail(
         "gate7",
         `${name} carries \`.${m[1]}(\` in its input schema — run-loop schemas describe shape; resolve or clamp this in execute and answer a miss with a teaching result (see iteration-proposal.ts)`,
+      );
+    }
+    // Nested objects are the other half of the rule ("required keys inside
+    // a nested object"). Prod 23fd28d6 (2026-09-27): record_item_result's
+    // `capture: z.object({ cells: z.record() })` rejected a flat
+    // `{ Column: value }` map at the schema — nine correct cells lost to a
+    // nesting level — and this gate did not see it because it scanned for
+    // refinements only. One `.object(` per run-loop schema: the top level.
+    // Anything the model may nest is a `z.record(...)` normalized in execute.
+    const nestedObjects = [...schemaBlock.matchAll(/\.object\(/g)].length - 1;
+    if (nestedObjects > 0) {
+      fail(
+        "gate7",
+        `${name} nests ${nestedObjects} z.object(...) inside its input schema — a nested object's keys are required at the schema layer; make it z.record(z.string(), z.unknown()) and normalize the shape in execute (see normalizeCaptureArg in iteration-proposal.ts)`,
       );
     }
   }

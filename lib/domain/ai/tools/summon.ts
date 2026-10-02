@@ -30,6 +30,34 @@ export const SUMMON_TOOL_ID = "summon";
  * added within a turn, never removed, so the advertised prefix grows
  * monotonically and each summon costs at most one prefix change.
  */
+/**
+ * Rough size of one tool's schema as the provider sees it (description +
+ * JSON schema, chars/4). Used only to TELL the model what a summon costs
+ * per step — prod ecf1d0e5 (2026-09-28) summoned four whole families (23
+ * tools, ~10k tokens) up front and paid for them on every one of 19 steps.
+ */
+export function estimateToolSchemaTokens(toolDef: unknown): number {
+  if (!toolDef || typeof toolDef !== "object") return 0;
+  const t = toolDef as { description?: unknown; inputSchema?: unknown };
+  let schemaText = "";
+  const schema = t.inputSchema as
+    | { jsonSchema?: unknown; _zod?: unknown }
+    | undefined;
+  try {
+    if (schema && typeof schema === "object") {
+      if ("jsonSchema" in schema && schema.jsonSchema) {
+        schemaText = JSON.stringify(schema.jsonSchema);
+      } else if ("_zod" in schema) {
+        schemaText = JSON.stringify(z.toJSONSchema(schema as unknown as z.ZodType));
+      }
+    }
+  } catch {
+    schemaText = "";
+  }
+  const description = typeof t.description === "string" ? t.description : "";
+  return Math.ceil((description.length + schemaText.length) / 4);
+}
+
 export function createSummonTool(input: {
   /** Every tool registered this turn. */
   registered: ReadonlySet<string>;
@@ -37,6 +65,8 @@ export function createSummonTool(input: {
   activated: Set<string>;
   /** Already advertised in full; summoning one is a no-op worth saying so. */
   isAdvertised: (id: string) => boolean;
+  /** Schema size per tool id, so the result can price the summon per step. */
+  schemaTokensFor?: (id: string) => number;
 }) {
   return tool({
     description:
@@ -67,8 +97,18 @@ export function createSummonTool(input: {
 
       const parts: string[] = [];
       if (fresh.length > 0) {
+        const tokens = input.schemaTokensFor
+          ? fresh.reduce((n, id) => n + input.schemaTokensFor!(id), 0)
+          : 0;
+        // The price rides the result (never silent): schemas are re-sent on
+        // every remaining step, so a family summoned "just in case" is the
+        // single most expensive line of the run.
+        const priceNote =
+          tokens > 0
+            ? ` (≈${tokens.toLocaleString("en-US")} tokens of schema now ride on EVERY remaining step${fresh.length >= 8 ? " — summon only the tools this run will call, not whole families" : ""}.)`
+            : "";
         parts.push(
-          `Activated: ${fresh.join(", ")}. Their full schemas are available from your NEXT step — call them there.`,
+          `Activated: ${fresh.join(", ")}. Their full schemas are available from your NEXT step — call them there.${priceNote}`,
         );
       }
       if (already.length > 0) {
