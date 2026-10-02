@@ -179,6 +179,62 @@ console.log("\n  ── custom-block codecs (pretty markdown, not base64) ──
   else if (r.md.includes("DGBLOCKv1:") || !r.md.includes("> [!")) fail(`callout codec — expected "> [!" markdown, got ${r.md.slice(0, 40)}`);
   else pass("callout → > [!warning] markdown");
 }
+{
+  // Accordion codec: pretty <details>/<summary>, not the fence. Lossless
+  // alone would stay green if the codec regressed to fencing, so assert
+  // the representation too. Three shapes: every attr non-default, nesting
+  // (the innermost-first reTag), and the one input that must decline.
+  const acc = (attrs: Record<string, unknown>, content: JSONContent[]): JSONContent => ({ type: "accordion", attrs, content });
+  const full = acc(
+    { blockId: "a0a0a0a0-0000-4000-8000-000000000001", headerText: "Q \"quoted\" & <tagged>", headerLevel: "3", openBehavior: "collapsed", openState: false, showContainer: true, showDivider: true },
+    [p([t("owned "), tm("data hygiene", ["bold"])]), list(["250K duplicates"], "bulletList")],
+  );
+  const r1 = lossless(doc(full));
+  if (!r1.ok) fail("accordion codec — LOSSY");
+  else if (r1.md.includes("DGBLOCKv1:") || !r1.md.includes("<details") || !r1.md.includes("<summary>Q &quot;quoted&quot; &amp; &lt;tagged&gt;</summary>".replace(/&quot;/g, '"')))
+    fail(`accordion codec — expected <details>/<summary> markdown, got ${r1.md.slice(0, 60)}`);
+  else pass("accordion → <details><summary> markdown, attrs on the tag");
+
+  const nested = acc({ headerText: "Outer" }, [p([t("before")]), acc({ headerText: "Inner", openState: false }, [p([t("deep")])]), p([t("after")])]);
+  const r2 = lossless(doc(nested));
+  if (!r2.ok) fail("nested accordion — LOSSY");
+  else if (r2.md.includes("DGBLOCKv1:")) fail("nested accordion — fenced; reTag must resolve innermost first");
+  else if ((r2.md.match(/<details/g) ?? []).length !== 2) fail(`nested accordion — expected two <details>, got ${r2.md.slice(0, 80)}`);
+  else pass("nested accordion → nested <details>, both pretty");
+
+  const multiline = acc({ headerText: "two\nlines" }, [p([t("x")])]);
+  const r3 = lossless(doc(multiline));
+  if (!r3.ok) fail("accordion with newline header — LOSSY");
+  else if (!r3.md.includes("DGBLOCKv1:")) fail("accordion with newline header — must DECLINE to the fence (a <summary> cannot span lines)");
+  else pass("accordion with newline header → declines to fence");
+}
+{
+  // Adjacent lists: each list round-trips alone, but markdown cannot end
+  // a list except with a non-list block, so two in a row merged on the way
+  // back. The serializer separates them with an HTML comment; assert both
+  // that the join is lossless and that the separator is what did it.
+  const ol = (start: number, ...items: string[]): JSONContent => ({ type: "orderedList", attrs: { start }, content: items.map((i) => ({ type: "listItem", content: [p([t(i)])] })) });
+  const task = (...items: string[]): JSONContent => ({ type: "taskList", content: items.map((i) => ({ type: "taskItem", attrs: { checked: false }, content: [p([t(i)])] })) });
+  const adjacent: Array<[string, JSONContent]> = [
+    ["two ordered lists (1, then start=2)", doc(ol(1, "a"), ol(2, "b"))],
+    ["two bullet lists", doc(list(["a"], "bulletList"), list(["b"], "bulletList"))],
+    ["bullet list then task list (same marker)", doc(list(["a"], "bulletList"), task("b"))],
+    ["two task lists", doc(task("a"), task("b"))],
+  ];
+  for (const [name, fixture] of adjacent) {
+    const r = lossless(fixture);
+    const before = norm(fixture).content?.length ?? 0;
+    if (!r.ok) fail(`adjacent lists — ${name}: LOSSY (merged into one list on the way back)`);
+    else if (!r.md.includes("<!-- -->")) fail(`adjacent lists — ${name}: round-tripped without the separator; something else is keeping them apart and it is not asserted`);
+    else pass(`adjacent lists — ${name} (${before} blocks stay ${before})`);
+  }
+  // A list with a non-list block between needs no separator — make sure
+  // the rule is not firing where it should not.
+  const r = lossless(doc(list(["a"], "bulletList"), p([t("between")]), list(["b"], "bulletList")));
+  if (!r.ok) fail("list / paragraph / list — LOSSY");
+  else if (r.md.includes("<!-- -->")) fail("list / paragraph / list — separator emitted where a paragraph already separates");
+  else pass("list / paragraph / list → no separator needed, none emitted");
+}
 // Private content: Obsidian comment syntax on the way out, never a fence.
 {
   const r = lossless(doc({ type: "privateBlock", content: [p([t("hidden")])] }));
