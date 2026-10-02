@@ -27,6 +27,7 @@ import { useContextMenuStore } from "@/state/context-menu-store";
 import { usePageTemplateStore } from "@/state/page-template-store";
 import type { TreeNode, ContentType } from "@/lib/domain/content/types";
 import { findTreeNodeById } from "@/lib/domain/content/tree-drop-target";
+import { recordCreateDestination } from "@/state/create-destination-store";
 import {
   registerCreateTargetResolver,
   resolveCreateParent,
@@ -458,6 +459,23 @@ export function LeftSidebarContent({
   // drops aimed at the top of a filtered tree land at the real vault root,
   // invisibly outside the view the user is looking at.
   const scopedRootParentId = effectiveViewRootContentId;
+
+  // Remember where a create landed (server-space parent) so the pane "+"
+  // picker can offer "the last place you created something" at its top.
+  // Titles come from the tree already in hand; the hidden view root resolves
+  // to the view's own title.
+  const rememberDestination = useCallback(
+    (serverParentId: string | null) => {
+      recordCreateDestination(serverParentId, (id) => {
+        if (id === scopedRootParentId && scopedRootTitle) {
+          return { title: scopedRootTitle, parentId: null };
+        }
+        const node = treeData ? findTreeNodeById(treeData, id) : null;
+        return node ? { title: node.title, parentId: node.parentId } : null;
+      });
+    },
+    [treeData, scopedRootParentId, scopedRootTitle],
+  );
   // Surfaces outside the tree (the reader's bookshelf, …) resolve "+" targets
   // with the tree's live rule.
   useEffect(() => {
@@ -1461,6 +1479,7 @@ export function LeftSidebarContent({
         return;
       }
 
+      rememberDestination(parentId);
       await fetchTree();
       setSelectedContentId(target.id, {
         title: target.title,
@@ -1572,6 +1591,7 @@ export function LeftSidebarContent({
         }
 
         // Success! Refresh tree and navigate to new link
+        rememberDestination(parentId);
         await fetchTree();
         setSelectedContentId(result.data.id, {
           title: result.data.title,
@@ -1800,6 +1820,7 @@ export function LeftSidebarContent({
         // Success! Refresh tree to show new document
         fetchTree();
         setCreatingItem(null);
+        rememberDestination(requestParentId ?? null);
         replaceContentTab(`tab:${tempId}`, result.data.id, {
           title: result.data.title,
           contentType: result.data.contentType ?? "file",
@@ -1889,6 +1910,9 @@ export function LeftSidebarContent({
       }
 
       // Success! Replace temporary node with real node from server
+      if (!createTarget.peopleGroupId && !createTarget.personId) {
+        rememberDestination(requestParentId ?? null);
+      }
       if (treeData && result.data) {
         const apiResponse = result.data;
 

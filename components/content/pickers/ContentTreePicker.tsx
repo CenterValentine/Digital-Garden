@@ -13,18 +13,35 @@
  * clip it. Surface anatomy, top to bottom:
  *   - search: debounced server search replaces the tree while typing
  *     (flat — search bypasses collapse and view scope).
+ *   - recent destinations (quickCreate consumers only): ONE collapsible
+ *     row naming the folder that last received a create, unfolding to
+ *     the last few. Each carries "+" (create inside it, whatever the
+ *     picker's scope) and click-to-jump (reveal it in the browse tree).
+ *     Backed by `state/create-destination-store.ts`, fed by every create
+ *     that goes through this picker or the file tree (owner ask,
+ *     2026-10-02: "the last selection the user made, especially if it
+ *     was somewhere different than they are targeting in the file tree").
  *   - recents: optional caller-supplied list shown above the tree.
- *   - scope row: the file-tree-style root representation. Shows the
- *     current view scope ("Root" = everything, or a workspace view's
- *     name). Clicking it lists the available scopes — ordered with the
- *     DEFAULT scope first (the active workspace view when one is set,
- *     Root otherwise), then the alternatives — selecting one re-fetches
- *     the tree filtered to that view. Carries "+ New Note" for creating
- *     at the top of the current scope.
- *   - browse: lazy-fetched content tree, COLLAPSED by default. Rows with
- *     nested content show a chevron: single click toggles expansion,
- *     double-click picks the container itself (touch parity beats
- *     hover-to-expand). Leaf rows pick on single click.
+ *   - scope header: the file-tree-style root representation, styled as
+ *     a HEADER (border, tint, bold title, count chip) so it reads as the
+ *     tree's frame rather than its first row — mirroring RootNodeHeader.
+ *     Shows the current view scope ("Root" = everything, or a workspace
+ *     view's name). Clicking it lists the available scopes — ordered
+ *     with the DEFAULT scope first (the active workspace view when one
+ *     is set, Root otherwise), then the alternatives — selecting one
+ *     re-fetches the tree filtered to that view. Carries "+ New Note"
+ *     for creating at the top of the current scope.
+ *   - browse: lazy-fetched content tree. Opens at the FILE TREE'S
+ *     perspective: the folders the tree has expanded are expanded here,
+ *     the tree's selected row is highlighted and scrolled into view, and
+ *     its ancestors are unfolded so it is visible. Same engine as the
+ *     tree's own create rule (`resolveCreateParent` reads the same
+ *     `useTreeStateStore` selection) — the user adds or loads content
+ *     from the place they already see, and lands elsewhere from that
+ *     point of reference. Rows with nested content show a chevron:
+ *     single click toggles expansion, double-click picks the container
+ *     itself (touch parity beats hover-to-expand). Leaf rows pick on
+ *     single click.
  *
  * Create affordances (press-and-hold was tried and REMOVED 2026-08-15 —
  * its arming hint collided with click-to-toggle; per-file "+" was tried
@@ -58,13 +75,20 @@ import {
   ChevronRight,
   ChevronDown,
   Home,
-  Layers,
+  Eye,
   Upload,
+  FolderInput,
 } from "lucide-react";
 
 import { cn } from "@/lib/core/utils";
 import { calculateMenuPosition } from "@/lib/core/menu-positioning";
 import { useWorkspaceStore } from "@/state/workspace-store";
+import { useTreeStateStore } from "@/state/tree-state-store";
+import {
+  recordCreateDestination,
+  useCreateDestinationStore,
+  type CreateDestination,
+} from "@/state/create-destination-store";
 
 const MENU_WIDTH = 300;
 const MENU_MAX_HEIGHT = 420;
@@ -215,6 +239,35 @@ function flattenEligible(
   return out;
 }
 
+/**
+ * Every node in the raw tree, children recursed — the same count the file
+ * tree's header chip shows (`countTotalNodes` in LeftSidebarContent), so
+ * the picker's header reads "295 files" when the tree does, not the
+ * smaller number of rows that survived `eligibleTypes`.
+ */
+function countTreeNodes(nodes: TreeNodeLite[]): number {
+  let count = 0;
+  for (const node of nodes) {
+    count += 1;
+    if (node.children?.length) count += countTreeNodes(node.children);
+  }
+  return count;
+}
+
+/** Ids of every in-tree ancestor of `id`, nearest-first. */
+function ancestorIds(
+  id: string,
+  parentById: ReadonlyMap<string, string | null>,
+): string[] {
+  const out: string[] = [];
+  let cursor = parentById.get(id) ?? null;
+  while (cursor && parentById.has(cursor)) {
+    out.push(cursor);
+    cursor = parentById.get(cursor) ?? null;
+  }
+  return out;
+}
+
 function TypeIcon({
   contentType,
   className,
@@ -351,11 +404,36 @@ export function ContentTreePicker({
   headerAction,
 }: ContentTreePickerProps) {
   const menuRef = useRef<HTMLDivElement | null>(null);
+  // A destination to unfold + reveal once the NEXT tree loads (a jump to a
+  // folder outside the current scope widens to Root first).
+  const pendingRevealRef = useRef<string | null>(null);
   const [tree, setTree] = useState<FlatRow[] | null>(null);
-  // Collapsed by default (owner decision): only top-level rows visible
-  // until expanded. Single click toggles; double-click picks the
-  // container itself.
+  // Raw node count for the scope header's chip (see countTreeNodes).
+  const [totalCount, setTotalCount] = useState(0);
+  // Expansion starts as the FILE TREE'S expansion (seeded when a tree
+  // loads — see the fetch effect) and then belongs to the picker: single
+  // click toggles; double-click picks the container itself. Rows the
+  // tree has collapsed stay collapsed, so a user who keeps the tree tidy
+  // gets a tidy picker.
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  // The row to highlight + scroll to once a tree holds it. Starts as the
+  // tree's single selection (the row the user is looking at); a click on
+  // a recent destination re-aims it. `nonce` lets the same id be revealed
+  // twice in a row (the user scrolled away and clicked it again).
+  const [reveal, setReveal] = useState<{ id: string; nonce: number } | null>(
+    () => {
+      const ids = useTreeStateStore.getState().selectedIds;
+      const only = ids.length === 1 ? ids[0] : null;
+      return only && !only.startsWith("temp-") ? { id: only, nonce: 0 } : null;
+    },
+  );
+  // Recent create destinations — the "last place you created something"
+  // row. Only meaningful to consumers that can create (quickCreate).
+  const recentDestinations = useCreateDestinationStore(
+    (s) => s.recentDestinations,
+  );
+  const forgetDestination = useCreateDestinationStore((s) => s.forgetDestination);
+  const [destinationsOpen, setDestinationsOpen] = useState(false);
   // View scope: null = Root (everything). Switching re-fetches the tree.
   const [viewId, setViewId] = useState<string | null>(defaultViewId);
   // The scope list is a floating dropdown (no layout shift). Anchor is
@@ -438,7 +516,42 @@ export function ContentTreePicker({
             ? raw.tree
             : [];
         if (!cancelled) {
-          setTree(flattenEligible(nodes, eligibleTypes, scopeRootParentId));
+          const flat = flattenEligible(nodes, eligibleTypes, scopeRootParentId);
+          // Open at the file tree's perspective. Read the store once here
+          // (not subscribed): the seed is taken when a tree arrives, and
+          // from then on the expansion is the picker's own — the user's
+          // clicks in either surface must not fight the other's.
+          const treeState = useTreeStateStore.getState();
+          const idsInTree = new Set(flat.map((r) => r.id));
+          const parentById = new Map<string, string | null>();
+          for (const row of flat) parentById.set(row.id, row.parentId);
+          const seed = new Set<string>();
+          for (const id of treeState.expandedIds) {
+            if (idsInTree.has(id)) seed.add(id);
+          }
+          // The selected row must be VISIBLE, whatever the tree has
+          // collapsed above it — unfold its ancestors.
+          const selectedOnly =
+            treeState.selectedIds.length === 1 ? treeState.selectedIds[0] : null;
+          if (selectedOnly && idsInTree.has(selectedOnly)) {
+            for (const id of ancestorIds(selectedOnly, parentById)) seed.add(id);
+          }
+          // A jump that had to widen the scope finishes here.
+          const pending = pendingRevealRef.current;
+          if (pending) {
+            pendingRevealRef.current = null;
+            if (idsInTree.has(pending)) {
+              for (const id of ancestorIds(pending, parentById)) seed.add(id);
+              seed.add(pending);
+              setReveal((prev) => ({ id: pending, nonce: (prev?.nonce ?? 0) + 1 }));
+            } else {
+              // Gone at Root too — the folder was trashed.
+              useCreateDestinationStore.getState().forgetDestination(pending);
+            }
+          }
+          setExpandedIds(seed);
+          setTotalCount(countTreeNodes(nodes));
+          setTree(flat);
         }
       } catch {
         if (!cancelled) setTree(null);
@@ -448,6 +561,31 @@ export function ContentTreePicker({
       cancelled = true;
     };
   }, [eligibleTypes, viewId, scopeRootParentId]);
+
+  // Lookup over the loaded tree for recording destinations + refreshing
+  // destination titles. The scope root's own row is hidden in a scoped
+  // tree, so it resolves to the view's label.
+  const lookupNode = useCallback(
+    (id: string): { title: string; parentId: string | null } | null => {
+      if (currentView && id === currentView.rootContentId) {
+        return { title: currentView.label, parentId: null };
+      }
+      const row = tree?.find((r) => r.id === id);
+      return row ? { title: row.title, parentId: row.parentId } : null;
+    },
+    [tree, currentView],
+  );
+
+  // Scroll the revealed row into view once a tree that holds it is on
+  // screen. Runs after paint (the rows must exist), reads the DOM through
+  // the menu ref — never during render.
+  useEffect(() => {
+    if (!reveal || !tree) return;
+    const el = menuRef.current?.querySelector<HTMLElement>(
+      `[data-row-id="${CSS.escape(reveal.id)}"]`,
+    );
+    el?.scrollIntoView({ block: "center" });
+  }, [reveal, tree]);
 
   // Debounced server search while typing.
   const activeQuery = query.trim();
@@ -537,66 +675,96 @@ export function ContentTreePicker({
   const createKind = quickCreate?.kind ?? "note";
   const createNoun = quickCreate?.noun ?? "Note";
 
-  // "Inside" — top of a container (by id), or top of the current scope (null).
-  const quickCreateInside = useCallback(
-    async (parentContentId: string | null) => {
+  // Every create funnels through here: one POST path, one error message,
+  // and ONE place that remembers the destination for next time. The
+  // parent is SERVER space (the view root's real id, never tree-space
+  // null) — exactly what the destination store expects.
+  const runCreate = useCallback(
+    async (parentId: string | null, newDisplayOrder: number) => {
       if (!quickCreate) return;
       setCreateError(null);
       const created = await createContent(
         createKind,
         quickCreate.defaultTitle,
-        parentContentId ?? scopeRootParentId,
-        0,
+        parentId,
+        newDisplayOrder,
       );
       if (!created) {
         setCreateError(`Couldn't create the ${createNoun.toLowerCase()}.`);
         return;
       }
+      recordCreateDestination(parentId, lookupNode);
       quickCreate.onCreated(created);
     },
-    [quickCreate, createKind, createNoun, scopeRootParentId],
+    [quickCreate, createKind, createNoun, lookupNode],
+  );
+
+  // "Inside" — top of a container (by id), or top of the current scope (null).
+  const quickCreateInside = useCallback(
+    (parentContentId: string | null) =>
+      runCreate(parentContentId ?? scopeRootParentId, 0),
+    [runCreate, scopeRootParentId],
   );
 
   // "Between" — the insertion gap under a row: sibling slot right after it.
   const quickCreateAfter = useCallback(
-    async (row: FlatRow) => {
-      if (!quickCreate) return;
-      setCreateError(null);
-      const created = await createContent(
-        createKind,
-        quickCreate.defaultTitle,
-        row.parentId,
-        row.siblingIndex + 1,
-      );
-      if (!created) {
-        setCreateError(`Couldn't create the ${createNoun.toLowerCase()}.`);
-        return;
-      }
-      quickCreate.onCreated(created);
-    },
-    [quickCreate, createKind, createNoun],
+    (row: FlatRow) => runCreate(row.parentId, row.siblingIndex + 1),
+    [runCreate],
   );
 
   // "Beginning" — the leading gap above a sibling group's first row:
   // the very top slot of that group (top of an expanded folder, or top
   // of root / the scoped view).
   const quickCreateAtStart = useCallback(
-    async (row: FlatRow) => {
-      if (!quickCreate) return;
-      setCreateError(null);
-      const created = await createContent(
-        createKind,
-        quickCreate.defaultTitle,
-        row.parentId,
-        0,
-      );
-      if (!created) {
-        setCreateError(`Couldn't create the ${createNoun.toLowerCase()}.`);
+    (row: FlatRow) => runCreate(row.parentId, 0),
+    [runCreate],
+  );
+
+  // "There again" — a recent destination's "+". The id is already server
+  // space, so no scope remap: it creates in that folder even when the
+  // picker is scoped to a view that can't see it.
+  const quickCreateAtDestination = useCallback(
+    (destination: CreateDestination) => runCreate(destination.id, 0),
+    [runCreate],
+  );
+
+  // Click on a recent destination: go THERE in the browse tree. In scope →
+  // unfold its ancestors and itself, highlight, scroll. Out of scope →
+  // widen to Root and finish once that tree arrives (pendingRevealRef).
+  // Absent even at Root → the folder is gone; forget it.
+  const jumpToDestination = useCallback(
+    (destination: CreateDestination) => {
+      setDestinationsOpen(false);
+      if (destination.id === null) {
+        // Root: the top of the tree. Scroll to the top, nothing to unfold.
+        if (viewId !== null) selectScope(null);
+        menuRef.current
+          ?.querySelector<HTMLElement>("[data-scope-header]")
+          ?.scrollIntoView({ block: "start" });
         return;
       }
-      quickCreate.onCreated(created);
+      const id = destination.id;
+      const inTree = tree?.some((r) => r.id === id) ?? false;
+      if (inTree && tree) {
+        const parentById = new Map<string, string | null>();
+        for (const row of tree) parentById.set(row.id, row.parentId);
+        setExpandedIds((prev) => {
+          const next = new Set(prev);
+          for (const a of ancestorIds(id, parentById)) next.add(a);
+          next.add(id);
+          return next;
+        });
+        setReveal((prev) => ({ id, nonce: (prev?.nonce ?? 0) + 1 }));
+        return;
+      }
+      if (viewId !== null) {
+        pendingRevealRef.current = id;
+        selectScope(null);
+        return;
+      }
+      if (tree) forgetDestination(id);
     },
-    [quickCreate, createKind, createNoun],
+    [tree, viewId, selectScope, forgetDestination],
   );
 
   // Create-targeting mode: a pick IS "create inside the picked container",
@@ -703,6 +871,18 @@ export function ContentTreePicker({
           )
         ) : (
           <>
+            {quickCreate && recentDestinations.length > 0 ? (
+              <RecentDestinations
+                destinations={recentDestinations}
+                open={destinationsOpen}
+                onToggle={() => setDestinationsOpen((o) => !o)}
+                noun={createNoun}
+                lookupTitle={(id) => (id ? (lookupNode(id)?.title ?? null) : null)}
+                onJump={jumpToDestination}
+                onCreate={(d) => void quickCreateAtDestination(d)}
+              />
+            ) : null}
+
             {recents.length > 0 ? (
               <>
                 <div className="px-3 pt-1 pb-0.5 text-[10px] uppercase tracking-wider text-gray-500 font-medium flex items-center gap-1">
@@ -732,14 +912,18 @@ export function ContentTreePicker({
               </>
             ) : null}
 
-            {/* Scope row — the root representation. Click to unfold the
-                view list beneath it; "+ New Note" creates at the top of
-                the current scope. */}
+            {/* Scope HEADER — the root representation, framed like the file
+                tree's RootNodeHeader (border, tint, bold title, gold view
+                icon, count chip) so it reads as the tree's header rather
+                than its first row. Click the title to unfold the view list
+                beneath it; "+ New Note" creates at the top of the current
+                scope. */}
             <div
               ref={scopeRowRef}
+              data-scope-header
               className={cn(
-                "flex w-full items-center gap-2 py-1.5 pl-3 pr-2 text-xs text-gray-500 dark:text-gray-400 transition-colors",
-                scopeAnchor && "bg-black/[0.04] dark:bg-white/[0.06]",
+                "sticky top-0 z-10 flex w-full items-center gap-2 border-y border-black/10 bg-[#f7f7f7] py-1.5 pl-3 pr-2 text-xs transition-colors dark:border-white/10 dark:bg-[#222]",
+                scopeAnchor && "bg-black/[0.06] dark:bg-white/[0.08]",
               )}
             >
               <button
@@ -759,32 +943,39 @@ export function ContentTreePicker({
                 className={cn(
                   // outline-none: the row's open-state tint is the designed
                   // affordance; the browser's focus ring read as foreign.
-                  "flex min-w-0 flex-1 items-center gap-2 text-left outline-none",
-                  views.length > 0 ? "cursor-pointer" : "cursor-default",
+                  "-ml-1 flex min-w-0 items-center gap-2 rounded px-1 py-0.5 text-left outline-none",
+                  views.length > 0
+                    ? "cursor-pointer hover:bg-black/[0.05] dark:hover:bg-white/10"
+                    : "cursor-default",
                 )}
               >
-                {views.length > 0 ? (
-                  scopeAnchor ? (
-                    <ChevronDown className="h-3 w-3 shrink-0 text-gray-400" />
-                  ) : (
-                    <ChevronRight className="h-3 w-3 shrink-0 text-gray-400" />
-                  )
-                ) : (
-                  <span className="w-3 shrink-0" aria-hidden />
-                )}
                 {currentView ? (
-                  <Layers className="h-3.5 w-3.5 shrink-0 text-gray-400" />
+                  <Eye className="h-3.5 w-3.5 shrink-0 text-gold-primary" />
                 ) : (
-                  <Home className="h-3.5 w-3.5 shrink-0 text-gray-400" />
+                  <Home className="h-3.5 w-3.5 shrink-0 text-gray-600 dark:text-gray-400" />
                 )}
-                <span className="truncate italic">
-                  {currentView ? currentView.label : "Root"}
+                <span className="truncate font-medium text-gray-900 dark:text-white">
+                  {currentView ? currentView.label : "root"}
                 </span>
+                {views.length > 0 ? (
+                  <ChevronDown
+                    className={cn(
+                      "h-3 w-3 shrink-0 text-gray-500 opacity-70 transition-transform",
+                      scopeAnchor && "rotate-180",
+                    )}
+                  />
+                ) : null}
               </button>
+              {tree ? (
+                <span className="ml-auto shrink-0 rounded-full bg-black/[0.05] px-2 py-px text-[10px] text-gray-500 dark:bg-white/[0.08] dark:text-gray-400">
+                  {totalCount} {totalCount === 1 ? "file" : "files"}
+                </span>
+              ) : null}
               {quickCreate ? (
                 <QuickCreateButton
                   noun={createNoun}
                   onClick={() => void quickCreateInside(null)}
+                  className={tree ? "ml-0" : undefined}
                 />
               ) : null}
             </div>
@@ -840,6 +1031,7 @@ export function ContentTreePicker({
                       disabled={disabledSet.has(row.id)}
                       disabledReason={disabledReason}
                       isExpanded={expandedIds.has(row.id)}
+                      isCurrent={reveal?.id === row.id}
                       onToggle={toggleExpanded}
                       onPick={effectiveOnPick}
                       commitLabel={pickCommitLabel}
@@ -917,11 +1109,13 @@ function ScopeMenu({
           className="flex w-full items-center gap-2 py-1.5 pl-3 pr-2 text-left text-xs text-gray-600 dark:text-gray-300 hover:bg-black/[0.04] dark:hover:bg-white/5"
         >
           {opt.id === null ? (
-            <Home className="h-3.5 w-3.5 shrink-0 text-gray-400" />
+            <Home className="h-3.5 w-3.5 shrink-0 text-gray-600 dark:text-gray-400" />
           ) : (
-            <Layers className="h-3.5 w-3.5 shrink-0 text-gray-400" />
+            <Eye className="h-3.5 w-3.5 shrink-0 text-gold-primary" />
           )}
-          <span className="truncate">{opt.label}</span>
+          <span className="truncate">
+            {opt.id === null ? "root — show all files" : opt.label}
+          </span>
         </button>
       ))}
     </div>,
@@ -970,20 +1164,150 @@ function InsertGap({
 function QuickCreateButton({
   noun,
   onClick,
+  title,
+  className,
 }: {
   noun: string;
   onClick: () => void;
+  title?: string;
+  className?: string;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      aria-label={`New ${noun.toLowerCase()}`}
-      title={`+ New ${noun}`}
-      className="ml-auto inline-flex h-5 w-5 shrink-0 items-center justify-center rounded text-gray-400 transition-colors hover:bg-black/5 hover:text-gray-700 dark:hover:bg-white/10 dark:hover:text-gray-200"
+      aria-label={title ?? `New ${noun.toLowerCase()}`}
+      title={title ?? `+ New ${noun}`}
+      className={cn(
+        "ml-auto inline-flex h-5 w-5 shrink-0 items-center justify-center rounded text-gray-400 transition-colors hover:bg-black/5 hover:text-gray-700 dark:hover:bg-white/10 dark:hover:text-gray-200",
+        className,
+      )}
     >
       <Plus className="h-3 w-3" aria-hidden="true" />
     </button>
+  );
+}
+
+/**
+ * Recent destinations — ONE row at the top of the picker naming the folder
+ * that last received a create, with a "+" that creates there again; click
+ * the row to unfold the last few. Each destination: click = go there in the
+ * browse tree, "+" = create inside it. The owner's framing: "a single item
+ * that is expanded to several parent locations the user created content
+ * for before" — promoted above the tree because it is most useful exactly
+ * when it differs from where the file tree is pointing.
+ */
+function RecentDestinations({
+  destinations,
+  open,
+  onToggle,
+  noun,
+  lookupTitle,
+  onJump,
+  onCreate,
+}: {
+  destinations: CreateDestination[];
+  open: boolean;
+  onToggle: () => void;
+  noun: string;
+  /** Live title from the loaded tree, when it can see the folder. */
+  lookupTitle: (id: string | null) => string | null;
+  onJump: (destination: CreateDestination) => void;
+  onCreate: (destination: CreateDestination) => void;
+}) {
+  const latest = destinations[0];
+  const titleOf = (d: CreateDestination) =>
+    d.id === null ? "Root" : (lookupTitle(d.id) ?? d.title);
+  const pathOf = (d: CreateDestination) =>
+    d.parentPath.length > 0 ? d.parentPath.join(" / ") : null;
+  // A plain render helper, not a nested component: a component declared
+  // inside render remounts on every render (react/no-unstable-nested-components).
+  const destIcon = (d: CreateDestination, className: string) =>
+    d.id === null ? <Home className={className} /> : <Folder className={className} />;
+
+  return (
+    <div className="border-b border-black/5 dark:border-white/5 pb-1 mb-1">
+      {/* Summary row: the LATEST destination, one click from creating there. */}
+      <div
+        className={cn(
+          "group flex w-full items-center gap-2 py-1.5 pl-3 pr-2 text-xs transition-colors hover:bg-black/[0.04] dark:hover:bg-white/5",
+          open && "bg-black/[0.03] dark:bg-white/[0.04]",
+        )}
+      >
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={open}
+          title={
+            open
+              ? "Hide recent destinations"
+              : `Where you last created: ${titleOf(latest)} — click for more`
+          }
+          className="flex min-w-0 flex-1 items-center gap-2 text-left"
+        >
+          {open ? (
+            <ChevronDown className="h-3 w-3 shrink-0 text-gray-400" />
+          ) : (
+            <ChevronRight className="h-3 w-3 shrink-0 text-gray-400" />
+          )}
+          <FolderInput className="h-3.5 w-3.5 shrink-0 text-emerald-600/80 dark:text-emerald-400/80" />
+          <span className="flex min-w-0 flex-col leading-tight">
+            <span className="text-[10px] uppercase tracking-wider text-gray-500 font-medium">
+              Recent destinations
+            </span>
+            {!open ? (
+              <span className="truncate text-gray-700 dark:text-gray-300">
+                {titleOf(latest)}
+                {pathOf(latest) ? (
+                  <span className="ml-1 text-gray-400 dark:text-gray-500">
+                    · {pathOf(latest)}
+                  </span>
+                ) : null}
+              </span>
+            ) : null}
+          </span>
+        </button>
+        {!open ? (
+          <QuickCreateButton
+            noun={noun}
+            title={`+ New ${noun} in ${titleOf(latest)}`}
+            onClick={() => onCreate(latest)}
+          />
+        ) : null}
+      </div>
+
+      {open
+        ? destinations.map((d) => (
+            <div
+              key={d.id ?? "root"}
+              className="group flex w-full items-center gap-2 py-1.5 pr-2 pl-3 text-xs transition-colors hover:bg-black/[0.04] dark:hover:bg-white/5"
+            >
+              <button
+                type="button"
+                onClick={() => onJump(d)}
+                title="Go there in the tree"
+                className="flex min-w-0 flex-1 items-center gap-2 text-left"
+              >
+                <span className="w-3 shrink-0" aria-hidden />
+                {destIcon(d, "h-3.5 w-3.5 shrink-0 text-yellow-500/80")}
+                <span className="truncate text-gray-700 dark:text-gray-300">
+                  {titleOf(d)}
+                </span>
+                {pathOf(d) ? (
+                  <span className="truncate text-[10px] text-gray-400 dark:text-gray-500">
+                    {pathOf(d)}
+                  </span>
+                ) : null}
+              </button>
+              <QuickCreateButton
+                noun={noun}
+                title={`+ New ${noun} in ${titleOf(d)}`}
+                onClick={() => onCreate(d)}
+              />
+            </div>
+          ))
+        : null}
+    </div>
   );
 }
 
@@ -992,6 +1316,7 @@ function PickRow({
   disabled,
   disabledReason,
   isExpanded = false,
+  isCurrent = false,
   onToggle,
   onPick,
   commitLabel = "open",
@@ -1002,6 +1327,12 @@ function PickRow({
   disabled?: boolean;
   disabledReason?: string;
   isExpanded?: boolean;
+  /**
+   * The row the file tree has selected (or a destination just jumped to):
+   * tinted + gold like the tree's own selected row, so the picker visibly
+   * opens where the user already is.
+   */
+  isCurrent?: boolean;
   onToggle?: (id: string) => void;
   onPick: (target: PickerTarget) => void;
   /** What committing this row does, for tooltips ("open" / "create a database here"). */
@@ -1045,9 +1376,11 @@ function PickRow({
 
   return (
     <div
+      data-row-id={row.id}
       className={cn(
         "group flex w-full items-center gap-2 pr-2 py-1.5 text-left text-xs transition-colors",
         disabled ? "opacity-50" : "hover:bg-black/[0.04] dark:hover:bg-white/5",
+        isCurrent && "bg-black/[0.05] dark:bg-white/10",
       )}
       style={{ paddingLeft: `${12 + row.depth * 12}px` }}
     >
@@ -1123,9 +1456,11 @@ function PickRow({
         <span
           className={cn(
             "truncate",
-            row.isReference
-              ? "text-gray-500 dark:text-gray-400"
-              : "text-gray-700 dark:text-gray-300",
+            isCurrent
+              ? "text-gold-primary font-medium"
+              : row.isReference
+                ? "text-gray-500 dark:text-gray-400"
+                : "text-gray-700 dark:text-gray-300",
           )}
         >
           {row.title}
