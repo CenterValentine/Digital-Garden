@@ -92,6 +92,10 @@ import { useSettingsStore } from "@/state/settings-store";
 import { compactToolOutputs } from "@/lib/domain/ai/compact-tool-outputs";
 import { cacheVolleyDelayMs, pendingApprovalKey } from "@/lib/domain/ai/cache-volley";
 import {
+  useChatSearchBackend,
+  type SearchBackendPreference,
+} from "@/lib/domain/ai/use-chat-search-backend";
+import {
   getAttachedPageContext,
   getCurrentPageHint,
 } from "@/state/panel-page-context-store";
@@ -535,6 +539,12 @@ export interface UseConversationEngineResult {
   modelPinned: boolean;
   /** Pin/unpin the current model for this conversation. */
   setModelPinned: (pinned: boolean) => void;
+  /**
+   * Web search for this chat: the model's own search (`native`, default) or
+   * the user's search connection (`app`). The server re-checks both.
+   */
+  searchBackend: SearchBackendPreference;
+  setSearchBackend: (next: SearchBackendPreference) => void;
 
   // ── suggestions ──
   mentionResults: SuggestionItem[];
@@ -1537,6 +1547,11 @@ export function useConversationEngine({
   // silently pinning on every switch was itself surprising). The picker uses
   // the raw handleModelChange; the footer pin button drives setModelPinned.
   const setModelPinned = persistModelPin;
+  // ── web search preference (plan §10 round 4) ──
+  const [searchBackend, setSearchBackend] = useChatSearchBackend(
+    conversationId,
+    contentId,
+  );
 
   // ── @ mention search (150ms debounce) ──
   const [mentionResults, setMentionResults] = useState<SuggestionItem[]>([]);
@@ -3032,6 +3047,7 @@ export function useConversationEngine({
       // Model pin (AI 3.4): true ⇒ the user's pick is the ladder's top rung
       // and playbook phase directives are ignored for this conversation.
       modelPinned,
+      searchBackend,
       // Agentic Browsing Phase 0: is the browser extension reachable right now?
       // Gates the client-executed read_page_in_browser tool. Read at send time.
       browserExtensionAvailable: isExtensionAcquireAvailable(),
@@ -3054,6 +3070,7 @@ export function useConversationEngine({
     resolvedPhaseIndex,
     outputTarget,
     modelPinned,
+    searchBackend,
   ]);
 
   // ── resumable streams (AI 3.3) ──
@@ -3328,6 +3345,7 @@ export function useConversationEngine({
           // Model pin (AI 3.4) — see handleSend for why every per-call
           // body must carry it.
           modelPinned,
+          searchBackend,
         },
       },
     );
@@ -3341,6 +3359,7 @@ export function useConversationEngine({
     modelId,
     outputTarget,
     modelPinned,
+    searchBackend,
   ]);
 
   // ── send ──
@@ -3504,6 +3523,7 @@ export function useConversationEngine({
           // resolver baseline is consulted, so a flag that lives only in
           // the resolver never reaches the server after a real send.
           modelPinned,
+          searchBackend,
           // Agentic Browsing Phase 0 — same per-call-body requirement as above.
           browserExtensionAvailable: isExtensionAcquireAvailable(),
           // Slice 5c co-browse gate — same per-call-body requirement.
@@ -3532,6 +3552,7 @@ export function useConversationEngine({
     resolvedPhaseIndex,
     outputTarget,
     modelPinned,
+    searchBackend,
     clearFollowUps,
   ]);
 
@@ -3560,6 +3581,7 @@ export function useConversationEngine({
       // Model pin (AI 3.4) — see handleSend for why every per-call body
       // must carry it.
       modelPinned,
+      searchBackend,
     }),
     [
       contentId,
@@ -3571,6 +3593,7 @@ export function useConversationEngine({
       resolvedPhaseIndex,
       outputTarget,
       modelPinned,
+      searchBackend,
     ],
   );
 
@@ -3686,6 +3709,8 @@ export function useConversationEngine({
     handleModelChange,
     modelPinned,
     setModelPinned,
+    searchBackend,
+    setSearchBackend,
     mentionResults,
     handleMentionSearch,
     handleResolveMention,

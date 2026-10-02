@@ -14,6 +14,7 @@ import { generateUniqueSlug } from "@/lib/domain/content";
 import { getUserStorageProvider } from "@/lib/infrastructure/storage";
 import crypto from "crypto";
 import { logger, spanPayload, withRouteTrace, withSpan } from "@/lib/core/logger";
+import { effectiveMimeType } from "@/lib/infrastructure/media/file-validation";
 
 const ROUTE_PATH = "/api/content/content/upload/simple";
 
@@ -183,6 +184,10 @@ export async function POST(request: NextRequest) {
 
       const arrayBuffer = await file.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
+      // The browser's MIME when it gave a specific one, else inferred from
+      // the extension — an OS with no `.md` mapping sends "", which used
+      // to be stored as octet-stream and skipped by text extraction.
+      const mimeType = effectiveMimeType(file) || "application/octet-stream";
 
       // Overwrite mode (owner approval, 2026-08-31): replace an existing
       // file node's bytes IN PLACE — same id, so every referencer (File
@@ -198,7 +203,7 @@ export async function POST(request: NextRequest) {
           {
             buffer,
             fileName: file.name,
-            mimeType: file.type || "application/octet-stream",
+            mimeType,
           }
         );
         if (!result.contentNodeId) {
@@ -225,7 +230,7 @@ export async function POST(request: NextRequest) {
           );
           const text = await new DocumentExtractor(storage, enableOCR).extractText(
             result.storageKey!,
-            file.type
+            mimeType
           );
           await prisma.filePayload.update({
             where: { contentId: result.contentNodeId },
@@ -260,20 +265,20 @@ export async function POST(request: NextRequest) {
       await withSpan(
         { layer: "storage", name: "upload" },
         {
-          attrs: { provider: usedProvider, bytes: buffer.length, mime: file.type || "octet-stream" },
+          attrs: { provider: usedProvider, bytes: buffer.length, mime: mimeType },
           summary: `${buffer.length} bytes`,
         },
-        async () => storageProvider.uploadFile(storageKey, buffer, file.type),
+        async () => storageProvider.uploadFile(storageKey, buffer, mimeType),
       );
 
       // Extract text for search (if document)
       const searchText = await withSpan(
         { layer: "content", name: "extract_text" },
-        { attrs: { mime: file.type || "octet-stream", ocr: enableOCR } },
+        { attrs: { mime: mimeType, ocr: enableOCR } },
         async (span) => {
           const { DocumentExtractor } = await import("@/lib/infrastructure/media/document-extractor");
           const documentExtractor = new DocumentExtractor(storageProvider, enableOCR);
-          const text = await documentExtractor.extractText(storageKey, file.type);
+          const text = await documentExtractor.extractText(storageKey, mimeType);
           span.attr("text_chars", text.length).summary(`${text.length} chars extracted`);
           return text;
         },
@@ -365,7 +370,7 @@ export async function POST(request: NextRequest) {
                     create: {
                       fileName: finalFileName,
                       fileExtension,
-                      mimeType: file.type || "application/octet-stream",
+                      mimeType,
                       fileSize: BigInt(file.size),
                       checksum,
                       storageProvider: usedProvider,

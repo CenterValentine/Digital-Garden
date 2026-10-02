@@ -102,7 +102,7 @@ export function validateFile(file: File): {
   }
 
   // Check file type
-  if (!isFileTypeSupported(file.type)) {
+  if (!isFileTypeSupported(effectiveMimeType(file))) {
     const extension = file.name.split('.').pop() || 'unknown';
     return {
       valid: false,
@@ -176,8 +176,7 @@ export function formatFileSize(bytes: number): string {
 /**
  * Map MIME type to file extension
  */
-function mimeToExtension(mimeType: string): string | null {
-  const map: Record<string, string> = {
+const MIME_TO_EXTENSION: Record<string, string> = {
     // Documents
     'text/plain': 'txt',
     'text/markdown': 'md',
@@ -210,5 +209,40 @@ function mimeToExtension(mimeType: string): string | null {
     'video/x-matroska': 'mkv',
   };
 
-  return map[mimeType] || null;
+function mimeToExtension(mimeType: string): string | null {
+  return MIME_TO_EXTENSION[mimeType] || null;
+}
+
+/**
+ * Extension → MIME, derived from the map above (first MIME wins where two
+ * share an extension: md → text/markdown, jpg → image/jpeg) plus the
+ * spellings that map has no row for.
+ */
+const EXTENSION_TO_MIME: Record<string, string> = {
+  ...Object.entries(MIME_TO_EXTENSION).reduce<Record<string, string>>((acc, [mime, ext]) => {
+    if (!(ext in acc)) acc[ext] = mime;
+    return acc;
+  }, {}),
+  markdown: 'text/markdown',
+  jpeg: 'image/jpeg',
+};
+
+/**
+ * The MIME type to judge and store a file by.
+ *
+ * Browsers derive `File.type` from the OS, and the OS often has no MIME
+ * registered for an extension it does not own — `.md` on many setups, and
+ * almost always `.mobi`, `.azw3`, `.fb2`, `.cbz`. The type then arrives as
+ * an empty string (or the generic `application/octet-stream`), and a
+ * MIME-only check rejects a file the server stores perfectly well:
+ * dragging a `.md` onto the file tree failed with `File type ".md" is not
+ * supported`. Trust a specific MIME when the browser gives one; otherwise
+ * infer it from the extension. Client-safe, so the upload route uses the
+ * same answer — an inferred `.md` is stored as `text/markdown` and gets its
+ * search text extracted instead of landing as an opaque blob.
+ */
+export function effectiveMimeType(file: { name: string; type: string }): string {
+  if (file.type && file.type !== 'application/octet-stream') return file.type;
+  const ext = file.name.includes('.') ? file.name.split('.').pop()!.toLowerCase() : '';
+  return EXTENSION_TO_MIME[ext] ?? file.type;
 }

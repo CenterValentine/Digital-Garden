@@ -121,6 +121,10 @@ import { logger } from "@/lib/core/logger";
 import { ensureFolderContextFresh } from "@/lib/domain/ai-context/gate";
 import { assembleFolderCapsule } from "@/lib/domain/ai-context/capsule";
 import {
+  AUTO_CLOSED_CHECKPOINT_NEXT,
+  toolAutoApproves,
+} from "./approval-policy";
+import {
   READ_PAGE_HEADLESS_OR_BROWSER_DESCRIPTION,
   readPageInBrowserInputSchema,
 } from "./read-page-in-browser";
@@ -305,6 +309,40 @@ async function renderHtmlPayload(
   if (!h) return `${header}\n\n(page record missing)`;
   const text = h.searchText.trim() || h.html;
   return `${header}${h.isTemplate ? "\nTemplate: yes" : ""}\n\n${text}`;
+}
+
+
+/**
+ * True when `contentId` is a file THIS chat created: associated with the
+ * conversation and created after the conversation began. The association
+ * alone is not enough — an @-mentioned file of the user's is associated
+ * too, and must never be overwritten without asking (§10 round 6).
+ */
+async function contentCreatedInThisChat(
+  ctx: ToolExecuteContext,
+  contentId: string,
+): Promise<boolean> {
+  if (!ctx.conversationId) return false;
+  const [conversation, association, node] = await Promise.all([
+    prisma.conversation.findFirst({
+      where: { id: ctx.conversationId, ownerId: ctx.userId },
+      select: { createdAt: true },
+    }),
+    prisma.conversationAssociation.findUnique({
+      where: {
+        conversationId_contentNodeId: {
+          conversationId: ctx.conversationId,
+          contentNodeId: contentId,
+        },
+      },
+      select: { conversationId: true },
+    }),
+    prisma.contentNode.findFirst({
+      where: { id: contentId, ownerId: ctx.userId, deletedAt: null },
+      select: { createdAt: true },
+    }),
+  ]).catch(() => [null, null, null] as const);
+  return !!(conversation && association && node && node.createdAt >= conversation.createdAt);
 }
 
 export function createBaseTools(ctx: ToolExecuteContext) {
@@ -2083,8 +2121,14 @@ export function createBaseTools(ctx: ToolExecuteContext) {
       // is not ready, execute immediately and return a corrective tool result
       // so the model can continue working instead of surfacing a false
       // approval card.
+      // The final phase's checkpoint closes without a pause when the user
+      // set it to (§10 round 6c); checkpoints between phases always ask.
       needsApproval: () =>
-        getPhaseCheckpointGateStatus(ctx.phaseCheckpointGate).ready,
+        getPhaseCheckpointGateStatus(ctx.phaseCheckpointGate).ready &&
+        !toolAutoApproves(ctx.autoApprovedTools, {
+          tool: "phase_checkpoint",
+          finalPhase: ctx.charterFinalPhase === true,
+        }),
       description:
         "Call at EVERY phase boundary of a multi-phase procedure/charter. Pauses for the user's verdict (approve / revise / approve-with-tweaks) and records the phase in the Run Ledger note. " +
         "This is a completion signal, never a planning shortcut: do not call it until the phase's required research, linked-note reads, analysis, and outputs have actually been completed. The runtime rejects checkpoints that lack verifiable required tool activity. " +
@@ -2202,8 +2246,12 @@ export function createBaseTools(ctx: ToolExecuteContext) {
               ledger.created ? "created" : "updated",
               "run ledger",
             )),
-            nextAction:
-              "APPROVED. Continue IMMEDIATELY with the next phase in this same response — announce it in one line, then proceed. If this was the FINAL phase, give a short completion summary instead (artifacts + where they were saved).",
+            nextAction: toolAutoApproves(ctx.autoApprovedTools, {
+              tool: "phase_checkpoint",
+              finalPhase: ctx.charterFinalPhase === true,
+            })
+              ? AUTO_CLOSED_CHECKPOINT_NEXT
+              : "APPROVED. Continue IMMEDIATELY with the next phase in this same response — announce it in one line, then proceed. If this was the FINAL phase, give a short completion summary instead (artifacts + where they were saved).",
           };
         } catch (error) {
           return {
@@ -2324,8 +2372,22 @@ export function createBaseTools(ctx: ToolExecuteContext) {
     }),
     create_docx: tool({
       // Document creation is a mutating action — same HITL gate as
-      // create_note (AI v3 core S4b / A4).
-      needsApproval: true,
+      // create_note (AI v3 core S4b / A4) — unless the user set this tool to
+      // run without a card (§10 round 6c). An overwrite skips the card only
+      // for a document this chat created (tools/approval-policy.ts).
+      needsApproval: async (rawArgs) => {
+        const overwriteId =
+          typeof (rawArgs as { overwriteContentId?: unknown }).overwriteContentId === "string"
+            ? ((rawArgs as { overwriteContentId: string }).overwriteContentId.trim() || null)
+            : null;
+        if (!ctx.autoApprovedTools?.has("create_docx")) return true;
+        return !toolAutoApproves(ctx.autoApprovedTools, {
+          tool: "create_docx",
+          ...(overwriteId
+            ? { overwrite: { targetCreatedInThisChat: await contentCreatedInThisChat(ctx, overwriteId) } }
+            : {}),
+        });
+      },
       description:
         "Create a Word (.docx) document from markdown content and file it in the user's garden. " +
         "Use when the user asks for a Word/docx deliverable (e.g. a resume). Headings, lists, bold/italic and links from the markdown are preserved. Do NOT create output on your own initiative — only when the user asks for it. " +
@@ -2924,8 +2986,10 @@ export function createBaseTools(ctx: ToolExecuteContext) {
       // File creation is a mutating action: pause the tool loop for user
       // approval before executing (AI SDK v6 native HITL). The chat surface
       // renders the approval card; execution resumes via
-      // addToolApprovalResponse.
-      needsApproval: true,
+      // addToolApprovalResponse — unless the user set this tool to run
+      // without a card (§10 round 6c).
+      needsApproval: () =>
+        !toolAutoApproves(ctx.autoApprovedTools, { tool: "create_note" }),
       description:
         "Create a NEW note in the user's Digital Garden. Use this only when the user EXPLICITLY asks for a new file. " +
         "Ambiguous phrasings to watch for: 'update the note in this chat', 'add to this conversation's notes', 'put X in the note' — these do NOT mean 'create a new note'. They typically refer to an existing note. When the phrasing is ambiguous, ASK the user whether to create a new note or update an existing one before calling this tool. " +

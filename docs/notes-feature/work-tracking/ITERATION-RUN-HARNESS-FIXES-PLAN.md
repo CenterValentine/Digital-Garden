@@ -289,6 +289,107 @@ The visual review is the owner's handoff, not a gap.
 - Matrix regenerated; the generator now probes Anthropic breakpoints.
 - Six mutations caught.
 
+### Round 4 (2026-09-30, prod `36237eb8` → branch `feat/search-choice-and-tail-check`)
+
+**Run (after #272):** gpt-6-sol, LeanData, one turn, $0.61 on the corrected meter (about $0.53 on the old one).
+- **Cache fixed:** 85% of input served from cache, up from 58%. Cached tokens climb every step (22.7k → 52.6k).
+- **Budget line:** carried on 11 tool results.
+- **DOCX links:** real hyperlinks, shown in the stored text as `label [→ url]`.
+- **The 6-minute approval wait stayed warm.** That's gpt-6's 30-minute lifetime, so no volley was needed.
+- **Web search is now the largest thing we can still control:** 12 calls, $0.12, 20% of the bill.
+- **Leftovers:**
+  - The model still said it "could not … test its text extraction". The charter doesn't say so yet, and the tail refused `read_content`.
+  - `insert_rows` refused a dedupe key without naming the columns (one guessed retry).
+  - One request started at the first-message prefix (22.7k) rather than about 39k. Requests 1 and 3 matched, so it's an isolated miss.
+
+**Built:**
+- **`read_content` is a tail tool** (`TAIL_VERIFY`): checking a deliverable is part of producing it. The in-tail notice now names it.
+- **A dedupe-key miss names the columns** and says nothing was inserted.
+- **Per-chat web-search choice** (owner decision D8 → default stays the model's own search). "Chat controls" gains a "Web search" row: *OpenAI* (or Claude, Google, Grok) versus *your search service*.
+  - It shows only when the chat's model has its own search (`nativeSearchLabel`).
+  - The service option is disabled, with a hint, when the user has no search connection.
+  - Stored per chat (`use-chat-search-backend.ts`, conversation key then content key) and carried on every request body.
+  - The route honours `searchBackend: "app"` only when a connection exists, and attaches the app-run tool under the same `search_web` name, so it is repeat-guarded, refusable in the tail, and priced by that service.
+- **The Chat controls panel opens at its button.** Placement assumed the 420px maximum height, so the panel opened about 200px above its trigger. It now uses `anchorMenuAbove`: bottom edge pinned above the trigger, growing upward.
+
+**The prompt-prefix diagnostic (owner question): keep the code, turn the variable off.** With `AI_PROMPT_PREFIX_DIAG` unset it costs one env read per step. It is the only tool that sees the request OpenAI actually receives, and it found this arc's two causes. The standard alternative is AI SDK telemetry (`experimental_telemetry`, OpenTelemetry spans). That records whole prompts per call, but it doesn't compute where two prompts diverge, and it adds tracing infrastructure and prompt-privacy exposure. The better upgrade is a per-conversation owner toggle that writes the divergence summary into the turn's own metadata, so a run is diagnosable from the database instead of a Vercel log export. It's backlogged, not built.
+
+**OpenAI's cheaper search (owner question):** the pricing page (2026-09-30) lists three options.
+- The `web_search` tool: $10 / 1k calls, with retrieved content billed as input at the model's rate. That's what we use.
+- Web search preview on non-reasoning models: $25 / 1k calls, content free.
+- A dedicated `gpt-5-search-api` model: $1.25 / $0.125 / $10 per 1M, with no per-call fee listed.
+
+For gpt-6-sol, every search's retrieved content is billed at $2–2.50 / 1M and then re-read, cached, on every later step. Handing search to a cheaper model that returns a short summary could cost less in total. That's a delegation design, untested; backlogged.
+
+**OpenAI as a search service (owner-requested, same round):**
+- New backend `acquisition/search/openai.ts` delegates `search_web` to `gpt-5-search-api`, a Chat Completions search model: `web_search_options: { search_context_size: "low" }`, returning `url_citation` annotations.
+- The tool returns the model's cited answer (`untrustedAnswer`), one result per cited URL with its supporting sentence, and `searchCostUsd` from the call's token usage at $1.25 / $10 per 1M. The search's cost is therefore visible in the transcript for the delegation trial, although the chat meter doesn't fold it in.
+- **Saved-key reuse:** a search connection can store a pointer to the user's OpenAI AI connection instead of a copy of its key (`SearchKeyPayload.source = "ai-connection"`). The resolver reads that key at call time, so rotating the key in one place covers both. A removed connection is an honest error.
+- **Settings:** when an OpenAI AI connection exists (the lab's own endpoint, not an openai-compat one) and there's no OpenAI search yet, the Web Search card opens on "OpenAI — gpt-5-search-api" with "Use your saved OpenAI key" selected. "Use a different key" shows the key field. Rows read "OpenAI · gpt-5-search-api · key from your AI connection".
+- **Chat controls** names a search-model service by its model id (`gpt-5-search-api`), so it never reads as a second "OpenAI" beside the model's own search.
+- No migration (`provider` is a free-form string).
+
+**Gates:** `run-harness:check` round 4 (`read_content` in both tail shapes; search label only for native-search models; route honours the preference only with a connection, before the native branch; `searchBackend` on all 8 body and dependency sites). `proposal:shape:check` tail-notice fixture updated. Four mutations caught.
+
+### Round 5 (2026-09-30) — resume quality: the profile, facts of record, finished documents
+
+**Evidence:** the LeanData resumes from Sol (in-app) and Astra, reviewed against the posting and the evidence tables.
+- Astra's is clearly stronger: outcome-first bullets; the 74%→85% satisfaction metric; QA and acceptance-criteria evidence; specific integrations; clean typography.
+- Both got the job titles wrong. Sol merged Tier III Support through 2023 and dropped Customer Success Automation Engineer; Astra invented "CS Operations Analyst". The evidence stores one combined title string for 2020–2025, and the charter says "stated employment history" without stating it.
+- Sol's run read the evidence index, about a third of Experiences, and **none of Claims and metrics**, where the satisfaction metric lives.
+- Sol's DOCX used Word's built-in theme: blue headings, default spacing.
+
+**Built (PR #273):**
+- **`Ingest in full: [[…]]`**, a line-start charter directive (`extractIngestReferences`). The named databases, every row and column, plus their forward-linked tables (no backlinks), are appended to the charter context by `buildCharterIngest` (`charters/ingest.ts`), before the prompt-cache key.
+  - It's part of the system prompt, the same on every request of a turn and cached after the first step.
+  - Ceiling: 60k tokens, with an explicit "not above; read with query_database" note if the ceiling cuts a table.
+  - Estimated ~30–35k tokens for the Career Evidence Library with Experiences, Claims and metrics, and Sources.
+- **Two general system-prompt rules:**
+  - *Reading before concluding*: a partial read is not an absence.
+  - *Facts of record*: names, titles, employers, dates, credentials and figures are copied exactly, never merged, renamed, re-dated or inferred.
+- **Charter gate check (system prompt):** before the closing summary, check each deliverable against the charter's gates, reading documents back first, and report each gate as met, not met or unchecked.
+- **DOCX defaults:** one font family (Calibri), black headings, US Letter. AI-written documents use the compact layout: 10.5 pt, 0.6 in margins. Exports keep 11 pt and 1 in.
+- **Gates:** `run-harness:check` round 5 (directive parsing; DOCX styles and margins; route wiring; prompt rules). Five mutations caught.
+
+**Charter (owner's note, text drafted in chat):**
+- The employment history of record, confirmed 2026-09-30.
+- `Ingest in full: [[Career Evidence Library]]`.
+- A hiring-thesis standard: why now; the employer's customer; the failure surface; ranked behaviours tagged Stated or Inferred; the screen-out risk; the candidate bridge; research → decision.
+- A bullet standard, the decisive-gap strategy, the DOCX check, and the duplicated paragraphs removed.
+
+### Round 6 (2026-09-30) — approvals: lift the formalities, keep the decisions
+
+**Evidence.** Every approval request in four days (25 of them) was approved; none was denied.
+- The last three charter runs (e5b899a2, e9ca56f2, 36237eb8) each paused three times: `create_docx`, `create_note` and `phase_checkpoint`.
+- The two creates are hard-coded approvals. The charter's Required outputs already ask for both documents.
+- On a one-phase charter the checkpoint is the gate right before the closing summary.
+- Earlier runs also paused on `propose_item_iteration` (the scope of a multi-item run) and, before #267, on bulk evidence reads.
+
+**Built (PR #273):** the user setting `ai.charterAutoApprove` ("Approve charter deliverables automatically", AI settings, off by default). The policy is `charters/auto-approve.ts` (pure): in a charter chat with the setting on, these no longer ask:
+- creating a document or note;
+- overwriting a document **this chat created**: associated with the conversation and created after it began, so a mentioned file of the user's still asks;
+- the **final** phase's checkpoint, which returns `AUTO_CLOSED_CHECKPOINT_NEXT` rather than "APPROVED", because nobody clicked;
+- bulk database reads (the model's ceiling still refuses an oversized read).
+
+**Kept deliberately:** intermediate checkpoints, which are real review points since the next phase loads on the next turn, and run proposals, which carry the scope and item budget. `update_note`'s destructive-rewrite guard is unchanged.
+
+**Round 6b (owner, same day):**
+- **Both approval settings are in Chat controls:** *Auto-approve charter* (switch) and *Ask before reads over* (tokens). They're written through the same settings store as Settings → AI, so the two surfaces never disagree.
+- **The read-approval default is now 25k (was 6k).** A whole evidence table or a job row with its description runs 9–12k, so every useful read paused the turn.
+- **A stored 6,000 counts as the old default**, not a choice (`effectiveBulkReadThreshold`). Whole-snapshot saves had persisted it; production's only account held exactly 6000. This follows the stored-4096 maxTokens precedent.
+- Pinned-read allowance stays 2× the threshold, now 50k.
+
+**Round 6c (owner, same day) — per-tool approvals replace the charter switch:**
+- The owner's two questions, "why approve creating what I asked for?" and "does a single-phase checkpoint need the checkpoint?", led to per-tool toggles in `ai.toolConfig[id].autoApprove`. They're shown in Chat controls and Settings → AI through one hook (`use-tool-approvals.ts`), apply in every chat, and use the policy in `tools/approval-policy.ts`:
+  - `create_docx`: a new document skips the card; an overwrite skips it only for a document this chat created.
+  - `create_note`: a new note skips the card.
+  - `phase_checkpoint`: only the **final** phase's pause is lifted. The call still writes the Run Ledger and runs the integrity gate.
+- `ai.charterAutoApprove` is gone (never shipped). Bulk reads are governed by the threshold alone.
+- The toggles write an **explicit** true/false. The settings PATCH deep-merges, so a deleted key could never switch off (the trap the tool table's `enabled` hit on 2026-08-28).
+- The tool table's "all defaults" pruning now counts `autoApprove`, so editing a tool there no longer drops the setting.
+
+**Gate:** `run-harness:check` round 6 (policy table; the wiring of each predicate; proposal always asks; route passes the setting and marks the final phase on both charter paths). Four mutations caught.
+
 ### L2 — keep the tool list constant for the turn
 
 Adding or removing a tool rewrites everything after the tool definitions, so every mid-turn change is a full cache flush. Today it costs 5–9¢ a time; after L1 it costs the whole prompt.

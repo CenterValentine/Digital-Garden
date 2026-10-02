@@ -231,6 +231,8 @@ export function ChatPanel({
     handleModelChange,
     modelPinned,
     setModelPinned,
+    searchBackend,
+    setSearchBackend,
     mentionResults,
     handleMentionSearch,
     handleResolveMention,
@@ -1365,6 +1367,10 @@ export function ChatPanel({
               originTitle={originTitle}
               modelPinned={modelPinned}
               onModelPinnedChange={setModelPinned}
+              providerId={providerId}
+              modelId={modelId}
+              searchBackend={searchBackend}
+              onSearchBackendChange={setSearchBackend}
               activeContextId={activeContextId}
               onContextChange={handleContextChange}
               busy={isActive}
