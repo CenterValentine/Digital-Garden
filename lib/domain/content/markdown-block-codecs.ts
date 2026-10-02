@@ -158,11 +158,102 @@ function outsideCode(html: string, fn: (segment: string) => string): string {
     .join("");
 }
 
+/** Text content for an element body: the three characters HTML reserves. */
+function escapeText(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+/**
+ * Accordion ⇄ `<details>`/`<summary>` — the HTML the block already means.
+ *
+ * Why a codec at all: the accordion carries six attrs plus a blockId, and
+ * markdown has no syntax for any of them, so it fell to the base64 fence —
+ * a 28-section note read as 28 opaque blobs in source view, and to a model
+ * handed the markdown. `<details>` is the one representation that is both
+ * legible AND a CommonMark type-6 HTML block: it ends at the first blank
+ * line, so the body written after that blank line is parsed as markdown by
+ * marked while the tag itself passes through verbatim. That is what lets
+ * the body stay real markdown (lists, bold, nested blocks) instead of
+ * escaped HTML.
+ *
+ * Attrs ride on the tag under the SAME data-* names the block's parseHTML
+ * reads (data-header-level, data-open-behavior, …), so reTag only has to
+ * add data-header (from <summary>) and the wrapper shape. Defaults are
+ * omitted for readability — parseHTML restores each one from absence, and
+ * the self-verify proves it. A header containing a newline cannot be a
+ * <summary>, so that block declines and fences.
+ */
+const ACCORDION_ATTR_DEFAULTS: Record<string, string> = {
+  "data-header-level": "2",
+  "data-open-behavior": "lastInteraction",
+  "data-open-state": "true",
+  "data-show-container": "false",
+  "data-show-divider": "false",
+};
+
+const accordionCodec: BlockMarkdownCodec = {
+  type: "accordion",
+  toMarkdown(node, serializeInner) {
+    const a = node.attrs ?? {};
+    const header = typeof a.headerText === "string" ? a.headerText : "";
+    if (/[\r\n]/.test(header)) return null;
+
+    const attrs: Record<string, string> = {
+      "data-header-level": String(a.headerLevel ?? "2"),
+      "data-open-behavior": String(a.openBehavior ?? "lastInteraction"),
+      "data-open-state": a.openState === false ? "false" : "true",
+      "data-show-container": a.showContainer === true ? "true" : "false",
+      "data-show-divider": a.showDivider === true ? "true" : "false",
+    };
+    const parts: string[] = [];
+    if (typeof a.blockId === "string" && a.blockId) {
+      parts.push(`data-block-id="${escapeAttr(a.blockId)}"`);
+    }
+    for (const [k, v] of Object.entries(attrs)) {
+      if (ACCORDION_ATTR_DEFAULTS[k] !== v) parts.push(`${k}="${escapeAttr(v)}"`);
+    }
+    const open = parts.length ? `<details ${parts.join(" ")}>` : "<details>";
+    const inner = serializeInner(node.content ?? []).trim();
+    // Blank lines on both sides of the body: the opening block must END
+    // (type-6 blocks end at a blank line) before the body can be markdown,
+    // and the close must START its own block after it.
+    return `${open}\n<summary>${escapeText(header)}</summary>\n\n${inner}\n\n</details>`;
+  },
+  reTag(html) {
+    // Innermost first. BOTH free groups are tempered: the body cannot
+    // contain another "<details", and the summary cannot contain
+    // "</summary>" or "<details". A lazy quantifier alone is not enough —
+    // when the body group failed to reach a "</details>" without crossing
+    // the inner accordion, the engine backtracked into the lazy summary
+    // and grew it until it had swallowed the inner opening tag (the
+    // header became "Outer</summary>…<summary>Inner"). With the summary
+    // fenced off, an outer match fails cleanly at the inner tag, the inner
+    // rewrites first, and the outer matches on the next pass. Nesting of
+    // any depth resolves in as many passes as there are levels.
+    const re =
+      /<details\b([^>]*)>\s*<summary>((?:(?!<\/summary>|<details\b)[\s\S])*)<\/summary>((?:(?!<details\b)[\s\S])*?)<\/details>/;
+    let out = html;
+    for (;;) {
+      const m = re.exec(out);
+      if (!m) return out;
+      const [whole, tagAttrs, summaryHtml, bodyHtml] = m;
+      // The summary's inner HTML is already entity-escaped text; only the
+      // quote needs escaping to sit inside an attribute value.
+      const header = summaryHtml.replace(/"/g, "&quot;");
+      const div =
+        `<div data-block-type="accordion"${tagAttrs} data-header="${header}">` +
+        `<div class="block-accordion-body">${bodyHtml}</div></div>`;
+      out = out.slice(0, m.index) + div + out.slice(m.index + whole.length);
+    }
+  },
+};
+
 export const BLOCK_CODECS: BlockMarkdownCodec[] = [
   calloutCodec,
   headingCodec,
   privateBlockCodec,
   privateTextCodec,
+  accordionCodec,
 ];
 
 const CODEC_BY_TYPE = new Map(BLOCK_CODECS.map((c) => [c.type, c]));
