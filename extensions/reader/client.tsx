@@ -21,6 +21,7 @@ import { placeShortcut } from "./lib/use-acquire";
 import {
   READER_EXTENSION_ID,
   READER_LIBRARY_CONTENT_ID,
+  READER_RESEARCH_CONTENT_ID,
   READER_SCRIPTURES_CONTENT_ID,
   READER_VIRTUAL_CONTENT_TYPE,
   READER_VIRTUAL_PREFIX,
@@ -28,6 +29,7 @@ import {
 import ReaderSettingsDialog from "./settings/ReaderSettingsDialog";
 import { useReaderBookshelf } from "./state/bookshelf-store";
 import { useReaderSession } from "./state/reader-store";
+import { useResearchStore } from "./state/research-store";
 
 /** Books listed directly in the "+" menu; the rest are one click away in the Library. */
 const SHELF_MENU_LIMIT = 12;
@@ -37,6 +39,16 @@ function openLibrary(parentId: string | null) {
   useReaderSession.getState().setLibraryTargetParentId(resolveServerCreateParent(parentId));
   useContentStore.getState().setSelectedContentId(READER_LIBRARY_CONTENT_ID, {
     title: "Library",
+    contentType: READER_VIRTUAL_CONTENT_TYPE,
+    pin: true,
+  });
+}
+
+/** Research: Works added from the tab land where this "+" pointed. */
+function openResearch(parentId: string | null) {
+  useResearchStore.getState().setTargetParentId(resolveServerCreateParent(parentId));
+  useContentStore.getState().setSelectedContentId(READER_RESEARCH_CONTENT_ID, {
+    title: "Research",
     contentType: READER_VIRTUAL_CONTENT_TYPE,
     pin: true,
   });
@@ -269,10 +281,10 @@ function readerMenu(): ExtensionCreateMenuItem[] {
         },
         {
           id: "new-reader-research",
-          label: "Research (coming soon)",
+          label: "Research",
           iconName: "FlaskConical",
-          title: "Papers and open-access research, planned",
-          disabled: true,
+          title: "Find papers, preprints and trials; paste a DOI, arXiv id or citation",
+          onSelect: ({ parentId }) => openResearch(parentId),
         },
       ],
     },

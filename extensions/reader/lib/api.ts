@@ -194,3 +194,6 @@ export const scriptureApi = {
       `/api/reader/scriptures/${encodeURIComponent(corpusId)}/resolve?ref=${encodeURIComponent(ref)}`
     ),
 };
+
+/** The shared request helper, for sibling clients (research-api.ts). */
+export { call as readerCall };
