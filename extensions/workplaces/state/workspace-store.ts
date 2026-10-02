@@ -440,9 +440,15 @@ const ORDINAL_PANE_IDS: Record<WorkspaceLayoutMode, WorkspacePaneId[]> = {
  * in the primary pane). Shared by open-time inheritance (R5) and the live
  * desktop coupling reconcile (R2).
  */
-function buildPanesFromLayoutRecord(
+export function buildPanesFromLayoutRecord(
   record: WorkspaceLayoutRecordSummary,
   openTabIds: string[],
+  /**
+   * Where the tabs sit locally right now. Supplied by the background
+   * reconcile, which is re-arranging state the user is looking at; omitted on
+   * a workspace open, where there is nothing local worth preserving.
+   */
+  currentPlacement?: Partial<Record<WorkspacePaneId, string[]>>,
 ): {
   layoutMode: WorkspaceLayoutMode;
   panes: WorkspacePaneId[];
@@ -461,11 +467,28 @@ function buildPanesFromLayoutRecord(
       placed.add(id);
     }
   }
+  // A tab the record has never heard of is almost always one THIS surface just
+  // opened — the record is written after the fact, so every local open spends
+  // a window unnamed by it. Sweeping those into panes[0] moved them to the
+  // left pane on the next poll, and because the post-sweep arrangement was
+  // then written back as the new record, two tabs would visibly rotate between
+  // panes poll after poll.
+  //
+  // So an unplaced tab keeps the pane it is in RIGHT NOW when the caller can
+  // say (a reconcile, which is re-arranging live state). panes[0] remains the
+  // fallback for a workspace being opened fresh, where there is no local
+  // placement to preserve, and for a pane that the incoming layout drops.
   for (const id of openTabIds) {
-    if (!placed.has(id)) {
-      (rebuilt[panes[0]] ??= []).push(id);
-      placed.add(id);
-    }
+    if (placed.has(id)) continue;
+    const currentPane = currentPlacement
+      ? (Object.keys(currentPlacement) as WorkspacePaneId[]).find((paneId) =>
+          currentPlacement[paneId]?.includes(id),
+        )
+      : undefined;
+    const target =
+      currentPane && panes.includes(currentPane) ? currentPane : panes[0];
+    (rebuilt[target] ??= []).push(id);
+    placed.add(id);
   }
   return { layoutMode: record.layoutMode, panes, paneTabContentIds: rebuilt };
 }
@@ -613,7 +636,19 @@ function restoreContentWorkspace(
       (r) => r.family === "desktop",
     );
     if (desktopRecord) {
-      const built = buildPanesFromLayoutRecord(desktopRecord, openTabIds);
+      // Pass this window's live placement so a tab the record predates stays
+      // where the user just put it instead of being swept to the first pane.
+      const localPlacement = Object.fromEntries(
+        Object.entries(local.panes).map(([paneId, pane]) => [
+          paneId,
+          (pane?.tabIds ?? []).map((tabId) => local.tabs[tabId]?.contentId),
+        ]),
+      ) as Partial<Record<WorkspacePaneId, string[]>>;
+      const built = buildPanesFromLayoutRecord(
+        desktopRecord,
+        openTabIds,
+        localPlacement,
+      );
       applyLayoutMode = built.layoutMode;
       applyPaneTabContentIds = built.paneTabContentIds as typeof paneTabContentIds;
       // Keep this window's active pane when it still exists in the incoming
