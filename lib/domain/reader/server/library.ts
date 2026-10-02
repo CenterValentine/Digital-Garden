@@ -119,7 +119,7 @@ function mimeFromDownload(declared: string, href: string, fallback: string): str
   return byExt?.[0] ?? fallback;
 }
 
-interface StoreBookInput {
+export interface StoreBookInput {
   ownerId: string;
   parentId: string | null;
   buffer: Buffer;
@@ -129,7 +129,8 @@ interface StoreBookInput {
   searchText: string;
 }
 
-async function storeBookFile(input: StoreBookInput): Promise<{ contentId: string; duplicate: boolean }> {
+/** Store a reader file (book or paper) in the user's storage as a file node; dedupes by checksum. */
+export async function storeBookFile(input: StoreBookInput): Promise<{ contentId: string; duplicate: boolean }> {
   const checksum = crypto.createHash("sha256").update(input.buffer).digest("hex");
   const existing = await prisma.filePayload.findFirst({
     where: {
