@@ -28,6 +28,7 @@ import { usePageTemplateStore } from "@/state/page-template-store";
 import type { TreeNode, ContentType } from "@/lib/domain/content/types";
 import { findTreeNodeById } from "@/lib/domain/content/tree-drop-target";
 import { recordCreateDestination } from "@/state/create-destination-store";
+import { useTreeRevealStore } from "@/state/tree-reveal-store";
 import {
   registerCreateTargetResolver,
   resolveCreateParent,
@@ -292,7 +293,16 @@ export function LeftSidebarContent({
     fromTemplateId?: string;
   } | null>(null);
   const [expandNodeId, setExpandNodeId] = useState<string | null>(null);
-  const [revealNodeId, setRevealNodeId] = useState<string | null>(null);
+  // Reveal requests (toolbar "show in file tree", breadcrumb, and the tree
+  // following the active content) live in a store so they survive the tree
+  // not being mounted or not yet holding the item — state/tree-reveal-store.ts.
+  const revealRequest = useTreeRevealStore((s) => s.request);
+  const consumeReveal = useTreeRevealStore((s) => s.consumeReveal);
+  const requestReveal = useTreeRevealStore((s) => s.requestReveal);
+  // The id the tree itself just opened (a row click). The follow-the-active-
+  // content reveal skips it: the user is already looking at that row, and a
+  // shortcut click must not drag the tree off to the target's real home.
+  const treeOpenedIdRef = useRef<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{
     ids: string[];
     title: string;
@@ -695,13 +705,49 @@ export function LeftSidebarContent({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [createTrigger]);
 
-  // Sync tree selection when selectedContentId changes (from search, backlinks, etc.)
+  // The tree follows the active content (tabs, search, backlinks, the pane
+  // "+" picker, …): select it AND reveal it — open its ancestors (adding to
+  // what the user has open, never collapsing) and scroll only if it is out
+  // of view. Setting selectedIds alone was not enough: FileTree applies an
+  // external selection only to VISIBLE rows, so an item inside a folder the
+  // tree had collapsed stayed hidden while the picker showed it unfolded
+  // (owner report, 2026-10-02). A row the tree itself just opened is skipped.
   useEffect(() => {
-    if (selectedContentId && !selectedContentId.startsWith("temp-")) {
-      // Update tree selection to match the active file
-      setSelectedIds([selectedContentId]);
+    if (!selectedContentId || selectedContentId.startsWith("temp-")) return;
+    setSelectedIds([selectedContentId]);
+    if (treeOpenedIdRef.current === selectedContentId) {
+      treeOpenedIdRef.current = null;
+      return;
     }
-  }, [selectedContentId, setSelectedIds]);
+    requestReveal(selectedContentId, { align: "auto", flash: false, explicit: false });
+  }, [selectedContentId, setSelectedIds, requestReveal]);
+
+  // A reveal is handed to the tree only once the tree HOLDS the item: a
+  // request for a row the fetched tree lacks would make react-arborist's
+  // scrollTo wait ~1s and give up. Implicit requests simply wait for a tree
+  // that has it (the picker-created note arrives with the next refetch).
+  const activeReveal = useMemo(() => {
+    if (!revealRequest || !treeData) return null;
+    return findTreeNodeById(treeData, revealRequest.id) ? revealRequest : null;
+  }, [revealRequest, treeData]);
+  const handleRevealComplete = useCallback(() => {
+    const current = useTreeRevealStore.getState().request;
+    if (current) consumeReveal(current.nonce);
+  }, [consumeReveal]);
+
+  // An EXPLICIT reveal ("show in file tree") for an item this tree can't
+  // see: in a scoped view, widen to root — the root tree then carries it
+  // and the pending request completes there. Nowhere at root → say so.
+  useEffect(() => {
+    if (!revealRequest?.explicit || !treeData) return;
+    if (findTreeNodeById(treeData, revealRequest.id)) return;
+    if (effectiveViewRootContentId) {
+      setScopeOverride("root");
+      return;
+    }
+    toast.info("This item isn't in the file tree");
+    consumeReveal(revealRequest.nonce);
+  }, [revealRequest, treeData, effectiveViewRootContentId, consumeReveal]);
 
   useEffect(() => {
     const handleContentUpdate = (
@@ -850,15 +896,16 @@ export function LeftSidebarContent({
   // Imperative reveal request from outside the tree (main-panel path
   // breadcrumb): open the node's ancestors, scroll to it, and select it —
   // the tree-side half of "select this node as if clicked in the tree".
+  // Routed through the reveal store like the toolbar button.
   useEffect(() => {
     const handleRevealRequest = (event: Event) => {
       const id = (event as CustomEvent<{ id?: string | null }>).detail?.id;
-      if (id) setRevealNodeId(id);
+      if (id) requestReveal(id, { align: "center", flash: true, explicit: true });
     };
 
     window.addEventListener("dg:tree-reveal", handleRevealRequest);
     return () => window.removeEventListener("dg:tree-reveal", handleRevealRequest);
-  }, []);
+  }, [requestReveal]);
 
   useEffect(() => {
     const handleCreateFromTemplate = (
@@ -1378,11 +1425,23 @@ export function LeftSidebarContent({
     const firstNode = nodes[0];
     if (!firstNode) return;
 
+    // Opening from a tree click: remember the id so the follow-the-active-
+    // content reveal leaves the tree where the user clicked (see the
+    // selectedContentId effect) — a shortcut click must not scroll off to
+    // the target's real home.
+    const openFromTree = (
+      id: string,
+      meta: Parameters<typeof setSelectedContentId>[1],
+    ) => {
+      treeOpenedIdRef.current = id;
+      setSelectedContentId(id, meta);
+    };
+
     // A mirror row is a projection of content that lives elsewhere. Its own id
     // is synthetic and path-scoped, so opening it means opening the REAL id —
     // otherwise the tab would hold an id no fetch can resolve.
     if (firstNode.isShortcutMirror && firstNode.mirrorOf) {
-      setSelectedContentId(firstNode.mirrorOf, {
+      openFromTree(firstNode.mirrorOf, {
         title: firstNode.title,
         contentType: firstNode.contentType,
       });
@@ -1396,12 +1455,12 @@ export function LeftSidebarContent({
     if (firstNode.contentType === "shortcut") {
       const target = firstNode.shortcut;
       if (target?.targetId && !target.targetDeleted) {
-        setSelectedContentId(target.targetId, {
+        openFromTree(target.targetId, {
           title: target.targetTitle ?? firstNode.title,
           contentType: target.targetContentType ?? undefined,
         });
       } else {
-        setSelectedContentId(firstNode.id, {
+        openFromTree(firstNode.id, {
           title: firstNode.title,
           contentType: "shortcut",
         });
@@ -1410,7 +1469,7 @@ export function LeftSidebarContent({
     }
 
     if (firstNode.treeNodeKind === "person") {
-      setSelectedContentId(firstNode.id, {
+      openFromTree(firstNode.id, {
         title: firstNode.title,
         contentType: "person-profile",
       });
@@ -1421,7 +1480,7 @@ export function LeftSidebarContent({
       return;
     }
 
-    setSelectedContentId(firstNode.id, {
+    openFromTree(firstNode.id, {
       title: firstNode.title,
       contentType: firstNode.contentType,
     });
@@ -3057,8 +3116,8 @@ ${workbenchWarning}`
             editingNodeId={creatingItem?.tempId}
             expandNodeId={expandNodeId}
             onExpandComplete={() => setExpandNodeId(null)}
-            revealNodeId={revealNodeId}
-            onRevealComplete={() => setRevealNodeId(null)}
+            revealRequest={activeReveal}
+            onRevealComplete={handleRevealComplete}
             onFileDrop={onFileDrop}
           />
         </div>

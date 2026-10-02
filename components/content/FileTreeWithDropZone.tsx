@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { FileTree } from "./FileTree";
 import { useTreeDragStore } from "@/state/tree-drag-store";
 import { useTreeStateStore } from "@/state/tree-state-store";
+import type { TreeRevealRequest } from "@/state/tree-reveal-store";
 import { useContentStore } from "@/state/content-store";
 import {
   ROOT_DROP_TARGET,
@@ -42,7 +43,7 @@ interface FileTreeWithDropZoneProps {
   editingNodeId?: string;
   expandNodeId?: string | null;
   onExpandComplete?: () => void;
-  revealNodeId?: string | null;
+  revealRequest?: TreeRevealRequest | null;
   onRevealComplete?: () => void;
   /**
    * Called with the validated files and the folder they were dropped into

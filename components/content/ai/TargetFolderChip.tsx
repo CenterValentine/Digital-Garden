@@ -251,9 +251,11 @@ export function TargetFolderChip({
                 type="button"
                 onClick={() => select(f)}
                 className={cn(
-                  "flex w-full items-center gap-1.5 px-3 py-1 text-left hover:bg-black/[0.04] dark:hover:bg-white/[0.06]",
+                  "flex w-full items-center gap-1.5 px-3 py-1 text-left transition-colors hover:bg-black/[0.04] dark:hover:bg-white/[0.06]",
+                  // The file tree's "current" tone (deep gold + gold rail), so
+                  // every tree-browse menu says "this is the one" the same way.
                   target?.id === f.id &&
-                    "text-emerald-700 dark:text-emerald-300",
+                    "bg-gold-primary/[0.22] font-medium text-gold-primary shadow-[inset_2px_0_0_0_var(--gold-primary)] dark:bg-gold-primary/[0.28]",
                 )}
                 style={{ paddingLeft: `${12 + f.depth * 12}px` }}
               >

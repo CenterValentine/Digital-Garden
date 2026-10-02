@@ -10,6 +10,18 @@ last_updated: 2026-09-29
 
 ---
 
+## One tree-browse menu — proposed (2026-10-02, owner; PR #277 context)
+
+`ContentTreePicker` (pane "+", Note Window retarget, databases rail, shortcut target) is the canonical tree-browse surface: opens at the file tree's perspective, recent destinations, header-styled scope row, the tree's row tones (deep gold = active, light gold = open elsewhere, grey = selected). The owner wants the OTHER file-tree-shaped menus united into it; PR #277 only gave them the "current" tone.
+
+- [ ] **AI target-folder pickers → `ContentTreePicker`** — `components/content/ai/TargetFolderChip.tsx` and `OutputTargetChip.tsx` ("Somewhere else…") each flatten the tree endpoint into their own folder list. Both are containers-only picks: `eligibleTypes` folders + `quickCreate` off (or `pickCreatesInside` for "new folder here"). Keep their chip-specific footers (mismatch warning, relative options).
+- [ ] **Move → Folder search → `ContentTreePicker` search mode** — `components/content/context-menu/FolderSearchFlyout.tsx` is a typeable folder search with recents (`folder-move-store`). The picker's search + a `recents` prop cover it; the flyout positioning (submenu math) is the part to keep.
+- [ ] **Folder assistant candidates** — `FolderAssistantDialog.tsx` lists candidate folders to confirm; tone only (no browse).
+- [ ] **Flashcard deck tree / People panel** — their own trees for their own data; align tones, do not migrate.
+- [ ] Once migrated, `folder-move-store` recents and `create-destination-store` recents should become one "recent folders" source with a `kind` (moved into / created into).
+
+---
+
 ## E-reader — proposed (2026-09-29, plan `EREADER-PLAN.md`)
 
 + → Reader → [Scriptures, Books]. One reader shell (foliate-js for EPUB/PDF, a corpus renderer for scriptures), one annotation store keyed by Readium Locators, and a library of book-source adapters (OPDS, Gutendex, Open Library, upload). Books are file nodes in a user-chosen library folder. Blocked on owner answers to the plan's §10.

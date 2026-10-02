@@ -31,6 +31,8 @@ import {
   type WorkspacePaneId,
 } from "@/state/content-store";
 import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
+import { useLeftPanelCollapseStore } from "@/state/left-panel-collapse-store";
+import { useTreeRevealStore } from "@/state/tree-reveal-store";
 import { usePageTemplateStore } from "@/state/page-template-store";
 import {
   useSaveConflictStore,
@@ -2398,7 +2400,24 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
 
   // Handlers passed as prop to ToolSurfaceProvider (can't use useRegisterToolHandler
   // here because this component renders the provider — useContext sees the parent, not self)
+  // "Show in file tree": make the tree visible (full sidebar, files view),
+  // then ask it to open the item's ancestors — adding to what the user has
+  // open, never collapsing — scroll it into view only if it is out of view,
+  // and pulse the row. The tree consumes the request once it holds the item,
+  // so this works even while the sidebar is still mounting.
+  const handleRevealInTree = useCallback(() => {
+    if (!selectedContentId) return;
+    useLeftPanelCollapseStore.getState().setMode("full");
+    setActiveView("files");
+    useTreeRevealStore.getState().requestReveal(selectedContentId, {
+      align: "smart",
+      flash: true,
+      explicit: true,
+    });
+  }, [selectedContentId, setActiveView]);
+
   const toolHandlers = useMemo(() => ({
+    "reveal-in-tree": handleRevealInTree,
     "import-markdown": handleImportMarkdown,
     "export-markdown": handleExportMarkdown,
     "export-chat": handleExportChat,
@@ -2406,7 +2425,7 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
     "save-as-template": handleSaveAsTemplate,
     "share": handleShareOpen,
     "markdown-source": toggleSourceMode,
-  }), [handleImportMarkdown, handleExportMarkdown, handleExportChat, handleCopyLink, handleSaveAsTemplate, handleShareOpen, toggleSourceMode]);
+  }), [handleRevealInTree, handleImportMarkdown, handleExportMarkdown, handleExportChat, handleCopyLink, handleSaveAsTemplate, handleShareOpen, toggleSourceMode]);
 
   // Toggle state for the toolbar. Unlike handlers (held in a ref), this must
   // flow as a prop so the pressed styling re-renders when the mode flips.

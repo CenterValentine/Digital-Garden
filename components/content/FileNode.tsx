@@ -53,6 +53,7 @@ import { useContextMenuStore } from "@/state/context-menu-store";
 import { useContentStore } from "@/state/content-store";
 import { useTreeStateStore } from "@/state/tree-state-store";
 import { useTreeDragStore } from "@/state/tree-drag-store";
+import { useTreeRevealStore } from "@/state/tree-reveal-store";
 import { referenceGroupKey } from "@/lib/features/content/reference-group";
 import { useFileTreeEditStore } from "@/state/file-tree-edit-store";
 import { toast } from "sonner";
@@ -254,6 +255,11 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
   // the rows whose target status flips re-render as the pointer moves.
   const isExternalDropTarget = useTreeDragStore(
     (state) => state.externalDropTargetId === data.id,
+  );
+  // "Show in file tree" pulse (state/tree-reveal-store.ts) — boolean
+  // selector so only the revealed row re-renders.
+  const isRevealHighlighted = useTreeRevealStore(
+    (state) => state.highlightId === data.id,
   );
   const isSelected = node.isSelected;
   const tree = node.tree;
@@ -592,6 +598,19 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
     // twice and land back where it started — the row would appear to stay shut
     // while its content opened.
     if (e.detail > 1) return;
+
+    // A single click on a nesting row also SELECTS it (grey), as well as
+    // toggling it. The tree's selection is the target for the header "+" and
+    // for drops (`resolveCreateParent` reads `selectedIds`), and the owner's
+    // rule is "grey = what is selected; gold = what is open" (2026-10-02).
+    // Before this the click only toggled, so a clicked folder never became
+    // the create target. Selection-only routing (the shift/cmd-click path)
+    // keeps it from opening in the main panel — that stays the double-click
+    // and press-and-hold gesture.
+    if (!node.isSelected) {
+      onSelectionOnly?.();
+      node.select();
+    }
     toggleNesting();
   };
 
@@ -990,17 +1009,19 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
     if (isExternalDropTarget) {
       return "bg-primary/30 ring-1 ring-primary/50"; // External file drop target
     }
+    // Gold = "open in the main panel", in two depths (owner, 2026-10-02):
+    // deep gold with a gold rail for the content ACTIVE in the pane (the
+    // workspace bar's active tone), light gold for content open in another
+    // tab. Grey = "selected in the tree" — single or multi, nested or not —
+    // a tree gesture, distinct from what the panel shows.
     if (isActive) {
-      return "bg-primary/20 text-primary font-medium"; // Active in panel (brightest)
+      return "bg-gold-primary/[0.22] text-gold-primary font-medium shadow-[inset_2px_0_0_0_var(--gold-primary)] dark:bg-gold-primary/[0.28]"; // Active in panel (deepest)
     }
     if (isOpenInTab) {
       return "bg-gold-primary/8 text-gold-primary"; // Open in another tab
     }
-    if (isMultiSelected) {
-      return "bg-white/8 text-gray-300"; // Multi-selected (subtle)
-    }
-    if (isSelected) {
-      return "bg-primary/10 text-primary"; // Selected but not active (medium)
+    if (isSelected || isMultiSelected) {
+      return "bg-black/[0.07] text-gray-800 dark:bg-white/[0.10] dark:text-gray-100"; // Selected in the tree (grey)
     }
     return "hover:bg-black/[0.03] dark:hover:bg-black/[0.03] dark:bg-white/5"; // Default hover
   };
@@ -1028,6 +1049,7 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
         ${referenceBlockClasses()}
         ${getBackgroundStyle()}
         ${node.state.isDragging ? "opacity-50" : ""}
+        ${isRevealHighlighted ? "dg-tree-reveal-flash" : ""}
       `}
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
