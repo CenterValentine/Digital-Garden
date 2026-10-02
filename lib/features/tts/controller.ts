@@ -173,6 +173,14 @@ export const ttsController = {
       webVoiceUri: options.webVoiceUri,
       label,
     };
+    // Mirror the INPUT into a snapshot that outlives `stop()`. Captured here,
+    // at the one place a read begins, so it can never drift from `session`.
+    lastRead = {
+      text: trimmed,
+      label,
+      cloudVoice: options.cloudVoice,
+      webVoiceUri: options.webVoiceUri,
+    };
 
     set({
       status: "loading",
@@ -194,10 +202,10 @@ export const ttsController = {
 
   /** Replay the last read (used by the idle mini-player's replay hint). */
   replayLast(): void {
-    // Read off the session rather than a parallel set of `last*` variables —
-    // those used to drift (the old rate-change restart dropped `cloudVoice`
-    // and `label`, so a replay after a speed change lost both).
-    const prev = session;
+    // Read the snapshot, NOT `session` — the replay hint only ever renders once
+    // playback is idle, and `stop()` has cleared `session` by then. Reading
+    // `session` here made the button a no-op in exactly the state it appears in.
+    const prev = lastRead;
     if (!prev?.text) return;
     void this.play(prev.text, {
       label: prev.label,
