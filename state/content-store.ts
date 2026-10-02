@@ -529,7 +529,18 @@ function collapsePaneContentIdsForLayout(
 // let go of.
 //
 // Local-only and deliberately so: the server-side truth is the guarded write.
-type PendingWorkspaceIntent = { kind: "open" | "close"; at: number };
+// `paneId` records WHERE an open put the tab. Without it, restoreWorkspace
+// re-adds every pending open into the ACTIVE pane, so any open into a pane
+// other than the focused one gets yanked across the moment a reconcile lands
+// before the debounced write — the tab appears where you asked, then jumps.
+// That was rare enough to look like a flake for drag-drop-onto-a-pane and
+// openContentInPane; the file tree's side-by-side open reproduces it every
+// time, because it targets a non-active pane by definition.
+type PendingWorkspaceIntent = {
+  kind: "open" | "close";
+  at: number;
+  paneId?: WorkspacePaneId;
+};
 const pendingWorkspaceIntents = new Map<string, PendingWorkspaceIntent>();
 
 // Standalone default. The workplaces extension overrides this off its real poll
@@ -548,12 +559,13 @@ export function configurePendingIntentBackstop(ms: number) {
 
 function rememberIntent(
   contentId: string | null | undefined,
-  kind: PendingWorkspaceIntent["kind"]
+  kind: PendingWorkspaceIntent["kind"],
+  paneId?: WorkspacePaneId
 ) {
   if (!contentId) return;
   // Recording the opposite intent replaces the previous one (case 2 above):
   // re-opening what you just closed is an explicit override, and vice versa.
-  pendingWorkspaceIntents.set(contentId, { kind, at: Date.now() });
+  pendingWorkspaceIntents.set(contentId, { kind, at: Date.now(), paneId });
 }
 
 /**
@@ -612,11 +624,25 @@ function pendingIntentFor(
   return intent.kind;
 }
 
-/** Content this surface has opened but not yet published. */
-function getPendingOpenContentIds(): string[] {
-  return [...pendingWorkspaceIntents.keys()].filter(
-    (contentId) => pendingIntentFor(contentId) === "open"
-  );
+/**
+ * Content this surface has opened but not yet published, each with the pane it
+ * was opened into (undefined when the opener didn't say — the URL-restore path
+ * via `markLocalOpenIntents`, which has no pane of its own).
+ */
+function getPendingOpenIntents(): Array<{
+  contentId: string;
+  paneId?: WorkspacePaneId;
+}> {
+  const open: Array<{ contentId: string; paneId?: WorkspacePaneId }> = [];
+  for (const contentId of [...pendingWorkspaceIntents.keys()]) {
+    // Call through pendingIntentFor so the backstop expiry still applies.
+    if (pendingIntentFor(contentId) !== "open") continue;
+    open.push({
+      contentId,
+      paneId: pendingWorkspaceIntents.get(contentId)?.paneId,
+    });
+  }
+  return open;
 }
 
 function createWorkspaceStateSnapshot(
@@ -1380,7 +1406,21 @@ export const useContentStore = create<ContentState>((set, get) => ({
     // overrides a pending close and protects the new tab from a reconcile that
     // lands before the debounced write does. restoreWorkspace deliberately
     // records nothing: that's the remote path intents exist to filter.
-    rememberIntent(id, "open");
+    //
+    // Resolve the destination pane the same way the reducer below does, and
+    // record it WITH the intent: a reconcile must put the tab back where it
+    // was opened, not into whichever pane holds focus. Computed out here from
+    // get() because the reducer's copy isn't visible to rememberIntent.
+    {
+      const { layoutMode, activePaneId } = get();
+      rememberIntent(
+        id,
+        "open",
+        options.paneId && isPaneVisible(layoutMode, options.paneId)
+          ? options.paneId
+          : activePaneId
+      );
+    }
 
     commitWorkspace(set, (state) => {
       if (!id) {
@@ -1979,15 +2019,25 @@ export const useContentStore = create<ContentState>((set, get) => ({
       const alreadyPresent = new Set(
         Object.values(reconciledPaneContentIds).flatMap((ids) => ids ?? [])
       );
-      const pendingOpens = getPendingOpenContentIds().filter(
-        (contentId) => !alreadyPresent.has(contentId)
+      const pendingOpenIntents = getPendingOpenIntents().filter(
+        ({ contentId }) => !alreadyPresent.has(contentId)
       );
-      if (pendingOpens.length > 0) {
-        reconciledPaneContentIds[intentPaneId] = [
-          ...(reconciledPaneContentIds[intentPaneId] ?? []),
-          ...pendingOpens,
+      // Re-add each pending open to the pane it was actually opened into, not
+      // to whichever pane happens to hold focus. Sending them all to
+      // `intentPaneId` gathered every unpublished tab into the active pane the
+      // moment a reconcile landed — content appeared where you asked, then
+      // jumped. `intentPaneId` stays the fallback for openers that named no
+      // pane (the URL-restore path via markLocalOpenIntents), and for a pane
+      // that is no longer visible after a layout change.
+      for (const { contentId, paneId } of pendingOpenIntents) {
+        const target =
+          paneId && requestedPaneIds.includes(paneId) ? paneId : intentPaneId;
+        reconciledPaneContentIds[target] = [
+          ...(reconciledPaneContentIds[target] ?? []),
+          contentId,
         ];
       }
+      const pendingOpens = pendingOpenIntents.map(({ contentId }) => contentId);
       normalizedWorkspace.paneTabContentIds = reconciledPaneContentIds;
 
       if (
