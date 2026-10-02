@@ -32,6 +32,8 @@ import {
   Image as ImageIcon,
 } from "lucide-react";
 import type { ReactNode } from "react";
+import { renderExtensionIcon } from "@/lib/extensions/icons";
+import type { ExtensionCreateMenuItem } from "@/lib/extensions/types";
 
 export interface NewContentMenuItem {
   id: string;
@@ -104,10 +106,44 @@ export interface NewContentCallbacks {
  * @param parentId - Target parent ID (null for root, string for specific folder)
  * @returns Array of menu items in display order
  */
+/** Wrap extension items so selecting one also closes the host menu. */
+export function withMenuClose(
+  items: ExtensionCreateMenuItem[],
+  close: () => void
+): ExtensionCreateMenuItem[] {
+  return items.map((item) => ({
+    ...item,
+    onSelect: item.onSelect
+      ? (context) => {
+          close();
+          item.onSelect?.(context);
+        }
+      : undefined,
+    submenu: item.submenu ? withMenuClose(item.submenu, close) : undefined,
+  }));
+}
+
+function toNewContentMenuItem(
+  item: ExtensionCreateMenuItem,
+  parentId: string | null
+): NewContentMenuItem {
+  return {
+    id: item.id,
+    label: item.label,
+    title: item.title,
+    icon: renderExtensionIcon(item.iconName, "h-4 w-4"),
+    disabled: item.disabled,
+    onClick: item.onSelect ? () => item.onSelect?.({ parentId }) : undefined,
+    submenu: item.submenu?.map((child) => toNewContentMenuItem(child, parentId)),
+  };
+}
+
 export function getNewContentMenuItems(
   callbacks: NewContentCallbacks,
   parentId?: string | null,
-  pageTemplateData?: PageTemplateMenuData
+  pageTemplateData?: PageTemplateMenuData,
+  /** Contributions from enabled extensions (`getExtensionCreateMenuItems()`). */
+  extensionItems: ExtensionCreateMenuItem[] = []
 ): NewContentMenuItem[] {
   const items: NewContentMenuItem[] = [];
   // Normalize parentId: undefined becomes null
@@ -455,6 +491,12 @@ export function getNewContentMenuItems(
       },
     ],
   });
+
+  // Extension contributions (e.g. Reader) — disabled extensions contribute
+  // nothing, so no extension ids are checked here.
+  for (const item of extensionItems) {
+    items.push(toNewContentMenuItem(item, normalizedParentId));
+  }
 
   // Stubs — defined but not implemented yet.
 

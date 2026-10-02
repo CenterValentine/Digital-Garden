@@ -1,5 +1,18 @@
 import { Node, mergeAttributes } from "@tiptap/core";
 
+/** Mirrors the client `wikiLinkDisplayText` (kept local: this file must stay server-safe). */
+function serverWikiLinkDisplayText(attrs: {
+  displayText?: string | null;
+  targetTitle?: string | null;
+  anchorLabel?: string | null;
+}): string {
+  if (attrs.displayText) return attrs.displayText;
+  const title = attrs.targetTitle || "Unknown";
+  if (!attrs.anchorLabel) return title;
+  const label = attrs.anchorLabel.length > 40 ? `${attrs.anchorLabel.slice(0, 39)}…` : attrs.anchorLabel;
+  return `${title} › “${label}”`;
+}
+
 export const ServerWikiLink = Node.create({
   name: "wikiLink",
   group: "inline",
@@ -45,6 +58,19 @@ export const ServerWikiLink = Node.create({
         renderHTML: (attributes) =>
           attributes.headingSlug ? { "data-heading-slug": attributes.headingSlug } : {},
       },
+      // Where inside the target ("<kind>:<id>") + its label — see client WikiLink.
+      anchor: {
+        default: null,
+        parseHTML: (element) => element.getAttribute("data-anchor"),
+        renderHTML: (attributes) =>
+          attributes.anchor ? { "data-anchor": attributes.anchor } : {},
+      },
+      anchorLabel: {
+        default: null,
+        parseHTML: (element) => element.getAttribute("data-anchor-label"),
+        renderHTML: (attributes) =>
+          attributes.anchorLabel ? { "data-anchor-label": attributes.anchorLabel } : {},
+      },
     };
   },
 
@@ -59,13 +85,13 @@ export const ServerWikiLink = Node.create({
         "data-type": "wiki-link",
         class: "wiki-link",
       }),
-      node.attrs.displayText || node.attrs.targetTitle || "Unknown",
+      serverWikiLinkDisplayText(node.attrs),
     ];
   },
 
   renderText({ node }) {
-    const { targetTitle, displayText, headingSlug } = node.attrs;
-    const title = `${headingSlug ? "#" : ""}${targetTitle ?? ""}`;
+    const { targetTitle, displayText, headingSlug, anchor } = node.attrs;
+    const title = `${headingSlug ? "#" : ""}${targetTitle ?? ""}${anchor ? `#^${anchor}` : ""}`;
     if (displayText) {
       return `[[${title}|${displayText}]]`;
     }

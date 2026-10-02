@@ -15,6 +15,7 @@
 // which is what lets one ref cover every viewer without touching each one.
 
 import { useCallback, useEffect, useRef } from "react";
+import { useContentAnchorStore } from "@/state/content-anchor-store";
 import {
   findScrollableElement,
   readViewport,
@@ -22,6 +23,22 @@ import {
   resolveRestoreOffset,
   type ViewportRegion,
 } from "./viewport-memory";
+
+/**
+ * Is a wiki-link anchor waiting to be honored for this content?
+ *
+ * An anchored link (`[[Note#annotation:…]]`, `[[Alma 32:21]]`) asks to open the
+ * target AT a specific spot; the viewer takes that from `content-anchor-store`
+ * and jumps there. An explicit "take me here" outranks a remembered offset
+ * every time, so viewport restore must stand down rather than race it — our
+ * restore retries for up to 20 frames and would otherwise win by arriving last.
+ *
+ * This PEEKS at `pending` and must never call `take()`: taking consumes the
+ * anchor, and the viewer would then never receive it.
+ */
+function anchorPending(contentId: string): boolean {
+  return Boolean(useContentAnchorStore.getState().pending[contentId]);
+}
 
 /** ≈330ms at 60fps. */
 const MAX_RESTORE_FRAMES = 20;
@@ -61,6 +78,10 @@ export function useViewportMemory(
   useEffect(() => {
     const root = rootRef.current;
     if (!root || !contentId || !enabled) return;
+
+    // An anchored link owns this open — don't restore, and don't record over
+    // wherever the anchor lands either until the next genuine scroll.
+    if (anchorPending(contentId)) return;
 
     suppressRef.current = true;
     const saved = readViewport(contentId, region);

@@ -1,3 +1,4 @@
+import { CalendarDays, CalendarPlus } from "lucide-react";
 import type { SlashCommand } from "@/lib/domain/editor/commands/slash-commands";
 
 function getDateKey(date = new Date()) {
@@ -9,7 +10,7 @@ export function getCalendarSlashCommands(): SlashCommand[] {
     {
       title: "Create Event",
       description: "Draft a calendar event from this note or selected text",
-      icon: "📅",
+      icon: CalendarPlus,
       command: ({ editor, range }) => {
         const selection = editor.state.selection;
         const selectedText = editor.state.doc
@@ -27,7 +28,7 @@ export function getCalendarSlashCommands(): SlashCommand[] {
     {
       title: "Calendar View",
       description: "Insert a mini calendar block with month, week, day, and agenda views",
-      icon: "🗓️",
+      icon: CalendarDays,
       command: ({ editor, range }) => {
         editor
           .chain()

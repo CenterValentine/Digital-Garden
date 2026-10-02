@@ -27,7 +27,22 @@ import {
   type DataToolId as _DataToolId,
 } from "./data-metadata";
 
-/** Tool IDs for the base tools */
+/**
+ * Tool IDs for the base tools.
+ *
+ * MINTING A NEW ID — `snake_case`, `^[a-z][a-z0-9]*(_[a-z0-9]+)*$`, asserted by
+ * `pnpm ai:drift:check`. Write it **verb_noun** and imperative
+ * (`read_content`, `query_database`, `record_item_result`), name the widest
+ * thing the tool truly operates on, and match the family an adjacent tool
+ * already established (`read_*`, `search_*`, `propose_*`, `record_*`) so the
+ * model's selection generalizes.
+ *
+ * A name that undersells the tool teaches the model not to reach for it:
+ * `getCurrentNote` read every content type and took an explicit id, so it was
+ * wrong about both "current" and "note", and a model looking for a way to read
+ * a database walked past it. Renaming is not free — the full checklist and the
+ * old→new table live in `./repair.ts`.
+ */
 export const BASE_TOOL_IDS = [
   "search_web",
   "read_page",
@@ -38,10 +53,10 @@ export const BASE_TOOL_IDS = [
   "create_docx",
   "search_content",
   "search_charters",
-  "getCurrentNote",
-  "createNote",
-  "updateNote",
-  "renameNote",
+  "read_content",
+  "create_note",
+  "update_note",
+  "rename_note",
   "generate_image",
   "generate_speech",
   "notify_user",
@@ -111,19 +126,20 @@ export const BASE_TOOL_METADATA: Record<BaseToolId, BaseToolMeta> = {
     name: "Search Charters",
     description: "List/search charters by name or topic (scoped, not generic note search)",
   },
-  getCurrentNote: {
-    name: "Read Note",
-    description: "Read the full content of a specific note",
+  read_content: {
+    name: "Read Content",
+    description:
+      "Read any item by id — a note, a folder's own notes, a database (schema plus a row preview), a file's extracted text, a saved link, code or a page",
   },
-  createNote: {
+  create_note: {
     name: "Create Note",
     description: "Create a new note with a title and optional content",
   },
-  updateNote: {
+  update_note: {
     name: "Update Note",
     description: "Update an existing note's content (content only — never the title)",
   },
-  renameNote: {
+  rename_note: {
     name: "Rename Note",
     description: "Rename (retitle) an existing note, chat, or folder — title only",
   },

@@ -2142,6 +2142,10 @@ const ALARM_PERIODS = {
   "dg-pull-sync": 60,
   "dg-embed-session-refresh": 20,
   [WORKFLOW_BADGE_ALARM]: 1,
+  // Sweep for a debugger attachment nobody is using. Five minutes against a
+  // fifteen-minute idle threshold: cheap (one storage read when idle), and it
+  // bounds the leak to ~20 minutes in the worst case.
+  "dg-cobrowse-idle-release": 5,
 };
 
 /**
@@ -2202,6 +2206,21 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
   }
   if (alarm.name === WORKFLOW_BADGE_ALARM) {
     await maybeRefreshWorkflowBadge("alarm");
+  }
+  if (alarm.name === "dg-cobrowse-idle-release") {
+    // Free a debugger attachment no run is using. Reads persisted state, so it
+    // works in the case that matters: the service worker was evicted, the
+    // in-memory session is gone, and the attachment is still held — which is
+    // what refuses every later co-browse on that tab. Releasing keeps the tab
+    // id, so the next operation re-attaches transparently.
+    try {
+      const result = await cobrowse.releaseIdleSession();
+      if (result?.released) {
+        console.info("[DG cobrowse] released idle attachment on tab", result.tabId);
+      }
+    } catch (error) {
+      console.warn("[DG cobrowse] idle release failed", error);
+    }
   }
 });
 

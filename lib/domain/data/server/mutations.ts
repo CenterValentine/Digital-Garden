@@ -32,15 +32,19 @@ import {
   FREEFORM_OPTION_CAP,
   type SelectOption,
   keyAtEnd,
+  keyBetween,
   keysBetween,
+  NON_STORING_COLUMN_TYPES,
   type CellValue,
   type DataColumn,
   type DataColumnConfig,
   type RowData,
 } from "@/lib/domain/data";
+import { writeRelationLinks } from "./relation-cells";
 // Not re-exported from the barrel (capture-core is capture-path code), but
 // pure and client-safe — it is the label/delimiter tolerance seam.
 import { translateOptionValue } from "@/lib/domain/data/capture-core";
+import { mergeCellValue } from "@/lib/domain/data/cell-merge";
 
 // ── Results ──────────────────────────────────────────────────────────────
 
@@ -62,6 +66,12 @@ export interface CellWrite {
   expect?: CellValue | undefined;
   /** Set when `expect` is a meaningful `undefined` rather than "not checking". */
   hasExpectation?: boolean;
+  /**
+   * MERGE into the current value instead of replacing it (cell-merge.ts):
+   * union for list columns, token-append for text. Computed against the row
+   * as it is inside this transaction — no read step, no race, idempotent.
+   */
+  merge?: boolean;
 }
 
 // ── Cells ────────────────────────────────────────────────────────────────
@@ -236,11 +246,22 @@ export async function writeCells(
       // pass 0 and then fail the strict encoder anyway. Applied narrowly to
       // multiSelect rather than normalizing every type, so the grid's
       // existing strictness elsewhere is unchanged.
-      const value =
+      const translated =
         column.type === "multiSelect" &&
         (column.config.freeform || column.config.splitOn)
           ? translateOptionValue(column, write.value)
           : write.value;
+      // Merge AFTER label translation (so list merges compare option ids)
+      // and BEFORE encoding (so the union is validated like any value).
+      let value: unknown = translated;
+      if (write.merge) {
+        const merged = mergeCellValue(column, current[write.columnKey], translated);
+        if ("error" in merged) {
+          results.push({ status: "error", rowId: write.rowId, message: merged.error });
+          continue;
+        }
+        value = merged.value;
+      }
 
       const encoded = encodeCell(column, value);
       if (isEncodeError(encoded)) {
@@ -495,6 +516,104 @@ export async function createRows(
 
     return ids;
   });
+}
+
+/**
+ * Duplicate rows in place: each copy lands DIRECTLY BELOW its source (a key
+ * between the source and its next neighbour — `createRows` can only append,
+ * which would scatter copies to the bottom of a 29-row table), carrying
+ * every stored cell of a live column. Derived and non-storing columns
+ * (formula, rollup, lookup, autoNumber, createdAt/By, updatedAt/By) recompute on
+ * their own; forward relation links are re-pointed at the copy afterwards
+ * (backlinks mirror automatically); promotion (`contentId`) is a page, not
+ * a cell, and is NOT copied. Sources are processed in storage order so a
+ * multi-select duplicates as a block, copies interleaved after each source.
+ */
+export async function duplicateRows(
+  tableId: string,
+  columns: DataColumn[],
+  rowIds: string[],
+  createdBy: string
+): Promise<{ rowIds: string[]; sourceIds: string[] }> {
+  const wanted = [...new Set(rowIds)].slice(0, 200);
+  if (wanted.length === 0) return { rowIds: [], sourceIds: [] };
+  const live = columns.filter((c) => !c.deletedAt);
+  const storing = new Set(
+    live
+      .filter((c) => !NON_STORING_COLUMN_TYPES.includes(c.type))
+      .map((c) => c.key)
+  );
+  const forwardRelations = live.filter(
+    (c) => c.type === "relation" && c.config.isBacklink !== true
+  );
+
+  const created = await prisma.$transaction(async (tx) => {
+    const sources = await tx.dataRow.findMany({
+      where: { id: { in: wanted }, tableId, deletedAt: null },
+      orderBy: [{ sortKey: "asc" }, { id: "asc" }],
+      select: { id: true, sortKey: true, data: true },
+    });
+    const out: Array<{ sourceId: string; rowId: string }> = [];
+    for (const source of sources) {
+      const next = await tx.dataRow.findFirst({
+        where: { tableId, deletedAt: null, sortKey: { gt: source.sortKey } },
+        orderBy: { sortKey: "asc" },
+        select: { sortKey: true },
+      });
+      const sortKey = keyBetween(source.sortKey, next?.sortKey ?? null);
+      const data: Record<string, unknown> = {};
+      for (const [key, value] of Object.entries(
+        (source.data ?? {}) as Record<string, unknown>
+      )) {
+        if (storing.has(key)) data[key] = value;
+      }
+      const row = await tx.dataRow.create({
+        data: {
+          tableId,
+          sortKey,
+          data: data as unknown as Prisma.InputJsonValue,
+          searchText: deriveRowSearchText(columns, data as RowData),
+          createdBy,
+        },
+        select: { id: true },
+      });
+      out.push({ sourceId: source.id, rowId: row.id });
+    }
+    if (out.length > 0) {
+      await tx.dataPayload.update({
+        where: { contentId: tableId },
+        data: { rowCount: { increment: out.length } },
+      });
+    }
+    return out;
+  });
+
+  // Links live beside the row, not in `data` — copy the forward halves.
+  if (forwardRelations.length > 0 && created.length > 0) {
+    const links = await prisma.dataRowLink.findMany({
+      where: {
+        fromRowId: { in: created.map((c) => c.sourceId) },
+        columnId: { in: forwardRelations.map((c) => c.id) },
+      },
+      orderBy: { position: "asc" },
+      select: { columnId: true, fromRowId: true, toRowId: true },
+    });
+    for (const copy of created) {
+      for (const column of forwardRelations) {
+        const targets = links
+          .filter((l) => l.fromRowId === copy.sourceId && l.columnId === column.id)
+          .map((l) => l.toRowId);
+        if (targets.length > 0) {
+          await writeRelationLinks(column.id, copy.rowId, targets);
+        }
+      }
+    }
+  }
+
+  return {
+    rowIds: created.map((c) => c.rowId),
+    sourceIds: created.map((c) => c.sourceId),
+  };
 }
 
 /**

@@ -23,7 +23,11 @@ pnpm lint             # ESLint with --max-warnings 175 ratchet (fails if count g
 pnpm build:tokens     # Regenerate CSS variables from design tokens
 pnpm db:seed          # Seed database with test ContentNode data
 pnpm collab:schema:check  # CI gate: validate collaboration schema covers all editor extensions
-pnpm ai:drift:check   # CI gate: AI parallel-table drift (provider catalog ↔ connection templates ↔ type unions ↔ settings enum; tool inventory ↔ settings metadata; prompt tool references; adapter branches)
+pnpm ai:drift:check   # CI gate: AI parallel-table drift (provider catalog ↔ connection templates ↔ type unions ↔ settings enum; tool inventory ↔ settings metadata; prompt tool references; adapter branches; run-loop schemas describe-only)
+pnpm context:diet:check  # CI gate: the model-facing transcript folds (distillation/turn), dedupe, write-input supersession, header retention — fixture transcripts, mutation-tested
+pnpm proposal:shape:check  # CI gate: the propose_item_iteration payloads that died in prod parse and resolve by meaning (lib/domain/ai/tools/iteration-proposal.ts — "schemas describe shape; execute judges")
+pnpm reader:check     # Reader gate: OPDS 1/2 parsing, EPUB DRM detection + metadata, Kindle clippings — fixture-based, no network (scripts/validate-reader.ts)
+pnpm private:content:check  # CI gate: private (commented-out) content — stripPrivateContent predicate + every AI/public/search seam calls it; the source-view serializer does not
 pnpm ai:matrix        # Regenerate docs/notes-feature/core/AI-CAPABILITY-MATRIX.md from the real provider/model tables
 pnpm ai:matrix:check  # CI gate: the committed capability matrix matches the code (run ai:matrix after model/provider changes)
 pnpm publishing:schema:check  # CI gate: validate every publishing block has Server* variant + correct registerBlock type
@@ -38,6 +42,8 @@ npx prisma generate   # Regenerate Prisma client (lib/database/generated/prisma)
 npx prisma db push    # Push schema changes in dev (no migration file)
 npx prisma studio     # Database GUI (http://localhost:5555)
 ```
+
+**Worktrees live in `.claude/worktrees/<name>` — always.** Every git worktree for this repo is created inside the repo at `.claude/worktrees/<short-name>` (e.g. `git worktree add .claude/worktrees/reader <branch>`), never as a sibling directory (`../Digital-Garden-foo`) or anywhere else. When giving the owner worktree commands, use this path. Copy `.env.local` into the new worktree, and run `pnpm dev` and `pnpm dev:collab` from inside it (Hocuspocus loads that checkout's schema).
 
 **Primary verification is still manual** — `pnpm build` must pass, then smoke-test in browser. The Playwright harness adds visual regression coverage but only for signed-out routes today (auth fixture pending).
 
@@ -209,6 +215,10 @@ Three-panel layout managed by `ResizablePanels.tsx` using Allotment:
 - **Main panel:** Content editor/viewer with toolbar (`MainPanel.tsx` → `MainPanelContent.tsx`)
 - **Right sidebar:** Backlinks, outline, tags tabs (`RightSidebar.tsx`)
 
+**Side panels belong in the right sidebar — never a panel inside a panel.** Any supporting view for the content in the main panel (details, notes/annotations, contents, display settings, inspectors) goes into the app's right sidebar, as a sidebar tab or a view within one (content-driven claims: `lib/extensions/content-sidebar.ts`; the reader's Book tab is the worked example). Don't build a second side panel inside a viewer. Accepted exceptions: the database row read view (may be reverted), and a book's table of contents beside the page in the reader (navigation wants the TOC next to the text; the same view is also in the sidebar rail, and hold/⌥-click on Contents opens it there). When the sidebar can't be seen (full screen), the same sidebar component may render as a drawer — reuse it, don't fork it.
+
+**Generalizable tools go in the existing content toolbar; content-specific ones may use a secondary toolbar.** Anything that applies across content types (full screen — `state/content-fullscreen-store.ts`, speed read, export, share) belongs in `ContentToolbar`, never duplicated inside a viewer. A viewer may have a **secondary toolbar** under it, but only for affordances specific to that content that can't be generalized (the reader's header row: contents, title, status, details, notes, display, bookmark). Buttons that open supporting views are *shortcuts into the right sidebar* on the right view, not toggles of a private panel. Tools may also live in context when they genuinely fit there: actions on a selection (the reader's highlight/underline popover), BubbleMenu formatting, in-content navigation (page arrows). (Owner rules, 2026-09-30.)
+
 Both sidebars follow the same pattern:
 ```
 Sidebar Wrapper (Client) — manages shared state
@@ -228,7 +238,7 @@ First-party feature modules with clear ownership boundaries. Each extension live
 - `server/` — Services, types, route handlers
 - `state/` — Extension-local Zustand stores
 
-**Active extensions:** `daily-notes`, `flashcards`, `people`, `workplaces`, `calendar`, `publishing`, `speed-reader`, `browser-bookmarks`
+**Active extensions:** `daily-notes`, `flashcards`, `people`, `workplaces`, `calendar`, `publishing`, `speed-reader`, `browser-bookmarks`, `reader` (e-reader + book library — `docs/notes-feature/work-tracking/EREADER-PLAN.md`)
 
 **Key rules:**
 - Disabled extensions disappear through registry filters — never add direct conditionals in shared UI
@@ -287,10 +297,11 @@ All stores in `state/`. Pattern: `create<T>()(persist((set, get) => ({...}), { n
 - `getCollaborationServerExtensions()` — Used by Hocuspocus server and `collab:schema:check` CI; lives in `lib/domain/collaboration/extensions.ts`
 
 **Custom extensions** (in `lib/domain/editor/extensions/`):
-- `wiki-link.ts` — `[[Note Title]]` or `[[slug|Display]]`, autocomplete, click navigation
+- `wiki-link.ts` — `[[Note Title]]` or `[[slug|Display]]`, autocomplete, click navigation. Optional **anchor** (`"<kind>:<id>"`) = where inside the target — generic contract in `lib/domain/content/link-anchor.ts`: owners register an anchor lister (`ExtensionRuntime.linkAnchors`) for the menu's `[[Title#` step (Tab drills in), and the target's viewer takes the anchor from `state/content-anchor-store.ts` on open. Kinds: `annotation` (reader highlights) and `verse` (scripture passages — `verse:alma/32/21-23`). A provider may also offer anchors straight from the typed text (`ExtensionRuntime.linkAnchorSuggestions` — `[[Alma 32:21`). Links may target an extension's virtual content (`reader:scripture/<corpus>`): clicks open that tab directly, and `collectWikiLinkRefs` skips non-UUID targets (never put them in a `@db.Uuid` query). Add kinds without a schema change.
 - `callout.ts` — Obsidian `> [!type] Title` syntax, 6 types (note, tip, warning, danger, info, success)
 - `tag.ts` — Inline atomic node with `tagId`, `tagName`, `slug`, `color`. Renders as colored pill.
 - `inline-timestamp.ts` — Clickable inline date/time with popover picker; `ServerInlineTimestamp` for server use
+- `private-content.ts` — **Comment out prose**: `privateText` mark + `privateBlock` node, Cmd+/ toggle, `%%…%%` Obsidian syntax, `/private`. Content stays for the author and is stripped from every other reader by ONE predicate, `stripPrivateContent` (`lib/domain/content/private-content.ts`), called explicitly at each egress seam (search column, AI reads, mentions, charter bodies, public render, client outline). Never strip inside `tiptapToMarkdown` — the source view must show it. `pnpm private:content:check` pins the seam list. Guide: [docs/notes-feature/guides/editor/PRIVATE-CONTENT.md](docs/notes-feature/guides/editor/PRIVATE-CONTENT.md)
 - `blocks/` — Custom block nodes (SectionHeader, CardPanel, Accordion, Tabs, Columns, DailySummary, WeeklySummary, ExcalidrawBlock, MermaidBlock, etc.)
 - `commands/slash-commands.tsx` — `/` menu for quick insertion
 

@@ -76,6 +76,39 @@ interface WorkspaceState {
     parentWorkspaceId: string,
     folderContentId: string,
   ) => Promise<ContentWorkspaceResponse>;
+  /**
+   * Materialize-or-reuse a workbench row WITHOUT activating it — for
+   * operations that name a bench as a destination (move a tab there) while
+   * the user stays where they are. `openWorkbench` is this plus activation.
+   */
+  ensureWorkbench: (
+    parentWorkspaceId: string,
+    folderContentId: string,
+  ) => Promise<ContentWorkspaceResponse>;
+  /**
+   * Move one open tab out of the ACTIVE workspace into `targetWorkspaceId` —
+   * a workspace or a workbench. R1 membership moves server-side in one
+   * transaction; the local tab closes on success and the target is refreshed
+   * in the list so a later switch lands the tab without a refetch. Rejects
+   * when there is no active workspace or the target is the active one.
+   */
+  moveTabToWorkspace: (
+    targetWorkspaceId: string,
+    tab: { id: string; contentId: string; title: string },
+    /** `openTarget`: also switch to the target once the tab is there. */
+    options?: { openTarget?: boolean },
+  ) => Promise<void>;
+  /**
+   * Open content as tabs in `targetWorkspaceId` (a workplace or bench)
+   * without leaving the active one — a file dragged onto the workplaces
+   * affordance. Targeting the ACTIVE workplace is an ordinary open through
+   * the workplace guard. `openTarget` switches there afterwards.
+   */
+  sendContentToWorkspace: (
+    targetWorkspaceId: string,
+    items: Array<{ id: string; title: string; contentType: string | null }>,
+    options?: { openTarget?: boolean },
+  ) => Promise<void>;
   updateWorkspace: (
     workspaceId: string,
     updates: {
@@ -120,6 +153,33 @@ interface WorkspaceState {
   receiveRefreshedWorkspaces: (workspaces: ContentWorkspaceResponse[]) => void;
 }
 
+/**
+ * Pane → affinity hint for a membership write (mirrors the server's
+ * `affinityForPane`, which lives beside Prisma and can't be imported here).
+ */
+function affinityForPane(paneId: WorkspacePaneId) {
+  return {
+    h: paneId.endsWith("left") ? "left" : "right",
+    v: paneId.startsWith("top") ? "top" : "bottom",
+  };
+}
+
+/**
+ * Which ownership claim, if any, should follow a tab out of `source`.
+ *
+ * Policy: only a claim the source ALREADY holds on this exact content moves;
+ * a folder-scoped (recursive) claim that merely covers the content stays put,
+ * because moving it would drag every sibling's ownership along with one tab.
+ */
+function claimToCarry(
+  source: ContentWorkspaceResponse | null,
+  contentId: string,
+) {
+  return (
+    source?.items.find((item) => item.contentId === contentId) ?? null
+  );
+}
+
 let isBypassingWorkspaceGuard = false;
 // Tracks the updatedAt we last applied from this tab so receiveRefreshedWorkspaces
 // can detect when another tab saved a newer pane state.
@@ -138,6 +198,8 @@ const lastAppliedUpdatedAt: Record<string, string> = {};
 const lastAppliedSnapshotJson: Record<string, string> = {};
 let onMutationBroadcast: (() => void) | null = null;
 const WORKSPACE_MUTATION_TIMEOUT_MS = 12_000;
+/** How long a move/send toast offers Undo — matches the clear-tabs control. */
+const UNDO_TOAST_MS = 10_000;
 export function registerMutationBroadcast(fn: () => void) {
   onMutationBroadcast = fn;
 }
@@ -998,6 +1060,18 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   },
 
   openWorkbench: async (parentWorkspaceId, folderContentId) => {
+    const workspace = await get().ensureWorkbench(
+      parentWorkspaceId,
+      folderContentId,
+    );
+    await get().activateWorkspace(workspace.id);
+    return (
+      get().workspaces.find((candidate) => candidate.id === workspace.id) ??
+      workspace
+    );
+  },
+
+  ensureWorkbench: async (parentWorkspaceId, folderContentId) => {
     // Reuse an already-known active workbench row without a round-trip.
     const existing = get().workspaces.find(
       (candidate) =>
@@ -1005,10 +1079,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         candidate.viewRootContentId === folderContentId &&
         candidate.status === "active",
     );
-    if (existing) {
-      await get().activateWorkspace(existing.id);
-      return existing;
-    }
+    if (existing) return existing;
     const response = await fetchWorkspaceMutation(
       `/api/content/workspaces/${parentWorkspaceId}/workbenches`,
       {
@@ -1031,10 +1102,303 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       ]),
     }));
     notifyMutation();
-    await get().activateWorkspace(workspace.id);
-    return (
-      get().workspaces.find((candidate) => candidate.id === workspace.id) ??
-      workspace
+    return workspace;
+  },
+
+  moveTabToWorkspace: async (targetWorkspaceId, tab, options = {}) => {
+    const sourceWorkspaceId = get().activeWorkspaceId;
+    if (!sourceWorkspaceId) {
+      throw new Error("No active workplace to move the tab from");
+    }
+    if (sourceWorkspaceId === targetWorkspaceId) {
+      throw new Error("The tab is already in that workplace");
+    }
+    const targetName =
+      getWorkspace(get().workspaces, targetWorkspaceId)?.name ?? "workplace";
+
+    // Placement hint (spec §4): the pane the tab leaves is the best guess for
+    // where the target should land it when its layout has that ordinal.
+    const panes = useContentStore.getState().panes;
+    const paneId = (Object.keys(panes) as WorkspacePaneId[]).find((id) =>
+      panes[id].tabIds.includes(tab.id),
+    );
+
+    const response = await fetchWorkspaceMutation(
+      `/api/content/workspaces/${targetWorkspaceId}/tabs/move`,
+      {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contentId: tab.contentId,
+          fromWorkspaceId: sourceWorkspaceId,
+          affinity: paneId ? affinityForPane(paneId) : undefined,
+        }),
+      },
+    );
+    const { workspace: target } = await parseResponse<{
+      workspace: ContentWorkspaceResponse;
+    }>(response, "Failed to move tab");
+
+    // The tab is the target's now. Closing it here records a close intent and
+    // lets the debounced persist write the source snapshot without it — the
+    // source membership row is already gone server-side, so that reconcile
+    // is a no-op there rather than a second write.
+    useContentStore.getState().closeContentTabs([tab.contentId]);
+    set((state) => ({
+      workspaces: state.workspaces.map((candidate) =>
+        candidate.id === target.id ? target : candidate,
+      ),
+    }));
+
+    // Ownership travels with the tab only when the source already held it.
+    // A move never MINTS a claim: that is what "Share permanently" and the
+    // settings dialog are for, and silently claiming on the user's behalf is
+    // how conflicts appear in workplaces they never assigned anything to.
+    const claim = claimToCarry(
+      getWorkspace(get().workspaces, sourceWorkspaceId),
+      tab.contentId,
+    );
+    let claimCarried = false;
+    if (claim) {
+      try {
+        await get().assignContentToWorkspace(targetWorkspaceId, tab.contentId, {
+          assignmentType: claim.assignmentType,
+          scope: claim.scope,
+          expiresAt: claim.expiresAt,
+          moveFromWorkspaceId: sourceWorkspaceId,
+        });
+        claimCarried = true;
+      } catch (error) {
+        toast.warning("Tab moved, but its workplace claim stayed behind", {
+          description: error instanceof Error ? error.message : undefined,
+        });
+      }
+    }
+
+    notifyMutation();
+    const switched = Boolean(options.openTarget);
+    if (switched) {
+      // The user held the drag: follow the tab.
+      await get().activateWorkspace(targetWorkspaceId);
+    }
+
+    const title = tab.title || "Untitled";
+    // Undo reverses every half of the move: membership back to the source,
+    // the carried claim back, and the switch if there was one.
+    const undo = async () => {
+      try {
+        const back = await fetchWorkspaceMutation(
+          `/api/content/workspaces/${sourceWorkspaceId}/tabs/move`,
+          {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contentId: tab.contentId,
+              fromWorkspaceId: targetWorkspaceId,
+              affinity: paneId ? affinityForPane(paneId) : undefined,
+            }),
+          },
+        );
+        const { workspace: restored } = await parseResponse<{
+          workspace: ContentWorkspaceResponse;
+        }>(back, "Failed to undo the move");
+        set((state) => ({
+          workspaces: state.workspaces.map((candidate) =>
+            candidate.id === restored.id
+              ? restored
+              : candidate.id === targetWorkspaceId
+                ? {
+                    ...candidate,
+                    membershipContentIds: (
+                      candidate.membershipContentIds ?? []
+                    ).filter((id) => id !== tab.contentId),
+                  }
+                : candidate,
+          ),
+        }));
+        if (claimCarried && claim) {
+          await get().assignContentToWorkspace(sourceWorkspaceId, tab.contentId, {
+            assignmentType: claim.assignmentType,
+            scope: claim.scope,
+            expiresAt: claim.expiresAt,
+            moveFromWorkspaceId: targetWorkspaceId,
+          });
+        }
+        if (get().activeWorkspaceId === sourceWorkspaceId) {
+          // The source is on screen. The move back bumped its revision;
+          // adopt it as this window's base (as a 409-adopt would) so the
+          // reopen's save cannot conflict with the undo itself, then put the
+          // tab back in the pane it left.
+          lastAppliedUpdatedAt[sourceWorkspaceId] = restored.updatedAt;
+          directOpenContent(tab.contentId, paneId ? { paneId } : {});
+        } else {
+          // The user followed the tab: close it where it is (the switch-away
+          // save carries the close) and go back — the source restores the
+          // tab from membership. A user who moved on to a THIRD workplace
+          // inside the undo window leaves the target's blob listing the tab
+          // until that workplace next saves; accepted for a 10 s window.
+          useContentStore.getState().closeContentTabs([tab.contentId]);
+          await get().activateWorkspace(sourceWorkspaceId);
+        }
+        notifyMutation();
+        toast.success(`Moved "${title}" back`);
+      } catch (error) {
+        toast.error(
+          error instanceof Error ? error.message : "Failed to undo the move",
+        );
+      }
+    };
+
+    toast.success(`Moved "${title}" to ${targetName}`, {
+      duration: UNDO_TOAST_MS,
+      action: {
+        label: "Undo",
+        onClick: () => {
+          void undo();
+        },
+      },
+      // "Go there" only when the drop did not already take the user there.
+      ...(switched
+        ? {}
+        : {
+            cancel: {
+              label: "Go there",
+              onClick: () => {
+                void get().activateWorkspace(targetWorkspaceId);
+              },
+            },
+          }),
+    });
+  },
+
+  sendContentToWorkspace: async (targetWorkspaceId, items, options = {}) => {
+    if (items.length === 0) return;
+    const label =
+      items.length === 1
+        ? `"${items[0].title || "Untitled"}"`
+        : `${items.length} items`;
+    const targetName =
+      getWorkspace(get().workspaces, targetWorkspaceId)?.name ?? "workplace";
+
+    const ids = items.map((item) => item.id);
+    const previousActiveId = get().activeWorkspaceId;
+
+    // Already here: open normally, through the workplace guard (claims,
+    // conflicts, borrow prompts all apply). Membership follows via persist,
+    // and so does the undo — a plain local close.
+    if (targetWorkspaceId === previousActiveId) {
+      for (const item of items) {
+        await get().requestOpenContent(item.id);
+      }
+      toast.success(`Opened ${label}`, {
+        duration: UNDO_TOAST_MS,
+        action: {
+          label: "Undo",
+          onClick: () => {
+            useContentStore.getState().closeContentTabs(ids);
+          },
+        },
+      });
+      return;
+    }
+
+    let target: ContentWorkspaceResponse | null = null;
+    for (const item of items) {
+      const response = await fetchWorkspaceMutation(
+        `/api/content/workspaces/${targetWorkspaceId}/tabs`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ contentId: item.id }),
+        },
+      );
+      const data = await parseResponse<{ workspace: ContentWorkspaceResponse }>(
+        response,
+        "Failed to send to workplace",
+      );
+      target = data.workspace;
+    }
+    if (target) {
+      const fresh = target;
+      set((state) => ({
+        workspaces: state.workspaces.map((candidate) =>
+          candidate.id === fresh.id ? fresh : candidate,
+        ),
+      }));
+    }
+    notifyMutation();
+
+    const switched = Boolean(options.openTarget);
+    if (switched) {
+      await get().activateWorkspace(targetWorkspaceId);
+    }
+
+    const undo = async () => {
+      try {
+        if (get().activeWorkspaceId === targetWorkspaceId) {
+          // On screen: a local close, carried by the next save — or by the
+          // switch-away save when we take the user back.
+          useContentStore.getState().closeContentTabs(ids);
+          if (
+            switched &&
+            previousActiveId &&
+            previousActiveId !== targetWorkspaceId
+          ) {
+            await get().activateWorkspace(previousActiveId);
+          }
+        } else {
+          for (const id of ids) {
+            const response = await fetchWorkspaceMutation(
+              `/api/content/workspaces/${targetWorkspaceId}/tabs?contentId=${encodeURIComponent(id)}`,
+              { method: "DELETE", credentials: "include" },
+            );
+            await parseResponse<unknown>(response, "Failed to undo");
+          }
+          const removed = new Set(ids);
+          set((state) => ({
+            workspaces: state.workspaces.map((candidate) =>
+              candidate.id === targetWorkspaceId
+                ? {
+                    ...candidate,
+                    membershipContentIds: (
+                      candidate.membershipContentIds ?? []
+                    ).filter((id) => !removed.has(id)),
+                  }
+                : candidate,
+            ),
+          }));
+        }
+        notifyMutation();
+        toast.success(`Closed ${label} in ${targetName}`);
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Failed to undo");
+      }
+    };
+
+    toast.success(
+      switched ? `Opened ${label} in ${targetName}` : `Sent ${label} to ${targetName}`,
+      {
+        duration: UNDO_TOAST_MS,
+        action: {
+          label: "Undo",
+          onClick: () => {
+            void undo();
+          },
+        },
+        ...(switched
+          ? {}
+          : {
+              cancel: {
+                label: "Go there",
+                onClick: () => {
+                  void get().activateWorkspace(targetWorkspaceId);
+                },
+              },
+            }),
+      },
     );
   },
 

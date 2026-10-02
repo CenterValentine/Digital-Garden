@@ -18,7 +18,7 @@
 
 export const CONTENT_ID_TOOL_ARGS: Record<string, readonly string[]> = {
   // Reads a specific note by id — the canonical cross-note reference.
-  getCurrentNote: ["contentId"],
+  read_content: ["contentId"],
 };
 
 /**

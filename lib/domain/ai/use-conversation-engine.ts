@@ -40,6 +40,7 @@ import {
 } from "@/lib/domain/browser-extension/acquire-url";
 import { READ_PAGE_HEADLESS_OR_BROWSER } from "@/lib/domain/ai/tools/read-page-in-browser";
 import { OPEN_TAB_AND_READ } from "@/lib/domain/ai/tools/open-tab-and-read";
+import { coBrowsePageIdentity } from "@/lib/domain/ai/co-browse-page-identity";
 import {
   CO_BROWSE_OPEN,
   CO_BROWSE_ACT,
@@ -47,10 +48,12 @@ import {
   LIST_TABS,
   stripTrackingParams,
 } from "@/lib/domain/ai/tools/co-browse-tools";
+import { countRepeatedFailures } from "@/lib/domain/ai/tools/repair";
 import {
   isCoBrowseAvailable,
   coBrowseOpen,
   coBrowseSnapshot,
+  coBrowseDetach,
   coBrowseNavigate,
   coBrowseClick,
   coBrowseHover,
@@ -67,6 +70,8 @@ import {
 import { capturePageContent } from "@/lib/domain/browser-extension/panel-bridge";
 import {
   markCoBrowseActive,
+  markCoBrowseInactive,
+  isCoBrowseActive,
   beginCoBrowseWait,
   endCoBrowseWait,
 } from "@/state/co-browse-store";
@@ -85,6 +90,7 @@ import {
 import type { SuggestionItem } from "@/components/content/ai/ChatSuggestionMenu";
 import { useSettingsStore } from "@/state/settings-store";
 import { compactToolOutputs } from "@/lib/domain/ai/compact-tool-outputs";
+import { cacheVolleyDelayMs, pendingApprovalKey } from "@/lib/domain/ai/cache-volley";
 import {
   getAttachedPageContext,
   getCurrentPageHint,
@@ -105,6 +111,7 @@ import {
   type FolderContextMentionData,
 } from "@/lib/domain/ai-context/mention-part";
 import { stopPendingToolCalls } from "@/lib/domain/ai/repair-dangling-tools";
+import { normalizeItemUrl } from "@/lib/domain/ai/tools/iteration-proposal";
 import { getContentWriteRefreshTargets } from "@/lib/domain/ai/content-write-receipts";
 
 export type { OutputTarget } from "@/lib/domain/ai/output-target";
@@ -220,8 +227,8 @@ const MENTION_RE = /@\[([^\]]+)\]\(([^)]+)\)/g;
 /** Default mention search hint copy keyed by tool id. */
 const COMMAND_HINTS: Record<string, string> = {
   search_content: "Search my garden for ",
-  getCurrentNote: "Read the current note",
-  createNote: "Create a new note titled ",
+  read_content: "Read content",
+  create_note: "Create a new note titled ",
 };
 
 /**
@@ -553,6 +560,11 @@ export interface UseConversationEngineResult {
   // ── charters (AI v3.2 T3) ──
   /** The playbook attached to this conversation, or null. */
   activeCharter: ActiveCharter | null;
+  /**
+   * The quest ledger this thread has written items into, or null. Appears once
+   * the first item lands and stays for the rest of the conversation.
+   */
+  activeQuest: ActiveQuest | null;
   /** Attach a playbook — called when ChatInput's `/` selection is a playbook. */
   attachCharter: (item: SuggestionItem) => void;
   /** Detach the active playbook (dismiss the composer chip). */
@@ -666,6 +678,99 @@ export interface ActiveCharter {
   phaseCount: number;
 }
 
+/** The quest ledger this thread is writing into (owner request 2026-09-18). */
+export interface ActiveQuest {
+  /** Run key, `quest:<slug>` — stable across the run's requests. */
+  runKey: string;
+  /** Display name from the proposal, falling back to the slug. */
+  title: string;
+  /** The quest LOG note's ContentNode, once a write has returned one. */
+  ledgerNodeId: string | null;
+  /**
+   * The quest's ROW database — what the user means by "the quest". Read
+   * from the proposal (and the findings) result; the pin opens this when
+   * it is known and falls back to the log note.
+   */
+  questLedgerNodeId: string | null;
+  /** Items written so far — the reason the pin exists is that this grows. */
+  itemsRecorded: number;
+}
+
+/** Turn a `quest:career-hunt-ii-test-batch` run key into readable words. */
+function questTitleFromRunKey(runKey: string): string {
+  return runKey
+    .replace(/^quest:/, "")
+    .split("-")
+    .filter(Boolean)
+    .map((w) => (w.length > 2 ? w[0].toUpperCase() + w.slice(1) : w))
+    .join(" ");
+}
+
+/**
+ * The quest this thread is actually writing to.
+ *
+ * Derived from the transcript rather than tracked in state, for the same
+ * reason the item-iteration budget is: a run spans several requests, and its
+ * tool calls are the only record that survives all of them.
+ *
+ * Deliberately gated on a WRITE, not on the proposal. A proposed run the user
+ * never approved is not this conversation's quest, and pinning on the proposal
+ * would put a chip on threads that only ever offered to do the work. The pin
+ * appears when the first item lands and stays for the rest of the thread —
+ * the quest is what this conversation has been about from then on.
+ */
+function deriveActiveQuest(messages: UIMessage[]): ActiveQuest | null {
+  let runKey: string | null = null;
+  let title: string | null = null;
+  let ledgerNodeId: string | null = null;
+  let questLedgerNodeId: string | null = null;
+  let itemsRecorded = 0;
+
+  for (const m of messages) {
+    if (m.role !== "assistant") continue;
+    for (const part of m.parts) {
+      const p = part as {
+        type?: string;
+        state?: string;
+        input?: { ledgerRunKey?: unknown; quest?: unknown };
+        output?: { ok?: boolean; ledgerNodeId?: unknown; questLedgerNodeId?: unknown };
+      };
+      // The proposal carries the human name and the quest DATABASE id;
+      // remember both even though the pin itself waits for a write.
+      if (p.type === "tool-propose_item_iteration") {
+        if (typeof p.input?.quest === "string") title = p.input.quest;
+        if (typeof p.output?.questLedgerNodeId === "string") {
+          questLedgerNodeId = p.output.questLedgerNodeId;
+        }
+      }
+      if (
+        p.type === "tool-record_iteration_findings" &&
+        typeof p.output?.questLedgerNodeId === "string"
+      ) {
+        questLedgerNodeId = p.output.questLedgerNodeId;
+      }
+      if (p.type !== "tool-record_item_result" || p.state !== "output-available") continue;
+      const key = p.input?.ledgerRunKey;
+      if (typeof key !== "string" || !key.startsWith("quest:")) continue;
+      if (p.output?.ok === false) continue; // a refused write is not a write
+      runKey = key;
+      itemsRecorded += 1;
+      if (typeof p.output?.ledgerNodeId === "string") {
+        ledgerNodeId = p.output.ledgerNodeId;
+      }
+    }
+  }
+
+  if (!runKey) return null;
+  return {
+    runKey,
+    title: title ?? questTitleFromRunKey(runKey),
+    ledgerNodeId,
+    questLedgerNodeId,
+    itemsRecorded,
+  };
+}
+
 /**
  * Auto-resume predicate for the client-executed `read_page_in_browser` tool
  * (Agentic Browsing Phase 0). The server stops the stream at the tool call (no
@@ -678,16 +783,43 @@ export interface ActiveCharter {
  * server-tool turn stops on a resolved tool at the `stopWhen` step-count limit,
  * which would defeat that bound and risk a runaway loop.
  */
-/** The one client-executed document-edit tool (see editor-tools.ts). */
+/** Client-executed document tools (see editor-tools.ts). */
 export const EDIT_TOOL_APPLY_DIFF = "apply_diff";
+export const EDIT_TOOL_APPEND = "append_to_document";
+export const EDIT_TOOL_OUTLINE = "list_document_outline";
 
-/** A document edit the engine hands to the surface that owns the live editor. */
-export interface ClientEditRequest {
-  type: "apply_diff";
-  toolCallId: string;
-  before: string;
-  after: string;
-}
+/**
+ * Every tool resolved against the live editor rather than on the server.
+ *
+ * The resume predicate below reads this set. A client-executed tool missing from
+ * it resolves but never re-POSTs, so the model stalls mid-turn with a completed
+ * tool call and no continuation.
+ */
+export const CLIENT_EXECUTED_EDIT_TOOLS: readonly string[] = [
+  EDIT_TOOL_APPLY_DIFF,
+  EDIT_TOOL_APPEND,
+  EDIT_TOOL_OUTLINE,
+];
+
+/** A document operation the engine hands to the surface that owns the live editor. */
+export type ClientEditRequest =
+  | {
+      type: "apply_diff";
+      toolCallId: string;
+      before: string;
+      after: string;
+      /** Optional block handle scoping the search (see block-handles.ts). */
+      handle?: string;
+    }
+  | {
+      type: "append_to_document";
+      toolCallId: string;
+      markdown: string;
+    }
+  | {
+      type: "list_document_outline";
+      toolCallId: string;
+    };
 
 /**
  * The honest outcome of a client-executed edit.
@@ -719,7 +851,9 @@ function lastMessageHasResolvedEdit({
   );
   const editParts = message.parts
     .slice(lastStepStart + 1)
-    .filter((part) => part.type === `tool-${EDIT_TOOL_APPLY_DIFF}`) as Array<{
+    .filter((part) =>
+      CLIENT_EXECUTED_EDIT_TOOLS.some((name) => part.type === `tool-${name}`),
+    ) as Array<{
     state?: string;
   }>;
   return (
@@ -983,10 +1117,14 @@ function coBrowseSnapshotOrDelta(
   const url = snap.data.url ?? "";
   const elements = shapeCoBrowseElements(snap.data.nodes ?? []);
   const base = coBrowseDeltaBase;
+  // Same DOCUMENT, not same URL: a query-string change (`?currentJobId=` on
+  // every LinkedIn card click) is state within the page, and forcing a
+  // keyframe on it made 55 of 65 results full snapshots. The churn ratio
+  // below still keyframes when a same-path change really replaced the page.
   const mustKeyframe =
     mode === "full" ||
     !base ||
-    base.url !== url ||
+    coBrowsePageIdentity(base.url) !== coBrowsePageIdentity(url) ||
     base.actsSinceKeyframe >= DELTA_KEYFRAME_EVERY;
   if (mustKeyframe) {
     setCoBrowseDeltaBase(url, elements, 0);
@@ -1096,12 +1234,20 @@ function deriveActiveItemIteration(
   batchSize: number | null;
   /** itemsRecorded value at the last record_batch_checkpoint (0 = none yet). */
   itemsAtLastCheckpoint: number;
+  /**
+   * The approved items' URLs, normalized (P6). A read of one of THESE is an
+   * item; any other read during the run is research and must not be told
+   * to "record this as an unreadable item" (prod 2026-09-27: a 403 on
+   * seatgeek.com/about was answered with exactly that).
+   */
+  itemUrls: Set<string>;
 } | null {
   let active: {
     itemBudget: number;
     itemsRecorded: number;
     batchSize: number | null;
     itemsAtLastCheckpoint: number;
+    itemUrls: Set<string>;
   } | null = null;
   for (const m of messages) {
     if (m.role !== "assistant") continue;
@@ -1112,9 +1258,20 @@ function deriveActiveItemIteration(
         p.state === "output-available"
       ) {
         const out = p.output as
-          | { ok?: boolean; itemBudget?: number; batchSize?: number | null }
+          | {
+              ok?: boolean;
+              itemBudget?: number;
+              batchSize?: number | null;
+              items?: Array<{ url?: unknown }>;
+            }
           | undefined;
         if (out?.ok && typeof out.itemBudget === "number" && out.itemBudget > 0) {
+          const itemUrls = new Set<string>();
+          for (const item of Array.isArray(out.items) ? out.items : []) {
+            if (typeof item?.url === "string" && item.url.trim()) {
+              itemUrls.add(normalizeItemUrl(item.url));
+            }
+          }
           active = {
             itemBudget: out.itemBudget,
             itemsRecorded: 0,
@@ -1123,6 +1280,7 @@ function deriveActiveItemIteration(
                 ? out.batchSize
                 : null,
             itemsAtLastCheckpoint: 0,
+            itemUrls,
           };
         }
       } else if (
@@ -1596,15 +1754,84 @@ export function useConversationEngine({
     null,
   );
 
-  const attachCharter = useCallback((item: SuggestionItem) => {
-    setActiveCharterId(item.id);
-    setActiveCharterTitle(item.label);
-  }, []);
+  /**
+   * The user dismissed the charter this chat is BOUND to.
+   *
+   * Needed because clearing the pick is not enough (owner report 2026-09-18:
+   * "detach didn't work in a side chat on the charter itself"). `boundCharter`
+   * below re-derives from `contentId` the moment `activeCharterId` goes null,
+   * so in a side chat opened ON a charter the X cleared the pick and the chip
+   * reappeared in the same render — inert by construction.
+   *
+   * It cannot be expressed as `charterId: null` in the request body either:
+   * null already means "nothing picked", which is what every fresh side chat
+   * sends, and the server binds from contentId in exactly that case. Detached
+   * is a third state and needs its own signal.
+   */
+  const [charterDetached, setCharterDetached] = useState(false);
+
+  /**
+   * Where the dismissal is remembered.
+   *
+   * Re-binding on reopen is right for a NEW chat — the binding is a property
+   * of what the chat was opened on. It is wrong for an EXISTING one (owner,
+   * 2026-09-18): a detach there is a decision about *that conversation*, and
+   * making the user repeat it every reload is the same inert button in slower
+   * motion. Keyed exactly like the output target, which persists per chat for
+   * the same reason.
+   */
+  const charterDetachedKey = conversationId
+    ? `dg:charter-detached:conv:${conversationId}`
+    : contentId
+      ? `dg:charter-detached:content:${contentId}`
+      : null;
+
+  // Hydrate on key change — ChatPanel stays mounted while the active
+  // conversation switches, so this must reload per chat rather than leak the
+  // previous one's dismissal into the next.
+  useEffect(() => {
+    if (!charterDetachedKey) {
+      setCharterDetached(false);
+      return;
+    }
+    try {
+      setCharterDetached(
+        window.localStorage.getItem(charterDetachedKey) === "1",
+      );
+    } catch {
+      setCharterDetached(false); // private mode / storage disabled
+    }
+  }, [charterDetachedKey]);
+
+  const persistCharterDetached = useCallback(
+    (detached: boolean) => {
+      if (!charterDetachedKey) return;
+      try {
+        if (detached) window.localStorage.setItem(charterDetachedKey, "1");
+        else window.localStorage.removeItem(charterDetachedKey);
+      } catch {
+        // Best-effort: the in-memory state still holds for this session.
+      }
+    },
+    [charterDetachedKey],
+  );
+
+  const attachCharter = useCallback(
+    (item: SuggestionItem) => {
+      setActiveCharterId(item.id);
+      setActiveCharterTitle(item.label);
+      setCharterDetached(false); // an explicit pick undoes an earlier dismissal
+      persistCharterDetached(false);
+    },
+    [persistCharterDetached],
+  );
 
   const detachCharter = useCallback(() => {
     setActiveCharterId(null);
     setActiveCharterTitle(null);
-  }, []);
+    setCharterDetached(true);
+    persistCharterDetached(true);
+  }, [persistCharterDetached]);
 
   // BOUND CHARTER (owner directive 2026-09-11): a chat opened ON a charter is
   // attached to it without a /charter pick. The server resolves the binding
@@ -1613,10 +1840,10 @@ export function useConversationEngine({
   // what the model got agree. An explicit pick still wins.
   const boundCharter = useMemo(
     () =>
-      !activeCharterId && contentId
+      !activeCharterId && !charterDetached && contentId
         ? (charters.find((c) => c.id === contentId) ?? null)
         : null,
-    [activeCharterId, contentId, charters],
+    [activeCharterId, charterDetached, contentId, charters],
   );
   const effectiveCharterId = activeCharterId ?? boundCharter?.id ?? null;
   const effectiveCharterTitle =
@@ -1954,21 +2181,42 @@ export function useConversationEngine({
       // outcome. Previously the server returned an edit payload plus a write
       // receipt, so the model and the receipt chip both reported success before the
       // client had tried — and a failure never travelled back at all.
-      if (toolCall.toolName === EDIT_TOOL_APPLY_DIFF) {
-        const input = (toolCall.input ?? {}) as { before?: string; after?: string };
+      if (CLIENT_EXECUTED_EDIT_TOOLS.includes(toolCall.toolName)) {
+        const input = (toolCall.input ?? {}) as {
+          before?: string;
+          after?: string;
+          handle?: string;
+          markdown?: string;
+        };
         const execute = editExecutorRef?.current;
+
+        let request: ClientEditRequest;
+        if (toolCall.toolName === EDIT_TOOL_APPEND) {
+          request = {
+            type: "append_to_document",
+            toolCallId: toolCall.toolCallId,
+            markdown: input.markdown ?? "",
+          };
+        } else if (toolCall.toolName === EDIT_TOOL_OUTLINE) {
+          request = {
+            type: "list_document_outline",
+            toolCallId: toolCall.toolCallId,
+          };
+        } else {
+          request = {
+            type: "apply_diff",
+            toolCallId: toolCall.toolCallId,
+            before: input.before ?? "",
+            after: input.after ?? "",
+            ...(input.handle ? { handle: input.handle } : {}),
+          };
+        }
+
         const output = execute
-          ? (
-              await execute({
-                type: "apply_diff",
-                toolCallId: toolCall.toolCallId,
-                before: input.before ?? "",
-                after: input.after ?? "",
-              })
-            ).message
-          : "No document editor is available in this surface, so the edit was not applied. Ask the user to open the document, or write to it with updateNote instead.";
+          ? (await execute(request)).message
+          : "No document editor is available in this surface, so nothing was read or changed. Ask the user to open the document, or write to it with update_note instead.";
         chat.addToolResult({
-          tool: EDIT_TOOL_APPLY_DIFF,
+          tool: toolCall.toolName,
           toolCallId: toolCall.toolCallId,
           output,
         });
@@ -1983,6 +2231,28 @@ export function useConversationEngine({
         toolCall.toolName === CO_BROWSE_ACT
       ) {
         const toolName = toolCall.toolName;
+        // LOOP GUARD (owner report 2026-09-18). A blocked tab drew eight
+        // identical co_browse_open calls across ten steps; nothing noticed the
+        // repetition, because each request re-reads a transcript where the
+        // failure is just one more thing that happened. Refuse the third
+        // identical FAILING call and say what else is available — cheaper than
+        // another round trip to the same wall, and it lands as a tool result
+        // the model can act on.
+        const priorFailures = countRepeatedFailures(
+          chat.messages,
+          toolName,
+          toolCall.input,
+        );
+        if (priorFailures >= 2) {
+          chat.addToolResult({
+            tool: toolName,
+            toolCallId: toolCall.toolCallId,
+            output:
+              `Not attempted: this exact ${toolName} call has already failed ${priorFailures} times this turn, so it will fail again. ` +
+              "Change something or change approach — for a blocked tab, `newTab: true` drives a fresh one; otherwise tell the user what is blocking you and what you need from them.",
+          });
+          return;
+        }
         const input = (toolCall.input ?? {}) as {
           url?: string;
           action?: string;
@@ -2010,10 +2280,18 @@ export function useConversationEngine({
               newTab: (input as { newTab?: boolean }).newTab === true,
             });
             if (!opened.ok) {
+              const reason = opened.error ?? "unknown error";
+              // A blocked tab used to report only the obstacle, so the model
+              // reissued the identical call eight times before stumbling on
+              // the way out (production, 2026-09-18). The escape hatch has
+              // always existed — `newTab: true` — so the failure says so.
+              const wayOut = /already attached/i.test(reason)
+                ? " That tab is held by another debugger — most often DevTools being open on it. Do NOT retry this same call: either call co_browse_open again with `newTab: true` to drive a fresh tab instead, or tell the user to close DevTools on that tab and say you will wait."
+                : "";
               chat.addToolResult({
                 tool: toolName,
                 toolCallId: toolCall.toolCallId,
-                output: `Could not start co-browsing: ${opened.error ?? "unknown error"}.`,
+                output: `Could not start co-browsing: ${reason}.${wayOut}`,
               });
               return;
             }
@@ -2291,7 +2569,7 @@ export function useConversationEngine({
         chat.addToolResult({
           tool: toolName,
           toolCallId: toolCall.toolCallId,
-          output: `Research page budget reached (${run.pageBudget} pages read). Stop reading now — synthesize from what you already have (createNote with a summary + a markdown table), then call record_research_findings.`,
+          output: `Research page budget reached (${run.pageBudget} pages read). Stop reading now — synthesize from what you already have (create_note with a summary + a markdown table), then call record_research_findings.`,
         });
         return;
       }
@@ -2301,11 +2579,20 @@ export function useConversationEngine({
       // read tools only (a read is how the NEXT item starts) so mid-item acting
       // is never broken. Fail-open: no active iteration → path skipped entirely.
       const iteration = deriveActiveItemIteration(chat.messages);
+      // P6: an item read is a read of one of the APPROVED items; every other
+      // read during a run (employer research, a guide) is not an item and
+      // gets research guidance instead of "record it unreadable". A run
+      // whose items carry no URLs (label-keyed) keeps the old behaviour —
+      // there is nothing to compare against.
+      const isItemRead =
+        !!iteration &&
+        (iteration.itemUrls.size === 0 ||
+          iteration.itemUrls.has(normalizeItemUrl(url)));
       if (iteration && iteration.itemsRecorded >= iteration.itemBudget) {
         chat.addToolResult({
           tool: toolName,
           toolCallId: toolCall.toolCallId,
-          output: `Item budget reached (${iteration.itemsRecorded}/${iteration.itemBudget} items recorded). Stop starting new items — write the roll-up now (createNote: summary + a markdown table of items/verdicts), then close with record_iteration_findings.`,
+          output: `Item budget reached (${iteration.itemsRecorded}/${iteration.itemBudget} items recorded). Stop starting new items — write the roll-up now (create_note: summary + a markdown table of items/verdicts), then close with record_iteration_findings.`,
         });
         return;
       }
@@ -2348,7 +2635,8 @@ export function useConversationEngine({
         let escalationNote: string | undefined;
         if (isBrowserRead && !researchRunRef.current) {
           const currentLen = outcome.content?.content?.trim().length ?? 0;
-          if (!outcome.ok || currentLen < 800) {
+          // Navigation chrome (P7) is thin whatever its length.
+          if (!outcome.ok || currentLen < 800 || outcome.content?.contentNote) {
             const launched = await launchTabAndRead(url);
             const launchedLen = launched.content?.content?.trim().length ?? 0;
             if (launched.ok && launchedLen > currentLen) {
@@ -2377,10 +2665,12 @@ export function useConversationEngine({
           // it and the ledger under-counts (observed live: a 190-char page dropped
           // from a 10-item run). Structural backstop to the prompt's "record every
           // attempt" rule.
-          const thin = (c.content?.trim().length ?? 0) < 500;
+          const thin = (c.content?.trim().length ?? 0) < 500 || !!c.contentNote;
           const iterationNote =
             iteration && thin
-              ? "This page has no substantial job description (near-empty). It is still an attempted item — call record_item_result with status=unreadable and a one-line reason BEFORE reading the next tab. Do not skip it."
+              ? isItemRead
+                ? "This page has no substantial job description (near-empty or navigation only). It is still an attempted item — call record_item_result with status=unreadable and a one-line reason BEFORE reading the next tab. Do not skip it."
+                : "This page has no substantial content (near-empty or navigation only). It is NOT one of the run's items — do not record it as one; note the gap and continue. If it was employer research, search_web (when available) can find official sources."
               : undefined;
           chat.addToolResult({
             tool: toolName,
@@ -2397,6 +2687,9 @@ export function useConversationEngine({
               // The escalation summary (if any) — the model relays it so the user
               // sees the steps (normal read → visible-tab open) it actually took.
               ...(escalationNote ? { escalationNote } : {}),
+              // P7: the body is a link list, not the article — say so, in
+              // its own field, so the model never reads a menu as content.
+              ...(c.contentNote ? { contentNote: c.contentNote } : {}),
               ...(iterationNote ? { iterationNote } : {}),
             },
           });
@@ -2410,8 +2703,12 @@ export function useConversationEngine({
                 : `Could not read the page: ${outcome.reason ?? "unknown error"}.${escalationNote ? ` ${escalationNote}` : ""}`) +
               // A failed read during an iteration is still an attempted item —
               // record it, don't silently skip (keeps the ledger complete).
+              // A failed RESEARCH read is not an item (P6): say what it is
+              // and what to do instead.
               (iteration
-                ? " This is an attempted iteration item — call record_item_result with status=unreadable (or blocked) for it before moving to the next tab."
+                ? isItemRead
+                  ? " This is an attempted iteration item — call record_item_result with status=unreadable (or blocked) for it before moving to the next tab."
+                  : " This URL is NOT one of the run's items — do not record it as one. If it was research (an employer page, a guide), record what is missing as a gap on the current item and continue; search_web (when available) can find official sources when a page is blocked."
                 : ""),
           });
         }
@@ -2589,6 +2886,50 @@ export function useConversationEngine({
     resumeStream,
   } = chat;
 
+  // ── cache volley (ITERATION-RUN-HARNESS-FIXES §10 round 3) ──
+  // A turn stopped on a pending approval keeps its prompt in the provider's
+  // cache only for the cache's lifetime (Anthropic 5 min, older OpenAI 5–10).
+  // ONE volley shortly before that lapses re-reads the cached prefix, which
+  // refreshes it, so an approval answered within ~10 minutes still resumes
+  // warm. Providers whose cache outlives the window (GPT-5.6+, 30 min) and
+  // providers with no controllable cache get none (`cacheVolleyDelayMs`).
+  // Cancelled when the approval is answered, the chat changes, or the
+  // surface unmounts; never repeated for the same pending approvals.
+  const volleyedApprovalsRef = useRef<Set<string>>(new Set());
+  // When each pending approval was first seen — the delay is measured from
+  // there, so an unrelated re-render cannot restart the clock past expiry.
+  const pendingSinceRef = useRef<Map<string, number>>(new Map());
+  useEffect(() => {
+    if (status !== "ready") return;
+    const key = pendingApprovalKey(messages);
+    if (!key || volleyedApprovalsRef.current.has(key)) return;
+    const last = messages[messages.length - 1];
+    const route = (last?.metadata as { modelRoute?: { providerId?: string; modelId?: string } } | undefined)
+      ?.modelRoute;
+    const delay = cacheVolleyDelayMs(route?.providerId ?? providerId, route?.modelId ?? modelId);
+    if (delay === null) return;
+    const baseline = lastSentBodies.get(conversationKey);
+    if (!baseline) return;
+    const now = Date.now();
+    const since = pendingSinceRef.current.get(key) ?? now;
+    pendingSinceRef.current.set(key, since);
+    const timer = setTimeout(() => {
+      volleyedApprovalsRef.current.add(key);
+      void fetch("/api/ai/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...baseline,
+          id: conversationKey,
+          messages: compactToolOutputs(messages),
+          trigger: "submit-message",
+          warmOnly: true,
+        }),
+      }).catch(() => null);
+    }, Math.max(0, delay - (now - since)));
+    return () => clearTimeout(timer);
+  }, [status, messages, providerId, modelId, conversationKey]);
+
   // ── active playbook: derived phase index (AI v3.2 T3) ──
   // Phase index is DERIVED from the message history, not manually
   // incremented — the count of phase_checkpoint tool calls that have
@@ -2633,6 +2974,14 @@ export function useConversationEngine({
     };
   }, [effectiveCharterId, effectiveCharterTitle, charters, resolvedPhaseIndex]);
 
+  // The quest this thread writes into. Recomputed from messages so it survives
+  // the request boundaries a run spans, and so reopening the conversation
+  // restores the pin from the transcript rather than from lost state.
+  const activeQuest = useMemo<ActiveQuest | null>(
+    () => deriveActiveQuest(messages),
+    [messages],
+  );
+
   // Stream-time freshness (v3.1 R2): dispatch artifact refresh as tool
   // outputs ARRIVE in the stream, not just at turn end — a playbook turn
   // can run for minutes, and the file tree stayed stale the whole time.
@@ -2676,6 +3025,7 @@ export function useConversationEngine({
       // resumes / internal sends carry the same binding as the turn that
       // started them.
       charterId: effectiveCharterId,
+      charterDetached,
       activePhaseIndex: resolvedPhaseIndex,
       // Output-target chip (WS7): where new content lands by default.
       outputTarget,
@@ -2700,6 +3050,7 @@ export function useConversationEngine({
     providerId,
     modelId,
     effectiveCharterId,
+    charterDetached,
     resolvedPhaseIndex,
     outputTarget,
     modelPinned,
@@ -2768,6 +3119,23 @@ export function useConversationEngine({
     stopRequest();
     setMessages((current) => stopPendingToolCalls(current));
     clearFollowUps();
+    // Stop means STOP — including the browser (owner report 2026-09-18).
+    // Until now the debugger attachment outlived the conversation that opened
+    // it: only the indicator's own Stop bar ever detached, so a stopped run
+    // left the tab attached, Chrome still telling the user it was being
+    // debugged, and every later co-browse on that tab refused with "another
+    // debugger is already attached".
+    //
+    // Deliberately NOT done at turn end: a charter run spans several turns on
+    // one tab, and tearing down between them would re-open constantly and
+    // discard the user's page state — the thing BIND-FIRST exists to protect.
+    if (isCoBrowseActive()) {
+      markCoBrowseInactive(); // optimistic: drop the bar now
+      void coBrowseDetach().catch(() => {
+        // Best-effort: the tab may already be gone. The extension's own
+        // reclaim-on-attach covers whatever this misses.
+      });
+    }
   }, [stopRequest, setMessages, clearFollowUps]);
 
   // ── per-message provider + model stamping ──
@@ -3127,6 +3495,7 @@ export function useConversationEngine({
           viewedContent: getActiveViewedContentHint(),
           // Attached playbook (AI v3.2 T3).
           charterId: effectiveCharterId,
+          charterDetached,
           activePhaseIndex: resolvedPhaseIndex,
           // Output-target chip (WS7).
           outputTarget,
@@ -3157,6 +3526,7 @@ export function useConversationEngine({
     providerId,
     modelId,
     effectiveCharterId,
+    charterDetached,
     effectiveCharterTitle,
     activeCharter,
     resolvedPhaseIndex,
@@ -3183,6 +3553,7 @@ export function useConversationEngine({
       viewedContent: getActiveViewedContentHint(),
       // Attached playbook (AI v3.2 T3) rides re-runs too, for continuity.
       charterId: effectiveCharterId,
+      charterDetached,
       activePhaseIndex: resolvedPhaseIndex,
       // Output-target chip (WS7).
       outputTarget,
@@ -3196,6 +3567,7 @@ export function useConversationEngine({
       providerId,
       modelId,
       effectiveCharterId,
+      charterDetached,
       resolvedPhaseIndex,
       outputTarget,
       modelPinned,
@@ -3321,6 +3693,7 @@ export function useConversationEngine({
     folderGates,
     commandItems,
     activeCharter,
+    activeQuest,
     attachCharter,
     detachCharter,
     outputTarget,

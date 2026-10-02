@@ -17,6 +17,8 @@ on:
       - "lib/features/ai-connections/**"
       - "lib/features/settings/validation.ts"
       - "scripts/validate-ai-drift.ts"
+      - "scripts/validate-context-diet.ts"
+      - "scripts/validate-iteration-proposal.ts"
       - "scripts/generate-ai-capability-matrix.ts"
       - "docs/notes-feature/core/AI-CAPABILITY-MATRIX.md"
       - "package.json"
@@ -50,6 +52,12 @@ jobs:
 
       - name: Validate AI drift gates
         run: pnpm ai:drift:check
+
+      - name: Validate context-diet transforms
+        run: pnpm context:diet:check
+
+      - name: Validate proposal shapes reach execute
+        run: pnpm proposal:shape:check
 
       - name: Validate capability matrix freshness
         run: pnpm ai:matrix:check
