@@ -356,18 +356,28 @@ export function MarkdownEditor({
     }
     setYdocContentReady(false);
     const fragment = runtimeYdoc.getXmlFragment("default");
+    // This observer removes ITSELF once content arrives, so the cleanup below
+    // must not remove it a second time — yjs logs "Tried to remove event
+    // handler that doesn't exist" for the duplicate. One flag, one removal,
+    // whichever path gets there first.
+    let observing = false;
+    const stopObserving = () => {
+      if (!observing) return;
+      observing = false;
+      fragment.unobserveDeep(evaluate);
+    };
     const evaluate = () => {
       if (ydocHasMeaningfulDefaultContent(runtimeYdoc)) {
         setYdocContentReady(true);
         // Once content is present it stays present for binding purposes; stop
-        // paying for the transform on every structural mutation.
-        fragment.unobserveDeep(evaluate);
+        // paying for the (full fromYdoc) transform on every structural
+        // mutation.
+        stopObserving();
       }
     };
     fragment.observeDeep(evaluate);
-    return () => {
-      fragment.unobserveDeep(evaluate);
-    };
+    observing = true;
+    return stopObserving;
   }, [runtimeYdoc]);
   // Anti-blank-document guard (the whole point of this component's care around
   // collaboration): the editor may bind to the collaborative Y.Doc only when
