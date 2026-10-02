@@ -34,9 +34,12 @@ const heading = (level: number, text: string) => ({
 const doc = (...content: unknown[]) => ({ type: "doc", content });
 
 async function main() {
-  const { compareVersions, toComparableLines } = await import(
-    "@/lib/domain/content/conflict-diff"
-  );
+  const {
+    compareVersions,
+    toComparableLines,
+    sameProjectedText,
+    sameCanonicalJson,
+  } = await import("@/lib/domain/content/conflict-diff");
 
   console.log("\nprojection");
 
@@ -71,8 +74,43 @@ async function main() {
   const same = compareVersions(doc(heading(1, "Job Hunting"), para("Body")), doc(heading(1, "Job Hunting"), para("Body")));
   check("no additions", same.added, 0);
   check("no removals", same.removed, 0);
-  check("reported identical", same.identical, true);
+  check("reported text-identical", same.textIdentical, true);
+  check("reported structurally identical", same.structurallyIdentical, true);
   check("no sections flagged", same.changedSections, []);
+
+  console.log("\nsame words, different structure");
+
+  // THE CASE THIS RESOLVER EXISTS TO EXPLAIN. A save is refused on a hash over
+  // the whole node tree; this diff compares a TEXT projection. When a doc
+  // round-trips through the server sanitizer or comes back as a Y.doc snapshot
+  // from the collaboration schema, attributes materialize differently for prose
+  // that is word-for-word the same. Collapsing both facts into one `identical`
+  // flag made the dialog announce "the two versions are identical" over a live
+  // block — the app contradicting itself (owner report, 2026-09-17).
+  const structural = compareVersions(
+    doc({ ...heading(1, "Job Hunting"), attrs: { level: 1, textAlign: null } }, para("Body")),
+    doc(heading(1, "Job Hunting"), para("Body")),
+  );
+  check("the words match", structural.textIdentical, true);
+  check("the JSON does not", structural.structurallyIdentical, false);
+  check("so the diff shows nothing added", structural.added, 0);
+  check("and nothing removed", structural.removed, 0);
+
+  console.log("\nthe two questions, asked directly");
+
+  // `sameProjectedText` is what decides whether a stashed conflict draft is
+  // worth re-raising on load. Answering that with canonical JSON is what left a
+  // permanent, per-document save-pause: the stash is raw editor JSON and the
+  // server copy is sanitized, so they never matched (PR #237's check).
+  const rawDraft = doc(para("Body"));
+  const sanitizedServerCopy = doc({ ...para("Body"), attrs: { textAlign: null } });
+  check("a sanitized round-trip still READS the same", sameProjectedText(rawDraft, sanitizedServerCopy), true);
+  check("but is not the same JSON", sameCanonicalJson(rawDraft, sanitizedServerCopy), false);
+  check("key order alone is not a difference", sameCanonicalJson(
+    { type: "doc", content: [para("Body")] },
+    { content: [para("Body")], type: "doc" },
+  ), true);
+  check("a real edit is not the same text", sameProjectedText(doc(para("one")), doc(para("two"))), false);
 
   console.log("\na real edit");
 
@@ -92,7 +130,8 @@ async function main() {
   );
   const edit = compareVersions(mine, theirs);
 
-  check("not identical", edit.identical, false);
+  check("not text-identical", edit.textIdentical, false);
+  check("and not structurally identical either", edit.structurallyIdentical, false);
   check("one line added", edit.added, 1);
   check("one line removed", edit.removed, 1);
   // The orienting fact. In a 70-block charter, naming the section beats every
@@ -131,7 +170,8 @@ async function main() {
   check("theirs counted from theirs", grew.theirs.words, 1);
 
   console.log("\nempty and missing documents");
-  check("both empty is identical", compareVersions(null, null).identical, true);
+  check("both empty is text-identical", compareVersions(null, null).textIdentical, true);
+  check("both empty is structurally identical", compareVersions(null, null).structurallyIdentical, true);
   const fromNothing = compareVersions(doc(para("new")), null);
   check("everything is an addition against nothing", fromNothing.added, 1);
 

@@ -850,16 +850,41 @@ export function BookReader({ contentId }: { contentId: string }) {
           <ChevronLeft className="h-3.5 w-3.5" /> Prev
         </button>
         <span className="max-w-[30%] truncate">{location.label ?? ""}</span>
-        <input
-          type="range"
-          aria-label="Position in book"
-          min={0}
-          max={1000}
-          value={Math.round(location.fraction * 1000)}
-          onChange={(event) => void viewRef.current?.goToFraction(Number(event.target.value) / 1000)}
-          className="min-w-0 flex-1"
-        />
-        <span>{Math.round(location.fraction * 100)}%</span>
+        {phase === "ready" ? (
+          <>
+            <input
+              type="range"
+              aria-label="Position in book"
+              min={0}
+              max={1000}
+              value={Math.round(location.fraction * 1000)}
+              onChange={(event) => void viewRef.current?.goToFraction(Number(event.target.value) / 1000)}
+              className="min-w-0 flex-1"
+            />
+            <span>{Math.round(location.fraction * 100)}%</span>
+          </>
+        ) : (
+          // Before the book reports its position, a slider pinned hard left
+          // reading "0%" asserts something we do not know — it reads as "you
+          // are at the very beginning", which is wrong for anyone resuming,
+          // and it flashes that wrong answer every single open. Say nothing
+          // instead. The placeholders hold the row's exact footprint so the
+          // real controls appear in place rather than shoving the row around.
+          <>
+            <div
+              aria-hidden
+              className={`h-1 min-w-0 flex-1 rounded-full bg-black/10 dark:bg-white/10 ${
+                phase === "loading" ? "animate-pulse" : ""
+              }`}
+            />
+            <div
+              aria-hidden
+              className={`h-3 w-7 rounded bg-black/10 dark:bg-white/10 ${
+                phase === "loading" ? "animate-pulse" : ""
+              }`}
+            />
+          </>
+        )}
         <button type="button" onClick={() => void viewRef.current?.goRight()} className={pageButton} title="Next page (→)">
           Next <ChevronRight className="h-3.5 w-3.5" />
         </button>

@@ -9,7 +9,10 @@
 "use client";
 
 import { createElement, useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { stableStringify } from "@/lib/core/stable-stringify";
+import {
+  sameProjectedText,
+  sameCanonicalJson,
+} from "@/lib/domain/content/conflict-diff";
 import type { SaveMeta } from "@/lib/domain/content/save-meta";
 import { usePathname } from "next/navigation";
 import { AlertTriangle } from "lucide-react";
@@ -86,6 +89,13 @@ import type { JSONContent } from "@tiptap/core";
 import type { EditorStats } from "../editor/MarkdownEditor";
 import type { OutlineHeading } from "@/lib/domain/content/outline-extractor";
 import { extractOutline } from "@/lib/domain/content/outline-extractor";
+import { useViewportMemory } from "@/lib/domain/content/use-viewport-memory";
+import {
+  cacheTabPayload,
+  invalidateTabPayload,
+  readTabPayload,
+  shouldApplyRevalidation,
+} from "@/lib/domain/content/tab-payload-cache";
 import { getViewerExtensions } from "@/lib/domain/editor/extensions-client";
 import { sanitizeTipTapJsonWithExtensions } from "@/lib/domain/editor/unsupported-content";
 import { resolveWikiLinkTarget } from "@/lib/domain/editor/wiki-link-resolve";
@@ -535,6 +545,20 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
     initialContent: contentType === "note" ? noteContent : null,
   });
 
+  // Whether this pane is currently bound to a live collaborative document,
+  // held in a ref so the fetch effect can consult it without taking the
+  // runtime object as a reactive dependency (its identity changes often).
+  //
+  // "Collaborative" here means the editor is bound to a Y.Doc — both
+  // `canonical` and `localFallback` are, and only `plainFallback` is reading
+  // the REST payload. Re-applying REST content over a Y.Doc-bound editor is
+  // the rival-document mistake CONTENT-LOAD-CASCADE §9.4 warns about.
+  const isCollaborativeRef = useRef(false);
+  isCollaborativeRef.current = Boolean(
+    collaborationRuntime &&
+      collaborationRuntime.state.availabilityState !== "plainFallback"
+  );
+
   // AbortController for in-flight save requests. When the user navigates to
   // a different document, we abort any pending fetch to prevent Doc A's content
   // from being written to Doc B's API endpoint.
@@ -655,8 +679,234 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
     // the commit, not the fetch.
     let cancelled = false;
 
+    // Everything that turns a content payload into on-screen state. Extracted
+    // so the warm-cache path and the network path paint through EXACTLY the
+    // same cascade — a second copy of this would be a drift bug waiting to
+    // happen.
+    const applyContentData = (data: ContentResponse["data"]) => {
+      // Capture the optimistic-concurrency baseline for the plain/REST save
+      // path. (SSR fast-path results have no note.bodyHash; that's fine —
+      // the first real save just proceeds without an If-Match.)
+      bodyHashRef.current = data.note?.bodyHash ?? null;
+
+      setNoteTitle(data.title);
+      setContentParentId(data.parentId);
+      setContentIsPublished(Boolean(data.isPublished));
+      setContentType(data.contentType);
+      setContentMimeType(data.file?.mimeType ?? null);
+      setContentExternalResourceType(data.external?.resourceType ?? null);
+      // Stamp WHICH item these type facts describe. The render guard
+      // (`contentTypeFor !== selectedContentId` → skeleton) exists because
+      // viewers were drawing a new id using the previous item's type facts —
+      // a link viewer fetched the old URL's preview, the book reader opened a
+      // session. The warm-cache path must stamp it too: these facts come from
+      // the cached payload FOR THIS id, so the guard is satisfied honestly,
+      // and without this the warm paint would hit the skeleton anyway and the
+      // whole no-unmount switch would be defeated.
+      setContentTypeFor(selectedContentId);
+      setContentCustomIcon(data.customIcon ?? null);
+      setContentIconColor(data.iconColor ?? null);
+      setOwnedByNote(data.ownedByNote ?? null);
+      // Provide creation/updated dates to inline-timestamp nodes
+      setDocumentDates(
+        data.createdAt ? new Date(data.createdAt).toISOString().slice(0, 10) : "",
+        data.updatedAt ? new Date(data.updatedAt).toISOString().slice(0, 10) : ""
+      );
+      updateContentTab(selectedContentId, {
+        title: data.title,
+        contentType: data.contentType,
+        isTemporary: false,
+      });
+
+      setPromotedFromRow(
+        data.promotedFromRow
+          ? {
+              ...data.promotedFromRow,
+              role: data.role ?? "primary",
+            }
+          : null
+      );
+
+      // Store payload data for Phase 2 content types
+      switch (data.contentType) {
+        case "folder":
+          setContentData(data.folder);
+          break;
+        case "external":
+          setContentData(data.external);
+          break;
+        case "chat":
+          setContentData(data.chat);
+          break;
+        case "visualization":
+          setContentData(data.visualization);
+          break;
+        case "data":
+          setContentData(data.data);
+          break;
+        case "hope":
+          setContentData(data.hope);
+          break;
+        case "workflow":
+          setContentData(data.workflow);
+          break;
+        default:
+          setContentData(null);
+      }
+
+      // Load note content (or empty document if no payload)
+      if (data.note?.tiptapJson) {
+        try {
+          // tiptapJson is stored as Prisma Json type, ensure it's proper JSONContent
+          const content = typeof data.note.tiptapJson === 'string'
+            ? JSON.parse(data.note.tiptapJson)
+            : data.note.tiptapJson;
+
+          // Validate that it's a valid TipTap document
+          if (!content || typeof content !== 'object' || !content.type) {
+            clientLogger.warn({
+              layer: "editor",
+              event: "tiptap_load:invalid_structure",
+              summary: "invalid TipTap JSON, using empty document",
+              attrs: { content_id: selectedContentId },
+            });
+            const emptyDoc = {
+              type: "doc",
+              content: [{ type: "paragraph" }],
+            };
+            setNoteContent(emptyDoc);
+
+            // Extract initial outline
+            const initialOutline = extractOutline(emptyDoc);
+            setOutline(selectedContentId, initialOutline);
+          } else {
+            const validContent = content as JSONContent;
+            const sanitized = sanitizeTipTapJsonWithExtensions(
+              validContent,
+              getViewerExtensions()
+            );
+            if (
+              sanitized.rewritten.length > 0 &&
+              process.env.NODE_ENV === "development"
+            ) {
+              clientLogger.warn({
+                layer: "editor",
+                event: "tiptap_load:rewrote_unsupported",
+                summary: "rewrote unsupported TipTap content while loading note",
+                attrs: { content_id: selectedContentId, rewritten_count: sanitized.rewritten.length },
+              });
+            }
+            setNoteContent(sanitized.json);
+
+            // Extract initial outline from loaded content
+            const initialOutline = extractOutline(sanitized.json);
+            setOutline(selectedContentId, initialOutline);
+          }
+        } catch (parseError) {
+          clientLogger.error({
+            layer: "editor",
+            event: "tiptap_load:parse_failed",
+            summary: "failed to parse TipTap JSON, using empty document",
+            attrs: { content_id: selectedContentId },
+            error: parseError,
+          });
+          const emptyDoc = {
+            type: "doc",
+            content: [{ type: "paragraph" }],
+          };
+          setNoteContent(emptyDoc);
+
+          // Extract initial outline
+          const initialOutline = extractOutline(emptyDoc);
+          setOutline(selectedContentId, initialOutline);
+        }
+      } else {
+        // No note payload — render empty doc
+        const emptyDoc = {
+          type: "doc",
+          content: [{ type: "paragraph" }],
+        };
+        setNoteContent(emptyDoc);
+
+        // Extract initial outline from loaded content
+        const initialOutline = extractOutline(emptyDoc);
+        setOutline(selectedContentId, initialOutline);
+      }
+
+      // Reload mid-conflict: if a prior session stashed unsaved edits for
+      // this doc, the server copy we just loaded is "theirs". Show the
+      // user's draft (not the server copy) and re-raise the conflict so it
+      // can be resolved — this is what preserves edits across a reload.
+      if (!cancelled && !isPageTemplateTab) {
+        const draft = loadConflictDraft(selectedContentId);
+        if (draft && bodyHashRef.current) {
+          // A stash IDENTICAL to the server copy has nothing to resolve.
+          // Left in place, it re-raises a conflict on EVERY load of this
+          // document: the view is replaced with the stale draft ("my edits
+          // revert when I come back") and handleSave pauses every save
+          // while a conflict exists ("nothing saves, even after the
+          // debounce") — a silent, permanent, per-document trap, keyed to
+          // whichever document once got a 409.
+          //
+          // Compare on the PROJECTION the resolver shows, not on canonical
+          // JSON. Canonical JSON cannot close this trap, because the two
+          // sides are not comparable by construction: the stash is raw
+          // editor JSON, while the server copy has been through
+          // `sanitizeTipTapJsonWithExtensions` (content PATCH) or is a Y.doc
+          // snapshot serialized by the collaboration schema (store hook) —
+          // both of which materialize attributes differently for prose that
+          // is word-for-word the same. So the check never fired where it was
+          // needed most, and the resolver opened announcing "the two
+          // versions are identical" over a block it could not explain.
+          //
+          // TRADE-OFF (owner call, 2026-09-17): a stash differing ONLY in
+          // formatting is discarded here. No writing is lost — the prose is
+          // by definition already on the server — and an unresolvable
+          // permanent save-pause is the worse failure. Logged distinctly so
+          // the cost is observable if it ever bites.
+          const serverJson = (data.note?.tiptapJson ?? null) as JSONContent | null;
+          if (serverJson && sameProjectedText(draft, serverJson)) {
+            const structuralOnly = !sameCanonicalJson(draft, serverJson);
+            clearConflictDraft(selectedContentId);
+            clientLogger.info({
+              layer: "ui",
+              event: "save_conflict:stale_draft_cleared",
+              summary: structuralOnly
+                ? "stashed conflict draft read the same as the server copy (structural difference only); cleared without raising"
+                : "stashed conflict draft matched the server copy; cleared without raising",
+              attrs: {
+                content_id: selectedContentId,
+                structural_only: structuralOnly,
+              },
+            });
+          } else {
+            setConflict({
+              contentId: selectedContentId,
+              mine: draft,
+              theirHash: bodyHashRef.current,
+            });
+            setNoteContent(draft);
+            setOutline(selectedContentId, extractOutline(draft));
+          }
+        }
+      }
+    };
+
+    // WARM SWITCH (CONTENT-LOAD-CASCADE §3.9). If this document is still in the
+    // MRU cache, paint it synchronously and never raise `isLoading` — which is
+    // what keeps `if (isLoading) return <EditorSkeleton />` from unmounting the
+    // editor subtree, and so keeps the reader's scroll position, the editor
+    // instance and its collaboration provider alive across the switch.
+    const warm = isPageTemplateTab
+      ? undefined
+      : readTabPayload<ContentResponse["data"]>(selectedContentId);
+    if (warm) {
+      setError(null);
+      applyContentData(warm.data);
+    }
+
     const fetchNote = async () => {
-      setIsLoading(true);
+      if (!warm) setIsLoading(true);
       setError(null);
 
       try {
@@ -789,182 +1039,87 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
 
         if (cancelled) return;
 
-        // Capture the optimistic-concurrency baseline for the plain/REST save
-        // path. (SSR fast-path results have no note.bodyHash; that's fine —
-        // the first real save just proceeds without an If-Match.)
-        bodyHashRef.current = result.data.note?.bodyHash ?? null;
-
-        setNoteTitle(result.data.title);
-        setContentParentId(result.data.parentId);
-        setContentIsPublished(Boolean(result.data.isPublished));
-        setContentType(result.data.contentType);
-        setContentMimeType(result.data.file?.mimeType ?? null);
-        setContentExternalResourceType(result.data.external?.resourceType ?? null);
-        setContentTypeFor(selectedContentId);
-        setContentCustomIcon(result.data.customIcon ?? null);
-        setContentIconColor(result.data.iconColor ?? null);
-        setOwnedByNote(result.data.ownedByNote ?? null);
-        // Provide creation/updated dates to inline-timestamp nodes
-        setDocumentDates(
-          result.data.createdAt ? new Date(result.data.createdAt).toISOString().slice(0, 10) : "",
-          result.data.updatedAt ? new Date(result.data.updatedAt).toISOString().slice(0, 10) : ""
-        );
-        updateContentTab(selectedContentId, {
-          title: result.data.title,
-          contentType: result.data.contentType,
-          isTemporary: false,
+        // Feed the MRU cache regardless of which path painted — the next
+        // switch back to this tab is the one that benefits.
+        cacheTabPayload(selectedContentId, result.data, {
+          bodyHash: result.data.note?.bodyHash ?? null,
+          updatedAt: result.data.updatedAt ?? null,
         });
 
-        setPromotedFromRow(
-          result.data.promotedFromRow
-            ? {
-                ...result.data.promotedFromRow,
-                role: result.data.role ?? "primary",
-              }
-            : null
-        );
+        if (warm) {
+          // Revalidation: the reader is ALREADY looking at the cached copy.
+          // Overwriting it is a real risk (see shouldApplyRevalidation), so
+          // the policy decides — the default is to leave the screen alone.
+          const freshBodyHash = result.data.note?.bodyHash ?? null;
+          // Read imperatively: pulling these in as reactive values would add
+          // them to this effect's dep array, and a dirty-flag flip would
+          // re-run the whole fetch cascade mid-edit.
+          const stats = useEditorStatsStore.getState();
+          const editorIsDirty = stats.hasUnsavedChanges || stats.isSaving;
 
-        // Store payload data for Phase 2 content types
-        switch (result.data.contentType) {
-          case "folder":
-            setContentData(result.data.folder);
-            break;
-          case "external":
-            setContentData(result.data.external);
-            break;
-          case "chat":
-            setContentData(result.data.chat);
-            break;
-          case "visualization":
-            setContentData(result.data.visualization);
-            break;
-          case "data":
-            setContentData(result.data.data);
-            break;
-          case "hope":
-            setContentData(result.data.hope);
-            break;
-          case "workflow":
-            setContentData(result.data.workflow);
-            break;
-          default:
-            setContentData(null);
-        }
+          const apply = shouldApplyRevalidation({
+            cachedBodyHash: warm.bodyHash,
+            freshBodyHash,
+            cachedUpdatedAt: warm.updatedAt,
+            freshUpdatedAt: result.data.updatedAt ?? null,
+            editorIsDirty,
+            isCollaborative: isCollaborativeRef.current,
+          });
+          if (!apply) {
+            // NOTE: we deliberately do NOT advance `bodyHashRef` here. It is
+            // tempting — a fresh hash would stop the next save from 409-ing.
+            // But the screen still shows the CACHED copy, so adopting the
+            // server's newer hash would let that stale copy overwrite the
+            // change we just declined to display, silently.
 
-        // Load note content (or empty document if no payload)
-        if (result.data.note?.tiptapJson) {
-          try {
-            // tiptapJson is stored as Prisma Json type, ensure it's proper JSONContent
-            const content = typeof result.data.note.tiptapJson === 'string'
-              ? JSON.parse(result.data.note.tiptapJson)
-              : result.data.note.tiptapJson;
+            // THE 50-300ms WINDOW. We painted from cache, the reader started
+            // typing before this revalidation landed, and the server's copy
+            // has genuinely moved. Their keystrokes are real and exist nowhere
+            // else, so we must not apply — but leaving it there means they
+            // keep writing onto a base that is already superseded, and only
+            // discover it when the autosave 409s a couple of seconds later.
+            //
+            // We already know, right now, what that save will find. So raise
+            // the conflict immediately instead of waiting to be told: same
+            // resolver, same three exits (Keep mine / Take theirs / Compare),
+            // nothing overwritten, just surfaced at the moment it became true
+            // rather than at the moment it became unavoidable.
+            const serverMoved =
+              freshBodyHash !== null &&
+              warm.bodyHash !== null &&
+              freshBodyHash !== warm.bodyHash;
 
-            // Validate that it's a valid TipTap document
-            if (!content || typeof content !== 'object' || !content.type) {
-              clientLogger.warn({
-                layer: "editor",
-                event: "tiptap_load:invalid_structure",
-                summary: "invalid TipTap JSON, using empty document",
-                attrs: { content_id: selectedContentId },
-              });
-              const emptyDoc = {
-                type: "doc",
-                content: [{ type: "paragraph" }],
-              };
-              setNoteContent(emptyDoc);
-
-              // Extract initial outline
-              const initialOutline = extractOutline(emptyDoc);
-              setOutline(selectedContentId, initialOutline);
-            } else {
-              const validContent = content as JSONContent;
-              const sanitized = sanitizeTipTapJsonWithExtensions(
-                validContent,
-                getViewerExtensions()
-              );
-              if (
-                sanitized.rewritten.length > 0 &&
-                process.env.NODE_ENV === "development"
-              ) {
-                clientLogger.warn({
-                  layer: "editor",
-                  event: "tiptap_load:rewrote_unsupported",
-                  summary: "rewrote unsupported TipTap content while loading note",
-                  attrs: { content_id: selectedContentId, rewritten_count: sanitized.rewritten.length },
+            if (serverMoved && editorIsDirty && !isCollaborativeRef.current) {
+              const live = useEditorInstanceStore
+                .getState()
+                .getEditor(selectedContentId)
+                ?.getJSON();
+              // Read the store directly rather than the reactive selector —
+              // same dep-array reason as above. Never stack a second conflict
+              // on top of one already showing.
+              const alreadyConflicted =
+                useSaveConflictStore.getState().conflicts[selectedContentId];
+              if (live && !alreadyConflicted) {
+                stashConflictDraft(selectedContentId, live);
+                setConflict({
+                  contentId: selectedContentId,
+                  mine: live,
+                  theirHash: freshBodyHash,
+                });
+                clientLogger.info({
+                  layer: "ui",
+                  event: "save_conflict:raised_from_revalidation",
+                  summary:
+                    "warm-painted copy diverged from server while the reader was editing; conflict raised before the save could 409",
+                  attrs: { content_id: selectedContentId },
                 });
               }
-              setNoteContent(sanitized.json);
-
-              // Extract initial outline from loaded content
-              const initialOutline = extractOutline(sanitized.json);
-              setOutline(selectedContentId, initialOutline);
             }
-          } catch (parseError) {
-            clientLogger.error({
-              layer: "editor",
-              event: "tiptap_load:parse_failed",
-              summary: "failed to parse TipTap JSON, using empty document",
-              attrs: { content_id: selectedContentId },
-              error: parseError,
-            });
-            const emptyDoc = {
-              type: "doc",
-              content: [{ type: "paragraph" }],
-            };
-            setNoteContent(emptyDoc);
-
-            // Extract initial outline
-            const initialOutline = extractOutline(emptyDoc);
-            setOutline(selectedContentId, initialOutline);
-          }
-        } else {
-          // No note payload — render empty doc
-          const emptyDoc = {
-            type: "doc",
-            content: [{ type: "paragraph" }],
-          };
-          setNoteContent(emptyDoc);
-
-          // Extract initial outline from loaded content
-          const initialOutline = extractOutline(emptyDoc);
-          setOutline(selectedContentId, initialOutline);
-        }
-
-        // Reload mid-conflict: if a prior session stashed unsaved edits for
-        // this doc, the server copy we just loaded is "theirs". Show the
-        // user's draft (not the server copy) and re-raise the conflict so it
-        // can be resolved — this is what preserves edits across a reload.
-        if (!cancelled && !isPageTemplateTab) {
-          const draft = loadConflictDraft(selectedContentId);
-          if (draft && bodyHashRef.current) {
-            // A stash IDENTICAL to the server copy has nothing to resolve.
-            // Left in place, it re-raises a conflict on EVERY load of this
-            // document: the view is replaced with the stale draft ("my edits
-            // revert when I come back") and handleSave pauses every save
-            // while a conflict exists ("nothing saves, even after the
-            // debounce") — a silent, permanent, per-document trap, keyed to
-            // whichever document once got a 409. Compare on the same
-            // canonical form the server hashes, and clear it.
-            const serverJson = result.data.note?.tiptapJson ?? null;
-            if (serverJson && stableStringify(draft) === stableStringify(serverJson)) {
-              clearConflictDraft(selectedContentId);
-              clientLogger.info({
-                layer: "ui",
-                event: "save_conflict:stale_draft_cleared",
-                summary: "stashed conflict draft matched the server copy; cleared without raising",
-                attrs: { content_id: selectedContentId },
-              });
-            } else {
-              setConflict({
-                contentId: selectedContentId,
-                mine: draft,
-                theirHash: bodyHashRef.current,
-              });
-              setNoteContent(draft);
-              setOutline(selectedContentId, extractOutline(draft));
-            }
+            return;
           }
         }
+
+        applyContentData(result.data);
       } catch (err) {
         if (cancelled) return;
         clientLogger.error({
@@ -1022,7 +1177,10 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
             setNoteTitle(updates.title);
             updateContentTab(contentId, { title: updates.title });
           } else {
-            // Other changes, trigger full refetch
+            // Other changes, trigger full refetch. Drop the cached payload
+            // first — a forced refresh must not warm-paint the copy it is
+            // refreshing away from.
+            invalidateTabPayload(contentId);
             setRefreshTrigger(prev => prev + 1);
         }
       }
@@ -1308,6 +1466,12 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
         // Keep parent state in sync so re-mounts (e.g., ExpandableEditor
         // collapse/reopen) receive the latest persisted content
         setNoteContent(content);
+
+        // The MRU cache still holds the PRE-save payload. Left there, a switch
+        // away and back would warm-paint the old body over freshly saved work
+        // — which reads as lost writing even though the server has it. Drop
+        // the entry so the next visit re-fetches.
+        invalidateTabPayload(selectedContentId);
       } catch (err: unknown) {
         // AbortError is expected when we cancel a save due to navigation —
         // not worth a log line, the navigation that triggered it is the signal.
@@ -1390,6 +1554,9 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
     clearConflict(selectedContentId);
     clearConflictDraft(selectedContentId);
     closeConflictDiff();
+    // "Take theirs" means specifically: go get the server's copy. A warm
+    // repaint of our cached copy would be the exact opposite.
+    invalidateTabPayload(selectedContentId);
     setRefreshTrigger((n) => n + 1);
   }, [selectedContentId, clearConflict, closeConflictDiff]);
 
@@ -2433,6 +2600,29 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
   );
   const ExtensionContentViewer = useExtensionContentViewer(extensionViewerMatch);
 
+  // The content's own scroll region — the folder grid/list/kanban, the database
+  // table, the PDF page, the image. Separate from the "note" region that
+  // `ExpandableEditor` / `MarkdownEditor` own, because both render for the SAME
+  // contentId and would otherwise fight over one remembered offset.
+  //
+  // The ref goes on the WRAPPER, not the real scroller: `FolderViewer`
+  // delegates to per-view components that each own their own `overflow-auto`,
+  // and `DataTableViewer` scrolls its virtualized container. The hook's
+  // capture-phase listener and scroller lookup find whichever one is live, so
+  // no viewer needs to be touched individually.
+  //
+  // DISABLED when an extension owns the viewer. Such a viewer keeps position in
+  // its own, better vocabulary — the reader saves a CFI locator through
+  // `readerApi.saveProgress`, a semantic spot in the book — and a pixel offset
+  // would be both meaningless against repagination and a second writer racing
+  // the first. It is also where `findScrollableElement` is least trustworthy:
+  // the reader nests TOC, annotations and details scrollers around the text.
+  // Gated on the registry answer, not on a content-type list, so a disabled
+  // extension needs no conditional here and a new viewer inherits the rule.
+  const primaryViewportRef = useViewportMemory(selectedContentId, "primary", {
+    enabled: !ExtensionContentViewer,
+  });
+
   // Inbox core view — full-panel takeover in the primary pane
   if (activeView === "inbox" && paneId === "top-left") {
     return (
@@ -2864,7 +3054,12 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
             )}
             {promotedRowBanner}
             {propsStripAbove}
-            <div className="flex-1 min-h-[150px] overflow-auto">{contentElement}</div>
+            <div
+              ref={primaryViewportRef}
+              className="flex-1 min-h-[150px] overflow-auto"
+            >
+              {contentElement}
+            </div>
             {propsStripBelow}
             {notesPanelPosition !== "above" && (
               <ExpandableEditor
