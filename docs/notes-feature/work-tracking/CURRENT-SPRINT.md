@@ -9,6 +9,26 @@ last_updated: 2026-05-13
 
 # Current Sprint Addendum
 
+## October 3, 2026 — Wiki-link views + send to new note
+
+**Tree**: worktree `.claude/worktrees/wikilink-views`, branch `feat/wikilink-views` (off `origin/main` at `2d3797f3`)
+**Status**: typecheck / lint 151 (0 errors, none new) / markdown:blocks (+15 fixtures, +13 shape assertions) / collab:schema / private:content green; **owner browser smoke pending**. **⚠ Hocuspocus redeploy required post-merge** (schema 1.20.0: `wikiLink.view` attr — an un-redeployed collab server drops it from live documents). Plan: `WIKILINK-VIEWS-PLAN.md`.
+
+### Shipped
+- **One link, four displays.** `wikiLink.view` ∈ link (default) / chip / card; the window stays the `noteWindow` block and `applyLinkView` (`lib/domain/editor/link-views.ts`) converts both ways (paragraph split on the way out, paragraph-with-link on the way back). Chip/card are a vanilla-DOM NodeView over renderHTML's own span (`wiki-link-node-view.ts`); card text from `link-preview.ts` (one cache per target, `content-updated` invalidates, private content stripped).
+- **Chosen in place.** Hover chooser (`wiki-link-hover.tsx`, tippy + `LinkViewChooser`), the same chooser in the window header ("Display as…"), and a "Display as" submenu in the context menu on links and window headers. Window needs a ContentNode id: title-only links resolve + heal first; heading/anchored/virtual targets say why they can't.
+- **Shared underneath.** `wiki-link-attrs.ts` is the one attr spec for both nodes; a `![[Title]]` with no id resolves by title via `resolveWikiLinkTarget` (the click rule). Autosuggest and the window picker untouched.
+- **Markdown.** `wiki-link-markdown.ts` grammar + `dgWikiLink`/`dgNoteWindow` turndown rules + `wikiLinkCodec`/`noteWindowCodec` reTags: `[[Title|alias]]{#id .card .no-context label="…" slug=…}`, `![[Title]]{#id block=… height=… .no-border view=… row=…}`. `ServerNoteWindow.renderHTML` symmetric; public safety moved to `publicSafeNoteWindows` in `TipTapContent`.
+- **Send to New Note** (`send-to-new-note.ts`): context-menu inline title input (first heading / first line suggested), note created beside the host (`move` to displayOrder+1), selection replaced by the link through the editor, toast with Open.
+- **Context menu** acts on the clicked editor (`editorForContext`), not the first in the store.
+
+### Smoke checklist (owner)
+1. Type `[[` → pick a note → hover the link → chooser appears; pick Card → excerpt shows; pick Window → block appears, paragraph split around it; in the window header "Display as…" → Link → back to a paragraph.
+2. Source view: a paragraph with a link reads `see [[Title]]{#…}`; a window reads `![[Title]]{#… block=…}`; toggle back → identical.
+3. Type `![[Some existing note]]` in source view → apply → the window resolves by title and shows the note.
+4. Select two paragraphs → right-click → Send to New Note → Enter → new note beside this one in the tree, selection replaced by a link, toast Open works.
+5. Publish a note with a window → published HTML shows "Windowed note: Title" with no ids.
+
 ## September 25, 2026 — Private content (comment out prose)
 
 **Tree**: worktree `.claude/worktrees/private-text`, branch `feat/private-text` (off `origin/main` at `e171048f`)

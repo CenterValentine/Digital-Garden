@@ -1,4 +1,4 @@
-import { Node } from "@tiptap/core";
+import { Node, mergeAttributes, type JSONContent } from "@tiptap/core";
 import { z } from "zod";
 
 import { createBlockSchema } from "@/lib/domain/blocks/schema";
@@ -145,14 +145,18 @@ export function noteWindowAttrSpec(): Record<string, unknown> {
 //   - getCollaborationServerExtensions() for the Hocuspocus server's
 //     Y.Doc schema
 //
+// renderHTML ↔ parseHTML are SYMMETRIC (every attr rides as a data-*): the
+// lossless markdown system only uses a pretty form when
+// generateJSON(generateHTML(node)) equals the node, and the window's
+// `![[Title]]{#id …}` syntax depends on that (markdown-block-codecs.ts).
+//
 // PUBLIC-SAFETY: this is also the schema used by the public-page renderer
 // in `components/public/TipTapContent.tsx`. The windowed content is
 // private user data, and the target's UUID must not leak into published
-// HTML — so renderHTML deliberately emits only the human-readable title
-// the author already placed in their own document. Middle ground between
-// ServerFlashcardEmbed (hidden div) and ServerExcalidrawBlock (static
-// label). Round-trip safety is unaffected: markdown export carries the
-// full attrs through the dg-block base64 fence, never through this HTML.
+// HTML — so the renderer strips every attr but the human-readable title
+// BEFORE serialising (`publicSafeNoteWindows`, the private-content
+// pattern: one explicit seam, not a lossy renderHTML). The visible text
+// stays the title the author already placed in their own document.
 export const ServerNoteWindow = Node.create({
   name: "noteWindow",
   group: "block",
@@ -166,16 +170,31 @@ export const ServerNoteWindow = Node.create({
     return [{ tag: 'div[data-block-type="noteWindow"]' }];
   },
 
-  renderHTML({ node }) {
+  renderHTML({ node, HTMLAttributes }) {
     const title =
       typeof node.attrs.targetTitle === "string" ? node.attrs.targetTitle : "";
     return [
       "div",
-      {
+      mergeAttributes(HTMLAttributes, {
         class: "block-note-window-public",
         "data-block-type": "noteWindow",
-      },
+      }),
       title ? `Windowed note: ${title}` : "Windowed note",
     ];
   },
 });
+
+/**
+ * The public seam: a noteWindow keeps only its title. Target, view and row
+ * ids, the block id and the presentation attrs are the author's — none of
+ * them belong in published HTML. Pure JSON, so the renderer applies it next
+ * to `stripPrivateContent` before any DOM exists.
+ */
+export function publicSafeNoteWindows(node: JSONContent): JSONContent {
+  if (node.type === "noteWindow") {
+    const title = typeof node.attrs?.targetTitle === "string" ? node.attrs.targetTitle : "";
+    return { type: "noteWindow", attrs: { targetTitle: title } };
+  }
+  if (!Array.isArray(node.content)) return node;
+  return { ...node, content: node.content.map(publicSafeNoteWindows) };
+}

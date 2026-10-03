@@ -38,6 +38,7 @@ import { BlockquoteLineOnly } from "./extensions/blockquote-line-only";
 import { Callout } from "./extensions/callout";
 import { WikiLink, type WikiLinkClickTarget } from "./extensions/wiki-link";
 import { createWikiLinkSuggestion } from "./extensions/wiki-link-suggestion";
+import { createWikiLinkHoverPlugin } from "./extensions/wiki-link-hover";
 import { Tag } from "./extensions/tag";
 import { PersonMention } from "./extensions/person-mention";
 import { InlineTimestamp } from "./extensions/inline-timestamp";
@@ -294,6 +295,10 @@ export function getEditorExtensions(options?: EditorExtensionsOptions): Extensio
             options.promoteRowForWikiLink
           )
         : undefined,
+      // The hover chooser (display as link / chip / card / window). Mounted
+      // wherever the suggestion is — the editing surfaces; viewers and
+      // embeds configure neither.
+      hover: options?.fetchNotesForWikiLink ? createWikiLinkHoverPlugin : null,
     }),
 
     // Heading + hardBreak split (only text before break becomes heading)

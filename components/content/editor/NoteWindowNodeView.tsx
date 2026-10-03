@@ -44,6 +44,7 @@ import {
   ExternalLink,
   FolderSearch,
   History,
+  LayoutTemplate,
   RefreshCw,
   ChevronRight,
   ChevronDown,
@@ -56,6 +57,9 @@ import {
   NoteWindowPicker,
   type PickerTarget,
 } from "@/components/content/editor/NoteWindowPicker";
+import { LinkViewChooser } from "@/components/content/editor/LinkViewChooser";
+import { applyLinkView, type LinkView } from "@/lib/domain/editor/link-views";
+import { resolveWikiLinkTarget } from "@/lib/domain/editor/wiki-link-resolve";
 import { contentDeepLink } from "@/lib/features/content/tree-clipboard";
 import { calculateMenuPosition } from "@/lib/core/menu-positioning";
 import {
@@ -195,6 +199,52 @@ function GhostIconButton({
     >
       {children}
     </button>
+  );
+}
+
+/** Portal popover holding the shared display chooser, anchored to its header button. */
+function ViewChooserPopover({
+  anchorEl,
+  onChange,
+  onClose,
+}: {
+  anchorEl: HTMLElement;
+  onChange: (view: LinkView) => void;
+  onClose: () => void;
+}) {
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const pos = useMemo(() => {
+    const rect = anchorEl.getBoundingClientRect();
+    return calculateMenuPosition({
+      triggerPosition: { x: rect.left, y: rect.bottom + 4 },
+      menuDimensions: { width: 320, height: 40 },
+      preferredPlacementX: "right",
+      preferredPlacementY: "bottom",
+    });
+  }, [anchorEl]);
+
+  useEffect(() => {
+    const onDown = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (menuRef.current?.contains(t) || anchorEl.contains(t)) return;
+      onClose();
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [anchorEl, onClose]);
+
+  return createPortal(
+    <div ref={menuRef} style={{ position: "fixed", left: pos.x, top: pos.y }} className="z-[130]">
+      <LinkViewChooser value="window" onChange={onChange} />
+    </div>,
+    document.body,
   );
 }
 
@@ -567,6 +617,41 @@ export function NoteWindowNodeView({
     }
   }, [fetchState, targetTitle, hostEditable, updateAttrs]);
 
+  // ── Title-only resolution: a window typed as `![[Title]]` in the source
+  // view (or pasted from markdown) knows its title but not its id. Resolve
+  // it the way a link click does — exact title — and stamp the id. ──
+  const [titleLookupFailed, setTitleLookupFailed] = useState(false);
+  useEffect(() => {
+    if (targetContentId || !targetTitle || !hostEditable) return;
+    let cancelled = false;
+    void resolveWikiLinkTarget({ targetId: null, targetTitle }).then((resolved) => {
+      if (cancelled) return;
+      if (!resolved) {
+        setTitleLookupFailed(true);
+        return;
+      }
+      updateAttrs({ targetContentId: resolved.id, targetTitle: resolved.title });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [targetContentId, targetTitle, hostEditable, updateAttrs]);
+
+  // ── Display as: link / chip / card convert this block back into an
+  // inline link (lib/domain/editor/link-views.ts — the same conversion the
+  // hover chooser runs in the other direction). ──
+  const [viewChooserOpen, setViewChooserOpen] = useState(false);
+  const viewChooserBtnRef = useRef<HTMLButtonElement | null>(null);
+  const changeView = useCallback(
+    (view: LinkView) => {
+      setViewChooserOpen(false);
+      const pos = getPos();
+      if (typeof pos !== "number") return;
+      applyLinkView(editor, pos, view);
+    },
+    [editor, getPos],
+  );
+
   // ── editable-plain save path: the main editor's exact REST contract
   // (MainPanelContent.handleSave, simplified). X-Body-Hash is the
   // optimistic-concurrency precondition — a custom header on purpose;
@@ -774,7 +859,13 @@ export function NoteWindowNodeView({
     return (
       <div className="nw-placeholder">
         <AppWindow className="h-4 w-4 shrink-0" />
-        <span>Choose a note to window — or create one.</span>
+        <span>
+          {targetTitle && !titleLookupFailed
+            ? `Finding “${targetTitle}”…`
+            : targetTitle
+              ? `“${targetTitle}” wasn't found — choose a note to window.`
+              : "Choose a note to window — or create one."}
+        </span>
         <GhostIconButton
           label="Choose a note"
           buttonRef={retargetBtnRef}
@@ -913,11 +1004,28 @@ export function NoteWindowNodeView({
           >
             <History className="h-3.5 w-3.5" />
           </GhostIconButton>
+          {hostEditable ? (
+            <GhostIconButton
+              label="Display as…"
+              buttonRef={viewChooserBtnRef}
+              onClick={() => setViewChooserOpen((v) => !v)}
+            >
+              <LayoutTemplate className="h-3.5 w-3.5" />
+            </GhostIconButton>
+          ) : null}
           <GhostIconButton label="Open full page" onClick={openFullPage}>
             <ExternalLink className="h-3.5 w-3.5" />
           </GhostIconButton>
         </div>
       </div>
+
+      {viewChooserOpen && viewChooserBtnRef.current ? (
+        <ViewChooserPopover
+          anchorEl={viewChooserBtnRef.current}
+          onChange={changeView}
+          onClose={() => setViewChooserOpen(false)}
+        />
+      ) : null}
 
       {pickerOpen && retargetBtnRef.current ? (
         <NoteWindowPicker
