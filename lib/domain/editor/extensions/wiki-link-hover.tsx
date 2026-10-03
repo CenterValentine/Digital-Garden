@@ -2,7 +2,7 @@
 
 /**
  * Wiki-link hover — rest the pointer on a link and a compact chooser
- * appears: Link · Chip · Card · Window, plus Open.
+ * appears: Link · Chip · Card · Window, plus Open, plus the editable label.
  *
  * A ProseMirror plugin (injected through WikiLink's `hover` option so the
  * node file stays React-free) that listens on the editor's DOM, finds the
@@ -12,12 +12,21 @@
  * (lib/domain/editor/link-views.ts) — the same conversion the window
  * header and the context menu use.
  *
+ * The chooser renders on its OWN React root (not TipTap's ReactRenderer):
+ * the label input must keep its focus and state across editor updates,
+ * and a root of its own cannot be touched by the editor's portal
+ * re-renders. The popover also ignores scrolls and keystrokes that happen
+ * inside itself — the input's own caret scroll used to count as "the page
+ * moved" and hid the popover under the user's fingers, one character at a
+ * time.
+ *
  * Only on editable surfaces: a viewer has nothing to choose.
  */
 
 import type { Editor } from "@tiptap/core";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
-import { ReactRenderer } from "@tiptap/react";
+import { createElement } from "react";
+import { createRoot, type Root } from "react-dom/client";
 import tippy, { type Instance as TippyInstance } from "tippy.js";
 import { LinkViewChooser, type LinkViewChooserProps } from "@/components/content/editor/LinkViewChooser";
 import { useSettingsStore } from "@/state/settings-store";
@@ -52,7 +61,8 @@ export function createWikiLinkHoverPlugin(editor: Editor): Plugin | null {
     key: wikiLinkHoverPluginKey,
     view(editorView) {
       let popup: TippyInstance | null = null;
-      let renderer: ReactRenderer<unknown, LinkViewChooserProps> | null = null;
+      let root: Root | null = null;
+      let content: HTMLElement | null = null;
       let anchor: HTMLElement | null = null;
       let showTimer: number | null = null;
       let hideTimer: number | null = null;
@@ -60,6 +70,8 @@ export function createWikiLinkHoverPlugin(editor: Editor): Plugin | null {
       // The label input is open — the popover must not hide under a
       // pointer that wandered off while the user is typing.
       let editing = false;
+      // Bumped per show so a re-shown popover never resumes a stale edit.
+      let session = 0;
 
       const clearTimers = () => {
         if (showTimer !== null) window.clearTimeout(showTimer);
@@ -148,6 +160,7 @@ export function createWikiLinkHoverPlugin(editor: Editor): Plugin | null {
         const targetTitle = el.getAttribute("data-target-title");
         return {
           value: current ?? "link",
+          sessionKey: session,
           title: el.getAttribute("data-display-text") || targetTitle,
           labelPlaceholder: targetTitle,
           onLabelChange: editorView.editable ? (label) => relabel(el, label) : undefined,
@@ -161,11 +174,13 @@ export function createWikiLinkHoverPlugin(editor: Editor): Plugin | null {
         };
       };
 
+      const render = (el: HTMLElement) => {
+        root?.render(createElement(LinkViewChooser, propsFor(el)));
+      };
+
       const ensurePopup = (el: HTMLElement) => {
-        const props = propsFor(el);
-        if (!renderer) {
-          renderer = new ReactRenderer(LinkViewChooser, { props, editor });
-          const content = renderer.element as HTMLElement;
+        if (!content) {
+          content = document.createElement("div");
           content.addEventListener("mouseenter", () => {
             overPopup = true;
             if (hideTimer !== null) window.clearTimeout(hideTimer);
@@ -174,6 +189,7 @@ export function createWikiLinkHoverPlugin(editor: Editor): Plugin | null {
             overPopup = false;
             scheduleHide();
           });
+          root = createRoot(content);
           popup = tippy(document.body, {
             getReferenceClientRect: () => el.getBoundingClientRect(),
             appendTo: () => document.body,
@@ -187,17 +203,21 @@ export function createWikiLinkHoverPlugin(editor: Editor): Plugin | null {
             theme: "link-view-chooser",
           });
         } else {
-          renderer.updateProps(props);
           popup?.setProps({ getReferenceClientRect: () => el.getBoundingClientRect() });
         }
+        render(el);
       };
 
       const show = (el: HTMLElement) => {
         if (!editorView.editable) return;
         anchor = el;
+        session += 1;
         ensurePopup(el);
         popup?.show();
       };
+
+      const insidePopup = (target: EventTarget | null) =>
+        Boolean(content && target instanceof Node && content.contains(target));
 
       const onMouseOver = (event: MouseEvent) => {
         const target = event.target as HTMLElement | null;
@@ -208,6 +228,7 @@ export function createWikiLinkHoverPlugin(editor: Editor): Plugin | null {
           hideTimer = null;
         }
         if (anchor === el && popup?.state.isVisible) return;
+        if (editing) return;
         if (showTimer !== null) window.clearTimeout(showTimer);
         showTimer = window.setTimeout(() => show(el), SHOW_DELAY_MS);
       };
@@ -225,19 +246,23 @@ export function createWikiLinkHoverPlugin(editor: Editor): Plugin | null {
         if (anchor === el) scheduleHide();
       };
 
-      // A click anywhere outside the popover, a keystroke, or a scroll ends
-      // the hover — the chooser is a resting affordance, not a mode.
+      // A click outside the popover, a keystroke in the editor, or a scroll
+      // of the page ends the hover — the chooser is a resting affordance,
+      // not a mode. Events that originate INSIDE the popover (typing in the
+      // label, the input scrolling its own text) are its own business.
       const onDocMouseDown = (event: MouseEvent) => {
         if (!popup?.state.isVisible) return;
-        const content = renderer?.element as HTMLElement | undefined;
-        if (content?.contains(event.target as Node)) return;
+        if (insidePopup(event.target)) return;
         hide();
       };
       const onKeyDown = () => {
-        if (popup?.state.isVisible) hide();
+        if (popup?.state.isVisible && !editing) hide();
       };
-      const onScroll = () => {
-        if (popup?.state.isVisible) hide();
+      const onScroll = (event: Event) => {
+        if (!popup?.state.isVisible) return;
+        if (insidePopup(event.target)) return;
+        if (editing) return;
+        hide();
       };
 
       editorView.dom.addEventListener("mouseover", onMouseOver);
@@ -255,9 +280,14 @@ export function createWikiLinkHoverPlugin(editor: Editor): Plugin | null {
           editorView.dom.removeEventListener("keydown", onKeyDown);
           window.removeEventListener("scroll", onScroll, true);
           popup?.destroy();
-          renderer?.destroy();
           popup = null;
-          renderer = null;
+          const r = root;
+          root = null;
+          content = null;
+          // React forbids unmounting a root during a render pass; the
+          // editor can be destroyed from inside one (the NodeView teardown
+          // precedent in note-window-client.tsx).
+          if (r) queueMicrotask(() => r.unmount());
         },
       };
     },

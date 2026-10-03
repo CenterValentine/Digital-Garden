@@ -39,7 +39,7 @@ export const LINK_VIEW_OPTIONS: LinkViewOption[] = [
   { id: "link", label: "Link", description: "Plain text link" },
   { id: "chip", label: "Chip", description: "Icon and title, inline" },
   { id: "card", label: "Card", description: "Title with a short excerpt" },
-  { id: "window", label: "Window", description: "The note itself, in place" },
+  { id: "window", label: "Window", description: "View and edit the other note right here" },
 ];
 
 export function isLinkView(value: unknown): value is LinkView {

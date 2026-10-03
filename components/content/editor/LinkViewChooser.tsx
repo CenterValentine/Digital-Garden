@@ -97,6 +97,8 @@ export interface LinkViewChooserProps {
   labelPlaceholder?: string | null;
   /** Fires when the label editor opens/closes — a host popover must not hide mid-edit. */
   onEditingChange?: (editing: boolean) => void;
+  /** Changes when the host re-shows the chooser; an edit from an earlier showing is dropped. */
+  sessionKey?: number;
   /** Why "Window" is unavailable (heading links, anchors, virtual targets). */
   windowDisabledReason?: string | null;
   className?: string;
@@ -110,22 +112,24 @@ export function LinkViewChooser({
   onLabelChange,
   labelPlaceholder,
   onEditingChange,
+  sessionKey = 0,
   windowDisabledReason,
   className,
 }: LinkViewChooserProps) {
-  // The title being edited and its draft. Keyed by the title so a popover
-  // re-anchored to a different link shows that link's label, not a stale
-  // editor (no effect needed — a changed title simply stops matching).
-  // `width` is the title's box when editing began: the input takes exactly
-  // that width, so the bar never grows — long text scrolls inside the field.
-  const [editing, setEditing] = useState<{ of: string; draft: string; width: number } | null>(null);
+  // The title being edited and its draft. Keyed by the title AND the host's
+  // session so a popover re-anchored to a different link, or re-shown
+  // later, shows that link's label rather than resuming a stale editor (no
+  // effect needed — a changed key simply stops matching). `width` is the
+  // title's box when editing began: the input takes exactly that width, so
+  // the bar never grows — long text scrolls inside the field.
+  const [editing, setEditing] = useState<{ of: string; session: number; draft: string; width: number } | null>(null);
   const titleRef = useRef<HTMLButtonElement | null>(null);
-  const isEditing = editing !== null && editing.of === (title ?? "");
+  const isEditing = editing !== null && editing.of === (title ?? "") && editing.session === sessionKey;
 
   const beginEdit = () => {
     if (!onLabelChange) return;
     const width = titleRef.current?.getBoundingClientRect().width ?? 0;
-    setEditing({ of: title ?? "", draft: title ?? "", width });
+    setEditing({ of: title ?? "", session: sessionKey, draft: title ?? "", width });
     onEditingChange?.(true);
   };
   const endEdit = (commit: boolean) => {

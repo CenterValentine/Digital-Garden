@@ -33,7 +33,7 @@
  * when the host has no ydoc (plain/fallback modes).
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { Editor } from "@tiptap/core";
 import type { JSONContent } from "@tiptap/core";
@@ -60,8 +60,8 @@ import {
 import { LinkViewChooser } from "@/components/content/editor/LinkViewChooser";
 import { applyLinkView, type LinkView } from "@/lib/domain/editor/link-views";
 import { resolveWikiLinkTarget } from "@/lib/domain/editor/wiki-link-resolve";
-import { contentDeepLink } from "@/lib/features/content/tree-clipboard";
 import { calculateMenuPosition } from "@/lib/core/menu-positioning";
+import { resolveOpenDestinationPane, useContentStore } from "@/state/content-store";
 import {
   noteWindowSubMapKey,
   type NoteWindowAttrs,
@@ -167,6 +167,8 @@ const EMPTY_DOC: JSONContent = {
 function GhostIconButton({
   label,
   onClick,
+  onMouseEnter,
+  onMouseLeave,
   className,
   buttonRef,
   disabled,
@@ -174,6 +176,8 @@ function GhostIconButton({
 }: {
   label: string;
   onClick?: () => void;
+  onMouseEnter?: () => void;
+  onMouseLeave?: () => void;
   className?: string;
   buttonRef?: React.Ref<HTMLButtonElement>;
   disabled?: boolean;
@@ -190,6 +194,8 @@ function GhostIconButton({
       // from stealing focus when a header control is clicked — the same
       // rule every BubbleMenu button follows.
       onMouseDown={(e) => e.preventDefault()}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
       onClick={onClick}
       className={`inline-flex h-6 w-6 items-center justify-center rounded text-gray-500 dark:text-gray-400 ${
         disabled
@@ -202,25 +208,42 @@ function GhostIconButton({
   );
 }
 
-/** Portal popover holding the shared display chooser, anchored to its header button. */
+/**
+ * Portal popover holding the shared display chooser, hanging off its header
+ * button: right edge aligned to the button (the header sits at the right
+ * side of the window, close to the viewport wall, so a left-anchored menu
+ * used to be pushed far away by the boundary clamp), measured after the
+ * first paint so the real width is used, flipped above when there is no
+ * room below. Opens on hover (and click) and closes when the pointer
+ * leaves both the button and the popover.
+ */
 function ViewChooserPopover({
   anchorEl,
   onChange,
   onClose,
+  onPointerEnter,
+  onPointerLeave,
 }: {
   anchorEl: HTMLElement;
   onChange: (view: LinkView) => void;
   onClose: () => void;
+  onPointerEnter: () => void;
+  onPointerLeave: () => void;
 }) {
   const menuRef = useRef<HTMLDivElement | null>(null);
-  const pos = useMemo(() => {
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
+
+  useLayoutEffect(() => {
+    const menu = menuRef.current;
+    if (!menu) return;
     const rect = anchorEl.getBoundingClientRect();
-    return calculateMenuPosition({
-      triggerPosition: { x: rect.left, y: rect.bottom + 4 },
-      menuDimensions: { width: 320, height: 40 },
-      preferredPlacementX: "right",
-      preferredPlacementY: "bottom",
-    });
+    const { width, height } = menu.getBoundingClientRect();
+    const margin = 8;
+    const gap = 6;
+    const x = Math.min(Math.max(margin, rect.right - width), window.innerWidth - width - margin);
+    const below = rect.bottom + gap;
+    const y = below + height + margin <= window.innerHeight ? below : Math.max(margin, rect.top - gap - height);
+    setPos({ x, y });
   }, [anchorEl]);
 
   useEffect(() => {
@@ -241,7 +264,18 @@ function ViewChooserPopover({
   }, [anchorEl, onClose]);
 
   return createPortal(
-    <div ref={menuRef} style={{ position: "fixed", left: pos.x, top: pos.y }} className="z-[130]">
+    <div
+      ref={menuRef}
+      style={{
+        position: "fixed",
+        left: pos?.x ?? 0,
+        top: pos?.y ?? 0,
+        visibility: pos ? "visible" : "hidden",
+      }}
+      className="z-[130]"
+      onMouseEnter={onPointerEnter}
+      onMouseLeave={onPointerLeave}
+    >
       <LinkViewChooser value="window" onChange={onChange} />
     </div>,
     document.body,
@@ -642,14 +676,32 @@ export function NoteWindowNodeView({
   // hover chooser runs in the other direction). ──
   const [viewChooserOpen, setViewChooserOpen] = useState(false);
   const viewChooserBtnRef = useRef<HTMLButtonElement | null>(null);
+  // Hover opens the chooser after a short dwell; leaving both the button
+  // and the popover closes it after a grace period (so the pointer can
+  // cross the gap between them). Click still toggles.
+  const viewChooserTimer = useRef<number | null>(null);
+  const clearViewChooserTimer = useCallback(() => {
+    if (viewChooserTimer.current !== null) window.clearTimeout(viewChooserTimer.current);
+    viewChooserTimer.current = null;
+  }, []);
+  const viewChooserHoverIn = useCallback(() => {
+    clearViewChooserTimer();
+    viewChooserTimer.current = window.setTimeout(() => setViewChooserOpen(true), 400);
+  }, [clearViewChooserTimer]);
+  const viewChooserHoverOut = useCallback(() => {
+    clearViewChooserTimer();
+    viewChooserTimer.current = window.setTimeout(() => setViewChooserOpen(false), 250);
+  }, [clearViewChooserTimer]);
+  useEffect(() => clearViewChooserTimer, [clearViewChooserTimer]);
   const changeView = useCallback(
     (view: LinkView) => {
+      clearViewChooserTimer();
       setViewChooserOpen(false);
       const pos = getPos();
       if (typeof pos !== "number") return;
       applyLinkView(editor, pos, view);
     },
-    [editor, getPos],
+    [editor, getPos, clearViewChooserTimer],
   );
 
   // ── editable-plain save path: the main editor's exact REST contract
@@ -738,17 +790,6 @@ export function NoteWindowNodeView({
     [hostEditable, targetContentId, getHostContentId, updateAttrs, recordHistory],
   );
 
-  const openFullPage = useCallback(() => {
-    if (!targetContentId) return;
-    // PWA note: in a standalone PWA this may open inside the app window —
-    // no platform escape hatch exists; best-effort per the plan.
-    window.open(
-      contentDeepLink(targetContentId),
-      "_blank",
-      "noopener,noreferrer",
-    );
-  }, [targetContentId]);
-
   const refresh = useCallback(() => {
     setConflict(false);
     setDirty(false);
@@ -786,6 +827,29 @@ export function NoteWindowNodeView({
     fetchState.phase === "ready" ? fetchState.target.title : null;
   const displayTitle =
     optimisticTitle || readyTitle || targetTitle || "Untitled";
+
+  // Open the windowed note as a workspace TAB (not a browser tab): beside
+  // the host by the same rule the file tree uses — the opposite pane in a
+  // split, the user's `openDestination` preference honoured, the only pane
+  // when there is one. Pinned, so it is a real tab rather than a preview
+  // the next open would replace; focus stays on the host so the next open
+  // still computes "beside" from here.
+  const openFullPage = useCallback(() => {
+    if (!targetContentId) return;
+    const { layoutMode, activePaneId, panes, openContentInPane } = useContentStore.getState();
+    const destination = resolveOpenDestinationPane(
+      layoutMode,
+      activePaneId,
+      (paneId) => (panes[paneId]?.tabIds.length ?? 0) === 0,
+      useSettingsStore.getState().ui?.openDestination,
+    );
+    openContentInPane(targetContentId, destination, {
+      title: displayTitle,
+      contentType: fetchState.phase === "ready" ? fetchState.target.contentType : "note",
+      pin: true,
+      focusPane: destination === activePaneId,
+    });
+  }, [targetContentId, displayTitle, fetchState]);
 
   // ── Header rename: renames the ACTUAL target file. The recipe is
   // MainPanelContent.handleTitleCommit: optimistic + revert, PATCH
@@ -1008,7 +1072,12 @@ export function NoteWindowNodeView({
             <GhostIconButton
               label="Display as…"
               buttonRef={viewChooserBtnRef}
-              onClick={() => setViewChooserOpen((v) => !v)}
+              onMouseEnter={viewChooserHoverIn}
+              onMouseLeave={viewChooserHoverOut}
+              onClick={() => {
+                clearViewChooserTimer();
+                setViewChooserOpen((v) => !v);
+              }}
             >
               <LayoutTemplate className="h-3.5 w-3.5" />
             </GhostIconButton>
@@ -1024,6 +1093,8 @@ export function NoteWindowNodeView({
           anchorEl={viewChooserBtnRef.current}
           onChange={changeView}
           onClose={() => setViewChooserOpen(false)}
+          onPointerEnter={clearViewChooserTimer}
+          onPointerLeave={viewChooserHoverOut}
         />
       ) : null}
 
