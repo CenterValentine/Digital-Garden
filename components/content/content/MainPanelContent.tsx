@@ -1728,7 +1728,38 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
         return;
       }
 
+      // A link that carries an id opens AT ONCE, named by its own text: the
+      // tab is on screen and the content loading before any lookup — the
+      // resolve used to stand between the click and the tab (a full content
+      // GET, then the open), which read as "did that do anything?". The
+      // lookup still runs, for the one job only it can do: a stale id that
+      // resolves by title heals the link and moves the tab to the real note.
+      // A dead id with no title match is closed by the loader's own 404 path.
+      const openedEarly = Boolean(targetId);
+      if (targetId) {
+        setSelectedContentId(targetId, { title: targetTitle, paneId });
+      }
+
       const resolved = await resolveWikiLinkTarget({ targetId, targetTitle });
+
+      if (openedEarly && resolved && targetId && resolved.id === targetId) {
+        return; // already open; the loader fills in title and type
+      }
+      if (openedEarly && resolved && targetId && resolved.id !== targetId) {
+        heal(resolved.id);
+        if (anchor) useContentAnchorStore.getState().request(resolved.id, anchor);
+        closeContentTabs([targetId]);
+        setSelectedContentId(resolved.id, {
+          title: resolved.title,
+          contentType: resolved.contentType,
+          paneId,
+        });
+        return;
+      }
+      if (openedEarly && !resolved) {
+        markBroken(); // the loader's 404 already closed the tab and said so
+        return;
+      }
 
       if (!resolved) {
         clientLogger.warn({
@@ -1759,7 +1790,7 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
         paneId,
       });
     },
-    [paneId, setSelectedContentId]
+    [paneId, setSelectedContentId, closeContentTabs]
   );
 
   // Handle wiki-link "Open" context menu action.
