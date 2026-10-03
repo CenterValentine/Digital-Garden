@@ -373,6 +373,15 @@ export function resolveOpenDestinationPane(
 
   const visible = getVisiblePaneIds(layoutMode);
   const from = visible.includes(activePaneId) ? activePaneId : visible[0];
+
+  // If the pane you are working in is EMPTY, that is the answer. The whole
+  // point of opening elsewhere is not to displace what you are reading, and an
+  // empty pane has nothing to displace. Without this the rule skips the
+  // obvious destination and piles everything into the opposite pane while the
+  // one you are looking at stays blank — which is what clicking into an empty
+  // pane produced before this line existed.
+  if (isPaneEmpty(from)) return from;
+
   // Opposite first, then the remaining panes in ordinal order. First empty one
   // wins; if the room is full we come back to the opposite and replace there.
   const candidates = [

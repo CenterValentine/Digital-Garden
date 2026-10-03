@@ -13,14 +13,21 @@
 // the same place in whatever layout you are in; the layout decides which
 // names are reachable, not which key does what.
 //
-// NO MODIFIER (owner call, 2026-10-02). Cmd/Ctrl-click and Shift-click are
-// already multi-select gestures in the tree, so the letter is what
-// distinguishes the gesture, not the modifier.
+// OPTION/ALT + letter, then click (owner call, 2026-10-02). A bare letter was
+// tried first and collided immediately: the tree already owns `r` (rename),
+// `d` (delete) and `a` (create), so aiming at the right pane deleted things.
 //
-// Keyed on `event.code`, never `event.key`. On macOS a letter pressed with
-// Option emits a glyph (⌥L is "¬", ⌥C is "ç"), and a `key` comparison would
-// silently stop matching the moment anyone held a modifier alongside. `code`
-// is the physical key and says KeyL either way.
+// Option resolves that whole class at once rather than per key, because those
+// shortcuts are gated on `isPlainKey` — explicitly no modifiers held — so
+// Option+letter bypasses every one of them by construction. Cmd/Ctrl-click and
+// Shift-click are separately unavailable: both are multi-select gestures in
+// the tree. Alt is the one modifier `handleClick` does not read, so the click
+// half of the gesture still selects and opens normally.
+//
+// Keyed on `event.code`, never `event.key`, and under Option that is the whole
+// ballgame on macOS: every letter in this cluster becomes a glyph — ⌥D is "∂",
+// ⌥S is "ß", ⌥A is "å", ⌥Q is "œ", ⌥Z is "Ω". A `key` comparison would match
+// none of them. `code` is the physical key and says KeyD either way.
 
 import type { WorkspacePaneId } from "@/state/content-store";
 
@@ -85,13 +92,35 @@ export function ensurePaneHotkeyTracker(): void {
   if (trackerInstalled || typeof window === "undefined") return;
   trackerInstalled = true;
 
-  window.addEventListener("keydown", (event) => {
-    if (isTypingTarget(event.target)) return;
-    if (paneForHotkeyCode(event.code)) heldCode = event.code;
-  });
-  window.addEventListener("keyup", (event) => {
-    if (event.code === heldCode) heldCode = null;
-  });
+  // CAPTURE phase, both of them. The file tree runs single-key shortcuts of
+  // its own and calls stopPropagation on them, and react-arborist does
+  // type-ahead on plain letters — so a bubble-phase listener here never saw
+  // the keystroke at all and no binding fired. Capture runs before any of that
+  // can intervene.
+  //
+  // keyup needs it just as much: a stopped keyup would leave the key latched
+  // down forever and send every later click to a pane nobody is asking for —
+  // the same wedge the blur handler below exists to undo.
+  window.addEventListener(
+    "keydown",
+    (event) => {
+      if (isTypingTarget(event.target)) return;
+      if (!event.altKey) return;
+      if (paneForHotkeyCode(event.code)) heldCode = event.code;
+    },
+    { capture: true }
+  );
+  window.addEventListener(
+    "keyup",
+    (event) => {
+      // Releasing either half disarms: the letter, or Option while the letter
+      // is still down. Without the second case, letting go of Option would
+      // leave the gesture live while the tree's own plain-key shortcuts become
+      // reachable again — both would fire on the next keystroke.
+      if (event.code === heldCode || !event.altKey) heldCode = null;
+    },
+    { capture: true }
+  );
   window.addEventListener("blur", () => {
     heldCode = null;
   });

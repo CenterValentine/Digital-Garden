@@ -297,6 +297,33 @@ console.log("\nfill the room before stacking (owner rule, 2026-10-02)");
   );
 }
 
+console.log("\nclicking around between opens");
+{
+  // Reading a pane focuses it (`focusPane` on pointerdown), so the anchor the
+  // rule is computed from moves whenever you click anything.
+  const empty = (paneId: WorkspacePaneId) =>
+    (useContentStore.getState().panes[paneId]?.tabIds.length ?? 0) === 0;
+
+  seedSplit(); // A on the left, focused left, right pane empty
+  check(
+    "first open goes right",
+    resolveOpenDestinationPane("dual-vertical", "top-left", empty),
+    "top-right",
+  );
+
+  // The reader clicks into the EMPTY right pane.
+  useContentStore.getState().focusPane("top-right");
+  check(
+    "focused on an empty pane, content should land THERE",
+    resolveOpenDestinationPane(
+      "dual-vertical",
+      useContentStore.getState().activePaneId,
+      empty,
+    ),
+    "top-right",
+  );
+}
+
 console.log("\ndirection-key aiming (hold a letter, click a file)");
 {
   // The cluster is the shape the panes make:
@@ -353,14 +380,16 @@ console.log("\nthe open-destination seam (settings.ui.openDestination)");
   // Nothing in the UI can reach these yet. They are covered anyway: an
   // unreachable branch is exactly the kind that rots before the control that
   // exposes it ever lands, and then the settings PR gets blamed for it.
-  const bothEmpty = () => true;
+  // The pane you are working in is occupied — otherwise the rule correctly
+  // answers "open right here", which is a different scenario (covered above).
+  const onlyActiveOccupied = (paneId: WorkspacePaneId) => paneId !== "top-left";
   const allFull = () => false;
 
   check(
     "the default is the fill rule",
     [
-      resolveOpenDestinationPane("quad", "top-left", bothEmpty),
-      resolveOpenDestinationPane("quad", "top-left", bothEmpty, "fill"),
+      resolveOpenDestinationPane("quad", "top-left", onlyActiveOccupied),
+      resolveOpenDestinationPane("quad", "top-left", onlyActiveOccupied, "fill"),
     ],
     ["top-right", "top-right"],
   );
@@ -382,7 +411,7 @@ console.log("\nthe open-destination seam (settings.ui.openDestination)");
   check(
     "'active' is the pre-rule behaviour — open where you are",
     [
-      resolveOpenDestinationPane("quad", "top-left", bothEmpty, "active"),
+      resolveOpenDestinationPane("quad", "top-left", onlyActiveOccupied, "active"),
       resolveOpenDestinationPane("dual-vertical", "top-right", allFull, "active"),
     ],
     ["top-left", "top-right"],
