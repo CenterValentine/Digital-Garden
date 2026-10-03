@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { CircleX, type LucideIcon } from "lucide-react";
+import { CircleX, Grid2x2Check, type LucideIcon } from "lucide-react";
 import { toast } from "sonner";
 import { useWorkspaceStore } from "@/extensions/workplaces/state/workspace-store";
 import {
@@ -433,8 +433,37 @@ export function WorkplacesShellNavigationTrailingControls() {
               style={menuStyle}
               className="z-[100] overflow-auto rounded-md border border-white/10 bg-white/95 p-1 shadow-lg backdrop-blur-sm dark:bg-gray-900/95"
             >
-              <div className="px-2.5 py-1.5 text-[10px] uppercase tracking-[0.18em] text-gray-500">
-                Clear tabs
+              <div className="flex items-center justify-between gap-2 px-2.5 py-1.5">
+                <span className="text-[10px] uppercase tracking-[0.18em] text-gray-500">
+                  Clear tabs
+                </span>
+                {/*
+                  Not a clear — it sits opposite the heading for that reason.
+                  Pane memory is where a tab goes when a layout offers the
+                  choice (a tab that lived bottom-right in a quad goes back
+                  there from a vertical split's right pane). Reset makes each
+                  tab's home the pane it is in now, on both axes — from the
+                  right pane that's top-right, the pane's default. The count
+                  is the tabs a layout change would otherwise move; it stays
+                  visible at 0 for the same reason the Idle row does.
+                */}
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={resetPaneMemory}
+                  title={
+                    stalePaneMemoryCount > 0
+                      ? `Reset pane memory — ${pluralizeTabs(stalePaneMemoryCount)} would move on the next layout change; make each tab's home the pane it's in now`
+                      : "Reset pane memory — every tab's home already matches the pane it's in"
+                  }
+                  aria-label="Reset pane memory"
+                  className="inline-flex items-center gap-1 rounded border border-white/10 bg-black/[0.02] px-1.5 py-0.5 text-xs text-gray-600 transition-colors hover:bg-black/5 hover:text-gray-900 dark:bg-white/[0.03] dark:text-gray-300 dark:hover:bg-white/10 dark:hover:text-white"
+                >
+                  <Grid2x2Check className="h-3 w-3" aria-hidden="true" />
+                  <span className="text-[10px] tabular-nums opacity-55">
+                    {stalePaneMemoryCount}
+                  </span>
+                </button>
               </div>
 
               {isMultiPane
@@ -538,26 +567,6 @@ export function WorkplacesShellNavigationTrailingControls() {
                 </ChipRow>
               ) : null}
 
-              <div className="my-1 h-px bg-black/5 dark:bg-white/10" />
-
-              {/*
-                Not a clear. Pane memory is where a tab goes when a layout
-                offers the choice (a tab that lived bottom-right in a quad goes
-                back there from a vertical split's right pane). Reset makes
-                each tab's home the pane it is in now, on both axes — so from
-                the right pane it becomes top-right, the right pane's default.
-                The memory itself stays; this only re-seats it.
-              */}
-              <RowButton
-                label="Reset pane memory"
-                count={stalePaneMemoryCount}
-                description={
-                  stalePaneMemoryCount > 0
-                    ? `${pluralizeTabs(stalePaneMemoryCount)} would move on the next layout change — make each tab's home the pane it's in now`
-                    : "Every tab's home already matches the pane it's in"
-                }
-                onSelect={resetPaneMemory}
-              />
             </div>,
             document.body
           )
