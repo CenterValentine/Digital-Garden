@@ -72,6 +72,12 @@ type WorkspaceTabPreferenceMap = Record<
   Pick<WorkspaceTabState, "preferredHorizontal" | "preferredVertical">
 >;
 
+/** A tab's pane memory: where it goes when a layout offers the choice. */
+export type TabPlacementMemory = Pick<
+  WorkspaceTabState,
+  "preferredHorizontal" | "preferredVertical"
+>;
+
 export interface ContentSelectionOptions {
   title?: string | null;
   contentType?: string | null;
@@ -195,6 +201,13 @@ export interface ContentState {
   closeContentTab: (tabId: string) => void;
   closeContentTabs: (contentIds: string[]) => void;
   clearAllWorkspaceTabs: () => void;
+  /**
+   * Make every visible tab's pane memory the pane it is in NOW, on both axes.
+   * Returns the memory it replaced, keyed by tab id, for undo.
+   */
+  resetPaneMemory: () => Record<string, TabPlacementMemory>;
+  /** Put back pane memory captured by resetPaneMemory (undo). */
+  applyPaneMemory: (memory: Record<string, TabPlacementMemory>) => void;
   getWorkspaceStateSnapshot: () => WorkspaceStateSnapshot;
   restoreWorkspace: (workspace: WorkspaceRestoreOptions) => void;
   /**
@@ -815,6 +828,46 @@ function getVerticalPositionForPane(
   return paneId === BOTTOM_LEFT_PANE_ID || paneId === BOTTOM_RIGHT_PANE_ID
     ? "bottom"
     : "top";
+}
+
+/**
+ * The pane memory a tab would have if it had been born in `paneId` — both
+ * axes, read off the pane's position. In a one-axis layout the other axis
+ * takes that pane's default (the right pane of a vertical split is top-right
+ * in a quad), which is what "reset" means: the tab stops remembering a pane
+ * the current layout doesn't show.
+ */
+export function paneMemoryForPane(paneId: WorkspacePaneId): TabPlacementMemory {
+  return {
+    preferredHorizontal: getHorizontalPositionForPane(paneId),
+    preferredVertical: getVerticalPositionForPane(paneId),
+  };
+}
+
+/**
+ * Visible tabs whose memory points somewhere other than the pane they are in
+ * — the ones a layout change would move. What the reset control counts.
+ */
+export function getStalePaneMemoryTabIds(
+  layoutMode: WorkspaceLayoutMode,
+  panes: Record<WorkspacePaneId, WorkspacePaneState>,
+  tabs: Record<string, WorkspaceTabState>
+): string[] {
+  const stale: string[] = [];
+  for (const paneId of getVisiblePaneIds(layoutMode)) {
+    const home = paneMemoryForPane(paneId);
+    for (const tabId of panes[paneId]?.tabIds ?? []) {
+      const tab = tabs[tabId];
+      if (!tab) continue;
+      if (
+        tab.preferredHorizontal !== home.preferredHorizontal ||
+        tab.preferredVertical !== home.preferredVertical
+      ) {
+        stale.push(tabId);
+      }
+    }
+  }
+  return stale;
 }
 
 function applyPanePreferenceToTab(
@@ -2161,6 +2214,48 @@ export const useContentStore = create<ContentState>((set, get) => ({
 
     tabIds.forEach((tabId) => {
       get().closeContentTab(tabId);
+    });
+  },
+
+  resetPaneMemory: () => {
+    const replaced: Record<string, TabPlacementMemory> = {};
+    commitWorkspace(set, (state) => {
+      const stale = getStalePaneMemoryTabIds(state.layoutMode, state.panes, state.tabs);
+      if (stale.length === 0) return {};
+      const paneOf = new Map<string, WorkspacePaneId>();
+      for (const paneId of getVisiblePaneIds(state.layoutMode)) {
+        for (const tabId of state.panes[paneId]?.tabIds ?? []) paneOf.set(tabId, paneId);
+      }
+      const nextTabs = { ...state.tabs };
+      for (const tabId of stale) {
+        const tab = state.tabs[tabId];
+        const paneId = paneOf.get(tabId);
+        if (!tab || !paneId) continue;
+        replaced[tabId] = {
+          preferredHorizontal: tab.preferredHorizontal,
+          preferredVertical: tab.preferredVertical,
+        };
+        nextTabs[tabId] = { ...tab, ...paneMemoryForPane(paneId) };
+      }
+      // Pane placement is untouched — only where each tab would go NEXT time.
+      // commitWorkspace's syncBrowserState persists the preferences; the
+      // workspace snapshot is unchanged, so the persist that follows is an echo.
+      return { tabs: nextTabs };
+    });
+    return replaced;
+  },
+
+  applyPaneMemory: (memory) => {
+    commitWorkspace(set, (state) => {
+      const nextTabs = { ...state.tabs };
+      let changed = false;
+      for (const [tabId, placement] of Object.entries(memory)) {
+        const tab = state.tabs[tabId];
+        if (!tab) continue;
+        nextTabs[tabId] = { ...tab, ...placement };
+        changed = true;
+      }
+      return changed ? { tabs: nextTabs } : {};
     });
   },
 

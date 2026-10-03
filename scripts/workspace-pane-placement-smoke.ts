@@ -29,6 +29,7 @@ import {
   resolveOppositePane,
   resolveOpenDestinationPane,
   resolveLayoutModeForPane,
+  getStalePaneMemoryTabIds,
   type WorkspacePaneId,
   type WorkspaceLayoutMode,
 } from "../state/content-store";
@@ -629,6 +630,80 @@ console.log("\na restore never collapses — only a user's removal does (owner r
     useContentStore.getState().layoutMode,
     "single",
   );
+}
+
+console.log("\nreset pane memory (owner request, 2026-10-03)");
+{
+  // A tab that lived bottom-right in a quad remembers that. Collapse to a
+  // vertical split and it sits in the right pane; go back to quad and it
+  // returns to bottom-right — that memory is the feature, and it stays. Reset
+  // re-seats the memory to the pane the tab is in NOW, on both axes: the right
+  // pane of a vertical split is top-right by default, so after a reset the
+  // quad puts it top-right.
+  seedSplit();
+  useContentStore.getState().restoreWorkspace({
+    activeContentId: "P1",
+    activePaneId: "top-left",
+    layoutMode: "quad",
+    paneTabContentIds: {
+      "top-left": ["P1"],
+      "top-right": ["P2"],
+      "bottom-left": ["P3"],
+      "bottom-right": ["P4"],
+    },
+  });
+  // Seat the memory the way the real flow does (restoreWorkspace keeps stored
+  // preferences; a move through each pane records both axes).
+  for (const [tab, pane] of [
+    ["tab:P2", "top-right"],
+    ["tab:P3", "bottom-left"],
+    ["tab:P4", "bottom-right"],
+  ] as const) {
+    useContentStore.getState().moveContentTabToPane(tab, pane, {});
+  }
+  useContentStore.getState().setLayoutMode("dual-vertical");
+  check(
+    "collapsing to a vertical split folds P4 into the right pane",
+    paneContents("top-right"),
+    ["P2", "P4"],
+  );
+  useContentStore.getState().setLayoutMode("quad");
+  check(
+    "…and the quad remembers P4 was bottom-right (memory kept — the feature)",
+    paneContents("bottom-right"),
+    ["P4"],
+  );
+
+  useContentStore.getState().setLayoutMode("dual-vertical");
+  check(
+    "from the vertical split, P3 and P4 would move on the next layout change",
+    getStalePaneMemoryTabIds(
+      "dual-vertical",
+      useContentStore.getState().panes,
+      useContentStore.getState().tabs,
+    ).sort(),
+    ["tab:P3", "tab:P4"],
+  );
+  const before = useContentStore.getState().resetPaneMemory();
+  check("reset returns the memory it replaced, for undo", Object.keys(before).sort(), ["tab:P3", "tab:P4"]);
+  check(
+    "…after which nothing would move",
+    getStalePaneMemoryTabIds("dual-vertical", useContentStore.getState().panes, useContentStore.getState().tabs),
+    [],
+  );
+  useContentStore.getState().setLayoutMode("quad");
+  check(
+    "the quad now seats P4 where the right pane's default is: top-right",
+    [paneContents("top-right"), paneContents("bottom-right"), paneContents("bottom-left")],
+    [["P2", "P4"], [], []],
+  );
+  check("…and P3 follows the left pane's default: top-left", paneContents("top-left"), ["P1", "P3"]);
+
+  // Undo puts the memory back; the next quad honours it again.
+  useContentStore.getState().setLayoutMode("dual-vertical");
+  useContentStore.getState().applyPaneMemory(before);
+  useContentStore.getState().setLayoutMode("quad");
+  check("undo restores the old memory: P4 is bottom-right again", paneContents("bottom-right"), ["P4"]);
 }
 
 console.log("\nclicking around between opens");

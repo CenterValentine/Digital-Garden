@@ -9,6 +9,7 @@ import {
   useContentStore,
   getVisiblePaneIds,
   getPaneLabel,
+  getStalePaneMemoryTabIds,
   markLocalOpenIntents,
   type WorkspacePaneId,
   type WorkspaceStateSnapshot,
@@ -317,6 +318,36 @@ export function WorkplacesShellNavigationTrailingControls() {
     );
   }, [clearAllWorkspaceTabs, runClear, tabs]);
 
+  // Tabs whose pane memory would move them on the next layout change — a tab
+  // that lived bottom-right in a quad still remembers that from the right pane
+  // of a vertical split. Counted live so the row reads as "what resetting
+  // would change", and it stays visible at 0 for the same reason the Idle row
+  // does: a control that only appears once it has work is indistinguishable
+  // from one that's broken.
+  const stalePaneMemoryCount = useMemo(
+    () => (open ? getStalePaneMemoryTabIds(layoutMode, panes, tabsById).length : 0),
+    [open, layoutMode, panes, tabsById]
+  );
+
+  const resetPaneMemory = useCallback(() => {
+    close();
+    const store = useContentStore.getState();
+    const before = store.resetPaneMemory();
+    const changed = Object.keys(before).length;
+    if (changed === 0) {
+      toast.message("Pane memory already matches where every tab sits");
+      return;
+    }
+    toast.success(`Pane memory reset for ${pluralizeTabs(changed)}`, {
+      description: "Each tab's home is now the pane it's in",
+      duration: UNDO_WINDOW_MS,
+      action: {
+        label: "Undo",
+        onClick: () => useContentStore.getState().applyPaneMemory(before),
+      },
+    });
+  }, [close]);
+
   const openClearMenu = useCallback(() => {
     setMenuOpenedAt(Date.now());
     openMenu();
@@ -506,6 +537,27 @@ export function WorkplacesShellNavigationTrailingControls() {
                   ))}
                 </ChipRow>
               ) : null}
+
+              <div className="my-1 h-px bg-black/5 dark:bg-white/10" />
+
+              {/*
+                Not a clear. Pane memory is where a tab goes when a layout
+                offers the choice (a tab that lived bottom-right in a quad goes
+                back there from a vertical split's right pane). Reset makes
+                each tab's home the pane it is in now, on both axes — so from
+                the right pane it becomes top-right, the right pane's default.
+                The memory itself stays; this only re-seats it.
+              */}
+              <RowButton
+                label="Reset pane memory"
+                count={stalePaneMemoryCount}
+                description={
+                  stalePaneMemoryCount > 0
+                    ? `${pluralizeTabs(stalePaneMemoryCount)} would move on the next layout change — make each tab's home the pane it's in now`
+                    : "Every tab's home already matches the pane it's in"
+                }
+                onSelect={resetPaneMemory}
+              />
             </div>,
             document.body
           )
