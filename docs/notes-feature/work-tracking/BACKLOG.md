@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-09-29
+last_updated: 2026-10-02
 ---
 
 # Sprint Backlog
@@ -7,6 +7,53 @@ last_updated: 2026-09-29
 **Prioritized work items for upcoming sprints, organized by epoch.**
 
 **Sprint Execution Protocol**: Before commencing any sprint, always ask the user for input before planning and executing — there may be additions or modifications.
+
+---
+
+## Split Pane Placement — behaviour as a setting (2026-10-02, from `feat/open-into-opposite-pane`)
+
+Where content opened from the file tree lands in a split workspace is a
+preference, and some of it is already built. The **seam exists and is
+covered**; what is missing is the control that reaches it.
+
+**Already shipped on that branch** — nothing below needs re-deriving:
+
+- `settings.ui.openDestination` in the Zod schema, with `"fill"` in
+  `DEFAULT_SETTINGS` (`lib/features/settings/validation.ts`). It sits under
+  `ui` on purpose: `saveToBackend` sends `ui` wholesale and `setUISettings`
+  already patches it, so registrations 3 and 4 of the four-registration rule
+  are satisfied by construction and the "saves, then silently reverts" trap
+  cannot apply.
+- `resolveOpenDestinationPane(layoutMode, activePaneId, isPaneEmpty, mode)`
+  in `state/content-store.ts` takes the mode and honours all three values.
+- The tree's open path reads the preference through the real store, so the
+  default is exercised end-to-end rather than hardcoded.
+- All three modes are pinned in `pnpm workspace:pane-placement:smoke`,
+  including the two nothing can select yet — an unreachable branch rots
+  before the control that exposes it lands, and then the settings PR gets
+  blamed for behaviour it did not write.
+
+**What is left: the UI only.**
+
+- A control in the appearance/workspace settings area with the three values:
+  - **Beside your work** (`fill`, default) — the opposite pane first, then any
+    empty pane, then back to the opposite. In a quad this fills the room
+    before stacking.
+  - **Always opposite** (`opposite`) — never spreads into the other panes.
+  - **In the active pane** (`active`) — how this behaved before the rule, for
+    anyone who wants it back.
+- Write through `setUISettings({ openDestination })`; do NOT add a new setter
+  or a new `saveToBackend` line.
+- Settings-page conventions apply: `"use client"`, Glass-0 `SettingSection`
+  cards, sonner toast on save.
+- Copy should say what each does to the pane you are reading in, since that is
+  the thing the default protects.
+
+**Worth deciding at the same time:** a tree click is a *preview* open, so a
+second one replaces the first in the destination pane rather than stacking.
+That is pinned as current behaviour, not asserted as correct. If "accumulate
+while browsing beside my work" is wanted, it is a `pin: true` on that call
+path and probably belongs to the same control.
 
 ---
 

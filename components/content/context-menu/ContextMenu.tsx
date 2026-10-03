@@ -25,6 +25,7 @@ import { useContextMenuStore } from "@/state/context-menu-store";
 import type { ContextMenuActionProvider, ContextMenuAction } from "./types";
 import { calculateMenuPosition, calculateSubmenuPosition } from "@/lib/core/menu-positioning";
 import { FolderSearchFlyout } from "./FolderSearchFlyout";
+import { PaneKeyGrid } from "./PaneKeyGrid";
 
 interface ContextMenuProps {
   /** Action providers for each panel type */
@@ -568,6 +569,9 @@ export function ContextMenu({ actionProviders }: ContextMenuProps) {
     let estimatedHeight = 400;
     if (foundAction.submenu && foundAction.submenu.length > 0) {
       estimatedHeight = Math.min(foundAction.submenu.length * 32 + 8, 400);
+    } else if (foundAction.customFlyout?.kind === "pane-grid") {
+      estimatedWidth = 196; // matches PaneKeyGrid's w-[196px]
+      estimatedHeight = 168; // three rows of cells + the footer line
     } else if (foundAction.customFlyout) {
       estimatedWidth = 288; // matches the flyout's w-72
       // Intentionally tiny: keeps the flyout anchored to the item's top (no
@@ -680,6 +684,17 @@ export function ContextMenu({ actionProviders }: ContextMenuProps) {
                       selectedIds={action.customFlyout.selectedIds}
                       excludeIds={action.customFlyout.excludeIds}
                       folderAssistant={action.customFlyout.folderAssistant}
+                      onClose={closeMenu}
+                      onMouseEnter={handleSubmenuMouseEnter}
+                    />
+                  )}
+
+                {/* The direction-key map for "Open In Pane" */}
+                {action.customFlyout?.kind === "pane-grid" &&
+                  openSubmenu?.id === action.id && (
+                    <PaneKeyGrid
+                      position={openSubmenu.position}
+                      onPick={action.customFlyout.onPick}
                       onClose={closeMenu}
                       onMouseEnter={handleSubmenuMouseEnter}
                     />

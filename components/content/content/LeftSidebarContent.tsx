@@ -18,7 +18,18 @@ import { FileUploadDialog } from "../dialogs/FileUploadDialog";
 import { IconSelector } from "../IconSelector";
 import { LeftSidebarStatusBar } from "../LeftSidebarStatusBar";
 import { RootNodeHeader, type RootScopeOption } from "../file-tree/RootNodeHeader";
-import { useContentStore } from "@/state/content-store";
+import {
+  useContentStore,
+  resolveOpenDestinationPane,
+  resolveLayoutModeForPane,
+  type WorkspacePaneId,
+} from "@/state/content-store";
+import {
+  ensurePaneHotkeyTracker,
+  heldPaneTarget,
+  PANE_HOTKEY_SINGLE,
+} from "@/lib/features/content/pane-hotkeys";
+import { useSettingsStore } from "@/state/settings-store";
 import { useSearchStore } from "@/state/search-store";
 import { useTreeStateStore } from "@/state/tree-state-store";
 import { useCharterIdsStore } from "@/state/charter-ids-store";
@@ -382,6 +393,14 @@ export function LeftSidebarContent({
   const replaceContentTab = useContentStore((state) => state.replaceContentTab);
   const closeContentTabs = useContentStore((state) => state.closeContentTabs);
   const { setSelectedIds } = useTreeStateStore();
+
+  // Direction-key aiming for tree opens. Installed on mount, not lazily at
+  // click time the way the Alt tracker is: the keydown we need to have seen
+  // happens BEFORE the click, so a tracker installed by the click is already
+  // too late to have recorded anything.
+  useEffect(() => {
+    ensurePaneHotkeyTracker();
+  }, []);
 
   // Search store - conditionally show search panel
   const isSearchOpen = useSearchStore((state) => state.isSearchOpen);
@@ -1360,6 +1379,67 @@ export function LeftSidebarContent({
     const firstNode = nodes[0];
     if (!firstNode) return;
 
+    // Side-by-side open (owner call, 2026-10-02). In a split layout a tree
+    // click puts content in the pane OPPOSITE the one you are working in,
+    // instead of replacing what you are reading — the complaint was that
+    // opening a second document cost you the first.
+    //
+    // `focusPane: false` is the other half: see ContentSelectionOptions, but
+    // in short, taking focus would move activePaneId to the target, so the
+    // NEXT tree click would compute "opposite" from there and land back on the
+    // document we just protected.
+    //
+    // In `single` the opposite IS the active pane, so we send nothing and the
+    // behavior is exactly what it was. Read imperatively — this is an event
+    // handler, and a reactive layoutMode would only add a stale-closure risk.
+    const { layoutMode, activePaneId, panes } = useContentStore.getState();
+    // Read the preference even though nothing can change it yet: the seam is
+    // the point. When the settings control lands it has nowhere new to reach.
+    const destinationPaneId = resolveOpenDestinationPane(
+      layoutMode,
+      activePaneId,
+      (paneId) => (panes[paneId]?.tabIds.length ?? 0) === 0,
+      useSettingsStore.getState().ui?.openDestination,
+    );
+    // A held direction key (lib/features/content/pane-hotkeys.ts) is an
+    // explicit aim and outranks the automatic rule — you said where it goes,
+    // so nothing should second-guess it. It also TAKES focus, unlike the
+    // automatic placement: naming a pane is a decision to work there, where
+    // the automatic one is a decision to keep working where you are.
+    const aimed = heldPaneTarget();
+    let sideBySide: {
+      paneId?: WorkspacePaneId;
+      focusPane?: boolean;
+      pin?: boolean;
+    };
+
+    if (aimed === PANE_HOTKEY_SINGLE) {
+      // S collapses to one pane and the clicked content becomes the live one,
+      // so focus is exactly what is wanted here — nothing to send.
+      useContentStore.getState().setLayoutMode("single");
+      sideBySide = {};
+    } else if (aimed) {
+      // Grow the layout to reach a pane that isn't on screen yet, the same way
+      // the context menu's "(expand layout)" entries do — pressing Z in a
+      // vertical split opens a quad rather than silently landing elsewhere.
+      const neededLayout = resolveLayoutModeForPane(layoutMode, aimed);
+      if (neededLayout !== layoutMode) {
+        useContentStore.getState().setLayoutMode(neededLayout);
+      }
+      // An aimed open is PINNED. Holding a key and naming a pane is placing,
+      // not browsing — the next casual click must land beside it, not over
+      // it. This matches the context menu's "Open In Pane", the other
+      // deliberate path, which already pins; before this the two disagreed.
+      // The automatic placement stays a preview on purpose: when the rule
+      // chose the pane for you, you have committed to nothing yet.
+      sideBySide = { paneId: aimed, pin: true };
+    } else {
+      sideBySide =
+        destinationPaneId === activePaneId
+          ? {}
+          : { paneId: destinationPaneId, focusPane: false };
+    }
+
     // A mirror row is a projection of content that lives elsewhere. Its own id
     // is synthetic and path-scoped, so opening it means opening the REAL id —
     // otherwise the tab would hold an id no fetch can resolve.
@@ -1367,6 +1447,7 @@ export function LeftSidebarContent({
       setSelectedContentId(firstNode.mirrorOf, {
         title: firstNode.title,
         contentType: firstNode.contentType,
+        ...sideBySide,
       });
       return;
     }
@@ -1381,11 +1462,13 @@ export function LeftSidebarContent({
         setSelectedContentId(target.targetId, {
           title: target.targetTitle ?? firstNode.title,
           contentType: target.targetContentType ?? undefined,
+          ...sideBySide,
         });
       } else {
         setSelectedContentId(firstNode.id, {
           title: firstNode.title,
           contentType: "shortcut",
+          ...sideBySide,
         });
       }
       return;
@@ -1395,6 +1478,7 @@ export function LeftSidebarContent({
       setSelectedContentId(firstNode.id, {
         title: firstNode.title,
         contentType: "person-profile",
+        ...sideBySide,
       });
       return;
     }
@@ -1406,6 +1490,7 @@ export function LeftSidebarContent({
     setSelectedContentId(firstNode.id, {
       title: firstNode.title,
       contentType: firstNode.contentType,
+      ...sideBySide,
     });
   };
 

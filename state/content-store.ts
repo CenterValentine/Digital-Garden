@@ -8,6 +8,12 @@
  */
 
 import { create } from "zustand";
+import {
+  fingerprintPlacement,
+  isWorkspaceTraceEnabled,
+  traceCaller,
+  traceWorkspace,
+} from "@/lib/core/workspace-trace";
 
 const TOP_LEFT_PANE_ID = "top-left";
 const TOP_RIGHT_PANE_ID = "top-right";
@@ -66,6 +72,12 @@ type WorkspaceTabPreferenceMap = Record<
   Pick<WorkspaceTabState, "preferredHorizontal" | "preferredVertical">
 >;
 
+/** A tab's pane memory: where it goes when a layout offers the choice. */
+export type TabPlacementMemory = Pick<
+  WorkspaceTabState,
+  "preferredHorizontal" | "preferredVertical"
+>;
+
 export interface ContentSelectionOptions {
   title?: string | null;
   contentType?: string | null;
@@ -79,6 +91,22 @@ export interface ContentSelectionOptions {
    * explicit placement. Omit for the classic preview-replacement behavior.
    */
   beforeTabId?: string | null;
+  /**
+   * Open the content WITHOUT moving focus to its pane (default: focus follows,
+   * as every other open path does).
+   *
+   * Used by the file tree's side-by-side open: the point of putting content in
+   * the opposite pane is that the pane you are reading in stays yours, and
+   * stealing focus would undo that on the very next click — the following tree
+   * click would compute "opposite" from the pane we just moved to and land back
+   * on the document you were protecting.
+   *
+   * The pane still shows the content (its own `activeTabId` is set, and each
+   * pane renders `getPaneActiveContentId` independently), so this does not hide
+   * what was opened — it only declines to claim the cursor, the right sidebar
+   * and the toolbar, all of which follow `selectedContentId`.
+   */
+  focusPane?: boolean;
 }
 
 interface WorkspaceRestoreOptions {
@@ -173,6 +201,13 @@ export interface ContentState {
   closeContentTab: (tabId: string) => void;
   closeContentTabs: (contentIds: string[]) => void;
   clearAllWorkspaceTabs: () => void;
+  /**
+   * Make every visible tab's pane memory the pane it is in NOW, on both axes.
+   * Returns the memory it replaced, keyed by tab id, for undo.
+   */
+  resetPaneMemory: () => Record<string, TabPlacementMemory>;
+  /** Put back pane memory captured by resetPaneMemory (undo). */
+  applyPaneMemory: (memory: Record<string, TabPlacementMemory>) => void;
   getWorkspaceStateSnapshot: () => WorkspaceStateSnapshot;
   restoreWorkspace: (workspace: WorkspaceRestoreOptions) => void;
   /**
@@ -273,8 +308,124 @@ function getVisiblePaneIds(layoutMode: WorkspaceLayoutMode) {
   return LAYOUT_VISIBLE_PANES[layoutMode];
 }
 
-function isPaneVisible(layoutMode: WorkspaceLayoutMode, paneId: WorkspacePaneId) {
+export function isPaneVisible(layoutMode: WorkspaceLayoutMode, paneId: WorkspacePaneId) {
   return getVisiblePaneIds(layoutMode).includes(paneId);
+}
+
+const HORIZONTAL_PARTNER: Record<WorkspacePaneId, WorkspacePaneId> = {
+  [TOP_LEFT_PANE_ID]: TOP_RIGHT_PANE_ID,
+  [TOP_RIGHT_PANE_ID]: TOP_LEFT_PANE_ID,
+  [BOTTOM_LEFT_PANE_ID]: BOTTOM_RIGHT_PANE_ID,
+  [BOTTOM_RIGHT_PANE_ID]: BOTTOM_LEFT_PANE_ID,
+};
+
+const VERTICAL_PARTNER: Record<WorkspacePaneId, WorkspacePaneId> = {
+  [TOP_LEFT_PANE_ID]: BOTTOM_LEFT_PANE_ID,
+  [BOTTOM_LEFT_PANE_ID]: TOP_LEFT_PANE_ID,
+  [TOP_RIGHT_PANE_ID]: BOTTOM_RIGHT_PANE_ID,
+  [BOTTOM_RIGHT_PANE_ID]: TOP_RIGHT_PANE_ID,
+};
+
+/**
+ * The pane to open new content into so it lands BESIDE what you are reading
+ * rather than replacing it.
+ *
+ * One rule covers every layout: take the horizontal partner when it is visible,
+ * otherwise the vertical one, otherwise stay put. That falls out as —
+ *
+ *   single           → itself (nothing to open beside; caller behaves as before)
+ *   dual-vertical    → top-left ↔ top-right
+ *   dual-horizontal  → top-left ↔ bottom-left
+ *   quad             → top-left ↔ top-right, bottom-left ↔ bottom-right
+ *
+ * Quad pairs horizontally rather than diagonally (owner call, 2026-10-02): the
+ * new content sits on the same row as its source, which is the arrangement you
+ * want when the reason for opening it was to read the two together.
+ *
+ * Pure and total — returns a visible pane for any input, so callers never need
+ * to re-check `isPaneVisible`.
+ */
+/**
+ * Where a tree open should land: beside the work, filling the room available.
+ *
+ * The opposite pane is the first choice, but only the FIRST one is unconditional
+ * — after that, emptiness decides. In a quad you fill the room you have before
+ * you start stacking:
+ *
+ *   quad, working top-left →  1st: top-right (the opposite, empty)
+ *                             2nd: bottom-left   (opposite taken, this is empty)
+ *                             3rd: bottom-right  (likewise)
+ *                             4th: top-right     (all full — back to the opposite)
+ *
+ *   dual, working left     →  1st: right (the opposite)
+ *                             2nd+: right (nothing else to fill)
+ *
+ * Engaging with a pane makes it the active one, and the whole rule re-aims off
+ * it — which only works because an open does not steal focus (`focusPane`).
+ * If it did, the anchor would move on every click and "opposite" would mean
+ * something different each time.
+ *
+ * Pure: occupancy comes in as a predicate so this stays testable and the caller
+ * owns where "empty" is read from.
+ */
+export type OpenDestinationMode = "fill" | "opposite" | "active";
+
+export function resolveOpenDestinationPane(
+  layoutMode: WorkspaceLayoutMode,
+  activePaneId: WorkspacePaneId,
+  isPaneEmpty: (paneId: WorkspacePaneId) => boolean,
+  /**
+   * User preference (`settings.ui.openDestination`). Defaults to the behaviour
+   * described above; the other two are escape hatches rather than variations —
+   * "opposite" never spreads into the other panes, and "active" is how this
+   * behaved before the setting existed, for anyone who wants it back.
+   */
+  mode: OpenDestinationMode = "fill"
+): WorkspacePaneId {
+  if (mode === "active") return activePaneId;
+
+  const opposite = resolveOppositePane(layoutMode, activePaneId);
+  if (mode === "opposite") return opposite;
+  // Single pane: nothing to open beside, and the caller treats this as "send
+  // no paneId at all", preserving the pre-existing behaviour exactly.
+  if (opposite === activePaneId) return activePaneId;
+
+  const visible = getVisiblePaneIds(layoutMode);
+  const from = visible.includes(activePaneId) ? activePaneId : visible[0];
+
+  // If the pane you are working in is EMPTY, that is the answer. The whole
+  // point of opening elsewhere is not to displace what you are reading, and an
+  // empty pane has nothing to displace. Without this the rule skips the
+  // obvious destination and piles everything into the opposite pane while the
+  // one you are looking at stays blank — which is what clicking into an empty
+  // pane produced before this line existed.
+  if (isPaneEmpty(from)) return from;
+
+  // Opposite first, then the remaining panes in ordinal order. First empty one
+  // wins; if the room is full we come back to the opposite and replace there.
+  const candidates = [
+    opposite,
+    ...visible.filter((paneId) => paneId !== from && paneId !== opposite),
+  ];
+  return candidates.find((paneId) => isPaneEmpty(paneId)) ?? opposite;
+}
+
+export function resolveOppositePane(
+  layoutMode: WorkspaceLayoutMode,
+  activePaneId: WorkspacePaneId
+): WorkspacePaneId {
+  const visible = getVisiblePaneIds(layoutMode);
+  // An activePaneId can outlive a layout change; clamp before pairing or we'd
+  // pair off a pane that isn't on screen.
+  const from = visible.includes(activePaneId) ? activePaneId : visible[0];
+
+  const horizontal = HORIZONTAL_PARTNER[from];
+  if (visible.includes(horizontal)) return horizontal;
+
+  const vertical = VERTICAL_PARTNER[from];
+  if (visible.includes(vertical)) return vertical;
+
+  return from;
 }
 
 function getActiveTab(state: Pick<ContentState, "activePaneId" | "panes" | "tabs">) {
@@ -462,7 +613,18 @@ function collapsePaneContentIdsForLayout(
 // let go of.
 //
 // Local-only and deliberately so: the server-side truth is the guarded write.
-type PendingWorkspaceIntent = { kind: "open" | "close"; at: number };
+// `paneId` records WHERE an open put the tab. Without it, restoreWorkspace
+// re-adds every pending open into the ACTIVE pane, so any open into a pane
+// other than the focused one gets yanked across the moment a reconcile lands
+// before the debounced write — the tab appears where you asked, then jumps.
+// That was rare enough to look like a flake for drag-drop-onto-a-pane and
+// openContentInPane; the file tree's side-by-side open reproduces it every
+// time, because it targets a non-active pane by definition.
+type PendingWorkspaceIntent = {
+  kind: "open" | "close";
+  at: number;
+  paneId?: WorkspacePaneId;
+};
 const pendingWorkspaceIntents = new Map<string, PendingWorkspaceIntent>();
 
 // Standalone default. The workplaces extension overrides this off its real poll
@@ -481,12 +643,13 @@ export function configurePendingIntentBackstop(ms: number) {
 
 function rememberIntent(
   contentId: string | null | undefined,
-  kind: PendingWorkspaceIntent["kind"]
+  kind: PendingWorkspaceIntent["kind"],
+  paneId?: WorkspacePaneId
 ) {
   if (!contentId) return;
   // Recording the opposite intent replaces the previous one (case 2 above):
   // re-opening what you just closed is an explicit override, and vice versa.
-  pendingWorkspaceIntents.set(contentId, { kind, at: Date.now() });
+  pendingWorkspaceIntents.set(contentId, { kind, at: Date.now(), paneId });
 }
 
 /**
@@ -499,11 +662,37 @@ function rememberIntent(
  * Retiring on its ack would drop the intent on the strength of a write that
  * never expressed the change.
  */
-export function confirmWorkspaceWrite(writtenContentIds: Iterable<string>) {
+export function confirmWorkspaceWrite(
+  writtenContentIds: Iterable<string>,
+  // The pane placement the acked write carried. A PLACED open intent ("put it
+  // in that pane") is durable only once the server holds it THERE: a write
+  // already in flight when the user dragged still carries the old pane, and
+  // retiring on its membership alone let the next stale snapshot drag the tab
+  // back. Callers that only know the id set (membership writes) omit this and
+  // get the membership rule.
+  writtenPlacement?: Partial<Record<WorkspacePaneId, string[]>>,
+  writtenLayoutMode?: WorkspaceLayoutMode
+) {
   const written = new Set(writtenContentIds);
+  const visibleInWrite = writtenLayoutMode
+    ? getVisiblePaneIds(writtenLayoutMode)
+    : null;
   for (const [contentId, intent] of [...pendingWorkspaceIntents]) {
-    const durable =
-      intent.kind === "open" ? written.has(contentId) : !written.has(contentId);
+    let durable: boolean;
+    if (intent.kind === "close") {
+      durable = !written.has(contentId);
+    } else if (
+      intent.paneId &&
+      writtenPlacement &&
+      // A pane the written layout does not show can never match — the tab
+      // was folded elsewhere by a collapse — so fall back to membership
+      // rather than keeping the intent alive until the backstop.
+      (visibleInWrite === null || visibleInWrite.includes(intent.paneId))
+    ) {
+      durable = (writtenPlacement[intent.paneId] ?? []).includes(contentId);
+    } else {
+      durable = written.has(contentId);
+    }
     if (durable) pendingWorkspaceIntents.delete(contentId);
   }
 }
@@ -545,11 +734,25 @@ function pendingIntentFor(
   return intent.kind;
 }
 
-/** Content this surface has opened but not yet published. */
-function getPendingOpenContentIds(): string[] {
-  return [...pendingWorkspaceIntents.keys()].filter(
-    (contentId) => pendingIntentFor(contentId) === "open"
-  );
+/**
+ * Content this surface has opened but not yet published, each with the pane it
+ * was opened into (undefined when the opener didn't say — the URL-restore path
+ * via `markLocalOpenIntents`, which has no pane of its own).
+ */
+function getPendingOpenIntents(): Array<{
+  contentId: string;
+  paneId?: WorkspacePaneId;
+}> {
+  const open: Array<{ contentId: string; paneId?: WorkspacePaneId }> = [];
+  for (const contentId of [...pendingWorkspaceIntents.keys()]) {
+    // Call through pendingIntentFor so the backstop expiry still applies.
+    if (pendingIntentFor(contentId) !== "open") continue;
+    open.push({
+      contentId,
+      paneId: pendingWorkspaceIntents.get(contentId)?.paneId,
+    });
+  }
+  return open;
 }
 
 function createWorkspaceStateSnapshot(
@@ -625,6 +828,46 @@ function getVerticalPositionForPane(
   return paneId === BOTTOM_LEFT_PANE_ID || paneId === BOTTOM_RIGHT_PANE_ID
     ? "bottom"
     : "top";
+}
+
+/**
+ * The pane memory a tab would have if it had been born in `paneId` — both
+ * axes, read off the pane's position. In a one-axis layout the other axis
+ * takes that pane's default (the right pane of a vertical split is top-right
+ * in a quad), which is what "reset" means: the tab stops remembering a pane
+ * the current layout doesn't show.
+ */
+export function paneMemoryForPane(paneId: WorkspacePaneId): TabPlacementMemory {
+  return {
+    preferredHorizontal: getHorizontalPositionForPane(paneId),
+    preferredVertical: getVerticalPositionForPane(paneId),
+  };
+}
+
+/**
+ * Visible tabs whose memory points somewhere other than the pane they are in
+ * — the ones a layout change would move. What the reset control counts.
+ */
+export function getStalePaneMemoryTabIds(
+  layoutMode: WorkspaceLayoutMode,
+  panes: Record<WorkspacePaneId, WorkspacePaneState>,
+  tabs: Record<string, WorkspaceTabState>
+): string[] {
+  const stale: string[] = [];
+  for (const paneId of getVisiblePaneIds(layoutMode)) {
+    const home = paneMemoryForPane(paneId);
+    for (const tabId of panes[paneId]?.tabIds ?? []) {
+      const tab = tabs[tabId];
+      if (!tab) continue;
+      if (
+        tab.preferredHorizontal !== home.preferredHorizontal ||
+        tab.preferredVertical !== home.preferredVertical
+      ) {
+        stale.push(tabId);
+      }
+    }
+  }
+  return stale;
 }
 
 function applyPanePreferenceToTab(
@@ -888,6 +1131,96 @@ function projectPanesToLayout(
   return nextPanes;
 }
 
+/**
+ * The layout that fits the panes that still hold content, or null for "leave
+ * it". Owner scenarios (2026-10-02), quad numbered 1 2 / 3 4:
+ *
+ *   3,4 empty → 1,2 take the vertical split      1,2 empty → 3,4 move up into it
+ *   1,3 empty → 2,4 become the horizontal split  2,4 empty → 1,3 do
+ *   any three empty → the survivor alone in a single pane
+ *   either side of a dual emptied → single
+ *
+ * Decided here, not in the spec: a diagonal pair takes the vertical split (the
+ * app's primary two-pane arrangement), and three survivors stay a quad because
+ * no layout holds three. Pure, so the harness pins every case.
+ */
+export function resolveLayoutForOccupancy(
+  layoutMode: WorkspaceLayoutMode,
+  panes: Record<WorkspacePaneId, WorkspacePaneState>
+): WorkspaceLayoutMode | null {
+  const visible = getVisiblePaneIds(layoutMode);
+  const occupied = visible.filter(
+    (paneId) => (panes[paneId]?.tabIds.length ?? 0) > 0
+  );
+  if (occupied.length === visible.length) return null; // nothing is empty
+  if (layoutMode === "single") return null;
+  if (occupied.length <= 1) return "single";
+  if (layoutMode !== "quad") return null; // a full dual was caught above
+  if (occupied.length === 3) return null; // nothing fits three
+
+  const has = new Set(occupied);
+  const leftColumn = has.has(TOP_LEFT_PANE_ID) && has.has(BOTTOM_LEFT_PANE_ID);
+  const rightColumn = has.has(TOP_RIGHT_PANE_ID) && has.has(BOTTOM_RIGHT_PANE_ID);
+  return leftColumn || rightColumn ? "dual-horizontal" : "dual-vertical";
+}
+
+/**
+ * Collapse empty panes out of the layout, as one patch for the SAME commit
+ * that removed the tab. Returns null when nothing should change.
+ *
+ * Only tab REMOVAL calls this — never a layout change (choosing a split leaves
+ * a pane empty by definition) and never a restore/reconcile (a snapshot can
+ * hand us empties mid-flight, and collapsing on it would let two windows
+ * ping-pong layouts through the sync loop). Being inside the removal's own
+ * commit also means one persisted mutation, not a removal followed by a
+ * second layout write that a reconcile could land between.
+ *
+ * Relocation is `projectPanesToLayout` — by pane POSITION — not the
+ * preference-driven fold `setLayoutMode` uses, which depends on per-tab
+ * preferences that can be stale after a restore. Checked against every pair
+ * and both diagonals: no two surviving panes ever map to the same slot, so
+ * nothing is merged and nothing is lost.
+ */
+function collapseForOccupancy(
+  state: ContentState,
+  fromLayoutMode: WorkspaceLayoutMode,
+  panes: Record<WorkspacePaneId, WorkspacePaneState>,
+  tabs: Record<string, WorkspaceTabState>,
+  preferredActivePaneId: WorkspacePaneId,
+  snapshots: Record<WorkspaceLayoutMode, WorkspaceLayoutSnapshot>
+): Partial<ContentState> | null {
+  const target = resolveLayoutForOccupancy(fromLayoutMode, panes);
+  if (!target) return null;
+  // A constrained surface can't leave its pinned layout (see setLayoutMode).
+  if (surfaceLayoutMode && target !== surfaceLayoutMode) return null;
+
+  const projected = projectPanesToLayout(fromLayoutMode, target, panes);
+  const activePaneId = resolveActivePaneForLayout(
+    target,
+    collapsePaneIdForLayout(target, preferredActivePaneId),
+    projected,
+    tabs
+  );
+  const activeTab = getPaneActiveTab({ panes: projected, tabs }, activePaneId);
+
+  return {
+    layoutMode: target,
+    panes: projected,
+    activePaneId,
+    layoutSnapshots: {
+      ...snapshots,
+      [target]: {
+        activePaneId,
+        isInitialized: true,
+        panes: clonePaneRecord(projected),
+      },
+    },
+    selectedContentId: activeTab?.contentId ?? null,
+    selectedContentType: activeTab?.contentType ?? null,
+    openContentIds: getVisibleOpenContentIds(target, projected, tabs),
+  };
+}
+
 function getPaneLabel(
   layoutMode: WorkspaceLayoutMode,
   paneId: WorkspacePaneId
@@ -914,7 +1247,7 @@ function getPaneLabel(
   }
 }
 
-function resolveLayoutModeForPane(
+export function resolveLayoutModeForPane(
   currentLayoutMode: WorkspaceLayoutMode,
   paneId: WorkspacePaneId
 ) {
@@ -1181,6 +1514,15 @@ function commitWorkspace(
   set((state: ContentState) => {
     const updates = recipe(state);
     const nextState = { ...state, ...updates } as ContentState;
+    // Tracer (lib/core/workspace-trace.ts): every placement change reports the
+    // action that made it. Flag-gated; the fingerprint is only computed when on.
+    if (isWorkspaceTraceEnabled()) {
+      const before = fingerprintPlacement(state);
+      const after = fingerprintPlacement(nextState);
+      if (before !== after) {
+        traceWorkspace("commit", { before, after }, traceCaller());
+      }
+    }
     syncBrowserState(nextState);
     return updates;
   });
@@ -1313,7 +1655,21 @@ export const useContentStore = create<ContentState>((set, get) => ({
     // overrides a pending close and protects the new tab from a reconcile that
     // lands before the debounced write does. restoreWorkspace deliberately
     // records nothing: that's the remote path intents exist to filter.
-    rememberIntent(id, "open");
+    //
+    // Resolve the destination pane the same way the reducer below does, and
+    // record it WITH the intent: a reconcile must put the tab back where it
+    // was opened, not into whichever pane holds focus. Computed out here from
+    // get() because the reducer's copy isn't visible to rememberIntent.
+    {
+      const { layoutMode, activePaneId } = get();
+      rememberIntent(
+        id,
+        "open",
+        options.paneId && isPaneVisible(layoutMode, options.paneId)
+          ? options.paneId
+          : activePaneId
+      );
+    }
 
     commitWorkspace(set, (state) => {
       if (!id) {
@@ -1420,15 +1776,23 @@ export const useContentStore = create<ContentState>((set, get) => ({
         }
       }
 
+      // `focusPane: false` is all-or-nothing on purpose. Moving the selection
+      // without moving the pane would split the two apart: `getActiveTab` reads
+      // the ACTIVE pane's tab, so the toolbar and right sidebar would target a
+      // document the focused pane isn't showing, and the workspace would
+      // persist an activeContentId belonging to no focused pane.
+      const takeFocus = options.focusPane !== false;
+
       return {
         panes: nextPanes,
         tabs: nextTabs,
-        activePaneId: paneId,
-        selectedContentId: id,
-        selectedContentType:
-          options.contentType ??
-          nextTabs[nextPane.activeTabId ?? ""]?.contentType ??
-          null,
+        activePaneId: takeFocus ? paneId : state.activePaneId,
+        selectedContentId: takeFocus ? id : state.selectedContentId,
+        selectedContentType: takeFocus
+          ? options.contentType ??
+            nextTabs[nextPane.activeTabId ?? ""]?.contentType ??
+            null
+          : state.selectedContentType,
         openContentIds: getVisibleOpenContentIds(
           state.layoutMode,
           nextPanes,
@@ -1570,6 +1934,18 @@ export const useContentStore = create<ContentState>((set, get) => ({
         return {};
       }
 
+      // A move is neither an open nor a close — the tab is in the workspace
+      // before and after — so until now it recorded NO intent, and nothing
+      // protected its placement from a stale layout record. The record is
+      // written after the fact, so a poll landing before our write still
+      // names the tab in its OLD pane: the drop lands, the reconcile drags it
+      // back, our write lands, the next record pulls it over again. Several
+      // moves in flight and tabOrder is rebuilt from alternating sources —
+      // that is the shuffling. Recording "this content belongs in paneId"
+      // lets restoreWorkspace keep it there until confirmWorkspaceWrite
+      // retires the intent on our own ack.
+      rememberIntent(tab.contentId, "open", paneId);
+
       const requestedLayoutMode =
         options.requestedLayoutMode ??
         (isPaneVisible(state.layoutMode, paneId)
@@ -1676,6 +2052,17 @@ export const useContentStore = create<ContentState>((set, get) => ({
         nextActivePaneId
       );
       const nextSnapshots = saveLayoutSnapshot(state);
+
+      // Moving the last tab out of a pane empties it — same rule as a close.
+      const collapsedAfterMove = collapseForOccupancy(
+        state,
+        nextLayoutMode,
+        finalPanes,
+        nextTabs,
+        nextActivePaneId,
+        nextSnapshots
+      );
+      if (collapsedAfterMove) return { tabs: nextTabs, ...collapsedAfterMove };
 
       return {
         layoutMode: nextLayoutMode,
@@ -1791,6 +2178,17 @@ export const useContentStore = create<ContentState>((set, get) => ({
         resolvedActivePaneId
       );
 
+      // If this close emptied a pane, fold the layout down in the same commit.
+      const collapsed = collapseForOccupancy(
+        state,
+        state.layoutMode,
+        nextPanes,
+        nextTabs,
+        resolvedActivePaneId,
+        nextSnapshots
+      );
+      if (collapsed) return { tabs: nextTabs, ...collapsed };
+
       return {
         tabs: nextTabs,
         panes: nextPanes,
@@ -1816,6 +2214,48 @@ export const useContentStore = create<ContentState>((set, get) => ({
 
     tabIds.forEach((tabId) => {
       get().closeContentTab(tabId);
+    });
+  },
+
+  resetPaneMemory: () => {
+    const replaced: Record<string, TabPlacementMemory> = {};
+    commitWorkspace(set, (state) => {
+      const stale = getStalePaneMemoryTabIds(state.layoutMode, state.panes, state.tabs);
+      if (stale.length === 0) return {};
+      const paneOf = new Map<string, WorkspacePaneId>();
+      for (const paneId of getVisiblePaneIds(state.layoutMode)) {
+        for (const tabId of state.panes[paneId]?.tabIds ?? []) paneOf.set(tabId, paneId);
+      }
+      const nextTabs = { ...state.tabs };
+      for (const tabId of stale) {
+        const tab = state.tabs[tabId];
+        const paneId = paneOf.get(tabId);
+        if (!tab || !paneId) continue;
+        replaced[tabId] = {
+          preferredHorizontal: tab.preferredHorizontal,
+          preferredVertical: tab.preferredVertical,
+        };
+        nextTabs[tabId] = { ...tab, ...paneMemoryForPane(paneId) };
+      }
+      // Pane placement is untouched — only where each tab would go NEXT time.
+      // commitWorkspace's syncBrowserState persists the preferences; the
+      // workspace snapshot is unchanged, so the persist that follows is an echo.
+      return { tabs: nextTabs };
+    });
+    return replaced;
+  },
+
+  applyPaneMemory: (memory) => {
+    commitWorkspace(set, (state) => {
+      const nextTabs = { ...state.tabs };
+      let changed = false;
+      for (const [tabId, placement] of Object.entries(memory)) {
+        const tab = state.tabs[tabId];
+        if (!tab) continue;
+        nextTabs[tabId] = { ...tab, ...placement };
+        changed = true;
+      }
+      return changed ? { tabs: nextTabs } : {};
     });
   },
 
@@ -1854,6 +2294,19 @@ export const useContentStore = create<ContentState>((set, get) => ({
   getWorkspaceStateSnapshot: () => createWorkspaceStateSnapshot(get()),
 
   restoreWorkspace: (workspace) => {
+    // Logged on EVERY call, not only when placement changes: a no-op restore
+    // still hands React fresh `panes`/`tabs` identities and re-renders every
+    // pane, which is a visible flash with nothing in the `commit` log.
+    traceWorkspace(
+      "restoreWorkspace:call",
+      {
+        layoutMode: workspace.layoutMode ?? null,
+        activePaneId: workspace.activePaneId ?? null,
+        activeContentId: workspace.activeContentId,
+        paneTabContentIds: workspace.paneTabContentIds ?? null,
+      },
+      traceCaller()
+    );
     commitWorkspace(set, (state) => {
       const normalizedWorkspace = normalizeLegacyRestorePanes(workspace);
       const incomingLayoutMode = normalizedWorkspace.layoutMode ?? "single";
@@ -1904,15 +2357,44 @@ export const useContentStore = create<ContentState>((set, get) => ({
       const alreadyPresent = new Set(
         Object.values(reconciledPaneContentIds).flatMap((ids) => ids ?? [])
       );
-      const pendingOpens = getPendingOpenContentIds().filter(
-        (contentId) => !alreadyPresent.has(contentId)
-      );
-      if (pendingOpens.length > 0) {
-        reconciledPaneContentIds[intentPaneId] = [
-          ...(reconciledPaneContentIds[intentPaneId] ?? []),
-          ...pendingOpens,
+      const pendingOpenIntents = getPendingOpenIntents();
+      // Honour each pending intent's pane over the snapshot's, until the
+      // write that carries it is confirmed:
+      //   - ABSENT from the snapshot (an open the snapshot predates): add it
+      //     to the pane it was opened into — not to whichever pane holds
+      //     focus, which gathered every unpublished tab into the active pane.
+      //   - PRESENT but in another pane (a MOVE the snapshot predates): move it.
+      //     Without this a stale layout record dragged a just-dropped tab back
+      //     on the next poll, then the following record pulled it over again.
+      // An intent that named no pane (the URL-restore path via
+      // markLocalOpenIntents) only guarantees membership: it is added if
+      // absent and left wherever the snapshot has it if present.
+      // `intentPaneId` is the fallback for a pane the layout no longer shows.
+      for (const { contentId, paneId } of pendingOpenIntents) {
+        const target =
+          paneId && requestedPaneIds.includes(paneId) ? paneId : intentPaneId;
+        const currentPane = (
+          Object.keys(reconciledPaneContentIds) as WorkspacePaneId[]
+        ).find((candidate) =>
+          reconciledPaneContentIds[candidate]?.includes(contentId)
+        );
+        if (currentPane === target) continue;
+        if (currentPane) {
+          if (!paneId) continue;
+          reconciledPaneContentIds[currentPane] = (
+            reconciledPaneContentIds[currentPane] ?? []
+          ).filter((id) => id !== contentId);
+        }
+        reconciledPaneContentIds[target] = [
+          ...(reconciledPaneContentIds[target] ?? []),
+          contentId,
         ];
       }
+      // Only the ones the snapshot lacked entirely — the activeContentId
+      // re-add below treats those as "what the user was just looking at".
+      const pendingOpens = pendingOpenIntents
+        .filter(({ contentId }) => !alreadyPresent.has(contentId))
+        .map(({ contentId }) => contentId);
       normalizedWorkspace.paneTabContentIds = reconciledPaneContentIds;
 
       if (
@@ -1998,14 +2480,26 @@ export const useContentStore = create<ContentState>((set, get) => ({
         const contentIds = (normalizedWorkspace.paneTabContentIds?.[paneId] ?? [])
           .map((contentId) => getTabId(contentId))
           .filter((tabId) => Boolean(nextTabs[tabId]));
-        nextPanes[paneId] = createNormalizedPaneState(
-          paneId,
-          contentIds,
+        // A snapshot carries ONE activeContentId, for the active pane. Passing
+        // null for every other pane looks harmless but isn't:
+        // createNormalizedPaneState resolves null to `tabIds[0]`, so each
+        // reconcile reset the unfocused panes to their FIRST tab. Open a
+        // second tab beside what you are reading and it would show, then hand
+        // the pane back to the tab that happened to be first.
+        //
+        // The snapshot has no opinion about those panes, so neither should we:
+        // keep whatever each pane is already showing, and fall back to first
+        // only for a pane we have never seen.
+        const preferredTabId =
           normalizedWorkspace.activePaneId === paneId
             ? normalizedWorkspace.activeContentId
               ? getTabId(normalizedWorkspace.activeContentId)
               : null
-            : null
+            : state.panes[paneId]?.activeTabId ?? null;
+        nextPanes[paneId] = createNormalizedPaneState(
+          paneId,
+          contentIds,
+          preferredTabId
         );
       });
 
