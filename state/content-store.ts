@@ -649,11 +649,37 @@ function rememberIntent(
  * Retiring on its ack would drop the intent on the strength of a write that
  * never expressed the change.
  */
-export function confirmWorkspaceWrite(writtenContentIds: Iterable<string>) {
+export function confirmWorkspaceWrite(
+  writtenContentIds: Iterable<string>,
+  // The pane placement the acked write carried. A PLACED open intent ("put it
+  // in that pane") is durable only once the server holds it THERE: a write
+  // already in flight when the user dragged still carries the old pane, and
+  // retiring on its membership alone let the next stale snapshot drag the tab
+  // back. Callers that only know the id set (membership writes) omit this and
+  // get the membership rule.
+  writtenPlacement?: Partial<Record<WorkspacePaneId, string[]>>,
+  writtenLayoutMode?: WorkspaceLayoutMode
+) {
   const written = new Set(writtenContentIds);
+  const visibleInWrite = writtenLayoutMode
+    ? getVisiblePaneIds(writtenLayoutMode)
+    : null;
   for (const [contentId, intent] of [...pendingWorkspaceIntents]) {
-    const durable =
-      intent.kind === "open" ? written.has(contentId) : !written.has(contentId);
+    let durable: boolean;
+    if (intent.kind === "close") {
+      durable = !written.has(contentId);
+    } else if (
+      intent.paneId &&
+      writtenPlacement &&
+      // A pane the written layout does not show can never match — the tab
+      // was folded elsewhere by a collapse — so fall back to membership
+      // rather than keeping the intent alive until the backstop.
+      (visibleInWrite === null || visibleInWrite.includes(intent.paneId))
+    ) {
+      durable = (writtenPlacement[intent.paneId] ?? []).includes(contentId);
+    } else {
+      durable = written.has(contentId);
+    }
     if (durable) pendingWorkspaceIntents.delete(contentId);
   }
 }

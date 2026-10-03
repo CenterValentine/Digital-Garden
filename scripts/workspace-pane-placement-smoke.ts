@@ -598,6 +598,39 @@ console.log("\nempty panes collapse the layout (owner scenarios, 2026-10-02)");
     ["dual-vertical", "P1"]);
 }
 
+console.log("\na restore never collapses — only a user's removal does (owner rule, 2026-10-03)");
+{
+  // "If a tab flickers and leaves a section empty it collapses the tab view,
+  // so we can't have any tolerance for flickers." A reconcile can hand this
+  // surface a snapshot in which a pane is momentarily empty (a stale row, a
+  // tab the server has not seen yet). That must never fold the layout: the
+  // collapse runs inside closeContentTab / moveContentTabToPane only, as part
+  // of the user's own commit. Two windows reconciling each other's collapses
+  // would otherwise ping-pong.
+  seedSplit();
+  useContentStore.getState().setSelectedContentId("B", { paneId: "top-right", focusPane: false });
+  clearPendingWorkspaceIntents(); // the server "knows" B — no intent to re-add it
+  reconcile({
+    layoutMode: "dual-vertical",
+    activePaneId: "top-left",
+    activeContentId: "A",
+    paneTabContentIds: { "top-left": ["A"], "top-right": [] },
+  });
+  check(
+    "a snapshot with an empty pane leaves the split in place",
+    [useContentStore.getState().layoutMode, paneContents("top-left"), paneContents("top-right")],
+    ["dual-vertical", ["A"], []],
+  );
+  // The same emptiness caused by the USER folds it — the two are not the same event.
+  useContentStore.getState().setSelectedContentId("B", { paneId: "top-right", focusPane: false });
+  useContentStore.getState().closeContentTab("tab:B");
+  check(
+    "…while closing the pane's last tab yourself collapses to single",
+    useContentStore.getState().layoutMode,
+    "single",
+  );
+}
+
 console.log("\nclicking around between opens");
 {
   // Reading a pane focuses it (`focusPane` on pointerdown), so the anchor the
@@ -975,6 +1008,284 @@ console.log("\nlayout-record rebuild (the reconcile's re-arrangement)");
     } finally {
       globalThis.fetch = realFetch;
       (globalThis as { window?: unknown }).window = realWindow;
+    }
+  }
+
+  console.log("\nwrites to the workspace row never race themselves");
+  {
+    // The 2026-10-03 trace: five persist:write events inside 230 ms, all with
+    // the same baseUpdatedAt. The server's optimistic-concurrency check let
+    // the first through and 409'd the other four; each 409 adopted the row
+    // (open mode — the whole arrangement) and retried. A tab dragged during
+    // that storm snapped back to its old pane, and the layout flipped under
+    // the user. Pinned against a fake server that implements the real 409
+    // rule: a PATCH whose base is not the row's current updatedAt is refused
+    // and handed the current row.
+    const realFetch = globalThis.fetch;
+    const realWindow = (globalThis as { window?: unknown }).window;
+    const realNavigator = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+    const realLocalStorage = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+    // With a window present the content store mirrors every commit into
+    // localStorage and the URL (syncBrowserState), and the persist path
+    // snapshots the tree into localStorage. Node 25's built-in localStorage is
+    // inert without --localstorage-file, so both get a Map. The tracer reads
+    // its flag from the same place; no "dg:trace:workspace" key, so it stays
+    // off.
+    const storage = new Map<string, string>();
+    const memoryStorage = {
+      getItem: (k: string) => storage.get(k) ?? null,
+      setItem: (k: string, v: string) => void storage.set(k, v),
+      removeItem: (k: string) => void storage.delete(k),
+    };
+    (globalThis as { window?: unknown }).window = {
+      setTimeout: globalThis.setTimeout.bind(globalThis),
+      clearTimeout: globalThis.clearTimeout.bind(globalThis),
+      location: { pathname: "/", href: "http://localhost/" },
+      history: { replaceState: () => undefined },
+      innerWidth: 1440,
+      innerHeight: 900,
+      addEventListener: () => undefined,
+      localStorage: memoryStorage,
+    };
+    Object.defineProperty(globalThis, "localStorage", {
+      value: memoryStorage,
+      configurable: true,
+    });
+    // Node ships a `navigator` without `onLine`; persist treats that as
+    // offline and returns before writing.
+    Object.defineProperty(globalThis, "navigator", {
+      value: { onLine: true },
+      configurable: true,
+    });
+
+    const WS = "ws-race";
+    type Snapshot = ReturnType<
+      ReturnType<typeof useContentStore.getState>["getWorkspaceStateSnapshot"]
+    >;
+    type Row = {
+      id: string;
+      updatedAt: string;
+      layoutMode: string;
+      activePaneId: string;
+      paneState: Snapshot;
+      [key: string]: unknown;
+    };
+    let stamp = 0;
+    const nextStamp = () =>
+      new Date(Date.UTC(2026, 9, 3, 16, 0, 0, ++stamp)).toISOString();
+    const server = {
+      row: {
+        id: WS, name: "ws", slug: "ws", isMain: true, isLocked: false, isView: false,
+        viewRootContentId: null, viewRoot: null, parentWorkspaceId: null,
+        status: "active", expiresAt: null, archivedAt: null,
+        layoutMode: "dual-vertical", activePaneId: "top-left",
+        paneState: {
+          layoutMode: "dual-vertical", activePaneId: "top-left", activeContentId: "A",
+          paneTabContentIds: { "top-left": { contentIds: ["A"], activeContentId: "A" } },
+        },
+        settings: {}, createdAt: "", updatedAt: nextStamp(), items: [], contentMeta: {},
+      } as Row,
+      /** Every state PATCH in arrival order: its base, its panes, the verdict. */
+      patches: [] as Array<{ base: string | null; panes: Record<string, string[]>; status: number }>,
+      /** When set, state PATCHes wait on it — a slow server, for interleaving. */
+      hold: null as Promise<void> | null,
+    };
+    const json = (status: number, body: unknown) =>
+      new Response(JSON.stringify(body), {
+        status, headers: { "Content-Type": "application/json" },
+      });
+    const panesOf = (snapshot: Snapshot) =>
+      Object.fromEntries(
+        Object.entries(snapshot.paneTabContentIds).map(([paneId, pane]) => [
+          paneId, pane?.contentIds ?? [],
+        ]),
+      );
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = init?.method ?? "GET";
+      const body = init?.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : null;
+      if (url.endsWith(`/workspaces/${WS}/state`) && method === "PATCH") {
+        if (server.hold) await server.hold;
+        const snapshot = body as unknown as Snapshot & { baseUpdatedAt: string | null };
+        const base = snapshot.baseUpdatedAt;
+        if (!base || base !== server.row.updatedAt) {
+          server.patches.push({ base, panes: panesOf(snapshot), status: 409 });
+          return json(409, { success: false, data: server.row, error: { message: "conflict" } });
+        }
+        server.row = {
+          ...server.row,
+          updatedAt: nextStamp(),
+          layoutMode: snapshot.layoutMode,
+          activePaneId: snapshot.activePaneId,
+          paneState: {
+            layoutMode: snapshot.layoutMode,
+            activePaneId: snapshot.activePaneId,
+            activeContentId: snapshot.activeContentId,
+            paneTabContentIds: snapshot.paneTabContentIds,
+          },
+        };
+        server.patches.push({ base, panes: panesOf(snapshot), status: 200 });
+        return json(200, { success: true, data: server.row });
+      }
+      if (url.endsWith(`/workspaces/${WS}`) && method === "PATCH") {
+        return json(200, { success: true, data: server.row });
+      }
+      if (url.endsWith("/layout-records") || url.endsWith("/tabs")) {
+        return json(200, { success: true, data: {} });
+      }
+      throw new Error(`unexpected fetch ${method} ${url}`);
+    }) as typeof fetch;
+
+    const persist = () => useWorkspaceStore.getState().persistActiveWorkspace();
+    const statuses = () => server.patches.map((p) => p.status);
+
+    try {
+      useWorkspaceStore.setState({ workspaces: [server.row as never], activeWorkspaceId: WS });
+      // Prime the base the way a real load does (updateWorkspace acks it).
+      await useWorkspaceStore.getState().updateWorkspace(WS, {});
+      check("the surface knows the row's revision", __lastAppliedUpdatedAtForTests(WS), server.row.updatedAt);
+
+      // ── one write in flight ────────────────────────────────────────────
+      seedSplit();
+      useContentStore.getState().setSelectedContentId("B", { paneId: "top-right", focusPane: false });
+      server.patches.length = 0;
+      await Promise.all([persist(), persist(), persist(), persist(), persist()]);
+      check(
+        "five persists fired together reach the server as ONE accepted write",
+        statuses(),
+        [200],
+      );
+      check(
+        "…carrying the current placement",
+        server.patches[0]?.panes,
+        { "top-left": ["A"], "top-right": ["B"], "bottom-left": [], "bottom-right": [] },
+      );
+      check(
+        "…and the surface's arrangement is untouched afterwards",
+        [useContentStore.getState().layoutMode, paneContents("top-left"), paneContents("top-right")],
+        ["dual-vertical", ["A"], ["B"]],
+      );
+
+      // ── a drag during an in-flight write ──────────────────────────────
+      // The user opens C on the right; that write is slow. While it is on the
+      // wire they drag B left and the store persists again. The second call
+      // coalesces; once the first is acked the write re-runs with the fresh
+      // snapshot — on the NEW base, so it is accepted rather than 409'd.
+      // B was opened as a preview; pin it ("touched") or C's open replaces it.
+      useContentStore.getState().pinContentTab("tab:B");
+      useContentStore.getState().setSelectedContentId("C", { paneId: "top-right", focusPane: false });
+      server.patches.length = 0;
+      let release!: () => void;
+      server.hold = new Promise<void>((resolve) => { release = resolve; });
+      const first = persist();
+      useContentStore.getState().moveContentTabToPane("tab:B", "top-left", {});
+      const second = persist();
+      release();
+      server.hold = null;
+      await Promise.all([first, second]);
+      check(
+        "a persist during an in-flight write re-runs ONCE after it, both accepted",
+        statuses(),
+        [200, 200],
+      );
+      check(
+        "…the first write carried what it captured, the second carries the drag",
+        [server.patches[0]?.panes["top-right"], server.patches[1]?.panes["top-left"], server.patches[1]?.panes["top-right"]],
+        [["B", "C"], ["A", "B"], ["C"]],
+      );
+      check("…and the tab is where the user dropped it", paneContents("top-left"), ["A", "B"]);
+      check(
+        "a persist with nothing new to say is skipped, not written",
+        await persist().then(() => statuses()),
+        [200, 200],
+      );
+
+      // ── a GENUINE conflict adopts the tab set, not the arrangement ─────
+      // Another surface wrote the row: single-pane, with a new tab C. This
+      // surface is dual-vertical with B open on the right and unpublished.
+      // The 409 adoption must bring C in and leave this surface's layout,
+      // active pane and B's placement alone (R3), then retry on the new base.
+      seedSplit();
+      useContentStore.getState().setSelectedContentId("B", { paneId: "top-right", focusPane: false });
+      server.row = {
+        ...server.row,
+        updatedAt: nextStamp(),
+        layoutMode: "single",
+        activePaneId: "top-left",
+        paneState: {
+          layoutMode: "single", activePaneId: "top-left", activeContentId: "C",
+          paneTabContentIds: { "top-left": { contentIds: ["A", "C"], activeContentId: "C" } },
+        },
+      };
+      server.patches.length = 0;
+      await persist();
+      check("a stale base is refused once, then accepted on the adopted base", statuses(), [409, 200]);
+      check(
+        "adopting another writer's row keeps THIS surface's layout (reconcile, not open)",
+        [useContentStore.getState().layoutMode, useContentStore.getState().activePaneId],
+        ["dual-vertical", "top-left"],
+      );
+      check(
+        "…brings in the tab the other writer opened, and keeps the unpublished one in its pane",
+        [paneContents("top-left"), paneContents("top-right")],
+        [["A", "C"], ["B"]],
+      );
+      check(
+        "…and the retry publishes that merged arrangement",
+        server.patches[1]?.panes,
+        { "top-left": ["A", "C"], "top-right": ["B"], "bottom-left": [], "bottom-right": [] },
+      );
+
+      // ── intents retire on PLACEMENT, not membership ────────────────────
+      // A move's intent must outlive a write that still had the tab in its
+      // old pane; otherwise the next stale snapshot drags it back.
+      seedSplit();
+      useContentStore.getState().restoreWorkspace({
+        activeContentId: "A", activePaneId: "top-left", layoutMode: "dual-vertical",
+        paneTabContentIds: { "top-left": ["A", "B"], "top-right": [] },
+      });
+      clearPendingWorkspaceIntents();
+      useContentStore.getState().moveContentTabToPane("tab:B", "top-right", {});
+      // Ack of a write that predates the move: B present, but on the left.
+      confirmWorkspaceWrite(["A", "B"], { "top-left": ["A", "B"], "top-right": [] }, "dual-vertical");
+      reconcile({
+        layoutMode: "dual-vertical", activePaneId: "top-left", activeContentId: "A",
+        paneTabContentIds: { "top-left": ["A", "B"], "top-right": [] },
+      });
+      check(
+        "a write that still had the tab in its OLD pane does not retire the move",
+        paneContents("top-right"),
+        ["B"],
+      );
+      // Ack of the write that carries the move: now it is durable.
+      confirmWorkspaceWrite(["A", "B"], { "top-left": ["A"], "top-right": ["B"] }, "dual-vertical");
+      reconcile({
+        layoutMode: "dual-vertical", activePaneId: "top-left", activeContentId: "A",
+        paneTabContentIds: { "top-left": ["A", "B"], "top-right": [] },
+      });
+      check(
+        "once a write places it there, the snapshot is trusted again",
+        paneContents("top-right"),
+        [],
+      );
+      // A pane the written layout no longer shows can never match: fall back
+      // to membership so a collapse does not leave an immortal intent.
+      useContentStore.getState().moveContentTabToPane("tab:B", "top-right", {});
+      confirmWorkspaceWrite(["A", "B"], { "top-left": ["A", "B"] }, "single");
+      reconcile({
+        layoutMode: "dual-vertical", activePaneId: "top-left", activeContentId: "A",
+        paneTabContentIds: { "top-left": ["A", "B"], "top-right": [] },
+      });
+      check(
+        "an intent for a pane the written layout does not show retires on membership",
+        paneContents("top-right"),
+        [],
+      );
+    } finally {
+      globalThis.fetch = realFetch;
+      (globalThis as { window?: unknown }).window = realWindow;
+      if (realNavigator) Object.defineProperty(globalThis, "navigator", realNavigator);
+      if (realLocalStorage) Object.defineProperty(globalThis, "localStorage", realLocalStorage);
     }
   }
 

@@ -197,6 +197,21 @@ const lastAppliedUpdatedAt: Record<string, string> = {};
  * user makes a real change, the snapshot differs and persistence resumes.
  */
 const lastAppliedSnapshotJson: Record<string, string> = {};
+
+/**
+ * One state write in flight per workspace. persistActiveWorkspace has several
+ * callers that fire for the same user action — the shell controller's
+ * debounced snapshot effect, the open path's immediate persist, the clear
+ * control — and each PATCH carries `baseUpdatedAt` = the last ack. Fired
+ * together they all carry the SAME base, the server lets the first through
+ * and 409s the rest, and every 409 adopts the (already-stale) row and
+ * retries: the 2026-10-03 trace showed five writes in 230 ms, four
+ * self-conflicts, and a dragged tab snapping back. A call made while a write
+ * is in flight marks the workspace dirty and shares the in-flight promise; the
+ * write re-runs once, with the snapshot as it stands then.
+ */
+const persistInFlight = new Map<string, Promise<void>>();
+const persistDirty = new Set<string>();
 let onMutationBroadcast: (() => void) | null = null;
 const WORKSPACE_MUTATION_TIMEOUT_MS = 12_000;
 /** How long a move/send toast offers Undo — matches the clear-tabs control. */
@@ -946,15 +961,30 @@ async function writeWorkspaceState(
       // reconcile toward this state. Retire the intents it settles. Keyed on
       // THIS payload, not merely "a write succeeded" — a request already in
       // flight when the user acted still carries the pre-change snapshot.
-      confirmWorkspaceWrite([
-        ...Object.values(snapshot.paneTabContentIds).flatMap(
-          (pane) => pane?.contentIds ?? [],
+      confirmWorkspaceWrite(
+        [
+          ...Object.values(snapshot.paneTabContentIds).flatMap(
+            (pane) => pane?.contentIds ?? [],
+          ),
+          // activeContentId counts as "written" even though it's normally
+          // already in a pane list: restoreWorkspace RE-ADDS an activeContentId
+          // that belongs to no pane, so an id surviving there is not a closed id.
+          ...(snapshot.activeContentId ? [snapshot.activeContentId] : []),
+        ],
+        // Placement too: a move's intent outlives a write that still had the
+        // tab in its old pane (see confirmWorkspaceWrite).
+        Object.fromEntries(
+          Object.entries(snapshot.paneTabContentIds).map(([paneId, pane]) => [
+            paneId,
+            pane?.contentIds ?? [],
+          ]),
         ),
-        // activeContentId counts as "written" even though it's normally already
-        // in a pane list: restoreWorkspace RE-ADDS an activeContentId that
-        // belongs to no pane, so an id surviving there is not a closed id.
-        ...(snapshot.activeContentId ? [snapshot.activeContentId] : []),
-      ]);
+        snapshot.layoutMode,
+      );
+      // The server holds exactly this snapshot now. Record it so a persist that
+      // fires with nothing new to say (the coalesced re-run below, the
+      // controller's debounced follow-up) recognises the echo and skips.
+      lastAppliedSnapshotJson[workspaceId] = JSON.stringify(snapshot);
       return saved;
     }
 
@@ -965,10 +995,17 @@ async function writeWorkspaceState(
 
     adoptedRemote = body.data;
     lastAppliedUpdatedAt[body.data.id] = body.data.updatedAt;
+    // Reconcile, not open: a 409 means ANOTHER writer's row — adopting it is a
+    // background merge of the tab set, and R3 says this surface's layoutMode
+    // and active pane are its own. The default "open" mode re-applied the
+    // other row's whole arrangement, so a lost race (five debounced persists
+    // firing on the same base, the 2026-10-03 trace) snapped a just-dragged
+    // tab back to its old pane and swapped the layout under the user's hands.
     restoreContentWorkspace(
       body.data,
       useContentStore.getState().selectedContentId,
       false, // remote state, not a cold load — no URL tiebreaker
+      "reconcile",
     );
   }
 
@@ -1708,97 +1745,119 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   persistActiveWorkspace: async () => {
     const activeWorkspaceId = get().activeWorkspaceId;
     if (!activeWorkspaceId) return;
-    if (!hasWorkspace(get().workspaces, activeWorkspaceId)) return;
-    saveTreeSnapshotForWorkspace(activeWorkspaceId);
 
-    if (typeof navigator !== "undefined" && !navigator.onLine) {
-      return;
+    // Coalesce (see persistInFlight): never two writes on the same base.
+    const inFlight = persistInFlight.get(activeWorkspaceId);
+    if (inFlight) {
+      persistDirty.add(activeWorkspaceId);
+      return inFlight;
     }
-
-    const snapshot = useContentStore.getState().getWorkspaceStateSnapshot();
-
-    // Echo suppression: if this snapshot is byte-identical to what we just
-    // adopted from remote, there is nothing new to say — skip the write
-    // (kills the adopt→persist echo; see lastAppliedSnapshotJson).
-    if (
-      JSON.stringify(snapshot) === lastAppliedSnapshotJson[activeWorkspaceId]
-    ) {
-      return;
-    }
-
-    // Spec §6.3 (ghost-writer #3): extension iframes never write workspace
-    // intent. No legacy PATCH — which would also reconcile R1 membership down
-    // to the panel's narrow single-pane snapshot, pruning every other tab —
-    // and no shared columns. They persist ONLY their own ext:* layout record,
-    // so R5/F2 can still see how the panel arranged itself.
-    const surfaceFamily = detectWorkspaceSurfaceFamily();
-    if (surfaceFamily.startsWith("ext:")) {
-      // R1 still applies to extension surfaces: their opens must reach
-      // membership. The legacy PATCH (which dual-writes membership) is
-      // skipped here by design, so sync membership explicitly — additive on
-      // the server, since the panel is a narrow projection and must never
-      // prune tabs only wider surfaces have open. (Prod fix: extension-
-      // originated tabs were invisible to PWA/desktop after PR #166.)
-      const paneContentIds = Object.fromEntries(
-        Object.entries(snapshot.paneTabContentIds).map(([paneId, pane]) => [
-          paneId,
-          pane?.contentIds ?? [],
-        ]),
-      );
-      await Promise.all([
-        fetch(`/api/content/workspaces/${activeWorkspaceId}/tabs`, {
-          method: "PUT",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ paneContentIds }),
-        }).catch(() => {}),
-        putLayoutRecord(activeWorkspaceId, surfaceFamily, snapshot),
-      ]);
-      return;
-    }
-
-    traceWorkspace("persist:write", {
-      workspaceId: activeWorkspaceId,
-      baseUpdatedAt: lastAppliedUpdatedAt[activeWorkspaceId] ?? null,
-      snapshot,
-    });
-    let workspace: ContentWorkspaceResponse;
-    try {
-      workspace = await writeWorkspaceState(activeWorkspaceId);
-      traceWorkspace("persist:ack", {
-        workspaceId: workspace.id,
-        updatedAt: workspace.updatedAt,
-        serverPanes: workspace.paneState?.paneTabContentIds,
-      });
-    } catch (error) {
-      if (isOfflineLikePersistenceError(error)) return;
-      if (!isWorkspaceNotFoundError(error)) throw error;
-
-      const workspaces = await fetchWorkspaces();
-      const fallbackWorkspace = getWorkspace(workspaces, null);
-      set({
-        workspaces,
-        activeWorkspaceId: fallbackWorkspace?.id ?? null,
-      });
-      if (fallbackWorkspace) {
-        syncWorkspaceUrl(fallbackWorkspace.id);
-        restoreContentWorkspace(fallbackWorkspace);
-        restoreTreeSnapshotForWorkspace(fallbackWorkspace.id);
+    const run = (async () => {
+      try {
+        do {
+          persistDirty.delete(activeWorkspaceId);
+          await persistNow();
+        } while (persistDirty.has(activeWorkspaceId));
+      } finally {
+        persistInFlight.delete(activeWorkspaceId);
       }
-      return;
+    })();
+    persistInFlight.set(activeWorkspaceId, run);
+    return run;
+
+    async function persistNow() {
+      if (!hasWorkspace(get().workspaces, activeWorkspaceId)) return;
+      saveTreeSnapshotForWorkspace(activeWorkspaceId);
+
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        return;
+      }
+
+      const snapshot = useContentStore.getState().getWorkspaceStateSnapshot();
+
+      // Echo suppression: if this snapshot is byte-identical to what we just
+      // adopted from remote, there is nothing new to say — skip the write
+      // (kills the adopt→persist echo; see lastAppliedSnapshotJson).
+      if (
+        JSON.stringify(snapshot) === lastAppliedSnapshotJson[activeWorkspaceId]
+      ) {
+        return;
+      }
+
+      // Spec §6.3 (ghost-writer #3): extension iframes never write workspace
+      // intent. No legacy PATCH — which would also reconcile R1 membership down
+      // to the panel's narrow single-pane snapshot, pruning every other tab —
+      // and no shared columns. They persist ONLY their own ext:* layout record,
+      // so R5/F2 can still see how the panel arranged itself.
+      const surfaceFamily = detectWorkspaceSurfaceFamily();
+      if (surfaceFamily.startsWith("ext:")) {
+        // R1 still applies to extension surfaces: their opens must reach
+        // membership. The legacy PATCH (which dual-writes membership) is
+        // skipped here by design, so sync membership explicitly — additive on
+        // the server, since the panel is a narrow projection and must never
+        // prune tabs only wider surfaces have open. (Prod fix: extension-
+        // originated tabs were invisible to PWA/desktop after PR #166.)
+        const paneContentIds = Object.fromEntries(
+          Object.entries(snapshot.paneTabContentIds).map(([paneId, pane]) => [
+            paneId,
+            pane?.contentIds ?? [],
+          ]),
+        );
+        await Promise.all([
+          fetch(`/api/content/workspaces/${activeWorkspaceId}/tabs`, {
+            method: "PUT",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ paneContentIds }),
+          }).catch(() => {}),
+          putLayoutRecord(activeWorkspaceId, surfaceFamily, snapshot),
+        ]);
+        return;
+      }
+
+      traceWorkspace("persist:write", {
+        workspaceId: activeWorkspaceId,
+        baseUpdatedAt: lastAppliedUpdatedAt[activeWorkspaceId] ?? null,
+        snapshot,
+      });
+      let workspace: ContentWorkspaceResponse;
+      try {
+        workspace = await writeWorkspaceState(activeWorkspaceId);
+        traceWorkspace("persist:ack", {
+          workspaceId: workspace.id,
+          updatedAt: workspace.updatedAt,
+          serverPanes: workspace.paneState?.paneTabContentIds,
+        });
+      } catch (error) {
+        if (isOfflineLikePersistenceError(error)) return;
+        if (!isWorkspaceNotFoundError(error)) throw error;
+
+        const workspaces = await fetchWorkspaces();
+        const fallbackWorkspace = getWorkspace(workspaces, null);
+        set({
+          workspaces,
+          activeWorkspaceId: fallbackWorkspace?.id ?? null,
+        });
+        if (fallbackWorkspace) {
+          syncWorkspaceUrl(fallbackWorkspace.id);
+          restoreContentWorkspace(fallbackWorkspace);
+          restoreTreeSnapshotForWorkspace(fallbackWorkspace.id);
+        }
+        return;
+      }
+
+      // Layout-intent P2: beside the legacy PATCH, persist THIS surface's
+      // per-family layout record (desktop → the shared coupling row).
+      void putLayoutRecord(activeWorkspaceId, surfaceFamily, snapshot);
+
+      lastAppliedUpdatedAt[workspace.id] = workspace.updatedAt;
+      set((state) => ({
+        workspaces: state.workspaces.map((candidate) =>
+          candidate.id === workspace.id ? workspace : candidate,
+        ),
+      }));
+      notifyMutation();
     }
-
-    // Layout-intent P2: beside the legacy PATCH, persist THIS surface's
-    // per-family layout record (desktop → the shared coupling row).
-    void putLayoutRecord(activeWorkspaceId, surfaceFamily, snapshot);
-
-    lastAppliedUpdatedAt[workspace.id] = workspace.updatedAt;
-    set((state) => ({
-      workspaces: state.workspaces.map((candidate) =>
-        candidate.id === workspace.id ? workspace : candidate,
-      ),
-    }));
-    notifyMutation();
   },
 
   requestOpenContent: async (contentId, options = {}) => {
