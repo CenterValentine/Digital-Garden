@@ -32,7 +32,10 @@ import {
   type WorkspacePaneId,
   type WorkspaceLayoutMode,
 } from "../state/content-store";
-import { buildPanesFromLayoutRecord } from "../extensions/workplaces/state/workspace-store";
+import {
+  buildPanesFromLayoutRecord,
+  restoreContentWorkspace,
+} from "../extensions/workplaces/state/workspace-store";
 import { DEFAULT_SETTINGS } from "../lib/features/settings/validation";
 import { paneForHotkeyCode } from "../lib/features/content/pane-hotkeys";
 
@@ -295,6 +298,133 @@ console.log("\nfill the room before stacking (owner rule, 2026-10-02)");
     resolveOpenDestinationPane("single", "top-left", () => true),
     "top-left",
   );
+}
+
+// ---------------------------------------------------------------------------
+// THE REAL LOOP. Every section above drives one piece in isolation and every
+// one of them passed while the app still bounced — because the bug lived in
+// the composition: persist → layout record → poll → restoreContentWorkspace
+// → restoreWorkspace → persist again. This drives that whole cycle on the real
+// store and asserts it is a FIXED POINT. If one lap changes anything, the app
+// will keep changing it on every poll, and each change remounts the panes and
+// steals focus from the editor.
+//
+// `detectWorkspaceSurfaceFamily()` returns "desktop" without a window, so the
+// reconcile's desktop-coupling branch genuinely runs here.
+// ---------------------------------------------------------------------------
+console.log("\npersist → record → reconcile is a fixed point");
+{
+  const ORDINAL: Record<string, WorkspacePaneId[]> = {
+    single: ["top-left"],
+    "dual-vertical": ["top-left", "top-right"],
+    "dual-horizontal": ["top-left", "bottom-left"],
+    quad: ["top-left", "top-right", "bottom-left", "bottom-right"],
+  };
+
+  /** What putLayoutRecord would write from the CURRENT local state. */
+  const recordFromLocal = () => {
+    const s = useContentStore.getState();
+    const panes = ORDINAL[s.layoutMode];
+    return {
+      family: "desktop",
+      deviceId: "shared",
+      layoutMode: s.layoutMode,
+      paneOrder: panes.map((paneId, i) => ({
+        paneOrdinal: i + 1,
+        tabOrder: paneContents(paneId),
+      })),
+      lastActive: s.selectedContentId
+        ? {
+            paneOrdinal: Math.max(1, panes.indexOf(s.activePaneId) + 1),
+            contentId: s.selectedContentId,
+          }
+        : null,
+      updatedAt: new Date().toISOString(),
+    };
+  };
+
+  /** What the server would hand back after our write landed. */
+  const workspaceFromLocal = (record = recordFromLocal()) => {
+    const s = useContentStore.getState();
+    const paneTabContentIds = Object.fromEntries(
+      (["top-left", "top-right", "bottom-left", "bottom-right"] as WorkspacePaneId[]).map(
+        (paneId) => [
+          paneId,
+          { contentIds: paneContents(paneId), activeContentId: paneActive(paneId) },
+        ],
+      ),
+    );
+    return {
+      id: "ws", name: "ws", slug: "ws", isMain: true, isLocked: false,
+      isView: false, viewRootContentId: null, viewRoot: null,
+      parentWorkspaceId: null, status: "active", expiresAt: null,
+      archivedAt: null, layoutMode: s.layoutMode, activePaneId: s.activePaneId,
+      paneState: {
+        layoutMode: s.layoutMode,
+        activePaneId: s.activePaneId,
+        activeContentId: s.selectedContentId,
+        paneTabContentIds,
+      },
+      settings: {}, createdAt: "", updatedAt: "", items: [], contentMeta: {},
+      layoutRecords: [record],
+    } as never;
+  };
+
+  /** Everything a poll could change, in one comparable string. */
+  const fingerprint = () => {
+    const s = useContentStore.getState();
+    const panes = (["top-left", "top-right", "bottom-left", "bottom-right"] as WorkspacePaneId[])
+      .map((p) => `${p}=[${paneContents(p).join(",")}]@${paneActive(p) ?? "-"}`)
+      .join(" ");
+    return `${s.layoutMode} focus=${s.activePaneId} sel=${s.selectedContentId} ${panes}`;
+  };
+
+  // The side-by-side state: A on the left (focused, selected), B just opened
+  // on the right without taking focus.
+  seedSplit();
+  useContentStore.getState().setSelectedContentId("B", {
+    paneId: "top-right",
+    focusPane: false,
+  });
+  confirmWorkspaceWrite(["A", "B"]); // our write landed; intents retire
+  const start = fingerprint();
+
+  // Lap the loop: the server echoes our own state back; we reconcile; then
+  // persist would write a record from the result, which the next poll echoes.
+  const laps: string[] = [];
+  for (let i = 0; i < 5; i += 1) {
+    const ws = workspaceFromLocal();
+    restoreContentWorkspace(
+      ws,
+      useContentStore.getState().selectedContentId,
+      false,
+      "reconcile",
+    );
+    laps.push(fingerprint());
+  }
+  check("five laps of our own echo change nothing", laps, Array(5).fill(start));
+  check("…and specifically never flip the layout (the focus-stealer)",
+    laps.every((l) => l.startsWith("dual-vertical ")), true);
+
+  // A STALE record — written before B existed — must not pull B anywhere.
+  const stale = {
+    ...recordFromLocal(),
+    paneOrder: [
+      { paneOrdinal: 1, tabOrder: ["A"] },
+      { paneOrdinal: 2, tabOrder: [] },
+    ],
+  };
+  const staleLaps: string[] = [];
+  for (let i = 0; i < 3; i += 1) {
+    restoreContentWorkspace(
+      workspaceFromLocal(stale),
+      useContentStore.getState().selectedContentId,
+      false,
+      "reconcile",
+    );
+    staleLaps.push(fingerprint());
+  }
+  check("a record that predates B leaves B on the right", staleLaps, Array(3).fill(start));
 }
 
 console.log("\nclicking around between opens");

@@ -516,7 +516,7 @@ function pickInheritedLayout(
   );
 }
 
-function restoreContentWorkspace(
+export function restoreContentWorkspace(
   workspace: ContentWorkspaceResponse,
   // Background reconcile (receiveRefreshedWorkspaces) re-applies the remote
   // snapshot to keep the open-tab SET in sync across windows — but it must not
