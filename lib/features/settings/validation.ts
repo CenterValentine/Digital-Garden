@@ -25,7 +25,7 @@ const uiSettingsSchema = z
      *
      * The alternatives are deliberately unreachable from the UI for now: the
      * seam exists so the choice is a settings control rather than a rewrite.
-     * See BACKLOG "Open-destination behaviour as a setting".
+     * See BACKLOG "Split Pane Placement".
      *
      * Lives under `ui` deliberately. `saveToBackend` already sends `ui`
      * wholesale and `setUISettings` already patches it, so this needs no new

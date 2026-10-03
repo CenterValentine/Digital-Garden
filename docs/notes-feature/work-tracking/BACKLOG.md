@@ -10,7 +10,7 @@ last_updated: 2026-10-02
 
 ---
 
-## Open-destination behaviour as a setting (2026-10-02, from `feat/open-into-opposite-pane`)
+## Split Pane Placement — behaviour as a setting (2026-10-02, from `feat/open-into-opposite-pane`)
 
 Where content opened from the file tree lands in a split workspace is a
 preference, and some of it is already built. The **seam exists and is

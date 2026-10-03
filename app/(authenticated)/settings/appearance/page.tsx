@@ -61,7 +61,7 @@ const THEME_OPTIONS = [
  * `pnpm workspace:pane-placement:smoke` — what is missing is the decision to
  * expose them, so they render disabled rather than being hidden: a preference
  * you can see is a promise, and it tells you what the default is *not* doing.
- * See BACKLOG "Open-destination behaviour as a setting".
+ * See BACKLOG "Split Pane Placement".
  */
 const OPEN_DESTINATION_OPTIONS: RadioCardOption<OpenDestinationMode>[] = [
   {
@@ -132,11 +132,11 @@ export default function AppearanceSettingsPage() {
       </SettingSection>
 
       <SettingSection
-        title="Opening content in a split workspace"
-        description="Where a file from the tree lands when more than one pane is open."
+        title="Split Pane Placement"
+        description="Which pane a file from the tree opens into when the workspace is split."
       >
         <RadioCardGroup
-          aria-label="Where opened content lands"
+          aria-label="Split pane placement"
           value={openDestination}
           onValueChange={() => {
             // Intentionally inert: every selectable option is the current
@@ -147,8 +147,8 @@ export default function AppearanceSettingsPage() {
           options={OPEN_DESTINATION_OPTIONS}
         />
         <p className="text-xs text-muted-foreground">
-          More ways to arrange this are on the way. For now content opens beside
-          what you are reading, and never takes the pane you are working in.
+          More placements are on the way. For now content opens beside what you
+          are reading, and never takes the pane you are working in.
         </p>
       </SettingSection>
     </SettingsPage>
