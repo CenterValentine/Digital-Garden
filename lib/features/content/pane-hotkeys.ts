@@ -269,21 +269,6 @@ export function heldPaneTarget(): PaneHotkeyTarget | null {
 }
 
 /** Test seam — the tracker is window-level and this lets a harness drive it. */
-/** The held key's cell (letter, meaning, layout), or null. */
-export function heldPaneHotkeyCell(): PaneHotkeyCell | null {
-  return heldCode ? hotkeyCellForCode(heldCode) : null;
-}
-
-/**
- * Forget the held key. A native drag swallows keyboard events for its whole
- * duration — the keyup for a letter released mid-drag never arrives — so the
- * drop that consumed the key clears it rather than leaving it wedged for the
- * next tree click.
- */
-export function clearHeldPaneHotkey(): void {
-  heldCode = null;
-}
-
 export function __setHeldPaneCodeForTests(code: string | null): void {
   heldCode = code;
 }

@@ -1,14 +1,10 @@
 "use client";
 
 import { traceWorkspace } from "@/lib/core/workspace-trace";
-import { createElement, useEffect, useRef, useState, type ReactNode } from "react";
+import { createElement, useEffect, useState, type ReactNode } from "react";
 import {
   PANE_HOTKEY_GRID,
-  clearHeldPaneHotkey,
-  ensurePaneHotkeyTracker,
-  heldPaneHotkeyCell,
   placementForHotkeyCell,
-  type PaneHotkeyCell,
 } from "@/lib/features/content/pane-hotkeys";
 import { KeyGlyph } from "@/components/content/context-menu/PaneKeyGrid";
 import { Allotment } from "allotment";
@@ -134,25 +130,21 @@ function WorkspacePane({
  * old reshape targets did with their six boxes. Replaces those: they offered
  * different boxes per layout and none in a quad.
  *
- * Keys during a drag: a native drag swallows keyboard events for its whole
- * duration (the browser owns the pointer and the keyboard until drop), so a
- * letter pressed MID-drag is invisible to the page. A letter held BEFORE the
- * tab is picked up is not — the parent reads it at dragstart and applies it
- * at dragend — and the map says so in its footer.
+ * No letters here, deliberately: a native drag swallows keyboard events for
+ * its whole duration, and a hand on the mouse is not reaching for a key
+ * anyway (owner call, 2026-10-03). The letters stay on the context menu's
+ * copy of this map, where a key IS the gesture.
  */
 function WorkspaceReshapeTargets({
   draggedTabId,
   sourcePaneId,
   hoveredTargetId,
-  heldLetter,
   onTargetHover,
   onTargetDrop,
 }: {
   draggedTabId: string | null;
   sourcePaneId: WorkspacePaneId | null;
   hoveredTargetId: string | null;
-  /** The letter held when the drag began, if any — shown as the armed cell. */
-  heldLetter: string | null;
   onTargetHover: (targetId: string | null) => void;
   onTargetDrop: (request: TabDropRequest) => void;
 }) {
@@ -185,13 +177,12 @@ function WorkspaceReshapeTargets({
           {PANE_HOTKEY_GRID.flat().map((cellDef) => {
             const placement = placementForHotkeyCell(cellDef);
             const hovered = hoveredTargetId === cellDef.code;
-            const armed = heldLetter === cellDef.letter;
             return (
               <div
                 key={cellDef.code}
-                title={`${cellDef.letter} — ${cellDef.description}`}
-                className={`flex min-h-[58px] flex-col items-center justify-center gap-0.5 rounded-xl border border-dashed px-1 py-1 transition-colors ${
-                  hovered || armed
+                title={cellDef.description}
+                className={`flex min-h-[52px] flex-col items-center justify-center gap-0.5 rounded-xl border border-dashed px-1 py-1 transition-colors ${
+                  hovered
                     ? "border-gold-primary/55 bg-gold-primary/[0.09] text-gold-primary shadow-[inset_0_0_0_1px_rgba(201,168,108,0.18)]"
                     : "border-gold-primary/24 bg-gold-primary/[0.025] text-gold-primary/75"
                 }`}
@@ -211,7 +202,6 @@ function WorkspaceReshapeTargets({
                   });
                 }}
               >
-                <span className="text-[12px] font-semibold leading-none">{cellDef.letter}</span>
                 <KeyGlyph glyph={cellDef.glyph} />
                 <span className="text-[9px] uppercase tracking-[0.12em] opacity-80">
                   {cellDef.caption}
@@ -219,11 +209,6 @@ function WorkspaceReshapeTargets({
               </div>
             );
           })}
-        </div>
-        <div className="mt-1.5 text-center text-[9px] leading-tight text-gold-primary/60">
-          {heldLetter
-            ? `Holding ${heldLetter} — release anywhere to place`
-            : "Or hold a letter before you pick a tab up"}
         </div>
       </div>
     </div>
@@ -257,29 +242,17 @@ export function MainPanelWorkspace({
   const [draggedTabId, setDraggedTabId] = useState<string | null>(null);
   const [draggedFromPaneId, setDraggedFromPaneId] = useState<WorkspacePaneId | null>(null);
   const [hoveredSinglePaneTargetId, setHoveredSinglePaneTargetId] = useState<string | null>(null);
-  // The direction key held when the tab was picked up. Read at dragstart —
-  // the only moment the page can see the keyboard around a native drag — and
-  // applied at dragend if the tab was dropped nowhere in particular.
-  const [heldCellAtDragStart, setHeldCellAtDragStart] = useState<PaneHotkeyCell | null>(null);
-  const dropHandledRef = useRef(false);
-
-  useEffect(() => {
-    ensurePaneHotkeyTracker();
-  }, []);
 
   const handleTabDragStart = (tabId: string, paneId: WorkspacePaneId) => {
     setDraggedTabId(tabId);
     setDraggedFromPaneId(paneId);
     setHoveredSinglePaneTargetId(null);
-    setHeldCellAtDragStart(heldPaneHotkeyCell());
-    dropHandledRef.current = false;
   };
 
   const resetDragState = () => {
     setDraggedTabId(null);
     setDraggedFromPaneId(null);
     setHoveredSinglePaneTargetId(null);
-    setHeldCellAtDragStart(null);
   };
 
   const handleTabDrop = ({
@@ -290,7 +263,6 @@ export function MainPanelWorkspace({
     complementPaneId,
   }: TabDropRequest) => {
     if (!draggedTabId) return;
-    dropHandledRef.current = true;
     moveContentTabToPane(draggedTabId, paneId, {
       beforeTabId,
       placementMode,
@@ -300,22 +272,6 @@ export function MainPanelWorkspace({
     resetDragState();
   };
 
-  // dragend fires after any drop. If no target took the tab and a letter was
-  // held when it was picked up, the letter places it — the same request the
-  // matching cell of the drop map would have made.
-  const handleTabDragEnd = () => {
-    if (draggedTabId && !dropHandledRef.current && heldCellAtDragStart) {
-      const placement = placementForHotkeyCell(heldCellAtDragStart);
-      moveContentTabToPane(draggedTabId, placement.paneId, {
-        placementMode: "explicit",
-        requestedLayoutMode: placement.requestedLayoutMode,
-        complementPaneId: placement.complementPaneId,
-      });
-    }
-    // The keyup for a letter released mid-drag never reached the page.
-    clearHeldPaneHotkey();
-    resetDragState();
-  };
 
   useEffect(() => {
     if (openContentIds.length > 0) return;
@@ -428,7 +384,7 @@ export function MainPanelWorkspace({
                 paneId={TOP_LEFT_PANE_ID}
                 draggedTabId={draggedTabId}
                 onTabDragStart={handleTabDragStart}
-                onTabDragEnd={handleTabDragEnd}
+                onTabDragEnd={resetDragState}
                 onTabDrop={handleTabDrop}
                 initialContent={initialContent}
               />
@@ -438,7 +394,7 @@ export function MainPanelWorkspace({
                 paneId={BOTTOM_LEFT_PANE_ID}
                 draggedTabId={draggedTabId}
                 onTabDragStart={handleTabDragStart}
-                onTabDragEnd={handleTabDragEnd}
+                onTabDragEnd={resetDragState}
                 onTabDrop={handleTabDrop}
                 initialContent={initialContent}
               />
@@ -452,7 +408,7 @@ export function MainPanelWorkspace({
                 paneId={TOP_RIGHT_PANE_ID}
                 draggedTabId={draggedTabId}
                 onTabDragStart={handleTabDragStart}
-                onTabDragEnd={handleTabDragEnd}
+                onTabDragEnd={resetDragState}
                 onTabDrop={handleTabDrop}
                 initialContent={initialContent}
               />
@@ -462,7 +418,7 @@ export function MainPanelWorkspace({
                 paneId={BOTTOM_RIGHT_PANE_ID}
                 draggedTabId={draggedTabId}
                 onTabDragStart={handleTabDragStart}
-                onTabDragEnd={handleTabDragEnd}
+                onTabDragEnd={resetDragState}
                 onTabDrop={handleTabDrop}
                 initialContent={initialContent}
               />
@@ -557,7 +513,6 @@ export function MainPanelWorkspace({
             draggedTabId={draggedTabId}
             sourcePaneId={draggedFromPaneId}
             hoveredTargetId={hoveredSinglePaneTargetId}
-            heldLetter={heldCellAtDragStart?.letter ?? null}
             onTargetHover={setHoveredSinglePaneTargetId}
             onTargetDrop={handleTabDrop}
           />
