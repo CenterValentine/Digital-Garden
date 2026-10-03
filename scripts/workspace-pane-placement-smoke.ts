@@ -458,6 +458,109 @@ console.log("\npersist → record → reconcile is a fixed point");
   check("…and the selection follows the pane, not the server", useContentStore.getState().selectedContentId, "W36");
 }
 
+console.log("\nempty panes collapse the layout (owner scenarios, 2026-10-02)");
+{
+  //   1 2        quad numbering used in the spec
+  //   3 4
+  const quad = () => {
+    clearPendingWorkspaceIntents();
+    useContentStore.getState().restoreWorkspace({
+      activeContentId: "P1",
+      activePaneId: "top-left",
+      layoutMode: "quad",
+      paneTabContentIds: {
+        "top-left": ["P1"],
+        "top-right": ["P2"],
+        "bottom-left": ["P3"],
+        "bottom-right": ["P4"],
+      },
+    });
+  };
+  const close = (...ids: string[]) => useContentStore.getState().closeContentTabs(ids);
+  const shape = () => {
+    const s = useContentStore.getState();
+    return `${s.layoutMode} ${(["top-left", "top-right", "bottom-left", "bottom-right"] as WorkspacePaneId[])
+      .map((p) => `${p}=[${paneContents(p).join(",")}]`)
+      .join(" ")}`;
+  };
+
+  quad(); close("P3", "P4");
+  check("3,4 cleared → 1,2 take the vertical split", shape(),
+    "dual-vertical top-left=[P1] top-right=[P2] bottom-left=[] bottom-right=[]");
+
+  quad(); close("P1", "P2");
+  check("1,2 cleared → 3,4 move up into the vertical split", shape(),
+    "dual-vertical top-left=[P3] top-right=[P4] bottom-left=[] bottom-right=[]");
+
+  quad(); close("P1", "P3");
+  check("1,3 cleared → 2,4 become the horizontal split", shape(),
+    "dual-horizontal top-left=[P2] top-right=[] bottom-left=[P4] bottom-right=[]");
+
+  quad(); close("P2", "P4");
+  check("2,4 cleared → 1,3 become the horizontal split", shape(),
+    "dual-horizontal top-left=[P1] top-right=[] bottom-left=[P3] bottom-right=[]");
+
+  quad(); close("P1", "P2", "P3");
+  check("1,2,3 cleared → 4 alone in a single pane", shape(),
+    "single top-left=[P4] top-right=[] bottom-left=[] bottom-right=[]");
+
+  // Not in the spec, decided here: a diagonal pair takes the vertical split,
+  // the app's primary two-pane arrangement. Pinned so it is a choice, not an
+  // accident.
+  quad(); close("P2", "P3");
+  check("1,4 (diagonal) → vertical split, 4 moves up", shape(),
+    "dual-vertical top-left=[P1] top-right=[P4] bottom-left=[] bottom-right=[]");
+
+  // Three remain: no layout holds three, so nothing happens.
+  quad(); close("P4");
+  check("one pane emptied in a quad → stays a quad (nothing fits three)", shape(),
+    "quad top-left=[P1] top-right=[P2] bottom-left=[P3] bottom-right=[]");
+
+  // Dual layouts: empty either side → single.
+  const dual = (mode: "dual-vertical" | "dual-horizontal") => {
+    clearPendingWorkspaceIntents();
+    const second = mode === "dual-vertical" ? "top-right" : "bottom-left";
+    useContentStore.getState().restoreWorkspace({
+      activeContentId: "P1",
+      activePaneId: "top-left",
+      layoutMode: mode,
+      paneTabContentIds: { "top-left": ["P1"], [second]: ["P2"] },
+    });
+  };
+  dual("dual-vertical"); close("P2");
+  check("vertical: right emptied → single", shape(),
+    "single top-left=[P1] top-right=[] bottom-left=[] bottom-right=[]");
+  dual("dual-vertical"); close("P1");
+  check("vertical: left emptied → single, 2 moves over", shape(),
+    "single top-left=[P2] top-right=[] bottom-left=[] bottom-right=[]");
+  dual("dual-horizontal"); close("P1");
+  check("horizontal: top emptied → single, 2 moves up", shape(),
+    "single top-left=[P2] top-right=[] bottom-left=[] bottom-right=[]");
+
+  // SAFETY: collapse is a response to a tab REMOVAL only. Choosing a split
+  // leaves a pane empty by definition, and a reconcile can hand us empties
+  // mid-flight; neither may collapse, or you could never open a split and two
+  // windows could ping-pong layouts through the sync loop.
+  clearPendingWorkspaceIntents();
+  useContentStore.getState().restoreWorkspace({
+    activeContentId: "P1", activePaneId: "top-left", layoutMode: "single",
+    paneTabContentIds: { "top-left": ["P1"] },
+  });
+  useContentStore.getState().setLayoutMode("dual-vertical");
+  check("choosing a split does NOT collapse its empty pane", useContentStore.getState().layoutMode, "dual-vertical");
+  useContentStore.getState().restoreWorkspace({
+    activeContentId: "P1", activePaneId: "top-left", layoutMode: "quad",
+    paneTabContentIds: { "top-left": ["P1"], "top-right": [], "bottom-left": [], "bottom-right": [] },
+  });
+  check("a restore/reconcile with empties does NOT collapse", useContentStore.getState().layoutMode, "quad");
+
+  // The emptied pane was the active one: focus must land on real content.
+  quad(); useContentStore.getState().focusPane("bottom-right"); close("P4", "P3");
+  check("closing the focused pane's last tab moves focus onto content",
+    [useContentStore.getState().layoutMode, useContentStore.getState().selectedContentId],
+    ["dual-vertical", "P1"]);
+}
+
 console.log("\nclicking around between opens");
 {
   // Reading a pane focuses it (`focusPane` on pointerdown), so the anchor the

@@ -1046,6 +1046,96 @@ function projectPanesToLayout(
   return nextPanes;
 }
 
+/**
+ * The layout that fits the panes that still hold content, or null for "leave
+ * it". Owner scenarios (2026-10-02), quad numbered 1 2 / 3 4:
+ *
+ *   3,4 empty → 1,2 take the vertical split      1,2 empty → 3,4 move up into it
+ *   1,3 empty → 2,4 become the horizontal split  2,4 empty → 1,3 do
+ *   any three empty → the survivor alone in a single pane
+ *   either side of a dual emptied → single
+ *
+ * Decided here, not in the spec: a diagonal pair takes the vertical split (the
+ * app's primary two-pane arrangement), and three survivors stay a quad because
+ * no layout holds three. Pure, so the harness pins every case.
+ */
+export function resolveLayoutForOccupancy(
+  layoutMode: WorkspaceLayoutMode,
+  panes: Record<WorkspacePaneId, WorkspacePaneState>
+): WorkspaceLayoutMode | null {
+  const visible = getVisiblePaneIds(layoutMode);
+  const occupied = visible.filter(
+    (paneId) => (panes[paneId]?.tabIds.length ?? 0) > 0
+  );
+  if (occupied.length === visible.length) return null; // nothing is empty
+  if (layoutMode === "single") return null;
+  if (occupied.length <= 1) return "single";
+  if (layoutMode !== "quad") return null; // a full dual was caught above
+  if (occupied.length === 3) return null; // nothing fits three
+
+  const has = new Set(occupied);
+  const leftColumn = has.has(TOP_LEFT_PANE_ID) && has.has(BOTTOM_LEFT_PANE_ID);
+  const rightColumn = has.has(TOP_RIGHT_PANE_ID) && has.has(BOTTOM_RIGHT_PANE_ID);
+  return leftColumn || rightColumn ? "dual-horizontal" : "dual-vertical";
+}
+
+/**
+ * Collapse empty panes out of the layout, as one patch for the SAME commit
+ * that removed the tab. Returns null when nothing should change.
+ *
+ * Only tab REMOVAL calls this — never a layout change (choosing a split leaves
+ * a pane empty by definition) and never a restore/reconcile (a snapshot can
+ * hand us empties mid-flight, and collapsing on it would let two windows
+ * ping-pong layouts through the sync loop). Being inside the removal's own
+ * commit also means one persisted mutation, not a removal followed by a
+ * second layout write that a reconcile could land between.
+ *
+ * Relocation is `projectPanesToLayout` — by pane POSITION — not the
+ * preference-driven fold `setLayoutMode` uses, which depends on per-tab
+ * preferences that can be stale after a restore. Checked against every pair
+ * and both diagonals: no two surviving panes ever map to the same slot, so
+ * nothing is merged and nothing is lost.
+ */
+function collapseForOccupancy(
+  state: ContentState,
+  fromLayoutMode: WorkspaceLayoutMode,
+  panes: Record<WorkspacePaneId, WorkspacePaneState>,
+  tabs: Record<string, WorkspaceTabState>,
+  preferredActivePaneId: WorkspacePaneId,
+  snapshots: Record<WorkspaceLayoutMode, WorkspaceLayoutSnapshot>
+): Partial<ContentState> | null {
+  const target = resolveLayoutForOccupancy(fromLayoutMode, panes);
+  if (!target) return null;
+  // A constrained surface can't leave its pinned layout (see setLayoutMode).
+  if (surfaceLayoutMode && target !== surfaceLayoutMode) return null;
+
+  const projected = projectPanesToLayout(fromLayoutMode, target, panes);
+  const activePaneId = resolveActivePaneForLayout(
+    target,
+    collapsePaneIdForLayout(target, preferredActivePaneId),
+    projected,
+    tabs
+  );
+  const activeTab = getPaneActiveTab({ panes: projected, tabs }, activePaneId);
+
+  return {
+    layoutMode: target,
+    panes: projected,
+    activePaneId,
+    layoutSnapshots: {
+      ...snapshots,
+      [target]: {
+        activePaneId,
+        isInitialized: true,
+        panes: clonePaneRecord(projected),
+      },
+    },
+    selectedContentId: activeTab?.contentId ?? null,
+    selectedContentType: activeTab?.contentType ?? null,
+    openContentIds: getVisibleOpenContentIds(target, projected, tabs),
+  };
+}
+
 function getPaneLabel(
   layoutMode: WorkspaceLayoutMode,
   paneId: WorkspacePaneId
@@ -1857,6 +1947,17 @@ export const useContentStore = create<ContentState>((set, get) => ({
       );
       const nextSnapshots = saveLayoutSnapshot(state);
 
+      // Moving the last tab out of a pane empties it — same rule as a close.
+      const collapsedAfterMove = collapseForOccupancy(
+        state,
+        nextLayoutMode,
+        finalPanes,
+        nextTabs,
+        nextActivePaneId,
+        nextSnapshots
+      );
+      if (collapsedAfterMove) return { tabs: nextTabs, ...collapsedAfterMove };
+
       return {
         layoutMode: nextLayoutMode,
         panes: finalPanes,
@@ -1970,6 +2071,17 @@ export const useContentStore = create<ContentState>((set, get) => ({
         { panes: nextPanes, tabs: nextTabs },
         resolvedActivePaneId
       );
+
+      // If this close emptied a pane, fold the layout down in the same commit.
+      const collapsed = collapseForOccupancy(
+        state,
+        state.layoutMode,
+        nextPanes,
+        nextTabs,
+        resolvedActivePaneId,
+        nextSnapshots
+      );
+      if (collapsed) return { tabs: nextTabs, ...collapsed };
 
       return {
         tabs: nextTabs,
