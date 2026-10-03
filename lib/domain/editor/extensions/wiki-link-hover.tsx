@@ -57,6 +57,9 @@ export function createWikiLinkHoverPlugin(editor: Editor): Plugin | null {
       let showTimer: number | null = null;
       let hideTimer: number | null = null;
       let overPopup = false;
+      // The label input is open — the popover must not hide under a
+      // pointer that wandered off while the user is typing.
+      let editing = false;
 
       const clearTimers = () => {
         if (showTimer !== null) window.clearTimeout(showTimer);
@@ -67,6 +70,7 @@ export function createWikiLinkHoverPlugin(editor: Editor): Plugin | null {
 
       const hide = () => {
         clearTimers();
+        editing = false;
         popup?.hide();
         anchor = null;
       };
@@ -74,7 +78,7 @@ export function createWikiLinkHoverPlugin(editor: Editor): Plugin | null {
       const scheduleHide = () => {
         if (hideTimer !== null) window.clearTimeout(hideTimer);
         hideTimer = window.setTimeout(() => {
-          if (!overPopup) hide();
+          if (!overPopup && !editing) hide();
         }, HIDE_DELAY_MS);
       };
 
@@ -122,13 +126,35 @@ export function createWikiLinkHoverPlugin(editor: Editor): Plugin | null {
         hide();
       };
 
+      // The label: the alias when the author set one, else the target's
+      // title. Committing a label equal to the title (or empty) clears the
+      // alias, so the link follows renames again.
+      const relabel = (el: HTMLElement, next: string) => {
+        const pos = wikiLinkPosFromElement(editor, el);
+        if (pos === null) return;
+        const node = editor.state.doc.nodeAt(pos);
+        if (!node || node.type.name !== "wikiLink") return;
+        const targetTitle = typeof node.attrs.targetTitle === "string" ? node.attrs.targetTitle : "";
+        const displayText = next && next !== targetTitle ? next : null;
+        if ((node.attrs.displayText ?? null) === displayText) return;
+        editor.view.dispatch(editor.state.tr.setNodeMarkup(pos, undefined, { ...node.attrs, displayText }));
+        hide();
+      };
+
       const propsFor = (el: HTMLElement): LinkViewChooserProps => {
         const pos = wikiLinkPosFromElement(editor, el);
         const node = pos !== null ? editor.state.doc.nodeAt(pos) : null;
         const current = node ? linkViewOfNode(node) : null;
+        const targetTitle = el.getAttribute("data-target-title");
         return {
           value: current ?? "link",
-          title: el.getAttribute("data-target-title"),
+          title: el.getAttribute("data-display-text") || targetTitle,
+          labelPlaceholder: targetTitle,
+          onLabelChange: editorView.editable ? (label) => relabel(el, label) : undefined,
+          onEditingChange: (next) => {
+            editing = next;
+            if (!next) scheduleHide();
+          },
           windowDisabledReason: windowDisabledReasonFor(el),
           onChange: (view) => void choose(el, view),
           onOpen: () => openTarget(el),
