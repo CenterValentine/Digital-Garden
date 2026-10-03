@@ -76,7 +76,8 @@
     "conflict-diff:smoke": "tsx scripts/conflict-diff-smoke.ts",
     "workspace:tab-move:smoke": "tsx --env-file=.env.local scripts/workspace-tab-move-smoke.ts",
     "polling:smoke": "tsx scripts/polling-scheduler-smoke.ts && tsx scripts/extension-engagement-smoke.ts && tsx scripts/presence-cadence-smoke.ts",
-    "workspace:pane-placement:smoke": "tsx scripts/workspace-pane-placement-smoke.ts"
+    "workspace:pane-placement:smoke": "tsx scripts/workspace-pane-placement-smoke.ts",
+    "workspace:ensure-main:smoke": "tsx --env-file=.env.local scripts/workspace-ensure-main-smoke.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

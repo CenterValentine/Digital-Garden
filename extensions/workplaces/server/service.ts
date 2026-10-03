@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/database/client";
+import { ensureMainWorkspaceRow } from "./ensure-main";
 import {
   ContentWorkspaceItemAssignmentType,
   ContentWorkspaceItemScope,
@@ -31,8 +32,6 @@ import {
   resolveFolderOrder,
 } from "./types";
 
-const MAIN_WORKSPACE_NAME = "Main Workspace";
-const MAIN_WORKSPACE_SLUG = "main";
 const DEFAULT_LAYOUT_MODE = "single";
 const DEFAULT_PANE_ID: WorkspacePaneId = "top-left";
 const WORKSPACE_PANE_IDS: WorkspacePaneId[] = [
@@ -413,32 +412,14 @@ export async function cleanupExpiredWorkspaces(ownerId: string) {
 export async function ensureMainWorkspace(ownerId: string) {
   await cleanupExpiredWorkspaces(ownerId);
 
-  return prisma.contentWorkspace.upsert({
-    where: {
-      ownerId_slug: {
-        ownerId,
-        slug: MAIN_WORKSPACE_SLUG,
-      },
-    },
-    update: {
-      isMain: true,
-      isLocked: false,
-      status: "active",
-      expiresAt: null,
-      archivedAt: null,
-    },
-    create: {
-      ownerId,
-      name: MAIN_WORKSPACE_NAME,
-      slug: MAIN_WORKSPACE_SLUG,
-      isMain: true,
-      isLocked: false,
-      status: "active",
-      layoutMode: DEFAULT_LAYOUT_MODE,
-      activePaneId: DEFAULT_PANE_ID,
-      paneState: {},
-      settings: {},
-    },
+  // Read-then-create, never upsert: this runs on every workspace LIST, and an
+  // upsert bumps `@updatedAt` on every call even when nothing changes — which
+  // made the 15 s poll reconcile against its own read, forever. The logic
+  // lives in ensure-main.ts so a DB-backed smoke can pin it without loading
+  // this module (the content barrel keeps service.ts out of plain tsx).
+  return ensureMainWorkspaceRow(ownerId, {
+    layoutMode: DEFAULT_LAYOUT_MODE,
+    activePaneId: DEFAULT_PANE_ID,
   });
 }
 
