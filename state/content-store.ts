@@ -2123,14 +2123,26 @@ export const useContentStore = create<ContentState>((set, get) => ({
         const contentIds = (normalizedWorkspace.paneTabContentIds?.[paneId] ?? [])
           .map((contentId) => getTabId(contentId))
           .filter((tabId) => Boolean(nextTabs[tabId]));
-        nextPanes[paneId] = createNormalizedPaneState(
-          paneId,
-          contentIds,
+        // A snapshot carries ONE activeContentId, for the active pane. Passing
+        // null for every other pane looks harmless but isn't:
+        // createNormalizedPaneState resolves null to `tabIds[0]`, so each
+        // reconcile reset the unfocused panes to their FIRST tab. Open a
+        // second tab beside what you are reading and it would show, then hand
+        // the pane back to the tab that happened to be first.
+        //
+        // The snapshot has no opinion about those panes, so neither should we:
+        // keep whatever each pane is already showing, and fall back to first
+        // only for a pane we have never seen.
+        const preferredTabId =
           normalizedWorkspace.activePaneId === paneId
             ? normalizedWorkspace.activeContentId
               ? getTabId(normalizedWorkspace.activeContentId)
               : null
-            : null
+            : state.panes[paneId]?.activeTabId ?? null;
+        nextPanes[paneId] = createNormalizedPaneState(
+          paneId,
+          contentIds,
+          preferredTabId
         );
       });
 

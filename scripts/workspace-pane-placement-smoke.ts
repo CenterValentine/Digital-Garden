@@ -45,6 +45,13 @@ function check(label: string, actual: unknown, expected: unknown) {
   );
 }
 
+/** The content a pane is currently SHOWING (its active tab). */
+function paneActive(paneId: WorkspacePaneId): string | null {
+  const { panes, tabs } = useContentStore.getState();
+  const tabId = panes[paneId]?.activeTabId;
+  return tabId ? tabs[tabId]?.contentId ?? null : null;
+}
+
 /** Content ids currently in a pane, in order. */
 function paneContents(paneId: WorkspacePaneId): string[] {
   const { panes, tabs } = useContentStore.getState();
@@ -215,6 +222,61 @@ console.log("\nonce published, the snapshot is authoritative again");
     "B",
   ]);
   check("…and the right pane is empty again", paneContents("top-right"), []);
+}
+
+console.log("\nwhich tab is active WITHIN an unfocused pane");
+{
+  // A snapshot names one activeContentId, for the active pane only. It has no
+  // opinion about the others — so a reconcile must not quietly reset them.
+  seedSplit();
+  // Left pane already holds A and C, showing C.
+  useContentStore.getState().restoreWorkspace({
+    activeContentId: "C",
+    activePaneId: "top-left",
+    layoutMode: "dual-vertical",
+    paneTabContentIds: { "top-left": ["A", "C"], "top-right": [] },
+  });
+  // Focus moves to the right pane and something opens there.
+  useContentStore.getState().setSelectedContentId("B", { paneId: "top-right" });
+  check("left pane is showing C", paneActive("top-left"), "C");
+
+  reconcile({
+    layoutMode: "dual-vertical",
+    paneTabContentIds: { "top-left": ["A", "C"], "top-right": ["B"] },
+    activeContentId: "B",
+    activePaneId: "top-right",
+  });
+
+  check("the unfocused pane keeps showing C", paneActive("top-left"), "C");
+  check("…not its first tab", paneActive("top-left") === "A", false);
+  check("the focused pane honours the snapshot", paneActive("top-right"), "B");
+}
+
+console.log("\nthe tab you just opened keeps the pane");
+{
+  // The report: 2026-W39 opened beside an existing tab, showed, then the other
+  // tab took the pane back on the next poll.
+  seedSplit();
+  useContentStore.getState().restoreWorkspace({
+    activeContentId: "A",
+    activePaneId: "top-right",
+    layoutMode: "dual-vertical",
+    paneTabContentIds: { "top-left": ["NewNote"], "top-right": ["A"] },
+  });
+  useContentStore
+    .getState()
+    .setSelectedContentId("W39", { paneId: "top-left", focusPane: false });
+
+  check("W39 is showing in the left pane", paneActive("top-left"), "W39");
+
+  reconcile({
+    layoutMode: "dual-vertical",
+    paneTabContentIds: { "top-left": ["NewNote"], "top-right": ["A"] },
+    activeContentId: "A",
+    activePaneId: "top-right",
+  });
+
+  check("W39 still has the pane after a poll", paneActive("top-left"), "W39");
 }
 
 // ---------------------------------------------------------------------------
