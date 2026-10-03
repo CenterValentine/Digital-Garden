@@ -25,6 +25,7 @@
 import {
   useContentStore,
   confirmWorkspaceWrite,
+  clearPendingWorkspaceIntents,
   resolveOppositePane,
   type WorkspacePaneId,
   type WorkspaceLayoutMode,
@@ -78,6 +79,9 @@ function reconcile(opts: {
 }
 
 function seedSplit() {
+  // Intents are module state and outlive a scenario; a leftover one would be
+  // re-added by the next block's reconcile and read as a product bug.
+  clearPendingWorkspaceIntents();
   // A workspace already holding A on the left, focused there.
   useContentStore.getState().restoreWorkspace({
     activeContentId: "A",
@@ -222,6 +226,75 @@ console.log("\nonce published, the snapshot is authoritative again");
     "B",
   ]);
   check("…and the right pane is empty again", paneContents("top-right"), []);
+}
+
+console.log("\nback-to-back tree opens land on the SAME side");
+{
+  // "Back to back" = the user never touches the opened content, so nothing
+  // should move focus and every open should resolve to the same destination.
+  seedSplit();
+  const open = (id: string) => {
+    const { layoutMode, activePaneId } = useContentStore.getState();
+    useContentStore.getState().setSelectedContentId(id, {
+      paneId: resolveOppositePane(layoutMode, activePaneId),
+      focusPane: false,
+    });
+  };
+
+  const landedIn: string[] = [];
+  for (const id of ["B", "C", "D"]) {
+    open(id);
+    landedIn.push(
+      paneContents("top-right").includes(id) ? "top-right" : "elsewhere",
+    );
+  }
+
+  check("every open landed on the same side", landedIn, [
+    "top-right",
+    "top-right",
+    "top-right",
+  ]);
+  check("none of them displaced A", paneContents("top-left"), ["A"]);
+  check("focus never moved", useContentStore.getState().activePaneId, "top-left");
+
+  // Current behaviour, pinned so a change to it is deliberate: each click is a
+  // PREVIEW open, so it replaces the previous preview in that pane rather than
+  // stacking. Same side, one tab. Pinning a tab (or a reconcile, which pins
+  // what it restores) makes the next open add instead of replace.
+  check("…replacing the previous preview, not stacking", paneContents("top-right"), [
+    "D",
+  ]);
+}
+
+console.log("\n…and still the same side after a poll lands mid-sequence");
+{
+  seedSplit();
+  const open = (id: string) => {
+    const { layoutMode, activePaneId } = useContentStore.getState();
+    useContentStore.getState().setSelectedContentId(id, {
+      paneId: resolveOppositePane(layoutMode, activePaneId),
+      focusPane: false,
+    });
+  };
+
+  open("B");
+  // A reconcile between two clicks must not re-aim the next one by moving
+  // focus — that would send the second open to the other side.
+  reconcile({
+    layoutMode: "dual-vertical",
+    paneTabContentIds: { "top-left": ["A"], "top-right": ["B"] },
+    activeContentId: "A",
+    activePaneId: "top-left",
+  });
+  open("C");
+
+  check(
+    "the second open went to the same side as the first",
+    paneContents("top-right").includes("C"),
+    true,
+  );
+  check("A is still alone on the left", paneContents("top-left"), ["A"]);
+  check("focus still never moved", useContentStore.getState().activePaneId, "top-left");
 }
 
 console.log("\nwhich tab is active WITHIN an unfocused pane");
