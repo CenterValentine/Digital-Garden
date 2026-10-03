@@ -349,12 +349,24 @@ const VERTICAL_PARTNER: Record<WorkspacePaneId, WorkspacePaneId> = {
  * Pure: occupancy comes in as a predicate so this stays testable and the caller
  * owns where "empty" is read from.
  */
+export type OpenDestinationMode = "fill" | "opposite" | "active";
+
 export function resolveOpenDestinationPane(
   layoutMode: WorkspaceLayoutMode,
   activePaneId: WorkspacePaneId,
-  isPaneEmpty: (paneId: WorkspacePaneId) => boolean
+  isPaneEmpty: (paneId: WorkspacePaneId) => boolean,
+  /**
+   * User preference (`settings.ui.openDestination`). Defaults to the behaviour
+   * described above; the other two are escape hatches rather than variations —
+   * "opposite" never spreads into the other panes, and "active" is how this
+   * behaved before the setting existed, for anyone who wants it back.
+   */
+  mode: OpenDestinationMode = "fill"
 ): WorkspacePaneId {
+  if (mode === "active") return activePaneId;
+
   const opposite = resolveOppositePane(layoutMode, activePaneId);
+  if (mode === "opposite") return opposite;
   // Single pane: nothing to open beside, and the caller treats this as "send
   // no paneId at all", preserving the pre-existing behaviour exactly.
   if (opposite === activePaneId) return activePaneId;

@@ -32,6 +32,7 @@ import {
   type WorkspaceLayoutMode,
 } from "../state/content-store";
 import { buildPanesFromLayoutRecord } from "../extensions/workplaces/state/workspace-store";
+import { DEFAULT_SETTINGS } from "../lib/features/settings/validation";
 
 let failures = 0;
 
@@ -291,6 +292,47 @@ console.log("\nfill the room before stacking (owner rule, 2026-10-02)");
     "single still has nowhere to go",
     resolveOpenDestinationPane("single", "top-left", () => true),
     "top-left",
+  );
+}
+
+console.log("\nthe open-destination seam (settings.ui.openDestination)");
+{
+  // Nothing in the UI can reach these yet. They are covered anyway: an
+  // unreachable branch is exactly the kind that rots before the control that
+  // exposes it ever lands, and then the settings PR gets blamed for it.
+  const bothEmpty = () => true;
+  const allFull = () => false;
+
+  check(
+    "the default is the fill rule",
+    [
+      resolveOpenDestinationPane("quad", "top-left", bothEmpty),
+      resolveOpenDestinationPane("quad", "top-left", bothEmpty, "fill"),
+    ],
+    ["top-right", "top-right"],
+  );
+  check(
+    "DEFAULT_SETTINGS agrees with that default",
+    DEFAULT_SETTINGS.ui?.openDestination,
+    "fill",
+  );
+  check(
+    "'opposite' ignores the other empty panes",
+    resolveOpenDestinationPane(
+      "quad",
+      "top-left",
+      (p) => p === "bottom-left",
+      "opposite",
+    ),
+    "top-right",
+  );
+  check(
+    "'active' is the pre-rule behaviour — open where you are",
+    [
+      resolveOpenDestinationPane("quad", "top-left", bothEmpty, "active"),
+      resolveOpenDestinationPane("dual-vertical", "top-right", allFull, "active"),
+    ],
+    ["top-left", "top-right"],
   );
 }
 

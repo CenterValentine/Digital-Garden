@@ -7,7 +7,14 @@
 
 "use client";
 
-import { Monitor, Moon, Sun } from "lucide-react";
+import {
+  ArrowLeftRight,
+  Columns2,
+  Monitor,
+  Moon,
+  Square,
+  Sun,
+} from "lucide-react";
 
 import {
   RadioCardGroup,
@@ -15,6 +22,7 @@ import {
   SettingSection,
   SettingsPage,
   useSaveTracker,
+  type RadioCardOption,
 } from "@/components/settings/ui";
 import { cn } from "@/lib/core/utils";
 import {
@@ -22,6 +30,7 @@ import {
   useThemePreference,
   type ThemePreference,
 } from "@/lib/features/theme";
+import type { OpenDestinationMode } from "@/state/content-store";
 import { useSettingsStore } from "@/state/settings-store";
 
 const THEME_OPTIONS = [
@@ -45,11 +54,49 @@ const THEME_OPTIONS = [
   },
 ];
 
+/**
+ * Where a file-tree click lands when the workspace is split.
+ *
+ * Only the default is selectable today. The other two are real and covered by
+ * `pnpm workspace:pane-placement:smoke` — what is missing is the decision to
+ * expose them, so they render disabled rather than being hidden: a preference
+ * you can see is a promise, and it tells you what the default is *not* doing.
+ * See BACKLOG "Open-destination behaviour as a setting".
+ */
+const OPEN_DESTINATION_OPTIONS: RadioCardOption<OpenDestinationMode>[] = [
+  {
+    value: "fill",
+    title: "Beside your work",
+    description:
+      "Opens in the opposite pane, filling any empty pane before reusing it. What you are reading is never replaced.",
+    icon: <Columns2 className="h-4 w-4" />,
+  },
+  {
+    value: "opposite",
+    title: "Always opposite",
+    description:
+      "Always the opposite pane, even when another one is free. Coming soon.",
+    icon: <ArrowLeftRight className="h-4 w-4" />,
+    disabled: true,
+  },
+  {
+    value: "active",
+    title: "In the pane I'm using",
+    description:
+      "Replaces whatever you are currently reading, as it worked before. Coming soon.",
+    icon: <Square className="h-4 w-4" />,
+    disabled: true,
+  },
+];
+
 export default function AppearanceSettingsPage() {
   const themePreference = useThemePreference();
   const resolvedTheme = useResolvedTheme();
   const setUISettings = useSettingsStore((state) => state.setUISettings);
   const { status, error, track } = useSaveTracker();
+  const openDestination = useSettingsStore(
+    (state) => state.ui?.openDestination ?? "fill",
+  );
 
   return (
     <SettingsPage
@@ -81,6 +128,27 @@ export default function AppearanceSettingsPage() {
           {themePreference === "system"
             ? `Following system — currently ${resolvedTheme}`
             : `Always ${resolvedTheme}`}
+        </p>
+      </SettingSection>
+
+      <SettingSection
+        title="Opening content in a split workspace"
+        description="Where a file from the tree lands when more than one pane is open."
+      >
+        <RadioCardGroup
+          aria-label="Where opened content lands"
+          value={openDestination}
+          onValueChange={() => {
+            // Intentionally inert: every selectable option is the current
+            // value. Wiring this up is `setUISettings({ openDestination })`
+            // and nothing else — the store, the schema and the resolver all
+            // take it already.
+          }}
+          options={OPEN_DESTINATION_OPTIONS}
+        />
+        <p className="text-xs text-muted-foreground">
+          More ways to arrange this are on the way. For now content opens beside
+          what you are reading, and never takes the pane you are working in.
         </p>
       </SettingSection>
     </SettingsPage>

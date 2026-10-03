@@ -12,6 +12,27 @@ const uiSettingsSchema = z
   .object({
     theme: z.enum(["light", "dark", "system"]).optional(),
     fontSize: z.number().min(10).max(24).optional(),
+    /**
+     * Where content opened from the file tree lands when the workspace is
+     * split — `resolveOpenDestinationPane` in `state/content-store.ts`.
+     *
+     *  fill     — beside your work, filling empty panes before reusing the
+     *             opposite one (the default, and the only value anything sets
+     *             today)
+     *  opposite — always the opposite pane, never the other empties
+     *  active   — the pane you are working in, replacing what is there (how
+     *             this behaved before the rule existed)
+     *
+     * The alternatives are deliberately unreachable from the UI for now: the
+     * seam exists so the choice is a settings control rather than a rewrite.
+     * See BACKLOG "Open-destination behaviour as a setting".
+     *
+     * Lives under `ui` deliberately. `saveToBackend` already sends `ui`
+     * wholesale and `setUISettings` already patches it, so this needs no new
+     * setter and cannot hit the "saves, then silently reverts" trap that a new
+     * top-level section does (the fourth registration everyone forgets).
+     */
+    openDestination: z.enum(["fill", "opposite", "active"]).optional(),
     panelLayout: z
       .object({
         leftSidebarWidth: z.number().min(200).max(600).optional(),
@@ -418,6 +439,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   ui: {
     theme: "system",
     fontSize: 14,
+    openDestination: "fill",
     panelLayout: {
       leftSidebarWidth: 200,
       leftSidebarVisible: true,

@@ -22,6 +22,7 @@ import {
   useContentStore,
   resolveOpenDestinationPane,
 } from "@/state/content-store";
+import { useSettingsStore } from "@/state/settings-store";
 import { useSearchStore } from "@/state/search-store";
 import { useTreeStateStore } from "@/state/tree-state-store";
 import { useCharterIdsStore } from "@/state/charter-ids-store";
@@ -1377,10 +1378,13 @@ export function LeftSidebarContent({
     // behavior is exactly what it was. Read imperatively — this is an event
     // handler, and a reactive layoutMode would only add a stale-closure risk.
     const { layoutMode, activePaneId, panes } = useContentStore.getState();
+    // Read the preference even though nothing can change it yet: the seam is
+    // the point. When the settings control lands it has nowhere new to reach.
     const destinationPaneId = resolveOpenDestinationPane(
       layoutMode,
       activePaneId,
       (paneId) => (panes[paneId]?.tabIds.length ?? 0) === 0,
+      useSettingsStore.getState().ui?.openDestination,
     );
     const sideBySide =
       destinationPaneId === activePaneId
