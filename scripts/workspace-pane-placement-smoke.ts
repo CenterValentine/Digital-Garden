@@ -425,6 +425,34 @@ console.log("\npersist → record → reconcile is a fixed point");
     staleLaps.push(fingerprint());
   }
   check("a record that predates B leaves B on the right", staleLaps, Array(3).fill(start));
+
+  // The focused pane, two tabs, typing in the SECOND. The server's snapshot
+  // still names the first as active (our click hasn't landed), and the
+  // reconcile arrives with no usable local preference. R3: active views never
+  // sync — the pane must keep showing what it is showing.
+  clearPendingWorkspaceIntents();
+  useContentStore.getState().restoreWorkspace({
+    activeContentId: "W36",
+    activePaneId: "top-left",
+    layoutMode: "dual-vertical",
+    paneTabContentIds: { "top-left": ["W39", "W36"], "top-right": ["X"] },
+  });
+  confirmWorkspaceWrite(["W39", "W36", "X"]);
+  const serverStale = {
+    ...workspaceFromLocal({
+      ...recordFromLocal(),
+      lastActive: { paneOrdinal: 1, contentId: "W39" },
+    }) as unknown as { paneState: { activeContentId: string | null; paneTabContentIds: Record<string, { activeContentId: string | null }> } },
+  };
+  serverStale.paneState.activeContentId = "W39";
+  serverStale.paneState.paneTabContentIds["top-left"].activeContentId = "W39";
+  restoreContentWorkspace(serverStale as never, null, false, "reconcile");
+  check(
+    "typing in the second tab: a stale server + null selection does not snap to the first",
+    paneActive("top-left"),
+    "W36",
+  );
+  check("…and the selection follows the pane, not the server", useContentStore.getState().selectedContentId, "W36");
 }
 
 console.log("\nclicking around between opens");

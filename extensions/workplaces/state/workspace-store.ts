@@ -578,11 +578,25 @@ export function restoreContentWorkspace(
   const preferStillOpen =
     preferActiveContentId != null &&
     openTabIds.includes(preferActiveContentId);
+  // Reconcile mode: R3 says active views never sync, so the server's
+  // activeContentId is the LAST thing to trust here — it is whatever the
+  // server saw last, which trails every local click. If the caller's
+  // preference is unusable (a selection nulled for an instant mid-typing),
+  // fall back to what the focused pane is showing RIGHT NOW before falling
+  // to the server. Without this a stale snapshot flipped the focused pane to
+  // its first tab while the user was typing in the second.
+  const localShown = (() => {
+    if (mode !== "reconcile") return null;
+    const cs = useContentStore.getState();
+    const tabId = cs.panes[cs.activePaneId]?.activeTabId;
+    const id = tabId ? cs.tabs[tabId]?.contentId ?? null : null;
+    return id && openTabIds.includes(id) ? id : null;
+  })();
   const activeContentId = preferStillOpen
     ? preferActiveContentId
     : urlContentBelongsToWorkspace
       ? contentIdFromUrl
-      : workspace.paneState.activeContentId;
+      : localShown ?? workspace.paneState.activeContentId;
 
   // Per-content title + type from the snapshot so tabs paint named on the
   // first frame (spec §3.8) — no "Loading…" tab label, no post-mount fetch.
