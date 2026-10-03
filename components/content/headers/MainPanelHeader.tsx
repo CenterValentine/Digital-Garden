@@ -683,6 +683,21 @@ export function MainPanelHeader({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [closeContentTab, isActivePane, pane?.activeTabId]);
 
+  // Keep the active tab on screen. The strip is `overflow-x-auto` with the
+  // scrollbar hidden, so once it overflows a newly opened tab lands past the
+  // right edge and the only sign it opened is a sliver of its title. `inline:
+  // "nearest"` scrolls the minimum distance and is a no-op when the tab is
+  // already visible, so an ordinary click on a visible tab never moves the
+  // strip. `block: "nearest"` keeps this from scrolling the PAGE vertically,
+  // which `scrollIntoView` otherwise does for free.
+  useEffect(() => {
+    const activeTabId = pane?.activeTabId;
+    if (!activeTabId) return;
+    const element = tabElementsRef.current.get(activeTabId);
+    if (!element || !tabScrollerRef.current) return;
+    element.scrollIntoView({ inline: "nearest", block: "nearest" });
+  }, [pane?.activeTabId]);
+
   useEffect(() => {
     // Wait for the workspace snapshot: backfillTabMeta names tabs from
     // contentMeta, which resolves the common case without a fetch. Only tabs
