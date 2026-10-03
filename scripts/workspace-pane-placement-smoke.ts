@@ -37,7 +37,10 @@ import {
   restoreContentWorkspace,
 } from "../extensions/workplaces/state/workspace-store";
 import { DEFAULT_SETTINGS } from "../lib/features/settings/validation";
-import { paneForHotkeyCode } from "../lib/features/content/pane-hotkeys";
+import {
+  paneForHotkeyCode,
+  hotkeyLettersForPane,
+} from "../lib/features/content/pane-hotkeys";
 
 let failures = 0;
 
@@ -504,6 +507,24 @@ console.log("\ndirection-key aiming (hold a letter, click a file)");
     ["top-left", "bottom-left"],
   );
   check("S collapses to one pane", paneForHotkeyCode("KeyS"), "single");
+
+  // The context menu's shortcut column is DERIVED from the key table, so this
+  // doubles as a check that the table has not drifted from the cluster.
+  check(
+    "menu advertises exactly the letters that aim at each pane",
+    (["top-left", "top-right", "bottom-left", "bottom-right"] as WorkspacePaneId[]).map(
+      hotkeyLettersForPane,
+    ),
+    ["Q / A / W", "E / D", "Z / X", "C"],
+  );
+
+  // An aimed open is pinned: the next casual (preview) open lands beside it
+  // instead of replacing it. Exercises the store contract the aimed branch
+  // relies on — `pin: true` through setSelectedContentId.
+  seedSplit();
+  useContentStore.getState().setSelectedContentId("B", { paneId: "top-right", pin: true });
+  useContentStore.getState().setSelectedContentId("C", { paneId: "top-right", focusPane: false });
+  check("a pinned (aimed) open survives the next preview open", paneContents("top-right"), ["B", "C"]);
   check("an unmapped key aims at nothing", paneForHotkeyCode("KeyB"), null);
 
   // The same place keeps the same key across layouts: "left" in a vertical

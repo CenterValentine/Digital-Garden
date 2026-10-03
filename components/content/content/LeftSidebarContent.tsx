@@ -1425,7 +1425,13 @@ export function LeftSidebarContent({
       if (neededLayout !== layoutMode) {
         useContentStore.getState().setLayoutMode(neededLayout);
       }
-      sideBySide = { paneId: aimed };
+      // An aimed open is PINNED. Holding a key and naming a pane is placing,
+      // not browsing — the next casual click must land beside it, not over
+      // it. This matches the context menu's "Open In Pane", the other
+      // deliberate path, which already pins; before this the two disagreed.
+      // The automatic placement stays a preview on purpose: when the rule
+      // chose the pane for you, you have committed to nothing yet.
+      sideBySide = { paneId: aimed, pin: true };
     } else {
       sideBySide =
         destinationPaneId === activePaneId

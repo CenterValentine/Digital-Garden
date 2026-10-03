@@ -63,6 +63,24 @@ export function paneForHotkeyCode(code: string): PaneHotkeyTarget | null {
 }
 
 /**
+ * The letters that aim at a pane, for the context menu's shortcut column —
+ * "Q / A / W" for top-left, since left-of-a-split, top-of-a-split and the
+ * quad's corner are all that pane. DERIVED from the table above rather than
+ * written out again, so the menu can never advertise a key the tracker does
+ * not honour.
+ */
+export function hotkeyLettersForPane(paneId: WorkspacePaneId): string {
+  return Object.entries(PANE_HOTKEY_BY_CODE)
+    .filter(([, target]) => target === paneId)
+    .map(([code]) => code.replace(/^Key/, ""))
+    .join(" / ");
+}
+
+/** One line for a tooltip, covering the keys the menu has no row for (S). */
+export const PANE_HOTKEY_LEGEND =
+  "Hold a letter and click a file — Q W E / A S D / Z X C aim at a pane; S collapses to one pane.";
+
+/**
  * True when the keystroke is someone typing rather than aiming.
  *
  * Without this the gesture would fire mid-rename: the tree's inline rename is

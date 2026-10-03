@@ -10,6 +10,10 @@
 
 import type { ReactNode } from "react";
 import {
+  hotkeyLettersForPane,
+  PANE_HOTKEY_LEGEND,
+} from "@/lib/features/content/pane-hotkeys";
+import {
   ArrowUpLeft,
   ArrowUpRight,
   Edit,
@@ -686,12 +690,17 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
         id: "open-in-pane",
         label: "Open In Pane",
         icon: <ExternalLink className="h-4 w-4" />,
+        // The keyboard form of this submenu lives on the parent as a tooltip,
+        // because one of its keys (S, collapse to a single pane) has no row.
+        tooltip: PANE_HOTKEY_LEGEND,
         submenu: paneActions.map((pane) => ({
           id: `open-${pane.id}`,
           label: visiblePaneIds.has(pane.id)
             ? getPaneLabel(layoutMode, pane.id)
             : `${pane.label} (expand layout)`,
           icon: pane.icon,
+          shortcut: hotkeyLettersForPane(pane.id),
+          tooltip: `Hold ${hotkeyLettersForPane(pane.id)} and click a file`,
           onClick: () =>
             openContentInPane(clickedId, pane.id, {
               title: clickedNode.title,
