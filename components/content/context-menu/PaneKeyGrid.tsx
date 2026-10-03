@@ -85,8 +85,8 @@ export function PaneKeyGrid({ position, onPick, onClose, onMouseEnter }: PaneKey
       role="menu"
       aria-label="Open in pane — hold a key and click a file"
     >
-      <div className="w-[232px] rounded-md border border-white/20 bg-white/95 p-1.5 shadow-lg backdrop-blur-sm dark:bg-gray-900/95">
-        <div className="grid grid-cols-3 gap-1">
+      <div className="w-[196px] rounded-md border border-white/20 bg-white/95 p-1 shadow-lg backdrop-blur-sm dark:bg-gray-900/95">
+        <div className="grid grid-cols-3 gap-0.5">
           {PANE_HOTKEY_GRID.flat().map((cellDef) => {
             const expands =
               cellDef.target !== PANE_HOTKEY_SINGLE &&
@@ -104,13 +104,13 @@ export function PaneKeyGrid({ position, onPick, onClose, onMouseEnter }: PaneKey
                   await onPick(cellDef.target);
                   onClose();
                 }}
-                className="flex flex-col items-center gap-0.5 rounded px-1 py-1.5 text-gray-700 transition-colors hover:bg-primary/10 hover:text-primary dark:text-gray-200"
+                className="flex flex-col items-center gap-px rounded px-0.5 py-1 text-gray-700 transition-colors hover:bg-primary/10 hover:text-primary dark:text-gray-200"
               >
-                <span className="text-sm font-medium leading-none">{cellDef.letter}</span>
+                <span className="text-[13px] font-medium leading-none">{cellDef.letter}</span>
                 <span className="opacity-70">
                   <KeyGlyph glyph={cellDef.glyph} />
                 </span>
-                <span className="text-[10px] leading-tight text-gray-500 dark:text-gray-400">
+                <span className="text-[9px] leading-tight text-gray-500 dark:text-gray-400">
                   {cellDef.caption}
                   {expands || collapses ? " ·" : ""}
                 </span>
@@ -118,8 +118,8 @@ export function PaneKeyGrid({ position, onPick, onClose, onMouseEnter }: PaneKey
             );
           })}
         </div>
-        <div className="mt-1 border-t border-gray-200/50 px-1 pt-1 text-[10px] leading-snug text-gray-500 dark:border-gray-700/50 dark:text-gray-400">
-          Hold a key and click a file. · = changes the layout.
+        <div className="mt-0.5 border-t border-gray-200/50 px-0.5 pt-1 text-[9px] leading-tight text-gray-500 dark:border-gray-700/50 dark:text-gray-400">
+          Hold a key, click a file. · changes the layout.
         </div>
       </div>
     </div>

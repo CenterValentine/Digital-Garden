@@ -570,8 +570,8 @@ export function ContextMenu({ actionProviders }: ContextMenuProps) {
     if (foundAction.submenu && foundAction.submenu.length > 0) {
       estimatedHeight = Math.min(foundAction.submenu.length * 32 + 8, 400);
     } else if (foundAction.customFlyout?.kind === "pane-grid") {
-      estimatedWidth = 232; // matches PaneKeyGrid's w-[232px]
-      estimatedHeight = 200; // three rows of cells + the footer line
+      estimatedWidth = 196; // matches PaneKeyGrid's w-[196px]
+      estimatedHeight = 168; // three rows of cells + the footer line
     } else if (foundAction.customFlyout) {
       estimatedWidth = 288; // matches the flyout's w-72
       // Intentionally tiny: keeps the flyout anchored to the item's top (no
