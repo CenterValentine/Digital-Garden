@@ -89,8 +89,13 @@ function reconcile(opts: {
 }
 
 function seedSplit() {
-  // Intents are module state and outlive a scenario; a leftover one would be
-  // re-added by the next block's reconcile and read as a product bug.
+  // Two kinds of state outlive a scenario, and each has read as a product bug:
+  //   - the `tabs` record — restoreWorkspace carries it FORWARD, and restored
+  //     tabs are pinned, so an id reused by a later scenario arrives already
+  //     pinned and survives a preview open it was supposed to lose to;
+  //   - pending intents — a leftover one is re-added by the next reconcile.
+  // Clear tabs first (it records close intents), then the intents.
+  useContentStore.getState().clearAllWorkspaceTabs();
   clearPendingWorkspaceIntents();
   // A workspace already holding A on the left, focused there.
   useContentStore.getState().restoreWorkspace({
@@ -456,6 +461,36 @@ console.log("\npersist → record → reconcile is a fixed point");
     "W36",
   );
   check("…and the selection follows the pane, not the server", useContentStore.getState().selectedContentId, "W36");
+
+  // DRAG A TAB ACROSS PANES, then a poll lands carrying the PRE-move state.
+  // Reported: the drop lands, flickers back, returns; with several moves the
+  // tabs shuffle into a new order. A move records no membership change, so it
+  // used to record no intent, and the stale record dragged it back.
+  clearPendingWorkspaceIntents();
+  useContentStore.getState().restoreWorkspace({
+    activeContentId: "A",
+    activePaneId: "top-left",
+    layoutMode: "dual-vertical",
+    paneTabContentIds: { "top-left": ["A"], "top-right": ["B", "C"] },
+  });
+  confirmWorkspaceWrite(["A", "B", "C"]);
+  const preMove = workspaceFromLocal(); // what the server still has
+  useContentStore.getState().moveContentTabToPane("tab:B", "top-left", {});
+  const afterMove = fingerprint();
+  check("B dropped into the left pane", paneContents("top-left"), ["A", "B"]);
+
+  const flicker: string[] = [];
+  for (let i = 0; i < 3; i += 1) {
+    restoreContentWorkspace(preMove, useContentStore.getState().selectedContentId, false, "reconcile");
+    flicker.push(fingerprint());
+  }
+  check("a stale poll does not drag the moved tab back (no flicker)", flicker, Array(3).fill(afterMove));
+  check("…and C, which did not move, is not disturbed", paneContents("top-right"), ["C"]);
+
+  // Our write lands and acks; the intent retires; the server now agrees.
+  confirmWorkspaceWrite(["A", "B", "C"]);
+  restoreContentWorkspace(workspaceFromLocal(), useContentStore.getState().selectedContentId, false, "reconcile");
+  check("after the write lands, the move is simply the state", fingerprint(), afterMove);
 }
 
 console.log("\nempty panes collapse the layout (owner scenarios, 2026-10-02)");

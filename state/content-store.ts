@@ -1840,6 +1840,18 @@ export const useContentStore = create<ContentState>((set, get) => ({
         return {};
       }
 
+      // A move is neither an open nor a close — the tab is in the workspace
+      // before and after — so until now it recorded NO intent, and nothing
+      // protected its placement from a stale layout record. The record is
+      // written after the fact, so a poll landing before our write still
+      // names the tab in its OLD pane: the drop lands, the reconcile drags it
+      // back, our write lands, the next record pulls it over again. Several
+      // moves in flight and tabOrder is rebuilt from alternating sources —
+      // that is the shuffling. Recording "this content belongs in paneId"
+      // lets restoreWorkspace keep it there until confirmWorkspaceWrite
+      // retires the intent on our own ack.
+      rememberIntent(tab.contentId, "open", paneId);
+
       const requestedLayoutMode =
         options.requestedLayoutMode ??
         (isPaneVisible(state.layoutMode, paneId)
@@ -2196,25 +2208,44 @@ export const useContentStore = create<ContentState>((set, get) => ({
       const alreadyPresent = new Set(
         Object.values(reconciledPaneContentIds).flatMap((ids) => ids ?? [])
       );
-      const pendingOpenIntents = getPendingOpenIntents().filter(
-        ({ contentId }) => !alreadyPresent.has(contentId)
-      );
-      // Re-add each pending open to the pane it was actually opened into, not
-      // to whichever pane happens to hold focus. Sending them all to
-      // `intentPaneId` gathered every unpublished tab into the active pane the
-      // moment a reconcile landed — content appeared where you asked, then
-      // jumped. `intentPaneId` stays the fallback for openers that named no
-      // pane (the URL-restore path via markLocalOpenIntents), and for a pane
-      // that is no longer visible after a layout change.
+      const pendingOpenIntents = getPendingOpenIntents();
+      // Honour each pending intent's pane over the snapshot's, until the
+      // write that carries it is confirmed:
+      //   - ABSENT from the snapshot (an open the snapshot predates): add it
+      //     to the pane it was opened into — not to whichever pane holds
+      //     focus, which gathered every unpublished tab into the active pane.
+      //   - PRESENT but in another pane (a MOVE the snapshot predates): move it.
+      //     Without this a stale layout record dragged a just-dropped tab back
+      //     on the next poll, then the following record pulled it over again.
+      // An intent that named no pane (the URL-restore path via
+      // markLocalOpenIntents) only guarantees membership: it is added if
+      // absent and left wherever the snapshot has it if present.
+      // `intentPaneId` is the fallback for a pane the layout no longer shows.
       for (const { contentId, paneId } of pendingOpenIntents) {
         const target =
           paneId && requestedPaneIds.includes(paneId) ? paneId : intentPaneId;
+        const currentPane = (
+          Object.keys(reconciledPaneContentIds) as WorkspacePaneId[]
+        ).find((candidate) =>
+          reconciledPaneContentIds[candidate]?.includes(contentId)
+        );
+        if (currentPane === target) continue;
+        if (currentPane) {
+          if (!paneId) continue;
+          reconciledPaneContentIds[currentPane] = (
+            reconciledPaneContentIds[currentPane] ?? []
+          ).filter((id) => id !== contentId);
+        }
         reconciledPaneContentIds[target] = [
           ...(reconciledPaneContentIds[target] ?? []),
           contentId,
         ];
       }
-      const pendingOpens = pendingOpenIntents.map(({ contentId }) => contentId);
+      // Only the ones the snapshot lacked entirely — the activeContentId
+      // re-add below treats those as "what the user was just looking at".
+      const pendingOpens = pendingOpenIntents
+        .filter(({ contentId }) => !alreadyPresent.has(contentId))
+        .map(({ contentId }) => contentId);
       normalizedWorkspace.paneTabContentIds = reconciledPaneContentIds;
 
       if (
