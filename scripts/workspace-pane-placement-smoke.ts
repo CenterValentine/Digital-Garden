@@ -35,6 +35,8 @@ import {
 import {
   buildPanesFromLayoutRecord,
   restoreContentWorkspace,
+  useWorkspaceStore,
+  __lastAppliedUpdatedAtForTests,
 } from "../extensions/workplaces/state/workspace-store";
 import { DEFAULT_SETTINGS } from "../lib/features/settings/validation";
 import {
@@ -926,7 +928,58 @@ console.log("\nlayout-record rebuild (the reconcile's re-arrangement)");
   );
 }
 
-console.log(
-  `\nworkspace-pane-placement smoke: ${failures === 0 ? "PASS" : `FAIL (${failures})`}`,
-);
-process.exit(failures === 0 ? 0 : 1);
+(async () => {
+  console.log("\na surface acks its OWN workspace writes (echo suppression)");
+  {
+    // Every write to the workspace row bumps updatedAt. If the surface does
+    // not record the value the server returns, the next poll sees an updatedAt
+    // it never acked and reconciles against its own write — a reconcile with
+    // no user action between. The traced persist always acked; updateWorkspace
+    // (name/settings) did not. Pinned here with a stubbed fetch, since the
+    // harness has no network.
+    const realFetch = globalThis.fetch;
+    // fetchWorkspaceMutation arms its abort timer on window.setTimeout, and the
+    // harness runs in Node. A minimal window for the duration of this scenario;
+    // no localStorage, so the tracer stays off, and a pathname so surface
+    // detection has something to read if anything reaches it.
+    const realWindow = (globalThis as { window?: unknown }).window;
+    (globalThis as { window?: unknown }).window = {
+      setTimeout: globalThis.setTimeout.bind(globalThis),
+      clearTimeout: globalThis.clearTimeout.bind(globalThis),
+      location: { pathname: "/", href: "http://localhost/" },
+      innerWidth: 1440,
+      innerHeight: 900,
+      addEventListener: () => undefined,
+    };
+    const WS = "ws-ack";
+    const served = {
+      id: WS, name: "ws", slug: "ws", isMain: true, isLocked: false, isView: false,
+      viewRootContentId: null, viewRoot: null, parentWorkspaceId: null,
+      status: "active", expiresAt: null, archivedAt: null,
+      layoutMode: "single", activePaneId: "top-left",
+      paneState: { layoutMode: "single", activePaneId: "top-left", activeContentId: null, paneTabContentIds: {} },
+      settings: {}, createdAt: "", updatedAt: "2026-10-03T15:52:00.511Z", items: [], contentMeta: {},
+    };
+    globalThis.fetch = (async () =>
+      new Response(JSON.stringify({ success: true, data: served }), {
+        status: 200, headers: { "Content-Type": "application/json" },
+      })) as typeof fetch;
+    try {
+      useWorkspaceStore.setState({ workspaces: [served as never], activeWorkspaceId: WS });
+      await useWorkspaceStore.getState().updateWorkspace(WS, { settings: { any: 1 } });
+      check(
+        "updateWorkspace records the server's updatedAt as known",
+        __lastAppliedUpdatedAtForTests(WS),
+        "2026-10-03T15:52:00.511Z",
+      );
+    } finally {
+      globalThis.fetch = realFetch;
+      (globalThis as { window?: unknown }).window = realWindow;
+    }
+  }
+
+  console.log(
+    `\nworkspace-pane-placement smoke: ${failures === 0 ? "PASS" : `FAIL (${failures})`}`,
+  );
+  process.exit(failures === 0 ? 0 : 1);
+})();

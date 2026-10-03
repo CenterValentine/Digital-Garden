@@ -1,7 +1,7 @@
 "use client";
 
 import { create } from "zustand";
-import { fingerprintPlacement, traceWorkspace } from "@/lib/core/workspace-trace";
+import { fingerprintPlacement, traceCaller, traceWorkspace } from "@/lib/core/workspace-trace";
 import { toast } from "sonner";
 import {
   useContentStore,
@@ -1507,6 +1507,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   },
 
   duplicateWorkspace: async (workspaceId) => {
+    traceWorkspace("workspace:patch:write", { via: "updateWorkspace" }, traceCaller());
     const response = await fetch(
       `/api/content/workspaces/${workspaceId}/duplicate`,
       {
@@ -1594,6 +1595,12 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         response,
         "Failed to update workspace",
       );
+      // Ack our own write (echo suppression). Without this the next poll saw an
+      // updatedAt this surface never recorded and reconciled against its OWN
+      // settings write — a reconcile with no user action between, which the
+      // tracer showed ~16s after load.
+      lastAppliedUpdatedAt[workspace.id] = workspace.updatedAt;
+      traceWorkspace("workspace:patch:ack", { via: "updateWorkspace", workspaceId: workspace.id, updatedAt: workspace.updatedAt });
       set((state) => ({
         workspaces: applyWorkspaceOrder(
           state.workspaces.map((candidate) =>
@@ -1638,6 +1645,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
 
     set({ workspaces: nextWorkspaces });
 
+    traceWorkspace("workspace:patch:write", { via: "reorderWorkspaces" }, traceCaller());
     const response = await fetch(
       `/api/content/workspaces/${mainWorkspace.id}`,
       {
@@ -1656,6 +1664,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       response,
       "Failed to save workspace order",
     );
+      // Ack our own write — same echo-suppression contract as updateWorkspace.
+      lastAppliedUpdatedAt[workspace.id] = workspace.updatedAt;
+      traceWorkspace("workspace:patch:ack", { via: "reorderWorkspaces", workspaceId: workspace.id, updatedAt: workspace.updatedAt });
     set((state) => ({
       workspaces: applyWorkspaceOrder(
         state.workspaces.map((candidate) =>
@@ -2094,6 +2105,11 @@ if (typeof window !== "undefined") {
       clearPendingWorkspaceIntents();
     }
   });
+}
+
+/** Test seam: what this surface believes the server's updatedAt is. */
+export function __lastAppliedUpdatedAtForTests(workspaceId: string): string | null {
+  return lastAppliedUpdatedAt[workspaceId] ?? null;
 }
 
 export function installWorkspaceOpenGuard() {
