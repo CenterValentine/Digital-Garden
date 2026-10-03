@@ -21,7 +21,14 @@ import { RootNodeHeader, type RootScopeOption } from "../file-tree/RootNodeHeade
 import {
   useContentStore,
   resolveOpenDestinationPane,
+  resolveLayoutModeForPane,
+  type WorkspacePaneId,
 } from "@/state/content-store";
+import {
+  ensurePaneHotkeyTracker,
+  heldPaneTarget,
+  PANE_HOTKEY_SINGLE,
+} from "@/lib/features/content/pane-hotkeys";
 import { useSettingsStore } from "@/state/settings-store";
 import { useSearchStore } from "@/state/search-store";
 import { useTreeStateStore } from "@/state/tree-state-store";
@@ -386,6 +393,14 @@ export function LeftSidebarContent({
   const replaceContentTab = useContentStore((state) => state.replaceContentTab);
   const closeContentTabs = useContentStore((state) => state.closeContentTabs);
   const { setSelectedIds } = useTreeStateStore();
+
+  // Direction-key aiming for tree opens. Installed on mount, not lazily at
+  // click time the way the Alt tracker is: the keydown we need to have seen
+  // happens BEFORE the click, so a tracker installed by the click is already
+  // too late to have recorded anything.
+  useEffect(() => {
+    ensurePaneHotkeyTracker();
+  }, []);
 
   // Search store - conditionally show search panel
   const isSearchOpen = useSearchStore((state) => state.isSearchOpen);
@@ -1386,10 +1401,37 @@ export function LeftSidebarContent({
       (paneId) => (panes[paneId]?.tabIds.length ?? 0) === 0,
       useSettingsStore.getState().ui?.openDestination,
     );
-    const sideBySide =
-      destinationPaneId === activePaneId
-        ? {}
-        : { paneId: destinationPaneId, focusPane: false };
+    // A held direction key (lib/features/content/pane-hotkeys.ts) is an
+    // explicit aim and outranks the automatic rule — you said where it goes,
+    // so nothing should second-guess it. It also TAKES focus, unlike the
+    // automatic placement: naming a pane is a decision to work there, where
+    // the automatic one is a decision to keep working where you are.
+    const aimed = heldPaneTarget();
+    let sideBySide: {
+      paneId?: WorkspacePaneId;
+      focusPane?: boolean;
+    };
+
+    if (aimed === PANE_HOTKEY_SINGLE) {
+      // S collapses to one pane and the clicked content becomes the live one,
+      // so focus is exactly what is wanted here — nothing to send.
+      useContentStore.getState().setLayoutMode("single");
+      sideBySide = {};
+    } else if (aimed) {
+      // Grow the layout to reach a pane that isn't on screen yet, the same way
+      // the context menu's "(expand layout)" entries do — pressing Z in a
+      // vertical split opens a quad rather than silently landing elsewhere.
+      const neededLayout = resolveLayoutModeForPane(layoutMode, aimed);
+      if (neededLayout !== layoutMode) {
+        useContentStore.getState().setLayoutMode(neededLayout);
+      }
+      sideBySide = { paneId: aimed };
+    } else {
+      sideBySide =
+        destinationPaneId === activePaneId
+          ? {}
+          : { paneId: destinationPaneId, focusPane: false };
+    }
 
     // A mirror row is a projection of content that lives elsewhere. Its own id
     // is synthetic and path-scoped, so opening it means opening the REAL id —

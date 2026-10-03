@@ -28,11 +28,13 @@ import {
   clearPendingWorkspaceIntents,
   resolveOppositePane,
   resolveOpenDestinationPane,
+  resolveLayoutModeForPane,
   type WorkspacePaneId,
   type WorkspaceLayoutMode,
 } from "../state/content-store";
 import { buildPanesFromLayoutRecord } from "../extensions/workplaces/state/workspace-store";
 import { DEFAULT_SETTINGS } from "../lib/features/settings/validation";
+import { paneForHotkeyCode } from "../lib/features/content/pane-hotkeys";
 
 let failures = 0;
 
@@ -292,6 +294,57 @@ console.log("\nfill the room before stacking (owner rule, 2026-10-02)");
     "single still has nowhere to go",
     resolveOpenDestinationPane("single", "top-left", () => true),
     "top-left",
+  );
+}
+
+console.log("\ndirection-key aiming (hold a letter, click a file)");
+{
+  // The cluster is the shape the panes make:
+  //   Q W E
+  //   A S D
+  //   Z X C
+  check(
+    "quad corners",
+    ["KeyQ", "KeyE", "KeyZ", "KeyC"].map(paneForHotkeyCode),
+    ["top-left", "top-right", "bottom-left", "bottom-right"],
+  );
+  check(
+    "left / right of a vertical split",
+    ["KeyA", "KeyD"].map(paneForHotkeyCode),
+    ["top-left", "top-right"],
+  );
+  check(
+    "top / bottom of a horizontal split",
+    ["KeyW", "KeyX"].map(paneForHotkeyCode),
+    ["top-left", "bottom-left"],
+  );
+  check("S collapses to one pane", paneForHotkeyCode("KeyS"), "single");
+  check("an unmapped key aims at nothing", paneForHotkeyCode("KeyB"), null);
+
+  // The same place keeps the same key across layouts: "left" in a vertical
+  // split, "top" in a horizontal one and the top-left corner of a quad are
+  // all the same pane, so A, W and Q agree.
+  check(
+    "A, W and Q all name the same pane",
+    new Set(["KeyA", "KeyW", "KeyQ"].map(paneForHotkeyCode)).size,
+    1,
+  );
+
+  // `event.key` would be "¬" for ⌥L on macOS; `code` is the physical key.
+  // Guarding against a future refactor quietly switching to `key`.
+  check("keyed on the physical key, not the glyph", paneForHotkeyCode("a"), null);
+
+  // The aimed pane may not be on screen — growing the layout to reach it is
+  // the same thing the context menu's "(expand layout)" entries do.
+  check(
+    "aiming at a corner from a vertical split expands to quad",
+    resolveLayoutModeForPane("dual-vertical", "bottom-right"),
+    "quad",
+  );
+  check(
+    "aiming at a pane already visible changes nothing",
+    resolveLayoutModeForPane("dual-vertical", "top-right"),
+    "dual-vertical",
   );
 }
 

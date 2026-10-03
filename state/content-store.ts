@@ -1063,7 +1063,7 @@ function getPaneLabel(
   }
 }
 
-function resolveLayoutModeForPane(
+export function resolveLayoutModeForPane(
   currentLayoutMode: WorkspaceLayoutMode,
   paneId: WorkspacePaneId
 ) {
