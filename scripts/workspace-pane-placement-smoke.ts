@@ -27,6 +27,7 @@ import {
   confirmWorkspaceWrite,
   clearPendingWorkspaceIntents,
   resolveOppositePane,
+  resolveOpenDestinationPane,
   type WorkspacePaneId,
   type WorkspaceLayoutMode,
 } from "../state/content-store";
@@ -226,6 +227,71 @@ console.log("\nonce published, the snapshot is authoritative again");
     "B",
   ]);
   check("…and the right pane is empty again", paneContents("top-right"), []);
+}
+
+console.log("\nfill the room before stacking (owner rule, 2026-10-02)");
+{
+  // Occupancy is the only input besides geometry, so drive it directly.
+  const empty = new Set<WorkspacePaneId>([
+    "top-left",
+    "top-right",
+    "bottom-left",
+    "bottom-right",
+  ]);
+  const isEmpty = (paneId: WorkspacePaneId) => empty.has(paneId);
+  empty.delete("top-left"); // the user is working here
+
+  const quadSequence: WorkspacePaneId[] = [];
+  for (let i = 0; i < 4; i += 1) {
+    const target = resolveOpenDestinationPane("quad", "top-left", isEmpty);
+    quadSequence.push(target);
+    empty.delete(target);
+  }
+  check("quad fills the room, then returns to the opposite", quadSequence, [
+    "top-right",
+    "bottom-left",
+    "bottom-right",
+    "top-right",
+  ]);
+
+  // Dual: nothing else to fill, so every open after the first repeats.
+  const dualEmpty = new Set<WorkspacePaneId>(["top-right"]);
+  const dualSequence: WorkspacePaneId[] = [];
+  for (let i = 0; i < 3; i += 1) {
+    const target = resolveOpenDestinationPane("dual-vertical", "top-left", (p) =>
+      dualEmpty.has(p),
+    );
+    dualSequence.push(target);
+    dualEmpty.delete(target);
+  }
+  check("dual goes opposite, then stays there", dualSequence, [
+    "top-right",
+    "top-right",
+    "top-right",
+  ]);
+
+  // Engaging with a pane re-aims the whole rule off the new active pane.
+  const allFull = () => false;
+  check(
+    "working in the bottom-right re-aims to ITS opposite",
+    resolveOpenDestinationPane("quad", "bottom-right", allFull),
+    "bottom-left",
+  );
+  check(
+    "…and an empty pane still wins over the opposite",
+    resolveOpenDestinationPane(
+      "quad",
+      "bottom-right",
+      (p) => p === "top-left",
+    ),
+    "top-left",
+  );
+
+  check(
+    "single still has nowhere to go",
+    resolveOpenDestinationPane("single", "top-left", () => true),
+    "top-left",
+  );
 }
 
 console.log("\nback-to-back tree opens land on the SAME side");

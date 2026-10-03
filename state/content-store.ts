@@ -326,6 +326,50 @@ const VERTICAL_PARTNER: Record<WorkspacePaneId, WorkspacePaneId> = {
  * Pure and total — returns a visible pane for any input, so callers never need
  * to re-check `isPaneVisible`.
  */
+/**
+ * Where a tree open should land: beside the work, filling the room available.
+ *
+ * The opposite pane is the first choice, but only the FIRST one is unconditional
+ * — after that, emptiness decides. In a quad you fill the room you have before
+ * you start stacking:
+ *
+ *   quad, working top-left →  1st: top-right (the opposite, empty)
+ *                             2nd: bottom-left   (opposite taken, this is empty)
+ *                             3rd: bottom-right  (likewise)
+ *                             4th: top-right     (all full — back to the opposite)
+ *
+ *   dual, working left     →  1st: right (the opposite)
+ *                             2nd+: right (nothing else to fill)
+ *
+ * Engaging with a pane makes it the active one, and the whole rule re-aims off
+ * it — which only works because an open does not steal focus (`focusPane`).
+ * If it did, the anchor would move on every click and "opposite" would mean
+ * something different each time.
+ *
+ * Pure: occupancy comes in as a predicate so this stays testable and the caller
+ * owns where "empty" is read from.
+ */
+export function resolveOpenDestinationPane(
+  layoutMode: WorkspaceLayoutMode,
+  activePaneId: WorkspacePaneId,
+  isPaneEmpty: (paneId: WorkspacePaneId) => boolean
+): WorkspacePaneId {
+  const opposite = resolveOppositePane(layoutMode, activePaneId);
+  // Single pane: nothing to open beside, and the caller treats this as "send
+  // no paneId at all", preserving the pre-existing behaviour exactly.
+  if (opposite === activePaneId) return activePaneId;
+
+  const visible = getVisiblePaneIds(layoutMode);
+  const from = visible.includes(activePaneId) ? activePaneId : visible[0];
+  // Opposite first, then the remaining panes in ordinal order. First empty one
+  // wins; if the room is full we come back to the opposite and replace there.
+  const candidates = [
+    opposite,
+    ...visible.filter((paneId) => paneId !== from && paneId !== opposite),
+  ];
+  return candidates.find((paneId) => isPaneEmpty(paneId)) ?? opposite;
+}
+
 export function resolveOppositePane(
   layoutMode: WorkspaceLayoutMode,
   activePaneId: WorkspacePaneId

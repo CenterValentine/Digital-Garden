@@ -18,7 +18,10 @@ import { FileUploadDialog } from "../dialogs/FileUploadDialog";
 import { IconSelector } from "../IconSelector";
 import { LeftSidebarStatusBar } from "../LeftSidebarStatusBar";
 import { RootNodeHeader, type RootScopeOption } from "../file-tree/RootNodeHeader";
-import { useContentStore, resolveOppositePane } from "@/state/content-store";
+import {
+  useContentStore,
+  resolveOpenDestinationPane,
+} from "@/state/content-store";
 import { useSearchStore } from "@/state/search-store";
 import { useTreeStateStore } from "@/state/tree-state-store";
 import { useCharterIdsStore } from "@/state/charter-ids-store";
@@ -1373,12 +1376,16 @@ export function LeftSidebarContent({
     // In `single` the opposite IS the active pane, so we send nothing and the
     // behavior is exactly what it was. Read imperatively — this is an event
     // handler, and a reactive layoutMode would only add a stale-closure risk.
-    const { layoutMode, activePaneId } = useContentStore.getState();
-    const oppositePaneId = resolveOppositePane(layoutMode, activePaneId);
+    const { layoutMode, activePaneId, panes } = useContentStore.getState();
+    const destinationPaneId = resolveOpenDestinationPane(
+      layoutMode,
+      activePaneId,
+      (paneId) => (panes[paneId]?.tabIds.length ?? 0) === 0,
+    );
     const sideBySide =
-      oppositePaneId === activePaneId
+      destinationPaneId === activePaneId
         ? {}
-        : { paneId: oppositePaneId, focusPane: false };
+        : { paneId: destinationPaneId, focusPane: false };
 
     // A mirror row is a projection of content that lives elsewhere. Its own id
     // is synthetic and path-scoped, so opening it means opening the REAL id —
