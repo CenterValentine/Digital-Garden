@@ -230,7 +230,7 @@ const persistDirty = new Set<string>();
  * very claim the intent check exists to gate. The persist is deferred, not
  * dropped — it runs the moment the last provisional open settles.
  */
-const provisionalOpens = new Set<string>();
+const provisionalOpens = new Map<string, { layoutModeBefore: WorkspaceLayoutMode }>();
 let persistDeferredByProvisional = false;
 
 function settleProvisionalOpen(contentId: string) {
@@ -249,11 +249,22 @@ function settleProvisionalOpen(contentId: string) {
   }
 }
 
-/** The server said no (or never answered): take the provisional tab back. */
+/**
+ * The server said no (or never answered): take the provisional tab back —
+ * and the layout with it. An open can grow the layout (a side-by-side open
+ * into the empty pane, an aimed open into a quad) and closing the only tab in
+ * a pane folds it (the removal rule); either way the user never had this tab,
+ * so the arrangement must be exactly what it was before they asked.
+ */
 function rollbackProvisionalOpen(contentId: string) {
-  if (!provisionalOpens.has(contentId)) return;
+  const provisional = provisionalOpens.get(contentId);
+  if (!provisional) return;
   traceWorkspace("open:provisional:rollback", { contentId });
-  useContentStore.getState().closeContentTabs([contentId]);
+  const cs = useContentStore.getState();
+  cs.closeContentTabs([contentId]);
+  if (useContentStore.getState().layoutMode !== provisional.layoutModeBefore) {
+    useContentStore.getState().setLayoutMode(provisional.layoutModeBefore);
+  }
   settleProvisionalOpen(contentId);
 }
 let onMutationBroadcast: (() => void) | null = null;
@@ -1954,7 +1965,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
 
     // Show it NOW; ask alongside (see provisionalOpens). The content fetch
     // and the intent check overlap instead of queueing.
-    provisionalOpens.add(contentId);
+    provisionalOpens.set(contentId, {
+      layoutModeBefore: useContentStore.getState().layoutMode,
+    });
     traceWorkspace("open:provisional", { contentId, workspaceId: activeWorkspace.id });
     directOpenContent(contentId, options);
 

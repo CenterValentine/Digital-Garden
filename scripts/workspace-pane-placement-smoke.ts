@@ -41,6 +41,15 @@ import {
 } from "../extensions/workplaces/state/workspace-store";
 import { DEFAULT_SETTINGS } from "../lib/features/settings/validation";
 import {
+  cacheTabPayload,
+  clearTabPayloadCache,
+  invalidateTabPayload,
+  readTabPayload,
+  tabPayloadCacheStats,
+  TAB_PAYLOAD_CACHE_BUDGET_BYTES,
+  TAB_PAYLOAD_MAX_AGE_MS,
+} from "../lib/domain/content/tab-payload-cache";
+import {
   paneForHotkeyCode,
   hotkeyLettersForPane,
   hotkeyCellForCode,
@@ -707,6 +716,41 @@ console.log("\nreset pane memory (owner request, 2026-10-03)");
   useContentStore.getState().applyPaneMemory(before);
   useContentStore.getState().setLayoutMode("quad");
   check("undo restores the old memory: P4 is bottom-right again", paneContents("bottom-right"), ["P4"]);
+}
+
+console.log("\nthe tab payload cache is bounded by memory, not by a tab count (owner, 2026-10-03)");
+{
+  // Least-recently-viewed entries drop off the bottom until the budget fits;
+  // a payload larger than the whole budget is never admitted. The 5-minute
+  // age is untouched — it matches the collaboration runtime's idle eviction
+  // (the Cloud Run cost measure) and is pinned here so a later tuning can't
+  // move one without the other on purpose.
+  clearTabPayloadCache();
+  const mb = (n: number) => "x".repeat(n * 1024 * 1024 / 2); // n MB as UTF-16
+  cacheTabPayload("big-1", { body: mb(6) });
+  cacheTabPayload("big-2", { body: mb(6) });
+  check("two 6 MB payloads fit a 16 MB budget", tabPayloadCacheStats().ids, ["big-1", "big-2"]);
+  readTabPayload("big-1"); // big-1 is now the most recently viewed
+  cacheTabPayload("big-3", { body: mb(6) });
+  check(
+    "a third evicts the LEAST recently viewed, not the oldest written",
+    tabPayloadCacheStats().ids,
+    ["big-1", "big-3"],
+  );
+  check("…and the budget holds", tabPayloadCacheStats().bytes <= TAB_PAYLOAD_CACHE_BUDGET_BYTES, true);
+  cacheTabPayload("huge", { body: mb(17) });
+  check("a payload past the whole budget is never admitted (and evicts nothing)", tabPayloadCacheStats().ids, ["big-1", "big-3"]);
+  for (let i = 0; i < 40; i += 1) cacheTabPayload(`small-${i}`, { body: mb(0.25) });
+  check("many small payloads are not capped by a count", tabPayloadCacheStats().entries > 5, true);
+  invalidateTabPayload("big-1");
+  check("invalidating returns its bytes", tabPayloadCacheStats().ids.includes("big-1"), false);
+  clearTabPayloadCache();
+  check("cleared is empty", tabPayloadCacheStats(), { entries: 0, bytes: 0, ids: [] });
+  check(
+    "the age cap is the collaboration runtime's idle eviction (5 min) — change both or neither",
+    TAB_PAYLOAD_MAX_AGE_MS,
+    5 * 60_000,
+  );
 }
 
 console.log("\nclicking around between opens");
@@ -1531,13 +1575,52 @@ console.log("\nlayout-record rebuild (the reconcile's re-arrangement)");
       useWorkspaceStore.getState().cancelOpenConflict();
       check("cancel takes the tab back", paneContents("top-left").includes("M"), false);
       await new Promise((r) => setTimeout(r, 0));
-      check("…and the deferred write runs without it", server.patches2.at(-1)?.panes["top-left"], ["A", "N"]);
+      // The deferred persist ran — and found nothing to say: after the
+      // rollback the local snapshot is exactly what the server holds, so the
+      // echo check skips the write. The server never saw M.
+      check(
+        "…the server never saw it, and nothing is left to write",
+        [
+          server.row2.paneState.paneTabContentIds["top-left"]?.contentIds,
+          JSON.stringify(useContentStore.getState().getWorkspaceStateSnapshot().paneTabContentIds) ===
+            JSON.stringify(server.row2.paneState.paneTabContentIds),
+        ],
+        [["A", "N"], true],
+      );
 
       // refused → borrow
       server.assignments.length = 0;
       await open("K");
       await useWorkspaceStore.getState().borrowPendingContent("2026-12-01T00:00:00.000Z");
       check("borrowing keeps the tab and claims it borrowed", [paneContents("top-left").includes("K"), server.assignments[0]?.assignmentType], [true, "borrowed"]);
+
+      // refused → cancel, after an open that GREW the layout. The side-by-side
+      // open lands in the empty right pane; closing the only tab there would
+      // fold the split (the removal rule). The user never had this tab, so
+      // the rollback restores the arrangement exactly — pane management and
+      // provisional opens must not trip over each other.
+      server.intentAnswer = {
+        allowed: false,
+        conflict: {
+          conflictType: "overlap", workspaceId: "ws-other", workspaceName: "Other",
+          contentId: "R", contentTitle: "Note R", claimContentId: "R", claimContentTitle: "Note R",
+          scope: "item", folderScopeContentId: null, folderScopeContentTitle: null,
+        },
+      };
+      useContentStore.getState().closeContentTabs(["N", "K"]);
+      clearPendingWorkspaceIntents();
+      useContentStore.getState().restoreWorkspace({
+        activeContentId: "A", activePaneId: "top-left", layoutMode: "dual-vertical",
+        paneTabContentIds: { "top-left": ["A"], "top-right": [] },
+      });
+      await useWorkspaceStore.getState().requestOpenContent("R", { title: "Note R", paneId: "top-right", focusPane: false });
+      check("a refused side-by-side open sits in the empty pane meanwhile", [useContentStore.getState().layoutMode, paneContents("top-right")], ["dual-vertical", ["R"]]);
+      useWorkspaceStore.getState().cancelOpenConflict();
+      check(
+        "…and cancelling puts the layout back exactly, not folded by the removal rule",
+        [useContentStore.getState().layoutMode, paneContents("top-left"), paneContents("top-right"), useContentStore.getState().activePaneId],
+        ["dual-vertical", ["A"], [], "top-left"],
+      );
 
       // the server never answers
       server.intentAnswer = { allowed: true, alreadyCovered: false, conflict: null };
