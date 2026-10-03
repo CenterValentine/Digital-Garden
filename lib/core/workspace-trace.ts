@@ -41,19 +41,51 @@ export function isWorkspaceTraceEnabled(): boolean {
   return enabled;
 }
 
-/** The store action that caused a commit, read off the stack. Dev-only names. */
+/**
+ * The store action that caused a commit, read off the stack.
+ *
+ * Scans the WHOLE stack for a known action name rather than taking the first
+ * foreign frame: under Turbopack's dev bundling the nearest frame is a chunk
+ * wrapper ("http", "[project]/…"), which is what the first version reported.
+ * Falls back to the nearest foreign frame so an unknown caller still shows
+ * something greppable.
+ */
+const KNOWN_ACTIONS = [
+  "restoreWorkspace",
+  "restoreContentWorkspace",
+  "setSelectedContentId",
+  "openContentInPane",
+  "focusPane",
+  "setLayoutMode",
+  "closeContentTab",
+  "closeContentTabs",
+  "clearAllWorkspaceTabs",
+  "moveContentTabToPane",
+  "activateContentTab",
+  "replaceContentTab",
+  "pinContentTab",
+  "updateContentTab",
+  "backfillTabMeta",
+  "activateWorkspace",
+  "loadWorkspaces",
+  "receiveRefreshedWorkspaces",
+  "persistActiveWorkspace",
+];
+
 export function traceCaller(): string {
   const stack = new Error().stack ?? "";
   const lines = stack.split("\n").slice(1);
-  // Skip our own frames; the first frame outside this module and the commit
-  // helper is the action.
+  for (const line of lines) {
+    const hit = KNOWN_ACTIONS.find((name) => line.includes(name));
+    if (hit) return hit;
+  }
   const frame = lines.find(
     (line) =>
       !line.includes("workspace-trace") &&
       !line.includes("commitWorkspace") &&
       !line.includes("traceCaller")
   );
-  const match = frame?.match(/at (?:Object\.)?([\w$.<>]+)/);
+  const match = frame?.match(/at (?:Object\.)?([\w$.<>\[\]/-]+)/);
   return match?.[1] ?? "?";
 }
 

@@ -2173,6 +2173,19 @@ export const useContentStore = create<ContentState>((set, get) => ({
   getWorkspaceStateSnapshot: () => createWorkspaceStateSnapshot(get()),
 
   restoreWorkspace: (workspace) => {
+    // Logged on EVERY call, not only when placement changes: a no-op restore
+    // still hands React fresh `panes`/`tabs` identities and re-renders every
+    // pane, which is a visible flash with nothing in the `commit` log.
+    traceWorkspace(
+      "restoreWorkspace:call",
+      {
+        layoutMode: workspace.layoutMode ?? null,
+        activePaneId: workspace.activePaneId ?? null,
+        activeContentId: workspace.activeContentId,
+        paneTabContentIds: workspace.paneTabContentIds ?? null,
+      },
+      traceCaller()
+    );
     commitWorkspace(set, (state) => {
       const normalizedWorkspace = normalizeLegacyRestorePanes(workspace);
       const incomingLayoutMode = normalizedWorkspace.layoutMode ?? "single";

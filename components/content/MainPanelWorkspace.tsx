@@ -1,5 +1,6 @@
 "use client";
 
+import { traceWorkspace } from "@/lib/core/workspace-trace";
 import { createElement, useEffect, useState, type ReactNode } from "react";
 import { Allotment } from "allotment";
 import { usePathname } from "next/navigation";
@@ -546,6 +547,13 @@ export function MainPanelWorkspace({
       // Deep-linked tabs are a LOCAL open that hasn't been published yet. Mark
       // the intent so a background reconcile arriving before the debounced
       // write can't erase them (see markLocalOpenIntents).
+      traceWorkspace("url:restore", {
+        contentIdFromUrl,
+        tabsFromUrl,
+        secondaryTabsFromUrl,
+        paneTabContentIds: hasPaneTabs ? paneTabContentIds : null,
+        href: window.location.href,
+      });
       markLocalOpenIntents([
         contentIdFromUrl,
         ...Object.values(paneTabContentIds).flatMap((ids) => ids ?? []),
