@@ -43,6 +43,7 @@ import { DEFAULT_SETTINGS } from "../lib/features/settings/validation";
 import {
   paneForHotkeyCode,
   hotkeyLettersForPane,
+  PANE_HOTKEY_GRID,
 } from "../lib/features/content/pane-hotkeys";
 
 let failures = 0;
@@ -791,6 +792,25 @@ console.log("\ndirection-key aiming (hold a letter, click a file)");
   // `event.key` would be "¬" for ⌥L on macOS; `code` is the physical key.
   // Guarding against a future refactor quietly switching to `key`.
   check("keyed on the physical key, not the glyph", paneForHotkeyCode("a"), null);
+
+  // The context menu draws the keys as a 3×3 map. Its cells must be the
+  // keyboard's own shape and must aim exactly where the tracker does — the
+  // map is derived from the table, and this pins that it stays derived.
+  check(
+    "the menu's key map is the keyboard's shape",
+    PANE_HOTKEY_GRID.map((row) => row.map((c) => c.letter).join("")),
+    ["QWE", "ASD", "ZXC"],
+  );
+  check(
+    "…and every cell aims where the tracker does",
+    PANE_HOTKEY_GRID.flat().every((c) => c.target === paneForHotkeyCode(c.code)),
+    true,
+  );
+  check(
+    "…with a caption and a description each",
+    PANE_HOTKEY_GRID.flat().every((c) => c.caption.length > 0 && c.description.length > 0),
+    true,
+  );
 
   // The aimed pane may not be on screen — growing the layout to reach it is
   // the same thing the context menu's "(expand layout)" entries do.

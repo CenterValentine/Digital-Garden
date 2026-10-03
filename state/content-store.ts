@@ -308,7 +308,7 @@ function getVisiblePaneIds(layoutMode: WorkspaceLayoutMode) {
   return LAYOUT_VISIBLE_PANES[layoutMode];
 }
 
-function isPaneVisible(layoutMode: WorkspaceLayoutMode, paneId: WorkspacePaneId) {
+export function isPaneVisible(layoutMode: WorkspaceLayoutMode, paneId: WorkspacePaneId) {
   return getVisiblePaneIds(layoutMode).includes(paneId);
 }
 

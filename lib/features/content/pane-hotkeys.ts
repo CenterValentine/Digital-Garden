@@ -80,6 +80,69 @@ export function hotkeyLettersForPane(paneId: WorkspacePaneId): string {
 export const PANE_HOTKEY_LEGEND =
   "Hold a letter and click a file — Q W E / A S D / Z X C aim at a pane; S collapses to one pane.";
 
+/** How a key's cell is drawn in the menu's 3×3 map. */
+export type PaneHotkeyGlyph =
+  | "corner-tl"
+  | "corner-tr"
+  | "corner-bl"
+  | "corner-br"
+  | "edge-left"
+  | "edge-right"
+  | "edge-top"
+  | "edge-bottom"
+  | "single";
+
+export interface PaneHotkeyCell {
+  /** Physical key, as `event.code`. */
+  code: string;
+  /** The printed letter. */
+  letter: string;
+  /** Where it aims — DERIVED from the key table, never restated. */
+  target: PaneHotkeyTarget;
+  glyph: PaneHotkeyGlyph;
+  /** Two words under the glyph. */
+  caption: string;
+  /** One sentence for the tooltip. */
+  description: string;
+}
+
+function cell(
+  code: string,
+  glyph: PaneHotkeyGlyph,
+  caption: string,
+  description: string,
+): PaneHotkeyCell {
+  const target = PANE_HOTKEY_BY_CODE[code];
+  if (!target) throw new Error(`pane-hotkeys: ${code} is not in the key table`);
+  return { code, letter: code.replace(/^Key/, ""), target, glyph, caption, description };
+}
+
+/**
+ * The map the context menu draws: three rows, the keyboard's own shape.
+ * Each cell's target comes from the key table, so the menu can never show a
+ * key the tracker does not honour. The captions and glyphs say what the key
+ * MEANS (a corner of a quad, a side of a split, one pane), which the flat
+ * "pane → letters" column could not: it gave the left pane three letters and
+ * the right pane two, and read as if some panes were more reachable.
+ */
+export const PANE_HOTKEY_GRID: ReadonlyArray<ReadonlyArray<PaneHotkeyCell>> = [
+  [
+    cell("KeyQ", "corner-tl", "Top left", "Top-left corner of a quad"),
+    cell("KeyW", "edge-top", "Top", "Top of a stacked split"),
+    cell("KeyE", "corner-tr", "Top right", "Top-right corner of a quad"),
+  ],
+  [
+    cell("KeyA", "edge-left", "Left", "Left of a side-by-side split"),
+    cell("KeyS", "single", "Single", "One pane — collapse the layout and show it there"),
+    cell("KeyD", "edge-right", "Right", "Right of a side-by-side split"),
+  ],
+  [
+    cell("KeyZ", "corner-bl", "Bottom left", "Bottom-left corner of a quad"),
+    cell("KeyX", "edge-bottom", "Bottom", "Bottom of a stacked split"),
+    cell("KeyC", "corner-br", "Bottom right", "Bottom-right corner of a quad"),
+  ],
+];
+
 /**
  * True when the keystroke is someone typing rather than aiming.
  *
