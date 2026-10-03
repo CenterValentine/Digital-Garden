@@ -13,21 +13,19 @@
 // the same place in whatever layout you are in; the layout decides which
 // names are reachable, not which key does what.
 //
-// OPTION/ALT + letter, then click (owner call, 2026-10-02). A bare letter was
-// tried first and collided immediately: the tree already owns `r` (rename),
-// `d` (delete) and `a` (create), so aiming at the right pane deleted things.
+// NO MODIFIER (owner call, 2026-10-02): hold the letter, click. The letters
+// are the discoverable gesture, so they stay bare; the tree's own `r` / `d` /
+// `a` shortcuts, which a bare "d" collided with (aiming at the right pane
+// deleted the selection), moved to Option instead — see FileTree.tsx.
 //
-// Option resolves that whole class at once rather than per key, because those
-// shortcuts are gated on `isPlainKey` — explicitly no modifiers held — so
-// Option+letter bypasses every one of them by construction. Cmd/Ctrl-click and
-// Shift-click are separately unavailable: both are multi-select gestures in
-// the tree. Alt is the one modifier `handleClick` does not read, so the click
-// half of the gesture still selects and opens normally.
+// Cmd/Ctrl-click and Shift-click are separately unavailable as modifiers:
+// both are multi-select gestures in the tree. So the letter is what
+// distinguishes this gesture, not a modifier.
 //
-// Keyed on `event.code`, never `event.key`, and under Option that is the whole
-// ballgame on macOS: every letter in this cluster becomes a glyph — ⌥D is "∂",
-// ⌥S is "ß", ⌥A is "å", ⌥Q is "œ", ⌥Z is "Ω". A `key` comparison would match
-// none of them. `code` is the physical key and says KeyD either way.
+// Keyed on `event.code`, never `event.key`. If anyone ever holds a modifier
+// alongside, macOS turns the letter into a glyph (⌥D "∂", ⌥S "ß") and a `key`
+// comparison stops matching; `code` is the physical key and says KeyD either
+// way.
 
 import type { WorkspacePaneId } from "@/state/content-store";
 
@@ -105,7 +103,10 @@ export function ensurePaneHotkeyTracker(): void {
     "keydown",
     (event) => {
       if (isTypingTarget(event.target)) return;
-      if (!event.altKey) return;
+      // A modifier means someone is asking for something else — ⌥D is the
+      // tree's delete now, ⌘D is the browser's bookmark. Only a bare letter
+      // aims.
+      if (event.altKey || event.metaKey || event.ctrlKey) return;
       if (paneForHotkeyCode(event.code)) heldCode = event.code;
     },
     { capture: true }
@@ -113,11 +114,7 @@ export function ensurePaneHotkeyTracker(): void {
   window.addEventListener(
     "keyup",
     (event) => {
-      // Releasing either half disarms: the letter, or Option while the letter
-      // is still down. Without the second case, letting go of Option would
-      // leave the gesture live while the tree's own plain-key shortcuts become
-      // reachable again — both would fire on the next keystroke.
-      if (event.code === heldCode || !event.altKey) heldCode = null;
+      if (event.code === heldCode) heldCode = null;
     },
     { capture: true }
   );

@@ -468,13 +468,22 @@ export function FileTree({
         return;
       }
 
-      // Only handle shortcuts when tree is focused and no modifiers for single-key shortcuts
-      const isPlainKey = !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey;
+      // Option + letter (owner call, 2026-10-02). These were bare letters and
+      // collided with the pane-aiming cluster (lib/features/content/
+      // pane-hotkeys.ts): holding "d" to aim at the right pane deleted the
+      // selection. The aiming keys stay bare — they are the discoverable
+      // gesture — and these three take the modifier instead.
+      //
+      // Compared on `e.code`, not `e.key`: under Option, macOS turns the key
+      // into a glyph (⌥R "®", ⌥D "∂", ⌥A "å") and a `key` comparison would
+      // match none of them — the shortcuts would simply stop working on the
+      // modifier they moved to.
+      const isOptionKey = e.altKey && !e.metaKey && !e.ctrlKey && !e.shiftKey;
 
-      // R - Rename selected node (single-key, Vim-style)
+      // ⌥R - Rename selected node
       // Safer than F2 which Vivaldi intercepts
       // Special case: For external links, triggers Edit Link dialog instead
-      if (e.key === "r" && isPlainKey && onRename) {
+      if (e.code === "KeyR" && isOptionKey && onRename) {
         e.preventDefault();
         e.stopPropagation();
         const tree = treeRef.current;
@@ -495,9 +504,9 @@ export function FileTree({
         return;
       }
 
-      // D - Delete selected nodes (single-key, Vim-style)
+      // ⌥D - Delete selected nodes
       // Safer than Delete key which navigates back in Vivaldi
-      if (e.key === "d" && isPlainKey && onDelete) {
+      if (e.code === "KeyD" && isOptionKey && onDelete) {
         e.preventDefault();
         e.stopPropagation();
         const tree = treeRef.current;
@@ -509,9 +518,9 @@ export function FileTree({
         return;
       }
 
-      // A - Open create menu (shows all content types)
+      // ⌥A - Open create menu (shows all content types)
       // Opens context menu at selected node position
-      if (e.key === "a" && isPlainKey && onCreate) {
+      if (e.code === "KeyA" && isOptionKey && onCreate) {
         e.preventDefault();
         e.stopPropagation();
         const tree = treeRef.current;

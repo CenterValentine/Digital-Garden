@@ -611,7 +611,7 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
           id: "edit-external",
           label: "Edit Link",
           icon: <Edit className="h-4 w-4" />,
-          shortcut: "R",
+          shortcut: "⌥R",
           onClick: async () => {
             if (onEditExternal) {
               await onEditExternal(clickedId);
@@ -704,7 +704,7 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
         id: "rename",
         label: "Rename",
         icon: <Edit className="h-4 w-4" />,
-        shortcut: "R",
+        shortcut: "⌥R",
         onClick: () => onRename?.(clickedId),
         disabled: !onRename || isMirrorRow,
       },
@@ -961,7 +961,7 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
           ) : (
             <Trash2 className="h-4 w-4" />
           ),
-          shortcut: "D",
+          shortcut: "⌥D",
           onClick: async () => await onDelete?.(selectedIds),
           disabled: !onDelete,
           // Not destructive styling: nothing is lost, and the red treatment is
