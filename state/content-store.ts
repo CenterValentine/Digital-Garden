@@ -8,6 +8,12 @@
  */
 
 import { create } from "zustand";
+import {
+  fingerprintPlacement,
+  isWorkspaceTraceEnabled,
+  traceCaller,
+  traceWorkspace,
+} from "@/lib/core/workspace-trace";
 
 const TOP_LEFT_PANE_ID = "top-left";
 const TOP_RIGHT_PANE_ID = "top-right";
@@ -1429,6 +1435,15 @@ function commitWorkspace(
   set((state: ContentState) => {
     const updates = recipe(state);
     const nextState = { ...state, ...updates } as ContentState;
+    // Tracer (lib/core/workspace-trace.ts): every placement change reports the
+    // action that made it. Flag-gated; the fingerprint is only computed when on.
+    if (isWorkspaceTraceEnabled()) {
+      const before = fingerprintPlacement(state);
+      const after = fingerprintPlacement(nextState);
+      if (before !== after) {
+        traceWorkspace("commit", { before, after }, traceCaller());
+      }
+    }
     syncBrowserState(nextState);
     return updates;
   });

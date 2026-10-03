@@ -1,6 +1,7 @@
 "use client";
 
 import { create } from "zustand";
+import { fingerprintPlacement, traceWorkspace } from "@/lib/core/workspace-trace";
 import { toast } from "sonner";
 import {
   useContentStore,
@@ -405,6 +406,15 @@ async function putLayoutRecord(
     const activeContentId =
       snapshot.paneTabContentIds[snapshot.activePaneId]?.activeContentId ??
       snapshot.activeContentId;
+    traceWorkspace("layoutRecord:write", {
+      workspaceId,
+      family,
+      layoutMode: snapshot.layoutMode,
+      paneOrder,
+      lastActive: activeContentId
+        ? { paneOrdinal: activeOrdinal, contentId: activeContentId }
+        : null,
+    });
     await fetch(`/api/content/workspaces/${workspaceId}/layout-records`, {
       method: "PUT",
       credentials: "include",
@@ -672,6 +682,24 @@ export function restoreContentWorkspace(
       }
     }
   }
+
+  traceWorkspace("restoreContentWorkspace", {
+    mode,
+    preferActiveContentId: preferActiveContentId ?? null,
+    allowUrlActiveFallback,
+    incomingPanes: paneTabContentIds,
+    incomingActive: workspace.paneState.activeContentId,
+    desktopRecord:
+      workspace.layoutRecords?.find((r) => r.family === "desktop")?.paneOrder ??
+      null,
+    localBefore: fingerprintPlacement(useContentStore.getState()),
+    apply: {
+      layoutMode: applyLayoutMode,
+      activePaneId: applyActivePaneId,
+      activeContentId: applyActiveContentId,
+      panes: applyPaneTabContentIds,
+    },
+  });
 
   isBypassingWorkspaceGuard = true;
   try {
@@ -1718,9 +1746,19 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       return;
     }
 
+    traceWorkspace("persist:write", {
+      workspaceId: activeWorkspaceId,
+      baseUpdatedAt: lastAppliedUpdatedAt[activeWorkspaceId] ?? null,
+      snapshot,
+    });
     let workspace: ContentWorkspaceResponse;
     try {
       workspace = await writeWorkspaceState(activeWorkspaceId);
+      traceWorkspace("persist:ack", {
+        workspaceId: workspace.id,
+        updatedAt: workspace.updatedAt,
+        serverPanes: workspace.paneState?.paneTabContentIds,
+      });
     } catch (error) {
       if (isOfflineLikePersistenceError(error)) return;
       if (!isWorkspaceNotFoundError(error)) throw error;
@@ -1991,6 +2029,11 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     if (incomingActive) {
       const knownUpdatedAt = lastAppliedUpdatedAt[incomingActive.id];
       if (knownUpdatedAt && incomingActive.updatedAt !== knownUpdatedAt) {
+        traceWorkspace("reconcile:trigger", {
+          workspaceId: incomingActive.id,
+          knownUpdatedAt,
+          incomingUpdatedAt: incomingActive.updatedAt,
+        });
         lastAppliedUpdatedAt[incomingActive.id] = incomingActive.updatedAt;
         // Preserve the local active tab: a background refresh syncs the open-tab
         // set, but must not revert what the user is currently viewing (e.g. a
