@@ -521,10 +521,14 @@ console.log("\ndirection-key aiming (hold a letter, click a file)");
   // An aimed open is pinned: the next casual (preview) open lands beside it
   // instead of replacing it. Exercises the store contract the aimed branch
   // relies on — `pin: true` through setSelectedContentId.
+  // Own ids, not B/C: `restoreWorkspace` carries the `tabs` record forward, so
+  // a tab pinned here would still be pinned when a later scenario reuses the
+  // id — and that scenario asserts preview REPLACEMENT. Same isolation class
+  // as the pending-intent leak seedSplit already guards against.
   seedSplit();
-  useContentStore.getState().setSelectedContentId("B", { paneId: "top-right", pin: true });
-  useContentStore.getState().setSelectedContentId("C", { paneId: "top-right", focusPane: false });
-  check("a pinned (aimed) open survives the next preview open", paneContents("top-right"), ["B", "C"]);
+  useContentStore.getState().setSelectedContentId("P1", { paneId: "top-right", pin: true });
+  useContentStore.getState().setSelectedContentId("P2", { paneId: "top-right", focusPane: false });
+  check("a pinned (aimed) open survives the next preview open", paneContents("top-right"), ["P1", "P2"]);
   check("an unmapped key aims at nothing", paneForHotkeyCode("KeyB"), null);
 
   // The same place keeps the same key across layouts: "left" in a vertical

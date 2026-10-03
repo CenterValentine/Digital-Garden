@@ -1410,6 +1410,7 @@ export function LeftSidebarContent({
     let sideBySide: {
       paneId?: WorkspacePaneId;
       focusPane?: boolean;
+      pin?: boolean;
     };
 
     if (aimed === PANE_HOTKEY_SINGLE) {
