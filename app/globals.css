@@ -1087,12 +1087,15 @@ nav[class*="fixed"] {
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
 }
 .link-view-chooser-title {
+  min-width: 3rem;
   max-width: 11rem;
   padding: 0 0.4rem;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
   font-weight: 500;
   color: var(--text-primary);
+  box-sizing: border-box;
 }
 /* Click-to-edit label: the same slot as the title, a dotted hint on hover,
    then a bare input in its place (no chrome — it is the title, editable). */
@@ -1105,8 +1108,12 @@ nav[class*="fixed"] {
 .link-view-chooser-title-edit:hover {
   text-decoration-color: color-mix(in srgb, currentColor 50%, transparent);
 }
+/* Same box as the title it replaces (width set inline from the measured
+   title); overflowing text scrolls inside the field, the bar never grows. */
 .link-view-chooser-title-input {
-  width: 9rem;
+  width: 6rem;
+  min-width: 3rem;
+  max-width: 11rem;
   background: transparent;
   border: 0;
   border-bottom: 1px solid var(--gold-primary);

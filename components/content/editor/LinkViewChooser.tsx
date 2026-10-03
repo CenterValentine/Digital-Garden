@@ -27,7 +27,7 @@
  */
 
 import { ExternalLink } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { LINK_VIEW_OPTIONS, type LinkView } from "@/lib/domain/editor/link-views";
 
 /** Pure-CSS thumbnail of a display (styles: `.lvs-*` in globals.css). */
@@ -116,12 +116,16 @@ export function LinkViewChooser({
   // The title being edited and its draft. Keyed by the title so a popover
   // re-anchored to a different link shows that link's label, not a stale
   // editor (no effect needed — a changed title simply stops matching).
-  const [editing, setEditing] = useState<{ of: string; draft: string } | null>(null);
+  // `width` is the title's box when editing began: the input takes exactly
+  // that width, so the bar never grows — long text scrolls inside the field.
+  const [editing, setEditing] = useState<{ of: string; draft: string; width: number } | null>(null);
+  const titleRef = useRef<HTMLButtonElement | null>(null);
   const isEditing = editing !== null && editing.of === (title ?? "");
 
   const beginEdit = () => {
     if (!onLabelChange) return;
-    setEditing({ of: title ?? "", draft: title ?? "" });
+    const width = titleRef.current?.getBoundingClientRect().width ?? 0;
+    setEditing({ of: title ?? "", draft: title ?? "", width });
     onEditingChange?.(true);
   };
   const endEdit = (commit: boolean) => {
@@ -148,8 +152,9 @@ export function LinkViewChooser({
           placeholder={labelPlaceholder ?? undefined}
           aria-label="Link label"
           autoFocus
+          style={editing.width ? { width: editing.width } : undefined}
           onFocus={(e) => e.currentTarget.select()}
-          onChange={(e) => setEditing({ of: editing.of, draft: e.target.value })}
+          onChange={(e) => setEditing({ ...editing, draft: e.target.value })}
           onBlur={() => endEdit(true)}
           onKeyDown={(e) => {
             e.stopPropagation();
@@ -165,6 +170,7 @@ export function LinkViewChooser({
       ) : title ? (
         onLabelChange ? (
           <button
+            ref={titleRef}
             type="button"
             className="link-view-chooser-title link-view-chooser-title-edit"
             title="Edit the link's label"
