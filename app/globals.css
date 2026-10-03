@@ -1137,6 +1137,121 @@ nav[class*="fixed"] {
   border-left-color: rgba(255, 255, 255, 0.1);
 }
 
+/* Skeleton tiles: a thumbnail of each display instead of an icon + word.
+   Grey bars are text, gold is the link; the active tile gets a gold ring. */
+.link-view-chooser-tile {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  color: var(--text-secondary);
+  line-height: 0;
+}
+.link-view-chooser-tile:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.05);
+}
+.dark .link-view-chooser-tile:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+}
+.link-view-chooser-tile[data-active="true"] {
+  border-color: color-mix(in srgb, var(--gold-primary) 70%, transparent);
+  background: color-mix(in srgb, var(--gold-primary) 12%, transparent);
+}
+.link-view-chooser-tile:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.lvs {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  width: 54px;
+  height: 36px;
+  padding: 3px 4px;
+  box-sizing: border-box;
+}
+.lvs-row {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  height: 4px;
+}
+.lvs-bar {
+  display: block;
+  height: 3px;
+  border-radius: 2px;
+  background: color-mix(in srgb, currentColor 28%, transparent);
+  flex-shrink: 0;
+}
+.lvs-bar--link {
+  background: var(--gold-primary);
+  box-shadow: 0 2px 0 -1px var(--gold-primary);
+}
+.lvs-bar--gold {
+  background: var(--gold-primary);
+}
+.lvs-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 7px;
+  padding: 0 3px;
+  border-radius: 9999px;
+  border: 1px solid color-mix(in srgb, var(--gold-primary) 60%, transparent);
+  background: color-mix(in srgb, var(--gold-primary) 14%, transparent);
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+.lvs-pill-dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 9999px;
+  background: var(--gold-primary);
+}
+.lvs-pill-bar {
+  flex: 1;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--gold-primary);
+}
+.lvs-frame {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  padding: 4px 5px;
+  border-radius: 4px;
+  border: 1px solid color-mix(in srgb, currentColor 35%, transparent);
+  background: color-mix(in srgb, var(--gold-primary) 5%, transparent);
+  box-sizing: border-box;
+}
+.lvs-frame--card {
+  height: 26px;
+  justify-content: center;
+}
+.lvs-frame--window {
+  height: 32px;
+  padding-top: 0;
+  gap: 3px;
+}
+.lvs-window-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 9px;
+  margin: 0 -5px 1px;
+  padding: 0 5px;
+  border-bottom: 1px solid color-mix(in srgb, currentColor 30%, transparent);
+  background: color-mix(in srgb, var(--gold-primary) 12%, transparent);
+}
+.lvs-window-dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 9999px;
+  background: color-mix(in srgb, currentColor 45%, transparent);
+}
+
 /* Unresolvable wiki-link. Applied to the DOM only (never written into the
    document) by the click handler when resolution finds nothing — a lookup can
    fail for transient reasons, so this must not be a persisted fact. Cleared on
