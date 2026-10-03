@@ -33,7 +33,7 @@ interface PaneKeyGridProps {
  * One glyph per meaning. Corners are diagonal arrows; sides are a divider
  * line with an arrow into the chosen half; single is a square.
  */
-function KeyGlyph({ glyph }: { glyph: PaneHotkeyGlyph }) {
+export function KeyGlyph({ glyph }: { glyph: PaneHotkeyGlyph }) {
   const common = {
     width: 16,
     height: 16,

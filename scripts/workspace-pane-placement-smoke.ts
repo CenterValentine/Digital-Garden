@@ -43,6 +43,8 @@ import { DEFAULT_SETTINGS } from "../lib/features/settings/validation";
 import {
   paneForHotkeyCode,
   hotkeyLettersForPane,
+  hotkeyCellForCode,
+  placementForHotkeyCell,
   PANE_HOTKEY_GRID,
 } from "../lib/features/content/pane-hotkeys";
 
@@ -810,6 +812,57 @@ console.log("\ndirection-key aiming (hold a letter, click a file)");
     "…with a caption and a description each",
     PANE_HOTKEY_GRID.flat().every((c) => c.caption.length > 0 && c.description.length > 0),
     true,
+  );
+
+  // Dropping a tab on a cell: the layout the key MEANS, exactly (a corner is
+  // a quad corner even from a single pane — that is what the old reshape
+  // targets did too), and the pane that keeps everything else.
+  const place = (letter: string) =>
+    placementForHotkeyCell(hotkeyCellForCode(`Key${letter}`)!);
+  check(
+    "corners drop into a quad",
+    ["Q", "E", "Z", "C"].map((l) => [place(l).requestedLayoutMode, place(l).paneId]),
+    [["quad", "top-left"], ["quad", "top-right"], ["quad", "bottom-left"], ["quad", "bottom-right"]],
+  );
+  check(
+    "A / D drop into a side-by-side split, W / X into a stacked one",
+    ["A", "D", "W", "X"].map((l) => [place(l).requestedLayoutMode, place(l).paneId, place(l).complementPaneId]),
+    [
+      ["dual-vertical", "top-left", "top-right"],
+      ["dual-vertical", "top-right", "top-left"],
+      ["dual-horizontal", "top-left", "bottom-left"],
+      ["dual-horizontal", "bottom-left", "top-left"],
+    ],
+  );
+  check("S drops into one pane", [place("S").requestedLayoutMode, place("S").paneId, place("S").complementPaneId], ["single", "top-left", null]);
+
+  // …and the store honours it: the same move the drop handler makes.
+  seedSplit();
+  useContentStore.getState().setLayoutMode("single");
+  useContentStore.getState().setSelectedContentId("B", { pin: true });
+  const dropOn = (letter: string) =>
+    useContentStore.getState().moveContentTabToPane("tab:B", place(letter).paneId, {
+      placementMode: "explicit",
+      requestedLayoutMode: place(letter).requestedLayoutMode,
+      complementPaneId: place(letter).complementPaneId,
+    });
+  dropOn("C");
+  check(
+    "dropping B on C from a single pane → quad, B bottom-right, A stays top-left",
+    [useContentStore.getState().layoutMode, paneContents("bottom-right"), paneContents("top-left")],
+    ["quad", ["B"], ["A"]],
+  );
+  dropOn("D");
+  check(
+    "then on D → side-by-side, B right",
+    [useContentStore.getState().layoutMode, paneContents("top-right"), paneContents("top-left")],
+    ["dual-vertical", ["B"], ["A"]],
+  );
+  dropOn("S");
+  check(
+    "then on S → one pane holding both, B active",
+    [useContentStore.getState().layoutMode, paneContents("top-left").sort(), paneActive("top-left")],
+    ["single", ["A", "B"], "B"],
   );
 
   // The aimed pane may not be on screen — growing the layout to reach it is

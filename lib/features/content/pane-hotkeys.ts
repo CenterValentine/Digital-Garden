@@ -27,7 +27,7 @@
 // comparison stops matching; `code` is the physical key and says KeyD either
 // way.
 
-import type { WorkspacePaneId } from "@/state/content-store";
+import type { WorkspaceLayoutMode, WorkspacePaneId } from "@/state/content-store";
 
 /** Collapse to a single pane and make the clicked content the live one. */
 export const PANE_HOTKEY_SINGLE = "single" as const;
@@ -99,12 +99,30 @@ export interface PaneHotkeyCell {
   letter: string;
   /** Where it aims — DERIVED from the key table, never restated. */
   target: PaneHotkeyTarget;
+  /**
+   * The layout the key MEANS: a corner is a corner of a quad, a side is a
+   * side of that split, S is one pane. The held-key open expands only as far
+   * as it must (see paneForHotkeyCode); a dragged tab goes exactly here.
+   */
+  layoutMode: WorkspaceLayoutMode;
   glyph: PaneHotkeyGlyph;
   /** Two words under the glyph. */
   caption: string;
   /** One sentence for the tooltip. */
   description: string;
 }
+
+const LAYOUT_FOR_GLYPH: Record<PaneHotkeyGlyph, WorkspaceLayoutMode> = {
+  "corner-tl": "quad",
+  "corner-tr": "quad",
+  "corner-bl": "quad",
+  "corner-br": "quad",
+  "edge-left": "dual-vertical",
+  "edge-right": "dual-vertical",
+  "edge-top": "dual-horizontal",
+  "edge-bottom": "dual-horizontal",
+  single: "single",
+};
 
 function cell(
   code: string,
@@ -114,7 +132,48 @@ function cell(
 ): PaneHotkeyCell {
   const target = PANE_HOTKEY_BY_CODE[code];
   if (!target) throw new Error(`pane-hotkeys: ${code} is not in the key table`);
-  return { code, letter: code.replace(/^Key/, ""), target, glyph, caption, description };
+  return {
+    code,
+    letter: code.replace(/^Key/, ""),
+    target,
+    layoutMode: LAYOUT_FOR_GLYPH[glyph],
+    glyph,
+    caption,
+    description,
+  };
+}
+
+/** The cell for a physical key, or null. */
+export function hotkeyCellForCode(code: string): PaneHotkeyCell | null {
+  for (const row of PANE_HOTKEY_GRID) {
+    for (const c of row) if (c.code === code) return c;
+  }
+  return null;
+}
+
+/**
+ * What dropping a tab on a cell asks of `moveContentTabToPane`: the pane,
+ * the layout the key means (explicit — the workspace takes that shape), and
+ * the pane that keeps everything else, which is how the old reshape targets
+ * phrased it. Pure, so the harness pins all nine.
+ */
+export function placementForHotkeyCell(cellDef: PaneHotkeyCell): {
+  paneId: WorkspacePaneId;
+  requestedLayoutMode: WorkspaceLayoutMode;
+  complementPaneId: WorkspacePaneId | null;
+} {
+  const paneId: WorkspacePaneId =
+    cellDef.target === PANE_HOTKEY_SINGLE ? "top-left" : cellDef.target;
+  const layout = cellDef.layoutMode;
+  const complementPaneId: WorkspacePaneId | null =
+    layout === "single"
+      ? null
+      : layout === "dual-vertical"
+        ? paneId === "top-left" ? "top-right" : "top-left"
+        : layout === "dual-horizontal"
+          ? paneId === "top-left" ? "bottom-left" : "top-left"
+          : paneId === "top-left" ? "top-right" : "top-left";
+  return { paneId, requestedLayoutMode: layout, complementPaneId };
 }
 
 /**
@@ -210,6 +269,21 @@ export function heldPaneTarget(): PaneHotkeyTarget | null {
 }
 
 /** Test seam — the tracker is window-level and this lets a harness drive it. */
+/** The held key's cell (letter, meaning, layout), or null. */
+export function heldPaneHotkeyCell(): PaneHotkeyCell | null {
+  return heldCode ? hotkeyCellForCode(heldCode) : null;
+}
+
+/**
+ * Forget the held key. A native drag swallows keyboard events for its whole
+ * duration — the keyup for a letter released mid-drag never arrives — so the
+ * drop that consumed the key clears it rather than leaving it wedged for the
+ * next tree click.
+ */
+export function clearHeldPaneHotkey(): void {
+  heldCode = null;
+}
+
 export function __setHeldPaneCodeForTests(code: string | null): void {
   heldCode = code;
 }
