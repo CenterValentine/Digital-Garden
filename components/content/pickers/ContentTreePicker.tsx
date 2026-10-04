@@ -1000,6 +1000,8 @@ export function ContentTreePicker({
               </>
             ) : null}
 
+            {/* z-20: above the insertion gaps' z-10 buttons, which are later in the DOM and
+                would otherwise paint over this sticky header as rows scroll under it. */}
             {/* Scope HEADER — the root representation, framed like the file
                 tree's RootNodeHeader (border, tint, bold title, gold view
                 icon, count chip) so it reads as the tree's header rather
@@ -1010,7 +1012,7 @@ export function ContentTreePicker({
               ref={scopeRowRef}
               data-scope-header
               className={cn(
-                "sticky top-0 z-10 flex w-full items-center gap-2 border-y border-black/10 bg-[#f7f7f7] py-1.5 pl-3 pr-2 text-xs transition-colors dark:border-white/10 dark:bg-[#222]",
+                "sticky top-0 z-20 flex w-full items-center gap-2 border-y border-black/10 bg-[#f7f7f7] py-1.5 pl-3 pr-2 text-xs transition-colors dark:border-white/10 dark:bg-[#222]",
                 scopeAnchor && "bg-black/[0.06] dark:bg-white/[0.08]",
               )}
             >
