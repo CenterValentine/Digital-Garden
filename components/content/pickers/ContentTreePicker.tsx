@@ -1490,7 +1490,10 @@ function PickRow({
       data-row-id={row.id}
       className={cn(
         "scroll-mt-9 group flex w-full items-center gap-2 pr-2 py-1.5 text-left text-xs transition-colors",
-        disabled ? "opacity-50" : "hover:bg-black/[0.04] dark:hover:bg-white/5",
+        // A disabled row dims its CONTENT (the button below), never the row
+        // itself — dimming the wrapper washed the active-note gold into mud
+        // in the Note Window picker, where the host note is both.
+        !disabled && "hover:bg-black/[0.04] dark:hover:bg-white/5",
         // Same scheme as FileNode: gold = open in the pane, grey = selected.
         isActive
           ? "bg-gold-primary/[0.22] shadow-[inset_2px_0_0_0_var(--gold-primary)] dark:bg-gold-primary/[0.28]"
@@ -1528,6 +1531,9 @@ function PickRow({
         className={cn(
           "flex min-w-0 flex-1 items-center gap-2 text-left",
           disabled ? "cursor-default" : "cursor-pointer",
+          // The active note keeps full strength: "(this note)" already says
+          // why it can't be picked, and the gold must read like the pane "+".
+          disabled && !isActive && "opacity-50",
         )}
         title={tooltip}
       >
