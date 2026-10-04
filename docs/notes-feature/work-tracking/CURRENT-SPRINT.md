@@ -12,11 +12,13 @@ last_updated: 2026-10-04
 ## October 4, 2026 — In-app feedback; the AI 3.x line closes; CLAUDE.md matches the build (PR #211)
 
 **Tree**: worktree `.claude/worktrees/t6-closeout`, branch `docs/t6-acquisition-closeout` (Sep 4; merged with `origin/main` at `45d697ba`)
-**Status**: typecheck / lint 151 (0 errors, none new) / `feedback:check` (new, in `build`, mutation-tested ×3: template heading drift, allowlist removed, starter counted as content) green; every CLAUDE.md path checked to exist. No migration, no schema or TipTap change → no Hocuspocus redeploy. Owner browser smoke pending.
+**Status**: typecheck / lint 151 (0 errors, none new) / `feedback:check` (new, in `build`, mutation-tested ×9 across templates, labels, flags, role filter, extras and screenshot helpers) green; every CLAUDE.md path checked to exist. No migration, no schema or TipTap change → no Hocuspocus redeploy. Owner browser smoke pending.
 
 ### Shipped
 
 - **In-app feedback form** (`components/client/feedback/FeedbackDialog.tsx`, mounted in `NotesNavBar`): opened by the profile menu's Send Feedback (→ Feature) and Report an Issue (→ Bug), and by `/Report an Issue`. It reaches GitHub through `POST /api/feedback` with `GITHUB_FEEDBACK_TOKEN`, or opens GitHub's prefilled new-issue page without it. Templates and labels live in `lib/domain/feedback/issue-templates.ts`, and the server recomposes from structured input, so it applies only allowlisted labels.
+- **Labels row:** Bug / Enhancement flags first, then areas, then **More labels** (live repo list, role-filtered: `FEEDBACK_TRIAGE_ONLY_LABELS` for owner/admin only). Hovering any chip shows the GitHub description.
+- **Screenshots:** paste or drop into any field. The image uploads (re-encoded under 4 MB if needed) into the root `Feedback attachments` folder through `upload/simple`, gets a `/f/<token>` link via `share-links`, and lands as `![name](url)`. The only new route is `POST /api/feedback/attachments-folder`. A local origin is flagged because GitHub can't fetch it.
 - `ACQUISITION-QUICK-REFERENCE.md` (T6, slim), re-verified against main. It now names both `search_web` paths: native by default, or the user's search connection per chat (#273). §9.1 has two open checks, not one.
 - URL field guide in `STAGE2-CHARTER-RECIPE.md` §5; AI-ROADMAP marks T6 closed-as-slimmed and the 3.x line complete.
 - CLAUDE.md: false statements fixed (lint ratchet, build chain, `strict: false`, local-Docker setup, extension list, CI list). Added: no unit-test runner, single-gate/single-spec commands, the workspace tracer. Copied inventories (Playwright, API routes, directory tree, Apr 2026 lessons) replaced with pointers. `AGENTS.md` → symlink.
