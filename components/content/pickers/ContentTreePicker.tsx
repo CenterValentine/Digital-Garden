@@ -429,6 +429,8 @@ export function ContentTreePicker({
   headerAction,
 }: ContentTreePickerProps) {
   const menuRef = useRef<HTMLDivElement | null>(null);
+  // The scrolling list (below the search box) — see the open-position effect.
+  const listRef = useRef<HTMLDivElement | null>(null);
   // A destination to unfold + reveal once the NEXT tree loads (a jump to a
   // folder outside the current scope widens to Root first).
   const pendingRevealRef = useRef<string | null>(null);
@@ -646,15 +648,31 @@ export function ContentTreePicker({
       .slice(0, 6);
   }, [recentDestinations, derivedDestinations, lookupNode]);
 
-  // Scroll the revealed row into view once a tree that holds it is on
-  // screen. Runs after paint (the rows must exist), reads the DOM through
-  // the menu ref — never during render.
+  // Where the list opens. The first time a tree is on screen, scroll so the
+  // scope HEADER sits at the top — the root/view is what you browse from —
+  // leaving "Recent destinations" just above, one scroll-up away (owner,
+  // 2026-10-04). Then, if the revealed row (the tree's selection, or a
+  // destination just jumped to) is outside the visible window, bring it in
+  // with the MINIMUM scroll ("nearest"), never re-centring over the header.
+  // Rows carry scroll-mt so a row scrolled to the top clears the sticky
+  // header. Runs after paint (rows must exist) and reads the DOM through
+  // refs — never during render.
+  const didAlignRef = useRef(false);
   useEffect(() => {
-    if (!reveal || !tree) return;
-    const el = menuRef.current?.querySelector<HTMLElement>(
-      `[data-row-id="${CSS.escape(reveal.id)}"]`,
-    );
-    el?.scrollIntoView({ block: "center" });
+    if (!tree) return;
+    const list = listRef.current;
+    if (list && !didAlignRef.current) {
+      didAlignRef.current = true;
+      const header = list.querySelector<HTMLElement>("[data-scope-header]");
+      if (header) {
+        list.scrollTop +=
+          header.getBoundingClientRect().top - list.getBoundingClientRect().top;
+      }
+    }
+    if (!reveal) return;
+    list
+      ?.querySelector<HTMLElement>(`[data-row-id="${CSS.escape(reveal.id)}"]`)
+      ?.scrollIntoView({ block: "nearest" });
   }, [reveal, tree]);
 
   // Debounced server search while typing.
@@ -905,7 +923,7 @@ export function ContentTreePicker({
         </button>
       ) : null}
 
-      <div className="min-h-0 flex-1 overflow-y-auto py-1">
+      <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto py-1">
         {createError ? (
           <div className="px-3 py-1 text-[11px] text-red-500">{createError}</div>
         ) : null}
@@ -1455,7 +1473,7 @@ function PickRow({
     <div
       data-row-id={row.id}
       className={cn(
-        "group flex w-full items-center gap-2 pr-2 py-1.5 text-left text-xs transition-colors",
+        "scroll-mt-9 group flex w-full items-center gap-2 pr-2 py-1.5 text-left text-xs transition-colors",
         disabled ? "opacity-50" : "hover:bg-black/[0.04] dark:hover:bg-white/5",
         // Same scheme as FileNode: gold = open in the pane, grey = selected.
         isActive
