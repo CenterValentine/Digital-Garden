@@ -63,7 +63,7 @@ export function MoveSelectionPicker({ editor }: { editor: Editor | null }) {
       const current = request;
       setRequest(null);
       if (!current || !editor) return;
-      void moveSelectionToNote(editor, target, current.trace);
+      void moveSelectionToNote(editor, target, current.trace, current.hostContentId);
     },
     [request, editor],
   );

@@ -1031,13 +1031,14 @@ export const editorActionProvider: ContextMenuActionProvider = (ctx) => {
           submenu: [
             {
               id: "move-to-note-link",
-              label: "Leave a link here",
-              tooltip: "Append the selection to the end of a note you pick; a link to it stays in its place",
+              label: "Leave link",
+              tooltip:
+                "Append the selection to the end of a note you pick; a link to it stays here and the moved text ends with a link back",
               onClick: () => requestMove("link"),
             },
             {
               id: "move-to-note-none",
-              label: "Leave nothing here",
+              label: "No link",
               tooltip: "Append the selection to the end of a note you pick and remove it from this note",
               onClick: () => requestMove("none"),
             },

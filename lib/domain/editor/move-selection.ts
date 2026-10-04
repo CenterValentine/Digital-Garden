@@ -85,19 +85,53 @@ async function appendToTarget(target: MoveTarget, blocks: JSONContent[]): Promis
   }
 }
 
+async function fetchTitle(contentId: string): Promise<string | null> {
+  try {
+    const res = await fetch(`/api/content/content/${encodeURIComponent(contentId)}`, { credentials: "include" });
+    const body = (await res.json().catch(() => null)) as { success?: boolean; data?: { title?: string } } | null;
+    return res.ok && body?.success && body.data?.title ? body.data.title : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The provenance stamp that follows the moved blocks when a link is left
+ * behind: `From [[Host]]` — so the two notes point at each other, and the
+ * moved text says where it came from.
+ */
+function provenanceStamp(host: { id: string; title: string }): JSONContent {
+  return {
+    type: "paragraph",
+    content: [
+      { type: "text", text: "From " },
+      { type: "wikiLink", attrs: { targetId: host.id, targetTitle: host.title } },
+    ],
+  };
+}
+
 /**
  * Move the current selection into `target`. Returns true when the blocks
  * landed in the target (the host edit is best-effort after that).
+ * `hostContentId` is the note the selection leaves; with a link trace, the
+ * moved blocks end with a stamp linking back to it.
  */
 export async function moveSelectionToNote(
   editor: Editor,
   target: MoveTarget,
   trace: MoveTrace,
+  hostContentId: string | null = null,
 ): Promise<boolean> {
   const captured = captureSelectionBlocks(editor);
   if (!captured) return false;
 
-  const landed = await appendToTarget(target, captured.blocks);
+  let outgoing = captured.blocks;
+  if (trace === "link" && hostContentId) {
+    const hostTitle = await fetchTitle(hostContentId);
+    if (hostTitle) outgoing = [...captured.blocks, provenanceStamp({ id: hostContentId, title: hostTitle })];
+  }
+
+  const landed = await appendToTarget(target, outgoing);
   if (!landed) return false;
 
   const stillThere = capturedStillThere(editor, captured);
