@@ -9,6 +9,22 @@ last_updated: 2026-05-13
 
 # Current Sprint Addendum
 
+## October 4, 2026 — Coming back lands you where you were (workspace cold-load restore)
+
+**Tree**: worktree `.claude/worktrees/workspace-restore`, branch `fix/workspace-cold-load-restore` (off `origin/main` at `80502511`)
+**Status**: typecheck / lint 151 (0 errors, none new) / `workspace:pane-placement:smoke` 132 / `workspace:cold-load:smoke` 22 (new, in `build`) / `workspace:tab-move:smoke` / `polling:check` green; no schema, TipTap or extension change → no Hocuspocus redeploy. Owner browser smoke pending.
+
+### Shipped
+- **Return to the last workspace**: `loadWorkspaces` resolved candidates with `getWorkspace` (falls back to Main), so the persisted last-workspace was dead code. Strict lookups; Main is the last resort.
+- **No cross-workspace tab bleed**: open tabs are kept on load only if they belong to the opening workspace (`contentStoreOwnerWorkspaceId`; the URL's `?workspace=` stands in on a cold start). Every pane is rebuilt from the snapshot otherwise. An external `?content=` deep link with no `?workspace=` survives as one tab.
+- **Re-run guard** for the write coalescing from #278: a deferred persist re-run no longer writes a different workspace's tabs under the old id.
+- **Not done, on purpose**: pruning the `tabs` record (it is the pane-memory and title-cache store).
+
+### Smoke checklist (owner)
+1. In a non-Main workspace with tabs open, open a bare `/content` in a new browser tab (or close the app and reopen it from its start URL) → it opens THAT workspace with its own tabs, not Main.
+2. Main with tabs open → switch to another workspace from the workspace menu → only that workspace's tabs, in every pane (try a split); wait 5s, reload → unchanged; switch back → Main's tabs are untouched.
+3. Paste `/content?content=<a note id>` (no `?workspace=`) → opens in the last workspace as one extra tab beside its own.
+
 ## October 4, 2026 — The pane "+" picker follows the user's perspective (PR #277, merged `e49fa0cd`)
 
 **Tree**: branch `feat/pane-picker-tree-perspective` (merged; local branch deleted, remote branch left for the owner)

@@ -210,6 +210,25 @@ const lastAppliedSnapshotJson: Record<string, string> = {};
  * is in flight marks the workspace dirty and shares the in-flight promise; the
  * write re-runs once, with the snapshot as it stands then.
  */
+/**
+ * Which workspace the content store's open tabs were last applied FROM.
+ *
+ * The store holds one workspace's tabs at a time, but nothing recorded whose.
+ * `loadWorkspaces` needed to know: it skips applying the snapshot when tabs are
+ * already open (a cold-start URL restore or a local open must not be stomped),
+ * and without an owner "tabs are open" meant "these are the right tabs" — so a
+ * navigation that re-ran it for workspace B while the store still held Main's
+ * tabs left Main's tabs on screen, and the debounced persist then PUBLISHED them
+ * into B. null = nothing applied yet this page-life (tabs, if any, came from
+ * the URL, which names its workspace in `?workspace=`).
+ */
+let contentStoreOwnerWorkspaceId: string | null = null;
+
+/** Test seam: forget whose tabs the store holds (a fresh page load). */
+export function __resetContentStoreOwnerForTests(): void {
+  contentStoreOwnerWorkspaceId = null;
+}
+
 const persistInFlight = new Map<string, Promise<void>>();
 const persistDirty = new Set<string>();
 
@@ -790,6 +809,7 @@ export function restoreContentWorkspace(
   lastAppliedSnapshotJson[workspace.id] = JSON.stringify(
     useContentStore.getState().getWorkspaceStateSnapshot(),
   );
+  contentStoreOwnerWorkspaceId = workspace.id;
 }
 
 function syncWorkspaceUrl(workspaceId: string | null) {
@@ -1081,15 +1101,20 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     try {
       const workspaces = await fetchWorkspaces();
       notifyExpiredWorkspaceRemoval(previousWorkspaces, workspaces);
+      // Each candidate is a STRICT lookup. `getWorkspace` falls back to Main
+      // when the id is missing, so using it for the middle candidate made it
+      // always truthy: on a fresh page (`activeWorkspaceId` null) the chain
+      // stopped there with Main and the persisted last-workspace below was dead
+      // code — leave and come back at a bare `/content` and you landed in Main
+      // instead of where you were. Main is the LAST resort, not a candidate.
+      const byId = (id: string | null) =>
+        (id && workspaces.find((workspace) => workspace.id === id)) || null;
       const requestedWorkspace =
-        (initialWorkspaceId &&
-          workspaces.find(
-            (workspace) => workspace.id === initialWorkspaceId,
-          )) ||
-        getWorkspace(workspaces, get().activeWorkspaceId) ||
-        // Fall back to the last active workspace persisted across reloads —
-        // covers navigations that drop the `?workspace=` URL param.
-        getWorkspace(workspaces, readPersistedActiveWorkspaceId());
+        byId(initialWorkspaceId ?? null) ??
+        byId(get().activeWorkspaceId) ??
+        // The last active workspace persisted across reloads — covers
+        // navigations that drop the `?workspace=` URL param.
+        byId(readPersistedActiveWorkspaceId());
       const activeWorkspace =
         requestedWorkspace ?? getMainWorkspace(workspaces);
 
@@ -1114,8 +1139,41 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       if (activeWorkspace) {
         lastAppliedUpdatedAt[activeWorkspace.id] = activeWorkspace.updatedAt;
         syncWorkspaceUrl(activeWorkspace.id);
-        if (useContentStore.getState().openContentIds.length === 0) {
+        const storeBefore = useContentStore.getState();
+        const hasOpenTabs = storeBefore.openContentIds.length > 0;
+        // Tabs already open are only "this workspace's own local state" if they
+        // were applied from it, or — on a cold start, before anything has been
+        // applied — if the URL they were restored from named it. Otherwise they
+        // are ANOTHER workspace's tabs (Main's, still on screen after a
+        // navigation; or a URL whose `?workspace=` was dropped or has expired)
+        // and applying this workspace's snapshot is exactly what's wanted: the
+        // old guard let them stand, and the debounced persist then published
+        // them into the workspace that just opened. Per pane — the snapshot
+        // restore rebuilds every pane.
+        const coldStart = contentStoreOwnerWorkspaceId === null;
+        const tabsOwner = contentStoreOwnerWorkspaceId ?? initialWorkspaceId ?? null;
+        const tabsAreThisWorkspaces =
+          hasOpenTabs && tabsOwner === activeWorkspace.id;
+        if (!tabsAreThisWorkspaces) {
+          // The one thing worth carrying across is an external deep link to a
+          // note: a cold start whose URL names NO workspace (the app always
+          // writes `?workspace=`, so its absence is what a pasted or shared
+          // `/content?content=…` looks like). Capture it before the restore
+          // rewrites the store. A URL that names a workspace that did not open
+          // is that workspace's state, and a known owner means the selection is
+          // the OTHER workspace's — neither may follow us.
+          const deepLink =
+            hasOpenTabs && coldStart && !initialWorkspaceId
+              ? storeBefore.selectedContentId
+              : null;
           restoreContentWorkspace(activeWorkspace);
+          if (
+            deepLink &&
+            !deepLink.startsWith("temp-") &&
+            !useContentStore.getState().openContentIds.includes(deepLink)
+          ) {
+            void get().requestOpenContent(deepLink);
+          }
         }
         // Order-independent title backfill (spec §3.8): the URL-restore path
         // in MainPanelWorkspace can create tabs (from the `tabs_*` URL params)
@@ -1812,7 +1870,16 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         do {
           persistDirty.delete(activeWorkspaceId);
           await persistNow();
-        } while (persistDirty.has(activeWorkspaceId));
+          // The re-run reads the store AS IT IS NOW. If the user switched
+          // workspace while the write was in flight, the store holds the other
+          // workspace's tabs and this id would receive them (the PATCH is keyed
+          // by the captured id, the snapshot is not). The switch persists its
+          // own outgoing workspace by id (activateWorkspace), so dropping the
+          // re-run loses nothing.
+        } while (
+          persistDirty.has(activeWorkspaceId) &&
+          get().activeWorkspaceId === activeWorkspaceId
+        );
       } finally {
         persistInFlight.delete(activeWorkspaceId);
       }
