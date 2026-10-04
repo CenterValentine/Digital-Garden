@@ -199,18 +199,6 @@ const lastAppliedUpdatedAt: Record<string, string> = {};
 const lastAppliedSnapshotJson: Record<string, string> = {};
 
 /**
- * One state write in flight per workspace. persistActiveWorkspace has several
- * callers that fire for the same user action — the shell controller's
- * debounced snapshot effect, the open path's immediate persist, the clear
- * control — and each PATCH carries `baseUpdatedAt` = the last ack. Fired
- * together they all carry the SAME base, the server lets the first through
- * and 409s the rest, and every 409 adopts the (already-stale) row and
- * retries: the 2026-10-03 trace showed five writes in 230 ms, four
- * self-conflicts, and a dragged tab snapping back. A call made while a write
- * is in flight marks the workspace dirty and shares the in-flight promise; the
- * write re-runs once, with the snapshot as it stands then.
- */
-/**
  * Which workspace the content store's open tabs were last applied FROM.
  *
  * The store holds one workspace's tabs at a time, but nothing recorded whose.
@@ -229,6 +217,18 @@ export function __resetContentStoreOwnerForTests(): void {
   contentStoreOwnerWorkspaceId = null;
 }
 
+/**
+ * One state write in flight per workspace. persistActiveWorkspace has several
+ * callers that fire for the same user action — the shell controller's
+ * debounced snapshot effect, the open path's immediate persist, the clear
+ * control — and each PATCH carries `baseUpdatedAt` = the last ack. Fired
+ * together they all carry the SAME base, the server lets the first through
+ * and 409s the rest, and every 409 adopts the (already-stale) row and
+ * retries: the 2026-10-03 trace showed five writes in 230 ms, four
+ * self-conflicts, and a dragged tab snapping back. A call made while a write
+ * is in flight marks the workspace dirty and shares the in-flight promise; the
+ * write re-runs once, with the snapshot as it stands then.
+ */
 const persistInFlight = new Map<string, Promise<void>>();
 const persistDirty = new Set<string>();
 
@@ -1174,6 +1174,14 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
           ) {
             void get().requestOpenContent(deepLink);
           }
+        } else {
+          // Kept as this workspace's own — RECORD that, or the next run treats
+          // them as a stranger's. The shell controller lives in
+          // MainPanelWorkspace, so leaving /content and coming back through a
+          // bare `/content` link re-runs this with no `?workspace=`; an unset
+          // owner then re-applied the server snapshot over the kept tabs and
+          // dropped any opened locally but not yet published.
+          contentStoreOwnerWorkspaceId = activeWorkspace.id;
         }
         // Order-independent title backfill (spec §3.8): the URL-restore path
         // in MainPanelWorkspace can create tabs (from the `tabs_*` URL params)

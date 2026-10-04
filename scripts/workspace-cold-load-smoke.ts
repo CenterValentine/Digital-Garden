@@ -161,10 +161,25 @@ function urlRestore(panes: Panes, activeContentId: string, layoutMode: "single" 
     );
     check("…only the deep-linked selection is carried (the rest of the URL's tabs are dropped)", placement(), { "top-left": ["m1", "m2", "b1"] });
 
-    freshPage("http://localhost/content?workspace=b-id&tabs_top_left=b1%2Cb2%2Cb3&content=b3", "b-id");
-    urlRestore({ "top-left": ["b1", "b2", "b3"] }, "b3");
+    freshPage("http://localhost/content?workspace=b-id&tabs_top_left=b1%2Cb2%2Cb3&content=b1", "b-id");
+    // b3 is open but NOT selected, so nothing but ownership can keep it.
+    urlRestore({ "top-left": ["b1", "b2", "b3"] }, "b1");
     await useWorkspaceStore.getState().loadWorkspaces("b-id");
     check("URL tabs that name THIS workspace stand (a local, unpublished open is not stomped)", placement(), { "top-left": ["b1", "b2", "b3"] });
+
+    // Kept URL tabs must be RECORDED as this workspace's. The shell controller
+    // lives in MainPanelWorkspace, so leaving /content (Settings) and coming
+    // back through a bare `/content` link re-runs loadWorkspaces(null). If the
+    // keep-path left the owner unset, that second run took the tabs for a
+    // stranger's, re-applied the server snapshot, and dropped b3 — opened
+    // locally, not yet published.
+    setHref("http://localhost/content");
+    await useWorkspaceStore.getState().loadWorkspaces(null);
+    check(
+      "…and a later bare /content remount still treats them as this workspace's",
+      [active(), placement()],
+      ["b-id", { "top-left": ["b1", "b2", "b3"] }],
+    );
 
     freshPage("http://localhost/content?workspace=gone-id&tabs_top_left=m1%2Cm2&content=m1", "b-id");
     urlRestore({ "top-left": ["m1", "m2"] }, "m1");

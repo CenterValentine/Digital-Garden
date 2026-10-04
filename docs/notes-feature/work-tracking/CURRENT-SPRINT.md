@@ -12,7 +12,7 @@ last_updated: 2026-05-13
 ## October 4, 2026 — Coming back lands you where you were (workspace cold-load restore)
 
 **Tree**: worktree `.claude/worktrees/workspace-restore`, branch `fix/workspace-cold-load-restore` (off `origin/main` at `80502511`)
-**Status**: typecheck / lint 151 (0 errors, none new) / `workspace:pane-placement:smoke` 132 / `workspace:cold-load:smoke` 22 (new, in `build`) / `workspace:tab-move:smoke` / `polling:check` green; no schema, TipTap or extension change → no Hocuspocus redeploy. Owner browser smoke pending.
+**Status**: typecheck / lint 151 (0 errors, none new) / `workspace:pane-placement:smoke` 132 / `workspace:cold-load:smoke` 23 (new, in `build`) / `workspace:tab-move:smoke` / `polling:check` green; no schema, TipTap or extension change → no Hocuspocus redeploy. Owner browser smoke pending.
 
 ### Shipped
 - **Return to the last workspace**: `loadWorkspaces` resolved candidates with `getWorkspace` (falls back to Main), so the persisted last-workspace was dead code. Strict lookups; Main is the last resort.
