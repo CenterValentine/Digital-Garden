@@ -74,6 +74,8 @@ path and probably belongs to the same control.
 - [ ] **Folder assistant candidates** — `FolderAssistantDialog.tsx` lists candidate folders to confirm; tone only (no browse).
 - [ ] **Flashcard deck tree / People panel** — their own trees for their own data; align tones, do not migrate.
 - [ ] Once migrated, `folder-move-store` recents and `create-destination-store` recents should become one "recent folders" source with a `kind` (moved into / created into).
+- [ ] **Single-tab workplace routes still hand one id straight to Prisma** (found with the reader-page save fix, PR #277) — `extensions/workplaces/server/membership.ts` add/move-tab paths (lines ~70, ~153) `findFirst({ where: { id: contentId } })` on a `@db.Uuid` column, so sending a reader tab (`reader:library`, `reader:scripture/…`) to another workplace can still throw. Guard with `isUuid` from `lib/domain/content/uuid.ts`; the snapshot paths are already fixed. Four older copies of the UUID regex (`relation-cells.ts`, `linked-schema.ts`, `resolve.ts`, `read-format.ts`) could adopt the shared helper.
+- [ ] **Picker polish to revisit only if reported** — the Active pill's folder name truncates hard at the picker's 300px (`MENU_WIDTH`; widening ~20px is one constant); `deriveDestinations` ignores `createdAt` ties; `jumpToDestination` forgets a folder absent at Root without telling the user.
 
 ---
 

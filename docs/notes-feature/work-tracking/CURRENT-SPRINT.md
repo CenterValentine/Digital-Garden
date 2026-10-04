@@ -9,6 +9,22 @@ last_updated: 2026-05-13
 
 # Current Sprint Addendum
 
+## October 4, 2026 — The pane "+" picker follows the user's perspective (PR #277, merged `e49fa0cd`)
+
+**Tree**: branch `feat/pane-picker-tree-perspective` (merged; local branch deleted, remote branch left for the owner)
+**Status**: typecheck / eslint (0 errors, no new warnings) green; no migration, no TipTap schema change, no extension change → no Hocuspocus redeploy. Owner smoked it on a dev server through the build and signed it off.
+
+### Shipped
+- **`ContentTreePicker` opens where the user is**: expansion seeded from the file tree, focus on the tree's selection else the active content, centred on open.
+- **Jump-to pills, pinned under the search box**: **Active** (creates a note right next to the active content), **Recent** (folders last created in), **Open** (folders holding this workspace's open content). New `state/create-destination-store.ts`; destinations also derived from `createdAt`.
+- **The tree follows the active content** and a toolbar **"Show in file tree"** tool for every content type — new `state/tree-reveal-store.ts` is the one reveal channel (toolbar, breadcrumb, follow-active). A single click on a folder now selects it (grey) as well as toggling, so "+" and drops target it.
+- **Row tones**: deep gold = active in the pane, light gold = open in another tab, grey = selected in the tree.
+- **Reader pages no longer 500 the workspace save** (`lib/domain/content/uuid.ts`).
+- Backlogged: unify the other tree-browse menus; the single-tab workplace routes' UUID guard (`BACKLOG.md`).
+
+### Decisions worth keeping
+- Flyouts beside the picker, gradients, left rails on menu items, and a pinned gold header above the search box were all tried and REJECTED by the owner this round; the picker's Jump-to is an inline pill row.
+
 ## October 3, 2026 — Wiki-link views + move to note
 
 **Tree**: worktree `.claude/worktrees/wikilink-views`, branch `feat/wikilink-views` (off `origin/main` at `2d3797f3`)
