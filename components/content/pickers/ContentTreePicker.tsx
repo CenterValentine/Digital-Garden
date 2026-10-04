@@ -1556,15 +1556,15 @@ type TargetKind = "active" | "recent" | "open";
 /**
  * Target header — ABOVE the search box, always visible, one line, and ONE
  * button: clicking anywhere on it creates a new item at the target.
- * `[icon] [name…] [· tag] [+]`.
+ * `[icon] [name…] [· tag]`, with a "+" that appears centred over the row on
+ * hover/focus (a small trailing "+" on touch, which has no hover).
  *  - "active tab": the new item lands LITERALLY NEXT TO the active content —
  *    same folder, the very next slot after it (the name shown is that
  *    folder). Owner: "the user clicking this affordance gets a new note in
  *    the same place next to the active content."
  *  - "last created" / "open" fallbacks: the top of that folder.
- * The "+" is the row's visible verb, not a separate button. Only the name
- * ellipsizes (`min-w-0 truncate`); the tag and "+" are `shrink-0`, so a long
- * folder name never displaces them, and the full path rides in the tooltip.
+ * Only the name ellipsizes (`min-w-0 truncate`); the tag is `shrink-0`, so a
+ * long folder name never displaces it, and the full path rides in the tooltip.
  * A flat menu row in the tree's active gold wash (no gradient, no rail —
  * it is a menu item, not a tree row), softer on this dark popup.
  */
@@ -1601,47 +1601,66 @@ function TargetRow({
       className={cn(
         // Flat like its neighbours; the whole row is the click target and
         // reacts to hover (tint + pointer).
-        "flex w-full shrink-0 cursor-pointer items-center gap-2 border-b py-1.5 pl-3 pr-2 text-left text-xs outline-none transition-colors focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-gold-primary/60",
+        "group/target relative flex w-full shrink-0 cursor-pointer items-center gap-2 border-b py-1.5 pl-3 pr-2 text-left text-xs outline-none transition-colors focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-gold-primary/60",
         gold
           ? "border-black/5 bg-gold-primary/[0.13] hover:bg-gold-primary/[0.20] dark:border-white/5 dark:bg-gold-primary/[0.12] dark:hover:bg-gold-primary/[0.18]"
           : "border-black/5 bg-black/[0.03] hover:bg-black/[0.07] dark:border-white/5 dark:bg-white/[0.04] dark:hover:bg-white/[0.09]",
       )}
     >
-      {target.id === null ? (
-        <Home
+      {/* The row's content. It dims on hover/focus so the centred "+" below
+          reads as the verb, and the name stays the only part that ellipsizes
+          (the tag is shrink-0). */}
+      <span className="flex min-w-0 flex-1 items-center gap-2 transition-opacity group-hover/target:opacity-25 group-focus-visible/target:opacity-25">
+        {target.id === null ? (
+          <Home
+            className={cn(
+              "h-3.5 w-3.5 shrink-0",
+              gold ? "text-gold-primary" : "text-yellow-500/80",
+            )}
+          />
+        ) : (
+          <Folder
+            className={cn(
+              "h-3.5 w-3.5 shrink-0",
+              gold ? "text-gold-primary" : "text-yellow-500/80",
+            )}
+          />
+        )}
+        <span
           className={cn(
-            "h-3.5 w-3.5 shrink-0",
-            gold ? "text-gold-primary" : "text-yellow-500/80",
+            "min-w-0 truncate font-medium",
+            gold ? "text-gold-primary" : "text-gray-700 dark:text-gray-300",
+          )}
+        >
+          {title}
+        </span>
+        <span
+          className={cn(
+            "shrink-0 whitespace-nowrap text-[10px]",
+            gold ? "text-gold-primary/60" : "text-gray-400 dark:text-gray-500",
+          )}
+        >
+          · {tag}
+        </span>
+      </span>
+      {/* The verb: a "+" that appears CENTRED in the row on hover/focus (the
+          whole row is the button, so there is no corner target to aim at). */}
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-0 transition-opacity group-hover/target:opacity-100 group-focus-visible/target:opacity-100 [@media(hover:none)]:hidden"
+      >
+        <Plus
+          className={cn(
+            "h-4 w-4",
+            gold ? "text-gold-primary" : "text-gray-700 dark:text-gray-200",
           )}
         />
-      ) : (
-        <Folder
-          className={cn(
-            "h-3.5 w-3.5 shrink-0",
-            gold ? "text-gold-primary" : "text-yellow-500/80",
-          )}
-        />
-      )}
-      <span
-        className={cn(
-          "min-w-0 truncate font-medium",
-          gold ? "text-gold-primary" : "text-gray-700 dark:text-gray-300",
-        )}
-      >
-        {title}
       </span>
-      <span
-        className={cn(
-          "shrink-0 whitespace-nowrap text-[10px]",
-          gold ? "text-gold-primary/60" : "text-gray-400 dark:text-gray-500",
-        )}
-      >
-        · {tag}
-      </span>
+      {/* Touch has no hover, so it keeps a small trailing "+" as the cue. */}
       <Plus
         aria-hidden="true"
         className={cn(
-          "ml-auto h-3.5 w-3.5 shrink-0",
+          "hidden h-3.5 w-3.5 shrink-0 [@media(hover:none)]:block",
           gold ? "text-gold-primary/80" : "text-gray-500 dark:text-gray-400",
         )}
       />
