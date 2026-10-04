@@ -67,6 +67,55 @@ export const IMPLEMENTED_COLUMN_TYPES: readonly DataColumnType[] = [
 ];
 
 /**
+ * The types the AI may PROPOSE, and the only types any create/extend API
+ * accepts (plan AI-RELATIONAL-DATABASE-REACH P1).
+ *
+ * This exists because it did not. The proposal tools and the create route
+ * each carried their own hand-copied subset of column types, and when Phase 4
+ * added relations, lookups, and rollups, none of those copies grew. A
+ * production session then asked for three linked tables, found no relation
+ * type in its tool schema, built the links as hand-typed text ids, and wrote
+ * the owner a feature request asking for relations the product already had.
+ * The parallel lists were the bug; one list, pinned by `ai:drift:check`, is
+ * the fix.
+ *
+ * `person` is the single deliberate exclusion: its cells store an id from
+ * either the User table or the people extension (`config.personSource`), a
+ * choice a proposal card has no way to put to the user yet. Everything else
+ * the grid offers, the AI may propose.
+ *
+ * ORDER IS THE TOOL-SCHEMA ORDER. Keep the common types first: it is what a
+ * model reads first in the enum, and "money → number, paragraphs → longText"
+ * should be reachable before the graph types.
+ */
+export const AI_PROPOSABLE_COLUMN_TYPES = [
+  "text",
+  "longText",
+  "number",
+  "checkbox",
+  "date",
+  "select",
+  "multiSelect",
+  "status",
+  "url",
+  "email",
+  "file",
+  "contentLink",
+  "relation",
+  "lookup",
+  "rollup",
+] as const satisfies readonly DataColumnType[];
+
+export type ProposableColumnType = (typeof AI_PROPOSABLE_COLUMN_TYPES)[number];
+
+/** The graph types: a relation, or something computed through one. */
+export const RELATION_FAMILY_TYPES: readonly DataColumnType[] = [
+  "relation",
+  "lookup",
+  "rollup",
+];
+
+/**
  * Types that store nothing in `DataRow.data` — either because the value lives
  * elsewhere (`relation` → DataRowLink) or because it is derived at read time.
  * Writing a cell for one of these is a bug, not a no-op, so the encoder
@@ -104,6 +153,13 @@ export interface SelectOption {
   /** `status` columns only; ignored on `select` / `multiSelect`. */
   group?: StatusGroup;
 }
+
+/**
+ * Ceiling on options a freeform multiSelect may mint. Past this the column
+ * is not merely large — it is the wrong shape, and the write refuses with a
+ * message that names the promotion path rather than a number.
+ */
+export const FREEFORM_OPTION_CAP = 200;
 
 /** Rollup aggregations (plan Phase 4). All computed at read time (D6). */
 export const ROLLUP_FNS = ["count", "sum", "min", "max", "join"] as const;
@@ -143,6 +199,17 @@ export interface DataColumnConfig {
    */
   maxLength?: number;
   /**
+   * Machinery column of a charter ledger (lib/domain/ai/quests.ts). The
+   * quest code reads these columns BY NAME and writes option ids it minted,
+   * so a rename, retype, option edit, or delete silently detaches the ledger
+   * from its charter (owner smoke: one renamed master column → a second
+   * quest ledger on the next sitting). The SHAPE is locked server-side
+   * (mutations.ts) and greyed in the grid; description and position stay
+   * free, and cells stay editable. A config specialization, not a DB column
+   * (plan D11 doctrine — same pattern as imageOnly on file).
+   */
+  system?: boolean;
+  /**
    * `checkbox` — how the cell renders. Default native checkbox; the icon
    * variants toggle on click like the checkbox does; "text" renders
    * true/false as words. DISPLAY-ONLY — cells store booleans in every
@@ -161,6 +228,62 @@ export interface DataColumnConfig {
   /** `checkbox` — new rows start checked (stamped in createRows, so every
    * creation path — grid, board, forms, AI inserts — agrees). */
   defaultChecked?: boolean;
+  /**
+   * `multiSelect` — the vocabulary GROWS as the user types instead of being
+   * fixed up front. A label with no matching option mints one on write.
+   *
+   * This is the shallow-list capability: jot "Redis, Postgres, Zod" now,
+   * without stopping to define a vocabulary first. It stays a real
+   * `string[]` of option ids underneath, so `hasAny`/`hasAll`/`hasNone`,
+   * grouping, board views and digests all keep working — a comma-delimited
+   * `text` column would have bought the same typing convenience and lost
+   * every one of them.
+   *
+   * Minting is CAPPED (FREEFORM_OPTION_CAP). `config.options` is a JSON blob
+   * on the column row with no garbage collection, and `digest.ts` truncates
+   * the vocabulary it shows the AI at OPTION_CAP — past that the model
+   * proposes duplicates of options it cannot see. So the cap is not a
+   * limitation to hide but the moment to say the list has outgrown a cell
+   * and should become a table.
+   */
+  freeform?: boolean;
+  /**
+   * `multiSelect` — the cell may hold the SAME value more than once.
+   *
+   * Off by default, and nonsense for a controlled vocabulary: you cannot
+   * tick a checkbox twice, so a picker-driven column that stored duplicates
+   * would just be showing a bug. But a FREE-FORM list is not a vocabulary —
+   * it is a jotted list, and a repeat in one can be exactly what the author
+   * meant (owner, 2026-09-16). The picker only offers this alongside
+   * `freeform` for that reason.
+   *
+   * Set membership is unaffected: hasAny/hasAll/hasNone ask whether a value
+   * is present, and twice is still present. What DOES need care is counting
+   * — group counts and profiling must count each row once per distinct
+   * value, or a row holding "hello" twice reports as two rows.
+   */
+  allowDuplicates?: boolean;
+  /**
+   * `select` · `multiSelect` — normalise new option labels to Title Case.
+   *
+   * With it OFF, case is significant: typing `how` where `How` exists mints
+   * a SECOND option, because what you typed is what you meant. With it ON,
+   * both collapse to `How`. That is the whole mental model — either case
+   * carries meaning or it is normalised away — and it replaces the silent
+   * case-insensitive reuse that used to title-case a value behind the
+   * user's back (owner, 2026-09-16).
+   *
+   * Only the FIRST letter of each word is touched, so `iPhone` and `macOS`
+   * survive; a rule that lowercased the rest would mangle them.
+   */
+  titleCase?: boolean;
+  /**
+   * `multiSelect` — a delimiter that splits a typed or pasted STRING into
+   * the list this column stores. A parse hint, never a storage format: the
+   * cell still holds `string[]`, and nothing downstream learns about the
+   * comma. Quoted fields are honoured, so "Portland, OR" stays one item.
+   */
+  splitOn?: string;
   /** `relation` — the DataPayload.contentId this column points at. */
   relationTableId?: string;
   /** `relation` — the column id on the far side that mirrors this one. */
@@ -284,6 +407,11 @@ export interface DataRow {
   /** Person cells hydrated to display names, keyed by column id. */
   personRefs?: Record<string, PersonRef>;
   /**
+   * AI row digest (AI-BULK-ROW-READING-PLAN §5) — read-model attachment
+   * from the DataRowDigest sidecar; `fresh` is the hash verdict now.
+   */
+  digest?: { text: string; fresh: boolean; generatedAt: string };
+  /**
    * Lookup/rollup results, computed server-side at read time (plan D6 —
    * derived columns store NOTHING) and keyed by column id. Display-ready:
    * strings and numbers only, aggregated over targets the viewer can see.
@@ -395,6 +523,38 @@ export interface ColumnPref {
 export const COLUMN_WIDTH_MIN = 60;
 export const COLUMN_WIDTH_MAX = 1200;
 
+/**
+ * Column types whose cell renders a LIST of chips rather than one value.
+ * Shared by the width floor below and the grid's overflow accounting, so
+ * "is this a list cell?" is answered in one place instead of by three
+ * hand-kept `type === …` chains in DataGridRow.
+ */
+export const CHIP_LIST_COLUMN_TYPES: readonly DataColumnType[] = [
+  "multiSelect",
+  "relation",
+  "contentLink",
+  "file",
+];
+
+/**
+ * The narrowest a column may be dragged, BY TYPE.
+ *
+ * `COLUMN_WIDTH_MIN` (60) is the absolute floor and stays the contract the
+ * views PATCH route clamps to. But 60px is a legibility cliff for a chip
+ * list: flex children in those cells shrink rather than overflow, so a
+ * narrow list column does not clip — it compresses every chip to a single
+ * letter ("O." "I." "W."), which reads as broken rather than as truncated
+ * (owner report, 2026-09-15). A list column therefore floors high enough to
+ * show one readable chip plus the overflow pill.
+ */
+export function columnWidthMin(column: {
+  type: DataColumnType;
+  config?: { imageOnly?: boolean };
+}): number {
+  if (column.type === "file" && column.config?.imageOnly) return 96;
+  return CHIP_LIST_COLUMN_TYPES.includes(column.type) ? 140 : COLUMN_WIDTH_MIN;
+}
+
 /** Per-field overrides for a form view (plan O15) — view-scoped, not column. */
 export interface FormFieldConfig {
   label?: string;
@@ -469,6 +629,8 @@ export interface DataTable {
   description: string | null;
   defaultViewId: string | null;
   rowCount: number;
+  /** AI row digests opt-in (plan §5); owner-controlled in the schema rail. */
+  rowDigests: boolean;
   columns: DataColumn[];
   views: DataView[];
 }

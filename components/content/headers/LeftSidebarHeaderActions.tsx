@@ -13,14 +13,52 @@ import { Plus, ChevronRight } from "lucide-react";
 import { calculateMenuPosition, calculateSubmenuPosition } from "@/lib/core/menu-positioning";
 import {
   getNewContentMenuItems,
+  withMenuClose,
   type NewContentCallbacks,
   type NewContentMenuItem,
   type PageTemplateMenuData,
 } from "@/components/content/menu-items/new-content-menu";
+import { getExtensionCreateMenuItems } from "@/lib/extensions/client-registry";
 import { usePageTemplateStore } from "@/state/page-template-store";
 import { useContentStore } from "@/state/content-store";
 
 const SUBMENU_HOVER_BRIDGE_PX = 12;
+/** Grace before a submenu closes once the pointer leaves it. */
+const SUBMENU_CLOSE_DELAY_MS = 350;
+/**
+ * With a submenu already open, hovering a *different* row switches only after
+ * this long — so crossing a sibling on the way into the open submenu (a
+ * diagonal move) doesn't swap it out from under the pointer.
+ */
+const SUBMENU_SWITCH_DELAY_MS = 250;
+
+/** Where a submenu sits: flush against one edge of its parent menu. */
+interface SubmenuPlacement {
+  /** The parent's edge the submenu touches (its right edge, or its left edge when flipped). */
+  x: number;
+  y: number;
+  side: "right" | "left";
+}
+
+/**
+ * Place a submenu flush against its parent, flipping left near the viewport's
+ * right edge. A flipped submenu is pinned by ITS right edge to the parent's
+ * left edge, so its real width never leaves a gap (an estimated width did:
+ * narrower menus landed short of the parent, and the pointer fell through).
+ */
+function placeSubmenu(parentMenuRect: DOMRect, buttonRect: DOMRect, count: number, estimatedWidth: number) {
+  const calculated = calculateSubmenuPosition({
+    parentMenuRect,
+    parentItemRect: buttonRect,
+    submenuDimensions: { width: estimatedWidth, height: Math.min(count * 32 + 8, 400) },
+    viewportPadding: 8,
+  });
+  const side: SubmenuPlacement["side"] = calculated.x < parentMenuRect.left ? "left" : "right";
+  return {
+    position: { x: side === "left" ? parentMenuRect.left : parentMenuRect.right, y: calculated.y, side },
+    maxHeight: calculated.maxHeight,
+  };
+}
 
 interface LeftSidebarHeaderActionsProps extends NewContentCallbacks {
   disabled?: boolean;
@@ -39,16 +77,19 @@ function MenuItem({
   onMenuClose,
   onSubmenuMouseEnter,
   onSubmenuMouseLeave,
+  onRowLeave,
 }: {
   item: NewContentMenuItem;
   index: number;
   totalItems: number;
   onSubmenuOpen: (itemId: string, rect: DOMRect) => void;
   isSubmenuOpen: boolean;
-  openSubmenuData: { id: string; position: { x: number; y: number }; maxHeight: number } | null;
+  openSubmenuData: { id: string; position: SubmenuPlacement; maxHeight: number } | null;
   onMenuClose: () => void;
   onSubmenuMouseEnter: () => void;
   onSubmenuMouseLeave: () => void;
+  /** Pointer left this row before a delayed submenu switch fired: cancel it. */
+  onRowLeave?: () => void;
 }) {
   const buttonRef = useRef<HTMLButtonElement>(null);
   const hasSubmenu = item.submenu && item.submenu.length > 0;
@@ -68,6 +109,7 @@ function MenuItem({
             onSubmenuOpen(item.id, rect);
           }
         }}
+        onMouseLeave={onRowLeave}
         disabled={item.disabled && !hasSubmenu}
         title={item.title}
         className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-sm text-left text-white hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
@@ -114,7 +156,7 @@ function SubMenu({
   onMouseLeave,
 }: {
   items: NewContentMenuItem[];
-  position: { x: number; y: number };
+  position: SubmenuPlacement;
   maxHeight: number;
   onClose: () => void;
   onMouseEnter: () => void;
@@ -124,9 +166,11 @@ function SubMenu({
   const [mounted, setMounted] = useState(false);
   const [openSubmenu, setOpenSubmenu] = useState<{
     id: string;
-    position: { x: number; y: number };
+    position: SubmenuPlacement;
     maxHeight: number;
   } | null>(null);
+  const openSubmenuIdRef = useRef<string | null>(null);
+  const submenuSwitchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const submenuCloseTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
@@ -138,42 +182,45 @@ function SubMenu({
       if (submenuCloseTimeoutRef.current) {
         clearTimeout(submenuCloseTimeoutRef.current);
       }
+      if (submenuSwitchTimeoutRef.current) {
+        clearTimeout(submenuSwitchTimeoutRef.current);
+      }
     };
   }, []);
 
-  const handleNestedSubmenuOpen = (itemId: string, buttonRect: DOMRect) => {
+  const openNestedSubmenuNow = (itemId: string, buttonRect: DOMRect) => {
     const menuRect = submenuRef.current?.getBoundingClientRect();
     if (!menuRect) return;
-
     const item = items.find((candidate) => candidate.id === itemId);
     if (!item?.submenu?.length) return;
+    const placed = placeSubmenu(menuRect, buttonRect, item.submenu.length, 220);
+    openSubmenuIdRef.current = itemId;
+    setOpenSubmenu({ id: itemId, ...placed });
+  };
 
-    const estimatedHeight = Math.min(item.submenu.length * 32 + 8, 400);
-    const estimatedWidth = 220;
-    const calculatedPosition = calculateSubmenuPosition({
-      parentMenuRect: menuRect,
-      parentItemRect: buttonRect,
-      submenuDimensions: {
-        width: estimatedWidth,
-        height: estimatedHeight,
-      },
-      viewportPadding: 8,
-    });
+  /** Open at once — unless another submenu is open: then after a short intent delay. */
+  const handleNestedSubmenuOpen = (itemId: string, buttonRect: DOMRect) => {
+    if (submenuSwitchTimeoutRef.current) clearTimeout(submenuSwitchTimeoutRef.current);
+    submenuSwitchTimeoutRef.current = null;
+    const current = openSubmenuIdRef.current;
+    if (!current || current === itemId) {
+      openNestedSubmenuNow(itemId, buttonRect);
+      return;
+    }
+    submenuSwitchTimeoutRef.current = setTimeout(() => openNestedSubmenuNow(itemId, buttonRect), SUBMENU_SWITCH_DELAY_MS);
+  };
 
-    setOpenSubmenu({
-      id: itemId,
-      position: {
-        x: calculatedPosition.x,
-        y: calculatedPosition.y,
-      },
-      maxHeight: calculatedPosition.maxHeight,
-    });
+  const cancelNestedSwitch = () => {
+    if (submenuSwitchTimeoutRef.current) clearTimeout(submenuSwitchTimeoutRef.current);
+    submenuSwitchTimeoutRef.current = null;
   };
 
   const handleNestedSubmenuClose = () => {
+    if (submenuCloseTimeoutRef.current) clearTimeout(submenuCloseTimeoutRef.current);
     submenuCloseTimeoutRef.current = setTimeout(() => {
+      openSubmenuIdRef.current = null;
       setOpenSubmenu(null);
-    }, 200);
+    }, SUBMENU_CLOSE_DELAY_MS);
   };
 
   const handleNestedSubmenuMouseEnter = () => {
@@ -212,6 +259,7 @@ function SubMenu({
               );
             }
           }}
+          onMouseLeave={cancelNestedSwitch}
           disabled={subItem.disabled && !hasSubmenu}
           className={`flex w-full items-center gap-2 px-3 py-2 text-sm text-left text-white hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
             index === 0 ? "first:rounded-t-md" : "border-t border-white/5"
@@ -245,11 +293,16 @@ function SubMenu({
   const submenuContent = (
     <div
       className="fixed z-[120] overflow-visible"
-      style={{
-        left: `${position.x - SUBMENU_HOVER_BRIDGE_PX}px`,
-        top: `${position.y}px`,
-        paddingLeft: `${SUBMENU_HOVER_BRIDGE_PX}px`,
-      }}
+      style={
+        // Flush against the parent, with the hover bridge on the side facing it.
+        position.side === "right"
+          ? { left: `${position.x - SUBMENU_HOVER_BRIDGE_PX}px`, top: `${position.y}px`, paddingLeft: `${SUBMENU_HOVER_BRIDGE_PX}px` }
+          : {
+              right: `${window.innerWidth - position.x - SUBMENU_HOVER_BRIDGE_PX}px`,
+              top: `${position.y}px`,
+              paddingRight: `${SUBMENU_HOVER_BRIDGE_PX}px`,
+            }
+      }
       onMouseEnter={onMouseEnter}
       onMouseLeave={() => {
         handleNestedSubmenuClose();
@@ -284,7 +337,9 @@ export function LeftSidebarHeaderActions({
   const menuRef = useRef<HTMLDivElement>(null);
   const submenuRef = useRef<HTMLDivElement>(null);
   const [menuPosition, setMenuPosition] = useState<{ x: number; y: number; maxHeight: number } | null>(null);
-  const [openSubmenu, setOpenSubmenu] = useState<{ id: string; position: { x: number; y: number }; maxHeight: number } | null>(null);
+  const [openSubmenu, setOpenSubmenu] = useState<{ id: string; position: SubmenuPlacement; maxHeight: number } | null>(null);
+  const openSubmenuIdRef = useRef<string | null>(null);
+  const submenuSwitchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const submenuCloseTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [mounted, setMounted] = useState(false);
   const setSelectedContentId = useContentStore((state) => state.setSelectedContentId);
@@ -325,6 +380,11 @@ export function LeftSidebarHeaderActions({
       // eslint-disable-next-line react-hooks/set-state-in-effect -- audited, see BACKLOG.md
       setMenuPosition(null);
       setOpenSubmenu(null);
+      openSubmenuIdRef.current = null;
+      if (submenuSwitchTimeoutRef.current) {
+        clearTimeout(submenuSwitchTimeoutRef.current);
+        submenuSwitchTimeoutRef.current = null;
+      }
       // Clear any pending submenu close timeout
       if (submenuCloseTimeoutRef.current) {
         clearTimeout(submenuCloseTimeoutRef.current);
@@ -334,43 +394,40 @@ export function LeftSidebarHeaderActions({
   }, [showMenu]);
 
   // Submenu handlers
-  const handleSubmenuOpen = (itemId: string, buttonRect: DOMRect) => {
+  const openSubmenuNow = (itemId: string, buttonRect: DOMRect) => {
     const menuRect = menuRef.current?.getBoundingClientRect();
     if (!menuRect) return;
-
-    // Find the submenu items
-    const item = menuItems.find(i => i.id === itemId);
+    const item = menuItems.find((i) => i.id === itemId);
     if (!item || !item.submenu || item.submenu.length === 0) return;
+    const placed = placeSubmenu(menuRect, buttonRect, item.submenu.length, 180);
+    openSubmenuIdRef.current = itemId;
+    setOpenSubmenu({ id: itemId, ...placed });
+  };
 
-    // Estimate submenu dimensions
-    const estimatedHeight = Math.min(item.submenu.length * 32 + 8, 400);
-    const estimatedWidth = 180;
+  /** Open at once — unless another submenu is open: then after a short intent delay. */
+  const handleSubmenuOpen = (itemId: string, buttonRect: DOMRect) => {
+    if (submenuSwitchTimeoutRef.current) clearTimeout(submenuSwitchTimeoutRef.current);
+    submenuSwitchTimeoutRef.current = null;
+    const current = openSubmenuIdRef.current;
+    if (!current || current === itemId) {
+      openSubmenuNow(itemId, buttonRect);
+      return;
+    }
+    submenuSwitchTimeoutRef.current = setTimeout(() => openSubmenuNow(itemId, buttonRect), SUBMENU_SWITCH_DELAY_MS);
+  };
 
-    const calculatedPosition = calculateSubmenuPosition({
-      parentMenuRect: menuRect,
-      parentItemRect: buttonRect,
-      submenuDimensions: {
-        width: estimatedWidth,
-        height: estimatedHeight,
-      },
-      viewportPadding: 8,
-    });
-
-    setOpenSubmenu({
-      id: itemId,
-      position: {
-        x: calculatedPosition.x,
-        y: calculatedPosition.y,
-      },
-      maxHeight: calculatedPosition.maxHeight,
-    });
+  const cancelSubmenuSwitch = () => {
+    if (submenuSwitchTimeoutRef.current) clearTimeout(submenuSwitchTimeoutRef.current);
+    submenuSwitchTimeoutRef.current = null;
   };
 
   const handleSubmenuClose = () => {
-    // Don't immediately close - give time to move mouse to submenu
+    // Don't immediately close — give time to move the pointer into the submenu.
+    if (submenuCloseTimeoutRef.current) clearTimeout(submenuCloseTimeoutRef.current);
     submenuCloseTimeoutRef.current = setTimeout(() => {
+      openSubmenuIdRef.current = null;
       setOpenSubmenu(null);
-    }, 200);
+    }, SUBMENU_CLOSE_DELAY_MS);
   };
 
   const handleSubmenuMouseEnter = () => {
@@ -444,7 +501,8 @@ export function LeftSidebarHeaderActions({
   const menuItems = getNewContentMenuItems(
     wrappedCallbacks,
     null,
-    pageTemplateData
+    pageTemplateData,
+    withMenuClose(getExtensionCreateMenuItems(), () => setShowMenu(false))
   );
 
   // Initial render without positioning (to measure dimensions)
@@ -487,6 +545,7 @@ export function LeftSidebarHeaderActions({
             onMenuClose={() => setShowMenu(false)}
             onSubmenuMouseEnter={handleSubmenuMouseEnter}
             onSubmenuMouseLeave={handleSubmenuClose}
+            onRowLeave={cancelSubmenuSwitch}
           />
         ))}
       </div>

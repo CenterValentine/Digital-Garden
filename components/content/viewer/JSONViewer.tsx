@@ -313,7 +313,7 @@ export function JSONViewer({
           {Array.from({ length: editorContent.split("\n").length }, (_, i) => (
             <div
               key={i + 1}
-              className="text-right pr-3 text-gray-500"
+              className="text-right pr-3 text-gray-500 dark:text-gray-400"
               style={{ height: "20.8px" }}
             >
               {i + 1}

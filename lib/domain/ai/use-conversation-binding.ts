@@ -31,6 +31,11 @@ import { useAIChatStore } from "@/state/ai-chat-store";
 import { useSettingsStore } from "@/state/settings-store";
 import { normalizePersistedToolParts } from "@/lib/domain/ai/tool-state-persistence";
 import { stripRevertSnapshotFromParts } from "@/lib/domain/ai/compact-tool-outputs";
+import {
+  getEngagement,
+  subscribeEngagement,
+  type Engagement,
+} from "@/lib/core/engagement";
 // Usage, segments AND cost all fold in one place — turn-diagnostics owns
 // the per-request accumulator (it imports the client-safe pricing module
 // by direct path, never the Prisma-bearing ai-connections barrel).
@@ -539,6 +544,29 @@ export function useConversationBinding({
               Array.isArray(effectiveParts) ? effectiveParts : [],
             )
           : requestMetadata;
+      // Write the FOLDED metadata back into message state so the avatar
+      // meter's step chain grows during the turn (owner, 2026-09-22): the
+      // SDK deep-merges each request's `segment` over the last, so without
+      // this the accumulated `segments[]` exists only in the DB row until a
+      // reload. Guarded on a real change so persist → setMessages cannot
+      // loop (the parts signature above already dedupes the persist).
+      if (m.role === "assistant" && turnMetadata) {
+        const merged = turnMetadata as { segments?: unknown[] };
+        const current = requestMetadata as { segments?: unknown[] } | undefined;
+        if (
+          Array.isArray(merged.segments) &&
+          merged.segments.length > (current?.segments?.length ?? 0)
+        ) {
+          const id = m.id;
+          type Msg = { id: string; metadata?: unknown };
+          (setMessages as (updater: (prev: Msg[]) => Msg[]) => void)(
+            (prev) =>
+              prev.map((msg) =>
+                msg.id === id ? { ...msg, metadata: turnMetadata } : msg,
+              ),
+          );
+        }
+      }
       if (savedIdsRef.current.has(m.id)) {
         // Continuation persistence (S4): an approval resume EXTENDS a
         // saved assistant message (resolved approval state + new parts).
@@ -663,7 +691,7 @@ export function useConversationBinding({
         }
       })();
     }
-  }, [conversationId, messages, getMessageStamp, providerId, modelId, onTitleChanged, pendingUserPartsRef]);
+  }, [conversationId, messages, getMessageStamp, providerId, modelId, onTitleChanged, pendingUserPartsRef, setMessages]);
 
   // Only claim the engine's persist ref when actually bound to a
   // conversation. In transient/unbound mode the caller (e.g. ChatViewer
@@ -711,12 +739,31 @@ export function useConversationBinding({
   // not generic messages, so we must `addEventListener(EVENT_NAME)` —
   // `es.onmessage` would silently drop every event (and produced the
   // initial "title doesn't update in the header" report).
+  // The stream is CLOSED whenever the user is not actively engaged, and
+  // reopened on return.
+  //
+  // This is the single most expensive line in the app's infrastructure bill.
+  // Vercel bills Fluid Provisioned Memory for a request's entire lifetime,
+  // including time spent idle in I/O — and an SSE response never completes, so
+  // one held-open stream at the default 2 GB is ~1,460 GB-hrs/month. That was
+  // ~97% of the observed memory charge, from a single forgotten tab.
+  //
+  // Gated on ENGAGEMENT, not visibility. Visibility alone was not enough for two
+  // surfaces that matter: a note left open on a second monitor, and — far worse
+  // — the browser extension's side panel, which is registered globally and so
+  // stays `visible` across every tab switch for as long as it is open. A side
+  // panel is a surface people deliberately leave up for days, which made it the
+  // worst case for a visibility-only gate rather than an edge case.
+  //
+  // Closing is safe because state/conversation-cache-store.ts binds
+  // `refetchAllCached` to window focus, so anything missed while closed is
+  // reconciled on return rather than lost.
   useEffect(() => {
     if (!conversationId) return;
     if (typeof EventSource === "undefined") return;
-    const es = new EventSource("/api/conversations/events", {
-      withCredentials: true,
-    });
+
+    let es: EventSource | null = null;
+
     const handler = (e: MessageEvent) => {
       try {
         const event = JSON.parse(e.data) as
@@ -733,10 +780,33 @@ export function useConversationBinding({
         /* malformed event — ignore */
       }
     };
-    es.addEventListener("conversation", handler as EventListener);
-    return () => {
+
+    const open = () => {
+      if (es) return;
+      es = new EventSource("/api/conversations/events", { withCredentials: true });
+      es.addEventListener("conversation", handler as EventListener);
+    };
+
+    const close = () => {
+      if (!es) return;
       es.removeEventListener("conversation", handler as EventListener);
       es.close();
+      es = null;
+    };
+
+    const sync = (state: Engagement) => {
+      if (state === "active") open();
+      else close();
+    };
+
+    sync(getEngagement());
+    // subscribeEngagement, not a visibilitychange listener: engagement owns both
+    // the hidden and the idle transitions, and a stream has no tick of its own
+    // to pull from — it has to be told when to close.
+    const unsubscribe = subscribeEngagement(sync);
+    return () => {
+      unsubscribe();
+      close();
     };
   }, [conversationId]);
 

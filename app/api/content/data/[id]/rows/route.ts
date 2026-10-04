@@ -2,7 +2,7 @@
  * Database rows API.
  *
  * GET    /api/content/data/[id]/rows?view=&cursor=&since=  — page, or changes
- * POST   /api/content/data/[id]/rows                        — append rows
+ * POST   /api/content/data/[id]/rows                        — append rows, or duplicate (`duplicateRowIds`)
  * PATCH  /api/content/data/[id]/rows                        — write cells (CAS)
  * DELETE /api/content/data/[id]/rows                        — soft-delete / restore
  *
@@ -29,11 +29,13 @@ import {
 } from "@/lib/domain/data/server/queries";
 import {
   createRows,
+  duplicateRows,
   restoreRows,
   softDeleteRows,
   writeCells,
   type CellWrite,
 } from "@/lib/domain/data/server/mutations";
+import { ensureLedgersForMasterRows } from "@/lib/domain/ai/quests";
 import { DEFAULT_ROW_PAGE_SIZE } from "@/lib/domain/data";
 
 const ROUTE_PATH = "/api/content/data/[id]/rows";
@@ -159,6 +161,8 @@ export async function POST(request: NextRequest, { params }: { params: Params })
       const body = (await request.json()) as {
         count?: number;
         afterSortKey?: string | null;
+        /** Duplicate these rows in place (each copy below its source). */
+        duplicateRowIds?: string[];
       };
       const count = Math.min(Math.max(body.count ?? 1, 1), 200);
 
@@ -166,6 +170,19 @@ export async function POST(request: NextRequest, { params }: { params: Params })
       if (!table) return notFound();
       if (table.mode === "query") {
         return badRequest("Query databases are read-only projections — create a note and it appears");
+      }
+
+      if (Array.isArray(body.duplicateRowIds)) {
+        const sourceIds = body.duplicateRowIds.filter(
+          (v): v is string => typeof v === "string" && v.length > 0
+        );
+        if (sourceIds.length === 0) return badRequest("duplicateRowIds is empty");
+        const result = await withSpan(
+          { layer: "content", name: "data_rows_duplicate" },
+          { attrs: { count: sourceIds.length } },
+          async () => duplicateRows(id, table.columns, sourceIds, session.user.id)
+        );
+        return NextResponse.json({ success: true, data: result });
       }
 
       const rowIds = await withSpan(
@@ -232,6 +249,27 @@ export async function PATCH(request: NextRequest, { params }: { params: Params }
           return outcome;
         }
       );
+
+      // Hard rule (quests, owner 2026-09-11): a NAMED row in a charter's
+      // master ledger gets its quest ledger the moment it is named — the grid
+      // creates blank rows first and the name arrives here. A cheap no-op for
+      // every other table; a hook failure never fails the cell write.
+      if (ok) {
+        try {
+          await ensureLedgersForMasterRows(
+            session.user.id,
+            id,
+            [...new Set(body.writes.map((w) => w.rowId))],
+          );
+        } catch (hookError) {
+          logger.warn({
+            layer: "content",
+            event: "data:rows_patch:quest_hook_caught",
+            summary: "quest-ledger hook failed after a cell write",
+            error: hookError,
+          });
+        }
+      }
 
       // 409 for a stale batch: the request was well-formed and permitted, it
       // just lost a race. The client turns this into "skipped — someone else

@@ -47,11 +47,11 @@ export function FullscreenVisualizationWrapper({
         <div className="h-10 bg-gray-900 border-t border-white/10 flex items-center justify-between px-4">
           <div className="flex items-center gap-2">
             <span className="text-xs text-gray-400">{title}</span>
-            <span className="text-xs text-gray-600">•</span>
-            <span className="text-xs text-gray-500 capitalize">{engine}</span>
+            <span className="text-xs text-gray-600 dark:text-gray-400">•</span>
+            <span className="text-xs text-gray-500 dark:text-gray-400 capitalize">{engine}</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-500">Auto-save: Enabled</span>
+            <span className="text-xs text-gray-500 dark:text-gray-400">Auto-save: Enabled</span>
           </div>
         </div>
 

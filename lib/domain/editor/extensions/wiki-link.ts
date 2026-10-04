@@ -10,11 +10,21 @@
  * M6: Search & Knowledge Features - Wiki Links
  */
 
-import { Node, mergeAttributes } from "@tiptap/core";
+import { Node, mergeAttributes, type Editor } from "@tiptap/core";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
 import { InputRule } from "@tiptap/core";
 import Suggestion from "@tiptap/suggestion";
 import { slugifyHeading } from "@/lib/domain/content/heading-ids";
+import { parseLinkAnchor } from "@/lib/domain/content/link-anchor";
+import {
+  wikiLinkAttrSpec,
+  wikiLinkDisplayText,
+  wikiLinkRenderAttrs,
+  wikiLinkSourceText,
+} from "./wiki-link-attrs";
+import { createWikiLinkNodeView } from "./wiki-link-node-view";
+
+export { wikiLinkDisplayText };
 
 /**
  * Attrs for a hand-typed [[...]] body. A leading `#` makes an in-document
@@ -25,7 +35,22 @@ import { slugifyHeading } from "@/lib/domain/content/heading-ids";
 function attrsForTypedLink(
   body: string,
   displayText: string | null,
-): { targetTitle: string; displayText: string | null; headingSlug: string | null } | null {
+): {
+  targetTitle: string;
+  displayText: string | null;
+  headingSlug: string | null;
+  anchor?: string | null;
+} | null {
+  // [[Title#^kind:id]] — an anchored link (lib/domain/content/link-anchor.ts).
+  // The Obsidian block-ref marker `#^` keeps it distinct from [[#Heading]].
+  const anchorAt = body.indexOf("#^");
+  if (anchorAt > 0) {
+    const title = body.slice(0, anchorAt).trim();
+    const anchor = body.slice(anchorAt + 2).trim();
+    if (title && parseLinkAnchor(anchor)) {
+      return { targetTitle: title, displayText, headingSlug: null, anchor };
+    }
+  }
   if (body.startsWith("#")) {
     const headingText = body.slice(1).trim();
     if (!headingText) return null;
@@ -36,16 +61,6 @@ function attrsForTypedLink(
     };
   }
   return { targetTitle: body, displayText, headingSlug: null };
-}
-
-/** The [[...]] source text a link un-wraps back into (Backspace/Delete). */
-function wikiTextFor(attrs: {
-  targetTitle?: string | null;
-  displayText?: string | null;
-  headingSlug?: string | null;
-}): string {
-  const title = `${attrs.headingSlug ? "#" : ""}${attrs.targetTitle ?? ""}`;
-  return attrs.displayText ? `[[${title}|${attrs.displayText}]]` : `[[${title}]]`;
 }
 
 export interface WikiLinkSuggestionItem {
@@ -73,6 +88,12 @@ export interface WikiLinkClickTarget {
    */
   headingSlug: string | null;
   /**
+   * Where inside the target (`"<kind>:<id>"`, lib/domain/content/link-anchor.ts),
+   * e.g. a highlight in a book. The app opens the target, then hands the
+   * anchor to its viewer.
+   */
+  anchor: string | null;
+  /**
    * Persist a resolved id back into the clicked node. Called when resolution
    * fell back to a title search, so the link upgrades itself in place and the
    * next rename can't orphan it. No-op on read-only surfaces or if the node
@@ -87,6 +108,13 @@ export interface WikiLinkOptions {
   HTMLAttributes: Record<string, unknown>;
   onClickLink?: (target: WikiLinkClickTarget) => void;
   suggestion?: Partial<import("@tiptap/suggestion").SuggestionOptions>;
+  /**
+   * The hover affordance — a compact chooser for the link's display (link /
+   * chip / card / window) plus Open. Built by wiki-link-hover.tsx (React,
+   * tippy) and injected here so this file stays React-free. Null = no
+   * hover UI (viewers, embeds).
+   */
+  hover?: ((editor: Editor) => Plugin | null) | null;
 }
 
 export const WikiLink = Node.create<WikiLinkOptions>({
@@ -109,82 +137,15 @@ export const WikiLink = Node.create<WikiLinkOptions>({
         render: () => ({}),
         command: () => {},
       },
+      hover: null,
     };
   },
 
+  // One spec for the client and server nodes (wiki-link-attrs.ts): the
+  // durable `targetId`, the label `targetTitle`, alias, heading slug, anchor
+  // + label, the context-expansion opt-out, and the display `view`.
   addAttributes() {
-    return {
-      /**
-       * Stable ContentNode id of the link target, when known.
-       *
-       * The title is a LABEL, not a pointer — renaming a note used to orphan
-       * every inbound link because resolution was an exact title match. This
-       * attribute is the durable pointer; `targetTitle` stays as the human
-       * text and as the fallback for links authored without an id (typed by
-       * hand, AI-generated, imported markdown).
-       *
-       * Optional by design: absent renders no attribute at all, so pre-existing
-       * links serialize byte-identically and the markdown round-trip is unmoved.
-       */
-      targetId: {
-        default: null,
-        parseHTML: (element) => element.getAttribute("data-target-id"),
-        renderHTML: (attributes) => {
-          if (!attributes.targetId) {
-            return {};
-          }
-          return {
-            "data-target-id": attributes.targetId,
-          };
-        },
-      },
-      targetTitle: {
-        default: null,
-        parseHTML: (element) => element.getAttribute("data-target-title"),
-        renderHTML: (attributes) => {
-          if (!attributes.targetTitle) {
-            return {};
-          }
-          return {
-            "data-target-title": attributes.targetTitle,
-          };
-        },
-      },
-      displayText: {
-        default: null,
-        parseHTML: (element) => element.getAttribute("data-display-text"),
-        renderHTML: (attributes) => {
-          if (!attributes.displayText) {
-            return {};
-          }
-          return {
-            "data-display-text": attributes.displayText,
-          };
-        },
-      },
-      /**
-       * Derived slug of an in-document heading target ([[#Heading]]).
-       *
-       * Heading ids are LIVE slugs (lib/domain/content/heading-ids.ts):
-       * renaming a heading changes its slug, and the heading-link-integrity
-       * extension rewrites this attr in the same edit. A slug with no
-       * matching heading is decorated as broken (never rewritten away —
-       * restoring the heading un-breaks the link). Absent renders no
-       * attribute, so pre-existing links serialize byte-identically.
-       */
-      headingSlug: {
-        default: null,
-        parseHTML: (element) => element.getAttribute("data-heading-slug"),
-        renderHTML: (attributes) => {
-          if (!attributes.headingSlug) {
-            return {};
-          }
-          return {
-            "data-heading-slug": attributes.headingSlug,
-          };
-        },
-      },
-    };
+    return wikiLinkAttrSpec();
   },
 
   parseHTML() {
@@ -196,22 +157,27 @@ export const WikiLink = Node.create<WikiLinkOptions>({
   },
 
   renderHTML({ node, HTMLAttributes }) {
-    // Display alias text if present, otherwise show target title (Obsidian-style)
-    const displayText = node.attrs.displayText || node.attrs.targetTitle || "Unknown";
-
+    // The plain span is what reaches the clipboard and the HTML tier — the
+    // chip/card chrome lives in the NodeView only (never in renderHTML, or it
+    // would re-parse as stray content on paste).
     return [
       "span",
-      mergeAttributes(this.options.HTMLAttributes, HTMLAttributes, {
-        "data-type": "wiki-link",
-        class: "wiki-link cursor-pointer text-primary hover:underline",
+      mergeAttributes(this.options.HTMLAttributes, HTMLAttributes, wikiLinkRenderAttrs(node.attrs), {
+        class: "cursor-pointer text-primary hover:underline",
       }),
-      displayText,
+      wikiLinkDisplayText(node.attrs),
     ];
   },
 
   renderText({ node }) {
     // For markdown export, show the full wiki-link syntax
-    return wikiTextFor(node.attrs);
+    return wikiLinkSourceText(node.attrs);
+  },
+
+  // Chip and card displays decorate the rendered span in place; the default
+  // link display returns renderHTML's span untouched.
+  addNodeView() {
+    return createWikiLinkNodeView();
   },
 
   addInputRules() {
@@ -245,12 +211,17 @@ export const WikiLink = Node.create<WikiLinkOptions>({
     const options = this.options;
     const nodeType = this.type;
 
+    const hoverPlugin = options.hover ? options.hover(this.editor) : null;
+
     return [
       // Autocomplete suggestion when typing [[
       Suggestion({
         editor: this.editor,
         ...options.suggestion,
       }),
+
+      // Hover chooser for the link's display (editable surfaces only).
+      ...(hoverPlugin ? [hoverPlugin] : []),
 
       // Convert [[text]] to wiki-link when Space or Enter is pressed
       new Plugin({
@@ -385,12 +356,13 @@ export const WikiLink = Node.create<WikiLinkOptions>({
             };
 
             const headingSlug = wikiLinkEl.getAttribute("data-heading-slug");
+            const anchor = wikiLinkEl.getAttribute("data-anchor");
 
             event.preventDefault();
             // Each attempt starts clean — a link that failed while offline
             // shouldn't stay marked once it resolves.
             wikiLinkEl.classList.remove("wiki-link-broken");
-            options.onClickLink({ targetId, targetTitle, headingSlug, heal, markBroken });
+            options.onClickLink({ targetId, targetTitle, headingSlug, anchor, heal, markBroken });
             return true;
           },
 
@@ -406,7 +378,7 @@ export const WikiLink = Node.create<WikiLinkOptions>({
             if (event.key === "Backspace" && nodeBefore?.type.name === "wikiLink") {
               event.preventDefault();
 
-              const wikiText = wikiTextFor(nodeBefore.attrs);
+              const wikiText = wikiLinkSourceText(nodeBefore.attrs);
 
               const nodePos = $from.pos - nodeBefore.nodeSize;
               const transaction = view.state.tr.replaceWith(
@@ -423,7 +395,7 @@ export const WikiLink = Node.create<WikiLinkOptions>({
             if (event.key === "Delete" && nodeAfter?.type.name === "wikiLink") {
               event.preventDefault();
 
-              const wikiText = wikiTextFor(nodeAfter.attrs);
+              const wikiText = wikiLinkSourceText(nodeAfter.attrs);
 
               const nodePos = $from.pos;
               const transaction = view.state.tr.replaceWith(

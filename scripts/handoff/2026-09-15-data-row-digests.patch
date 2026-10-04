@@ -1,0 +1,78 @@
+diff --git a/prisma/schema.prisma b/prisma/schema.prisma
+index 245fa664..83512f77 100644
+--- a/prisma/schema.prisma
++++ b/prisma/schema.prisma
+@@ -1521,6 +1521,9 @@ model DataPayload {
+   description   String? @db.VarChar(280)
+   /// Table title + column names, so a table is findable by its schema (B2).
+   searchText    String  @default("")
++  /// AI row digests opt-in (AI-BULK-ROW-READING-PLAN §5): one AI-written
++  /// line per row, refreshed in the background, read by query_database.
++  rowDigests    Boolean @default(false)
+ 
+   createdAt DateTime @default(now()) @db.Timestamptz(6)
+   updatedAt DateTime @updatedAt @db.Timestamptz(6)
+@@ -1589,12 +1592,34 @@ model DataRow {
+   content  ContentNode?  @relation("PromotedDataRow", fields: [contentId], references: [id], onDelete: SetNull)
+   linksOut DataRowLink[] @relation("DataLinkFrom")
+   linksIn  DataRowLink[] @relation("DataLinkTo")
++  digest   DataRowDigest?
+ 
+   @@index([tableId, sortKey])
+   @@index([tableId, deletedAt])
+   @@index([data(ops: JsonbPathOps)], type: Gin)
+ }
+ 
++/// AI row digest sidecar (AI-BULK-ROW-READING-PLAN §5): one AI-written line
++/// per row plus provenance. A sidecar, never a cell — the same stance as
++/// AgenticMetadata for folder capsules. Staleness at read time is the HASH
++/// (sourceHash vs the row's cells + forward links now); `dirty` is discovery
++/// only, set by every cell/link write and cleared on generation.
++model DataRowDigest {
++  rowId       String   @id @db.Uuid
++  digest      String   @db.VarChar(400)
++  /// sha256 of canonicalJson(data) + sorted forward link ids at generation time.
++  sourceHash  String   @db.VarChar(64)
++  /// Sweep discovery — indexed; never read-time truth.
++  dirty       Boolean  @default(false)
++  model       String?  @db.VarChar(100)
++  generatedAt DateTime @db.Timestamptz(6)
++  updatedAt   DateTime @updatedAt @db.Timestamptz(6)
++
++  row DataRow @relation(fields: [rowId], references: [id], onDelete: Cascade)
++
++  @@index([dirty])
++}
++
+ /// Relation cells. The ONLY home for links (plan D4) — never mirrored into
+ /// DataRow.data, so there is one source of truth and both directions index.
+ /// Symmetry is a property of the COLUMNS, not of this row: a two-way relation
+diff --git a/prisma/migrations/20260915120000_data_row_digests/migration.sql b/prisma/migrations/20260915120000_data_row_digests/migration.sql
+new file mode 100644
+--- /dev/null
++++ b/prisma/migrations/20260915120000_data_row_digests/migration.sql
+@@ -0,0 +1,24 @@
++-- AI row digests (AI-BULK-ROW-READING-PLAN §5): per-table opt-in plus a
++-- 1:1 sidecar holding one AI-written line per row with its provenance.
++
++-- AlterTable
++ALTER TABLE "DataPayload" ADD COLUMN     "rowDigests" BOOLEAN NOT NULL DEFAULT false;
++
++-- CreateTable
++CREATE TABLE "DataRowDigest" (
++    "rowId" UUID NOT NULL,
++    "digest" VARCHAR(400) NOT NULL,
++    "sourceHash" VARCHAR(64) NOT NULL,
++    "dirty" BOOLEAN NOT NULL DEFAULT false,
++    "model" VARCHAR(100),
++    "generatedAt" TIMESTAMPTZ(6) NOT NULL,
++    "updatedAt" TIMESTAMPTZ(6) NOT NULL,
++
++    CONSTRAINT "DataRowDigest_pkey" PRIMARY KEY ("rowId")
++);
++
++-- CreateIndex
++CREATE INDEX "DataRowDigest_dirty_idx" ON "DataRowDigest"("dirty");
++
++-- AddForeignKey
++ALTER TABLE "DataRowDigest" ADD CONSTRAINT "DataRowDigest_rowId_fkey" FOREIGN KEY ("rowId") REFERENCES "DataRow"("id") ON DELETE CASCADE ON UPDATE CASCADE;

@@ -13,6 +13,7 @@
  */
 
 import { prisma } from "@/lib/database/client";
+import { canonicalJson } from "@/lib/domain/data/digest-hash";
 import type { Prisma } from "@/lib/database/generated/prisma";
 import {
   applyCell,
@@ -23,14 +24,27 @@ import {
   deriveTableSearchText,
   encodeCell,
   isEncodeError,
+  generateColumnKey,
   generateUniqueColumnKey,
+  splitDelimited,
+  titleCaseLabel,
+  optionMatchKey,
+  FREEFORM_OPTION_CAP,
+  type SelectOption,
   keyAtEnd,
+  keyBetween,
   keysBetween,
+  NON_STORING_COLUMN_TYPES,
   type CellValue,
   type DataColumn,
   type DataColumnConfig,
   type RowData,
 } from "@/lib/domain/data";
+import { writeRelationLinks } from "./relation-cells";
+// Not re-exported from the barrel (capture-core is capture-path code), but
+// pure and client-safe — it is the label/delimiter tolerance seam.
+import { translateOptionValue } from "@/lib/domain/data/capture-core";
+import { mergeCellValue } from "@/lib/domain/data/cell-merge";
 
 // ── Results ──────────────────────────────────────────────────────────────
 
@@ -52,9 +66,96 @@ export interface CellWrite {
   expect?: CellValue | undefined;
   /** Set when `expect` is a meaningful `undefined` rather than "not checking". */
   hasExpectation?: boolean;
+  /**
+   * MERGE into the current value instead of replacing it (cell-merge.ts):
+   * union for list columns, token-append for text. Computed against the row
+   * as it is inside this transaction — no read step, no race, idempotent.
+   */
+  merge?: boolean;
 }
 
 // ── Cells ────────────────────────────────────────────────────────────────
+
+/** Reason shared by every system-column refusal (grid, route, AI tools). */
+export const SYSTEM_COLUMN_LOCK_REASON =
+  "This is a system column of a charter ledger — its name, type, options and existence are locked. The description and position can change; add a new column for anything else.";
+
+/** DataColumnConfig.system — the charter-ledger machinery lock. */
+export function isSystemColumnConfig(config: unknown): boolean {
+  return (
+    !!config &&
+    typeof config === "object" &&
+    (config as { system?: unknown }).system === true
+  );
+}
+
+// canonicalJson lives in digest-hash.ts (shared with the row source hash).
+
+/**
+ * Grow a freeform multiSelect's vocabulary to cover the labels being written.
+ *
+ * MUTATES the column objects in `byKey` as well as the database row, because
+ * the validation pass that follows reads `column.config.options` to resolve
+ * labels — handing it the pre-mint column would reject the very options just
+ * created.
+ *
+ * Returns an error message (aborting the whole write) only when the cap is
+ * hit. That refusal is deliberate and is the feature's honest edge: an
+ * unbounded `config.options` blob degrades every schema read and silently
+ * truncates the vocabulary the AI can see, so the right answer past the cap
+ * is a table, not a bigger cell.
+ */
+async function mintFreeformOptions(
+  tx: Prisma.TransactionClient,
+  byKey: Map<string, DataColumn>,
+  writes: CellWrite[]
+): Promise<string | null> {
+  for (const [, column] of byKey) {
+    if (column.type !== "multiSelect" || !column.config.freeform) continue;
+
+    const relevant = writes.filter((w) => w.columnKey === column.key);
+    if (relevant.length === 0) continue;
+
+    const existing = column.config.options ?? [];
+    const keyOf = (label: string) => optionMatchKey(label, column.config);
+    const seen = new Set(existing.map((o) => keyOf(o.label)));
+    const byId = new Set(existing.map((o) => o.id));
+    const minted: SelectOption[] = [];
+
+    for (const write of relevant) {
+      // The value has already been through translateOptionValue, so known
+      // labels arrive as ids and only genuinely new labels are still text.
+      const raw =
+        typeof write.value === "string" && column.config.splitOn
+          ? splitDelimited(write.value, column.config.splitOn)
+          : write.value;
+      if (!Array.isArray(raw)) continue;
+      for (const entry of raw) {
+        if (typeof entry !== "string") continue;
+        const raw = entry.trim();
+        if (!raw || byId.has(raw)) continue;
+        const label = column.config.titleCase ? titleCaseLabel(raw) : raw;
+        const key = keyOf(label);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        minted.push({ id: generateColumnKey(), label: label.slice(0, 120) });
+      }
+    }
+
+    if (minted.length === 0) continue;
+    if (existing.length + minted.length > FREEFORM_OPTION_CAP) {
+      return `"${column.name}" would exceed ${FREEFORM_OPTION_CAP} options. A list this varied has outgrown a cell — turn it into its own database and link to it with a relation column.`;
+    }
+
+    const options = [...existing, ...minted];
+    column.config = { ...column.config, options };
+    await tx.dataColumn.update({
+      where: { id: column.id },
+      data: { config: column.config as unknown as Prisma.InputJsonValue },
+    });
+  }
+  return null;
+}
 
 /**
  * Write cells, optionally under CAS.
@@ -84,6 +185,23 @@ export async function writeCells(
 
     const results: CellWriteResult[] = [];
     const nextByRow = new Map<string, RowData>();
+
+    // Pass 0 — freeform multiSelect: mint options for labels that do not
+    // exist yet, IN THIS TRANSACTION, before anything is encoded.
+    //
+    // Minting cannot live in translateOptionValue with the rest of the
+    // label tolerance: that function is pure and cannot persist a
+    // vocabulary. It cannot live after encoding either, because the strict
+    // encoder rejects an unknown option — so the vocabulary has to grow
+    // first, and the column objects the loop below reads have to be the
+    // grown ones. Hence a pass of its own.
+    const mintError = await mintFreeformOptions(tx, byKey, writes);
+    if (mintError) {
+      return {
+        ok: false,
+        results: [{ status: "error", rowId: writes[0].rowId, message: mintError }],
+      };
+    }
 
     // Pass 1 — validate and check preconditions. Nothing is written yet.
     for (const write of writes) {
@@ -120,7 +238,32 @@ export async function writeCells(
         }
       }
 
-      const encoded = encodeCell(column, write.value);
+      // Shallow-list columns accept LABELS and delimited strings, not just
+      // option ids. translateOptionValue is the label-tolerance seam, but it
+      // only ran on the AI capture path (capture-core's normalizeCellInput)
+      // — the grid writes straight through here, so a user typing
+      // "Redis, Postgres" into a freeform cell would mint the options in
+      // pass 0 and then fail the strict encoder anyway. Applied narrowly to
+      // multiSelect rather than normalizing every type, so the grid's
+      // existing strictness elsewhere is unchanged.
+      const translated =
+        column.type === "multiSelect" &&
+        (column.config.freeform || column.config.splitOn)
+          ? translateOptionValue(column, write.value)
+          : write.value;
+      // Merge AFTER label translation (so list merges compare option ids)
+      // and BEFORE encoding (so the union is validated like any value).
+      let value: unknown = translated;
+      if (write.merge) {
+        const merged = mergeCellValue(column, current[write.columnKey], translated);
+        if ("error" in merged) {
+          results.push({ status: "error", rowId: write.rowId, message: merged.error });
+          continue;
+        }
+        value = merged.value;
+      }
+
+      const encoded = encodeCell(column, value);
       if (isEncodeError(encoded)) {
         results.push({
           status: "error",
@@ -216,6 +359,12 @@ export async function writeCells(
           data: data as unknown as Prisma.InputJsonValue,
           searchText: deriveRowSearchText(columns, data),
         },
+      });
+      // AI digest discovery bit (plan §5.2): read-time truth is the hash;
+      // this only makes "what needs work" an indexed query for the sweep.
+      await tx.dataRowDigest.updateMany({
+        where: { rowId, dirty: false },
+        data: { dirty: true },
       });
 
       // Title sync: the primary column is canonical, and writes through to
@@ -370,6 +519,104 @@ export async function createRows(
 }
 
 /**
+ * Duplicate rows in place: each copy lands DIRECTLY BELOW its source (a key
+ * between the source and its next neighbour — `createRows` can only append,
+ * which would scatter copies to the bottom of a 29-row table), carrying
+ * every stored cell of a live column. Derived and non-storing columns
+ * (formula, rollup, lookup, autoNumber, createdAt/By, updatedAt/By) recompute on
+ * their own; forward relation links are re-pointed at the copy afterwards
+ * (backlinks mirror automatically); promotion (`contentId`) is a page, not
+ * a cell, and is NOT copied. Sources are processed in storage order so a
+ * multi-select duplicates as a block, copies interleaved after each source.
+ */
+export async function duplicateRows(
+  tableId: string,
+  columns: DataColumn[],
+  rowIds: string[],
+  createdBy: string
+): Promise<{ rowIds: string[]; sourceIds: string[] }> {
+  const wanted = [...new Set(rowIds)].slice(0, 200);
+  if (wanted.length === 0) return { rowIds: [], sourceIds: [] };
+  const live = columns.filter((c) => !c.deletedAt);
+  const storing = new Set(
+    live
+      .filter((c) => !NON_STORING_COLUMN_TYPES.includes(c.type))
+      .map((c) => c.key)
+  );
+  const forwardRelations = live.filter(
+    (c) => c.type === "relation" && c.config.isBacklink !== true
+  );
+
+  const created = await prisma.$transaction(async (tx) => {
+    const sources = await tx.dataRow.findMany({
+      where: { id: { in: wanted }, tableId, deletedAt: null },
+      orderBy: [{ sortKey: "asc" }, { id: "asc" }],
+      select: { id: true, sortKey: true, data: true },
+    });
+    const out: Array<{ sourceId: string; rowId: string }> = [];
+    for (const source of sources) {
+      const next = await tx.dataRow.findFirst({
+        where: { tableId, deletedAt: null, sortKey: { gt: source.sortKey } },
+        orderBy: { sortKey: "asc" },
+        select: { sortKey: true },
+      });
+      const sortKey = keyBetween(source.sortKey, next?.sortKey ?? null);
+      const data: Record<string, unknown> = {};
+      for (const [key, value] of Object.entries(
+        (source.data ?? {}) as Record<string, unknown>
+      )) {
+        if (storing.has(key)) data[key] = value;
+      }
+      const row = await tx.dataRow.create({
+        data: {
+          tableId,
+          sortKey,
+          data: data as unknown as Prisma.InputJsonValue,
+          searchText: deriveRowSearchText(columns, data as RowData),
+          createdBy,
+        },
+        select: { id: true },
+      });
+      out.push({ sourceId: source.id, rowId: row.id });
+    }
+    if (out.length > 0) {
+      await tx.dataPayload.update({
+        where: { contentId: tableId },
+        data: { rowCount: { increment: out.length } },
+      });
+    }
+    return out;
+  });
+
+  // Links live beside the row, not in `data` — copy the forward halves.
+  if (forwardRelations.length > 0 && created.length > 0) {
+    const links = await prisma.dataRowLink.findMany({
+      where: {
+        fromRowId: { in: created.map((c) => c.sourceId) },
+        columnId: { in: forwardRelations.map((c) => c.id) },
+      },
+      orderBy: { position: "asc" },
+      select: { columnId: true, fromRowId: true, toRowId: true },
+    });
+    for (const copy of created) {
+      for (const column of forwardRelations) {
+        const targets = links
+          .filter((l) => l.fromRowId === copy.sourceId && l.columnId === column.id)
+          .map((l) => l.toRowId);
+        if (targets.length > 0) {
+          await writeRelationLinks(column.id, copy.rowId, targets);
+        }
+      }
+    }
+  }
+
+  return {
+    rowIds: created.map((c) => c.rowId),
+    sourceIds: created.map((c) => c.sourceId),
+  };
+}
+
+/**
  * Soft-delete rows, and their promoted nodes with them.
  *
  * Cascade keys off `DataRow`, NOT off `ownedByNoteId` (plan Phase 5): a row
@@ -485,7 +732,28 @@ export async function createColumn(
     config?: DataColumnConfig;
   }
 ): Promise<string> {
-  return prisma.$transaction(async (tx) => {
+  return prisma.$transaction((tx) => createColumnTx(tx, tableId, input));
+}
+
+/**
+ * The body of `createColumn`, on a caller-supplied transaction.
+ *
+ * Exists so a multi-table schema can be created as ONE transaction (plan
+ * AI-RELATIONAL-DATABASE-REACH P2): a linked set of tables that half-applies
+ * is worse than one that fails, and nested `prisma.$transaction` calls cannot
+ * give that guarantee.
+ */
+export async function createColumnTx(
+  tx: Prisma.TransactionClient,
+  tableId: string,
+  input: {
+    name: string;
+    type: DataColumn["type"];
+    description?: string | null;
+    config?: DataColumnConfig;
+  }
+): Promise<string> {
+  {
     const existing = await tx.dataColumn.findMany({
       where: { tableId },
       select: { key: true, position: true },
@@ -517,7 +785,7 @@ export async function createColumn(
 
     await refreshTableSearchText(tx, tableId);
     return created.id;
-  });
+  }
 }
 
 /**
@@ -534,7 +802,20 @@ export async function createRelationPair(
   input: { name: string; description?: string | null },
   backlinkName: string
 ): Promise<{ forwardId: string; backlinkId: string }> {
-  return prisma.$transaction(async (tx) => {
+  return prisma.$transaction((tx) =>
+    createRelationPairTx(tx, tableId, targetTableId, input, backlinkName)
+  );
+}
+
+/** `createRelationPair` on a caller-supplied transaction (see createColumnTx). */
+export async function createRelationPairTx(
+  tx: Prisma.TransactionClient,
+  tableId: string,
+  targetTableId: string,
+  input: { name: string; description?: string | null },
+  backlinkName: string
+): Promise<{ forwardId: string; backlinkId: string }> {
+  {
     const makeColumn = async (
       onTableId: string,
       name: string,
@@ -586,7 +867,7 @@ export async function createRelationPair(
     await refreshTableSearchText(tx, tableId);
     await refreshTableSearchText(tx, targetTableId);
     return { forwardId: forward.id, backlinkId: backlink.id };
-  });
+  }
 }
 
 /**
@@ -606,7 +887,28 @@ export async function updateColumn(
     /** Fractional key. A drag rewrites ONE column — the point of D7. */
     position?: string;
   }
-): Promise<void> {
+): Promise<{ ok: boolean; reason?: string }> {
+  // System columns (DataColumnConfig.system — charter ledger machinery) are
+  // read BY NAME and by the option ids the quest code minted, so their shape
+  // is locked: a changed name or config is refused, never applied.
+  // Description and position stay free. Compared against the live row so an
+  // unchanged round-trip from the grid's Save (which resends both) passes.
+  const current = await prisma.dataColumn.findUnique({
+    where: { id: columnId },
+    select: { name: true, config: true },
+  });
+  if (!current) return { ok: false, reason: "Column not found" };
+  if (isSystemColumnConfig(current.config)) {
+    if (patch.name !== undefined && patch.name !== current.name) {
+      return { ok: false, reason: SYSTEM_COLUMN_LOCK_REASON };
+    }
+    if (
+      patch.config !== undefined &&
+      canonicalJson(patch.config) !== canonicalJson(current.config ?? {})
+    ) {
+      return { ok: false, reason: SYSTEM_COLUMN_LOCK_REASON };
+    }
+  }
   await prisma.$transaction(async (tx) => {
     const column = await tx.dataColumn.update({
       where: { id: columnId },
@@ -626,6 +928,7 @@ export async function updateColumn(
     });
     await refreshTableSearchText(tx, column.tableId);
   });
+  return { ok: true };
 }
 
 /**
@@ -641,11 +944,16 @@ export async function softDeleteColumn(
 ): Promise<{ ok: boolean; reason?: string }> {
   const column = await prisma.dataColumn.findUnique({
     where: { id: columnId },
-    select: { isPrimary: true, tableId: true },
+    select: { isPrimary: true, tableId: true, config: true },
   });
   if (!column) return { ok: false, reason: "Column not found" };
   if (column.isPrimary) {
     return { ok: false, reason: "The primary column cannot be deleted" };
+  }
+  // The charter-ledger machinery reads system columns by name; deleting one
+  // would detach the ledger from its charter at the next sitting.
+  if (isSystemColumnConfig(column.config)) {
+    return { ok: false, reason: SYSTEM_COLUMN_LOCK_REASON };
   }
 
   await prisma.$transaction(async (tx) => {
@@ -662,7 +970,7 @@ export async function softDeleteColumn(
  * Recompute the table's schema-derived search text (plan B2), so a table
  * stays findable by its column names after any schema edit.
  */
-async function refreshTableSearchText(
+export async function refreshTableSearchText(
   tx: Prisma.TransactionClient,
   tableId: string
 ): Promise<void> {

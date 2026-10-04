@@ -2,7 +2,7 @@
  * AI Tool Type Definitions
  *
  * Types for the base AI tools registry.
- * These tools are hard-coded application tools (searchNotes, getCurrentNote, createNote)
+ * These tools are hard-coded application tools (search_content, read_content, create_note)
  * plus editor tools (read_first_chunk, apply_diff, etc.) added in Sprint 39.
  */
 
@@ -26,12 +26,20 @@ export interface ToolExecuteContext {
   /**
    * Set by the chat route AFTER playbook resolution (attached or rooted
    * execution) when a playbook's full body is already injected into the
-   * system prompt. getCurrentNote returns a short pointer for this id
+   * system prompt. read_content returns a short pointer for this id
    * instead of re-sending the body — weak models re-read the playbook as a
    * belt-and-braces habit (measured: 17k duplicate chars in one live run).
    * The pointer is absence-safe: the source is re-injected every request.
    */
   activeCharter?: { contentId: string; title: string };
+  /**
+   * Tool ids the user set to run without an approval card
+   * (`ai.toolConfig[id].autoApprove`), and whether the charter's current
+   * phase is its last — read by the approval predicates in
+   * tools/approval-policy.ts.
+   */
+  autoApprovedTools?: ReadonlySet<string>;
+  charterFinalPhase?: boolean;
   /**
    * The bound Conversation entity id (sidebar multi-conv / full-page chat).
    * AI v3 core S3: lets tools associate created/read content with the
@@ -58,6 +66,9 @@ export interface ToolExecuteContext {
     input?: number;
     output?: number;
     cachedInput?: number;
+    /** Largest single step's prompt — decides the long-context tier. */
+    maxStepInput?: number;
+    maxStepCachedInput?: number;
   };
   /**
    * Usage from the turn's EARLIER segments (approval continuations start a
@@ -82,7 +93,7 @@ export interface ToolExecuteContext {
    * ChatViewer (i.e. the chat IS the open content, not the editor). Set
    * even though `contentId` is intentionally undefined for editor tools.
    *
-   * Used by createNote to default the parent folder to the chat's own
+   * Used by create_note to default the parent folder to the chat's own
    * parent — so "create a note about X" in a chat under /Recipes drops the
    * note next to the chat instead of at the vault root.
    */

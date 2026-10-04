@@ -13,6 +13,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/database/client";
+import { markRowDigestsDirty } from "@/lib/domain/data/server/digest-read";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import { logger, withRouteTrace } from "@/lib/core/logger";
 import {
@@ -141,6 +142,7 @@ export async function POST(request: NextRequest, { params }: { params: Params })
         update: {},
         select: { id: true },
       });
+      await markRowDigestsDirty([body.fromRowId, body.toRowId]);
 
       return NextResponse.json({ success: true, data: { linkId: link.id } });
     } catch (error) {
@@ -177,11 +179,12 @@ export async function DELETE(request: NextRequest, { params }: { params: Params 
       // holding write on some other table must not delete links here.
       const link = await prisma.dataRowLink.findFirst({
         where: { id: body.linkId, from: { tableId: id } },
-        select: { id: true },
+        select: { id: true, fromRowId: true, toRowId: true },
       });
       if (!link) return notFound("Link");
 
       await prisma.dataRowLink.delete({ where: { id: link.id } });
+      await markRowDigestsDirty([link.fromRowId, link.toRowId]);
       return NextResponse.json({ success: true, data: { deleted: true } });
     } catch (error) {
       logger.error({

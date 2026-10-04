@@ -10,6 +10,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/database/client";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import { logger, spanPayload, withRouteTrace, withSpan } from "@/lib/core/logger";
+import { WINDOW_REF_LINK_TYPE } from "@/lib/domain/content/window-refs";
+import { toWindowReferenceRow } from "@/lib/features/content/window-reference";
 
 const ROUTE_PATH = "/api/content/content/tree";
 
@@ -143,6 +145,16 @@ type ContentTreeNode = {
     groupId?: string;
     personId?: string;
   };
+  /**
+   * Mirror-row contract, set on synthesized window reference rows (see
+   * lib/features/content/window-reference.ts): the client's existing
+   * projection rules then apply unchanged — selection opens `mirrorOf`,
+   * drag is refused, the context menu goes read-only.
+   */
+  mirrorOf?: string;
+  isShortcutMirror?: boolean;
+  /** Present only on rows derived from window-ref edges. */
+  windowRef?: { targetId: string };
 };
 
 // ============================================================
@@ -720,6 +732,46 @@ export async function GET(request: NextRequest) {
       // Sort first, partition second — references keep the parent's sort order
       // among themselves instead of needing their own comparator.
       partitionReferences(rootNodes);
+
+      // Window reference rows: a note containing Note Window blocks surfaces
+      // each windowed target in its Reference Drawer. Rows are DERIVED per
+      // fetch from window-ref edges (maintained on save by
+      // syncWindowReferences) and never stored, so a retargeted or removed
+      // window cannot strand a stale row. Path-scoped `wref:` ids keep a
+      // target windowed by several notes — plus its real row at its storage
+      // location — from ever sharing an id in react-arborist. Appended AFTER
+      // partitioning so owned attachments keep their sort order and windows
+      // follow, in edge-creation order.
+      const windowEdges = await withSpan(
+        { layer: "tree", name: "window_refs" },
+        undefined,
+        async (span) => {
+          const edges = await prisma.contentLink.findMany({
+            where: {
+              linkType: WINDOW_REF_LINK_TYPE,
+              source: { ownerId: session.user.id, deletedAt: null },
+            },
+            select: { sourceId: true, targetId: true },
+            orderBy: { createdAt: "asc" },
+          });
+          span
+            .attr("edges", edges.length)
+            .summary(`${edges.length} window-ref edges`);
+          return edges;
+        },
+      );
+      for (const edge of windowEdges) {
+        const host = nodeMap.get(edge.sourceId);
+        const target = nodeMap.get(edge.targetId);
+        // Both ends must be visible in this tree (view scoping can drop
+        // either), the target must be live, and a target whose real row
+        // already sits under this host (an owned deliverable the note also
+        // windows) would duplicate that row, not add information.
+        if (!host || !target) continue;
+        if (target.deletedAt !== null) continue;
+        if (target.parentId === host.id) continue;
+        host.references.push(toWindowReferenceRow(target, host.id));
+      }
 
       const stats = {
         totalNodes: nodeMap.size,

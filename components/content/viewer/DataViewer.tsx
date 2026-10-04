@@ -62,12 +62,12 @@ export function DataViewer({
           <div className="mt-4 rounded-lg border border-white/10 bg-white/5 p-4">
             <div className="text-sm text-gray-400 mb-2">Data Configuration</div>
             {source && (
-              <div className="text-xs text-gray-500 mb-2">
+              <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
                 Source keys: {Object.keys(source).join(", ")}
               </div>
             )}
             {schema && (
-              <div className="text-xs text-gray-500">
+              <div className="text-xs text-gray-500 dark:text-gray-400">
                 Schema keys: {Object.keys(schema).join(", ")}
               </div>
             )}

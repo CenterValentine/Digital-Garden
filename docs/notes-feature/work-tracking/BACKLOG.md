@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-08-29
+last_updated: 2026-10-03
 ---
 
 # Sprint Backlog
@@ -9,6 +9,274 @@ last_updated: 2026-08-29
 **Sprint Execution Protocol**: Before commencing any sprint, always ask the user for input before planning and executing — there may be additions or modifications.
 
 ---
+
+## Split Pane Placement — behaviour as a setting (2026-10-02, from `feat/open-into-opposite-pane`)
+
+Where content opened from the file tree lands in a split workspace is a
+preference, and some of it is already built. The **seam exists and is
+covered**; what is missing is the control that reaches it.
+
+**Already shipped on that branch** — nothing below needs re-deriving:
+
+- `settings.ui.openDestination` in the Zod schema, with `"fill"` in
+  `DEFAULT_SETTINGS` (`lib/features/settings/validation.ts`). It sits under
+  `ui` on purpose: `saveToBackend` sends `ui` wholesale and `setUISettings`
+  already patches it, so registrations 3 and 4 of the four-registration rule
+  are satisfied by construction and the "saves, then silently reverts" trap
+  cannot apply.
+- `resolveOpenDestinationPane(layoutMode, activePaneId, isPaneEmpty, mode)`
+  in `state/content-store.ts` takes the mode and honours all three values.
+- The tree's open path reads the preference through the real store, so the
+  default is exercised end-to-end rather than hardcoded.
+- All three modes are pinned in `pnpm workspace:pane-placement:smoke`,
+  including the two nothing can select yet — an unreachable branch rots
+  before the control that exposes it lands, and then the settings PR gets
+  blamed for behaviour it did not write.
+
+**What is left: the UI only.**
+
+- A control in the appearance/workspace settings area with the three values:
+  - **Beside your work** (`fill`, default) — the opposite pane first, then any
+    empty pane, then back to the opposite. In a quad this fills the room
+    before stacking.
+  - **Always opposite** (`opposite`) — never spreads into the other panes.
+  - **In the active pane** (`active`) — how this behaved before the rule, for
+    anyone who wants it back.
+- Write through `setUISettings({ openDestination })`; do NOT add a new setter
+  or a new `saveToBackend` line.
+- Settings-page conventions apply: `"use client"`, Glass-0 `SettingSection`
+  cards, sonner toast on save.
+- Copy should say what each does to the pane you are reading in, since that is
+  the thing the default protects.
+
+**Worth deciding at the same time:** a tree click is a *preview* open, so a
+second one replaces the first in the destination pane rather than stacking.
+That is pinned as current behaviour, not asserted as correct. If "accumulate
+while browsing beside my work" is wanted, it is a `pin: true` on that call
+path and probably belongs to the same control.
+
+---
+## Wiki-link views — follow-ups (2026-10-03, plan `WIKILINK-VIEWS-PLAN.md`)
+
+- [ ] **Hocuspocus redeploy** after `feat/wikilink-views` merges (schema 1.20.0, `wikiLink.view`).
+- [ ] **Card preview for non-note targets** — folders, databases and files show the type word as the excerpt; a per-type summary (row count, file size, child count) is the nicety.
+- [ ] **Window → link drops `targetViewId` / `targetRowId`** (database windows); re-windowing picks the default view. Revisit with DATABASE Phase 2.
+- [ ] **"Send to…" destination picker** — `Send to New Note` creates beside the host; a `ContentTreePicker` flavor could offer a folder. Not built: the sibling placement is the structurally sound default.
+- [ ] **Typed input rule for the braced form** — typing `[[Title]]{#id}` by hand goes through the bare rule; the brace stays as text. Paste-as-markdown handles it.
+- [ ] **Hover chooser on touch** — no hover on touch devices; the context menu "Display as" is the reachable copy today.
+
+## One tree-browse menu — proposed (2026-10-02, owner; PR #277 context)
+
+`ContentTreePicker` (pane "+", Note Window retarget, databases rail, shortcut target) is the canonical tree-browse surface: opens at the file tree's perspective, recent destinations, header-styled scope row, the tree's row tones (deep gold = active, light gold = open elsewhere, grey = selected). The owner wants the OTHER file-tree-shaped menus united into it; PR #277 only gave them the "current" tone.
+
+- [ ] **AI target-folder pickers → `ContentTreePicker`** — `components/content/ai/TargetFolderChip.tsx` and `OutputTargetChip.tsx` ("Somewhere else…") each flatten the tree endpoint into their own folder list. Both are containers-only picks: `eligibleTypes` folders + `quickCreate` off (or `pickCreatesInside` for "new folder here"). Keep their chip-specific footers (mismatch warning, relative options).
+- [ ] **Move → Folder search → `ContentTreePicker` search mode** — `components/content/context-menu/FolderSearchFlyout.tsx` is a typeable folder search with recents (`folder-move-store`). The picker's search + a `recents` prop cover it; the flyout positioning (submenu math) is the part to keep.
+- [ ] **Folder assistant candidates** — `FolderAssistantDialog.tsx` lists candidate folders to confirm; tone only (no browse).
+- [ ] **Flashcard deck tree / People panel** — their own trees for their own data; align tones, do not migrate.
+- [ ] Once migrated, `folder-move-store` recents and `create-destination-store` recents should become one "recent folders" source with a `kind` (moved into / created into).
+- [ ] **Four private copies of the UUID regex** (`relation-cells.ts`, `linked-schema.ts`, `resolve.ts`, `read-format.ts`) could adopt `isUuid` from `lib/domain/content/uuid.ts`. (The single-tab workplace routes' guard — the other half of this item — shipped after PR #277.)
+- [ ] **The remembered workspace is per-browser** (found with the cold-load fix, 2026-10-04) — "where you were last" is `localStorage["workspace-active-id"]`, so a new device, a cleared profile or a private window still opens Main. A server-side last-active-workspace would fix it, but it is the one "active view" R3 says never syncs, so it needs a decision before it is built (and a column or a user-settings key — migration/four-registrations).
+- [ ] **Picker polish to revisit only if reported** — the Active pill's folder name truncates hard at the picker's 300px (`MENU_WIDTH`; widening ~20px is one constant); `deriveDestinations` ignores `createdAt` ties; `jumpToDestination` forgets a folder absent at Root without telling the user.
+
+---
+
+## E-reader — proposed (2026-09-29, plan `EREADER-PLAN.md`)
+
++ → Reader → [Scriptures, Books]. One reader shell (foliate-js for EPUB/PDF, a corpus renderer for scriptures), one annotation store keyed by Readium Locators, and a library of book-source adapters (OPDS, Gutendex, Open Library, upload). Books are file nodes in a user-chosen library folder. Blocked on owner answers to the plan's §10.
+
+- [x] **R0 Read an uploaded book** (built 2026-09-29; migration staged) — `createMenuItems` extension field, `extensions/reader/`, EPUB MIME + DRM gate, foliate-js viewer, `ReadingProgress`.
+- [x] **R1 Mark it up** (built 2026-09-29) — `ReaderAnnotation`, selection toolbar, in-reader annotations panel, send to note. *Still open:* `readerLink` TipTap node, right-sidebar tab.
+- [x] **R2 Library** (built 2026-09-29; + Wikisource, OAPEN, Google Books, Standard Ebooks preset) — OPDS / Gutendex / Open Library adapters, library dialog, acquire into folder, `BookMeta` + covers.
+- [ ] **R3 Scriptures in the reader** — scriptures plan P0/P1 feed a corpus source sharing the annotation store.
+- [ ] **R4 Bring in the rest** — ~~Kindle clippings + Readwise, Hardcover, Libby link~~ (built 2026-09-29); highlights → database, flashcards, AI tools, speed-reader EPUB, PDF in reader.
+- [ ] **Research (reader stub)** — third reader source after Scriptures: open-access papers (arXiv, PubMed Central, OpenAlex/Unpaywall, Semantic Scholar) through the same shell + annotation store.
+- [ ] **CSP for /content** — foliate-js wants a script-blocking CSP; the reader sanitizer is the interim defence.
+
+## Scriptures integration — parked (reader moved to `EREADER-PLAN.md`) (2026-09-28, plan `SCRIPTURES-INTEGRATION-PLAN.md`)
+
+LDS standard works as a shared read-only corpus (seeded from the public-domain `bcbooks/scriptures-json` at a pinned SHA), with study living in the user's own notes. Blocked on owner answers to the plan's §9 open questions (shared corpus tables; talk-clipping vs site terms).
+
+- [ ] **P0 Corpus** — shared `Scripture*` tables + migration, pinned seed script cross-checked against `beandog/lds-scriptures`, read API.
+- [ ] **P1 Read & cite** — `extensions/scriptures/`, reference parser (evaluate `scripture-guide` first), `scriptureRef` inline node, reader viewer, `ScriptureCitation` index.
+- [ ] **P2 Study** — `scriptureQuote` block, "Add study note" into a user-chosen folder (lazy), Citations sidebar tab, scripture search scope.
+- [ ] **P3 Mark & memorize** — offset-anchored highlights (`ScriptureAnnotation`), flashcard "Memorize".
+- [ ] **P4 Talks & AI** — user-initiated talk clipping (never bundled), footnote → citation parsing, Talks database, AI `read_scripture` grounding tools.
+
+## Iteration run harness — follow-ups (2026-09-27, from `feat/charter-run-harness`; plan `ITERATION-RUN-HARNESS-FIXES-PLAN.md`)
+
+- [ ] **Clean the *Apply for a job* charter note in production.** It holds four identical copies of its content (66 KB TipTap, last modified 2026-09-27 22:19 UTC, after the evaluated run). The parser now collapses the copies and the charter context says so, but the note itself still costs four copies to load in the editor and to sync. Hand-fix: delete three copies in the editor.
+- [ ] **Charter-named databases and private content.** `charterReferencedTableIds` reads the charter's wiki-links without running `stripPrivateContent`; a link inside a commented-out run still grants reach. Reach is not disclosure, so this was left as-is — revisit if the private-content seam list wants jurisdiction on it.
+- [ ] **Status-column regressions during a rows pass.** The evaluated run moved a Qualified opportunity back to Research Queue on its own judgment. Deliberately not guarded in the harness (D6) — the charter's wording owns pipeline state. If it recurs, the cheapest guard is a capture rule "a status column only moves forward within its group order unless the charter says otherwise".
+- [ ] **`durationMs` on turn metadata is server time only.** It sums per-request server durations and excludes client-executed tools (browser reads, `create_docx`); a five-minute turn reports ~72 s. Not wrong, but unlabelled — rename or add `wallClockMs` from the first request's `startedAt` to the last request's finish.
+- [ ] **Extension-side chrome detection.** `looksLikeNavigationChrome` runs server-side (P1/P2 material) and on the session-tab result; the extension's own reader could apply it before hydration settles and retry once with a longer settle when the body is chrome.
+- [ ] **Run cost levers (plan §10) — remaining.**
+  - L1, L2, L3a and L4a are built (#270, #271). L3b was superseded by L2. Round 3 is on `fix/docx-cache-volley`: budget on tool results, DOCX hyperlinks and file-extracted check text, GPT-5.6+ write pricing, gpt-6 cache key, Anthropic breakpoints, and the approval volley.
+  - **Verify on the next run:** `cachedInputTokens` climbs inside a request now that the trailing notice is gone. If it still freezes, export `ai:prompt_wire` again.
+  - **Prefix diagnostic → per-conversation owner toggle** that writes the divergence summary into the turn's metadata (readable with pg-read), replacing the env var and the Vercel log export. Keep the env var until then (unset).
+  - **Search delegation trial:** the OpenAI search backend is built (#273). Run one charter job with Chat controls → Web search set to `gpt-5-search-api`, then compare against `36237eb8` (native: 12 searches, $0.12 in fees). Compare `searchCostUsd` summed from the transcript plus the chat meter, and research quality. The per-search fee question ("search actions incur a tool call cost") is settled by the first OpenAI bill.
+  - **Fold backend search cost into the chat meter:** `searchCostUsd` rides the tool result but isn't added to the turn's cost.
+  - **DOCX layout render (optional):** a DOCX → PDF tool (OnlyOffice conversion) returning the page count and an image of page one, for a true layout check. Until then the charter hands visual review to the owner.
+  - Open decision **D8 (revised):** should charter turns on OpenAI use the app-run search backend instead of native search, so search is refusable, repeat-guarded and budgetable, at the cost of OpenAI's integrated citations?
+  - **Model watch:** a weekly routine reporting gaps between new model releases and our catalog, pricing, constraints, adapter and gateway rows to a GitHub Issue. Waits on the owner: provider keys as repo secrets, and Issue versus Wiki.
+  - **Cost forecast:** a per-task token and cost estimate before a run or charter turn, with actual next to forecast afterwards.
+
+## Move tab to workplace / workbench — follow-ups (2026-09-21, from `feat/move-tab-to-workspace`)
+
+- [ ] **`service.ts` is unreachable from `tsx` scripts.** The workplaces service imports `generateSlug` from the content barrel, which loads the TipTap server extensions, and `@tiptap/extension-code-block-lowlight`'s CJS build fails default-export interop against the nested code-block package under plain Node. `workspace-tab-move-smoke.ts` therefore covers `membership.ts` only; the `getWorkspace` tabs include + `contentMeta` naming of membership-only ids is typecheck- and browser-covered. Either import `generateSlug` from its own module in `service.ts` or give the barrel a Prisma-free, editor-free slug entry point.
+- [ ] **Move into a deeper-layer workbench folder before it exists.** The tab menu fetches each view workplace's root-layer folder list; folders at nesting depth 2–3 are destinations only once materialized (they then come from the store). The selector's scoped-tree fetch (`/api/content/content/tree?viewRootContentId=`) answers every layer in one call if deeper unmaterialized moves are wanted.
+- [ ] **Multi-tab move.** The menu moves the right-clicked tab only. A "Move N selected tabs" needs a tab-strip multi-selection that does not exist yet.
+- [ ] **Drop panel on the side-panel embed.** `PanelShellClient` mounts `WorkspaceSelector` directly, not through `WorkplacesShellNavigationControls`, so the drag-to-move panel does not exist there. Wrap that mount in `WorkspaceTabDropTarget` if the panel's narrow tab strip wants it.
+- [ ] **Undo after moving on to a third workplace.** Undoing a hold-drop (which switched to the target) after the user has since switched to a THIRD workplace moves membership back but cannot rewrite the target's `paneState` blob, which still lists the tab until that workplace next saves; on its next open the blob ∪ membership union resurrects the tab there. Rare inside a 10 s window; a fix needs a server-side blob scrub on `/tabs/move` (like `removeContentFromWorkspaces` does on delete).
+- [ ] **Touch has no HTML5 drag.** The drop panel is desktop-only by construction; on touch the context menu's "Move tab to" remains the path. A long-press → sheet variant would need the pointer-event hold pattern from the clear-tabs control.
+- [ ] **Extension side-panel closes never reach membership (pre-existing).** `closeWorkspaceTab` (`DELETE /tabs`) has no client caller and ext:* surfaces persist additively, so a close in the panel never removes the R1 row. Not introduced here — the move deletes its source row server-side precisely so it is complete on those surfaces — but traced while wiring this.
+
+## Proposal shape leniency — follow-ups (2026-09-21, from `feat/proposal-shape-leniency`)
+
+- [ ] **Stitch hrefs onto label-only items.** When a proposal's items are bare strings (no url) and the turn's last `co_browse_act collect` returned cards with hrefs, the harness could attach each matching card's href at proposal time — url-tier keys instead of label-tier, dedupe against the capture table possible. The model had the hrefs in prod `fa475acc` and sent strings anyway.
+- [ ] **Extend the describe-only rule beyond the run loop.** Gate 7 covers the five run-loop tools. `propose_database_columns` / `propose_linked_databases` / the flashcard proposal tools still carry schema refinements; each should get the same treatment (resolvers + teaching refusals) and join the gate's list.
+- [ ] **Step-chain fold attribution.** The chain shows `−N` where context shrank; naming *which* transform folded it (turn / distillation / dedupe / write input) needs the route to stamp per-step fold stats into the segment.
+
+## Context economics — follow-ups (2026-09-18, from `feat/context-economics`)
+
+PR A of `AI-CONTEXT-ECONOMICS-PLAN.md` shipped the fold-on-distillation/turn and the tool-part dedupe. Left deliberately:
+
+- [x] **PR B — pay for a page once, at the source.** Shipped 2026-09-18 on `feat/payload-economics` (stacked on PR A): `supersedeWriteInputs` (addresses kept, payload dropped, failed writes exempt; `propose_item_iteration` only after findings) and `coBrowsePageIdentity` (keyframe on origin+path, not the full URL). Plan §2.
+- [ ] **Write-tool bubbles could show an "input folded" badge.** Deliberately not built in PR B — the bubble's default view already leads with the receipt the model keeps (plan §2 B1) — but a badge would make the fold *visible* the way the perception chips are.
+- [ ] **Continuations after a reload persist as new rows.** `use-conversation-binding.ts` keys its PATCH-vs-POST decision on refs that a reload resets, so a turn continued after Stop + refresh lands as one row per continuation, each carrying the whole prefix (the evidence thread stored 144 kB of unique parts as 577 kB) and the turn's full `usage` — the session cost estimate counts such a turn once per row. Fix at write time in `appendMessage` (update the latest assistant row when the incoming parts share its leading `toolCallId` sequence), or carry the row's uuid into the continuation so the route's `isUuid` branch extends it; the latter touches the approval-resume path and needs a prod resume smoke. Plan §3.
+- [ ] **Compaction / summarisation as the fallback layer** under the folds — sized only after PR B, against a clean transcript.
+- [ ] **`scripts/pg-read.sh` dies silently when `DATABASE_URL_READONLY` is absent** — `set -e` kills it on the failing `grep` before its own "not set" message prints, and it resolves `.env.local` relative to the script's checkout, so a worktree copy of the script needs the worktree's `.env.local` to carry the variable (this worktree's is commented out). Print the message before the grep can fail.
+
+## Tool summoner — follow-ups (2026-09-17, from `feat/ai-tool-summoner`)
+
+The branch shipped P0-P4 of `AI-TOOL-SUMMONER-PLAN.md`. These were specified in it and deliberately not built.
+
+- [x] **Measurement harness** — `pnpm tools:prefix:measure`, reading a development-only `GET /api/dev/tool-prefix`. Shipped 2026-09-17. Stubbing the heavy modules was tried and rejected: `insert_block`'s description is generated from the block registry, populated by `registerBlock()` at import time of each TipTap block extension, so a stubbed run measures the largest tool as a fraction of itself. Breaking the require-cycles so plain `tsx` can load the graph remains open, and would also unblock unit tests over tool definitions.
+- [ ] **`repaired` badge on the collapsed tool chip** when `record_item_result` inferred a status. The `statusNote` is already in the tool result (visible on expand); the badge is disclosure at a glance, per "a silently applied correction reads as a bug".
+- [ ] **Predictive activation named in the run ledger** phase line, so the user can see *why* a tool was available without a summon chip.
+- [ ] **Advertised-tool tokens in the turn accumulator**, so the prefix cost is reported per turn rather than inferred.
+- [ ] *Known ceiling, may be unfixable:* a **name repair cannot surface in the UI**. `repairToolCall` rewrites the call before a tool part exists, so there is no stream hook — the chip shows the corrected name with no trace of the correction. Server-side `tools:name_repaired` logging may be the honest limit.
+- [ ] **Watch for off-task tool calls.** Tool absence used to keep a run focused; a menu gives that up. Mitigated by leading with the active mode's families, but this is the one place the change could plausibly regress behaviour.
+
+## `pg` pool silently falls back to production Neon (2026-09-17)
+
+Found while debugging a local dev failure, unrelated to the branch it surfaced on. `.env.local` carries the Vercel/Neon integration's libpq variables (`PGHOST`, `PGPASSWORD`, `PGDATABASE`, all pointing at Neon), and `lib/database/client.ts:156` builds its pool as `new Pool({ connectionString: databaseUrl })` with no explicit host — while `databaseUrl` has a `|| ""` fallback. `node-postgres` reads `PG*` as defaults, so an unset, empty or unparseable `DATABASE_URL` does not fail: it connects to **production**.
+
+- [ ] Throw on an empty/unparseable `DATABASE_URL` instead of defaulting, or pass an explicit host and `ssl: false` when `LOCAL_POSTGRES=1`. `scripts/check-db-target.ts` already guards the *declared* target; this is the same guard missing one layer down, at the pool.
+
+## Charter detach is per-device — needs a migration to follow the conversation (2026-09-18)
+
+**Requires a schema change.** `prisma/` is owner-protected, so this ships as a reviewable migration handoff (canonical SQL via `prisma migrate diff` + create-and-commit steps), not an agent-run `migrate dev`.
+
+Shipped in PR #249: dismissing the charter chip in a chat bound to that charter now actually detaches — the chip stays hidden AND the server stops binding it (`charterDetached` on the request body, honored where `boundCharterId` resolves). The dismissal persists per chat in `localStorage`, keyed `dg:charter-detached:conv:<id>` / `:content:<id>`, matching where the output target already lives.
+
+That makes it **per device**. The same conversation opened on another machine re-binds the charter, because the decision lives in the browser rather than on the conversation. Owner accepted this for now (2026-09-18) with the fix tracked here.
+
+- [ ] Add a nullable `charterDetached Boolean?` (or a broader `charterBinding` enum, if a third state ever appears) to `Conversation` — it sits beside `activeContextId` / `targetFolderId`, which are the same shape of per-conversation preference.
+- [ ] Chat route reads it when resolving `boundCharterId`, so the detach holds for a conversation regardless of which device opens it.
+- [ ] Engine writes it through the conversation API instead of `localStorage`; keep reading the old key once as a migration path so an existing dismissal is not silently undone on first load.
+- [ ] Transient chats (no `conversationId`) have no row to write to — they keep the `localStorage` path, which is correct: there is no conversation for the preference to belong to yet.
+
+Worth pairing with any other `Conversation` column that comes up, rather than spending a migration on one boolean.
+
+## Duplicate relation columns in production (cleanup, 2026-09-13)
+
+From the first linked-schema run, before PR #234's reciprocal refusal shipped. The fix prevents recurrence but cannot remove what exists.
+
+- [ ] Delete the second `Experience` column on **Claims and metrics** (`7c3565e1`) — the table has a forward and a backlink with the same name.
+- [ ] Delete **`Claims and metrics 2`** on **Experiences** (`79477f2d`) — the collision-suffixed backlink of the duplicate pair.
+- [ ] Confirm the surviving pair still links both ways before deleting either.
+- *2026-09-14:* the Career Evidence Library was loaded (235 rows, 1,025 links) writing ONLY the canonical pair `Experiences.Claims and metrics ↔ Claims.Experience (backlink)`; the duplicate pair holds zero links, so both deletions above are now safe.
+
+## Database CSV import + per-table export button (2026-09-12, from the career-evidence migration brainstorm)
+
+Export already ships — `exportDatabaseCsv` (`lib/domain/data/server/export.ts`) writes a CSV of the default view plus a `.meta.json` sidecar — but only through **vault export** (`bulk-export.ts`); there is no per-table "Export CSV" affordance. Import is a **reserved shape with nothing behind it**: `lib/domain/data/import.ts` returns `NOT_IMPLEMENTED` and has zero consumers. Surfaced because moving a 28-item markdown ledger into the four-table Career Evidence Library had no file-based route at all.
+
+- [ ] **Per-table Export CSV** in the database toolbar/context menu, reusing `exportDatabaseCsv` (the sidecar already reserves the round-trip shape). *2026-09-13:* the vault export now also writes a `.schema.md` sidecar per database (`lib/domain/data/schema-markdown.ts`), and the markdown/plaintext note exports carry accordion / card-panel headers and statsTable rows instead of flattening them.
+- [ ] **CSV/TSV import** behind `inferColumnsFromSamples` — header→column mapping card, type inference with confidence, select-vocabulary proposals from distinct values, provenance stamped in `DataPayload.source`. Relations import by target-row title (the same resolution `insert_rows` uses).
+- [ ] **Markdown-table → rows** as a thin variant of the same importer (paste or pick a note; each table row becomes a DataRow) — the cheapest bridge from an existing note to a database that needs no AI turn.
+
+## Unrefined → structured — feature soil (2026-09-12, from the career-evidence migration brainstorm)
+
+Principle: `core/PRODUCT-PRINCIPLES.md` §2. Each item below serves the general note ↔ database loop, not the one ledger that surfaced it.
+
+- [ ] **Paste rows into a database.** Paste a TSV / CSV / markdown-table block (or plain lines) into the grid → a mapping strip (source column → table column, type coercion, select labels resolved or proposed) → rows appended. The cheapest bridge from a spreadsheet, a chat answer, or another note into a table; shares its mapping/coercion core with the CSV importer above.
+- [ ] **Send block to database (context-menu action) — the table picker is the heart of it.** Right-click a block (accordion, heading section, list, table row) → *Send to database…* → picker with recent tables, search, and a *New table from this block* option → a proposal card pre-filled from the block, with the block's `blockId` recorded on the row (contentLink or provenance) so the row points back at its source. The picker should be the reusable tree-browse picker (`NoteWindowPicker` lineage), scoped to `data` nodes. Benefits: promotion without a chat turn; provenance for free; a natural home for the vocabulary pre-scan; the same picker later serves "send selection", "send chat output", and "send row to another table".
+- [ ] **`source: "document-sections"` for `propose_item_iteration`** — enumerate the bound note's accordions / headings / list items / dated entries as items keyed by `blockId` (a `"block"` keyTier, stronger than URL). Makes note → rows an approved, resumable run. Pairs with a vocabulary pre-scan step (one `propose_column_options` card up front) so per-item option collisions don't stall the run.
+- [ ] **`read_content_chunk(contentId, index)`** — chunk reads for any owned note, not only the bound one (the chunker exists; it just needs a content id instead of `loadNote()`). Defuses the 2,000-char mention cap for tools and lets satellites come from a second note.
+- [ ] **Mention pill character-count tooltip.** The `@mention` pill's `title` (`makeMentionPill`, `ChatInput.tsx`) should show the note's length and what the capsule will inject: e.g. `28,103 chars — first 2,000 injected`. Needs the count on the suggestion payload (`/api/content/content?search=` → add `charCount` from `searchText`, and the data/row suggest route) or a lazy fetch on hover. Small; intended to ship in the same session as the brainstorm if time allows.
+- [ ] **Model-aware mention budget** — replace the flat `slice(0, 2000)` (`app/api/ai/chat/route.ts`) with a budget derived from the model's `contextWindow` + cost tier (`PROVIDER_CATALOG`), a global default in `settings.ai` (compact / standard / full or an explicit number), a per-model override, and a per-turn chip override ("Full text"). Budget in tokens, allocated across mentions rather than per note; outline-first when truncating (headings + accordion `headerText`s via `outline-extractor.ts`); and *say* it's truncated (`showing 2,000 of 28,103 — read_content_chunk to continue`).
+- [ ] **Note character limit at the 1M-token equivalent.** Hard cap so a single note can never exceed ~1M tokens (≈ 3.5–4M characters; pick the constant from the catalog's largest context window and document the tokens-per-char assumption). Enforce in the editor — `CharacterCount` is already loaded in both extension sets; check TipTap's built-in `limit` option first — so typing/pasting past the cap is refused, with a sonner toast each time the user tries. Also enforce server-side on the note write path (REST + `write-note-content.ts`) so imports and scripts can't exceed it either. Prevention, not truncation: never drop content silently.
+- [x] **Accordion markdown codec** — *Shipped 2026-09-26* (`feat/accordion-markdown-codec`). Accordions were falling to the **Tier-3 opaque fence** (not the Tier-2 HTML div the original note assumed): six attrs plus a blockId with no markdown form. They now serialize as `<details data-*>` + `<summary>` with the body as real markdown after a blank line (CommonMark type-6 HTML block), and `reTag` folds marked's output back into `div[data-block-type="accordion"]`. Nested accordions resolve innermost-first; a newline in the header declines to the fence. The gate asserts pretty, nested, and the decline; mutation-tested. Guide §5a records the tempered-regex lesson.
+- [ ] **Deliberate-gap semantics for cells** (raw). A row can be "incomplete on purpose" (the source was never captured) vs "not yet processed". Today only conventions distinguish them (placeholder rows, `Readiness: Needs detail`, `Evidence strength: Needs verification`, column descriptions saying blanks may be deliberate). Consider a first-class marker — a per-cell *unknown* sentinel or a table-level "gaps are deliberate" description the schema digest surfaces — so DG's AI neither fills gaps with invention nor treats them as work to redo.
+- [ ] **Flashcards → database schema (cleanup, very raw).** Flashcards carry their own Prisma models (`FlashcardDeck`, `Flashcard`, `FlashcardReviewAttempt`) beside the general `DataPayload` / `DataColumn` / `DataRow` schema that arrived later. Explore reducing flashcards to a *database with a review runtime*: a deck = a table with a locked system column set (front/back/media/FSRS state), the player and scheduler read rows, and `propose_cards_from_media` becomes an instance of note → rows. Data II already proved the Database → deck direction (PR #195). Owner intends to expand this later; record only the basis for now.
+
+## Loader hardening after the career-evidence migration (2026-09-14)
+
+The owner-run loader (`scripts/import-career-evidence.ts`) surfaced two things worth fixing in the product paths that share its helpers:
+
+- [ ] **`createRows` runs every insert inside one interactive transaction.** 99 rows over the Neon pooler crossed Prisma's 5 s default ceiling and rolled back. `insert_rows` caps at 25 so it is unlikely to hit this today, but a slow pooler moment could; either chunk inside `createRows`, raise the transaction timeout for that call, or batch-insert with `createMany` + a second query for ids.
+- [ ] **Library-style index tables upsert on the primary text column with no uniqueness guarantee.** Two ledger sections collapsed to the same title once trailing punctuation was trimmed; only the dry run caught it. Consider a dedupe warning in `insert_rows` when `dedupeBy` is the primary column and the batch itself contains duplicates.
+- [ ] **`Evidence strength`-style columns need their levels defined in the column description.** Two models given the same mapping read "Documented" differently (artifact exists vs. appears in a supplied document). The schema digest already carries descriptions to the model; a one-line definition per level is the cheapest guard.
+
+
+## Right-sized database reads — follow-ups (2026-09-15, after the build)
+
+From `AI-BULK-ROW-READING-PLAN.md` §8; each is small and independent.
+- **Iteration card: per-line release controls.** The standing-context block lists the reads pinned for the run; a *release* (fold now) and *index only* control per line needs a way to change the applied lifetime after the fact — a tool-part annotation the fold reads. Today the block is informational.
+- **Charter-declared tables on the card, with sizes.** The card shows a generic line for tables the charter declares (`Reference tables`); sizing them pre-approval needs a small route (`GET …/standing-context?charterId=`) that returns tier + row count + estimate per declared table.
+- **Grid virtual "AI digest" column.** Hidden until a view shows it — but views have no column-visibility mechanism yet (`ColumnPref.hidden` is declared, not wired). Digests render on the row page/peek with a stale badge for now.
+- **`expand` (one-hop subgraph reads) and keyset cursor on sorted queries** — plan §6 (PR 2). Measured: nesting is the cheapest whole-graph encoding (22.7k vs 37.9k tokens for the evidence library).
+- **Standing context tier "index with digests" needs the table opted in** — the schema-rail switch is per table; a charter that declares digests on a table with digests off falls back to the index tier silently. Surface it on the iteration card once sizes are fetched.
+
+## SQL passthrough for AI database reads — considering, not planned (2026-09-14)
+
+A tool that takes a SQL string from the model and runs it verbatim against the database, returning raw rows. Attractive because one flexible tool would cover every read shape (filter, join, group-by, subgraph). Parked while `query_database` gains `search`/`rowIds`/`groupBy`/`expand` through the one filter compiler (`AI-BULK-ROW-READING-PLAN.md`), which covers the same ground with the safeguards below intact. Revisit only if a read shape appears that the compiler cannot express.
+
+Risks recorded at the time:
+- **Jurisdiction cannot be enforced.** Every read tool passes through `resolveJurisdiction`, so the model reaches only databases mentioned in the chat (or charter-linked). A SQL string can name any table id; guaranteeing a query touches only permitted rows means parsing and rewriting SQL — a project of its own.
+- **The model must know the storage layer.** Cells are keyed by opaque column keys, selects store option ids, links live in `DataRowLink`. The physical schema would have to ride along in context on every call — more tokens than the reads it saves.
+- **A read-only role reduces, not removes, the risk.** It stops writes but not expensive queries, cross-user reads through any table the role can see, or timing probes against the pooler.
+- **The teaching refusals vanish.** "No column named X — columns are …" is what makes weak models converge; a SQL error is not a lesson.
+- **Drift.** Column keys and option ids change under the model; a saved query in a charter would rot silently.
+
+Ad-hoc SQL keeps its proper home: a human at a terminal with the read-only role (`scripts/pg-read.sh`).
+
+## Referenced content: which relationships are actually FIXED? (review, 2026-09-13)
+
+Owner's rule (2026-09-13): **only referenced content that has a FIXED relationship with its parent should be unmovable** — everything else must be draggable out.
+
+Verified for chat outputs: they are movable. `POST /content/move` detaches a reference on an explicit folder drop (`ownedByNoteId = null`) or a root drop, and the tree's re-nesting fallback only re-homes references whose owner is an `image-ref` / `audio-ref` embed. A chat-created note or database is not embedded, so it detaches permanently.
+
+- [ ] **Audit every producer of `role: "referenced"` against the rule** — diagram/media embeds (genuinely fixed while the embed exists), flashcard media folders, promoted data rows (`contentId` on `DataRow` is unique and load-bearing), quest/run ledgers, chat outputs (free). Write down which are fixed and why.
+- [ ] **Make the fixed ones say so** rather than silently snapping back. Today an embedded reference dragged to a folder re-nests on the next tree fetch; the move route already returns `stillReferencedBy` for exactly this, so the affordance exists — check it is actually surfaced everywhere it should be.
+- [ ] **Consider a tree affordance** distinguishing "nested but free" from "nested because something points at it", so the difference is visible before the drag rather than after.
+
+## AI relational database reach — MERGED 2026-09-12 (**PR #231**, merge commit `0114a80a`)
+
+Plan: [AI-RELATIONAL-DATABASE-REACH-PLAN.md](AI-RELATIONAL-DATABASE-REACH-PLAN.md). Built as one release train; see §3 for the commit table and what the build changed about the plan.
+
+- [x] **Let the assistant see the graph** — digest names relation targets, lookup paths and rollup functions; limit-scoping prompt rule; relational-database prompt block; `ai:drift:check` gate 6 pins the column vocabulary (mutation-tested three ways).
+- [x] **One consent for a linked schema** — `propose_linked_databases`, `POST /api/content/data/batch` in one transaction, `LinkedDatabasesProposalCard` leading with the edges.
+- [x] **Fill the links** — relation cells in `insert_rows` / `update_row`, addressed by target row title or id.
+- [ ] **Production smoke** (PR #231 and PR #234 bodies each carry a 10-item list): replay the recorded request; bad-target rollback; relation + rollup onto an existing table; populate from the ledger note; refusal paths (unresolvable title, backlink write, captureTo relation).
+- [ ] **Annotate feature-request note `3cc169ea`** with what shipped and which layer each of its five gaps lived in, so the document that started this reflects the outcome.
+- [ ] **Migrate the four prod tables** from that session (text `Claim IDs` / `Source IDs` / `Experience ID` columns → real relations). Owner action in the grid, or a one-off script.
+- [ ] **`note-sections` enumeration source** for `propose_item_iteration` — the governed route for migrating notes too long to attach. Unscheduled.
+
+## Public file links — follow-ups (2026-09-11, after PR #227 `feat/shareable-image-links`)
+
+The `/f/<token>` capability link (FilePayload.publicToken → 302 to a presigned URL) now exists; these are the other places that still emit the session-only `/api/content/content/<id>/download?stream=true` path and should be switched to it.
+
+- [ ] **Published notes with uploaded images are likely broken for visitors.** `components/public/TipTapContent.tsx` renders image nodes with their stored `src`, which is the owner-only download route; an anonymous visitor gets 401/500. Rewrite image `src` at render time via `ensurePublicFileLinks` (server-side, the owner is the page's author). Verify in a private window before and after.
+- [ ] **Markdown export emits the private path.** `lib/domain/export/converters/markdown.ts` `case "image"` writes `![alt](src)` with the stored src. Resolve `contentId` → `/f/<token>` (absolute, using the request origin) so exported vaults render images outside the app.
+- [ ] **R2 `uploadFile` returns a seven-day presigned URL** (`lib/infrastructure/storage/r2-provider.ts` ~L195) and `POST /api/media/upload` stores that URL directly into hero / gallery block attributes. On R2-backed accounts those block images plausibly expire a week after upload. Unverified in prod — check a hero block older than seven days. Fix direction: media uploads should create a FilePayload (or at least a token-bearing record) and store the `/f/` link, not a presign.
+- [ ] **Owner-facing revocation.** Nothing in the UI rotates or clears a file's `publicToken` yet. A "Reset share link" action on the file node (context menu or file viewer) that nulls the token closes the loop; trashing the node already 404s the link.
+- [ ] **Copy inside the browser-extension embed.** The share-link prime request rides plain fetch cookies, which the `/embed`-scoped session does not provide; copies there fall back to the absolute private URL. Route the prime through the embed bridge (`X-Embed-Session` / `?_t=`) if embed copy matters.
+## Window reference rows — follow-ups (2026-09-11, branch `feat/window-reference-drawer`)
+
+- [ ] **Media-ref freshness gap (latent, pre-existing):** `syncImageReferences` runs only on the REST PATCH and browser-extension paths — the collaboration store hook (`storeCollaborationYDocState`) never calls it, and Y.js-first saves are the primary write path. Embedded media edges (which drive Reference Drawer ownership resolution in the tree route) can therefore go stale for collab-edited notes until some REST-path write lands. The window-ref sync added by this branch DOES hook the store path — extending the media sync the same way needs its own care because it carries ref-count-gated soft-delete (`softDeleteIfOrphaned`), which must not run against a transient/partial snapshot.
+- [ ] **Edge backfill:** `window-ref` edges materialize on a note's first save after deploy. Existing notes show no window rows until then. Acceptable lazily; a one-shot backfill script (walk NotePayloads → `syncWindowReferences`) would close it if anyone notices.
+- [ ] **Shared projection-row helper:** window rows are the second consumer of the mirror-row contract (path-scoped id + `mirrorOf` + `isShortcutMirror`). If a third appears, extract the contract (id minting, view-only guards) into one module instead of a third parallel implementation.
 
 ## Quest master ledger under-counts sitting tokens (2026-09-04, first production quest)
 

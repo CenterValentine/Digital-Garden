@@ -9,7 +9,7 @@
  * point of having descriptions at all.
  */
 
-import { Info } from "lucide-react";
+import { Info, Lock } from "lucide-react";
 import { cn } from "@/lib/core/utils";
 import type { DataColumn, DataColumnType } from "@/lib/domain/data";
 
@@ -168,6 +168,15 @@ export function DataColumnHeader({
           aria-label={`${column.name}: ${column.description}`}
         >
           <Info className="h-3 w-3" />
+        </span>
+      )}
+      {column.config?.system === true && (
+        <span
+          className="shrink-0 text-muted-foreground/70"
+          title="System column — part of the charter's ledger machinery; name, type and options are locked"
+          aria-label={`${column.name}: system column, schema locked`}
+        >
+          <Lock className="h-3 w-3" />
         </span>
       )}
       {column.isPrimary && <span className="sr-only">(primary column)</span>}

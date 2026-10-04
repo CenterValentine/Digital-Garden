@@ -176,7 +176,7 @@ export function DashboardView({
       const preview = item.note.searchText.substring(0, 150);
       return (
         <div className="h-full flex flex-col">
-          <p className="text-xs text-gray-600 line-clamp-4 flex-1">
+          <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-4 flex-1">
             {preview}
           </p>
         </div>
@@ -193,7 +193,7 @@ export function DashboardView({
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="text-sm text-gray-600">Loading dashboard...</div>
+        <div className="text-sm text-gray-600 dark:text-gray-400">Loading dashboard...</div>
       </div>
     );
   }
@@ -202,8 +202,8 @@ export function DashboardView({
     return (
       <div className="flex flex-col items-center justify-center h-full text-center px-4">
         <ImageIcon className="h-16 w-16 text-gray-400 mb-4" />
-        <p className="text-sm text-gray-600 mb-2">No items in this folder</p>
-        <p className="text-xs text-gray-500">
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">No items in this folder</p>
+        <p className="text-xs text-gray-500 dark:text-gray-400">
           Create content to see it displayed as dashboard tiles
         </p>
       </div>
@@ -247,11 +247,11 @@ export function DashboardView({
           >
             <div className="drag-handle cursor-move border-b border-white/10 px-3 py-2 bg-white/5">
               <div className="flex items-center gap-2">
-                <div className="text-gray-600">{getIcon(item.contentType)}</div>
-                <h4 className="text-sm font-medium text-gray-900 truncate flex-1">
+                <div className="text-gray-600 dark:text-gray-400">{getIcon(item.contentType)}</div>
+                <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate flex-1">
                   {item.title}
                   {displayExtension && (
-                    <span className="text-gray-600">{displayExtension}</span>
+                    <span className="text-gray-600 dark:text-gray-400">{displayExtension}</span>
                   )}
                 </h4>
                 <button
@@ -262,7 +262,7 @@ export function DashboardView({
                   className="flex-shrink-0 p-1 rounded hover:bg-white/20 transition-colors"
                   title="Open in main panel"
                 >
-                  <ExternalLink className="h-3.5 w-3.5 text-gray-600" />
+                  <ExternalLink className="h-3.5 w-3.5 text-gray-600 dark:text-gray-400" />
                 </button>
               </div>
             </div>

@@ -65,12 +65,24 @@ import {
   BASE_TOOL_METADATA,
 } from "@/lib/domain/ai/tools/metadata";
 import { useSettingsStore } from "@/state/settings-store";
+import { useToolApprovals } from "@/components/content/ai/use-tool-approvals";
+import {
+  BULK_READ_DEFAULT_TOKENS,
+  BULK_READ_MAX_TOKENS,
+  BULK_READ_MIN_TOKENS,
+  effectiveBulkReadThreshold,
+} from "@/lib/features/settings/validation";
 
 const MAX_TOKENS_MIN = 1;
 const MAX_TOKENS_MAX = 200_000;
+const BULK_READ_MIN = BULK_READ_MIN_TOKENS;
+const BULK_READ_MAX = BULK_READ_MAX_TOKENS;
+const BULK_READ_DEFAULT = BULK_READ_DEFAULT_TOKENS;
 
 interface ToolConfigEntry {
   enabled?: boolean;
+  /** Run without an approval card (tools/approval-policy.ts). */
+  autoApprove?: boolean;
   routeOverride?: { presetId: string; modelId: string };
 }
 
@@ -91,6 +103,8 @@ export default function AISettingsPage() {
   // deliberate choice) — normalize it to "unset" so legacy settings pick up
   // the catalog-resolved maximum instead of a silent truncation cap.
   const maxTokens = ai?.maxTokens === 4096 ? null : (ai?.maxTokens ?? null);
+  const bulkReadThreshold = effectiveBulkReadThreshold(ai?.bulkReadTokenThreshold);
+  const toolApprovals = useToolApprovals();
   const typingEffect = ai?.typingEffect ?? true;
   const showAiHighlight = ai?.showAiHighlight ?? true;
   const showReasoning = ai?.showReasoning ?? true;
@@ -102,6 +116,7 @@ export default function AISettingsPage() {
   // Drafts for controls that commit on release/blur rather than keystroke.
   const [temperatureDraft, setTemperatureDraft] = useState<number | null>(null);
   const [maxTokensDraft, setMaxTokensDraft] = useState<string | null>(null);
+  const [bulkReadDraft, setBulkReadDraft] = useState<string | null>(null);
 
   // Connections for the tool override picker (cheap; ~1 row per configured
   // provider). Failure is non-fatal — empty list = no override options.
@@ -152,11 +167,28 @@ export default function AISettingsPage() {
     }
   };
 
+  const commitBulkRead = () => {
+    if (bulkReadDraft === null) return;
+    const trimmed = bulkReadDraft.trim();
+    setBulkReadDraft(null);
+    const parsed = trimmed === "" ? BULK_READ_DEFAULT : parseInt(trimmed, 10);
+    if (Number.isNaN(parsed)) return;
+    const clamped = Math.min(Math.max(parsed, BULK_READ_MIN), BULK_READ_MAX);
+    if (clamped !== bulkReadThreshold) {
+      void generation.track(setAISettings({ bulkReadTokenThreshold: clamped }));
+    }
+  };
+
   const handleToolConfigChange = (toolId: string, next: ToolConfigEntry) => {
     // Strip the entry when it returns to all-defaults so the JSON doesn't
     // accumulate noise.
+    // autoApprove counts too — without it, editing a tool's other fields
+    // here would silently drop its approval setting (an explicit false is a
+    // value, not a default, for the same deep-merge reason as `enabled`).
     const isDefault =
-      next.enabled === undefined && next.routeOverride === undefined;
+      next.enabled === undefined &&
+      next.routeOverride === undefined &&
+      next.autoApprove === undefined;
     const out: Record<string, ToolConfigEntry> = { ...toolConfig };
     if (isDefault) delete out[toolId];
     else out[toolId] = next;
@@ -253,6 +285,40 @@ export default function AISettingsPage() {
             }}
           />
         </SettingRow>
+
+        <SettingRow
+          label="Database read approval"
+          description="Database reads larger than this many estimated tokens ask for your approval; the request shows the estimate. Smaller reads run without asking."
+          htmlFor="ai-bulk-read-threshold"
+        >
+          <Input
+            id="ai-bulk-read-threshold"
+            type="number"
+            min={BULK_READ_MIN}
+            max={BULK_READ_MAX}
+            step={500}
+            className="w-32"
+            value={bulkReadDraft ?? String(bulkReadThreshold)}
+            onChange={(event) => setBulkReadDraft(event.target.value)}
+            onBlur={commitBulkRead}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                commitBulkRead();
+              }
+            }}
+          />
+        </SettingRow>
+
+        {toolApprovals.map((row) => (
+          <SettingRow key={row.id} label={row.label} description={row.hint} htmlFor={`ai-auto-approve-${row.id}`}>
+            <Switch
+              id={`ai-auto-approve-${row.id}`}
+              checked={row.checked}
+              onCheckedChange={(checked) => void generation.track(row.onChange(checked))}
+            />
+          </SettingRow>
+        ))}
 
         <SettingRow
           label="Typing animation"

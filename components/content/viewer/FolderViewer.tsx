@@ -118,8 +118,8 @@ export function FolderViewer({
       {/* Header */}
       <div className="flex items-center justify-between border-b border-white/10 px-6 py-2">
         <div className="flex items-center gap-2">
-          <Folder className="h-4 w-4 text-gray-600" />
-          <h1 className="text-sm font-medium text-gray-900 leading-tight">{title}</h1>
+          <Folder className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+          <h1 className="text-sm font-medium text-gray-900 dark:text-gray-100 leading-tight">{title}</h1>
         </div>
 
         {/* View Mode Toggle */}

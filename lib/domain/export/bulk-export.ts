@@ -230,6 +230,15 @@ export async function exportSingleDocument(
           mimeType: "application/json",
           size: Buffer.byteLength(metaJson, "utf-8"),
         },
+        // The human/model-readable schema: column vocabulary, option sets,
+        // relation edges. The meta sidecar carries the same facts as JSON
+        // for a future importer; this one is for reading and prompting.
+        {
+          name: `${base}.schema.md`,
+          content: db.schemaMarkdown,
+          mimeType: "text/markdown",
+          size: Buffer.byteLength(db.schemaMarkdown, "utf-8"),
+        },
       ],
       metadata: {
         warnings: [],

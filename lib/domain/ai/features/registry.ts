@@ -213,6 +213,21 @@ export const FEATURE_REGISTRY: FeatureSpec[] = [
     // not a pointer into Studio defaults).
   },
   {
+    // AI row digests (AI-BULK-ROW-READING-PLAN §5): one line per database
+    // row, batched 20 per call under the auto-context daily cap. Unconfigured
+    // → falls back to studio-metadata's model (same stance as enhanced).
+    id: "row-digest",
+    label: "Row Digests",
+    description:
+      "Writes the one-line AI digest of each row in databases that opt in (schema rail → AI digests), refreshed in the background when rows change. Cheap, batched; a low-cost model is right here.",
+    requiredCapabilities: ["text"],
+    preferredCapabilities: ["low-cost"],
+    defaultSuggestion: {
+      presetId: "anthropic",
+      modelId: "claude-haiku-4-5",
+    },
+  },
+  {
     id: "studio-generation",
     label: "Studio Artifact Generation",
     description:

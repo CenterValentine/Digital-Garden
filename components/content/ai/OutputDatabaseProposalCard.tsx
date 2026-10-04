@@ -18,6 +18,21 @@ import { useCallback, useState } from "react";
 import { Check, Loader2, Table2 } from "lucide-react";
 import { toast } from "sonner";
 import { useContentStore } from "@/state/content-store";
+import {
+  dispatchProposalApplied,
+  matchExistingTitles,
+  useProposalObsolete,
+  useProposalRevision,
+  type ExistingDatabase,
+} from "./use-proposal-revision";
+import {
+  ModifyProposalButton,
+  ProposalExistsNotice,
+  ProposalObsoleteNotice,
+  ProposalSupersededNotice,
+  ProposalWithdrawnNotice,
+  useSupersededGuard,
+} from "./ProposalRevisionControls";
 
 export interface OutputDatabaseProposalPayload {
   __outputDatabaseProposal: true;
@@ -33,11 +48,24 @@ export interface OutputDatabaseProposalPayload {
       group?: "todo" | "active" | "done";
     }>;
     primary?: boolean;
+    /** relation — the existing database this column links to (title or id). */
+    target?: string;
+    /** relation — what the mirrored column on the target is called. */
+    backlinkName?: string;
+    /** lookup · rollup — the relation column on THIS table it reads across. */
+    through?: string;
+    /** lookup — the target column shown. rollup — the column aggregated. */
+    column?: string;
+    /** rollup — the aggregation. */
+    fn?: string;
   }>;
   dedupeColumn: string | null;
-  /** Resolved destination — charter folder, else the chat's target. */
+  /** Resolved destination — output folder, owner's folder, charter, target. */
   parentId?: string | null;
   parentTitle?: string | null;
+  /** Nest under this chat/content as a reference (Target output). */
+  ownerContentId?: string | null;
+  ownerTitle?: string | null;
 }
 
 type ApplyState =
@@ -76,14 +104,56 @@ function loadAppliedState(
   return { status: "idle" };
 }
 
+
+/** What a relation/lookup/rollup column does, in the user's words. */
+function describeLink(
+  col: OutputDatabaseProposalPayload["columns"][number],
+): string | null {
+  if (col.type === "relation" && col.target) {
+    return col.backlinkName
+      ? `links to ${col.target} · appears there as "${col.backlinkName}"`
+      : `links to ${col.target}`;
+  }
+  if (col.type === "lookup" && col.through) {
+    return `reads ${col.column ?? "a value"} through ${col.through}`;
+  }
+  if (col.type === "rollup" && col.through) {
+    const fn = col.fn ?? "count";
+    return fn === "count"
+      ? `counts linked rows through ${col.through}`
+      : `${fn} of ${col.column ?? "a value"} through ${col.through}`;
+  }
+  return null;
+}
+
 export function OutputDatabaseProposalCard({
   payload,
+  superseded = false,
+  existingDatabases,
 }: {
   payload: OutputDatabaseProposalPayload;
+  /** A later message carries a newer proposal of this kind. */
+  superseded?: boolean;
+  /** The user's existing databases, for the already-exists check. */
+  existingDatabases?: ExistingDatabase[];
 }) {
   const [state, setState] = useState<ApplyState>(() =>
     loadAppliedState(payload),
   );
+  const revision = useProposalRevision(storageKey(payload), !superseded);
+  const obsolete = useProposalObsolete("outputDatabase", storageKey(payload));
+
+  /**
+   * Withdraw this card and hand the composer a revision request. The prompt
+   * names what is being replaced so the model does not re-propose blind, and
+   * says the part it kept getting wrong: it may re-issue the WHOLE thing
+   * rather than waiting for an Apply it needs nothing from.
+   */
+  const askForChanges = useCallback(() => {
+    revision.requestRevision(
+      `I've sent the proposed database (${payload.title}) back for changes — nothing was applied. Re-propose the complete corrected version with these changes: `,
+    );
+  }, [payload, revision]);
 
   const apply = useCallback(async () => {
     setState({ status: "applying" });
@@ -95,7 +165,13 @@ export function OutputDatabaseProposalCard({
         body: JSON.stringify({
           title: payload.title,
           columns: payload.columns,
+          // The proposal's one-line purpose becomes the table's description —
+          // it used to be shown on the card and then dropped on Apply.
+          ...(payload.purpose ? { description: payload.purpose } : {}),
           ...(payload.parentId ? { parentId: payload.parentId } : {}),
+          ...(payload.ownerContentId
+            ? { ownerContentId: payload.ownerContentId }
+            : {}),
         }),
       });
       const json = await res.json().catch(() => null);
@@ -112,6 +188,15 @@ export function OutputDatabaseProposalCard({
         /* best-effort persistence */
       }
       setState({ status: "applied", tableId });
+      // Retire every OTHER card of this kind: a second apply now
+      // duplicates real tables rather than revising them.
+      // A new database is a new NODE, so the file tree has to hear about
+      // it too. dispatchDataSchemaChanged only reaches the grid and the
+      // schema rail — the tree listens for dg:tree-refresh and nothing on
+      // the chat-apply path was firing it, so a database created from chat
+      // stayed invisible until a manual refresh (owner, 2026-09-16).
+      window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
+      dispatchProposalApplied("outputDatabase", storageKey(payload));
       toast.success(`"${payload.title}" created`);
     } catch (err) {
       const message =
@@ -122,6 +207,25 @@ export function OutputDatabaseProposalCard({
       toast.error(message);
     }
   }, [payload]);
+
+  // Already on the server under this name? Then Apply needs a confirm for
+  // the same reason a superseded card does — the risk is a duplicate, not a
+  // wrong design.
+  const existing = matchExistingTitles(
+    [payload.title],
+    existingDatabases ?? []
+  );
+  const guard = useSupersededGuard(superseded || Boolean(existing), apply);
+
+  if (obsolete && state.status !== "applied") {
+    return <ProposalObsoleteNotice label="database" />;
+  }
+
+  if (revision.withdrawn) {
+    return (
+      <ProposalWithdrawnNotice label="database" onRestore={revision.restore} />
+    );
+  }
 
   if (state.status === "applied") {
     return (
@@ -170,9 +274,11 @@ export function OutputDatabaseProposalCard({
               Identity column: {payload.dedupeColumn}
             </div>
           )}
-          {payload.parentTitle && (
+          {(payload.ownerTitle || payload.parentTitle) && (
             <div className="text-[11px] text-gray-500 dark:text-gray-400">
-              Location: {payload.parentTitle}
+              {payload.ownerTitle
+                ? `Nested under ${payload.ownerTitle}`
+                : `Location: ${payload.parentTitle}`}
             </div>
           )}
         </div>
@@ -195,6 +301,11 @@ export function OutputDatabaseProposalCard({
             <div className="text-[11px] text-gray-500 dark:text-gray-400">
               {col.description}
             </div>
+            {describeLink(col) && (
+              <div className="text-[10px] text-indigo-600/80 dark:text-indigo-300/80">
+                {describeLink(col)}
+              </div>
+            )}
             {col.options && col.options.length > 0 && (
               <div className="mt-0.5 flex flex-wrap gap-1">
                 {col.options.map((o) => (
@@ -217,10 +328,18 @@ export function OutputDatabaseProposalCard({
         </div>
       )}
 
+      {superseded && <ProposalSupersededNotice />}
+      {existing && (
+        <ProposalExistsNotice
+          matches={existing}
+          onOpen={(id) => useContentStore.getState().setSelectedContentId(id)}
+        />
+      )}
+
       <div className="flex items-center gap-2">
         <button
           type="button"
-          onClick={apply}
+          onClick={guard.onClick}
           disabled={state.status === "applying"}
           className="inline-flex items-center gap-1 rounded-md bg-sky-600/90 px-2.5 py-1 text-[11px] font-medium text-white transition-colors hover:bg-sky-600 disabled:opacity-50"
         >
@@ -229,8 +348,12 @@ export function OutputDatabaseProposalCard({
           ) : (
             <Check className="h-3 w-3" />
           )}
-          Create database
+          {guard.confirming ? "Apply anyway?" : "Create database"}
         </button>
+        <ModifyProposalButton
+          onClick={askForChanges}
+          disabled={state.status === "applying"}
+        />
         <span className="text-[10px] text-gray-400 dark:text-gray-500">
           Nothing is created until you click.
         </span>

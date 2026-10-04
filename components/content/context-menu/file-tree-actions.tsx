@@ -8,10 +8,11 @@
  * M4: File Tree Completion - File Tree Context Menu
  */
 
-import type { ReactNode } from "react";
 import {
-  ArrowUpLeft,
-  ArrowUpRight,
+  PANE_HOTKEY_LEGEND,
+  PANE_HOTKEY_SINGLE,
+} from "@/lib/features/content/pane-hotkeys";
+import {
   Edit,
   Trash2,
   Unlink,
@@ -32,8 +33,6 @@ import {
   Eye,
   EyeOff,
   ExternalLink,
-  ArrowDownLeft,
-  ArrowDownRight,
   FolderInput,
   Captions,
   LampDesk,
@@ -58,17 +57,9 @@ import {
   type NewContentMenuItem,
   type PageTemplateMenuData,
 } from "@/components/content/menu-items/new-content-menu";
+import { getExtensionCreateMenuItems } from "@/lib/extensions/client-registry";
 import { supportsCustomIcon } from "@/lib/domain/content/file-extension-utils";
-import {
-  BOTTOM_LEFT_PANE_ID,
-  BOTTOM_RIGHT_PANE_ID,
-  TOP_LEFT_PANE_ID,
-  TOP_RIGHT_PANE_ID,
-  getPaneLabel,
-  getVisiblePaneIds,
-  useContentStore,
-  type WorkspacePaneId,
-} from "@/state/content-store";
+import { useContentStore } from "@/state/content-store";
 import { usePageTemplateStore } from "@/state/page-template-store";
 import { useSettingsStore } from "@/state/settings-store";
 import { useExtensionActivationStore } from "@/state/extension-activation-store";
@@ -232,8 +223,7 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
    * think they were editing. Read-only actions only.
    */
   const isMirrorRow = clickedNode?.isShortcutMirror === true;
-  const { layoutMode, openContentInPane } = useContentStore.getState();
-  const visiblePaneIds = new Set(getVisiblePaneIds(layoutMode));
+  const { openContentInPane } = useContentStore.getState();
 
   // Section 1: Create actions (always show for single selection or empty space)
   // Behavior:
@@ -323,7 +313,8 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
     const newMenuItems = getNewContentMenuItems(
       callbacks,
       targetId,
-      pageTemplateData
+      pageTemplateData,
+      getExtensionCreateMenuItems()
     );
 
     sections.push({
@@ -609,7 +600,7 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
           id: "edit-external",
           label: "Edit Link",
           icon: <Edit className="h-4 w-4" />,
-          shortcut: "R",
+          shortcut: "⌥R",
           onClick: async () => {
             if (onEditExternal) {
               await onEditExternal(clickedId);
@@ -636,33 +627,6 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
   // Section 3: Edit actions (single selection only, exclude external links)
   if (isSingleSelection && clickedId && clickedNode && clickedNode.contentType !== "external") {
     const canCustomizeIcon = clickedNode && supportsCustomIcon(clickedNode);
-    const paneActions: Array<{
-      id: WorkspacePaneId;
-      label: string;
-      icon: ReactNode;
-    }> = [
-      {
-        id: TOP_LEFT_PANE_ID,
-        label: "Top Left Pane",
-        icon: <ArrowUpLeft className="h-4 w-4" />,
-      },
-      {
-        id: TOP_RIGHT_PANE_ID,
-        label: "Top Right Pane",
-        icon: <ArrowUpRight className="h-4 w-4" />,
-      },
-      {
-        id: BOTTOM_LEFT_PANE_ID,
-        label: "Bottom Left Pane",
-        icon: <ArrowDownLeft className="h-4 w-4" />,
-      },
-      {
-        id: BOTTOM_RIGHT_PANE_ID,
-        label: "Bottom Right Pane",
-        icon: <ArrowDownRight className="h-4 w-4" />,
-      },
-    ];
-
     const editActions: ContextMenuAction[] = [
       {
         // An explicit, discoverable "open" for every content type. Folders now
@@ -684,25 +648,34 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
         id: "open-in-pane",
         label: "Open In Pane",
         icon: <ExternalLink className="h-4 w-4" />,
-        submenu: paneActions.map((pane) => ({
-          id: `open-${pane.id}`,
-          label: visiblePaneIds.has(pane.id)
-            ? getPaneLabel(layoutMode, pane.id)
-            : `${pane.label} (expand layout)`,
-          icon: pane.icon,
-          onClick: () =>
-            openContentInPane(clickedId, pane.id, {
+        tooltip: PANE_HOTKEY_LEGEND,
+        // The submenu IS the key map — Q W E / A S D / Z X C drawn as what
+        // each key means. A pane list gave the left pane three letters and the
+        // right pane two, which read as unequal reach; the grid reads as the
+        // keyboard. Picking a cell does what holding the key and clicking the
+        // file does, including S (collapse to one pane), which had no row.
+        customFlyout: {
+          kind: "pane-grid",
+          onPick: (target) => {
+            const meta = {
               title: clickedNode.title,
               contentType: clickedNode.contentType,
-              pin: true,
-            }),
-        })),
+            };
+            if (target === PANE_HOTKEY_SINGLE) {
+              useContentStore.getState().setLayoutMode("single");
+              useContentStore.getState().setSelectedContentId(clickedId, meta);
+              return;
+            }
+            // A deliberate placement is pinned, as the held-key open is.
+            openContentInPane(clickedId, target, { ...meta, pin: true });
+          },
+        },
       },
       {
         id: "rename",
         label: "Rename",
         icon: <Edit className="h-4 w-4" />,
-        shortcut: "R",
+        shortcut: "⌥R",
         onClick: () => onRename?.(clickedId),
         disabled: !onRename || isMirrorRow,
       },
@@ -959,7 +932,7 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
           ) : (
             <Trash2 className="h-4 w-4" />
           ),
-          shortcut: "D",
+          shortcut: "⌥D",
           onClick: async () => await onDelete?.(selectedIds),
           disabled: !onDelete,
           // Not destructive styling: nothing is lost, and the red treatment is

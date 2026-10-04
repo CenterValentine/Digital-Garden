@@ -1,0 +1,230 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
+import { AlertTriangle, BookOpen, ChevronRight, ExternalLink, Loader2 } from "lucide-react";
+import { TRADITION_LABELS } from "@/lib/domain/scripture/catalog";
+import {
+  scriptureTabId,
+  type ScriptureCatalogItem,
+  type ScriptureTradition,
+} from "@/lib/domain/scripture/types";
+import { useContentStore } from "@/state/content-store";
+import { ReaderApiError, scriptureApi } from "../lib/api";
+import { READER_VIRTUAL_CONTENT_TYPE } from "../manifest";
+import { useReaderBookshelf } from "../state/bookshelf-store";
+
+export function openScriptureTab(corpusId: string, title: string): void {
+  useContentStore.getState().setSelectedContentId(scriptureTabId(corpusId), {
+    title,
+    contentType: READER_VIRTUAL_CONTENT_TYPE,
+    pin: true,
+  });
+}
+
+/**
+ * Scripture collections across traditions. Each user adds the ones they want
+ * to their own "+ → Reader → Scriptures" menu; the first add of a collection
+ * loads its text (stored once, shared, read-only). Shown in Reader settings
+ * and as the "Browse traditions…" tab — one component, two mounts.
+ */
+export function ScriptureCatalog() {
+  const [items, setItems] = useState<ScriptureCatalogItem[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const result = await scriptureApi.catalog();
+      setItems(result.items);
+      setError(null);
+    } catch (caught) {
+      setError(
+        caught instanceof ReaderApiError && caught.code === "READER_NOT_MIGRATED"
+          ? caught.message
+          : caught instanceof Error
+            ? caught.message
+            : "Could not load the scripture catalog"
+      );
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  // Installable collections lead, as cards by tradition. Everything planned or
+  // link-only folds into one compact "More traditions" list — the catalog
+  // stays one screen however many traditions it names.
+  const { groups, later } = useMemo(() => {
+    const byTradition = new Map<ScriptureTradition, ScriptureCatalogItem[]>();
+    const rest: ScriptureCatalogItem[] = [];
+    for (const item of items ?? []) {
+      if (item.status === "available" || item.installed) {
+        byTradition.set(item.tradition, [...(byTradition.get(item.tradition) ?? []), item]);
+      } else rest.push(item);
+    }
+    return { groups: [...byTradition.entries()], later: rest };
+  }, [items]);
+
+  const run = async (item: ScriptureCatalogItem, action: () => Promise<unknown>, done: string) => {
+    setBusy(item.id);
+    try {
+      await action();
+      toast.success(done);
+      await Promise.all([load(), useReaderBookshelf.getState().loadScriptures()]);
+    } catch (caught) {
+      toast.error(caught instanceof Error ? caught.message : "Something went wrong");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  if (error) {
+    return (
+      <div className="flex items-start gap-2 rounded border border-amber-500/30 bg-amber-500/5 p-3 text-xs">
+        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+        <span>{error}</span>
+      </div>
+    );
+  }
+  if (!items) {
+    return (
+      <div className="flex justify-center p-4">
+        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  const action = "inline-flex h-7 items-center gap-1 rounded border border-black/10 px-2.5 text-xs disabled:opacity-50 dark:border-white/10";
+
+  return (
+    <div className="space-y-5">
+      {groups.map(([tradition, entries]) => (
+        <section key={tradition}>
+          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            {TRADITION_LABELS[tradition]}
+          </h3>
+          <ul className="space-y-2">
+            {entries.map((item) => (
+              <li key={item.id} className="rounded-lg border border-black/10 p-3 dark:border-white/10">
+                <div className="flex flex-wrap items-start gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2 text-sm font-medium">
+                      {item.title}
+                      {item.status !== "available" && (
+                        <span className="rounded bg-black/5 px-1.5 py-0.5 text-[10px] font-normal text-muted-foreground dark:bg-white/10">
+                          {item.status === "planned" ? "Planned" : "Link only"}
+                        </span>
+                      )}
+                      {item.installed && (
+                        <span className="text-[10px] font-normal text-muted-foreground">
+                          {item.verseCount.toLocaleString()} verses
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">{item.description}</p>
+                    <p className="mt-1 text-[10px] text-muted-foreground">{item.license}</p>
+                  </div>
+                  <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+                    {busy === item.id && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
+                    {item.status === "available" && !item.enabled && (
+                      <button
+                        type="button"
+                        disabled={busy !== null}
+                        title={
+                          item.installed
+                            ? "Add to your + → Reader → Scriptures menu"
+                            : "Add to your menu — the first add loads the text (about half a minute)"
+                        }
+                        onClick={() =>
+                          void run(
+                            item,
+                            () => (item.installed ? scriptureApi.setEnabled(item.id, true) : scriptureApi.install(item.id)),
+                            `${item.title} added to your menu`
+                          )
+                        }
+                        className={`${action} bg-primary text-primary-foreground`}
+                      >
+                        {busy === item.id ? (item.installed ? "Adding…" : "Loading text…") : "Add"}
+                      </button>
+                    )}
+                    {item.enabled && (
+                      <>
+                        <button
+                          type="button"
+                          disabled={busy !== null}
+                          title="Remove from your menu (your highlights and notes are kept)"
+                          onClick={() =>
+                            void run(item, () => scriptureApi.setEnabled(item.id, false), `${item.title} removed from your menu`)
+                          }
+                          className={action}
+                        >
+                          Remove
+                        </button>
+                        <button type="button" onClick={() => openScriptureTab(item.id, item.title)} className={action}>
+                          <BookOpen className="h-3.5 w-3.5" /> Open
+                        </button>
+                      </>
+                    )}
+                    {!item.enabled && item.homepage && (
+                      <a href={item.homepage} target="_blank" rel="noreferrer" className={action}>
+                        <ExternalLink className="h-3.5 w-3.5" /> Read online
+                      </a>
+                    )}
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
+
+      {later.length > 0 && (
+        <details className="group rounded-lg border border-black/10 dark:border-white/10">
+          <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2 text-xs text-muted-foreground hover:text-foreground">
+            <ChevronRight className="h-3.5 w-3.5 transition-transform group-open:rotate-90" />
+            <span className="font-medium text-foreground">More traditions</span>
+            <span>
+              {[
+                countLabel(later.filter((item) => item.status === "planned").length, "planned"),
+                countLabel(later.filter((item) => item.status === "link").length, "link only"),
+              ]
+                .filter(Boolean)
+                .join(" · ")}
+            </span>
+          </summary>
+          <ul className="divide-y divide-black/5 border-t border-black/10 dark:divide-white/5 dark:border-white/10">
+            {later.map((item) => (
+              <li key={item.id} className="flex items-center gap-3 px-3 py-1.5 text-xs" title={`${item.description}\n${item.license}`}>
+                <span className="w-24 shrink-0 truncate text-[10px] uppercase tracking-wide text-muted-foreground">
+                  {TRADITION_LABELS[item.tradition]}
+                </span>
+                <span className="min-w-0 flex-1 truncate">{item.title}</span>
+                <span className="shrink-0 text-[10px] text-muted-foreground">
+                  {item.status === "planned" ? "Planned" : "Link only"}
+                </span>
+                {item.homepage && (
+                  <a
+                    href={item.homepage}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label={`Read ${item.title} online`}
+                    title="Read online"
+                    className="shrink-0 rounded p-1 text-muted-foreground hover:bg-black/5 hover:text-foreground dark:hover:bg-white/10"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" />
+                  </a>
+                )}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+    </div>
+  );
+}
+
+function countLabel(count: number, label: string): string | null {
+  return count ? `${count} ${label}` : null;
+}

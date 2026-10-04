@@ -358,7 +358,7 @@ export function FileViewer({ contentId, title }: FileViewerProps) {
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
           <div className="text-sm text-red-400 mb-2">Failed to load file</div>
-          <div className="text-xs text-gray-500">{error}</div>
+          <div className="text-xs text-gray-500 dark:text-gray-400">{error}</div>
         </div>
       </div>
     );

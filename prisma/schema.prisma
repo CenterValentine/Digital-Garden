@@ -154,6 +154,7 @@ model ContentNode {
   // Shortcuts pointing AT this node. Not a payload: the inverse side of
   // ShortcutPayload.target, which Prisma needs to resolve the named relation.
   shortcutsToThis      ShortcutPayload[]     @relation("ShortcutTarget")
+  bookMeta             BookMeta?
 
   history                      ContentHistory[]
   sourceLinks                  ContentLink[]             @relation("SourceContent")
@@ -381,7 +382,13 @@ model FilePayload {
   createdAt        DateTime        @default(now()) @db.Timestamptz(6)
   updatedAt        DateTime        @updatedAt @db.Timestamptz(6)
   searchText       String          @default("")
-  content          ContentNode     @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  /// Capability token behind the public file link (`/f/<token>`). Minted
+  /// lazily the first time a share link is requested for the file; null means
+  /// no link has ever been issued. Rotating (or nulling) it revokes every
+  /// copy of the link that has left the app.
+  publicToken      String?         @unique @db.VarChar(64)
+
+  content ContentNode @relation(fields: [contentId], references: [id], onDelete: Cascade)
 
   @@index([uploadStatus])
   @@index([storageProvider, uploadedAt(sort: Desc)])
@@ -541,7 +548,7 @@ model User {
   tags                    Tag[]
   trashedContent          TrashBin[]
   viewGrants              ViewGrant[]
-  dataViews               DataView[]                @relation("DataViewOwner")
+  dataViews               DataView[]               @relation("DataViewOwner")
   peopleGroups            PeopleGroup[]
   peopleDefaultGroups     PeopleGroup[]            @relation("DefaultPeopleGroup")
   people                  Person[]
@@ -595,6 +602,12 @@ model User {
 
   workflowDefinitions WorkflowDefinition[]
   workflowRuns        WorkflowRun[]
+  bookMetas           BookMeta[]
+  readingProgress     ReadingProgress[]
+  readerAnnotations   ReaderAnnotation[]
+  readerCatalogs      ReaderCatalog[]
+  readerConnections   ReaderConnection[]
+  scriptureCorpora    UserScriptureCorpus[]
 
   @@index([email])
 }
@@ -619,14 +632,13 @@ model ContentWorkspace {
   parentWorkspaceId String?                @db.Uuid
   dormantAt         DateTime?              @db.Timestamptz(6)
 
-  owner         User                           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  viewRoot      ContentNode?                   @relation("WorkspaceViewRoot", fields: [viewRootContentId], references: [id], onDelete: SetNull)
-  items         ContentWorkspaceItem[]
-  tabs          ContentWorkspaceTab[]
-  layoutRecords ContentWorkspaceLayoutRecord[]
-  parentWorkspace ContentWorkspace?  @relation("WorkspaceWorkbenches", fields: [parentWorkspaceId], references: [id], onDelete: Cascade)
-  workbenches     ContentWorkspace[] @relation("WorkspaceWorkbenches")
-
+  owner           User                           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  viewRoot        ContentNode?                   @relation("WorkspaceViewRoot", fields: [viewRootContentId], references: [id], onDelete: SetNull)
+  items           ContentWorkspaceItem[]
+  tabs            ContentWorkspaceTab[]
+  layoutRecords   ContentWorkspaceLayoutRecord[]
+  parentWorkspace ContentWorkspace?              @relation("WorkspaceWorkbenches", fields: [parentWorkspaceId], references: [id], onDelete: Cascade)
+  workbenches     ContentWorkspace[]             @relation("WorkspaceWorkbenches")
 
   @@unique([ownerId, slug])
   @@unique([parentWorkspaceId, viewRootContentId])
@@ -634,7 +646,6 @@ model ContentWorkspace {
   @@index([ownerId, isMain])
   @@index([expiresAt])
   @@index([parentWorkspaceId])
-
 }
 
 model ContentWorkspaceItem {
@@ -1517,6 +1528,9 @@ model DataPayload {
   description   String? @db.VarChar(280)
   /// Table title + column names, so a table is findable by its schema (B2).
   searchText    String  @default("")
+  /// AI row digests opt-in (AI-BULK-ROW-READING-PLAN §5): one AI-written
+  /// line per row, refreshed in the background, read by query_database.
+  rowDigests    Boolean @default(false)
 
   createdAt DateTime @default(now()) @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @db.Timestamptz(6)
@@ -1581,14 +1595,36 @@ model DataRow {
   updatedAt DateTime  @updatedAt @db.Timestamptz(6)
   deletedAt DateTime? @db.Timestamptz(6)
 
-  table    DataPayload  @relation(fields: [tableId], references: [contentId], onDelete: Cascade)
-  content  ContentNode? @relation("PromotedDataRow", fields: [contentId], references: [id], onDelete: SetNull)
-  linksOut DataRowLink[] @relation("DataLinkFrom")
-  linksIn  DataRowLink[] @relation("DataLinkTo")
+  table    DataPayload    @relation(fields: [tableId], references: [contentId], onDelete: Cascade)
+  content  ContentNode?   @relation("PromotedDataRow", fields: [contentId], references: [id], onDelete: SetNull)
+  linksOut DataRowLink[]  @relation("DataLinkFrom")
+  linksIn  DataRowLink[]  @relation("DataLinkTo")
+  digest   DataRowDigest?
 
   @@index([tableId, sortKey])
   @@index([tableId, deletedAt])
   @@index([data(ops: JsonbPathOps)], type: Gin)
+}
+
+/// AI row digest sidecar (AI-BULK-ROW-READING-PLAN §5): one AI-written line
+/// per row plus provenance. A sidecar, never a cell — the same stance as
+/// AgenticMetadata for folder capsules. Staleness at read time is the HASH
+/// (sourceHash vs the row's cells + forward links now); `dirty` is discovery
+/// only, set by every cell/link write and cleared on generation.
+model DataRowDigest {
+  rowId       String   @id @db.Uuid
+  digest      String   @db.VarChar(400)
+  /// sha256 of canonicalJson(data) + sorted forward link ids at generation time.
+  sourceHash  String   @db.VarChar(64)
+  /// Sweep discovery — indexed; never read-time truth.
+  dirty       Boolean  @default(false)
+  model       String?  @db.VarChar(100)
+  generatedAt DateTime @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(6)
+
+  row DataRow @relation(fields: [rowId], references: [id], onDelete: Cascade)
+
+  @@index([dirty])
 }
 
 /// Relation cells. The ONLY home for links (plan D4) — never mirrored into
@@ -2696,4 +2732,190 @@ model ShortcutPayload {
   target  ContentNode? @relation("ShortcutTarget", fields: [targetContentId], references: [id], onDelete: SetNull)
 
   @@index([targetContentId])
+}
+
+/// Book metadata for a file node the reader opens. A book is an ordinary
+/// file in the user's library folder; this side table carries what the file
+/// row cannot (authors, identifiers, where it came from, its license).
+model BookMeta {
+  contentId       String   @id @db.Uuid
+  ownerId         String   @db.Uuid
+  title           String   @db.VarChar(500)
+  authors         String[]
+  language        String?  @db.VarChar(20)
+  description     String?
+  publisher       String?  @db.VarChar(255)
+  publishedYear   Int?
+  isbn            String?  @db.VarChar(20)
+  openLibraryId   String?  @db.VarChar(40)
+  coverUrl        String?
+  // Where the file came from: "upload" | "gutendex" | "openlibrary" | "opds:<catalog>" | …
+  sourceAdapter   String   @default("upload") @db.VarChar(80)
+  sourceUrl       String?
+  sourceEntryId   String?  @db.VarChar(255)
+  // "public-domain" | "creative-commons" | "owned" | "unknown" — gates publishing.
+  license         String   @default("unknown") @db.VarChar(40)
+  // "want" | "reading" | "finished" | null — mirrors Hardcover when connected.
+  readingStatus   String?  @db.VarChar(20)
+  hardcoverBookId String?  @db.VarChar(40)
+  createdAt       DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime @updatedAt @db.Timestamptz(6)
+
+  content ContentNode @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  owner   User        @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([ownerId])
+  @@index([ownerId, isbn])
+}
+
+/// Last reading position per (user, target). targetKey is "content:<id>" for
+/// a book file, or a corpus key (e.g. "scripture:lds-en") for virtual sources.
+model ReadingProgress {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId   String   @db.Uuid
+  targetKey String   @db.VarChar(255)
+  // Readium Locator JSON (href + locations{cfi,progression,…} + text quote).
+  locator   Json
+  percent   Float    @default(0)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@unique([ownerId, targetKey])
+}
+
+/// Highlights, notes and bookmarks anchored to text the user does not own
+/// (a book file, a corpus). Kept beside the text, never inside it. Imported
+/// highlights (Kindle clippings, Readwise) carry source + externalId so a
+/// re-import is idempotent.
+model ReaderAnnotation {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId       String   @db.Uuid
+  targetKey     String   @db.VarChar(255)
+  // "highlight" | "note" | "bookmark"
+  kind          String   @db.VarChar(16)
+  locator       Json
+  color         String?  @db.VarChar(20)
+  body          String?
+  // Set once the annotation was sent to a note ("has note" marker).
+  noteContentId String?  @db.Uuid
+  // "reader" | "kindle" | "readwise"
+  source        String   @default("reader") @db.VarChar(20)
+  externalId    String?  @db.VarChar(255)
+  createdAt     DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime @updatedAt @db.Timestamptz(6)
+  owner         User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@unique([ownerId, source, externalId])
+  @@index([ownerId, targetKey])
+}
+
+/// A scripture collection (one tradition's canon in one edition/translation).
+/// Global and read-only: the text lives once, installed by the owner, never
+/// copied per user. `id` is a stable slug ("lds-standard-works").
+/// Plan: docs/notes-feature/work-tracking/SCRIPTURES-INTEGRATION-PLAN.md §11.
+model ScriptureCorpus {
+  id            String   @id @db.VarChar(80)
+  // "lds" | "jewish" | "buddhist" | "islamic" | "christian" | "sikh" | …
+  tradition     String   @db.VarChar(40)
+  title         String   @db.VarChar(255)
+  language      String   @db.VarChar(20)
+  // Where the text came from (pinned repo/URL) and its licence.
+  sourceUrl     String
+  license       String   @db.VarChar(80)
+  // "chapter-verse" | "surah-ayah" | "sutta-segment" | … (how references read)
+  versification String   @default("chapter-verse") @db.VarChar(40)
+  version       String   @db.VarChar(80)
+  // Written last by the installer: 0 means a half-finished install.
+  verseCount    Int      @default(0)
+  installedAt   DateTime @default(now()) @db.Timestamptz(6)
+  books         ScriptureBook[]
+  verses        ScriptureVerse[]
+  users         UserScriptureCorpus[]
+}
+
+/// A book in a corpus (1 Nephi, Genesis, D&C, Moses …), in canonical order.
+/// `volume` groups books (the LDS standard works: ot, nt, bofm, dc-testament, pgp).
+model ScriptureBook {
+  id            String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  corpusId      String          @db.VarChar(80)
+  ordinal       Int
+  slug          String          @db.VarChar(40)
+  name          String          @db.VarChar(120)
+  fullTitle     String          @db.VarChar(255)
+  heading       String?
+  volume        String          @db.VarChar(40)
+  volumeTitle   String          @db.VarChar(120)
+  chapterCount  Int
+  // Accepted reference spellings ("1 Ne.", "1 Nephi", "1ne").
+  abbreviations String[]
+  corpus        ScriptureCorpus @relation(fields: [corpusId], references: [id], onDelete: Cascade)
+
+  @@unique([corpusId, slug])
+  @@index([corpusId, ordinal])
+}
+
+/// One verse (or equivalent unit). ~42k rows for the LDS standard works.
+model ScriptureVerse {
+  id       String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  corpusId String          @db.VarChar(80)
+  bookSlug String          @db.VarChar(40)
+  chapter  Int
+  verse    Int
+  // Global reading order within the corpus (navigation, ranges, search order).
+  ordinal  Int
+  text     String
+  // Full-text search vectors, filled on install (and backfilled by the
+  // migration): "english" stems word forms (smart search), "simple" keeps
+  // exact whole words (exact / all / any). GIN-indexed.
+  searchEnglish Unsupported("tsvector")?
+  searchSimple  Unsupported("tsvector")?
+  corpus   ScriptureCorpus @relation(fields: [corpusId], references: [id], onDelete: Cascade)
+
+  @@unique([corpusId, bookSlug, chapter, verse])
+  @@index([corpusId, ordinal])
+  @@index([searchEnglish], type: Gin)
+  @@index([searchSimple], type: Gin)
+}
+
+/// A user's enabled collections (the text itself is shared).
+model UserScriptureCorpus {
+  id        String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String          @db.Uuid
+  corpusId  String          @db.VarChar(80)
+  enabledAt DateTime        @default(now()) @db.Timestamptz(6)
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  corpus    ScriptureCorpus @relation(fields: [corpusId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, corpusId])
+}
+
+/// A user-added OPDS catalog (Calibre, Kavita, Komga, COPS, any OPDS feed).
+/// Preset public catalogs are code constants, not rows.
+model ReaderCatalog {
+  id                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId             String   @db.Uuid
+  name                String   @db.VarChar(120)
+  url                 String
+  // Encrypted "user:password" for HTTP Basic, when the catalog needs it.
+  credentialEncrypted String?
+  createdAt           DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt           DateTime @updatedAt @db.Timestamptz(6)
+  owner               User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([ownerId])
+}
+
+/// Bring-your-own-token connections to reading services
+/// ("readwise" | "hardcover" | "google-books").
+model ReaderConnection {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId        String    @db.Uuid
+  provider       String    @db.VarChar(40)
+  tokenEncrypted String
+  lastSyncedAt   DateTime? @db.Timestamptz(6)
+  createdAt      DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime  @updatedAt @db.Timestamptz(6)
+  owner          User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@unique([ownerId, provider])
 }

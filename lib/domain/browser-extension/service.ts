@@ -5,11 +5,13 @@ import { normalizeUrl } from "@/lib/domain/content/external-validation";
 import { markdownToTiptapResult, tiptapToMarkdown } from "@/lib/domain/content/markdown";
 import { syncContentTags } from "@/lib/domain/content/tag-sync";
 import { syncImageReferences } from "@/lib/domain/content/image-refs";
+import { syncWindowReferences } from "@/lib/domain/content/window-refs";
 import { syncPersonMentions } from "@/lib/domain/content/person-mention-sync";
 import { getServerExtensions } from "@/lib/domain/editor/extensions-server";
 import { sanitizeTipTapJsonWithExtensions } from "@/lib/domain/editor/unsupported-content";
 import { writeNoteContent } from "@/lib/domain/content/write-note-content";
 import { generateJSON, type JSONContent } from "@tiptap/core";
+import { stripPrivateContent } from "@/lib/domain/content/private-content";
 
 function asIsoString(value: Date | null | undefined) {
   return value ? value.toISOString() : null;
@@ -1125,6 +1127,7 @@ export async function updateExtensionNoteContent(
 
   await syncContentTags(contentId, json, userId);
   await syncImageReferences(contentId, json, userId);
+  await syncWindowReferences(prisma, contentId, json);
   await syncPersonMentions(contentId, json, userId);
 
   return getExtensionNoteContent(userId, contentId);
@@ -1159,7 +1162,10 @@ function formatExtensionNoteContent(
     contentType: content.contentType,
     note: {
       tiptapJson: json,
-      markdown: tiptapToMarkdown(json),
+      // The markdown flavour is what the extension hands to a model as page
+      // context; private (commented-out) content stays out of it. The JSON
+      // stays whole — it is the author's own editing copy.
+      markdown: tiptapToMarkdown(stripPrivateContent(json)),
       searchText: content.notePayload?.searchText ?? "",
       metadata: (content.notePayload?.metadata ?? {}) as Record<string, unknown>,
     },

@@ -50,6 +50,7 @@ function segment(overrides: Partial<TurnSegment>): TurnSegment {
     maxTokensSource: "catalog",
     reasoningConfig: null,
     toolCount: 53,
+    finalStepReserved: false,
     ...overrides,
   };
 }
@@ -85,7 +86,7 @@ console.log("turn-diagnostics contract checks");
     { type: "step-start" },
     { type: "reasoning", text: "…" },
     { type: "text", text: "I'll start by reading the playbook." },
-    { type: "tool-getCurrentNote", state: "output-available", output: "…" },
+    { type: "tool-read_content", state: "output-available", output: "…" },
     { type: "step-start" },
     { type: "reasoning", text: "…" },
     { type: "tool-co_browse_open", state: "output-available", output: { url: "x" } },
@@ -205,6 +206,23 @@ console.log("turn-diagnostics contract checks");
     );
     assert.ok(flags.includes("step-cap-hit"));
   });
+  ok("step-cap-hit: reserved final step still counts (D1)", () => {
+    // The final-step reservation forces the terminal step to finish "stop",
+    // which is precisely the signal the old tool-calls-only test relied on.
+    // Without finalStepReserved the fix would blind its own diagnostic.
+    const flags = deriveTurnFlags(
+      [{ type: "text", text: "I ran out of steps." }],
+      [
+        segment({
+          finishReason: "stop",
+          stepsUsed: 8,
+          stepCap: 8,
+          finalStepReserved: true,
+        }),
+      ],
+    );
+    assert.ok(flags.includes("step-cap-hit"));
+  });
   ok("no step-cap-hit when the model stopped on its own", () => {
     const flags = deriveTurnFlags(
       [{ type: "text", text: "…" }],
@@ -218,7 +236,7 @@ console.log("turn-diagnostics contract checks");
         { type: "tool-read_page", state: "output-error" },
         { type: "tool-co_browse_act", state: "output-available", output: { ok: false, note: "no match" } },
         { type: "tool-co_browse_open", state: "output-available", output: { captchaDetected: true } },
-        { type: "tool-createNote", state: "output-denied" },
+        { type: "tool-create_note", state: "output-denied" },
         { type: "text", text: "recovered" },
       ],
       [segment({ finishReason: "stop" })],
@@ -237,7 +255,7 @@ console.log("turn-diagnostics contract checks");
   });
   ok("approval-requested is a normal pause, not an anomaly", () => {
     const flags = deriveTurnFlags(
-      [{ type: "tool-createNote", state: "approval-requested" }],
+      [{ type: "tool-create_note", state: "approval-requested" }],
       [],
     );
     assert.equal(flags.length, 0);

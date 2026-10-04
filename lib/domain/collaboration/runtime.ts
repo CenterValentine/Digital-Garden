@@ -16,6 +16,11 @@ import { getCollaborationServerExtensions } from "@/lib/domain/collaboration/ext
 import { sanitizeTipTapJsonWithExtensions } from "@/lib/domain/editor/unsupported-content";
 import { onNativeMessage } from "@/lib/mobile-bridge/client";
 import { clientLogger } from "@/lib/core/logger/client";
+import {
+  subscribeContentPresence,
+  type PresenceRecord,
+} from "@/lib/domain/collaboration/presence-poll";
+import { resolvePresenceHeartbeatDelay } from "@/lib/domain/collaboration/presence-cadence";
 
 // Initial-promote deferral.
 //
@@ -278,11 +283,18 @@ interface DocumentRuntimeEntry {
   sessionSweepTimer: ReturnType<typeof setInterval> | null;
   presenceHeartbeatTimer: ReturnType<typeof setTimeout> | null;
   presenceHeartbeatInFlight: boolean;
-  presenceEventSource: EventSource | null;
+  /**
+   * True once this entry has gone deep-dormant and released its presence
+   * record. Stops the release from being re-sent every time something asks to
+   * reschedule while still dormant; cleared when heartbeats resume.
+   */
+  presenceReleased: boolean;
+  /** Unsubscribe from the shared presence poller; null when not subscribed. */
+  presencePollUnsubscribe: (() => void) | null;
   // True once the tab has been hidden past VISIBILITY_SLEEP_DELAY_MS. Blocks
-  // the SSE presence stream from (re)opening and selects the deep-dormant
+  // the presence subscription from (re)opening and selects the deep-dormant
   // heartbeat cadence. Cleared when the tab becomes visible again.
-  presenceStreamSuspended: boolean;
+  presenceSuspended: boolean;
   broadcastChannel: BroadcastChannel | null;
   knownBrowserSessions: Map<string, BrowserSessionPresence>;
   pendingInitialContent: JSONContent | null;
@@ -333,14 +345,6 @@ const NOTE_CAPABILITY: ContentCollaborationCapability = {
 const COLLABORATION_CHANNEL_NAME = "dg-collaboration-runtime";
 const SESSION_STALE_AFTER_MS = 6000;
 const SESSION_ANNOUNCE_INTERVAL_MS = 2000;
-const PRESENCE_HEARTBEAT_INTERVAL_MS = 10_000;
-const PRESENCE_HEARTBEAT_IDLE_INTERVAL_MS = 30_000;
-const PRESENCE_HEARTBEAT_HIDDEN_INTERVAL_MS = 30_000;
-// Deep-dormant cadence: transport is deliberately asleep (sleep mode) and the
-// tab is hidden past the suspension threshold or idle past the sleep window.
-// Server-side staleness gives dormant transportStates an 8-minute window
-// (presence-server.ts DORMANT_STALE_AFTER_MS), so 5 min keeps the record alive.
-const PRESENCE_HEARTBEAT_SLEEP_INTERVAL_MS = 5 * 60 * 1000;
 // Transport states that mean "no live WebSocket". Used to route presence
 // leadership away from hibernating tabs and to pick the deep-dormant cadence.
 const DORMANT_TRANSPORT_STATES: ReadonlySet<ConnectionState> = new Set([
@@ -348,7 +352,6 @@ const DORMANT_TRANSPORT_STATES: ReadonlySet<ConnectionState> = new Set([
   "coolingDown",
   "disconnectedButDirty",
 ]);
-const PRESENCE_IDLE_AFTER_MS = 60_000;
 const PROVIDER_RECONNECT_BASE_MS = 1000;
 const PROVIDER_RECONNECT_MAX_MS = 5 * 60 * 1000; // 5 min — activity triggers immediate reconnect instead
 const BOOTSTRAP_SLOW_WARNING_MS = 10_000;
@@ -446,9 +449,9 @@ function pruneCleanLocalCacheManifestEntries() {
   }
 }
 
-export function getCollaborationBrowserSessionId() {
-  return getSessionStorageId("dg-collab-session-id", "session");
-}
+// Re-exported so the many existing importers keep working; the implementation
+// moved to browser-session.ts to break the runtime <-> presence-poll cycle.
+export { getCollaborationBrowserSessionId } from "@/lib/domain/collaboration/browser-session";
 
 function createConsumerId(
   descriptor: Omit<RuntimeConsumerDescriptor, "consumerId" | "contentId" | "mountedAt">
@@ -631,7 +634,7 @@ class CollaborationRuntimeManager {
     if (!entry) return;
     const { connectionState } = entry.state;
     if (connectionState === "connected" || connectionState === "synced") return;
-    entry.lastActivityAt = Date.now();
+    this.noteLocalActivity(entry);
     void this.promote(entry, "remote-write");
   }
 
@@ -729,8 +732,9 @@ class CollaborationRuntimeManager {
       sessionSweepTimer: null,
       presenceHeartbeatTimer: null,
       presenceHeartbeatInFlight: false,
-      presenceEventSource: null,
-      presenceStreamSuspended: false,
+      presenceReleased: false,
+      presencePollUnsubscribe: null,
+      presenceSuspended: false,
       broadcastChannel: null,
       knownBrowserSessions: new Map(),
       pendingInitialContent: null,
@@ -787,7 +791,7 @@ class CollaborationRuntimeManager {
       if (!transaction.local || entry.isBootstrappingInitialContent) return;
       if (entry.state.persistenceState !== "localReady") return;
 
-      entry.lastActivityAt = Date.now();
+      this.noteLocalActivity(entry);
 
       // Cancel any pending sleep timers — the user is actively editing.
       if (entry.inactivitySleepTimer) {
@@ -907,8 +911,8 @@ class CollaborationRuntimeManager {
     if (typeof document !== "undefined" && document.visibilityState === "hidden") {
       entry.visibilitySleepTimer = setTimeout(() => {
         entry.visibilitySleepTimer = null;
-        entry.presenceStreamSuspended = true;
-        this.closePresenceStream(entry);
+        entry.presenceSuspended = true;
+        this.closePresenceSubscription(entry);
         this.maybeEnterSleepMode(entry);
       }, VISIBILITY_SLEEP_DELAY_MS);
     }
@@ -1318,64 +1322,79 @@ class CollaborationRuntimeManager {
     this.syncPresenceTransport(entry);
   }
 
-  private openPresenceStream(entry: DocumentRuntimeEntry) {
-    if (entry.presenceEventSource || entry.consumers.size === 0) return;
-    // Deep-hidden tabs don't need live badge updates; the stream reopens on
-    // tab-visible. This kills the server-side 10s Postgres poll for the
-    // lifetime of the suspension.
-    if (entry.presenceStreamSuspended) return;
-    const streamUrl = `/api/collaboration/presence/stream?contentId=${encodeURIComponent(
-      entry.contentId
-    )}&sessionId=${encodeURIComponent(this.sessionId)}`;
-    entry.presenceEventSource = new EventSource(streamUrl, { withCredentials: true });
-    entry.presenceEventSource.addEventListener("presence", (event) => {
-      this.handleRemotePresence(entry, event as MessageEvent<string>);
+  /**
+   * Subscribe to the SHARED presence poller (Phase 1).
+   *
+   * This replaced a dedicated EventSource per document whose server side
+   * re-queried Postgres every 10 s and, being an SSE response that never
+   * completes, was billed provisioned memory for the whole life of the tab.
+   *
+   * Awareness cannot do this job alone. Once connected, awareness is the better
+   * signal and `updateProviderPresence` owns the display — but awareness only
+   * ever describes peers we are ALREADY connected to. A document sleeping in
+   * `localOnly` has no provider and therefore no awareness, so nothing would
+   * ever tell it a collaborator arrived. That wake signal is what this
+   * subscription preserves, now riding a poll that already runs for the tab
+   * strip instead of a transport of its own.
+   */
+  private openPresenceSubscription(entry: DocumentRuntimeEntry) {
+    if (entry.presencePollUnsubscribe || entry.consumers.size === 0) return;
+    // Deep-hidden tabs don't need live badge updates; resubscribes on
+    // tab-visible.
+    if (entry.presenceSuspended) return;
+    entry.presencePollUnsubscribe = subscribeContentPresence(entry.contentId, (sessions) => {
+      this.handleRemotePresence(entry, sessions);
     });
-    entry.presenceEventSource.onerror = () => {
-      // EventSource reconnects automatically. Keep state unchanged to avoid false warnings.
-    };
   }
 
-  private closePresenceStream(entry: DocumentRuntimeEntry) {
-    entry.presenceEventSource?.close();
-    entry.presenceEventSource = null;
+  private closePresenceSubscription(entry: DocumentRuntimeEntry) {
+    entry.presencePollUnsubscribe?.();
+    entry.presencePollUnsubscribe = null;
   }
 
   private syncPresenceTransport(entry: DocumentRuntimeEntry) {
     if (!entry.broadcastChannel || this.isPresenceLeader(entry)) {
-      this.openPresenceStream(entry);
+      this.openPresenceSubscription(entry);
     } else {
-      this.closePresenceStream(entry);
+      this.closePresenceSubscription(entry);
     }
   }
 
-  private getPresenceHeartbeatDelay(entry: DocumentRuntimeEntry) {
-    if (entry.state.networkState === "offline") return PRESENCE_HEARTBEAT_HIDDEN_INTERVAL_MS;
-    // Deep-dormant tier: the transport is deliberately asleep (sleep mode
-    // completed — no provider, no reconnect intent) AND the tab is either
-    // suspended-hidden or idle past the sleep window. The record survives on
-    // the server's dormant staleness window, so 5 min is safe. Requiring
-    // !hocuspocusProvider keeps sessions that stayed connected (e.g. dirty
-    // edits blocked the sleep) on the fast cadence so their "synced" record
-    // isn't pruned under the 45s active-tier window.
-    const transportDormant =
-      !entry.hocuspocusProvider &&
-      entry.state.connectionState === "localOnly" &&
-      !entry.state.reconnectIntent;
-    if (
-      transportDormant &&
-      (entry.presenceStreamSuspended ||
-        Date.now() - entry.lastActivityAt >= INACTIVITY_SLEEP_DELAY_MS)
-    ) {
-      return PRESENCE_HEARTBEAT_SLEEP_INTERVAL_MS;
+  /**
+   * Delegates to the pure resolver in presence-cadence.ts so the tiers can be
+   * tested. A NULL return means stop beating entirely — see the resolver and
+   * schedulePresenceHeartbeat.
+   */
+  private getPresenceHeartbeatDelay(entry: DocumentRuntimeEntry): number | null {
+    return resolvePresenceHeartbeatDelay({
+      networkState: entry.state.networkState === "offline" ? "offline" : "online",
+      hasProvider: Boolean(entry.hocuspocusProvider),
+      connectionState: entry.state.connectionState,
+      reconnectIntent: Boolean(entry.state.reconnectIntent),
+      presenceSuspended: entry.presenceSuspended,
+      msSinceActivity: Date.now() - entry.lastActivityAt,
+      inactivitySleepDelayMs: INACTIVITY_SLEEP_DELAY_MS,
+      documentHidden:
+        typeof document !== "undefined" && document.visibilityState === "hidden",
+    });
+  }
+
+  /**
+   * Record local activity, and resume heartbeating if we had gone dormant.
+   *
+   * The resume half is load-bearing now that deep-dormant STOPS the heartbeat
+   * rather than slowing it. Previously every activity path could just stamp
+   * `lastActivityAt` and rely on the next 5-minute beat to re-evaluate the
+   * cadence; with no timer left running, nothing re-evaluates anything. A user
+   * who came back and started TYPING would have stayed invisible to their
+   * collaborators for as long as they kept working — the failure is silent on
+   * their side and looks like a presence bug on everyone else's.
+   */
+  private noteLocalActivity(entry: DocumentRuntimeEntry) {
+    entry.lastActivityAt = Date.now();
+    if (entry.presenceReleased) {
+      this.schedulePresenceHeartbeat(entry, 0);
     }
-    if (typeof document !== "undefined" && document.visibilityState === "hidden") {
-      return PRESENCE_HEARTBEAT_HIDDEN_INTERVAL_MS;
-    }
-    if (Date.now() - entry.lastActivityAt > PRESENCE_IDLE_AFTER_MS) {
-      return PRESENCE_HEARTBEAT_IDLE_INTERVAL_MS;
-    }
-    return PRESENCE_HEARTBEAT_INTERVAL_MS;
   }
 
   private schedulePresenceHeartbeat(entry: DocumentRuntimeEntry, delay?: number) {
@@ -1384,13 +1403,27 @@ class CollaborationRuntimeManager {
       entry.presenceHeartbeatTimer = null;
     }
 
+    const resolved = delay ?? this.getPresenceHeartbeatDelay(entry);
+
+    // null means deep-dormant: schedule nothing at all. Release the record once
+    // so collaborators see us leave promptly, rather than staring at a stale
+    // badge until the 8-minute dormant staleness window expires.
+    if (resolved === null) {
+      if (!entry.presenceReleased) {
+        entry.presenceReleased = true;
+        this.releasePresenceRecord(entry);
+      }
+      return;
+    }
+    entry.presenceReleased = false;
+
     entry.presenceHeartbeatTimer = setTimeout(() => {
       void this.sendPresenceHeartbeat(entry).finally(() => {
         if (this.entries.get(entry.contentId) === entry) {
           this.schedulePresenceHeartbeat(entry);
         }
       });
-    }, delay ?? this.getPresenceHeartbeatDelay(entry));
+    }, resolved);
   }
 
   private isPresenceLeader(entry: DocumentRuntimeEntry) {
@@ -1463,7 +1496,13 @@ class CollaborationRuntimeManager {
     }
   }
 
-  private sendPresenceCloseBeacon(entry: DocumentRuntimeEntry) {
+  /**
+   * Declare this session absent: one write with surfaceCount 0, which drops us
+   * out of `listCollaborationPresence` (it filters surfaceCount > 0) straight
+   * away. Used both when the page is going away and when the tab goes
+   * deep-dormant and stops heartbeating — hence the neutral name.
+   */
+  private releasePresenceRecord(entry: DocumentRuntimeEntry) {
     const session = {
       ...this.getSelfPresencePayload(entry),
       surfaceCount: 0,
@@ -1491,21 +1530,16 @@ class CollaborationRuntimeManager {
     });
   }
 
-  private handleRemotePresence(entry: DocumentRuntimeEntry, event: MessageEvent<string>) {
-    try {
-      const payload = JSON.parse(event.data) as {
-        sessions?: Array<{ sessionId?: string; userId?: string; surfaceCount?: number }>;
-      };
-      this.applyRemotePresenceSessions(entry, payload.sessions ?? []);
-      entry.broadcastChannel?.postMessage({
-        type: "remote-presence-snapshot",
-        contentId: entry.contentId,
-        sessions: payload.sessions ?? [],
-        timestamp: Date.now(),
-      });
-    } catch {
-      // Ignore malformed presence events.
-    }
+  private handleRemotePresence(entry: DocumentRuntimeEntry, sessions: PresenceRecord[]) {
+    this.applyRemotePresenceSessions(entry, sessions);
+    // Fan out to the other tabs of this browser so only the leader subscribes.
+    // Kept from the SSE design: the poller is shared per-tab, not cross-tab.
+    entry.broadcastChannel?.postMessage({
+      type: "remote-presence-snapshot",
+      contentId: entry.contentId,
+      sessions,
+      timestamp: Date.now(),
+    });
   }
 
   private handleBroadcastMessage(entry: DocumentRuntimeEntry, payload: unknown) {
@@ -2127,7 +2161,7 @@ class CollaborationRuntimeManager {
     if (!entry) return;
     entry.state.networkState = "offline";
     this.clearProviderReconnect(entry);
-    this.closePresenceStream(entry);
+    this.closePresenceSubscription(entry);
     this.schedulePresenceHeartbeat(entry);
     if (entry.hocuspocusProvider) {
       entry.state.connectionState = "disconnectedButDirty";
@@ -2166,8 +2200,8 @@ class CollaborationRuntimeManager {
    * in the native shell, by the host app actually backgrounding.
    */
   private enterDeepHidden(entry: DocumentRuntimeEntry) {
-    entry.presenceStreamSuspended = true;
-    this.closePresenceStream(entry);
+    entry.presenceSuspended = true;
+    this.closePresenceSubscription(entry);
     this.maybeEnterSleepMode(entry);
   }
 
@@ -2183,8 +2217,13 @@ class CollaborationRuntimeManager {
     // Lift deep-hidden suspension: reopen the presence stream (if leader)
     // and heartbeat immediately so our record refreshes and we re-learn who
     // else is here without waiting out a dormant-cadence interval.
-    if (entry.presenceStreamSuspended) {
-      entry.presenceStreamSuspended = false;
+    // `presenceReleased` is checked alongside `presenceSuspended` because the
+    // two dormancy routes set different flags: outlasting the visibility
+    // countdown suspends, while going idle with a sleeping transport only
+    // releases. Both have to be lifted here or the tab comes back looking
+    // present to itself and absent to everyone else.
+    if (entry.presenceSuspended || entry.presenceReleased) {
+      entry.presenceSuspended = false;
       this.syncPresenceTransport(entry);
       this.schedulePresenceHeartbeat(entry, 0);
     }
@@ -2236,7 +2275,7 @@ class CollaborationRuntimeManager {
     const entry = this.entries.get(contentId);
     if (!entry || entry.consumers.size === 0) return;
     this.announceBrowserSession(entry, true);
-    this.sendPresenceCloseBeacon(entry);
+    this.releasePresenceRecord(entry);
   }
 
   private maybeStartCooldown(entry: DocumentRuntimeEntry) {
@@ -2369,7 +2408,7 @@ class CollaborationRuntimeManager {
     entry.bootstrapAbortController = null;
     entry.indexedDbProvider.destroy?.();
     if (entry.presenceHeartbeatTimer) clearTimeout(entry.presenceHeartbeatTimer);
-    this.closePresenceStream(entry);
+    this.closePresenceSubscription(entry);
     if (entry.ydocUpdateHandler) {
       entry.ydoc.off("update", entry.ydocUpdateHandler);
     }
@@ -2422,7 +2461,7 @@ class CollaborationRuntimeManager {
         const current = entry.consumers.get(consumerId);
         if (!current) return;
         entry.consumers.set(consumerId, { ...current, ...patch });
-        entry.lastActivityAt = Date.now();
+        this.noteLocalActivity(entry);
         this.recalculateLocalSurfaceTopology(entry);
         this.announceBrowserSession(entry);
         this.syncPresenceTransport(entry);

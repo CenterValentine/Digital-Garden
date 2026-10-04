@@ -250,8 +250,8 @@ function TreeNode({ node, depth, isLast, parentPrefix, showStyles, showBoxModel 
 
     return (
       <div className="flex items-start text-xs font-mono">
-        <span className="text-gray-600 select-none">{parentPrefix}</span>
-        <span className="text-gray-600 select-none">{isLast ? "└─ " : "├─ "}</span>
+        <span className="text-gray-600 dark:text-gray-400 select-none">{parentPrefix}</span>
+        <span className="text-gray-600 dark:text-gray-400 select-none">{isLast ? "└─ " : "├─ "}</span>
         <span className="text-blue-400">Text:</span>
         <span className="text-gray-300 ml-2">&quot;{escaped}&quot;</span>
       </div>
@@ -296,10 +296,10 @@ function TreeNode({ node, depth, isLast, parentPrefix, showStyles, showBoxModel 
       <div className="flex flex-col text-xs font-mono group hover:bg-white/5 rounded px-1 -mx-1">
         {/* Main node line */}
         <div className="flex items-start cursor-pointer" onClick={() => hasChildren && setIsExpanded(!isExpanded)}>
-          <span className="text-gray-600 select-none">{parentPrefix}</span>
-          <span className="text-gray-600 select-none">{isLast ? "└─ " : "├─ "}</span>
+          <span className="text-gray-600 dark:text-gray-400 select-none">{parentPrefix}</span>
+          <span className="text-gray-600 dark:text-gray-400 select-none">{isLast ? "└─ " : "├─ "}</span>
           {hasChildren && (
-            <span className="text-gray-500 select-none mr-1">
+            <span className="text-gray-500 dark:text-gray-400 select-none mr-1">
               {isExpanded ? <ChevronDown className="h-3 w-3 inline" /> : <ChevronRight className="h-3 w-3 inline" />}
             </span>
           )}
@@ -321,7 +321,7 @@ function TreeNode({ node, depth, isLast, parentPrefix, showStyles, showBoxModel 
         {/* CSS Classes */}
         {showStyles && styleInfo.classes.length > 0 && (
           <div className="flex items-start ml-8 mt-1">
-            <span className="text-gray-500 mr-2">Classes:</span>
+            <span className="text-gray-500 dark:text-gray-400 mr-2">Classes:</span>
             <span className="text-orange-400">{styleInfo.classes.join(" ")}</span>
           </div>
         )}
@@ -329,7 +329,7 @@ function TreeNode({ node, depth, isLast, parentPrefix, showStyles, showBoxModel 
         {/* Computed Styles */}
         {showStyles && Object.keys(styleInfo.computedStyles).length > 0 && (
           <div className="flex flex-col ml-8 mt-1">
-            <span className="text-gray-500 mb-1">Styles:</span>
+            <span className="text-gray-500 dark:text-gray-400 mb-1">Styles:</span>
             {Object.entries(styleInfo.computedStyles).map(([key, value]) => (
               <div key={key} className="ml-2">
                 <span className="text-pink-400">{key}:</span>
@@ -342,7 +342,7 @@ function TreeNode({ node, depth, isLast, parentPrefix, showStyles, showBoxModel 
         {/* Box Model */}
         {showBoxModel && (styleInfo.boxModel.padding || styleInfo.boxModel.margin || styleInfo.boxModel.border) && (
           <div className="flex flex-col ml-8 mt-1">
-            <span className="text-gray-500 mb-1">Box Model:</span>
+            <span className="text-gray-500 dark:text-gray-400 mb-1">Box Model:</span>
             {styleInfo.boxModel.margin && (
               <div className="ml-2">
                 <span className="text-emerald-400">margin:</span>

@@ -197,6 +197,25 @@ export function DataRowFields({
           />
         )
       )}
+      {row.digest && (
+        <div className="border-b border-border/40 py-2.5 last:border-b-0">
+          <label className="mb-1 flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
+            AI digest
+            {!row.digest.fresh && (
+              <span
+                className="rounded-sm bg-amber-500/15 px-1 py-px text-[9px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300"
+                title="The row changed since this digest was written; it refreshes in the nightly sweep or via the schema rail."
+              >
+                stale
+              </span>
+            )}
+          </label>
+          <p className="text-xs text-muted-foreground">{row.digest.text}</p>
+          <p className="mt-1 text-[10px] italic leading-snug text-muted-foreground">
+            Written by AI from the cells; not editable here.
+          </p>
+        </div>
+      )}
     </>
   );
 }

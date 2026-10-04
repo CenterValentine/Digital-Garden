@@ -39,6 +39,37 @@ echo "    web target: ${WEB_URL}"
 # -allowProvisioningUpdates lets Xcode mint/refresh the provisioning profile
 # and register the device with the team automatically (required weekly, since
 # free-team profiles are short-lived).
+# Before the build, make sure the phone's developer disk image is mounted.
+# After an iOS update (or the first connection to a new Xcode) the device sits
+# in "Preparing" until the personalized DDI mounts, and that mount is refused
+# while the screen is locked (kAMDMobileImageMounterDeviceLocked). xcodebuild
+# then times out with "Device is busy (Preparing ...)". Poll here so the
+# unlock can happen at leisure instead of failing the whole run.
+#
+# The same DeviceLocked code is ALSO what iOS returns when the Mac's pairing
+# trust went stale (typically after an iOS update) — the phone is unlocked
+# and still refuses the mount (seen 2026-09-13, phone on 26.6.1). Re-pairing
+# fixes it and puts a "Trust This Computer" prompt on the phone, so after a
+# few refusals assume that case and re-pair once.
+echo "==> Checking developer services on the phone (unlock it if prompted)"
+REPAIRED=0
+for attempt in $(seq 1 30); do
+  OUT=$(xcrun devicectl device info ddiServices --device "${DEVICE_ID}" 2>&1 || true)
+  if ! grep -q "DeviceLocked" <<<"$OUT"; then
+    break
+  fi
+  [[ $attempt -eq 1 ]] && echo "    phone is locked — waiting for it to be unlocked..."
+  if [[ $attempt -eq 4 && $REPAIRED -eq 0 ]]; then
+    echo "    still refused — assuming stale pairing; re-pairing (tap Trust + enter passcode on the phone)"
+    xcrun devicectl manage unpair --device "${DEVICE_ID}" >/dev/null 2>&1 || true
+    xcrun devicectl manage pair --device "${DEVICE_ID}" >/dev/null 2>&1 || true
+    REPAIRED=1
+    continue
+  fi
+  [[ $attempt -eq 30 ]] && { echo "error: device stayed locked for 5 minutes" >&2; exit 1; }
+  sleep 10
+done
+
 cd "$IOS_DIR"
 xcodebuild \
   -workspace DigitalGarden.xcworkspace \

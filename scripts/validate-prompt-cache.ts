@@ -10,6 +10,7 @@ import {
   mergeAIProviderOptions,
   summarizePromptCacheUsage,
   supportsOpenAIPromptCaching,
+  withAnthropicCacheBreakpoint,
 } from "../lib/domain/ai/prompt-cache";
 import { buildSystemPrompt } from "../lib/domain/ai/system-prompt";
 
@@ -75,7 +76,7 @@ assert.equal(
     modelId: "claude-sonnet-4",
   }).enabled,
   false,
-  "3.2.2 does not opt Anthropic into paid cache writes",
+  "the OpenAI routing-key policy stays OpenAI-only (Anthropic caches through breakpoints — withAnthropicCacheBreakpoint)",
 );
 assert.equal(
   buildPromptCachePolicy({
@@ -87,6 +88,20 @@ assert.equal(
 );
 assert.equal(supportsOpenAIPromptCaching("openai/gpt-5.6-terra"), true);
 assert.equal(supportsOpenAIPromptCaching("o3-mini"), true);
+assert.equal(supportsOpenAIPromptCaching("gpt-6-sol"), true, "gpt-6 gets a routing key (a model we allow is a model we own)");
+{
+  const msgs = [
+    { role: "user", content: "a" },
+    { role: "assistant", content: "b", providerOptions: { openai: { phase: "x" } } },
+  ] as Parameters<typeof withAnthropicCacheBreakpoint>[0];
+  const marked = withAnthropicCacheBreakpoint(msgs);
+  assert.equal(marked[0], msgs[0], "only the last message is marked");
+  assert.deepEqual(marked[1].providerOptions, {
+    openai: { phase: "x" },
+    anthropic: { cacheControl: { type: "ephemeral" } },
+  }, "the breakpoint is ephemeral and keeps sibling provider options");
+  assert.deepEqual(withAnthropicCacheBreakpoint([]), [], "an empty prompt is left alone");
+}
 
 const merged = mergeAIProviderOptions(
   {
@@ -150,7 +165,6 @@ const orderedPrompt = buildSystemPrompt({
   chatContentId: undefined,
   autoPronounceDefault: false,
   charterContext: "CACHEABLE_PLAYBOOK_PHASE",
-  charterAwareness: "",
   rootedContentSection: "RUN_SPECIFIC_ROOT",
   outputTargetSection: "RUN_SPECIFIC_OUTPUT_TARGET",
   userContextSection: "RUN_SPECIFIC_USER_CONTEXT",

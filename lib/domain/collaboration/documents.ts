@@ -4,6 +4,7 @@ import * as Y from "yjs";
 
 import type { PrismaClient } from "@/lib/database/generated/prisma";
 import { extractSearchTextFromTipTap } from "@/lib/domain/content/search-text";
+import { syncWindowReferences } from "@/lib/domain/content/window-refs";
 import {
   hasMeaningfulTipTapContent,
   ydocUpdateHasMeaningfulDefaultContent,
@@ -290,6 +291,13 @@ export async function storeCollaborationYDocState(
       },
     });
   });
+
+  // Window-ref edges are derived from note content, and collaborative saves
+  // are the PRIMARY write path — hooking the sync only into the REST routes
+  // would leave edges stale for exactly the notes users edit most. Outside
+  // the transaction (and non-throwing internally): edge syncing must never
+  // fail or slow the store hook itself.
+  await syncWindowReferences(prisma, contentId, snapshot);
 }
 
 export function parseCollaborationDocumentName(documentName: string): string {

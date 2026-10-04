@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/database/client";
+import { ensureMainWorkspaceRow } from "./ensure-main";
 import {
   ContentWorkspaceItemAssignmentType,
   ContentWorkspaceItemScope,
@@ -13,6 +14,7 @@ import {
 import { generateSlug } from "@/lib/domain/content";
 import { logger } from "@/lib/core/logger";
 import { reconcileMembershipFromSnapshot } from "./membership";
+import { onlyUuids } from "@/lib/domain/content/uuid";
 import { LAYOUT_RECORD_MAX_AGE_DAYS } from "./layout-records";
 import type {
   ContentWorkspaceResponse,
@@ -31,8 +33,6 @@ import {
   resolveFolderOrder,
 } from "./types";
 
-const MAIN_WORKSPACE_NAME = "Main Workspace";
-const MAIN_WORKSPACE_SLUG = "main";
 const DEFAULT_LAYOUT_MODE = "single";
 const DEFAULT_PANE_ID: WorkspacePaneId = "top-left";
 const WORKSPACE_PANE_IDS: WorkspacePaneId[] = [
@@ -275,7 +275,12 @@ export function formatWorkspace(
     workspace.items.map((item) => [item.contentId, item.content]),
   );
   const contentMeta: Record<string, { title: string; contentType: string }> = {};
-  for (const id of collectPaneContentIds(normalizedState)) {
+  // Membership-only ids (tabs moved in, or opened by a surface that doesn't
+  // write the blob) are part of the open-tab set too — name them, or they
+  // paint as "Loading…" on arrival.
+  const openIds = collectPaneContentIds(normalizedState);
+  for (const tab of workspace.tabs ?? []) openIds.add(tab.contentId);
+  for (const id of openIds) {
     const fromItem = itemContentById.get(id);
     const title = fromItem?.title ?? contentLookup?.get(id)?.title;
     const contentType =
@@ -408,32 +413,14 @@ export async function cleanupExpiredWorkspaces(ownerId: string) {
 export async function ensureMainWorkspace(ownerId: string) {
   await cleanupExpiredWorkspaces(ownerId);
 
-  return prisma.contentWorkspace.upsert({
-    where: {
-      ownerId_slug: {
-        ownerId,
-        slug: MAIN_WORKSPACE_SLUG,
-      },
-    },
-    update: {
-      isMain: true,
-      isLocked: false,
-      status: "active",
-      expiresAt: null,
-      archivedAt: null,
-    },
-    create: {
-      ownerId,
-      name: MAIN_WORKSPACE_NAME,
-      slug: MAIN_WORKSPACE_SLUG,
-      isMain: true,
-      isLocked: false,
-      status: "active",
-      layoutMode: DEFAULT_LAYOUT_MODE,
-      activePaneId: DEFAULT_PANE_ID,
-      paneState: {},
-      settings: {},
-    },
+  // Read-then-create, never upsert: this runs on every workspace LIST, and an
+  // upsert bumps `@updatedAt` on every call even when nothing changes — which
+  // made the 15 s poll reconcile against its own read, forever. The logic
+  // lives in ensure-main.ts so a DB-backed smoke can pin it without loading
+  // this module (the content barrel keeps service.ts out of plain tsx).
+  return ensureMainWorkspaceRow(ownerId, {
+    layoutMode: DEFAULT_LAYOUT_MODE,
+    activePaneId: DEFAULT_PANE_ID,
   });
 }
 
@@ -456,6 +443,7 @@ async function buildContentLookup(
     for (const id of collectPaneContentIds(normalizeWorkspaceState(workspace))) {
       ids.add(id);
     }
+    for (const tab of workspace.tabs ?? []) ids.add(tab.contentId);
   }
   for (const id of covered) ids.delete(id);
   if (ids.size === 0) return new Map();
@@ -557,6 +545,12 @@ export async function getWorkspace(ownerId: string, workspaceId: string) {
         orderBy: { updatedAt: "desc" },
       },
       viewRoot: { select: { id: true, title: true } },
+      // R1 membership on the single read too: a mutation response that
+      // replaces a list entry must not drop the tab SET the list carried.
+      tabs: {
+        where: { content: { ownerId, deletedAt: null } },
+        select: { contentId: true },
+      },
     },
   });
 
@@ -954,9 +948,16 @@ export async function saveWorkspaceState(
         normalizeWorkspaceStatePayload(state),
       );
   const requestedContentIds = getStateContentIds(normalizedState);
-  const ownedContentIds = requestedContentIds.length
+  // Extension tabs (the reader's library/scripture pages) sit in the strip
+  // with ids like `reader:library` — not content, so never persisted. They
+  // must be dropped BEFORE the lookup: a non-UUID id in a `@db.Uuid` filter
+  // throws, which turned every save with such a tab open into a 500 and a
+  // noisy "Failed to save workspace state" on each debounce. Dropping them
+  // here is what the "no such row" result would have done anyway.
+  const lookupContentIds = onlyUuids(requestedContentIds);
+  const ownedContentIds = lookupContentIds.length
     ? await prisma.contentNode.findMany({
-        where: { ownerId, id: { in: requestedContentIds }, deletedAt: null },
+        where: { ownerId, id: { in: lookupContentIds }, deletedAt: null },
         select: { id: true },
       })
     : [];

@@ -9,6 +9,131 @@ last_updated: 2026-05-13
 
 # Current Sprint Addendum
 
+## October 4, 2026 — Coming back lands you where you were (workspace cold-load restore)
+
+**Tree**: worktree `.claude/worktrees/workspace-restore`, branch `fix/workspace-cold-load-restore` (off `origin/main` at `80502511`)
+**Status**: typecheck / lint 151 (0 errors, none new) / `workspace:pane-placement:smoke` 132 / `workspace:cold-load:smoke` 23 (new, in `build`) / `workspace:tab-move:smoke` / `polling:check` green; no schema, TipTap or extension change → no Hocuspocus redeploy. Owner browser smoke pending.
+
+### Shipped
+- **Return to the last workspace**: `loadWorkspaces` resolved candidates with `getWorkspace` (falls back to Main), so the persisted last-workspace was dead code. Strict lookups; Main is the last resort.
+- **No cross-workspace tab bleed**: open tabs are kept on load only if they belong to the opening workspace (`contentStoreOwnerWorkspaceId`; the URL's `?workspace=` stands in on a cold start). Every pane is rebuilt from the snapshot otherwise. An external `?content=` deep link with no `?workspace=` survives as one tab.
+- **Re-run guard** for the write coalescing from #278: a deferred persist re-run no longer writes a different workspace's tabs under the old id.
+- **Not done, on purpose**: pruning the `tabs` record (it is the pane-memory and title-cache store).
+
+### Smoke checklist (owner)
+1. In a non-Main workspace with tabs open, open a bare `/content` in a new browser tab (or close the app and reopen it from its start URL) → it opens THAT workspace with its own tabs, not Main.
+2. Main with tabs open → switch to another workspace from the workspace menu → only that workspace's tabs, in every pane (try a split); wait 5s, reload → unchanged; switch back → Main's tabs are untouched.
+3. Paste `/content?content=<a note id>` (no `?workspace=`) → opens in the last workspace as one extra tab beside its own.
+
+## October 4, 2026 — The pane "+" picker follows the user's perspective (PR #277, merged `e49fa0cd`)
+
+**Tree**: branch `feat/pane-picker-tree-perspective` (merged; local branch deleted, remote branch left for the owner)
+**Status**: typecheck / eslint (0 errors, no new warnings) green; no migration, no TipTap schema change, no extension change → no Hocuspocus redeploy. Owner smoked it on a dev server through the build and signed it off.
+
+### Shipped
+- **`ContentTreePicker` opens where the user is**: expansion seeded from the file tree, focus on the tree's selection else the active content, centred on open.
+- **Jump-to pills, pinned under the search box**: **Active** (creates a note right next to the active content), **Recent** (folders last created in), **Open** (folders holding this workspace's open content). New `state/create-destination-store.ts`; destinations also derived from `createdAt`.
+- **The tree follows the active content** and a toolbar **"Show in file tree"** tool for every content type — new `state/tree-reveal-store.ts` is the one reveal channel (toolbar, breadcrumb, follow-active). A single click on a folder now selects it (grey) as well as toggling, so "+" and drops target it.
+- **Row tones**: deep gold = active in the pane, light gold = open in another tab, grey = selected in the tree.
+- **Reader pages no longer 500 the workspace save** (`lib/domain/content/uuid.ts`).
+- Backlogged: unify the other tree-browse menus; the single-tab workplace routes' UUID guard (`BACKLOG.md`).
+
+### Decisions worth keeping
+- Flyouts beside the picker, gradients, left rails on menu items, and a pinned gold header above the search box were all tried and REJECTED by the owner this round; the picker's Jump-to is an inline pill row.
+
+## October 3, 2026 — Wiki-link views + move to note
+
+**Tree**: worktree `.claude/worktrees/wikilink-views`, branch `feat/wikilink-views` (off `origin/main` at `2d3797f3`)
+**Status**: typecheck / lint 151 (0 errors, none new) / markdown:blocks (+15 fixtures, +13 shape assertions) / collab:schema / private:content green; **owner browser smoke pending**. **⚠ Hocuspocus redeploy required post-merge** (schema 1.20.0: `wikiLink.view` attr — an un-redeployed collab server drops it from live documents). Plan: `WIKILINK-VIEWS-PLAN.md`.
+
+### Shipped
+- **One link, four displays.** `wikiLink.view` ∈ link (default) / chip / card; the window stays the `noteWindow` block and `applyLinkView` (`lib/domain/editor/link-views.ts`) converts both ways (paragraph split on the way out, paragraph-with-link on the way back). Chip/card are a vanilla-DOM NodeView over renderHTML's own span (`wiki-link-node-view.ts`); card text from `link-preview.ts` (one cache per target, `content-updated` invalidates, private content stripped).
+- **Chosen in place.** Hover chooser (`wiki-link-hover.tsx`, tippy + `LinkViewChooser`), the same chooser in the window header ("Display as…"), and a "Display as" submenu in the context menu on links and window headers. Window needs a ContentNode id: title-only links resolve + heal first; heading/anchored/virtual targets say why they can't.
+- **Shared underneath.** `wiki-link-attrs.ts` is the one attr spec for both nodes; a `![[Title]]` with no id resolves by title via `resolveWikiLinkTarget` (the click rule). Autosuggest and the window picker untouched.
+- **Markdown.** `wiki-link-markdown.ts` grammar + `dgWikiLink`/`dgNoteWindow` turndown rules + `wikiLinkCodec`/`noteWindowCodec` reTags: `[[Title|alias]]{#id .card .no-context label="…" slug=…}`, `![[Title]]{#id block=… height=… .no-border view=… row=…}`. `ServerNoteWindow.renderHTML` symmetric; public safety moved to `publicSafeNoteWindows` in `TipTapContent`.
+- ~~Send to New Note~~ — folded into Move to Note (owner, round 7): the picker's "+ New Note" is the one way to make a new note for the selection.
+- **Context menu** acts on the clicked editor (`editorForContext`), not the first in the store.
+- **Move highlight to note** (`move-selection.ts`, `selection-blocks.ts`, `MoveSelectionPicker.tsx`, `POST /api/content/content/[id]/append`): one item, no submenu, always leaves a link (round 9 — "No link" removed; the point is building content out into other notes). The shared tree picker targets an existing note or creates one in place via "+ New Note" (named from the selection's first heading/line); blocks append to the end of the target (buffer paragraph when non-empty) followed by a `From [[Host]]` provenance stamp, through the live editor or the collab-safe server writer; the selection here becomes a link in the last-used display (`lastUsedLinkView`, localStorage) — whole blocks replaced by one paragraph, no empty block left. **Disabled offline**, and refused at pick time if the connection dropped meanwhile.
+- **Chooser polish** (owner rounds 2–5): skeleton tiles instead of icons, slimmer, editable label (same box, scroll inside), window header opens on hover beside its button, window Open is a workspace tab (#278's destination rule).
+
+### Smoke checklist (owner)
+1. Type `[[` → pick a note → hover the link → chooser appears; pick Card → excerpt shows; pick Window → block appears, paragraph split around it; in the window header "Display as…" → Link → back to a paragraph.
+2. Source view: a paragraph with a link reads `see [[Title]]{#…}`; a window reads `![[Title]]{#… block=…}`; toggle back → identical.
+3. Type `![[Some existing note]]` in source view → apply → the window resolves by title and shows the note.
+4. Select two paragraphs → right-click → Move highlight to note → "+ New Note" on this note's folder → a note named from the selection's first line is created there with the blocks followed by `From [[This note]]`; the two paragraphs here become one line holding a link; toast Open works.
+5. Move highlight to note → pick an OPEN note → the paragraphs appear at its end after a blank line, then the stamp. Repeat on a note that is NOT open → the target shows the blocks and the stamp when opened; the link here uses the display you last chose.
+6. Publish a note with a window → published HTML shows "Windowed note: Title" with no ids.
+7. Turn the network off (DevTools → Network → Offline) → right-click a selection → "Move highlight to note" is greyed out with "you're offline" on hover.
+
+## September 25, 2026 — Private content (comment out prose)
+
+**Tree**: worktree `.claude/worktrees/private-text`, branch `feat/private-text` (off `origin/main` at `e171048f`)
+**Status**: typecheck / lint 151 (0 errors) / collab:schema / markdown:blocks (+6 fixtures, +2 pretty assertions) / private:content:check (new, mutation-tested) / full build green; **owner browser smoke pending**. **⚠ Hocuspocus redeploy required post-merge** (schema 1.18.0: new mark `privateText` + node `privateBlock` — an un-redeployed collab server rewrites them to `unsupportedInline` / `unsupportedBlock`).
+
+### Shipped
+- **`privateText` mark + `privateBlock` node** (`lib/domain/editor/extensions/private-content.ts`, Server twins registered in `extensions-server.ts` + `collaboration/extensions.ts`). Cmd+/ `togglePrivate`: in-paragraph selection → mark; bare cursor / cross-block selection → block wrap; inside either → reverse (whole run via `extendEmptyMarkRange`, whole block via `liftTarget`). `%%text%%` markInputRule; `%%` + Enter opens / closes a block; `/private`; EyeOff toolbelt button (`private` tool, order 45).
+- **One predicate, explicit at each seam** — `stripPrivateContent` (pure JSON, `lib/domain/content/private-content.ts`): `extractSearchTextFromTipTap` (covers the `searchText` column on every write path + `read_content`), `chunkDocument`, `resolveNote`, `renderCharterSection` / `Plain`, `TipTapContent`. Live-ProseMirror twins `visibleTextOf` / `visibleTextBetween` (`lib/domain/editor/ai/visible-text.ts`) for `buildOutline` previews and ChatPanel's ambiguity context + "document currently reads" dump. NOT in `tiptapToMarkdown` (source view must show it).
+- **Lossless markdown**: `privateBlock` codec (`%%` fence, blank-line padded, unanchored reTag) + reTag-only `privateText` codec; `dgPrivateText` / `dgPrivateBlock` turndown rules; code segments excluded from the inline reTag. Export markdown converter emits `%%…%%` / `%%` fences.
+- **Gate**: `pnpm private:content:check` — two halves, wired into `build`: `scripts/validate-private-content.ts` (predicate + seam scan, mutation-tested) and `scripts/validate-private-content-editor.ts` (a REAL TipTap editor under jsdom: Cmd+/ both shapes and their reversal, the `%%text%%` input rule via `handleTextInput`, `%%` + Enter open/close incl. the trailing-node reuse, strip ≡ visible text).
+- **CSS**: `.ProseMirror .private-text` / `.private-block` (muted, dotted underline / dashed left rule, `%%` chrome via pseudo-elements, dark companions); `.public-prose [data-private] { display: none }` as the belt-and-braces net.
+
+### Also in this release train (same branch, 2026-09-25)
+- **Paste into a code block always lands** (owner report: long pastes into a ``` block landed nothing or one line). Root cause: the editor's own `handlePaste` in `MarkdownEditor.tsx` runs before TipTap's code-block-aware handler and, when the text looked like markdown (`#` comments, `-` lines, backticks…), either replaced the literal paste with block nodes a `codeBlock` (`content: text*`) cannot hold ("Always format" on) or offered a toast whose "convert" undid the good paste. Fix: bail out of that handler whenever `$from.parent.type.spec.code` — ProseMirror's default then inserts one text node with every line kept. The context-menu "Paste as Markdown" inserts literal text inside a code block for the same reason.
+- **Slash menu uses Lucide icons** instead of 60 mixed emoji/glyphs: `SlashCommand.icon` is now `LucideIcon | string` (string kept for extension authors), all 72 built-in commands + the calendar extension's two mapped to icons, rendered at 18px in the menu's existing gold accent.
+
+### First owner smoke (2026-09-26) — findings + fixes
+- **Leak found:** a side chat asked "does this document have the phrase …" and the model quoted a `%%…%%` run. Path: the side chat attaches its bound note as an implicit first mention (`app/api/ai/chat/route.ts`), rendered from the materialized `searchText` column, which predated the strip. **Fix:** derive live via `extractSearchTextFromTipTap` (same rule `read_content` already followed). **Also closed** from the same sweep: `findTextInDoc` (apply_diff could match/edit private text and its match COUNT confirmed existence), charter phase titles (`headingText`), inject-media `blockPreview`, `list_document_blocks`, the browser-extension note read's markdown flavour. Six seams added to `private:content:check`. Left as documented edges: `read_current_page` DOM capture of the app's own page (extension content script), stale AI-derived metadata.
+- **Search "toggling" observation:** consistent with the `searchText` column lagging the editor by one collaborative save — the column is written stripped on every save path, so a result that shows right after un-marking disappears on the next save after re-marking. Not a second code path.
+- **Side-chat copy-link first click** (separate regression, owner report): the clipboard write ran after an `await`ed ensure-node POST; on the first click that POST creates the node and the click's user activation expires, so the browser refuses the write; the second click's POST is a no-op and squeaks in. Fixed by handing `ClipboardItem` a pending value (write stays inside the gesture) + caching the node id per conversation.
+- **Local sign-in outage** during the smoke: the dev server's inherited shell env forced TLS on the localhost Postgres (`Error opening a TLS connection: The server does not support SSL connections`); a restart from a clean shell fixed it. Both dev and collab servers now run detached from this worktree.
+
+### Smoke checklist (owner)
+- [ ] Side chat on a note with a `%%…%%` run: ask "does this document contain <the private phrase>" → the model says no / cannot find it.
+- [ ] Caret at the end of a `%%…%%` run, type → text stays inside; press → once (caret does not move), type → text is outside.
+- [ ] After stepping out, Backspace → the run is uncommented (text kept). Caret just before a run, Delete → same.
+- [ ] Caret at the start of the paragraph right after a private block, Backspace → the block is uncommented and the paragraph is NOT pulled into it.
+- [ ] Side chat header → copy-link button on the FIRST click → "Chat link copied" toast and the link is on the clipboard.
+- [ ] Inside a ``` code block, paste a multi-line snippet containing `#` comment lines and `-` bullets → every line lands verbatim, no toast. Also via right-click → Paste as Markdown.
+- [ ] Type `/` → every row shows a line icon (no emoji); `/calendar` rows too.
+- [ ] Select words inside a paragraph → Cmd+/ → muted `%%…%%` run; Cmd+/ again with the caret inside → plain text.
+- [ ] Caret on a paragraph → Cmd+/ → dashed private block with the "%% private — hidden…" label; Cmd+/ inside → unwrapped.
+- [ ] Type `%%secret%%` → converts on the closing `%%`. Type `%%` + Enter → block opens; `%%` + Enter inside → block closes with the caret in a fresh paragraph after it.
+- [ ] `/private` and the EyeOff toolbelt button behave like Cmd+/.
+- [ ] Source view (markdown toggle) shows `%%secret%%` and the `%%` fence lines; toggling back restores both shapes.
+- [ ] AI chat bound to the note: `read_content` / "read the document" never quotes private text; `list_document_outline` shows "(no text)" for a private block.
+- [ ] Publish the note → private text and block absent from the public page.
+- [ ] Global search for a private-only word finds nothing after the note saves.
+=======
+## September 21, 2026 — Move tab to workplace / workbench
+
+**Tree**: worktree `.claude/worktrees/move-tab-to-workspace`, branch `feat/move-tab-to-workspace` (PR pending)
+**Status**: typecheck / lint / full build green; `pnpm workspace:tab-move:smoke` (new, DB-backed) green; owner browser smoke pending. No migration, no TipTap schema change → no Hocuspocus redeploy.
+
+### Shipped
+- **Real tab move** (`POST /api/content/workspaces/[id]/tabs/move`, `moveWorkspaceTab` in `membership.ts`): R1 membership upserted in the target and deleted from the source in one transaction; only the target's `updatedAt` bumps (the source is the mover's active workplace — bumping it would 409 their own next save).
+- **Menu** (`WorkplacesTabMenuSection`): "Move tab to" lists top-level workplaces with their workbenches indented, the current workplace's own benches included; unmaterialized root-layer folders are fetched from the workbenches route on open and materialized on click via the new `ensureWorkbench` store action. "Share permanently" now lists top-level workplaces only.
+- **Store** (`moveTabToWorkspace`): posts the move with the leaving pane's affinity hint, closes the local tab, replaces the target's list entry from the response, carries an existing claim (never mints one), toasts with "Go there".
+- **Read path**: `getWorkspace` includes membership; `contentMeta` names membership-only ids so the moved tab arrives titled.
+
+### Addendum (2026-09-25) — drag a tab onto the workplaces affordance
+- **`WorkspaceTabDropTarget`** wraps `WorkspaceSelector` in the shell nav: a tab dragged over the trigger opens (after 150 ms) a drop-only panel with the same grouped destinations as the context menu (`useTabMoveTargets`, shared). Drop = move, stay put. Hold one row 2 s → bar fills, "Opens here" pill → drop also switches there. Moving rows restarts the hold. Panel closes 300 ms after `dragover` stops reaching trigger or panel.
+- **`state/tab-drag-store.ts`** bridges the strip's drag (set/cleared in `MainPanelHeader`, plus `application/x-dg-tab` mime) to targets outside the pane subtree.
+- **`moveTabToWorkspace(…, { openTarget })`** activates the target after the move and omits the "Go there" toast action.
+- **Files (same panel, `WorkspaceDropTarget`)**: a tree node or multi-selection dragged onto the affordance → "Send … to" panel; drop = `sendContentToWorkspace` → `POST /tabs` per item (now bumps target `updatedAt`, returns the workspace read); the current workplace / active bench are droppable for content (guarded open when active); hold 2 s follows. Tree drags are react-dnd → hover native, drop via `useDrop` (the HTML5 backend forces `dropEffect="none"` elsewhere).
+
+- **Round-1 fix + Undo (2026-09-26)**: bench folder lists prefetch at drag start and seed from a 60 s cache (`usePrefetchTabMoveTargets`) so the panel no longer shifts under the pointer. Every move/send toast carries **Undo** for 10 s: tab move → membership back + claim back + reopen in the original pane (or close where followed and switch back); send → `DELETE /tabs` per item (now bumps the revision) or local close. "Go there" is the toast's secondary button.
+
+### Drag-and-drop smoke (owner)
+**Undo:** drop a tab on another workplace → toast shows **Undo** and **Go there** → Undo → the tab is back in the same pane, no conflict dialog, and the target no longer lists it → hold-drop (followed) → Undo → tab closes there, you are back in the source with the tab open → send a file → Undo → the target no longer has it → drop a file on the current workplace → Undo → it closes here.
+**Shift:** drag a tab over the selector after a page load → the panel opens with every view workplace's folders already listed; nothing moves under the pointer while hovering.
+**Files:** drag a file from the tree over the selector → panel opens with "Send … to", the current workplace listed as a droppable row → drop on another workplace → opens there as a tab, you stay, toast "Sent … to X" with "Go there" → hold 2 s → "Opens here" → drop → file opens there AND you land there → drop on the current workplace's row → it just opens here → drag a multi-selection → "Send N items to" → all open in the target → second window on the target → tab appears within the refresh cadence, no conflict dialog.
+**Tabs:**
+Drag a tab over the workplaces selector → the panel opens beneath it listing other workplaces with benches indented, the current one labelled "current" with only its benches → drag away from both → closes within ~300 ms → release the drag elsewhere → closes → drop on a workplace row quickly → tab closes here, toast with "Go there", you stay → hover a row → thin bar fills across it over 2 s → "Opens here" pill → drop → tab moves AND you land in that workplace, toast without "Go there" → hover a row ~1.5 s then move to another → bar restarts from zero, no pill until 2 s there → drop on a never-opened bench folder → bench materializes and holds the tab → reorder a workplace inside the real dropdown → unaffected → drag a file-tree node over the selector → panel does NOT open → after any drop the pane reshape overlays are gone.
+
+### Smoke script (owner)
+Right-click a tab → "Move tab to" lists the other workplaces, each with its workbenches indented; the current workplace shows as "current" with only its benches clickable → pick a sibling workplace → the tab closes here and a toast says "Moved … to X" with "Go there" → Go there → the tab is open in X, titled, in the top-left pane → from a view workplace, move a tab into a subfolder that has NEVER been opened as a bench → the bench materializes (it now appears in the selector's dwell submenu) and holds the tab → from that bench, move the tab back to the parent workplace → with a second browser window sitting on the target workplace, move a tab into it → the tab appears there within the background refresh cadence and neither window shows a conflict dialog → move a tab whose content the source workplace had claimed (via Share permanently or the settings dialog) → the claim follows (settings dialog lists it under the target) → move a tab from a two-pane layout's right pane → it lands per the target's own layout (top-left when the target has no right ordinal) → right-click on a workplace with no other workplaces and no benches → "Create another workplace first."
+
+
 ## August 14, 2026 — Note Window block + clipboard round-trip fixes
 
 **Tree**: main working tree (no branch yet — owner decides branch/PR)

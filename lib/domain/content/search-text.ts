@@ -6,6 +6,7 @@
  */
 
 import type { JSONContent } from "@tiptap/core";
+import { stripPrivateContent } from "./private-content";
 
 // ============================================================
 // TIPTAP JSON → PLAIN TEXT
@@ -14,10 +15,21 @@ import type { JSONContent } from "@tiptap/core";
 /**
  * Extract plain text from TipTap JSON for search indexing
  *
+ * Private (commented-out) content is stripped FIRST. This function feeds the
+ * materialized `searchText` column on every note write AND the AI's
+ * current-note reader, so stripping here is what keeps private text out of
+ * search excerpts and the model's context in one move. The author's own
+ * in-page find still works on the live editor DOM.
+ *
  * @param json - TipTap JSON content
  * @returns Plain text string (newlines preserved)
  */
 export function extractSearchTextFromTipTap(json: JSONContent): string {
+  if (!json) return "";
+  return extractVisibleText(stripPrivateContent(json));
+}
+
+function extractVisibleText(json: JSONContent): string {
   if (!json) return "";
 
   let text = "";
@@ -29,7 +41,7 @@ export function extractSearchTextFromTipTap(json: JSONContent): string {
 
   // Atomic inline nodes carry their human text in ATTRS, not text content —
   // a text-only traversal renders each one as "" and silently drops it.
-  // That blinded getCurrentNote (which serves searchText to the AI) to every
+  // That blinded read_content (which serves searchText to the AI) to every
   // [[wiki-link]] in a note: a playbook's cross-references to its grounding
   // docs vanished from what the model saw (2026-08-08 Rapid Scout run).
   text += atomicInlineText(json);
@@ -37,7 +49,7 @@ export function extractSearchTextFromTipTap(json: JSONContent): string {
   // Recursively extract from children
   if (json.content && Array.isArray(json.content)) {
     for (const child of json.content) {
-      const childText = extractSearchTextFromTipTap(child);
+      const childText = extractVisibleText(child);
       if (childText) {
         text += (text ? " " : "") + childText;
       }

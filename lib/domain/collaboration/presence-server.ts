@@ -24,9 +24,6 @@ export interface CollaborationPresenceRecord {
   lastSeenAt: number;
 }
 
-interface PresenceStore {
-  listeners: Map<string, Set<() => void>>;
-}
 
 // Two-tier staleness keyed off the record's transportState:
 // - Active transports heartbeat every 10-30s → 45s window keeps crashed tabs
@@ -58,18 +55,6 @@ function freshnessFilter(now: number) {
   };
 }
 
-declare global {
-  var __dgCollaborationPresenceStore: PresenceStore | undefined;
-}
-
-function getStore() {
-  if (!globalThis.__dgCollaborationPresenceStore) {
-    globalThis.__dgCollaborationPresenceStore = {
-      listeners: new Map(),
-    };
-  }
-  return globalThis.__dgCollaborationPresenceStore;
-}
 
 async function prune(prisma: PrismaClient, contentId: string) {
   const now = Date.now();
@@ -124,7 +109,6 @@ export async function upsertCollaborationPresence(
     },
   });
   await prune(prisma, record.contentId);
-  notifyCollaborationPresence(record.contentId);
 }
 
 export async function listCollaborationPresence(prisma: PrismaClient, contentId: string) {
@@ -159,24 +143,3 @@ export async function listCollaborationPresence(prisma: PrismaClient, contentId:
   }));
 }
 
-export function subscribeCollaborationPresence(contentId: string, listener: () => void) {
-  const store = getStore();
-  const listeners = store.listeners.get(contentId) ?? new Set<() => void>();
-  listeners.add(listener);
-  store.listeners.set(contentId, listeners);
-
-  return () => {
-    listeners.delete(listener);
-    if (listeners.size === 0) {
-      store.listeners.delete(contentId);
-    }
-  };
-}
-
-export function notifyCollaborationPresence(contentId: string) {
-  const listeners = getStore().listeners.get(contentId);
-  if (!listeners) return;
-  for (const listener of listeners) {
-    listener();
-  }
-}

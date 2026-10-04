@@ -18,8 +18,9 @@
  */
 
 import { useCallback, useMemo, useSyncExternalStore } from "react";
+import { registerPollingTask } from "@/lib/core/polling/scheduler";
 
-import { getCollaborationBrowserSessionId } from "@/lib/domain/collaboration/runtime";
+import { getCollaborationBrowserSessionId } from "@/lib/domain/collaboration/browser-session";
 
 /**
  * Transport states that represent an actively-synced collaboration
@@ -78,8 +79,13 @@ function recordsEqual(a: PresenceRecord[], b: PresenceRecord[]): boolean {
 class PresencePoller {
   private subscribers = new Map<string, Set<() => void>>();
   private cache = new Map<string, PresenceRecord[]>();
-  private intervalId: number | null = null;
+  private unregisterPoll: (() => void) | null = null;
+  // Shared by the `focus` and `visibilitychange` listeners. The visibility
+  // guard matters for the latter: visibilitychange fires on the hidden
+  // transition too, and refreshing on the way out is exactly the tick we are
+  // trying to avoid.
   private readonly onFocus = () => {
+    if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
     void this.fetchIds([...this.subscribers.keys()]);
   };
 
@@ -106,19 +112,29 @@ class PresencePoller {
   }
 
   private start() {
-    if (this.intervalId !== null || typeof window === "undefined") return;
-    this.intervalId = window.setInterval(() => {
-      void this.fetchIds([...this.subscribers.keys()]);
-    }, POLL_INTERVAL_MS);
+    if (this.unregisterPoll !== null || typeof window === "undefined") return;
+    // Gating (hidden AND idle both pause) lives in the scheduler. Batching still
+    // lives here: N subscribers collapse to ceil(N/16) requests per tick, which
+    // is the property that made this module the unification model in the first
+    // place. The two compose — the scheduler decides WHETHER to tick, this class
+    // decides how few requests a tick costs.
+    //
+    // per-tab, not leader: different tabs subscribe to different contentIds, so
+    // one tab's answer is not another's.
+    this.unregisterPoll = registerPollingTask({
+      id: "collaboration-presence-poll",
+      intervalMs: POLL_INTERVAL_MS,
+      run: () => this.fetchIds([...this.subscribers.keys()]),
+    });
     window.addEventListener("focus", this.onFocus);
+    document.addEventListener("visibilitychange", this.onFocus);
   }
 
   private stop() {
-    if (this.intervalId !== null) {
-      window.clearInterval(this.intervalId);
-      this.intervalId = null;
-    }
+    this.unregisterPoll?.();
+    this.unregisterPoll = null;
     window.removeEventListener("focus", this.onFocus);
+    document.removeEventListener("visibilitychange", this.onFocus);
   }
 
   private async fetchIds(ids: string[]): Promise<void> {
@@ -158,6 +174,26 @@ class PresencePoller {
 }
 
 const presencePoller = new PresencePoller();
+
+/**
+ * Non-React subscription, for the collaboration runtime.
+ *
+ * The runtime is a plain class, not a component, and it needs the same answer
+ * the hook below computes — so it subscribes here rather than opening its own
+ * transport. That is the whole point of Phase 1: the runtime used to hold a
+ * dedicated SSE per document whose server side re-queried Postgres every 10 s.
+ * Folding it into this poller costs nothing extra, because a document the
+ * runtime has open is almost always already being polled for the tab strip, and
+ * the batch route collapses the ids either way.
+ */
+export function subscribeContentPresence(
+  contentId: string,
+  callback: (sessions: PresenceRecord[]) => void,
+): () => void {
+  return presencePoller.subscribe(contentId, () => {
+    callback(presencePoller.getSnapshot(contentId));
+  });
+}
 
 export interface ContentPresence {
   sessions: PresenceRecord[];

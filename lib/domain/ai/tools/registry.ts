@@ -12,6 +12,11 @@
 import { tool, generateObject } from "ai";
 import { z } from "zod/v4";
 import { prisma } from "@/lib/database/client";
+import { resolveRowRefs } from "@/lib/domain/data/server/resolve";
+import {
+  readStandingContext,
+  type StandingContextDeclaration,
+} from "@/lib/domain/ai/quests";
 import {
   acquire,
   createAcquisitionBudget,
@@ -37,18 +42,42 @@ import {
   preflightCapture,
 } from "@/lib/domain/data/server/capture";
 import { createColumn } from "@/lib/domain/data/server/mutations";
+import { renderDataNodePreview } from "@/lib/domain/data/server/read-preview";
+import { resolveItemStatus, resolveIterationSource } from "./repair";
+import {
+  DELIVERABLE_TOOLS,
+  ITERATION_PROPOSAL_INPUT,
+  PROPOSAL_BOUNDS,
+  QUEST_COLUMN_TYPES,
+  RESEARCH_ALLOWANCE_PER_ITEM,
+  clampInt,
+  clipText,
+  normalizeProposalItems,
+  reservedTailSize,
+  resolveCaptureTarget,
+  normalizeCaptureArg,
+  resolveDeliverables,
+  stripCaptureDeliverables,
+  resolveQuestColumnType,
+  resolveQuestColumns,
+  stepsPerItemFor,
+} from "./iteration-proposal";
 import {
   closeSitting,
   ensureMasterLedger,
+  ensureOutputRelation,
   ensureQuest,
+  ledgerOutputRelations,
   parseQuestInfo,
   questSeenKeys,
   recordQuestItem,
   setQuestLog,
+  sittingRecordedCount,
   tableColumnKeys,
   type QuestInfo,
 } from "@/lib/domain/ai/quests";
 import { computeTurnCost } from "@/lib/features/ai-connections/usage/pricing";
+import { resolveDocumentArgs } from "./write-args";
 import type { JSONContent } from "@tiptap/core";
 import { listCharters, isCharterMetadata } from "@/lib/domain/ai/charters/registry";
 import {
@@ -56,6 +85,7 @@ import {
   extractSearchTextFromTipTap,
   markdownToTiptapResult,
 } from "@/lib/domain/content";
+import type { ContentType } from "@/lib/domain/content/types";
 import { linkifyWikiRefsInTiptap } from "@/lib/domain/editor/wiki-link-refs";
 import { generateAndStoreImage } from "@/lib/domain/ai/image/generate-and-store";
 import { IMAGE_PROVIDER_CATALOG } from "@/lib/domain/ai/image/catalog";
@@ -90,6 +120,10 @@ import { REVERT_SNAPSHOT_KEY } from "@/lib/domain/ai/compact-tool-outputs";
 import { logger } from "@/lib/core/logger";
 import { ensureFolderContextFresh } from "@/lib/domain/ai-context/gate";
 import { assembleFolderCapsule } from "@/lib/domain/ai-context/capsule";
+import {
+  AUTO_CLOSED_CHECKPOINT_NEXT,
+  toolAutoApproves,
+} from "./approval-policy";
 import {
   READ_PAGE_HEADLESS_OR_BROWSER_DESCRIPTION,
   readPageInBrowserInputSchema,
@@ -202,7 +236,18 @@ function estimateRunCostUsd(ctx: ToolExecuteContext): number | undefined {
   const cachedInputTokens = (tokens?.cachedInput ?? 0) + (prior?.cachedInput ?? 0);
   if (!model || inputTokens + outputTokens <= 0) return undefined;
   const cost = computeTurnCost(
-    { inputTokens, outputTokens, cachedInputTokens },
+    {
+      inputTokens,
+      outputTokens,
+      cachedInputTokens,
+      // Tier per call, never per summed run (pricing.ts `maxStepInputTokens`).
+      ...(tokens?.maxStepInput
+        ? {
+            maxStepInputTokens: tokens.maxStepInput,
+            maxStepCachedInputTokens: tokens.maxStepCachedInput ?? 0,
+          }
+        : {}),
+    },
     model.modelId,
     model.vendorId,
   );
@@ -216,6 +261,90 @@ function estimateRunCostUsd(ctx: ToolExecuteContext): number | undefined {
  * `execute` needs the authenticated `userId` — which is only available
  * at request time in the API route.
  */
+/**
+ * Model-facing name for a content type, used by `search_content` results.
+ *
+ * Deliberately NOT `getContentTypeLabel` (lib/domain/content/types.ts): that
+ * one is the UI vocabulary ("Data Table"), while the tools speak of
+ * DATABASES (describe_database, query_database, propose_database_columns).
+ * A search result labelled "Data Table" would not tell the model which tool
+ * to reach for next; "database" does.
+ *
+ * Exhaustive `Record<ContentType, …>` on purpose — a new content type must
+ * fail the build here rather than silently search under a wrong name.
+ */
+const AI_CONTENT_TYPE_NAMES: Record<ContentType, string> = {
+  folder: "folder",
+  note: "note",
+  file: "file",
+  html: "html page",
+  template: "template",
+  code: "code file",
+  external: "external link",
+  chat: "chat",
+  visualization: "diagram",
+  data: "database",
+  hope: "goal",
+  workflow: "workflow",
+  shortcut: "shortcut",
+};
+
+function describeContentType(type: ContentType): string {
+  return AI_CONTENT_TYPE_NAMES[type];
+}
+
+/**
+ * HTML pages and templates share `HtmlPayload`. Prefer the extracted text —
+ * markup is mostly tokens the model does not need — and fall back to the raw
+ * HTML only when no text was extracted.
+ */
+async function renderHtmlPayload(
+  contentId: string,
+  header: string,
+): Promise<string> {
+  const h = await prisma.htmlPayload.findUnique({
+    where: { contentId },
+    select: { html: true, searchText: true, isTemplate: true },
+  });
+  if (!h) return `${header}\n\n(page record missing)`;
+  const text = h.searchText.trim() || h.html;
+  return `${header}${h.isTemplate ? "\nTemplate: yes" : ""}\n\n${text}`;
+}
+
+
+/**
+ * True when `contentId` is a file THIS chat created: associated with the
+ * conversation and created after the conversation began. The association
+ * alone is not enough — an @-mentioned file of the user's is associated
+ * too, and must never be overwritten without asking (§10 round 6).
+ */
+async function contentCreatedInThisChat(
+  ctx: ToolExecuteContext,
+  contentId: string,
+): Promise<boolean> {
+  if (!ctx.conversationId) return false;
+  const [conversation, association, node] = await Promise.all([
+    prisma.conversation.findFirst({
+      where: { id: ctx.conversationId, ownerId: ctx.userId },
+      select: { createdAt: true },
+    }),
+    prisma.conversationAssociation.findUnique({
+      where: {
+        conversationId_contentNodeId: {
+          conversationId: ctx.conversationId,
+          contentNodeId: contentId,
+        },
+      },
+      select: { conversationId: true },
+    }),
+    prisma.contentNode.findFirst({
+      where: { id: contentId, ownerId: ctx.userId, deletedAt: null },
+      select: { createdAt: true },
+    }),
+  ]).catch(() => [null, null, null] as const);
+  return !!(conversation && association && node && node.createdAt >= conversation.createdAt);
+}
+
 export function createBaseTools(ctx: ToolExecuteContext) {
   // One acquisition budget per request scope: createBaseTools is called per
   // chat turn in the route, so every read_page in a single turn shares this
@@ -330,7 +459,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
       description:
         "Propose a BOUNDED multi-page research run for the user to approve BEFORE reading anything. " +
         "Use this when the user asks to research a topic across multiple pages/sources. The user approves the objective, sources, page budget, and follow depth up front. " +
-        "On approval you receive a per-run page budget (reads refuse once it is spent) and a ledger key. Then read sources, call extract_structured on each, and finish with a synthesis (createNote) + record_research_findings.",
+        "On approval you receive a per-run page budget (reads refuse once it is spent) and a ledger key. Then read sources, call extract_structured on each, and finish with a synthesis (create_note) + record_research_findings.",
       needsApproval: true,
       inputSchema: z.object({
         objective: z
@@ -416,16 +545,16 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           nextAction:
             `APPROVED. You have a per-run budget of ${pageBudget} pages — reads refuse once it is spent, so spend them well (breadth first, depth ${depth}). ` +
             `Read each source, call extract_structured on its content with columns (the user's if named, else inferred from the objective), and accumulate the rows. ` +
-            `When the objective is met OR the budget is spent, synthesize with createNote (a short prose summary + a markdown table of the rows) into the output target, then call record_research_findings with ledgerRunKey "${ledgerRunKey}".`,
+            `When the objective is met OR the budget is spent, synthesize with create_note (a short prose summary + a markdown table of the rows) into the output target, then call record_research_findings with ledgerRunKey "${ledgerRunKey}".`,
         };
       },
     }),
     // Append a research run's outcome to its objective ledger (audit trail).
     // Called AFTER the synthesis note is written. Not user-approved — it is a log
-    // write; the user already approved the synthesis via createNote.
+    // write; the user already approved the synthesis via create_note.
     record_research_findings: tool({
       description:
-        "Record the outcome of a research run in its objective ledger (audit trail). Call AFTER synthesizing (createNote), passing the ledgerRunKey from propose_research_run. " +
+        "Record the outcome of a research run in its objective ledger (audit trail). Call AFTER synthesizing (create_note), passing the ledgerRunKey from propose_research_run. " +
         "Include the pages you read and a short summary of findings so the ledger is a faithful record of the run.",
       inputSchema: z.object({
         ledgerRunKey: z
@@ -525,122 +654,144 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         "Enumerate FIRST, then propose with the item list. On approval you receive an item budget, a ledger checklist (one row per item), and stable item keys. Process items IN ORDER, one at a time, recording EVERY item with record_item_result; finish with record_iteration_findings (quest-less runs also write a roll-up note first — quest runs never do). " +
         "Skip this tool for a single item — just run the analysis directly.",
       needsApproval: true,
-      inputSchema: z.object({
-        objective: z
-          .string()
-          .min(1)
-          .max(400)
-          .describe("What each item gets, in one sentence (e.g. \"score fit with the Job Fit charter; document >75% matches\")."),
-        source: z
-          .enum(["list-page", "open-tabs", "urls", "database-rows"])
-          .describe(
-            "Where the items were enumerated from. \"database-rows\" = a stage-2 pass over an existing table: requires captureTo (the table is both source and stamp-back target); omit items — the server enumerates rows itself (optionally narrowed by rowIds).",
-          ),
-        items: z
-          .array(
-            z.object({
-              label: z.string().min(1).max(200).describe("Human label — title/company as shown."),
-              url: z.string().max(600).optional().describe("The item's own URL when known (tab URL, link href) — the strongest stable key."),
-            }),
-          )
-          .min(1)
-          .max(250)
-          .optional()
-          .describe("The enumerated items, in processing order. REQUIRED for every source except \"database-rows\" (where the server enumerates)."),
-        rowIds: z
-          .array(z.string().min(1).max(80))
-          .max(200)
-          .optional()
-          .describe(
-            "database-rows only: iterate exactly these rows, in this order (row ids from query_database). Omit to iterate the whole table in grid order (capped by itemCap).",
-          ),
-        itemCap: z
-          .number()
-          .int()
-          .min(1)
-          .max(200)
-          // The plan card is approve/reject only — do NOT promise editable
-          // fields here (an earlier description claimed the user could raise
-          // the cap in the card; they can't, and a denied proposal was the
-          // observable result).
-          .describe("Max items to process this run. PROPOSE a sensible default (~10-15, up to 200); raise it yourself ONLY when the user explicitly asked for more. If the user wants a different cap after seeing the plan, they will say so — re-propose with their number."),
-        batchSize: z
-          .number()
-          .int()
-          .min(2)
-          .max(50)
-          .optional()
-          .describe(
-            "Optional batch cadence: checkpoint the run every N items (dedupe the batch, record a batch checkpoint in the ledger) before starting the next batch. Omit when one batch covers the whole run. RECOMMEND 10 or fewer — larger batches raise drift and context risk; go higher only when the user asks for it.",
-          ),
-        ledgerLabel: z
-          .string()
-          .max(120)
-          .optional()
-          .describe("Short label for the run's ledger; omit to derive from the objective."),
-        captureTo: z
-          .object({
-            database: z
-              .string()
-              .min(1)
-              .max(200)
-              .describe(
-                "Target database — its id (from the mention capsule) or exact name.",
-              ),
-            admission: z
-              .enum(["all", "qualified", "custom"])
-              .describe(
-                "Which recorded items get rows: all done items, only qualified ones, or custom (the user's stated rule — pass cells only for items meeting it).",
-              ),
-            admissionNote: z
-              .string()
-              .max(300)
-              .optional()
-              .describe("One line stating a custom admission rule (shown on the card and in the ledger)."),
-            columns: z
-              .array(z.string().min(1).max(120))
-              .min(1)
-              .max(20)
-              .describe("Column NAMES this run will write per admitted item."),
-            dedupeColumn: z
-              .string()
-              .max(120)
-              .optional()
-              .describe(
-                "Column holding each item's stable identity; defaults to the table's first url column.",
-              ),
-          })
-          .optional()
-          .describe(
-            "Capture admitted items as DATABASE ROWS in addition to the ledger. Declare it when the user asked for results in a database — approving this card is the user's consent to write there, and each admitted item's record_item_result must then include capture.cells.",
-          ),
-        quest: z
-          .string()
-          .min(1)
-          .max(120)
-          .optional()
-          .describe(
-            "The ongoing MATTER this run belongs to (continue-or-create): pass the quest's name when the user mentions a past matter to continue (\"my job hunt\") — the same quest across sittings shares one ledger and skips already-scored items. Omit for a brand-new matter (a quest is then created from the run's label).",
-          ),
-        questColumns: z
-          .array(
-            z.object({
-              name: z.string().min(1).max(60),
-              type: z.enum(["text", "longText", "number", "url", "date", "checkbox"]),
-              description: z
-                .string()
-                .min(8)
-                .max(300)
-                .describe("What goes in it — same load-bearing context as every capture column."),
-            }),
-          )
-          .max(8)
-          .optional()
-          .describe(
-            "NEW quests only: extra ledger columns sculpted to this matter (a scoring task adds its criteria columns; a collection task adds none). The machinery core (Item/Status/Pass/Fit/Qualified/Verdict/…) always exists — never re-declare it. Write their values via questCells on record_item_result. Ignored when continuing an existing quest.",
-          ),
-      }),
-      execute: async ({ objective, source, items, rowIds, itemCap, batchSize, ledgerLabel, captureTo, quest: questArg, questColumns }) => {
+      // THE RULE — schemas describe shape; execute judges. The contract is
+      // the pure module (also loaded by `pnpm proposal:shape:check`, whose
+      // fixtures are the four payloads that died at this schema in prod
+      // fa475acc, 2026-09-21); drift gate 7 fails the build if a `.enum()` /
+      // `.min()` / `.max()` creeps back into any run-loop tool. Every
+      // judgement the old schema made — source vocabulary, item shape, caps,
+      // captureTo's keys and admission words, column count, quest column
+      // types — is made below, and a miss comes back as a RESULT the model
+      // fixes in one step instead of a rejection that ends the call.
+      inputSchema: ITERATION_PROPOSAL_INPUT,
+      execute: async ({ objective: objectiveArg, source: sourceArg, items: itemsArg, rowIds: rowIdsArg, itemCap: itemCapArg, budget: budgetArg, batchSize: batchSizeArg, ledgerLabel: ledgerLabelArg, captureTo: captureToArg, quest: questArg, questColumns: questColumnsArg, deliverables: deliverablesArg, stepsPerItem: stepsPerItemArg }) => {
+        // ── Shape → meaning (iteration-proposal.ts resolvers) ────────────
+        const objective = clipText(objectiveArg, 400) ?? "";
+        if (!objective) {
+          return {
+            ok: false,
+            refusal: "No objective given. Say in one sentence what each item gets (e.g. \"score fit with the Job Fit charter; document >75% matches\") and re-propose — keep the items you already enumerated.",
+            nextAction: "Re-propose with an objective. Do NOT start processing items.",
+          };
+        }
+        // Every item shape the model has sent → { label, url? }; over-long
+        // labels/urls are clipped, label-less entries skipped (reported below).
+        const itemsNorm = normalizeProposalItems(itemsArg);
+        const items = itemsNorm.items;
+        const rowIds = rowIdsArg
+          ?.map((r) => r.trim())
+          .filter((r) => r.length > 0)
+          .slice(0, PROPOSAL_BOUNDS.rowIds);
+        const ledgerLabel = clipText(ledgerLabelArg, 120);
+        // Resolve the two fields that used to reject the whole proposal
+        // (production, 2026-09-18). Both refusals below are ordinary tool
+        // RESULTS, so the model can re-propose in the same turn with the
+        // enumeration it already has — the expensive part of this call.
+        const source = resolveIterationSource(sourceArg);
+        if (!source) {
+          return {
+            ok: false,
+            refusal: `Could not tell where these items came from: source "${sourceArg ?? ""}". Re-propose with exactly one of "list-page", "open-tabs", "urls" or "database-rows" — keep the items you already enumerated.`,
+            nextAction: "Re-propose with a valid source. Do NOT start processing items.",
+          };
+        }
+        const itemCapRaw = itemCapArg ?? budgetArg;
+        if (itemCapRaw === undefined) {
+          return {
+            ok: false,
+            refusal:
+              "No item cap given. Re-propose with itemCap set (~10-15 is a sensible default, up to 200) — keep the items you already enumerated.",
+            nextAction: "Re-propose with itemCap. Do NOT start processing items.",
+          };
+        }
+        const itemCap = clampInt(itemCapRaw, PROPOSAL_BOUNDS.itemCap.min, PROPOSAL_BOUNDS.itemCap.max, PROPOSAL_BOUNDS.itemCap.max);
+        // A cadence below 2 is no cadence; above the bound is clamped.
+        const batchSize =
+          typeof batchSizeArg === "number" && Number.isFinite(batchSizeArg) && batchSizeArg >= PROPOSAL_BOUNDS.batchSize.min
+            ? clampInt(batchSizeArg, PROPOSAL_BOUNDS.batchSize.min, PROPOSAL_BOUNDS.batchSize.max, PROPOSAL_BOUNDS.batchSize.max)
+            : undefined;
+        // captureTo in every shape seen (bare id, databaseId, comma columns,
+        // admission by meaning) → one target, or a refusal naming the fix.
+        const captureRes = resolveCaptureTarget(captureToArg);
+        if (captureRes && !captureRes.ok) {
+          return {
+            ok: false,
+            refusal: captureRes.refusal ?? "captureTo could not be read.",
+            nextAction: "Re-propose with captureTo fixed as the refusal says. Do NOT start processing items.",
+          };
+        }
+        const captureTo = captureRes?.target;
+        const questRes = resolveQuestColumns(questColumnsArg);
+        if (!questRes.ok) {
+          return {
+            ok: false,
+            refusal: questRes.refusal ?? "questColumns could not be read.",
+            nextAction: "Re-propose with questColumns fixed as the refusal says. Do NOT start processing items.",
+          };
+        }
+        const questColumns = questRes.columns;
+        // Deliverables (plan §6b): the write tools each item ends with. The
+        // route sizes the step cap from them and reserves the turn's tail.
+        const deliverablesRes = resolveDeliverables(deliverablesArg);
+        // Narrowed again below once the capture target is known (P3): with
+        // capture on, the row write IS capture.cells.
+        let deliverables = deliverablesRes.deliverables;
+        const stepsPerItemFrom = (list: readonly string[]) =>
+          typeof stepsPerItemArg === "number" && Number.isFinite(stepsPerItemArg)
+            ? stepsPerItemFor(list, stepsPerItemArg)
+            : undefined;
+        let stepsPerItem = stepsPerItemFrom(deliverables);
+        // Everything the resolvers silently read differently from what was
+        // sent rides the result, so a normalization is never invisible.
+        const shapeNotes = [
+          ...(captureRes?.notes ?? []),
+          ...questRes.notes,
+          ...(deliverablesRes.unknown.length > 0
+            ? [`deliverables not recognized and dropped: ${deliverablesRes.unknown.join(", ")} (known: ${DELIVERABLE_TOOLS.join(", ")})`]
+            : []),
+          ...(itemsNorm.dropped > 0 ? [`${itemsNorm.dropped} item(s) had no label under any key and were skipped`] : []),
+          ...(itemsNorm.clipped ? [`items clipped to the first ${PROPOSAL_BOUNDS.items}`] : []),
+          ...(itemCap !== itemCapRaw ? [`itemCap ${itemCapRaw} clamped to ${itemCap}`] : []),
+        ];
+
+        // An enumeration that lost its URLs is a degraded run, not a failed
+        // one, and it degrades SILENTLY: the ledger cannot link to sources, a
+        // second sitting cannot revisit them, and URL dedupe against the
+        // capture table is impossible. Refuse where the URL is definitionally
+        // available — a tab HAS a url, and a "urls" source IS urls — and let a
+        // list-page pass, since an extractor that strips hrefs is a real
+        // condition the model cannot always defeat (production 2026-09-18).
+        const urlIsDefinitional = source === "open-tabs" || source === "urls";
+        if (urlIsDefinitional && items && !items.some((i) => i.url?.trim())) {
+          return {
+            ok: false,
+            refusal: `Every item in a "${source}" run needs its url, and none of these have one. Re-enumerate while the source is still open and include each item's url — without it the ledger cannot link to the source, a follow-up run cannot revisit it, and duplicate rows cannot be detected.`,
+            nextAction: "Re-propose with urls on the items. Do NOT start processing items.",
+          };
+        }
+
+        // A run whose objective says it will write somewhere, but which
+        // declares no capture target, cannot write anywhere: record_item_result
+        // answers `capture ignored — this run has no approved captureTo
+        // config`. In production the user named the destination database in
+        // their own message and the proposal still arrived without it, so the
+        // run would have screened 20 jobs and saved none of them.
+        // The object sits between the verb and the destination ("write ROLES
+        // SCORING 75+ to the Library"), so the gap is bounded rather than
+        // absent. Only "to"/"into" count: bare "in" turns "record the verdict
+        // in one sentence" into a false refusal, and blocking a legitimate
+        // report-only run costs more than missing one capture-less run, which
+        // the user still sees on the approval card.
+        const OBJECTIVE_WRITES_SOMEWHERE =
+          /\b(writ|captur|add|record|log|sav)\w*\b[^.;]{0,80}?\b(to|into)\b/i;
+        if (!captureTo && OBJECTIVE_WRITES_SOMEWHERE.test(objective)) {
+          return {
+            ok: false,
+            refusal:
+              "This objective says the run will write its results somewhere, but no captureTo was given — so nothing would be written. Name the destination database in captureTo and re-propose, or reword the objective if the run is only meant to report.",
+            nextAction: "Re-propose with captureTo. Do NOT start processing items.",
+          };
+        }
         const label = (ledgerLabel ?? objective).trim();
         let ledgerRunKey =
           "iterate:" +
@@ -690,8 +841,10 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             database: captureTo.database,
             admission: captureTo.admission,
             admissionNote: captureTo.admissionNote,
+            // Empty = every writable column (the preflight expands it).
             columnNames: captureTo.columns,
             dedupeColumnName: captureTo.dedupeColumn,
+            mergeColumnNames: captureTo.mergeColumns,
           });
           if (!capture.ok) {
             return {
@@ -714,11 +867,27 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         // config presence IS the "preflight passed" signal below. rowKeyed
         // rides the stamped config so record_item_result knows item keys
         // are row ids (P3 stamp-back).
+        // `approvedAt` (P3): the moment from which a same-sitting write on a
+        // captured row is protected from the closing capture.
+        const approvedAt = new Date().toISOString();
         const captureCfg = capture?.config
           ? rowSourced
-            ? { ...capture.config, rowKeyed: true }
-            : capture.config
+            ? { ...capture.config, rowKeyed: true, approvedAt }
+            : { ...capture.config, approvedAt }
           : null;
+        // P3: one write path. With capture on, update_row/update_rows are
+        // not deliverables — capture.cells on record_item_result lands the
+        // row, and a second write of the same cells would overwrite it.
+        if (captureCfg) {
+          const narrowed = stripCaptureDeliverables(deliverables, true);
+          if (narrowed.stripped.length > 0) {
+            deliverables = narrowed.deliverables;
+            stepsPerItem = stepsPerItemFrom(deliverables);
+            shapeNotes.push(
+              `${narrowed.stripped.join(", ")} dropped from deliverables — CAPTURE IS ON, so capture.cells on record_item_result IS the row write for the capture columns; do NOT also call ${narrowed.stripped.join("/")} for them (a second write of the same cells overwrites the first).`,
+            );
+          }
+        }
         const captureVocab = capture?.optionVocab ?? {};
         const captureDescMissing = capture?.descriptionsMissing ?? [];
         const captureEmptyVocab = capture?.emptyVocabColumns ?? [];
@@ -740,10 +909,26 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           if (!captureCfg) {
             return { ok: false, refusal: "Capture preflight did not resolve the table.", nextAction: "Re-propose." };
           }
+          // Handles (AI bulk reads, plan §4.3): the model narrows with the
+          // [ab12cd34] handles a query_database result showed it.
+          let resolvedRowIds = rowIds;
+          if (rowIds && rowIds.length > 0) {
+            const refs = await resolveRowRefs(captureCfg.tableId, rowIds);
+            const bad = refs.filter((r): r is { refusal: string } => "refusal" in r);
+            if (bad.length > 0) {
+              return {
+                ok: false,
+                refusal: `rowIds did not resolve:\n${bad.map((b) => b.refusal).join("\n")}`,
+                nextAction:
+                  "Re-propose with the [handles] or full ids from a query_database result of the captureTo database.",
+              };
+            }
+            resolvedRowIds = refs.map((r) => (r as { id: string }).id);
+          }
           const enumerated = await enumerateCaptureRows({
             userId: ctx.userId,
             config: captureCfg,
-            rowIds,
+            rowIds: resolvedRowIds,
             limit: itemCap,
           });
           if (!enumerated.items) {
@@ -808,6 +993,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         // per-item dual-writes and the P4b budget fallback never reload
         // schemas. Charter-less runs keep the legacy markdown-only path.
         let questInfo: QuestInfo | null = null;
+        let standingContext: StandingContextDeclaration[] = [];
         let questContinued = false;
         let questHomeFolderId: string | null = null;
         const alreadyScored = new Set<string>();
@@ -818,16 +1004,17 @@ export function createBaseTools(ctx: ToolExecuteContext) {
               // All quest artifacts (ledger + log) home in the charter's
               // folder — one findable cluster, no root/chat scatter (owner
               // policy 2026-09-02).
-              questHomeFolderId = master.charterParentId;
+              questHomeFolderId = master.questHomeFolderId;
               const questLabel = (questArg ?? label).trim().slice(0, 120);
               const ensured = await ensureQuest({
                 userId: ctx.userId,
                 charterTitle: ctx.activeCharter.title,
+                charterId: ctx.activeCharter.contentId,
                 masterId: master.masterId,
                 masterCols: master.masterCols,
                 questLabel,
                 objective,
-                targetFolderId: master.charterParentId,
+                targetFolderId: master.questHomeFolderId,
                 outputTableId: captureCfg?.tableId,
                 ...(questColumns && questColumns.length > 0
                   ? { extraColumns: questColumns }
@@ -846,8 +1033,33 @@ export function createBaseTools(ctx: ToolExecuteContext) {
                     .replace(/[^a-z0-9]+/g, "-")
                     .replace(/^-+|-+$/g, "")
                     .slice(0, 60) || "quest");
+                // Row-level attachment (quests v2): the capture table of THIS
+                // sitting gets its relation column on the ledger; the map is
+                // recomputed from the ledger so earlier sittings' tables stay
+                // linkable (a quest may capture into several tables).
+                if (captureCfg) {
+                  await ensureOutputRelation(
+                    ensured.questLedgerId,
+                    captureCfg.tableId,
+                    questLabel,
+                  );
+                }
+                const outputRelations = await ledgerOutputRelations(
+                  ensured.questLedgerId,
+                  master.masterId,
+                );
+                // Standing context (plan D9): the reference tables this
+                // quest declares on its master row — read once at the
+                // declared tier, kept for the run (the read tool promotes
+                // charter-linked tables to `run` on its own).
+                standingContext = await readStandingContext(
+                  master.masterId,
+                  ensured.questRowId,
+                  master.masterCols,
+                ).catch(() => []);
                 questInfo = {
                   sittingId: crypto.randomUUID(),
+                  openedAt: approvedAt,
                   masterId: master.masterId,
                   questRowId: ensured.questRowId,
                   questLedgerId: ensured.questLedgerId,
@@ -859,6 +1071,8 @@ export function createBaseTools(ctx: ToolExecuteContext) {
                       : null,
                   masterCols: master.masterCols,
                   ledgerCols: await tableColumnKeys(ensured.questLedgerId),
+                  questRelationColumnId: ensured.questRelationColumnId,
+                  outputRelations,
                 };
                 // Quest memory (rejects INCLUDED): items this quest already
                 // scored in ANY earlier sitting — the recurring token saver
@@ -893,6 +1107,43 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         // lookup in upsertRunLedger so every sitting adopts the same note.
         const ledgerParentId = questInfo ? questHomeFolderId : placement.parentId;
         const ledgerOwnerId = questInfo ? undefined : placement.ownedByNoteId;
+        // P11: a continued quest whose previous sitting never closed is
+        // said so — in the result and in the log — instead of being
+        // silently superseded (prod 2026-09-27: a 09-22 plan with no item
+        // and no reconciliation sat above the new plan, unremarked).
+        let priorSitting:
+          | { openedAt: string | null; itemsRecorded: number; closed: false }
+          | null = null;
+        if (questInfo && questContinued) {
+          try {
+            const priorState = await readRunLedgerCaptureConfig(
+              ctx.userId,
+              ledgerParentId,
+              { runKey: ledgerRunKey, ownerContentId: ledgerOwnerId },
+            );
+            const prior = parseQuestInfo(priorState?.questInfo);
+            if (prior && prior.sittingId !== questInfo.sittingId && !prior.sittingClosed) {
+              priorSitting = {
+                openedAt: prior.openedAt ?? null,
+                itemsRecorded: await sittingRecordedCount(prior).catch(() => 0),
+                closed: false,
+              };
+            }
+          } catch {
+            // Best-effort context; never blocks the proposal.
+          }
+        }
+        const priorSittingLine = priorSitting
+          ? `\n\n**Previous sitting** (opened ${priorSitting.openedAt ? priorSitting.openedAt.replace("T", " ").slice(0, 16) : "date unknown"}) recorded ${priorSitting.itemsRecorded} item${priorSitting.itemsRecorded === 1 ? "" : "s"} and never closed — superseded by this sitting.`
+          : "";
+        // Real titles for the closing references (P10): the quest ledger
+        // is renamable, and the log note is titled by buildRunLedgerTitle.
+        const questLedgerTitle = questInfo
+          ? ((await prisma.contentNode
+              .findFirst({ where: { id: questInfo.questLedgerId, deletedAt: null }, select: { title: true } })
+              .then((n) => n?.title)
+              .catch(() => undefined)) ?? `${questInfo.questLabel} — Quest Ledger`)
+          : null;
         if (questInfo || placement.parentId || placement.ownedByNoteId) {
           try {
             const ledger = await upsertRunLedger(
@@ -909,6 +1160,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
                   (questInfo
                     ? `\n\n**Quest:** ${questInfo.questLabel} (${questContinued ? "continued" : "new"} · sitting stamped)`
                     : "") +
+                  priorSittingLine +
                   (captureCfg
                     ? `\n\n**Capture:** → "${captureCfg.tableTitle}" · admission ${captureCfg.admission}` +
                       (captureCfg.admissionNote
@@ -954,6 +1206,17 @@ export function createBaseTools(ctx: ToolExecuteContext) {
                 ledgerNodeId,
                 "tool-call",
               ).catch(() => null);
+              // The quest's row database attaches too — it is where the
+              // items land, and a later turn's reads reach it without a
+              // summon (owner, 2026-09-22: "that is what I want attaching").
+              if (questInfo) {
+                void addAutoAssociation(
+                  ctx.userId,
+                  ctx.conversationId,
+                  questInfo.questLedgerId,
+                  "tool-call",
+                ).catch(() => null);
+              }
             }
           } catch {
             // Ledger is best-effort — the run can still proceed without it.
@@ -967,13 +1230,36 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           source,
           itemBudget,
           batchSize: effectiveBatchSize,
+          // The route reads these from history to size and reserve the
+          // step budget (plan §6b); the notice on every step names them.
+          deliverables,
+          ...(stepsPerItem != null ? { stepsPerItem } : {}),
+          stepBudget: {
+            perItem: stepsPerItemFor(deliverables, stepsPerItem),
+            reservedTail: reservedTailSize(deliverables),
+            note:
+              deliverables.length > 0
+                ? `Each item: ~${RESEARCH_ALLOWANCE_PER_ITEM} research steps, then ${deliverables.join(" → ")} → record_item_result. The harness reserves each turn's last ${reservedTailSize(deliverables)} steps for those tools.`
+                : "Screening budget: read → record per item. Declare `deliverables` if each item must end in artifacts (a document, a row update).",
+          },
           items: normalized,
           ...(questInfo
             ? {
+                // The quest's ROW database — the thing the user means by
+                // "the quest" (owner, 2026-09-22: the pin opened the long
+                // log note; the database never attached). The client pins
+                // and auto-associates from this id.
+                questLedgerNodeId: questInfo.questLedgerId,
                 quest: {
                   label: questInfo.questLabel,
                   continued: questContinued,
                   alreadyScoredKeys: [...alreadyScored],
+                  ...(priorSitting
+                    ? {
+                        priorSitting,
+                        priorSittingNote: `The previous sitting of this quest${priorSitting.openedAt ? ` (opened ${priorSitting.openedAt.slice(0, 10)})` : ""} recorded ${priorSitting.itemsRecorded} item${priorSitting.itemsRecorded === 1 ? "" : "s"} and was never closed; this sitting supersedes it. Mention that to the user in your closing summary.`,
+                      }
+                    : {}),
                 },
               }
             : {}),
@@ -986,6 +1272,24 @@ export function createBaseTools(ctx: ToolExecuteContext) {
                 questIgnored: `quest "${questArg}" was NOT engaged — no charter is attached to this chat (or quest setup failed). This is a plain legacy run: NO quest ledger writes, NO cross-sitting dedup, NO master-ledger update. Never claim otherwise.`,
               }
             : {}),
+          ...(standingContext.filter((d) => d.tier !== "none").length > 0
+            ? {
+                standingContext: standingContext
+                  .filter((d) => d.tier !== "none")
+                  .map((d) => ({
+                    databaseId: d.tableId,
+                    tier: d.tier,
+                    ...(d.columns.length > 0 ? { columns: d.columns } : {}),
+                    ...(d.filter ? { filter: d.filter } : {}),
+                  })),
+                standingContextInstruction:
+                  'BEFORE item 1, read each standingContext database ONCE with query_database (lifetime: "run"; tier index → default columns; "index with digests" → digests: true; "full" → columns: "all"; apply the listed columns/filter). Judge every item against those rows; write matches as relation cells with the [handles]. Do not re-read per item.',
+              }
+            : {}),
+          // What the resolvers read differently from what was sent — a
+          // normalization is never invisible (silent correctness reads as a
+          // bug), and the ledger line below quotes these too.
+          ...(shapeNotes.length > 0 ? { shapeNotes } : {}),
           ...(captureCfg
             ? {
                 capture: {
@@ -1038,7 +1342,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             (effectiveBatchSize
               ? `This run is BATCHED: after every ${effectiveBatchSize} recorded items, pause acquisition and call record_batch_checkpoint (dedupe the batch, note anomalies) BEFORE starting the next item — the harness holds new reads until the checkpoint is recorded. `
               : "") +
-            `The ledger is the checklist; never trust your memory for completeness. When every item is recorded OR the budget is reached, ${questInfo ? `do NOT create a roll-up note (the quest log + quest ledger ARE the record — reuse, never duplicate); close with record_iteration_findings, then link [[${questInfo.questLabel} — Quest Ledger]] in your closing message` : `write the roll-up (createNote: a short prose summary + a markdown table of items/verdicts) and close with record_iteration_findings`}. ` +
+            `The ledger is the checklist; never trust your memory for completeness. When every item is recorded OR the budget is reached, ${questInfo ? `do NOT create a roll-up note (the quest log + quest ledger ARE the record — reuse, never duplicate); close with record_iteration_findings, then link @[${questLedgerTitle}](${questInfo.questLedgerId}) in your closing message (that @[…](id) form renders as a pill; never write [[wiki-links]] in chat)` : `write the roll-up (create_note: a short prose summary + a markdown table of items/verdicts) and close with record_iteration_findings`}. ` +
             `If a captcha or session end interrupts, stop and tell the user — recorded progress is preserved and the run can resume from the first pending item.`,
         };
       },
@@ -1050,32 +1354,44 @@ export function createBaseTools(ctx: ToolExecuteContext) {
       description:
         "Record ONE item's outcome in the iteration ledger. Call after finishing EACH item of an approved propose_item_iteration run — including items you could NOT read (status unreadable/blocked). Never skip an item silently. ALWAYS pass the item's `url` so the ledger links to the source page (the user can click through, and a follow-up run can revisit it).",
       inputSchema: z.object({
-        ledgerRunKey: z.string().min(1).describe("The ledgerRunKey from propose_item_iteration."),
-        itemKey: z.string().min(1).max(600).describe("The item's key from the approved run's items list."),
-        itemLabel: z.string().max(200).optional().describe("The item's label (for the ledger line)."),
+        // Describe-only schema (drift gate 7; the rule in
+        // iteration-proposal.ts): bounds are clipped/clamped in execute.
+        ledgerRunKey: z.string().describe("The ledgerRunKey from propose_item_iteration."),
+        itemKey: z.string().describe("The item's key from the approved run's items list."),
+        itemLabel: z.string().optional().describe("The item's label (for the ledger line)."),
         url: z
           .string()
-          .max(600)
           .optional()
           .describe("The item's source URL (from the approved items list / the page you read). ALWAYS include it when known — the ledger renders it as a clickable link so the page can be revisited."),
+        // Deliberately a lenient string, not an enum (owner report
+        // 2026-09-17): a required enum rejected the WHOLE call before
+        // execute — verdict, score and nine captured cells with it — and the
+        // best-scoring item of a production run was lost to a missing word.
+        // Resolution lives in execute, where the rest of the call can inform
+        // it. Same doctrine as data-tools.ts's read schema.
         status: z
-          .enum(["done", "unreadable", "blocked"])
-          .describe("done = analyzed; unreadable = page could not be read; blocked = an obstacle (login/captcha) stopped this item."),
+          .string()
+          .optional()
+          .describe('"done" = analyzed; "unreadable" = page could not be read; "blocked" = an obstacle (login/captcha) stopped this item.'),
         qualified: z.boolean().optional().describe("Whether the item met the objective's bar (e.g. fit > 75%)."),
-        fitPercent: z.number().min(0).max(100).optional().describe("Numeric score when the objective scores items."),
-        verdict: z.string().max(1000).optional().describe("One-to-three sentence rationale for this item."),
-        artifactTitle: z.string().max(200).optional().describe("Title of any per-item note you created."),
+        fitPercent: z.number().optional().describe("Numeric score 0–100 when the objective scores items."),
+        // No `.max()` on the prose fields (production 2026-09-18): a verdict
+        // of 1,043 characters failed `max(1000)` and took the whole call with
+        // it — a correct item, scored 88/100 and qualified, plus its capture
+        // row carrying the full job description. Losing an analyzed item
+        // because its SUMMARY ran long is the worst trade in this tool. They
+        // are clipped in execute instead, where over-length is a formatting
+        // detail rather than a fatal one.
+        verdict: z.string().optional().describe("One-to-three sentence rationale for this item (clipped at 1000 characters)."),
+        artifactTitle: z.string().optional().describe("Title of any per-item note you created."),
+        // A plain record, not a nested object (gate 7's second half): the
+        // model has sent both `{ cells: { Column: value } }` and the flat
+        // `{ Column: value }`; `normalizeCaptureArg` reads either in execute.
         capture: z
-          .object({
-            cells: z
-              .record(z.string(), z.unknown())
-              .describe(
-                "Column NAME → value for THIS item's database row. Select/status accept option labels; dates ISO; numbers plain.",
-              ),
-          })
+          .record(z.string(), z.unknown())
           .optional()
           .describe(
-            "Land this item as a database row — ONLY when the approved run declared captureTo AND this item meets its admission rule. The row upserts by the item's identity: a re-run updates, never duplicates.",
+            "Land this item as a database row — ONLY when the approved run declared captureTo AND this item meets its admission rule. Shape: { cells: { \"Column NAME\": value } } (a flat { \"Column NAME\": value } map is read the same way). Select/status accept option labels; dates ISO; numbers plain. The row upserts by the item's identity: a re-run updates, never duplicates.",
           ),
         questCells: z
           .record(z.string(), z.unknown())
@@ -1083,10 +1399,76 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           .describe(
             "Quest runs with SCULPTED ledger columns: their values for this item (column name → value). Machinery fields (status/fit/qualified/verdict) are recorded automatically — never repeat them here.",
           ),
+        gaps: z
+          .array(z.string())
+          .optional()
+          .describe(
+            "GAPS ARE DATA: facts this item needed that ONE evidence search did not find (\"Education/degree — not in evidence\"). Put a placeholder in the artifact, list the gap here, and move on — never a second search, never an invented value. Recorded in the ledger so the user can fill them.",
+          ),
       }),
-      execute: async ({ ledgerRunKey, itemKey, itemLabel, url, status, qualified, fitPercent, verdict, artifactTitle, capture, questCells }) => {
+      execute: async ({ ledgerRunKey: ledgerRunKeyArg, itemKey: itemKeyArg, itemLabel: itemLabelArg, url: urlArg, status: statusArg, qualified, fitPercent: fitPercentArg, verdict: verdictArg, artifactTitle: artifactTitleArg, capture: captureArg, questCells, gaps: gapsArg }) => {
+        // P4: either nesting the model sends is read; a normalization is
+        // reported, never silent.
+        const captureNorm = normalizeCaptureArg(captureArg);
+        const capture = captureNorm.cells ? { cells: captureNorm.cells } : undefined;
+        const shapeNotes: string[] = captureNorm.note ? [captureNorm.note] : [];
+        // Gaps are data (plan §6b.3): clipped, bounded, recorded — never a
+        // reason to keep searching.
+        const gaps = (gapsArg ?? [])
+          .map((g) => (typeof g === "string" ? g.trim().slice(0, 200) : ""))
+          .filter((g) => g.length > 0)
+          .slice(0, 20);
+        // Clip the prose. These used to be `.max()` on the schema, where an
+        // over-long verdict rejected the entire call — see the schema comment.
+        const clip = (text: string | undefined, max: number) =>
+          text !== undefined && text.length > max
+            ? `${text.slice(0, max - 1).trimEnd()}…`
+            : text;
+        const verdict = clip(verdictArg, 1000);
+        const itemLabel = clip(itemLabelArg, 200);
+        const artifactTitle = clip(artifactTitleArg, 200);
+        // Bounds that were schema refinements (gate 7): keys must be present,
+        // the url is clipped, the score is clamped to 0–100.
+        const ledgerRunKey = ledgerRunKeyArg.trim();
+        const itemKey = clip(itemKeyArg.trim(), 600) ?? "";
+        if (!ledgerRunKey || !itemKey) {
+          return {
+            ok: false,
+            recorded: null,
+            note: "record_item_result needs both ledgerRunKey (from the approved proposal) and itemKey (from its items list). Re-record this item with both.",
+          };
+        }
+        const url = clip(urlArg, 600);
+        const fitPercent =
+          typeof fitPercentArg === "number" && Number.isFinite(fitPercentArg)
+            ? Math.min(100, Math.max(0, fitPercentArg))
+            : undefined;
+
+        // Resolve before anything is written: a recognized word is taken, a
+        // missing one is inferred from the evidence in the same call, and only
+        // a call with neither is sent back — as a RESULT the model can act on
+        // in the next step, never a validation error that ends the call.
+        const resolution = resolveItemStatus({
+          status: statusArg,
+          verdict,
+          fitPercent,
+          qualified,
+          hasCapture: Boolean(capture),
+        });
+        if ("needsStatus" in resolution) {
+          return { ok: false, recorded: null, note: resolution.needsStatus };
+        }
+        const status = resolution.status;
+        const statusNote = resolution.note;
+
         const placement = resolveToolOutputPlacement(ctx);
-        if (!placement.parentId && !placement.ownedByNoteId) {
+        // Quest logs are keyed globally (upsertRunLedger "quest:" keys), so a
+        // sitting in a chat with no target folder still finds its log. Only
+        // quest-less runs need a placement to write into — this bail used to
+        // fire BEFORE the quest dual-write, leaving a quest with zero rows
+        // (lifecycle audit 2026-09-11).
+        const questKeyed = ledgerRunKey.startsWith("quest:");
+        if (!questKeyed && !placement.parentId && !placement.ownedByNoteId) {
           return { ok: false, note: "No target folder set, so no ledger was written. Continue the run; reconcile in the roll-up." };
         }
         // Prefer an explicit url; fall back to itemKey when it IS a url (url-tier
@@ -1135,6 +1517,9 @@ export function createBaseTools(ctx: ToolExecuteContext) {
               config,
               cells: capture.cells,
               ...(rowKeyedRun ? { rowId: itemKey } : { dedupeValue }),
+              // P3: a same-sitting write (update_row, the grid) is never
+              // clobbered by the closing capture.
+              ...(config.approvedAt ? { keepFilledSince: config.approvedAt } : {}),
             });
             if (res.status === "rejected") {
               captureErrors = res.errors;
@@ -1142,7 +1527,12 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             } else {
               capturedRowId = res.rowId;
               capturedRowStatus = res.status;
-              captureNote = `row ${res.status} in "${config.tableTitle}"`;
+              const kept = res.keptCells ?? [];
+              captureNote =
+                `row ${res.status} in "${config.tableTitle}"` +
+                (kept.length > 0
+                  ? ` (${kept.length} cell${kept.length === 1 ? "" : "s"} kept — ${kept.join(", ")} already written this sitting; capture fills only empty cells after a same-sitting write, so the fuller first write stands)`
+                  : "");
             }
           }
         }
@@ -1153,6 +1543,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         // the run (markdown stays authoritative until P4b's cutover).
         const questState = parseQuestInfo(runState?.questInfo);
         const sittingClosed = Boolean(questState?.sittingClosed);
+        let questWriteNote = "";
         if (questState && !sittingClosed) {
           try {
             const isUrlKey = /^https?:\/\//.test(itemKey);
@@ -1163,7 +1554,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             // instead of advancing the same trajectory. The tier records
             // the identity actually used.
             const ledgerItemKey = url?.trim() || itemKey;
-            await recordQuestItem({
+            const questRecorded = await recordQuestItem({
               userId: ctx.userId,
               quest: questState,
               item: {
@@ -1181,9 +1572,25 @@ export function createBaseTools(ctx: ToolExecuteContext) {
                 qualified,
                 verdict,
                 outputRowId: capturedRowId,
+                ...(capturedRowId && runCaptureConfig
+                  ? { outputTableId: runCaptureConfig.tableId }
+                  : {}),
                 ...(questCells ? { extraCells: questCells } : {}),
               },
             });
+            // A null here is a REFUSED ledger write (a system column the
+            // machinery needs is gone or retyped) — it used to be ignored,
+            // so the item reported ok while its row was never written.
+            if (!questRecorded) {
+              questWriteNote =
+                "quest ledger refused this item's row — the ledger's system columns may have been altered; tell the user";
+              logger.warn({
+                layer: "ai",
+                event: "quests:record_item_refused",
+                summary: "quest-ledger row write refused",
+                attrs: { ledgerRunKey, itemKey: ledgerItemKey },
+              });
+            }
           } catch (error) {
             logger.warn({
               layer: "ai",
@@ -1199,7 +1606,11 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           (typeof fitPercent === "number" ? ` · fit ${Math.round(fitPercent)}%` : "") +
           (qualified === true ? " · **qualified**" : qualified === false ? " · not qualified" : "") +
           (captureNote ? ` · ${captureNote}` : "") +
-          (verdict ? `\n\n${verdict}` : "");
+          (questWriteNote ? ` · ⚠ ${questWriteNote}` : "") +
+          (verdict ? `\n\n${verdict}` : "") +
+          (gaps.length > 0
+            ? `\n\n**Gaps (not in evidence — confirm):**\n${gaps.map((g) => `- ${g}`).join("\n")}`
+            : "");
         try {
           const ledger = await upsertRunLedger(
             ctx.userId,
@@ -1216,9 +1627,19 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             ok: true,
             recorded: itemKey,
             status,
+            // An inferred status is reported, never applied silently — the
+            // model (and the transcript) should see that the harness filled
+            // something in, and what it filled in.
+            ...(statusNote ? { statusNote } : {}),
+            ...(shapeNotes.length > 0 ? { shapeNotes } : {}),
+            ...(gaps.length > 0 ? { gaps } : {}),
             ledgerNodeId: ledger.contentNodeId,
             ...(capturedRowId
-              ? { rowId: capturedRowId, rowStatus: capturedRowStatus }
+              ? {
+                  rowId: capturedRowId,
+                  rowStatus: capturedRowStatus,
+                  ...(captureNote.includes("kept") ? { captureNote } : {}),
+                }
               : {}),
             ...(captureErrors ? { captureErrors } : {}),
             ...(captureNote && !capturedRowId && !captureErrors
@@ -1237,11 +1658,16 @@ export function createBaseTools(ctx: ToolExecuteContext) {
                     "this sitting is CLOSED (findings already recorded) — the quest ledger was NOT updated",
                 }
               : {}),
+            ...(questWriteNote ? { questWarning: questWriteNote } : {}),
             next: captureErrors
               ? "The ledger line is recorded but the row was REJECTED whole (no partial rows). Fix exactly the cells named in captureErrors and call record_item_result AGAIN for this SAME itemKey with corrected capture.cells — then continue to the next item."
               : sittingClosed
                 ? "STOP recording against this closed run. If more items need processing, call propose_item_iteration again (same quest label) — a fresh sitting opens and already-scored items are skipped automatically."
-                : `Recorded. Do NOT stop or ask the user whether to continue — immediately move to the NEXT item now (open/read it, then record it). Only once EVERY item is recorded do you ${questState ? "call record_iteration_findings (NO roll-up note — the quest log + ledger are the record)" : "write the roll-up (createNote) and call record_iteration_findings"}.`,
+                : status === "blocked"
+                  // P2: a blocked item is the one place the loop may stop —
+                  // the old directive said "move on" even after a captcha.
+                  ? `Recorded as blocked. If the obstacle is a captcha, a login wall, a session end, or a charter-named INPUT the tools refused (a database or note to @-mention), STOP here and tell the user exactly what is needed — recorded progress is preserved and the run resumes from the first pending item. For any other obstacle, move to the NEXT item now. ${questState ? "Close with record_iteration_findings only once every item is recorded or the run is stopped." : ""}`
+                  : `Recorded. Do NOT stop or ask the user whether to continue — immediately move to the NEXT item now (open/read it, then record it). Only once EVERY item is recorded do you ${questState ? "call record_iteration_findings (NO roll-up note — the quest log + ledger are the record)" : "write the roll-up (create_note) and call record_iteration_findings"}.`,
           };
         } catch (error) {
           return { ok: false, note: `Ledger write failed (${error instanceof Error ? error.message : "unknown"}). Continue to the next item; reconcile in the roll-up.` };
@@ -1257,18 +1683,29 @@ export function createBaseTools(ctx: ToolExecuteContext) {
     record_batch_checkpoint: tool({
       description:
         "Record a BATCH checkpoint in the iteration ledger. Call it when an approved batched run (propose_item_iteration with batchSize) has recorded a full batch since the last checkpoint — the harness holds new item reads until this is written. Summarize the batch (counts, qualified so far, duplicates merged, anomalies), then continue IMMEDIATELY with the next item. Skip it after the FINAL batch — the roll-up + record_iteration_findings close the run.",
+      // Describe-only schema (drift gate 7): bounds clamp in execute.
       inputSchema: z.object({
-        ledgerRunKey: z.string().min(1).describe("The ledgerRunKey from propose_item_iteration."),
-        batchNumber: z.number().int().min(1).describe("1-based index of the batch just completed."),
-        itemsRecordedSoFar: z.number().int().min(1).describe("Total items recorded so far in this run (across all batches)."),
-        batchSummary: z.string().min(1).max(2000).describe("Short markdown reconciliation of THIS batch: what was covered, counts, qualified so far, anomalies."),
+        ledgerRunKey: z.string().describe("The ledgerRunKey from propose_item_iteration."),
+        batchNumber: z.number().describe("1-based index of the batch just completed."),
+        itemsRecordedSoFar: z.number().describe("Total items recorded so far in this run (across all batches)."),
+        batchSummary: z.string().describe("Short markdown reconciliation of THIS batch: what was covered, counts, qualified so far, anomalies (clipped at 2000 characters)."),
         duplicatesMerged: z
           .array(z.string())
-          .max(40)
           .optional()
           .describe("Labels/keys identified as duplicates (within this batch or against earlier batches)."),
       }),
-      execute: async ({ ledgerRunKey, batchNumber, itemsRecordedSoFar, batchSummary, duplicatesMerged }) => {
+      execute: async ({ ledgerRunKey: ledgerRunKeyArg, batchNumber: batchNumberArg, itemsRecordedSoFar: itemsRecordedSoFarArg, batchSummary: batchSummaryArg, duplicatesMerged: duplicatesMergedArg }) => {
+        const ledgerRunKey = ledgerRunKeyArg.trim();
+        const batchSummary = clipText(batchSummaryArg, 2000) ?? "";
+        if (!ledgerRunKey || !batchSummary) {
+          return {
+            ok: false,
+            note: "record_batch_checkpoint needs the ledgerRunKey and a batchSummary. Re-record the checkpoint with both, then continue with the next item.",
+          };
+        }
+        const batchNumber = clampInt(batchNumberArg, 1, 10_000, 1);
+        const itemsRecordedSoFar = clampInt(itemsRecordedSoFarArg, 0, 100_000, 0);
+        const duplicatesMerged = duplicatesMergedArg?.slice(0, 40);
         const placement = resolveToolOutputPlacement(ctx);
         if (!placement.parentId && !placement.ownedByNoteId) {
           // Still ok:true — this result is the client gate's re-open marker,
@@ -1320,18 +1757,32 @@ export function createBaseTools(ctx: ToolExecuteContext) {
     add_quest_ledger_column: tool({
       description:
         "Mid-run schema grace (quest LEDGER only): add ONE column to the active quest's ledger when the matter turns out to need a field it lacks (a criterion that emerged from the pages). Never for output/capture tables — those change via propose_column_options or the user. One column per call; the addition is logged in the quest log. After adding, write its value for later items via questCells on record_item_result.",
+      // Describe-only schema (drift gate 7): the type vocabulary resolves in
+      // execute by meaning, with a refusal that names the accepted words.
       inputSchema: z.object({
-        ledgerRunKey: z.string().min(1).describe("The ledgerRunKey of the ACTIVE quest run."),
-        name: z.string().min(1).max(60).describe("The new column's name."),
-        type: z.enum(["text", "longText", "number", "url", "date", "checkbox"]),
+        ledgerRunKey: z.string().describe("The ledgerRunKey of the ACTIVE quest run."),
+        name: z.string().describe("The new column's name."),
+        type: z.string().describe('One of "text", "longText", "number", "url", "date", "checkbox".'),
         description: z
           .string()
-          .min(8)
-          .max(300)
           .describe("What goes in it — same load-bearing context as every capture column."),
-        reason: z.string().min(1).max(200).describe("One line: why this emerged mid-run (logged in the quest log)."),
+        reason: z.string().describe("One line: why this emerged mid-run (logged in the quest log)."),
       }),
-      execute: async ({ ledgerRunKey, name, type, description, reason }) => {
+      execute: async ({ ledgerRunKey: ledgerRunKeyArg, name: nameArg, type: typeArg, description: descriptionArg, reason: reasonArg }) => {
+        const ledgerRunKey = ledgerRunKeyArg.trim();
+        const name = clipText(nameArg, 60) ?? "";
+        const description = clipText(descriptionArg, 300) ?? "";
+        const reason = clipText(reasonArg, 200) ?? "";
+        if (!ledgerRunKey || !name) {
+          return { ok: false, note: "add_quest_ledger_column needs the active run's ledgerRunKey and a column name." };
+        }
+        const type = resolveQuestColumnType(typeArg);
+        if (!type) {
+          return {
+            ok: false,
+            note: `Column type "${typeArg}" is not one I can map. Use one of ${QUEST_COLUMN_TYPES.map((t) => `"${t}"`).join(", ")}.`,
+          };
+        }
         const placement = resolveToolOutputPlacement(ctx);
         const runState = await readRunLedgerCaptureConfig(
           ctx.userId,
@@ -1395,19 +1846,34 @@ export function createBaseTools(ctx: ToolExecuteContext) {
     // item budget (the engine watches for this result, as with research runs).
     record_iteration_findings: tool({
       description:
-        "Close an iteration run: record the reconciliation (processed / qualified / unreadable counts + summary) in its ledger, passing the ledgerRunKey from propose_item_iteration. Quest-less runs call it AFTER the roll-up note (createNote); quest runs skip the roll-up note entirely (the quest log + ledger are the record).",
+        "Close an iteration run: record the reconciliation (processed / qualified / unreadable counts + summary) in its ledger, passing the ledgerRunKey from propose_item_iteration. Quest-less runs call it AFTER the roll-up note (create_note); quest runs skip the roll-up note entirely (the quest log + ledger are the record).",
+      // Describe-only schema (drift gate 7): bounds clamp in execute.
       inputSchema: z.object({
-        ledgerRunKey: z.string().min(1).describe("The ledgerRunKey from propose_item_iteration."),
-        resultSummary: z.string().min(1).max(4000).describe("Short markdown reconciliation: what was processed and what qualified."),
-        processedCount: z.number().int().min(0).describe("Items actually processed (recorded)."),
-        qualifiedCount: z.number().int().min(0).optional().describe("Items that met the bar."),
-        unreadableItems: z.array(z.string()).max(60).optional().describe("Keys/labels of items that could not be read or were blocked."),
-        rollupTitle: z.string().max(200).optional().describe("Title of the roll-up note, recorded as the run's artifact."),
-        rowsWritten: z.number().int().min(0).optional().describe("Capture runs: rows CREATED in the target database this run."),
-        rowsUpdated: z.number().int().min(0).optional().describe("Capture runs: existing rows UPDATED (re-encountered identities)."),
-        rowsFailed: z.number().int().min(0).optional().describe("Capture runs: items whose row was rejected and never landed."),
+        ledgerRunKey: z.string().describe("The ledgerRunKey from propose_item_iteration."),
+        resultSummary: z.string().describe("Short markdown reconciliation: what was processed and what qualified (clipped at 4000 characters)."),
+        processedCount: z.number().describe("Items actually processed (recorded)."),
+        qualifiedCount: z.number().optional().describe("Items that met the bar."),
+        unreadableItems: z.array(z.string()).optional().describe("Keys/labels of items that could not be read or were blocked."),
+        rollupTitle: z.string().optional().describe("Title of the roll-up note, recorded as the run's artifact."),
+        rowsWritten: z.number().optional().describe("Capture runs: rows CREATED in the target database this run."),
+        rowsUpdated: z.number().optional().describe("Capture runs: existing rows UPDATED (re-encountered identities)."),
+        rowsFailed: z.number().optional().describe("Capture runs: items whose row was rejected and never landed."),
       }),
-      execute: async ({ ledgerRunKey, resultSummary, processedCount, qualifiedCount, unreadableItems, rollupTitle, rowsWritten, rowsUpdated, rowsFailed }) => {
+      execute: async ({ ledgerRunKey: ledgerRunKeyArg, resultSummary: resultSummaryArg, processedCount: processedCountArg, qualifiedCount: qualifiedCountArg, unreadableItems: unreadableItemsArg, rollupTitle: rollupTitleArg, rowsWritten: rowsWrittenArg, rowsUpdated: rowsUpdatedArg, rowsFailed: rowsFailedArg }) => {
+        const ledgerRunKey = ledgerRunKeyArg.trim();
+        const resultSummary = clipText(resultSummaryArg, 4000) ?? "";
+        if (!ledgerRunKey || !resultSummary) {
+          return { ok: false, note: "record_iteration_findings needs the ledgerRunKey and a resultSummary. Re-record the close with both." };
+        }
+        const count = (v: number | undefined): number | undefined =>
+          typeof v === "number" && Number.isFinite(v) ? Math.max(0, Math.round(v)) : undefined;
+        const processedCount = count(processedCountArg) ?? 0;
+        const qualifiedCount = count(qualifiedCountArg);
+        const rowsWritten = count(rowsWrittenArg);
+        const rowsUpdated = count(rowsUpdatedArg);
+        const rowsFailed = count(rowsFailedArg);
+        const unreadableItems = unreadableItemsArg?.slice(0, 60);
+        const rollupTitle = clipText(rollupTitleArg, 200);
         const placement = resolveToolOutputPlacement(ctx);
         if (!placement.parentId && !placement.ownedByNoteId) {
           return { ok: false, note: "No target folder set, so no ledger was written. The roll-up note still landed." };
@@ -1473,6 +1939,27 @@ export function createBaseTools(ctx: ToolExecuteContext) {
               "tool-call",
             ).catch(() => null);
           }
+          // P10: the labels are the nodes' REAL titles (prod 2026-09-27:
+          // the model was handed "… — Quest Log" for a note titled "Run
+          // Ledger — … · Indigo Reef"; the id resolved, the label lied).
+          const titles = questState
+            ? await prisma.contentNode
+                .findMany({
+                  where: {
+                    id: { in: [questState.questLedgerId, ledger.contentNodeId] },
+                    deletedAt: null,
+                  },
+                  select: { id: true, title: true },
+                })
+                .then((rows) => new Map(rows.map((r) => [r.id, r.title])))
+                .catch(() => new Map<string, string>())
+            : new Map<string, string>();
+          const questLedgerLabel = questState
+            ? (titles.get(questState.questLedgerId) ?? `${questState.questLabel} — Quest Ledger`)
+            : "";
+          const questLogLabel = questState
+            ? (titles.get(ledger.contentNodeId) ?? `${questState.questLabel} — Quest Log`)
+            : "";
           return {
             ok: true,
             ledgerNodeId: ledger.contentNodeId,
@@ -1483,7 +1970,11 @@ export function createBaseTools(ctx: ToolExecuteContext) {
                   // the roll-up note and never mentioned where the ROWS
                   // live — users went looking for "the database" and found
                   // only notes. Name the ledger.
-                  next: `In your closing summary, tell the user the item rows live in the "${questState.questLabel} — Quest Ledger" database (every item, one row each) and the narrative lives in the quest log note — do NOT create any additional note.`,
+                  // Mention syntax, ids included (owner, 2026-09-22): the
+                  // model had been copying the ledger's [[wiki-link]] style
+                  // into chat, where nothing renders it. @[Title](id) is
+                  // the chat's pill, so hand it the exact string to use.
+                  next: `In your closing summary, tell the user the item rows live in @[${questLedgerLabel}](${questState.questLedgerId}) (every item, one row each) and the narrative lives in the quest log note @[${questLogLabel}](${ledger.contentNodeId}) — write those two references exactly as given (they render as links) and do NOT create any additional note.`,
                 }
               : {}),
           };
@@ -1630,8 +2121,14 @@ export function createBaseTools(ctx: ToolExecuteContext) {
       // is not ready, execute immediately and return a corrective tool result
       // so the model can continue working instead of surfacing a false
       // approval card.
+      // The final phase's checkpoint closes without a pause when the user
+      // set it to (§10 round 6c); checkpoints between phases always ask.
       needsApproval: () =>
-        getPhaseCheckpointGateStatus(ctx.phaseCheckpointGate).ready,
+        getPhaseCheckpointGateStatus(ctx.phaseCheckpointGate).ready &&
+        !toolAutoApproves(ctx.autoApprovedTools, {
+          tool: "phase_checkpoint",
+          finalPhase: ctx.charterFinalPhase === true,
+        }),
       description:
         "Call at EVERY phase boundary of a multi-phase procedure/charter. Pauses for the user's verdict (approve / revise / approve-with-tweaks) and records the phase in the Run Ledger note. " +
         "This is a completion signal, never a planning shortcut: do not call it until the phase's required research, linked-note reads, analysis, and outputs have actually been completed. The runtime rejects checkpoints that lack verifiable required tool activity. " +
@@ -1749,8 +2246,12 @@ export function createBaseTools(ctx: ToolExecuteContext) {
               ledger.created ? "created" : "updated",
               "run ledger",
             )),
-            nextAction:
-              "APPROVED. Continue IMMEDIATELY with the next phase in this same response — announce it in one line, then proceed. If this was the FINAL phase, give a short completion summary instead (artifacts + where they were saved).",
+            nextAction: toolAutoApproves(ctx.autoApprovedTools, {
+              tool: "phase_checkpoint",
+              finalPhase: ctx.charterFinalPhase === true,
+            })
+              ? AUTO_CLOSED_CHECKPOINT_NEXT
+              : "APPROVED. Continue IMMEDIATELY with the next phase in this same response — announce it in one line, then proceed. If this was the FINAL phase, give a short completion summary instead (artifacts + where they were saved).",
           };
         } catch (error) {
           return {
@@ -1765,7 +2266,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
     create_folder: tool({
       description:
         "Find or create a folder by name. Use for charter standing rules like 'place outputs in a folder named after the company under job-search/'. " +
-        "Pass parentId to nest; omit it to use this conversation's target folder. Returns the folder id for use as parentId in createNote/create_docx. " +
+        "Pass parentId to nest; omit it to use this conversation's target folder. Returns the folder id for use as parentId in create_note/create_docx. " +
         "Find-or-create: an existing folder with the same name under the same parent is reused, never duplicated.",
       inputSchema: z.object({
         name: z.string().min(1).max(255).describe("Folder name"),
@@ -1790,7 +2291,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             select: { id: true },
           });
           if (!owned) {
-            return `Parent folder ${parentId} was not found. Use create_folder without parentId, or searchNotes to locate the right folder.`;
+            return `Parent folder ${parentId} was not found. Use create_folder without parentId, or search_content to locate the right folder.`;
           }
         }
         try {
@@ -1871,18 +2372,41 @@ export function createBaseTools(ctx: ToolExecuteContext) {
     }),
     create_docx: tool({
       // Document creation is a mutating action — same HITL gate as
-      // createNote (AI v3 core S4b / A4).
-      needsApproval: true,
+      // create_note (AI v3 core S4b / A4) — unless the user set this tool to
+      // run without a card (§10 round 6c). An overwrite skips the card only
+      // for a document this chat created (tools/approval-policy.ts).
+      needsApproval: async (rawArgs) => {
+        const overwriteId =
+          typeof (rawArgs as { overwriteContentId?: unknown }).overwriteContentId === "string"
+            ? ((rawArgs as { overwriteContentId: string }).overwriteContentId.trim() || null)
+            : null;
+        if (!ctx.autoApprovedTools?.has("create_docx")) return true;
+        return !toolAutoApproves(ctx.autoApprovedTools, {
+          tool: "create_docx",
+          ...(overwriteId
+            ? { overwrite: { targetCreatedInThisChat: await contentCreatedInThisChat(ctx, overwriteId) } }
+            : {}),
+        });
+      },
       description:
         "Create a Word (.docx) document from markdown content and file it in the user's garden. " +
         "Use when the user asks for a Word/docx deliverable (e.g. a resume). Headings, lists, bold/italic and links from the markdown are preserved. Do NOT create output on your own initiative — only when the user asks for it. " +
         "Targeting: omit placement fields to use the configured output-target preset. If the user or active charter gives THIS document a different relative destination, pass outputLocation (`under_chat`, `under_content`, or `beside_content`). Pass parentId only for a specifically resolved folder UUID. A per-document instruction always overrides the preset.",
+      // Describe-only schema (drift gate 7; the rule in
+      // iteration-proposal.ts): the body is read from `markdown` OR the
+      // sibling tools' `content`/`body`/`text`, the title falls back to the
+      // first heading, and placement resolves in execute — prod f51fa2d8
+      // (2026-09-29) lost a finished resume to `content` vs `markdown` on
+      // a turn with one step left. See write-args.ts.
       inputSchema: z.object({
-        title: z.string().min(1).max(200).describe("Document title (also the file name)"),
+        title: z.string().optional().describe("Document title (also the file name); defaults to the body's first heading"),
         markdown: z
           .string()
-          .min(1)
-          .describe("Full document body as markdown"),
+          .optional()
+          .describe("Full document body as markdown (also read from `content`, `body` or `text`)"),
+        content: z.string().optional().describe("Alias for markdown"),
+        body: z.string().optional().describe("Alias for markdown"),
+        text: z.string().optional().describe("Alias for markdown"),
         parentId: z
           .string()
           .optional()
@@ -1890,10 +2414,10 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             "Destination folder id. Pass ONLY when the user explicitly names a folder; otherwise omit it so the configured output-target preset is enforced.",
           ),
         outputLocation: z
-          .enum(["under_chat", "under_content", "beside_content"])
+          .string()
           .optional()
           .describe(
-            "Per-document relative destination. Pass when the user or active charter explicitly routes this document differently from the configured preset; otherwise omit.",
+            'Per-document relative destination: "under_chat", "under_content" or "beside_content". Pass when the user or active charter explicitly routes this document differently from the configured preset; otherwise omit.',
           ),
         alsoShortcutTo: z
           .string()
@@ -1908,16 +2432,24 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             "Id of an EXISTING file to overwrite in place with this document — same id, so every File cell and shortcut referencing it sees the new version. Use when the user asks to update/regenerate an attached or existing document; NEVER create a second copy for that. Placement fields are ignored in overwrite mode.",
           ),
       }),
-      execute: async ({
-        title,
-        markdown,
-        parentId,
-        outputLocation,
-        alsoShortcutTo,
-        overwriteContentId,
-      }) => {
+      execute: async (rawArgs) => {
+        const { parentId, alsoShortcutTo, overwriteContentId } = rawArgs;
+        const resolved = resolveDocumentArgs(rawArgs, {
+          toolName: "create_docx",
+          canonicalBodyKey: "markdown",
+        });
+        if (!resolved.ok || !resolved.body || !resolved.title) {
+          return {
+            ok: false,
+            refusal: resolved.refusal ?? "create_docx needs a markdown body.",
+            nextAction: "Call create_docx again with `markdown` set. Do not write the document anywhere else.",
+          };
+        }
+        const title = resolved.title;
+        const markdown = resolved.body;
+        const shapeNotes = resolved.shapeNotes;
         const effectiveOutputLocation =
-          (outputLocation as ToolOutputLocation | undefined) ??
+          (resolved.outputLocation as ToolOutputLocation | undefined) ??
           resolveCharterOutputLocation(
             ctx.charterOutputDirectives,
             title,
@@ -1937,6 +2469,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
               contentNodeId: result.contentNodeId,
               fileName: result.fileName,
               overwritten: true,
+              ...(shapeNotes.length > 0 ? { shapeNotes } : {}),
               ...(await getContentWriteReceiptEnvelope(
                 ctx.userId,
                 result.contentNodeId,
@@ -2011,6 +2544,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             fileName: result.fileName,
             parentFolderId: destination,
             ...mirror,
+            ...(shapeNotes.length > 0 ? { shapeNotes } : {}),
             ...(await getContentWriteReceiptEnvelope(
               ctx.userId,
               result.contentNodeId,
@@ -2023,72 +2557,155 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         }
       },
     }),
-    searchNotes: tool({
+    // The GARDEN-WIDE finder (D2, owner report 2026-09-10). Replaces the old
+    // `searchNotes`, which was hard-scoped to `contentType: "note"` and so
+    // could not see databases, folders, files, or anything else. That blind
+    // spot cost a real turn its whole step budget: asked to update "the
+    // charter database", the model searched six times, found nothing, then
+    // guessed database names one at a time until the harness cut it off.
+    //
+    // `DataPayload.searchText` (title + column names) already existed for
+    // exactly this — the finder simply never read it.
+    search_content: tool({
       description:
-        "Search the user's notes by title or content. Returns matching note titles and excerpts.",
+        "Search everything the user owns — notes, folders, databases, files, and more — by title and indexed content. Returns each hit's TYPE, id, location, and a one-line excerpt, so you can pick the right follow-up tool (a [database] hit goes to describe_database, a [folder] hit to read_folder_context, a [note] hit to read_content). Search BEFORE guessing an id or a name: one call here beats a chain of failed lookups. Pass an EMPTY query with `types` to LIST what exists — `{query: \"\", types: [\"data\"]}` is how you see the user's databases when you don't know their names. Narrow with `types` only when you know the shape you want; the default covers notes, folders, and databases.",
       inputSchema: z.object({
-        query: z.string().describe("Search query to find notes"),
+        query: z
+          .string()
+          .describe(
+            'What to look for — matches titles and indexed content. EMPTY string = list the most recently updated of `types` (use this to enumerate, e.g. "which databases exist?").'
+          ),
+        types: z
+          .array(
+            z.enum([
+              "note",
+              "folder",
+              "data",
+              "file",
+              "code",
+              "html",
+              "external",
+              "visualization",
+              "workflow",
+              "chat",
+            ]),
+          )
+          .optional()
+          .describe(
+            'Restrict to these content types ("data" = a database). Default: note, folder, and data.',
+          ),
         limit: z
           .number()
           .min(1)
           .max(20)
           .optional()
-          .describe("Maximum number of results (default 5)"),
+          .describe("Maximum number of results (default 8)"),
       }),
-      execute: async ({ query, limit = 5 }) => {
+      execute: async ({ query, types, limit = 8 }) => {
+        const scope: ContentType[] =
+          types && types.length > 0
+            ? (types as ContentType[])
+            : ["note", "folder", "data"];
+        // ENUMERATION MODE. An empty query lists the most recent of `types`
+        // instead of matching nothing. This is the other half of the D2 fix:
+        // widening the search let the model FIND a database it could name,
+        // but "the charter database" named nothing that existed, and with no
+        // way to enumerate the model fell back to guessing names one call at
+        // a time until the step cap cut it off. Listing is the answer to
+        // "which ones are there?"; matching can't be.
+        const term = query.trim();
         const results = await prisma.contentNode.findMany({
           where: {
             ownerId: ctx.userId,
             deletedAt: null,
-            contentType: "note",
-            OR: [
-              { title: { contains: query, mode: "insensitive" } },
-              {
-                notePayload: {
-                  searchText: { contains: query, mode: "insensitive" },
-                },
-              },
-            ],
+            contentType: { in: scope },
+            ...(term
+              ? {
+                  OR: [
+                    { title: { contains: term, mode: "insensitive" } },
+                    {
+                      notePayload: {
+                        searchText: { contains: term, mode: "insensitive" },
+                      },
+                    },
+                    // Databases index title + column names here (schema B2),
+                    // so a table is findable by a FIELD the user names.
+                    {
+                      dataPayload: {
+                        searchText: { contains: term, mode: "insensitive" },
+                      },
+                    },
+                  ],
+                }
+              : {}),
           },
-          include: {
-            notePayload: {
-              select: { searchText: true, metadata: true },
+          select: {
+            id: true,
+            title: true,
+            contentType: true,
+            parent: { select: { title: true } },
+            notePayload: { select: { searchText: true, metadata: true } },
+            dataPayload: {
+              select: {
+                description: true,
+                rowCount: true,
+                _count: { select: { columns: true } },
+              },
             },
           },
           orderBy: { updatedAt: "desc" },
           take: limit,
         });
 
+        const scopeLabel = scope.map(describeContentType).join(", ");
         if (results.length === 0) {
-          return `No notes found matching "${query}".`;
+          return term
+            ? `Nothing matching "${term}" in ${scopeLabel}. ` +
+                "Before trying again: an EMPTY query with the same `types` LISTS what actually exists — do that rather than guessing another name. " +
+                "If the list doesn't contain what the user meant, ask them; do NOT guess ids or names."
+            : `The user has no ${scopeLabel} at all. Tell them so — there is nothing to search.`;
         }
 
         const summaries = results.map((r, i) => {
-          const excerpt = r.notePayload?.searchText?.slice(0, 150) || "";
-          // Flag playbook notes inline so a generic search still surfaces
-          // them unambiguously — no separate read needed to tell.
+          const kind = describeContentType(r.contentType);
+          const where = r.parent?.title ? ` — in "${r.parent.title}"` : "";
+          // Flag charter notes/folders inline so a generic search still
+          // surfaces them unambiguously — no separate read needed to tell.
           const tag = isCharterMetadata(r.notePayload?.metadata)
             ? " [CHARTER]"
             : "";
-          return `${i + 1}. "${r.title}"${tag} (id: ${r.id})${excerpt ? `\n   ${excerpt}...` : ""}`;
+          const head = `${i + 1}. [${kind}] "${r.title}"${tag} (id: ${r.id})${where}`;
+          if (r.dataPayload) {
+            const cols = r.dataPayload._count.columns;
+            const detail =
+              `${cols} column${cols === 1 ? "" : "s"}, ` +
+              `${r.dataPayload.rowCount} row${r.dataPayload.rowCount === 1 ? "" : "s"}`;
+            const purpose = r.dataPayload.description?.trim();
+            return `${head}\n   ${detail}${purpose ? ` · ${purpose}` : ""}\n   Read its schema: describe_database with this id.`;
+          }
+          const excerpt = r.notePayload?.searchText?.slice(0, 150) || "";
+          return `${head}${excerpt ? `\n   ${excerpt}...` : ""}`;
         });
 
-        return `Found ${results.length} note${results.length !== 1 ? "s" : ""} matching "${query}":\n\n${summaries.join("\n\n")}`;
+        const header = term
+          ? `Found ${results.length} result${results.length !== 1 ? "s" : ""} for "${term}"`
+          : `${results.length} most recently updated (${scopeLabel})`;
+        return `${header}:\n\n${summaries.join("\n\n")}`;
       },
     }),
 
     // The WALK primitive (FOLDER-CONTEXT-CAPSULE-PLAN Phase 5): capsules for
     // progressive folder disclosure. A mention injects the root capsule;
     // every descent is one visible call here. Playbooks reach folders by
-    // resolving the title via searchNotes first, then walking.
+    // resolving the title via search_content first, then walking.
     read_folder_context: tool({
       description:
-        "Read a folder's context capsule: its purpose (user directives + role), summary, signals (known gaps/ambiguities), and a machine-readable index of its DIRECT children — each with id, one-liner, token estimate, and freshness. Use it to understand a folder and decide which specific files to read; be frugal — prefer drilling via the index over reading every file. Call again with a subfolder's id (from the index) to descend one level. Resolve a folder's id from its name with searchNotes when you only have a title.",
+        "Read a folder's context capsule: its purpose (user directives + role), summary, signals (known gaps/ambiguities), and a machine-readable index of its DIRECT children — each with id, one-liner, token estimate, and freshness. Use it to understand a folder and decide which specific files to read; be frugal — prefer drilling via the index over reading every file. Call again with a subfolder's id (from the index) to descend one level. Resolve a folder's id from its name with search_content when you only have a title.",
       inputSchema: z.object({
         folderId: z
           .string()
           .describe(
-            "The folder's ContentNode id (from a capsule index, a mention, or searchNotes results)."
+            "The folder's ContentNode id (from a capsule index, a mention, or search_content results)."
           ),
       }),
       execute: async ({ folderId }) => {
@@ -2124,7 +2741,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
     }),
     search_charters: tool({
       description:
-        "List the user's charters (notes/folders marked as multi-phase procedures) with their descriptions. Use this — not searchNotes — when the user asks to run/find a charter by name or topic; it searches ONLY charters, so it won't return unrelated notes. If a charter is already attached to this chat (see the Active Charter section, if present), you don't need this — that one is already the answer.",
+        "List the user's charters (notes/folders marked as multi-phase procedures) with their descriptions. Use this — not search_content — when the user asks to run/find a charter by name or topic; it searches ONLY charters, so it won't return unrelated notes. If a charter is already attached to this chat (see the Active Charter section, if present), you don't need this — that one is already the answer.",
       inputSchema: z.object({
         query: z
           .string()
@@ -2152,13 +2769,13 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           (p, i) =>
             `${i + 1}. "${p.title}" (id: ${p.id}, ${p.phaseCount} phase${p.phaseCount === 1 ? "" : "s"})${p.description ? `\n   ${p.description}` : ""}`,
         );
-        return `Found ${matches.length} charter${matches.length !== 1 ? "s" : ""}:\n\n${lines.join("\n\n")}\n\nRead the right one with getCurrentNote using its contentId.`;
+        return `Found ${matches.length} charter${matches.length !== 1 ? "s" : ""}:\n\n${lines.join("\n\n")}\n\nRead the right one with read_content using its contentId.`;
       },
     }),
 
-    getCurrentNote: tool({
+    read_content: tool({
       description:
-        "Get the full content of a specific note (or a folder's own notes content) by its ID. Useful for reading context about a note the user is viewing, or a folder's notes when the folder itself is referenced.",
+        "Read ANY content node by its ID — note, folder notes, database, file, link, code, page. Returns the content itself where it is text, and a database's schema plus a row preview where it is a database. Use it for any 'what is in this thing' question; it never refuses a content type, so you never need a specialist tool just to look.",
       inputSchema: z.object({
         contentId: z.string().uuid().describe("The content node ID to read"),
       }),
@@ -2184,54 +2801,199 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         });
 
         if (!content) {
-          return `Note with ID "${contentId}" not found or not accessible.`;
+          return `Content with ID "${contentId}" not found or not accessible.`;
         }
 
-        // Folders can carry a notePayload too (the folder "Notes" editor), so
-        // a folder WITH notes content is readable the same as a note — only a
-        // folder with no notePayload (or a genuinely non-text content type)
-        // is rejected.
-        const isTextBearing =
-          content.contentType === "note" || content.contentType === "folder";
-        if (!isTextBearing || !content.notePayload) {
-          return `Content "${content.title}" is a ${content.contentType}, not readable as text.`;
-        }
-
-        // Render live from tiptapJson — the materialized searchText column
-        // was written by the old extractor for existing notes, and that
-        // extractor dropped every atomic inline node ([[wiki-links]], #tags,
-        // @mentions). Live extraction fixes all notes without a reindex;
-        // searchText stays as the fallback for payloads with no JSON.
-        const liveText = content.notePayload.tiptapJson
-          ? extractSearchTextFromTipTap(
-              content.notePayload.tiptapJson as JSONContent,
-            ).trim()
-          : "";
-        const text =
-          liveText || content.notePayload.searchText || "(empty note)";
         // Summarize-on-write (S5): abstract first, so multi-phase runs can
         // often stop reading here instead of pulling full content into
         // context.
-        const meta = content.notePayload.metadata as
+        const meta = content.notePayload?.metadata as
           | { abstract?: string }
-          | null;
-        const abstractLine = meta?.abstract
-          ? `\nAbstract: ${meta.abstract}\n`
-          : "";
-        return `Title: ${content.title}\nType: ${content.contentType}\nUpdated: ${content.updatedAt.toISOString()}${abstractLine}\nContent:\n${text}`;
+          | null
+          | undefined;
+        const header =
+          `Title: ${content.title}\n` +
+          `Type: ${describeContentType(content.contentType)}\n` +
+          `Updated: ${content.updatedAt.toISOString()}` +
+          (meta?.abstract ? `\nAbstract: ${meta.abstract}` : "");
+
+        // Notes and folders: the folder "Notes" editor writes a notePayload
+        // too, so both render the same way.
+        const renderNoteText = (): string => {
+          if (!content.notePayload) {
+            return content.contentType === "folder"
+              ? `${header}\n\nThis folder has no notes content of its own. Its sources and children are read with read_folder_context.`
+              : `${header}\n\n(empty note)`;
+          }
+          // Render live from tiptapJson — the materialized searchText column
+          // was written by the old extractor for existing notes, and that
+          // extractor dropped every atomic inline node ([[wiki-links]], #tags,
+          // @mentions). Live extraction fixes all notes without a reindex;
+          // searchText stays as the fallback for payloads with no JSON.
+          const liveText = content.notePayload.tiptapJson
+            ? extractSearchTextFromTipTap(
+                content.notePayload.tiptapJson as JSONContent,
+              ).trim()
+            : "";
+          const text =
+            liveText || content.notePayload.searchText || "(empty note)";
+          return `${header}\nContent:\n${text}`;
+        };
+
+        /**
+         * A read NEVER dead-ends (AI-TOOL-SUMMONER-PLAN §1.2, owner direction
+         * 2026-09-17: "every content type is a note technically"). Each branch
+         * either renders the thing or says what it is and names the way in —
+         * the old blanket refusal sent a charter run blind mid-task.
+         *
+         * Exhaustive `Record<ContentType, …>` on purpose: a new content type
+         * must fail the build here rather than silently falling back to a
+         * refusal (the `default:`-hides-gaps lesson).
+         */
+        const renderers: Record<ContentType, () => Promise<string>> = {
+          note: async () => renderNoteText(),
+          folder: async () => renderNoteText(),
+
+          data: async () => {
+            const preview = await renderDataNodePreview(contentId, {
+              viewerId: ctx.userId,
+            });
+            // Reading a database ATTACHES it (prod 6d0b0e30, 2026-09-29: the
+            // model read the Career Evidence Library here after
+            // describe_database had refused it, then concluded its linked
+            // tables were unreachable without trying — they were reachable
+            // from this moment on). Say so, in the result, every time.
+            let attachedNote = "";
+            if (ctx.conversationId) {
+              await addAutoAssociation(
+                ctx.userId,
+                ctx.conversationId,
+                contentId,
+                "tool-call",
+              ).catch(() => null);
+              attachedNote =
+                "\n\n[This database is now attached to this chat: describe_database and query_database reach it, and every table it links by relation column.]";
+            }
+            return preview
+              ? `${header}\n\n${preview}${attachedNote}`
+              : `${header}\n\nThis database has no schema yet.${attachedNote}`;
+          },
+
+          file: async () => {
+            const f = await prisma.filePayload.findUnique({
+              where: { contentId },
+              select: {
+                fileName: true,
+                mimeType: true,
+                fileSize: true,
+                uploadStatus: true,
+                searchText: true,
+              },
+            });
+            if (!f) return `${header}\n\n(file record missing)`;
+            const size = `${Math.round(Number(f.fileSize) / 1024).toLocaleString("en-US")} KB`;
+            const facts = `File: ${f.fileName} · ${f.mimeType} · ${size} · upload ${f.uploadStatus}`;
+            // E-books: the reader's capsule (metadata, position, highlights)
+            // plus a bounded excerpt — a whole novel's text would flood the
+            // context window.
+            const { buildBookCapsule, isBookMimeType } = await import(
+              "@/lib/domain/reader/server/ai-capsule"
+            );
+            if (isBookMimeType(f.mimeType)) {
+              const capsule = await buildBookCapsule(ctx.userId, contentId);
+              const text = f.searchText.trim();
+              const BOOK_EXCERPT_CHARS = 24_000;
+              const excerpt = text
+                ? `\n\nText excerpt (${Math.min(text.length, BOOK_EXCERPT_CHARS).toLocaleString("en-US")} of ${text.length.toLocaleString("en-US")} characters, from the start):\n${text.slice(0, BOOK_EXCERPT_CHARS)}`
+                : "\n\nNo extracted text is held for this book.";
+              return `${header}\n\n${facts}${capsule ? `\n\n${capsule}` : ""}${excerpt}`;
+            }
+            const body = f.searchText.trim()
+              ? `\n\nExtracted text:\n${f.searchText.trim()}`
+              : "\n\nNo extracted text is held for this file. Attach it to the conversation if its contents are needed.";
+            return `${header}\n\n${facts}${body}`;
+          },
+
+          external: async () => {
+            const e = await prisma.externalPayload.findUnique({
+              where: { contentId },
+              select: {
+                url: true,
+                description: true,
+                sourceDomain: true,
+                readingStatus: true,
+              },
+            });
+            if (!e) return `${header}\n\n(link record missing)`;
+            return (
+              `${header}\n\nURL: ${e.url}` +
+              (e.sourceDomain ? `\nDomain: ${e.sourceDomain}` : "") +
+              `\nReading status: ${e.readingStatus}` +
+              (e.description ? `\n\n${e.description}` : "") +
+              "\n\nThis is a saved link, not its page text. Read the page itself with a page-read tool if you need its contents."
+            );
+          },
+
+          code: async () => {
+            const c = await prisma.codePayload.findUnique({
+              where: { contentId },
+              select: { code: true, language: true },
+            });
+            if (!c) return `${header}\n\n(code record missing)`;
+            return `${header}\nLanguage: ${c.language}\n\n${c.code}`;
+          },
+
+          html: async () => renderHtmlPayload(contentId, header),
+          template: async () => renderHtmlPayload(contentId, header),
+
+          visualization: async () => {
+            const v = await prisma.visualizationPayload.findUnique({
+              where: { contentId },
+              select: { engine: true },
+            });
+            return v
+              ? `${header}\n\nDiagram rendered with ${v.engine}. Its source is edited in the diagram editor and is not readable as prose here.`
+              : `${header}\n\n(diagram record missing)`;
+          },
+
+          shortcut: async () => {
+            const s = await prisma.shortcutPayload.findUnique({
+              where: { contentId },
+              select: {
+                targetContentId: true,
+                target: { select: { title: true, contentType: true } },
+              },
+            });
+            if (!s?.targetContentId || !s.target) {
+              return `${header}\n\nThis shortcut points at nothing — its target was deleted.`;
+            }
+            return `${header}\n\nThis is a shortcut to the ${describeContentType(s.target.contentType)} "${s.target.title}". Read the real thing with read_content on ${s.targetContentId}.`;
+          },
+
+          chat: async () =>
+            `${header}\n\nThis is a saved chat. Its transcript is not readable through this tool.`,
+          hope: async () =>
+            `${header}\n\nThis is a goal. It carries no text body of its own.`,
+          workflow: async () =>
+            `${header}\n\nThis is a workflow. Read its definition with get_workflow.`,
+        };
+
+        return renderers[content.contentType]();
       },
     }),
 
-    createNote: tool({
+    create_note: tool({
       // File creation is a mutating action: pause the tool loop for user
       // approval before executing (AI SDK v6 native HITL). The chat surface
       // renders the approval card; execution resumes via
-      // addToolApprovalResponse.
-      needsApproval: true,
+      // addToolApprovalResponse — unless the user set this tool to run
+      // without a card (§10 round 6c).
+      needsApproval: () =>
+        !toolAutoApproves(ctx.autoApprovedTools, { tool: "create_note" }),
       description:
         "Create a NEW note in the user's Digital Garden. Use this only when the user EXPLICITLY asks for a new file. " +
         "Ambiguous phrasings to watch for: 'update the note in this chat', 'add to this conversation's notes', 'put X in the note' — these do NOT mean 'create a new note'. They typically refer to an existing note. When the phrasing is ambiguous, ASK the user whether to create a new note or update an existing one before calling this tool. " +
-        "If they confirm a new note, this is the right tool. If they name an existing note, use `searchNotes` to find its id then use `updateNote`. " +
+        "If they confirm a new note, this is the right tool. If they name an existing note, use `search_content` to find its id then use `update_note`. " +
         "Do NOT create output on your own initiative — only when the user asks for it. " +
         "Targeting: omit placement fields to use the configured output-target preset. If the user or active charter gives THIS note a different relative destination, pass `outputLocation` (`under_chat`, `under_content`, or `beside_content`). Pass `parentId` only for a specifically resolved folder UUID. A per-note instruction always overrides the preset. " +
         "HYPERLINKING: to link other garden content inline (notes OR folders), write wiki-links in the markdown — [[Exact Title]] or [[Exact Title|Shown Text]]. They become real clickable links, resolve by title, and a linked FOLDER also feeds its context to the AI when the note is used in chat or as a charter. Use the content's exact title; do not invent URL-style links for internal content.",
@@ -2244,7 +3006,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         abstract: z
           .string()
           // Truncate rather than reject: a slightly-too-long abstract used to
-          // hard-fail the WHOLE createNote call, discarding the note's entire
+          // hard-fail the WHOLE create_note call, discarding the note's entire
           // content (smoke finding). The abstract is a cosmetic summary, so
           // clip it to the limit and keep the note.
           .transform((s) =>
@@ -2258,8 +3020,13 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           .string()
           .optional()
           .describe(
-            "Markdown content for the note (optional). Use standard markdown: # headings, **bold**, *italic*, `code`, bulleted/numbered lists, tables, blockquotes, links, images. The system converts it to rich text.",
+            "Markdown content for the note (optional; also read from `markdown` or `body`). Use standard markdown: # headings, **bold**, *italic*, `code`, bulleted/numbered lists, tables, blockquotes, links, images. The system converts it to rich text.",
           ),
+        // Sibling keys (create_docx says `markdown`): same concept, same
+        // key, everywhere — a model that used one tool's word for the
+        // other's must not lose the note to it.
+        markdown: z.string().optional().describe("Alias for content"),
+        body: z.string().optional().describe("Alias for content"),
         parentId: z
           .string()
           .uuid()
@@ -2283,11 +3050,14 @@ export function createBaseTools(ctx: ToolExecuteContext) {
       execute: async ({
         title,
         abstract,
-        content = "",
+        content: contentArg,
+        markdown: markdownAlias,
+        body: bodyAlias,
         parentId,
         outputLocation,
         alsoShortcutTo,
       }) => {
+        const content = contentArg?.trim() ? contentArg : (markdownAlias?.trim() ? markdownAlias : bodyAlias) ?? "";
         // Resolve the parent folder. Priority:
         //   1. AI-supplied parentId (validated to exist + belong to user)
         //   2. Chat's own parent folder (when in a chat context)
@@ -2421,15 +3191,15 @@ export function createBaseTools(ctx: ToolExecuteContext) {
       },
     }),
 
-    updateNote: tool({
+    update_note: tool({
       description:
         "Update the markdown/TipTap notes attached to a content item. " +
         "WORKS ON ANY CONTENT TYPE: notes (full-page editor), chats (the 'Add notes' panel below the chat), folders, files, externals, etc. — every content type has an optional sidecar NotePayload keyed by its contentId. " +
         "Common phrasings: 'update this conversation's notes', 'add to my Sourdough note', 'put X in the notes for this chat'. " +
         "If the user is chatting in a full-page chat and asks to update 'the note in this chat' or 'this chat's notes', pass the CHAT's contentId here — that updates the notes panel attached to the chat itself, not a separate file. " +
-        "Do NOT use this to create new top-level notes — use `createNote` for that. " +
-        "Do NOT call this on your own initiative — only when the user asks you to write to a note. There is no default between writing-to-a-note and creating new output (createNote/create_docx); pick whichever the user's request actually asks for, and do neither unless they ask. " +
-        "This updates CONTENT ONLY — it never changes the title. Renaming is a separate, explicit action: if the user asks to rename/retitle, use `renameNote`. Do not rename as a side effect of a content update. " +
+        "Do NOT use this to create new top-level notes — use `create_note` for that. " +
+        "Do NOT call this on your own initiative — only when the user asks you to write to a note. There is no default between writing-to-a-note and creating new output (create_note/create_docx); pick whichever the user's request actually asks for, and do neither unless they ask. " +
+        "This updates CONTENT ONLY — it never changes the title. Renaming is a separate, explicit action: if the user asks to rename/retitle, use `rename_note`. Do not rename as a side effect of a content update. " +
         "HYPERLINKING: to link other garden content inline (notes OR folders), write wiki-links in the markdown — [[Exact Title]] or [[Exact Title|Shown Text]]. They become real clickable links, resolve by title, and a linked FOLDER also feeds its context to the AI when the note is used in chat or as a charter. Use the content's exact title; do not invent URL-style links for internal content.",
       inputSchema: z.object({
         contentId: z
@@ -2466,7 +3236,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
       needsApproval: async ({ contentId, mode, content }) =>
         isDestructiveRewrite({ contentId, mode, contentLength: content.length }),
       execute: async ({ contentId, mode, content }) => {
-        // Allow updateNote against ANY content type the user owns —
+        // Allow update_note against ANY content type the user owns —
         // notes, chats (their 'Add notes' sidecar), folders, files, etc.
         // The legacy filter of `contentType: "note"` was the cause of the
         // "you can't update this chat's notes" behavior the user reported.
@@ -2479,11 +3249,11 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           select: { id: true, title: true, contentType: true },
         });
         if (!existing) {
-          return `Content "${contentId}" not found or deleted. Use searchNotes to find the right id.`;
+          return `Content "${contentId}" not found or deleted. Use search_content to find the right id.`;
         }
 
-        // updateNote is CONTENT-ONLY — it structurally cannot rename. (Renaming
-        // lives in the separate `renameNote` tool.) The former `title` argument
+        // update_note is CONTENT-ONLY — it structurally cannot rename. (Renaming
+        // lives in the separate `rename_note` tool.) The former `title` argument
         // was removed after it caused a silent rename: the model serialized this
         // tool's own "do NOT … rename" guard text into the title field
         // ("/do-not-rename/"). No title param = nothing to bleed in.
@@ -2532,7 +3302,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           __notePayload: true,
           kind: "updated",
           contentId: existing.id,
-          title: existing.title, // unchanged — updateNote never renames
+          title: existing.title, // unchanged — update_note never renames
           wordCount,
           targetKind: existing.contentType,
           // Route + delta make the receipt self-diagnosing. The 2026-08-12 incident
@@ -2562,16 +3332,16 @@ export function createBaseTools(ctx: ToolExecuteContext) {
       },
     }),
 
-    // Explicit, standalone RENAME. Split out from updateNote (2026-08-05): a
+    // Explicit, standalone RENAME. Split out from update_note (2026-08-05): a
     // title argument on a content-update tool let the model rename as a side
-    // effect — and worse, it serialized updateNote's own "do NOT … rename" guard
+    // effect — and worse, it serialized update_note's own "do NOT … rename" guard
     // text into the title ("/do-not-rename/"). Renaming is now its own deliberate
     // action the user must ask for; content updates can't touch the title.
-    renameNote: tool({
+    rename_note: tool({
       description:
         "Rename (retitle) an existing note, chat, folder, or other content the user owns. " +
         "Use ONLY when the user EXPLICITLY asks to rename or retitle something (e.g. 'rename this to X', 'call this note Y'). " +
-        "This changes the TITLE ONLY and never touches content — do not use it as part of a content update (use updateNote for content). Mentioning a topic or theme is NOT a rename request.",
+        "This changes the TITLE ONLY and never touches content — do not use it as part of a content update (use update_note for content). Mentioning a topic or theme is NOT a rename request.",
       inputSchema: z.object({
         contentId: z
           .string()
@@ -2593,7 +3363,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           select: { id: true, title: true, contentType: true },
         });
         if (!existing) {
-          return `Content "${contentId}" not found or deleted. Use searchNotes to find the right id.`;
+          return `Content "${contentId}" not found or deleted. Use search_content to find the right id.`;
         }
         await prisma.contentNode.update({
           where: { id: contentId },

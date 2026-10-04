@@ -157,10 +157,12 @@ export interface TreeNode {
     targetDeleted: boolean;
   };
   /**
-   * Set by the client transform, not the API: the real ContentNode id this row
-   * mirrors, for rows synthesized inside an expanded shortcut-folder. Mirror
-   * rows carry a path-scoped synthetic `id` (see `shortcut-mirror.ts`), so
-   * every action that touches real content must route through this instead.
+   * The real ContentNode id this row mirrors, for synthesized projection rows.
+   * Set by the client transform for rows inside an expanded shortcut-folder,
+   * and by the tree API for window reference rows. Mirror rows carry a
+   * path-scoped synthetic `id` (see `shortcut-mirror.ts` /
+   * `window-reference.ts`), so every action that touches real content must
+   * route through this instead.
    */
   mirrorOf?: string;
   /**
@@ -169,6 +171,16 @@ export interface TreeNode {
    * folder — the projection never becomes a second home for content.
    */
   isShortcutMirror?: boolean;
+  /**
+   * Present only on rows the tree API derived from a `window-ref` edge: this
+   * row sits in a note's Reference Drawer because that note contains a Note
+   * Window block targeting it. Carries the mirror-row contract above (id is
+   * `wref:<hostId>/<targetId>`, `mirrorOf` is the target) plus this marker so
+   * the row can render a window badge instead of a shortcut arrow. Derived
+   * per fetch, never stored — a retargeted window rewrites its edges on the
+   * next save and the row simply stops being synthesized.
+   */
+  windowRef?: { targetId: string };
 }
 
 // ============================================================

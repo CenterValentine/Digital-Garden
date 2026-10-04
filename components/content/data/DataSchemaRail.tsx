@@ -19,7 +19,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
-import { ChevronDown, ChevronRight, Info } from "lucide-react";
+import { ChevronDown, ChevronRight, Info, Loader2 } from "lucide-react";
 import { cn } from "@/lib/core/utils";
 import type { DataColumnType, DataTable } from "@/lib/domain/data";
 import { TYPE_GLYPH } from "./DataColumnHeader";
@@ -58,6 +58,75 @@ export function DataSchemaRail({ contentId }: DataSchemaRailProps) {
   const [state, setState] = useState<RailState>(INITIAL);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // AI row digests (AI-BULK-ROW-READING-PLAN §5): opt-in switch, manual
+  // refresh, and the durable one-line outcome (chips & traceability).
+  const [digestBusy, setDigestBusy] = useState(false);
+  const [digestLine, setDigestLine] = useState<string | null>(null);
+  // Elapsed seconds while a refresh runs — a labeled wait spends patience,
+  // a silent one spends trust (owner smoke 2026-09-15: "stuck on refresh").
+  const [digestElapsed, setDigestElapsed] = useState(0);
+  useEffect(() => {
+    if (!digestBusy) {
+      setDigestElapsed(0);
+      return;
+    }
+    const started = Date.now();
+    const timer = window.setInterval(
+      () => setDigestElapsed(Math.floor((Date.now() - started) / 1000)),
+      1000
+    );
+    return () => window.clearInterval(timer);
+  }, [digestBusy]);
+
+  const toggleDigests = useCallback(
+    async (on: boolean) => {
+      if (!contentId) return;
+      setDigestBusy(true);
+      try {
+        const res = await fetch(`/api/content/data/${contentId}`, {
+          method: "PATCH",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ rowDigests: on }),
+        });
+        const json = await res.json().catch(() => null);
+        if (!res.ok || json?.success === false) {
+          throw new Error(json?.error?.message ?? "Could not change AI digests");
+        }
+        setState((cur) =>
+          cur.table ? { ...cur, table: { ...cur.table, rowDigests: on } } : cur
+        );
+        setDigestLine(on ? "AI digests on — refresh now, or wait for the nightly sweep." : "AI digests off. Existing digests are kept but no longer refreshed.");
+      } catch (err) {
+        setNotice(err instanceof Error ? err.message : "Could not change AI digests");
+      } finally {
+        setDigestBusy(false);
+      }
+    },
+    [contentId]
+  );
+
+  const refreshDigests = useCallback(async () => {
+    if (!contentId) return;
+    setDigestBusy(true);
+    setDigestLine("Refreshing digests — batches of 20 rows, one model call each; the outcome line replaces this when done.");
+    try {
+      const res = await fetch(`/api/content/data/${contentId}/digests`, {
+        method: "POST",
+        credentials: "include",
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok || json?.success === false) {
+        throw new Error(json?.error?.message ?? "Could not refresh digests");
+      }
+      setDigestLine(typeof json?.data?.line === "string" ? json.data.line : "Digests refreshed.");
+    } catch (err) {
+      setDigestLine(null);
+      setNotice(err instanceof Error ? err.message : "Could not refresh digests");
+    } finally {
+      setDigestBusy(false);
+    }
+  }, [contentId]);
 
   const load = useCallback(async () => {
     if (!contentId) return;
@@ -265,6 +334,54 @@ export function DataSchemaRail({ contentId }: DataSchemaRailProps) {
           </p>
         )}
       </div>
+
+      {!isQuery && state.table && (
+        <div className="border-t border-border/60 px-3 py-1.5">
+          <div className="flex items-center justify-between">
+            <span
+              className="text-[11px] text-muted-foreground"
+              title="One AI-written line per row, refreshed in the background when rows change. query_database reads them with digests: true."
+            >
+              AI digests
+            </span>
+            <div className="flex items-center gap-2">
+              {state.table.rowDigests && canEditSchema && (
+                <button
+                  type="button"
+                  disabled={digestBusy}
+                  onClick={() => void refreshDigests()}
+                  className="rounded-md border border-border/60 px-2 py-0.5 text-[11px] text-muted-foreground hover:bg-accent disabled:opacity-50"
+                >
+                  {digestBusy ? (
+                    <span className="inline-flex items-center gap-1">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      Refreshing… {digestElapsed}s
+                    </span>
+                  ) : (
+                    "Refresh now"
+                  )}
+                </button>
+              )}
+              <button
+                type="button"
+                role="switch"
+                aria-checked={state.table.rowDigests}
+                disabled={!canEditSchema || digestBusy}
+                onClick={() => void toggleDigests(!state.table?.rowDigests)}
+                className={`relative h-4 w-7 rounded-full transition-colors disabled:opacity-50 ${state.table.rowDigests ? "bg-emerald-500" : "bg-muted-foreground/30"}`}
+                title={canEditSchema ? "Turn AI digests on or off for this database" : "Only the owner can change this"}
+              >
+                <span
+                  className={`absolute top-0.5 h-3 w-3 rounded-full bg-white transition-transform ${state.table.rowDigests ? "translate-x-3.5" : "translate-x-0.5"}`}
+                />
+              </button>
+            </div>
+          </div>
+          {digestLine && (
+            <p className="mt-1 text-[10px] leading-snug text-muted-foreground">{digestLine}</p>
+          )}
+        </div>
+      )}
 
       {canEditSchema && !isQuery && (
         <div className="flex items-center justify-between border-t border-border/60 px-3 py-1.5">

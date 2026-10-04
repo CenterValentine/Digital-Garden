@@ -144,13 +144,62 @@ function encodeNumber(raw: unknown, precision?: number): EncodeResult {
 
 // ── Option handling ──────────────────────────────────────────────────────
 
+/** Most choices a rejection lists before summarizing the rest. */
+const REJECTION_OPTION_LIST_MAX = 12;
+
+/**
+ * A rejection that teaches: the column, the value that missed, the choices
+ * it could have been, and the closest one when there is an obvious
+ * candidate. The bare "Unknown option for this column" cost a production run
+ * six steps (ITERATION-RUN-HARNESS-FIXES §10 L3a): five identical messages
+ * named no column, no value and no choice, so the model re-read the schema,
+ * summoned a tool and rewrote 27 cells to recover. Exported for the gate.
+ */
+export function unknownOptionError(column: DataColumn, value: string): string {
+  const options = column.config.options ?? [];
+  if (options.length === 0) {
+    return `"${column.name}" has no options yet, so "${value}" cannot be stored — add the option to the column first.`;
+  }
+  const labels = options.map((o) => o.label);
+  const shown = labels.slice(0, REJECTION_OPTION_LIST_MAX).join(", ");
+  const more =
+    labels.length > REJECTION_OPTION_LIST_MAX
+      ? ` (+${labels.length - REJECTION_OPTION_LIST_MAX} more)`
+      : "";
+  const needle = value.trim().toLowerCase();
+  // Containment either way, only when it picks exactly one label: a guess
+  // between two is not a suggestion.
+  const near = needle
+    ? labels.filter((l) => {
+        const hay = l.toLowerCase();
+        return hay.includes(needle) || needle.includes(hay);
+      })
+    : [];
+  const hint = near.length === 1 ? ` Closest: "${near[0]}".` : "";
+  return `"${value}" is not an option of "${column.name}". Choices: ${shown}${more}.${hint}`;
+}
+
+/**
+ * One line per distinct rejection, with how many cells it covers. Six cells
+ * failing for two reasons read as two lines, not five copies of one message
+ * with the sixth cut off (ITERATION-RUN-HARNESS-FIXES §10 L3a). Exported
+ * for the gate.
+ */
+export function summarizeRejections(messages: string[], max = 8): string {
+  const counts = new Map<string, number>();
+  for (const m of messages) counts.set(m, (counts.get(m) ?? 0) + 1);
+  const lines = [...counts].map(([m, n]) => `- ${m}${n > 1 ? ` (×${n})` : ""}`);
+  const extra = lines.length - max;
+  return (extra > 0 ? [...lines.slice(0, max), `- …and ${extra} more`] : lines).join("\n");
+}
+
 function encodeOptionId(raw: unknown, column: DataColumn): EncodeResult {
   if (typeof raw !== "string") return fail("Expected an option");
   const options = column.config.options ?? [];
   if (!options.some((o) => o.id === raw)) {
     // Guarding here is what makes "the cell stores ids" true rather than
     // aspirational — a label sneaking in would render fine and filter wrong.
-    return fail("Unknown option for this column");
+    return fail(unknownOptionError(column, raw));
   }
   return ok(raw);
 }
@@ -163,15 +212,136 @@ function encodeOptionIds(raw: unknown, column: DataColumn): EncodeResult {
   for (const entry of raw) {
     if (typeof entry !== "string") return fail("Expected option ids");
     if (!options.some((o) => o.id === entry)) {
-      return fail("Unknown option for this column");
+      return fail(unknownOptionError(column, entry));
     }
-    // Order is significant (it is the display order), but duplicates are not.
-    if (!seen.has(entry)) {
+    // Order is significant (it is the display order). Duplicates normally
+    // are not — a controlled vocabulary cannot be picked twice — but a
+    // free-form list may opt into them (config.allowDuplicates).
+    if (column.config.allowDuplicates) {
+      out.push(entry);
+    } else if (!seen.has(entry)) {
       seen.add(entry);
       out.push(entry);
     }
   }
   return out.length === 0 ? ok(undefined) : ok(out);
+}
+
+// ── Option labels ────────────────────────────────────────────────
+
+/**
+ * Title-case a value, leaving deliberately-cased words alone.
+ *
+ * `body condition` -> `Body Condition`. A word that ALREADY contains a
+ * capital is left untouched, so `iPhone`, `macOS` and `eBay` survive —
+ * uppercasing their first letter is exactly the mangling a title-case
+ * feature must not do, and it is not hypothetical in a tag list of
+ * products or tools.
+ */
+export function titleCaseLabel(label: string): string {
+  return label
+    .split(/(\s+)/)
+    .map((part) =>
+      /\s/.test(part) || /[A-Z]/.test(part)
+        ? part
+        : part.charAt(0).toUpperCase() + part.slice(1)
+    )
+    .join("");
+}
+
+/**
+ * How two option labels are compared for "is this the same value?".
+ *
+ * Case-SENSITIVE when the column preserves case, which is the default for a
+ * free-form list: the user typing `how` next to an existing `How` means two
+ * values, and silently reusing the existing one retitled their input
+ * (owner, 2026-09-16). With `titleCase` on, both normalise first, so they
+ * legitimately collapse.
+ *
+ * Controlled vocabularies stay case-INSENSITIVE: their labels are picked
+ * from a list rather than typed, and the tolerance is what lets a model
+ * write `redis` for an option named `Redis`.
+ */
+export function optionMatchKey(
+  label: string,
+  config: { freeform?: boolean; titleCase?: boolean }
+): string {
+  const trimmed = label.trim();
+  if (config.titleCase) return titleCaseLabel(trimmed);
+  return config.freeform ? trimmed : trimmed.toLowerCase();
+}
+
+// ── Delimited input (config.splitOn) ─────────────────────────────
+
+/** The only quoting character. See splitDelimited for why it is this one. */
+const FENCE = "`";
+
+/**
+ * Split one typed/pasted string into list items on a delimiter.
+ *
+ * `Redis, Postgres` → ["Redis", "Postgres"]
+ * `hello world, next` → ["hello world", "next"]
+ * "`Portland, OR`, Seattle" → ["Portland, OR", "Seattle"]
+ *
+ * Quoting uses BACKTICKS, and only backticks (owner, 2026-09-16). The first
+ * version honoured RFC 4180 double/single quotes and did not survive contact
+ * with ordinary prose: the apostrophe in "I'm" opened a quote, which made
+ * every later delimiter literal, so
+ * `I'm going to try this again, now this` collapsed into one value with the
+ * apostrophes eaten. Apostrophes and quotation marks appear in real tags all
+ * the time; a backtick essentially never does, which is what makes it safe
+ * to give a parsing meaning.
+ *
+ * A doubled backtick inside a fenced value is a literal one.
+ *
+ * Empty fields are dropped: a trailing comma is a typing artefact, not an
+ * instruction to store "".
+ */
+export function splitDelimited(raw: string, delimiter: string): string[] {
+  const delim = delimiter.length > 0 ? delimiter[0] : ",";
+  const out: string[] = [];
+  let field = "";
+  let fenced = false;
+  for (let i = 0; i < raw.length; i++) {
+    const ch = raw[i];
+    if (ch === FENCE) {
+      if (fenced && raw[i + 1] === FENCE) {
+        field += FENCE;
+        i++;
+      } else {
+        fenced = !fenced;
+      }
+      continue;
+    }
+    if (!fenced && ch === delim) {
+      out.push(field.trim());
+      field = "";
+      continue;
+    }
+    field += ch;
+  }
+  out.push(field.trim());
+  return out.filter((f) => f.length > 0);
+}
+
+/**
+ * True while `text` sits inside an unclosed backtick fence.
+ *
+ * The type-and-pill editor uses this to know a delimiter keystroke is
+ * LITERAL rather than terminal, so typing "`Portland, " keeps accepting
+ * input instead of closing the pill on the comma.
+ */
+export function hasOpenFence(text: string): boolean {
+  let fenced = false;
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] !== FENCE) continue;
+    if (fenced && text[i + 1] === FENCE) {
+      i++;
+      continue;
+    }
+    fenced = !fenced;
+  }
+  return fenced;
 }
 
 // ── Simple validators ────────────────────────────────────────────────────

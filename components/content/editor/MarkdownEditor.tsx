@@ -12,6 +12,7 @@
 "use client";
 
 import { useEditor, EditorContent } from "@tiptap/react";
+import type { SaveMeta } from "@/lib/domain/content/save-meta";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { usePathname } from "next/navigation";
 import { getEditorExtensions, getViewerExtensions } from "@/lib/domain/editor/extensions-client";
@@ -22,9 +23,11 @@ import { AiImageGenDialog } from "@/components/content/ai/AiImageGenDialog";
 import { BubbleMenu } from "./BubbleMenu";
 import { TemplatePicker } from "./TemplatePicker";
 import { SnippetPicker } from "./SnippetPicker";
+import { MoveSelectionPicker } from "./MoveSelectionPicker";
 import { TableBubbleMenu } from "./TableBubbleMenu";
 import { ImageBubbleMenu } from "./ImageBubbleMenu";
 import { extractOutline, type OutlineHeading } from "@/lib/domain/content/outline-extractor";
+import { useViewportMemory } from "@/lib/domain/content/use-viewport-memory";
 import { computeHeadingIds } from "@/lib/domain/content/heading-ids";
 import { expandFoldsContaining } from "@/lib/domain/editor/extensions/heading-fold";
 import { markdownPasteToTiptap } from "@/lib/domain/content/markdown";
@@ -164,10 +167,7 @@ export interface MarkdownEditorProps {
    * shrink-refusal guard for the former. `secondsSinceInput` is reported
    * for telemetry — helps calibrate the recency window over time.
    */
-  onSave?: (
-    content: JSONContent,
-    meta?: { userInitiated?: boolean; secondsSinceInput?: number },
-  ) => Promise<void>;
+  onSave?: (content: JSONContent, meta?: SaveMeta) => Promise<void>;
   /** Callback when editor stats change */
   onStatsChange?: (stats: EditorStats) => void;
   /** Callback when outline changes (headings extracted) */
@@ -273,6 +273,14 @@ export function MarkdownEditor({
   const [remoteCollaborators, setRemoteCollaborators] = useState<RemoteCollaborator[]>([]);
   const [cursorLabels, setCursorLabels] = useState<CollaborationCursorLabel[]>([]);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  /**
+   * The save the pending timeout WOULD run, held separately so it can be
+   * flushed — run immediately — when the editor unmounts, the pane
+   * navigates, or the page goes away. Null whenever no save is pending.
+   */
+  const pendingSaveRef = useRef<
+    ((opts?: { flush?: boolean; keepalive?: boolean }) => Promise<void>) | null
+  >(null);
   const editorScrollRef = useRef<HTMLDivElement>(null);
   const appliedEditableRef = useRef<boolean | null>(null);
   // Track the last content we saved so we can distinguish save-echoes
@@ -349,18 +357,28 @@ export function MarkdownEditor({
     }
     setYdocContentReady(false);
     const fragment = runtimeYdoc.getXmlFragment("default");
+    // This observer removes ITSELF once content arrives, so the cleanup below
+    // must not remove it a second time — yjs logs "Tried to remove event
+    // handler that doesn't exist" for the duplicate. One flag, one removal,
+    // whichever path gets there first.
+    let observing = false;
+    const stopObserving = () => {
+      if (!observing) return;
+      observing = false;
+      fragment.unobserveDeep(evaluate);
+    };
     const evaluate = () => {
       if (ydocHasMeaningfulDefaultContent(runtimeYdoc)) {
         setYdocContentReady(true);
         // Once content is present it stays present for binding purposes; stop
-        // paying for the transform on every structural mutation.
-        fragment.unobserveDeep(evaluate);
+        // paying for the (full fromYdoc) transform on every structural
+        // mutation.
+        stopObserving();
       }
     };
     fragment.observeDeep(evaluate);
-    return () => {
-      fragment.unobserveDeep(evaluate);
-    };
+    observing = true;
+    return stopObserving;
   }, [runtimeYdoc]);
   // Anti-blank-document guard (the whole point of this component's care around
   // collaboration): the editor may bind to the collaborative Y.Doc only when
@@ -594,6 +612,17 @@ export function MarkdownEditor({
           return true;
         }
 
+        // Inside a code block, EVERYTHING pasted is code. ProseMirror's own
+        // paste path already does the right thing there (one text node, every
+        // line kept), but this handler runs first — and the image-URL and
+        // markdown branches below used to hijack it: "Always format" replaced
+        // the literal paste with block nodes a code block cannot hold (nothing
+        // or one line landed), and the toast's "convert" undid the good paste.
+        // Bail before either branch so the default literal paste proceeds.
+        if (view.state.selection.$from.parent.type.spec.code) {
+          return false;
+        }
+
         // Check for image URL paste
         const text = event.clipboardData?.getData("text/plain");
         if (text && isImageUrl(text)) {
@@ -767,10 +796,14 @@ export function MarkdownEditor({
       // Mark as unsaved
       setHasUnsavedChanges(true);
 
-      // Clear existing timeout
+      // Clear existing timeout. A newer edit supersedes the pending save — and
+      // if one of the early returns below fires, there must be NO pending save
+      // left behind for a flush to pick up.
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
+        saveTimeoutRef.current = null;
       }
+      pendingSaveRef.current = null;
 
       if (collaborationState?.provider || shouldSkipRestAutosaveRef.current) {
         return;
@@ -818,9 +851,11 @@ export function MarkdownEditor({
             delay_ms: autoSaveDelay,
           },
         });
-        saveTimeoutRef.current = setTimeout(async () => {
-          // Guard: if contentId changed since the edit, discard this save
-          if (snapshotContentId && contentIdRef.current !== snapshotContentId) {
+        const runSave = async (opts: { flush?: boolean; keepalive?: boolean } = {}) => {
+          // Guard: if contentId changed since the edit, discard this save.
+          // NOT on a flush — a flush is by definition firing after navigation,
+          // and the snapshot binds it to the document the edit came from.
+          if (!opts.flush && snapshotContentId && contentIdRef.current !== snapshotContentId) {
             clientLogger.info({
               layer: "editor",
               event: "autosave:skipped_navigated",
@@ -861,6 +896,8 @@ export function MarkdownEditor({
             await snapshotSave(json, {
               userInitiated,
               secondsSinceInput: secondsSinceInput ?? undefined,
+              ...(opts.flush ? { flush: true } : {}),
+              ...(opts.keepalive ? { keepalive: true } : {}),
             });
             setHasUnsavedChanges(false);
           } catch (error) {
@@ -876,6 +913,12 @@ export function MarkdownEditor({
           } finally {
             setIsSaving(false);
           }
+        };
+        pendingSaveRef.current = runSave;
+        saveTimeoutRef.current = setTimeout(() => {
+          pendingSaveRef.current = null;
+          saveTimeoutRef.current = null;
+          void runSave();
         }, autoSaveDelay);
       }
     },
@@ -1016,6 +1059,20 @@ export function MarkdownEditor({
     editor.commands.setContent(safeContent);
     appliedContentRef.current = safeContent;
   }, [collaborationState, editor, safeContent]);
+
+  // Viewport memory — "leave a tab, come back to the same spot".
+  //
+  // Disabled in `compact` mode: that is the attached-notes drawer, where
+  // `ExpandableEditor` wraps us in its own `overflow-y-auto` and owns the
+  // "note" region for that content. Both claiming it would have two elements
+  // writing one key.
+  //
+  // Keyed on the outer wrapper rather than `editorScrollRef` so the hook's
+  // scroller lookup stays in one place, and so `editorScrollRef` keeps its
+  // single existing job (positioning remote collaborator cursor labels).
+  const viewportRef = useViewportMemory(contentId, "note", {
+    enabled: !compact,
+  });
 
   // Initial stats update when editor is created
   useEffect(() => {
@@ -1448,22 +1505,69 @@ export function MarkdownEditor({
     [insertImageFromFile]
   );
 
-  // Cancel pending saves when contentId changes (user navigated away)
-  // or on unmount. This is the first line of defense against cross-document saves.
+  /**
+   * Run the pending debounced save NOW, if there is one.
+   *
+   * This used to be a cancel. The cancel was the March 2026 fix for a stale
+   * timer writing Doc A's body over Doc B after a fast tab switch — but the
+   * save has since been snapshotted (target id + callback captured at edit
+   * time), which removes that hazard on its own. What the cancel still did
+   * was lose work: a continuous edit followed by a tab switch inside the 2s
+   * debounce dropped the WHOLE edit, because the timer reset on every
+   * keystroke and never fired. The charter Notes editor unmounts on every tab
+   * switch, so charter bodies were the worst case (2026-09-15).
+   */
+  const flushPendingSave = useCallback((opts: { keepalive?: boolean } = {}) => {
+    const pending = pendingSaveRef.current;
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = null;
+    }
+    pendingSaveRef.current = null;
+    if (!pending) return;
+    clientLogger.info({
+      layer: "editor",
+      event: "autosave:flushed",
+      summary: `pending autosave flushed (${opts.keepalive ? "page hiding" : "unmount/navigation"})`,
+      attrs: { content_id: contentIdRef.current ?? "unknown", keepalive: Boolean(opts.keepalive) },
+    });
+    void pending({ flush: true, ...opts });
+  }, []);
+
+  // Flush the pending save when contentId changes (pane navigated) or on
+  // unmount (tab switch, Notes section collapsed).
   useEffect(() => {
     return () => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-        saveTimeoutRef.current = null;
-      }
+      flushPendingSave();
     };
-  }, [contentId]);
+  }, [contentId, flushPendingSave]);
+
+  // Unmount never fires when the page itself goes away — reload, close tab,
+  // navigate off-site. `pagehide` is the signal for that, and
+  // `visibilitychange → hidden` is the more reliable one on mobile Safari.
+  // Both flush with keepalive so the request outlives the page.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const onHide = () => flushPendingSave({ keepalive: true });
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") onHide();
+    };
+    window.addEventListener("pagehide", onHide);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("pagehide", onHide);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [flushPendingSave]);
 
   // AI highlight visibility — controlled by settings toggle
   const showAiHighlight = useSettingsStore((s) => s.ai?.showAiHighlight ?? true);
 
   return (
-    <div className={`flex flex-col h-full ${className} ${showAiHighlight ? "" : "ai-highlight-hidden"}`}>
+    <div
+      ref={viewportRef}
+      className={`flex flex-col h-full ${className} ${showAiHighlight ? "" : "ai-highlight-hidden"}`}
+    >
       {collaborationEnabled && collaborationNotice && !isCollaborationBooting ? (
         <div
           className={
@@ -1695,6 +1799,9 @@ export function MarkdownEditor({
       {/* Template / Snippet pickers — event-driven, no props needed */}
       <TemplatePicker />
       <SnippetPicker />
+
+      {/* "Move to Note" target picker — event-driven, addressed to THIS editor */}
+      <MoveSelectionPicker editor={editor} />
 
       {/* /ai-image slash command target — mounted only when triggered.
           The new image becomes "referenced" (hidden behind the

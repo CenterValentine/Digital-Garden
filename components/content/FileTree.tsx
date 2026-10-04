@@ -18,6 +18,7 @@ import { useRef, useEffect, useMemo } from "react";
 import { Tree, type NodeApi, type TreeApi, type NodeRendererProps } from "react-arborist";
 import { FileNode } from "./FileNode";
 import { useTreeStateStore } from "@/state/tree-state-store";
+import { useTreeRevealStore, type TreeRevealRequest } from "@/state/tree-reveal-store";
 import { clientLogger } from "@/lib/core/logger/client";
 import type { TreeNode } from "@/lib/domain/content/types";
 import { expandReferences } from "@/lib/features/content/reference-group";
@@ -56,7 +57,12 @@ interface FileTreeProps {
   editingNodeId?: string; // If set, automatically triggers edit mode on this node
   expandNodeId?: string | null; // If set, imperatively expands this node
   onExpandComplete?: () => void; // Called after expansion completes
-  revealNodeId?: string | null; // If set, opens ancestors, scrolls to, and selects this node
+  /**
+   * If set, opens ancestors, scrolls to (per `align`), selects this node and
+   * optionally flashes it. The caller passes a request only when the node is
+   * in `data` — see LeftSidebarContent.
+   */
+  revealRequest?: TreeRevealRequest | null;
   onRevealComplete?: () => void; // Called after the reveal request is consumed
   dndManager?: unknown; // Optional: DndManager from parent DndProvider; opaque pass-through
 }
@@ -81,7 +87,7 @@ export function FileTree({
   editingNodeId,
   expandNodeId,
   onExpandComplete,
-  revealNodeId,
+  revealRequest,
   onRevealComplete,
   dndManager,
 }: FileTreeProps) {
@@ -386,24 +392,32 @@ export function FileTree({
       return true;
     }
 
-    // Only allow dropping into folders — with ONE exception: referenced
-    // nodes may be dropped onto a NOTE (re-homing the reference under that
-    // note). Primary content can never gain a leaf parent; this is
+    // Only allow dropping into folders — with a short list of exceptions.
+    // Primary content generally cannot gain a leaf parent; this is
     // deliberately not Notion-style nesting.
     if (parentNode.data.contentType !== "folder") {
       const allReferences =
         dragNodes.length > 0 &&
         dragNodes.every((dragNode) => dragNode.data.role === "referenced");
-      // A database accepts exactly its own promoted rows back (plan Phase 5:
-      // rows are freely movable — that has to include the way home). Nothing
-      // else may nest under a data node.
+      // A database accepts its own promoted rows back (plan Phase 5: rows
+      // are freely movable — that has to include the way home).
       const allRowsOfThisTable =
         dragNodes.length > 0 &&
         dragNodes.every(
           (dragNode) => dragNode.data.promotedFromTableId === parentNode.data.id
         );
+      // …and it accepts other DATABASES (owner, 2026-09-13). A set of
+      // linked tables has a natural head — the index everything points at —
+      // and the tree should be able to say so. The nested table becomes a
+      // reference under its host and lives behind its chip; dragging it to a
+      // folder detaches it again, so nothing is locked in place.
+      const allDatabases =
+        dragNodes.length > 0 &&
+        dragNodes.every((dragNode) => dragNode.data.contentType === "data");
       const noteOk = parentNode.data.contentType === "note" && allReferences;
-      const dataOk = parentNode.data.contentType === "data" && allRowsOfThisTable;
+      const dataOk =
+        parentNode.data.contentType === "data" &&
+        (allRowsOfThisTable || allDatabases);
       if (!noteOk && !dataOk) {
         return false;
       }
@@ -460,13 +474,22 @@ export function FileTree({
         return;
       }
 
-      // Only handle shortcuts when tree is focused and no modifiers for single-key shortcuts
-      const isPlainKey = !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey;
+      // Option + letter (owner call, 2026-10-02). These were bare letters and
+      // collided with the pane-aiming cluster (lib/features/content/
+      // pane-hotkeys.ts): holding "d" to aim at the right pane deleted the
+      // selection. The aiming keys stay bare — they are the discoverable
+      // gesture — and these three take the modifier instead.
+      //
+      // Compared on `e.code`, not `e.key`: under Option, macOS turns the key
+      // into a glyph (⌥R "®", ⌥D "∂", ⌥A "å") and a `key` comparison would
+      // match none of them — the shortcuts would simply stop working on the
+      // modifier they moved to.
+      const isOptionKey = e.altKey && !e.metaKey && !e.ctrlKey && !e.shiftKey;
 
-      // R - Rename selected node (single-key, Vim-style)
+      // ⌥R - Rename selected node
       // Safer than F2 which Vivaldi intercepts
       // Special case: For external links, triggers Edit Link dialog instead
-      if (e.key === "r" && isPlainKey && onRename) {
+      if (e.code === "KeyR" && isOptionKey && onRename) {
         e.preventDefault();
         e.stopPropagation();
         const tree = treeRef.current;
@@ -487,9 +510,9 @@ export function FileTree({
         return;
       }
 
-      // D - Delete selected nodes (single-key, Vim-style)
+      // ⌥D - Delete selected nodes
       // Safer than Delete key which navigates back in Vivaldi
-      if (e.key === "d" && isPlainKey && onDelete) {
+      if (e.code === "KeyD" && isOptionKey && onDelete) {
         e.preventDefault();
         e.stopPropagation();
         const tree = treeRef.current;
@@ -501,9 +524,9 @@ export function FileTree({
         return;
       }
 
-      // A - Open create menu (shows all content types)
+      // ⌥A - Open create menu (shows all content types)
       // Opens context menu at selected node position
-      if (e.key === "a" && isPlainKey && onCreate) {
+      if (e.code === "KeyA" && isOptionKey && onCreate) {
         e.preventDefault();
         e.stopPropagation();
         const tree = treeRef.current;
@@ -581,29 +604,36 @@ export function FileTree({
     onExpandComplete?.();
   }, [expandNodeId, onExpandComplete, setExpanded]);
 
-  // Reveal request from outside the tree (breadcrumb path click): mirror a
-  // real selection of the node. scrollTo opens every ancestor (firing
-  // onToggle per folder, which keeps the persisted expandedIds store in
-  // sync), waits for the row to appear, and scrolls it into view. Selection
+  // Reveal request (toolbar "show in file tree", breadcrumb, or the tree
+  // following the active content): mirror a real selection of the node.
+  // scrollTo opens every ancestor (firing onToggle per folder, which keeps
+  // the persisted expandedIds store in sync — it only ADDS, never collapses
+  // what the user had open), waits for the row to appear, and scrolls it
+  // per `align` ("auto" leaves a visible row where it is). Selection
   // deliberately happens AFTER the row exists: tree.select on a still-hidden
   // node fires onSelect against a stale visible-row index, reporting an
-  // empty selection and wiping the store selection the caller just set.
-  // A node absent from this tree (workspace-scoped view, stale id) makes
-  // scrollTo's internal wait give up after ~1s and the select is skipped.
+  // empty selection and wiping the store selection the caller just set. An
+  // already-selected row is left alone so a tree click doesn't re-open its
+  // own content. A node absent from this tree (workspace-scoped view, stale
+  // id) makes scrollTo's internal wait give up after ~1s and the select is
+  // skipped — callers avoid that by requesting only nodes present in `data`.
   useEffect(() => {
-    if (!revealNodeId) return;
+    if (!revealRequest) return;
+    const { id, align, flash } = revealRequest;
 
     const tree = treeRef.current;
     if (tree) {
-      Promise.resolve(tree.scrollTo(revealNodeId, "center")).then(() => {
-        treeRef.current?.get(revealNodeId)?.select();
+      Promise.resolve(tree.scrollTo(id, align)).then(() => {
+        const node = treeRef.current?.get(id);
+        if (node && !node.isSelected) node.select();
+        if (flash) useTreeRevealStore.getState().flashNode(id);
       });
     }
 
     // Clear the request either way so the next reveal for the same node
     // isn't swallowed.
     onRevealComplete?.();
-  }, [revealNodeId, onRevealComplete]);
+  }, [revealRequest, onRevealComplete]);
 
   // Auto-trigger edit mode when editingNodeId changes (for inline creation)
   useEffect(() => {

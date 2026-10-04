@@ -35,6 +35,7 @@ import TurndownService from "turndown";
 import { gfm } from "turndown-plugin-gfm";
 import { serializeUnknownBlock, restoreDgBlocks, DG_BLOCK_PREFIX } from "./markdown-fences";
 import { getBlockCodec, applyBlockReTags } from "./markdown-block-codecs";
+import { noteWindowToMarkdown, wikiLinkToMarkdown } from "./wiki-link-markdown";
 
 /**
  * The TipTap HTML (de)serialization pair. Injectable so the CI gate can supply a
@@ -141,6 +142,65 @@ export function createTurndown(
     filter: (node) =>
       node.nodeName === "INPUT" && node.getAttribute("type") === "checkbox",
     replacement: () => "",
+  });
+  // Private (commented-out) content → Obsidian comment syntax. The inline mark
+  // becomes `%%text%%`; a private block nested inside another container becomes
+  // the `%%` … `%%` fence (top-level private blocks take the codec path, which
+  // emits the identical shape). Parsed back by the private codecs' reTag in
+  // markdown-block-codecs.ts.
+  td.addRule("dgPrivateText", {
+    filter: (node) =>
+      node.nodeName === "SPAN" && node.getAttribute("data-private") === "text",
+    replacement: (content) => `%%${content}%%`,
+  });
+  td.addRule("dgPrivateBlock", {
+    filter: (node) =>
+      node.nodeName === "DIV" && node.getAttribute("data-private") === "block",
+    replacement: (content) => `\n\n%%\n\n${content.trim()}\n\n%%\n\n`,
+  });
+  // Wiki-links → `[[Title|alias]]{#id .card …}`; a Note Window nested inside
+  // another container (callout, column, blockquote) → `![[Title]]{#id …}`.
+  // Grammar shared with the parse side in wiki-link-markdown.ts; top-level
+  // windows take the codec path, which emits the identical shape. Before
+  // this rule a paragraph holding a link fell to the HTML tier — the source
+  // view showed `<span data-type="wiki-link" …>` for every linked sentence.
+  // A link the grammar can't carry keeps turndown's default (its text),
+  // which fails self-verify and falls to that HTML tier as before.
+  td.addRule("dgWikiLink", {
+    filter: (node) =>
+      node.nodeName === "SPAN" && node.getAttribute("data-type") === "wiki-link",
+    replacement: (content, node) => {
+      const el = node as HTMLElement;
+      const md = wikiLinkToMarkdown({
+        targetId: el.getAttribute("data-target-id"),
+        targetTitle: el.getAttribute("data-target-title"),
+        displayText: el.getAttribute("data-display-text"),
+        headingSlug: el.getAttribute("data-heading-slug"),
+        anchor: el.getAttribute("data-anchor"),
+        anchorLabel: el.getAttribute("data-anchor-label"),
+        expand: el.getAttribute("data-expand") === "false" ? false : null,
+        view: el.getAttribute("data-view"),
+      });
+      return md ?? content;
+    },
+  });
+  td.addRule("dgNoteWindow", {
+    filter: (node) =>
+      node.nodeName === "DIV" && node.getAttribute("data-block-type") === "noteWindow",
+    replacement: (content, node) => {
+      const el = node as HTMLElement;
+      const height = Number(el.getAttribute("data-height"));
+      const md = noteWindowToMarkdown({
+        blockId: el.getAttribute("data-block-id"),
+        targetContentId: el.getAttribute("data-target-content-id"),
+        targetTitle: el.getAttribute("data-target-title"),
+        targetViewId: el.getAttribute("data-target-view-id"),
+        targetRowId: el.getAttribute("data-target-row-id"),
+        height: Number.isFinite(height) && el.hasAttribute("data-height") ? height : null,
+        showBorder: el.getAttribute("data-show-border") === "false" ? false : null,
+      });
+      return md ? `\n\n${md}\n\n` : content;
+    },
   });
   // TipTap tables need our own rules — the GFM plugin's don't fit its HTML:
   //   • it only converts a table whose first row is a heading row, and that test
@@ -428,11 +488,43 @@ export function tiptapToMarkdownRich(
   bridge: HtmlBridge = defaultBridge,
 ): string {
   if (!doc || !Array.isArray(doc.content) || doc.content.length === 0) return "";
-  return doc.content
-    .map((block) => serializeBlock(block, extensions, bridge))
-    .filter((seg) => seg.length > 0)
-    .join("\n\n");
+  const blocks = doc.content;
+  const segments = blocks.map((block) => serializeBlock(block, extensions, bridge));
+  let out = "";
+  let prevType: string | undefined;
+  for (let i = 0; i < blocks.length; i++) {
+    const seg = segments[i];
+    if (seg.length === 0) continue;
+    const type = blocks[i].type;
+    if (out.length > 0) {
+      out +=
+        prevType && LIST_TYPES.has(prevType) && type && LIST_TYPES.has(type)
+          ? `\n\n${LIST_SEPARATOR}\n\n`
+          : "\n\n";
+    }
+    out += seg;
+    prevType = type;
+  }
+  return out;
 }
+
+const LIST_TYPES = new Set(["bulletList", "orderedList", "taskList"]);
+
+/**
+ * Keeps two adjacent lists two lists.
+ *
+ * Each block round-trips alone — the self-verify proves that — but the
+ * join is not verified, and markdown has no way to end a list except by
+ * starting a non-list block: `1. a` + blank line + `2. b` is ONE list to
+ * marked (as is `- a` / `- b`, and a bullet list followed by a task list,
+ * which shares its marker). Two adjacent same-marker lists therefore
+ * merged on the way back — a top-level lossless hole, found while giving
+ * the accordion a codec (a real note had an ordered list starting at 2
+ * directly after one starting at 1). An HTML comment is a CommonMark
+ * type-2 block: it ends the first list, marked passes it through, and the
+ * DOM parser drops comment nodes, so nothing reaches the document.
+ */
+const LIST_SEPARATOR = "<!-- -->";
 
 // ── Parse: markdown → TipTap ─────────────────────────────────────────────────
 

@@ -195,10 +195,10 @@ export function MetadataDebugView({ content, title }: MetadataDebugViewProps) {
         <section>
           <h4 className="text-xs font-semibold text-gray-300 mb-3 uppercase tracking-wider flex items-center gap-2">
             Headings
-            <span className="text-gray-500 font-normal">({metadata.headings.length})</span>
+            <span className="text-gray-500 dark:text-gray-400 font-normal">({metadata.headings.length})</span>
           </h4>
           {metadata.headings.length === 0 ? (
-            <div className="text-xs text-gray-500 italic">No headings found</div>
+            <div className="text-xs text-gray-500 dark:text-gray-400 italic">No headings found</div>
           ) : (
             <div className="space-y-2">
               {metadata.headings.map((heading, index) => (
@@ -207,7 +207,7 @@ export function MetadataDebugView({ content, title }: MetadataDebugViewProps) {
                   className="flex items-start gap-2 text-xs"
                   style={{ paddingLeft: `${(heading.level - 1) * 12}px` }}
                 >
-                  <span className="text-gray-500 font-mono">H{heading.level}</span>
+                  <span className="text-gray-500 dark:text-gray-400 font-mono">H{heading.level}</span>
                   <span className="text-gray-300">{heading.text}</span>
                 </div>
               ))}
@@ -219,10 +219,10 @@ export function MetadataDebugView({ content, title }: MetadataDebugViewProps) {
         <section>
           <h4 className="text-xs font-semibold text-gray-300 mb-3 uppercase tracking-wider flex items-center gap-2">
             Wiki Links
-            <span className="text-gray-500 font-normal">({metadata.wikiLinks.length})</span>
+            <span className="text-gray-500 dark:text-gray-400 font-normal">({metadata.wikiLinks.length})</span>
           </h4>
           {metadata.wikiLinks.length === 0 ? (
-            <div className="text-xs text-gray-500 italic">No wiki links found</div>
+            <div className="text-xs text-gray-500 dark:text-gray-400 italic">No wiki links found</div>
           ) : (
             <div className="space-y-2">
               {metadata.wikiLinks.map((link, index) => (
@@ -232,7 +232,7 @@ export function MetadataDebugView({ content, title }: MetadataDebugViewProps) {
                     {link.displayText && `|${link.displayText}`}]]
                   </div>
                   {link.contentId && (
-                    <div className="text-gray-500 text-[10px] mt-1">
+                    <div className="text-gray-500 dark:text-gray-400 text-[10px] mt-1">
                       ID: {link.contentId}
                     </div>
                   )}
@@ -246,10 +246,10 @@ export function MetadataDebugView({ content, title }: MetadataDebugViewProps) {
         <section>
           <h4 className="text-xs font-semibold text-gray-300 mb-3 uppercase tracking-wider flex items-center gap-2">
             Callouts
-            <span className="text-gray-500 font-normal">({metadata.callouts.length})</span>
+            <span className="text-gray-500 dark:text-gray-400 font-normal">({metadata.callouts.length})</span>
           </h4>
           {metadata.callouts.length === 0 ? (
-            <div className="text-xs text-gray-500 italic">No callouts found</div>
+            <div className="text-xs text-gray-500 dark:text-gray-400 italic">No callouts found</div>
           ) : (
             <div className="space-y-2">
               {metadata.callouts.map((callout, index) => (

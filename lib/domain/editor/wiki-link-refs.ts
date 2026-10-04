@@ -15,6 +15,17 @@
 
 import type { JSONContent } from "@tiptap/core";
 
+/**
+ * ContentNode ids are UUIDs. A link may also point at an extension's virtual
+ * content (`reader:scripture/<corpus>` — a verse link); those aren't nodes,
+ * and a non-UUID in a `@db.Uuid` query throws, so refs skip them.
+ */
+const CONTENT_NODE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function isContentNodeId(id: string): boolean {
+  return CONTENT_NODE_ID.test(id);
+}
+
 export interface WikiLinkRef {
   targetId: string | null;
   targetTitle: string;
@@ -38,7 +49,7 @@ export function collectWikiLinkRefs(doc: JSONContent | null | undefined): WikiLi
         targetTitle?: string | null;
       };
       const title = (attrs.targetTitle ?? "").trim();
-      if (title) {
+      if (title && !(attrs.targetId && !isContentNodeId(attrs.targetId))) {
         const key = `${attrs.targetId ?? ""}::${title.toLowerCase()}`;
         if (!seen.has(key)) {
           seen.add(key);

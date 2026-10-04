@@ -95,5 +95,8 @@ export function useAnchoredMenu<
       }
     : undefined;
 
-  return { open, toggle, close, triggerRef, menuRef, menuStyle };
+  // `openMenu` is exposed alongside `toggle` for triggers whose open gesture
+  // isn't a click — press-and-hold, right-click — where toggling on an
+  // already-open menu would close it mid-gesture.
+  return { open, openMenu, toggle, close, triggerRef, menuRef, menuStyle };
 }

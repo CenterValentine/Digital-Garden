@@ -26,7 +26,7 @@ import {
   type KeyboardEvent,
   type FormEvent,
 } from "react";
-import { ArrowUp, Square, Mic, Paperclip, X, FileText, Loader2, ScrollText } from "lucide-react";
+import { ArrowUp, Square, Mic, Paperclip, X, FileText, Loader2, ScrollText, ListChecks } from "lucide-react";
 import { useDrop } from "react-dnd";
 import { cn } from "@/lib/core/utils";
 import {
@@ -37,6 +37,7 @@ import type { ChatStatus } from "ai";
 import type {
   ChatAttachment,
   ActiveCharter,
+  ActiveQuest,
 } from "@/lib/domain/ai/use-conversation-engine";
 import { useTreeDragStore } from "@/state/tree-drag-store";
 import { useImagePreviewStore } from "@/state/image-preview-store";
@@ -96,6 +97,12 @@ interface ChatInputProps {
   onResolveMention?: (item: SuggestionItem) => Promise<SuggestionItem | null>;
   /** The playbook currently attached to this conversation, if any. */
   activeCharter?: ActiveCharter | null;
+  /** The quest ledger this thread has written into (pinned once items land). */
+  activeQuest?: ActiveQuest | null;
+  /** Open the quest's ledger — omit to render the chip as a non-interactive label. */
+  onOpenQuestLedger?: (contentId: string) => void;
+  /** Open the attached charter. */
+  onOpenCharter?: (contentId: string) => void;
   /** Detach the active playbook (dismiss the chip). */
   onDetachCharter?: () => void;
   /**
@@ -126,6 +133,9 @@ export function ChatInput({
   onMentionInserted,
   onResolveMention,
   activeCharter = null,
+  activeQuest = null,
+  onOpenQuestLedger,
+  onOpenCharter,
   onDetachCharter,
   footerLeading,
   attachments = [],
@@ -543,6 +553,25 @@ export function ChatInput({
     [],
   );
 
+  // Copy/cut put the canonical `@[Title](id)` on the clipboard so a mention
+  // survives the round trip (see selectionToCanonical). Cut then deletes the
+  // selection through the browser and re-serializes via handleInput.
+  const handleCopyOrCut = useCallback(
+    (e: React.ClipboardEvent<HTMLDivElement>) => {
+      const root = editorRef.current;
+      if (!root) return;
+      const canonical = selectionToCanonical(root);
+      if (canonical == null) return;
+      e.clipboardData.setData("text/plain", canonical);
+      e.preventDefault();
+      if (e.type === "cut") {
+        document.execCommand("delete");
+        handleInput();
+      }
+    },
+    [handleInput],
+  );
+
   const handlePaste = useCallback(
     (e: React.ClipboardEvent<HTMLDivElement>) => {
       // OS-file paste → attachment intake.
@@ -696,18 +725,74 @@ export function ChatInput({
           />
         )}
 
-        {/* Active charter chip (AI v3.2 T3; charter vocabulary P0a) */}
-        {activeCharter && (
+        {/* Active charter chip (AI v3.2 T3; charter vocabulary P0a), and the
+            quest this thread is writing into. The quest chip has no dismiss:
+            the charter is a CHOICE the user can revoke, while the quest is a
+            FACT about what this conversation has already written — hiding it
+            would not unwrite the rows. Clicking opens the ledger. */}
+        {(activeCharter || activeQuest) && (
           <div className="flex flex-wrap gap-1.5 px-2.5 pt-2.5">
+            {activeQuest && (
+              // The pin opens the quest's ROW database (owner, 2026-09-22 —
+              // it used to open the long log note); the log stays one
+              // click away on its own small affordance.
+              <span className="inline-flex items-stretch rounded-md border border-emerald-500/30 bg-emerald-500/10 text-[11px] text-emerald-700 dark:text-emerald-300">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const target = activeQuest.questLedgerNodeId ?? activeQuest.ledgerNodeId;
+                    if (target) onOpenQuestLedger?.(target);
+                  }}
+                  disabled={!activeQuest.questLedgerNodeId && !activeQuest.ledgerNodeId}
+                  title={
+                    activeQuest.questLedgerNodeId
+                      ? `Open the ${activeQuest.title} quest ledger (rows)`
+                      : activeQuest.ledgerNodeId
+                        ? `Open the ${activeQuest.title} quest log`
+                        : activeQuest.title
+                  }
+                  className="inline-flex items-center gap-1.5 rounded-l-md px-2 py-1 transition-colors enabled:hover:bg-emerald-500/20"
+                >
+                  <ListChecks className="h-3 w-3 shrink-0" />
+                  <span className="truncate max-w-[160px]">{activeQuest.title}</span>
+                  <span className="text-emerald-600/70 dark:text-emerald-400/70">
+                    · {activeQuest.itemsRecorded}{" "}
+                    {activeQuest.itemsRecorded === 1 ? "item" : "items"}
+                  </span>
+                </button>
+                {activeQuest.questLedgerNodeId && activeQuest.ledgerNodeId && (
+                  <button
+                    type="button"
+                    onClick={() => onOpenQuestLedger?.(activeQuest.ledgerNodeId!)}
+                    title={`Open the ${activeQuest.title} quest log (narrative)`}
+                    aria-label="Open the quest log"
+                    className="inline-flex items-center rounded-r-md border-l border-emerald-500/30 px-1.5 text-emerald-600/70 transition-colors hover:bg-emerald-500/20 dark:text-emerald-400/70"
+                  >
+                    log
+                  </button>
+                )}
+              </span>
+            )}
+            {activeCharter && (
             <span className="inline-flex items-center gap-1.5 rounded-md border border-indigo-500/30 bg-indigo-500/10 px-2 py-1 text-[11px] text-indigo-700 dark:text-indigo-300">
-              <ScrollText className="h-3 w-3 shrink-0" />
-              <span className="truncate max-w-[160px]">{activeCharter.title}</span>
-              {activeCharter.phaseCount > 0 && (
-                <span className="text-indigo-500/70 dark:text-indigo-400/70">
-                  · Phase {Math.min(activeCharter.phaseIndex + 1, activeCharter.phaseCount)}/
-                  {activeCharter.phaseCount}
-                </span>
-              )}
+              {/* The label is its own button, a SIBLING of the detach button
+                  rather than its parent — nesting them would be invalid, and
+                  the X would open the charter on its way to dismissing it. */}
+              <button
+                type="button"
+                onClick={() => onOpenCharter?.(activeCharter.id)}
+                title={`Open ${activeCharter.title}`}
+                className="inline-flex items-center gap-1.5 min-w-0 rounded-sm transition-colors hover:text-indigo-900 dark:hover:text-indigo-100"
+              >
+                <ScrollText className="h-3 w-3 shrink-0" />
+                <span className="truncate max-w-[160px]">{activeCharter.title}</span>
+                {activeCharter.phaseCount > 0 && (
+                  <span className="text-indigo-500/70 dark:text-indigo-400/70">
+                    · Phase {Math.min(activeCharter.phaseIndex + 1, activeCharter.phaseCount)}/
+                    {activeCharter.phaseCount}
+                  </span>
+                )}
+              </button>
               <button
                 type="button"
                 onClick={onDetachCharter}
@@ -717,6 +802,7 @@ export function ChatInput({
                 <X className="h-3 w-3" />
               </button>
             </span>
+            )}
           </div>
         )}
 
@@ -748,6 +834,8 @@ export function ChatInput({
           onInput={handleInput}
           onKeyDown={handleKeyDown}
           onPaste={handlePaste}
+          onCopy={handleCopyOrCut}
+          onCut={handleCopyOrCut}
           onClick={handleEditorClick}
           data-placeholder={placeholder}
           className={cn(
@@ -837,6 +925,26 @@ export function ChatInput({
 }
 
 // ───────────────────────── DOM helpers ─────────────────────────
+
+/**
+ * Copy/cut the SELECTION as canonical text (owner, 2026-09-22): the browser
+ * copies a pill's visible label, so pasting a copied mention gave back the
+ * file name and lost the reference. Serializing the selected fragment with
+ * the same walker the submit path uses puts `@[Title](id)` on the clipboard,
+ * and the paste handler already revives that form as a pill — so a mention
+ * now round-trips within the composer, across chats, and across tabs.
+ * Plain text only; the fragment is serialized, never the whole editor.
+ */
+export function selectionToCanonical(root: HTMLElement): string | null {
+  const selection = typeof window !== "undefined" ? window.getSelection() : null;
+  if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return null;
+  const range = selection.getRangeAt(0);
+  if (!root.contains(range.commonAncestorContainer)) return null;
+  const fragment = range.cloneContents();
+  const holder = document.createElement("div");
+  holder.appendChild(fragment);
+  return serializeDom(holder);
+}
 
 /** Walk the editor root and produce the canonical `@[Title](id)` string. */
 function serializeDom(root: HTMLElement): string {
@@ -946,28 +1054,56 @@ function insertLineBreakAtCaret() {
   placeCaretAfter(br);
 }
 
+/**
+ * Insert pasted text at the caret, reviving `@[Title](id)` tokens as pills.
+ *
+ * The composer's canonical value already IS text plus those tokens, and the
+ * renderer turns them into pills — but only on a full re-render. A paste
+ * inserts DOM directly, so without this a mention copied out of one chat and
+ * pasted into another arrives as literal `@[Job Opportunities Library](4974…)`
+ * characters: still a working reference on send, but unreadable in the
+ * composer and impossible to tell from prose the user typed (owner report,
+ * 2026-09-17).
+ *
+ * Same treatment the wiki-link HTML flavor already gets in `handlePaste` —
+ * this extends it to the plain-text path, which is what a chat-to-chat copy
+ * produces.
+ */
 function insertPlainTextAtCaret(text: string) {
   const sel = window.getSelection();
   if (!sel || sel.rangeCount === 0) return;
   const range = sel.getRangeAt(0);
   range.deleteContents();
-  const lines = text.split("\n");
   let last: Node | null = null;
+
+  const insert = (node: Node) => {
+    range.insertNode(node);
+    range.setStartAfter(node);
+    range.collapse(true);
+    last = node;
+  };
+
+  /** One line's worth of text, with mention tokens promoted to pills. */
+  const insertLine = (line: string) => {
+    const re = new RegExp(MENTION_RE.source, "g");
+    let cursor = 0;
+    let match: RegExpExecArray | null;
+    while ((match = re.exec(line)) !== null) {
+      if (match.index > cursor) {
+        insert(document.createTextNode(line.slice(cursor, match.index)));
+      }
+      insert(makeMentionPill(match[1], match[2]));
+      cursor = match.index + match[0].length;
+    }
+    if (cursor < line.length) {
+      insert(document.createTextNode(line.slice(cursor)));
+    }
+  };
+
+  const lines = text.split("\n");
   for (let i = 0; i < lines.length; i++) {
-    if (i > 0) {
-      const br = document.createElement("br");
-      range.insertNode(br);
-      range.setStartAfter(br);
-      range.collapse(true);
-      last = br;
-    }
-    if (lines[i].length > 0) {
-      const txt = document.createTextNode(lines[i]);
-      range.insertNode(txt);
-      range.setStartAfter(txt);
-      range.collapse(true);
-      last = txt;
-    }
+    if (i > 0) insert(document.createElement("br"));
+    if (lines[i].length > 0) insertLine(lines[i]);
   }
   if (last) placeCaretAfter(last);
 }
@@ -1011,7 +1147,28 @@ function AttachmentChip({
       ) : (
         <FileText className="h-3.5 w-3.5 shrink-0 text-gray-400" />
       )}
-      <span className="truncate">{name}</span>
+      {/* The thumbnail was openable but the NAME was not, which is the larger
+          target and the one people aim at. Both now open the same thing: a
+          preview for images, the file itself for anything else. Still plain
+          text while uploading or on error, when there is nothing to open. */}
+      {url && status !== "uploading" ? (
+        <button
+          type="button"
+          onClick={() =>
+            isImage
+              ? useImagePreviewStore
+                  .getState()
+                  .open([{ src: url, alt: name, downloadUrl: url }])
+              : window.open(url, "_blank", "noopener,noreferrer")
+          }
+          title={isImage ? "Preview image" : `Open ${name}`}
+          className="min-w-0 truncate rounded-sm text-left transition-colors hover:text-gray-900 dark:hover:text-gray-100"
+        >
+          {name}
+        </button>
+      ) : (
+        <span className="truncate">{name}</span>
+      )}
       <button
         type="button"
         onClick={onRemove}

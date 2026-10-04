@@ -134,7 +134,7 @@ export function DebugViewToggle() {
             ))}
           </div>
 
-          <div className="border-t border-white/10 px-3 py-2 text-[10px] text-gray-500">
+          <div className="border-t border-white/10 px-3 py-2 text-[10px] text-gray-500 dark:text-gray-400">
             Press <kbd className="px-1 py-0.5 bg-black/30 rounded">Cmd+Shift+D</kbd> to toggle
           </div>
         </div>

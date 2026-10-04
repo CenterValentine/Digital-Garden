@@ -16,7 +16,8 @@ import { createPortal } from "react-dom";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { common, createLowlight } from "lowlight";
-import {
+import { LEGACY_TOOL_IDS } from "@/lib/domain/ai/tools/repair";
+import { AlertTriangle,
   Activity,
   Bot,
   BrainCircuit,
@@ -57,9 +58,21 @@ import {
   type ColumnOptionsProposalPayload,
 } from "./ColumnOptionsProposalCard";
 import {
+  DatabaseColumnsProposalCard,
+  type DatabaseColumnsProposalPayload,
+} from "./DatabaseColumnsProposalCard";
+import {
   OutputDatabaseProposalCard,
   type OutputDatabaseProposalPayload,
 } from "./OutputDatabaseProposalCard";
+import {
+  LinkedDatabasesProposalCard,
+  type LinkedDatabasesProposalPayload,
+} from "./LinkedDatabasesProposalCard";
+import type {
+  ExistingDatabase,
+  LatestProposalIndex,
+} from "./use-proposal-revision";
 import {
   BatchGalleryCard,
   type BatchGalleryGroup,
@@ -92,7 +105,54 @@ import {
 } from "@/lib/features/ai-connections/usage/pricing";
 import { ReasoningRouter } from "./reasoning/ReasoningRouter";
 import { parseCharterMessageAttachment } from "@/lib/domain/ai/charters/message-binding";
-import { shouldSupersedePart } from "@/lib/domain/ai/context-diet";
+import {
+  bulkReadFoldState,
+  duplicatePartState,
+  perceptionFoldState,
+  shouldSupersedePart,
+  type BulkReadFoldState,
+  type DuplicatePartState,
+  type PerceptionFoldState,
+} from "@/lib/domain/ai/context-diet";
+import {
+  readTurnSegment,
+  type TurnStepSummary,
+} from "@/lib/domain/ai/turn-diagnostics";
+import { parseReadHeader } from "@/lib/domain/data/read-format";
+
+/** "~32 tokens" under a thousand, "~6.1k tokens" above (chips, cards). */
+function fmtTokens(n: number): string {
+  return n >= 1000 ? `~${(n / 1000).toFixed(1)}k tokens` : `~${Math.round(n)} tokens`;
+}
+
+const UUID_LIKE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Title of a content node the user can open, for cards that only hold an
+ * id (the approval card shows what the model passed — an id is honest but
+ * unreadable). Empty until fetched; falls back to nothing on error.
+ */
+function useNodeTitle(id: string | undefined): string | null {
+  // State keyed by the id it belongs to, so a changed id reads as "not
+  // fetched" without a synchronous reset inside the effect.
+  const [fetched, setFetched] = useState<{ id: string; title: string } | null>(null);
+  const valid = !!id && UUID_LIKE.test(id);
+  useEffect(() => {
+    if (!valid || !id) return;
+    let cancelled = false;
+    fetch(`/api/content/content/${id}`, { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((json) => {
+        const t = json?.data?.title ?? json?.data?.node?.title ?? json?.title;
+        if (!cancelled && typeof t === "string") setFetched({ id, title: t });
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [id, valid]);
+  return valid && fetched && fetched.id === id ? fetched.title : null;
+}
 import { parseFolderContextMentionPart } from "@/lib/domain/ai-context/mention-part";
 import {
   parseContentWriteReceipts,
@@ -143,6 +203,13 @@ function detectToolPart(part: unknown): DetectedToolPart | null {
 
   if (!toolName) return null;
 
+  // Transcripts recorded before a tool was renamed still carry the old id in
+  // their part type (`tool-getCurrentNote`). Normalize here — the one place
+  // every tool part passes through — so every downstream check (chip labels,
+  // note cards, result parsing) sees the current id and old chats keep
+  // rendering as they always did.
+  toolName = LEGACY_TOOL_IDS[toolName] ?? toolName;
+
   return {
     toolCallId: p.toolCallId as string,
     toolName,
@@ -154,7 +221,7 @@ function detectToolPart(part: unknown): DetectedToolPart | null {
   };
 }
 
-/** Shape of the note payload returned by createNote / updateNote tools. */
+/** Shape of the note payload returned by create_note / update_note tools. */
 interface NotePayload {
   __notePayload: true;
   kind: "created" | "updated";
@@ -262,13 +329,34 @@ interface ChatMessageProps {
   isStreaming?: boolean;
   /**
    * P4c lean context: this message's index in the conversation plus the
-   * active iteration run's fold boundary (from findIterationFoldBoundary).
-   * Perception parts BEFORE the boundary render collapsed — the default
-   * view IS the model's retained view (owner rule: no divergence between
-   * front and back). Expanding is user-only and free.
+   * fold verdicts (perceptionFoldStates) — perception / read parts the
+   * model no longer sees render collapsed, so the default view IS the
+   * model's retained view (owner rule: no divergence between front and
+   * back). Expanding is user-only and free.
    */
   messageIndex?: number;
-  foldBoundary?: { messageIdx: number; partIdx: number } | null;
+  perceptionFolds?: Map<string, PerceptionFoldState> | null;
+  /**
+   * Repeated tool parts (duplicatePartStates): a call the model-facing
+   * assembly dropped as a duplicate, or whose output it replaced with a
+   * pointer to an identical earlier result, renders collapsed likewise.
+   */
+  duplicateFolds?: Map<string, DuplicatePartState> | null;
+  /**
+   * Last message index carrying a proposal of each kind (ChatPanel memo).
+   * A card in an EARLIER message than the latest of its kind renders
+   * superseded — Apply behind a confirm — so a re-proposal prompted by a
+   * typed reply cannot leave two equally live Apply buttons.
+   */
+  latestProposalIndex?: LatestProposalIndex;
+  /**
+   * The user's existing databases (ChatPanel). Lets a creation card notice
+   * that its tables are already there — the localStorage applied-flag is
+   * per-origin and per-browser, so it says nothing on a second device.
+   */
+  existingDatabases?: ExistingDatabase[];
+  /** Bulk database reads: fold/pin state per part (bulkReadFoldStates). */
+  bulkReadFolds?: Map<string, BulkReadFoldState> | null;
   /**
    * Cumulative session usage (all assistant turns so far, aggregated by the
    * surface) — the avatar popover shows it beside the turn's own numbers so
@@ -362,10 +450,95 @@ interface ChatMessageProps {
  * expanding shows the raw superseded output — user-only, costs no tokens,
  * and visually marks what the model no longer carries.
  */
-function FoldedPerceptionPart({ part }: { part: unknown }) {
+/**
+ * A `turn`-lifetime database read behind the latest user message (plan
+ * §4.6). Reads as a CONTEXT EVENT, not a tool call (owner smoke
+ * 2026-09-15: the first version looked like an unhelpful long tool line):
+ * what left the model's context, how much it saves per turn, and that
+ * expanding is free.
+ */
+function FoldedBulkReadPart({ part }: { part: unknown }) {
+  const [expanded, setExpanded] = useState(false);
+  const p = part as { output?: unknown };
+  const raw = typeof p.output === "string" ? p.output : JSON.stringify(p.output, null, 2);
+  const h = parseReadHeader(raw);
+  const what = h
+    ? `${h.rows} row${h.rows === 1 ? "" : "s"} of "${h.table}"`
+    : "a database read";
+  return (
+    <div className="my-1.5">
+      <button
+        type="button"
+        onClick={() => setExpanded((e) => !e)}
+        className="group flex w-full items-start gap-2 rounded-md border border-dashed border-black/10 bg-transparent px-2.5 py-1.5 text-left text-[11px] text-gray-500 transition-colors hover:bg-black/[0.03] dark:border-white/10 dark:text-gray-400 dark:hover:bg-white/[0.04]"
+        title="This read left the model's context after the turn it served. It is not re-sent with later messages; the model reads the table again if a later step needs the rows. Expanding here is free."
+      >
+        <ChevronRight
+          className={`mt-0.5 h-3 w-3 shrink-0 transition-transform ${expanded ? "rotate-90" : ""}`}
+        />
+        <span className="min-w-0">
+          <span className="mr-1.5 rounded-sm bg-black/[0.06] px-1 py-px text-[9.5px] font-semibold uppercase tracking-wide text-gray-600 dark:bg-white/[0.08] dark:text-gray-300">
+            Context folded
+          </span>
+          <span className="text-gray-600 dark:text-gray-300">{what}</span>
+          {h && (
+            <span>
+              {" "}
+              · {fmtTokens(h.tokens)} no longer re-sent each turn
+            </span>
+          )}
+          <span className="block text-[10px] text-gray-400 dark:text-gray-500">
+            Served the reply above; the model re-reads if a later step needs the rows. Expand to see what it read.
+          </span>
+        </span>
+      </button>
+      {expanded && (
+        <pre className="mt-1 max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-md border border-black/5 bg-black/[0.02] p-2 text-[11px] text-gray-600 dark:border-white/5 dark:bg-white/[0.03] dark:text-gray-300">
+          {raw}
+        </pre>
+      )}
+    </div>
+  );
+}
+
+/** Chip copy per fold verdict — says WHY the model no longer carries it. */
+const FOLD_CHIP_COPY: Record<
+  Exclude<PerceptionFoldState, "kept"> | DuplicatePartState,
+  { label: string; title: string }
+> = {
+  "folded-distilled": {
+    label: "folded at checkpoint — digested into the run records",
+    title:
+      "Folded at batch checkpoint — the model no longer carries this; expanding is free",
+  },
+  "folded-turn": {
+    label: "folded — digested into the reply that followed",
+    title:
+      "Folded after the turn — the model no longer carries this; expanding is free",
+  },
+  "dropped-duplicate-call": {
+    label: "duplicate of an earlier call — not resent",
+    title:
+      "This call already appears earlier in the transcript; the model sees it once",
+  },
+  "identical-output": {
+    label: "identical to an earlier result — nothing changed",
+    title:
+      "Same input and output as an earlier call; the model gets a pointer to that one",
+  },
+};
+
+function FoldedPerceptionPart({
+  part,
+  reason = "folded-distilled",
+}: {
+  part: unknown;
+  reason?: keyof typeof FOLD_CHIP_COPY;
+}) {
   const [expanded, setExpanded] = useState(false);
   const p = part as { type?: string; output?: unknown };
   const toolName = (p.type ?? "tool-").replace(/^tool-/, "");
+  const copy = FOLD_CHIP_COPY[reason];
   const raw = (() => {
     const out = p.output as { value?: unknown } | unknown;
     const v =
@@ -380,13 +553,13 @@ function FoldedPerceptionPart({ part }: { part: unknown }) {
         type="button"
         onClick={() => setExpanded((e) => !e)}
         className="inline-flex items-center gap-1.5 rounded-md border border-black/5 bg-black/[0.02] px-2 py-1 text-[11px] text-gray-500 transition-colors hover:bg-black/[0.05] dark:border-white/5 dark:bg-white/[0.03] dark:text-gray-400 dark:hover:bg-white/[0.06]"
-        title="Folded at batch checkpoint — the model no longer carries this; expanding is free"
+        title={copy.title}
       >
         <ChevronRight
           className={`h-3 w-3 shrink-0 transition-transform ${expanded ? "rotate-90" : ""}`}
         />
         <span>
-          {toolName} · folded at checkpoint — digested into the run records
+          {toolName} · {copy.label}
         </span>
       </button>
       {expanded && (
@@ -402,7 +575,11 @@ export const ChatMessage = memo(function ChatMessage({
   message,
   isStreaming = false,
   messageIndex,
-  foldBoundary = null,
+  latestProposalIndex,
+  existingDatabases,
+  perceptionFolds = null,
+  duplicateFolds = null,
+  bulkReadFolds = null,
   sessionUsage = null,
   charterAttached,
   resumedStream = false,
@@ -601,7 +778,10 @@ export const ChatMessage = memo(function ChatMessage({
     deckProposals,
     deckWithCardsProposals,
     columnOptionsProposals,
+    databaseColumnsProposals,
     outputDatabaseProposals,
+    linkedDatabasesProposals,
+    unknownProposals,
     hasRunningTools,
   } = useMemo(() => {
     const images: ImagePayload[] = [];
@@ -614,7 +794,10 @@ export const ChatMessage = memo(function ChatMessage({
     const deckProps: DeckProposalPayload[] = [];
     const deckWithCardsProps: DeckWithCardsProposalPayload[] = [];
     const columnOptionsProps: ColumnOptionsProposalPayload[] = [];
+    const dbColumnsProps: DatabaseColumnsProposalPayload[] = [];
     const outputDbProps: OutputDatabaseProposalPayload[] = [];
+    const linkedDbProps: LinkedDatabasesProposalPayload[] = [];
+    const unknownProps: string[] = [];
     let running = false;
     const seenImageIds = new Set<string>();
     const seenAudioIds = new Set<string>();
@@ -670,9 +853,26 @@ export const ChatMessage = memo(function ChatMessage({
           columnOptionsProps.push(columnOptions);
           continue;
         }
+        const dbColumns = parseDatabaseColumnsProposal(tp.output);
+        if (dbColumns) {
+          dbColumnsProps.push(dbColumns);
+          continue;
+        }
         const outputDb = parseOutputDatabaseProposal(tp.output);
         if (outputDb) {
           outputDbProps.push(outputDb);
+          continue;
+        }
+        const linkedDbs = parseLinkedDatabasesProposal(tp.output);
+        if (linkedDbs) {
+          linkedDbProps.push(linkedDbs);
+          continue;
+        }
+        // No card claimed it. If it is still a proposal, say so rather than
+        // letting the turn's point disappear into a raw tool bubble.
+        const unknown = detectUnknownProposal(tp.output);
+        if (unknown && !unknownProps.includes(unknown)) {
+          unknownProps.push(unknown);
         }
       }
     }
@@ -685,10 +885,20 @@ export const ChatMessage = memo(function ChatMessage({
       deckProposals: deckProps,
       deckWithCardsProposals: deckWithCardsProps,
       columnOptionsProposals: columnOptionsProps,
+      databaseColumnsProposals: dbColumnsProps,
       outputDatabaseProposals: outputDbProps,
+      linkedDatabasesProposals: linkedDbProps,
+      unknownProposals: unknownProps,
       hasRunningTools: running,
     };
   }, [message.parts]);
+
+  // Sibling-aware chip text: receipts in one message that share a title
+  // prefix show their distinguishing tail (siblingReceiptLabels).
+  const writeReceiptLabels = useMemo(
+    () => siblingReceiptLabels(writeReceipts.map((w) => w.receipt.title)),
+    [writeReceipts],
+  );
 
   // §5 batch gallery (owner shape 2026-09-03): group each RECORDED batch
   // into ONE card — an item gallery with per-item raw expansion. Anchors
@@ -933,6 +1143,12 @@ export const ChatMessage = memo(function ChatMessage({
         "group flex gap-3 px-4 py-3",
         isUser && "flex-row-reverse"
       )}
+      onCopy={(e) => {
+        const text = serializeSelectionForCopy(e.currentTarget);
+        if (text == null) return;
+        e.clipboardData.setData("text/plain", text);
+        e.preventDefault();
+      }}
     >
       {/* Avatar */}
       {isUser ? (
@@ -1016,19 +1232,34 @@ export const ChatMessage = memo(function ChatMessage({
           if (groupRole?.kind === "card") {
             return <BatchGalleryCard key={i} group={groupRole.group} />;
           }
-          // P4c: perception parts the model no longer sees (folded behind
-          // the latest batch checkpoint) render collapsed — the default
-          // view equals the retained context. Same rule as the server fold
-          // (shouldSupersedePart), same boundary, one implementation.
-          if (
-            foldBoundary != null &&
-            typeof messageIndex === "number" &&
-            (messageIndex < foldBoundary.messageIdx ||
-              (messageIndex === foldBoundary.messageIdx &&
-                i < foldBoundary.partIdx)) &&
-            shouldSupersedePart(part)
-          ) {
-            return <FoldedPerceptionPart key={i} part={part} />;
+          // Parts the model no longer sees render collapsed — the default
+          // view equals the retained context. Same maps as the server fold
+          // (perceptionFoldStates / duplicatePartStates), one implementation.
+          // Duplicates first: a dropped duplicate call is gone from the
+          // model's view entirely, whatever its fold state.
+          const dupState =
+            duplicateFolds && typeof messageIndex === "number"
+              ? duplicatePartState(duplicateFolds, messageIndex, i)
+              : null;
+          if (dupState) {
+            return <FoldedPerceptionPart key={i} part={part} reason={dupState} />;
+          }
+          const foldState =
+            perceptionFolds && typeof messageIndex === "number"
+              ? perceptionFoldState(perceptionFolds, messageIndex, i)
+              : null;
+          if (foldState === "folded-distilled" || foldState === "folded-turn") {
+            return <FoldedPerceptionPart key={i} part={part} reason={foldState} />;
+          }
+          // Bulk database reads (plan §4.6): a `turn` read behind the
+          // latest user message renders folded; pinned reads carry their
+          // state into the tool bubble's summary.
+          const bulkState =
+            bulkReadFolds && typeof messageIndex === "number"
+              ? bulkReadFoldState(bulkReadFolds, messageIndex, i)
+              : null;
+          if (bulkState === "folded") {
+            return <FoldedBulkReadPart key={i} part={part} />;
           }
           // Reasoning / "thinking" parts (Session 6). Routed to a
           // provider-themed renderer keyed on this message's stamped
@@ -1261,11 +1492,26 @@ export const ChatMessage = memo(function ChatMessage({
               toolPart.state === "approval-requested" &&
               toolPart.approvalId
             ) {
+              // Standing context (plan §4.6a rule 3): database reads made
+              // in this same message BEFORE the proposal are pinned for the
+              // run — the card says so, with sizes, before the user approves.
+              const standingReads =
+                toolPart.toolName === "propose_item_iteration"
+                  ? message.parts
+                      .slice(0, i)
+                      .map((prior) => {
+                        const q = prior as { type?: string; state?: string; output?: unknown };
+                        if (q.type !== "tool-query_database" || q.state !== "output-available") return null;
+                        return parseReadHeader(typeof q.output === "string" ? q.output : "");
+                      })
+                      .filter((h): h is NonNullable<typeof h> => !!h)
+                  : [];
               return (
                 <ToolApprovalCard
                   key={i}
                   toolName={toolPart.toolName}
                   args={toolPart.input}
+                  standingReads={standingReads}
                   charterAttached={charterAttached}
                   approvalId={toolPart.approvalId}
                   onRespond={
@@ -1282,7 +1528,12 @@ export const ChatMessage = memo(function ChatMessage({
               if (parseDeckProposal(toolPart.output) !== null) return null;
               if (parseDeckWithCardsProposal(toolPart.output) !== null) return null;
               if (parseColumnOptionsProposal(toolPart.output) !== null) return null;
+              if (parseDatabaseColumnsProposal(toolPart.output) !== null) return null;
               if (parseOutputDatabaseProposal(toolPart.output) !== null) return null;
+              if (parseLinkedDatabasesProposal(toolPart.output) !== null) return null;
+              // A proposal with no card in this build renders as a notice
+              // below, not as raw JSON in a tool bubble.
+              if (detectUnknownProposal(toolPart.output) !== null) return null;
             }
 
             return (
@@ -1305,6 +1556,7 @@ export const ChatMessage = memo(function ChatMessage({
                 }
                 args={toolPart.input}
                 result={toolPart.output}
+                pinState={bulkState}
                 errorText={
                   !isStreaming &&
                   (toolPart.state === "input-streaming" ||
@@ -1344,7 +1596,7 @@ export const ChatMessage = memo(function ChatMessage({
           <GeneratedAudioCard key={payload.contentId} payload={payload} />
         ))}
 
-        {/* Note cards — clickable link affordance for createNote / updateNote */}
+        {/* Note cards — clickable link affordance for create_note / update_note */}
         {notePayloads.map((payload) => (
           <NotePayloadCard
             key={payload.contentId}
@@ -1363,6 +1615,7 @@ export const ChatMessage = memo(function ChatMessage({
               <ContentWriteReceiptCard
                 key={`${toolCallId}-${receipt.contentId}-${index}`}
                 receipt={receipt}
+                label={writeReceiptLabels[index]}
                 midRunPaneOpen={midRunPaneOpen}
               />
             ))}
@@ -1390,10 +1643,32 @@ export const ChatMessage = memo(function ChatMessage({
             config. The already-applied flag is keyed by proposal CONTENT
             inside the card: message ids change when a streamed conversation
             persists, so they cannot key anything durable. */}
+        {/* A card demotes when a STRICTLY later message carries a proposal
+            of the same kind — same-turn siblings both stay live. */}
         {columnOptionsProposals.map((payload, i) => (
           <ColumnOptionsProposalCard
             key={`column-options-${i}`}
             payload={payload}
+            superseded={
+              messageIndex !== undefined &&
+              latestProposalIndex?.columnOptions !== undefined &&
+              messageIndex < latestProposalIndex.columnOptions
+            }
+          />
+        ))}
+
+        {/* Database-column proposals (D3) — Apply POSTs one column at a
+            time to an EXISTING table, so a mid-way failure reports a partial
+            result rather than an all-or-nothing lie. */}
+        {databaseColumnsProposals.map((payload, i) => (
+          <DatabaseColumnsProposalCard
+            key={`db-columns-${i}`}
+            payload={payload}
+            superseded={
+              messageIndex !== undefined &&
+              latestProposalIndex?.databaseColumns !== undefined &&
+              messageIndex < latestProposalIndex.databaseColumns
+            }
           />
         ))}
 
@@ -1403,7 +1678,48 @@ export const ChatMessage = memo(function ChatMessage({
           <OutputDatabaseProposalCard
             key={`output-db-${i}`}
             payload={payload}
+            existingDatabases={existingDatabases}
+            superseded={
+              messageIndex !== undefined &&
+              latestProposalIndex?.outputDatabase !== undefined &&
+              messageIndex < latestProposalIndex.outputDatabase
+            }
           />
+        ))}
+
+        {/* Linked-database proposals (P2) — Apply creates every table and
+            relation in ONE transaction via POST /api/content/data/batch. */}
+        {linkedDatabasesProposals.map((payload, i) => (
+          <LinkedDatabasesProposalCard
+            key={`linked-dbs-${i}`}
+            payload={payload}
+            existingDatabases={existingDatabases}
+            superseded={
+              messageIndex !== undefined &&
+              latestProposalIndex?.linkedDatabases !== undefined &&
+              messageIndex < latestProposalIndex.linkedDatabases
+            }
+          />
+        ))}
+
+        {/* A proposal this build has no card for — the browser is behind the
+            server. Explicit beats a silently missing card. */}
+        {unknownProposals.map((sentinel) => (
+          <div
+            key={sentinel}
+            className="flex items-start gap-2 rounded-lg border border-amber-400/40 bg-amber-500/[0.06] px-3 py-2 text-[12px] text-amber-800 dark:border-amber-400/30 dark:bg-amber-500/[0.08] dark:text-amber-200"
+          >
+            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <span>
+              This turn produced a{" "}
+              <span className="font-medium">
+                {readableProposalName(sentinel)}
+              </span>{" "}
+              proposal that this page cannot display — the app was updated
+              since this tab was opened. Reload to see and apply it. Nothing
+              was created.
+            </span>
+          </div>
         ))}
 
         {/* Thinking indicator — shows during tool execution */}
@@ -1667,12 +1983,107 @@ function MessageActionButton({
 
 const MENTION_PATTERN = /@\[([^\]]+)\]\(([^)]+)\)/g;
 
+/**
+ * `[[Title]]` / `[[Title|Display]]` as the model writes it — copied from the
+ * run ledger's wiki-link convention, where nothing in chat rendered it
+ * (owner, 2026-09-22: the closing summary showed literal brackets). Resolved
+ * by TITLE on click, since the model has no id when it writes this form.
+ */
+const WIKI_LINK_PATTERN = /\[\[([^\]|]+?)(?:\|([^\]]+?))?\]\]/g;
+
 /** Pre-process @[Title](id) mentions into markdown-safe placeholders */
 function preprocessMentions(text: string): string {
-  return text.replace(
-    MENTION_PATTERN,
-    (_, title, id) => `[@@${title}](mention:${id})`
+  return text
+    .replace(MENTION_PATTERN, (_, title, id) => `[@@${title}](mention:${id})`)
+    .replace(
+      WIKI_LINK_PATTERN,
+      (_, title: string, display?: string) =>
+        `[@@${(display ?? title).trim()}](wiki:${encodeURIComponent(title.trim())})`,
+    );
+}
+
+/**
+ * A `[[Title]]` pill: looks like a mention, resolves on click by searching
+ * the user's content for that exact title (case-insensitive), preferring a
+ * database when several match — the model writes these for ledgers.
+ */
+function WikiPill({ title }: { title: string }) {
+  const [busy, setBusy] = useState(false);
+  const open = useCallback(async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const res = await fetch(
+        `/api/content/search?query=${encodeURIComponent(title)}&caseSensitive=false`,
+        { credentials: "include" },
+      );
+      const body = (await res.json()) as {
+        data?: { items?: Array<{ id: string; title: string; contentType?: string }> };
+      };
+      const items = body.data?.items ?? [];
+      const wanted = title.trim().toLowerCase();
+      const exact = items.filter((i) => i.title.trim().toLowerCase() === wanted);
+      const pick =
+        exact.find((i) => i.contentType === "data") ?? exact[0] ?? items[0] ?? null;
+      if (pick) useContentStore.getState().setSelectedContentId(pick.id);
+      else toast.error(`No content titled "${title}"`);
+    } catch {
+      toast.error(`Could not look up "${title}"`);
+    } finally {
+      setBusy(false);
+    }
+  }, [busy, title]);
+  return (
+    <button
+      type="button"
+      onClick={() => void open()}
+      data-mention="true"
+      data-label={title}
+      data-wiki="true"
+      title={`Open "${title}"`}
+      className="inline-flex items-center gap-0.5 rounded bg-blue-500/15 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300 px-1.5 py-0.5 text-xs font-medium hover:bg-blue-500/25 dark:hover:bg-blue-500/30 transition-colors cursor-pointer disabled:opacity-60"
+      disabled={busy}
+    >
+      {title}
+    </button>
   );
+}
+
+/**
+ * Copy from a message bubble keeps mentions as `@[Title](id)` — the same
+ * canonical form the composer pastes back into a pill (owner, 2026-09-22).
+ * A `[[wiki]]` pill has no id and copies as `[[Title]]`.
+ */
+function serializeSelectionForCopy(root: HTMLElement): string | null {
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return null;
+  const range = selection.getRangeAt(0);
+  if (!root.contains(range.commonAncestorContainer)) return null;
+  const holder = document.createElement("div");
+  holder.appendChild(range.cloneContents());
+  let out = "";
+  const walk = (node: Node) => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      out += node.nodeValue ?? "";
+      return;
+    }
+    if (node.nodeType !== Node.ELEMENT_NODE) return;
+    const el = node as HTMLElement;
+    if (el.dataset.mention) {
+      const label = el.dataset.label ?? el.textContent ?? "";
+      out += el.dataset.wiki ? `[[${label}]]` : `@[${label}](${el.dataset.id ?? ""})`;
+      return;
+    }
+    if (el.tagName === "BR") {
+      out += "\n";
+      return;
+    }
+    const block = /^(P|DIV|LI|H[1-6]|PRE|TR)$/.test(el.tagName);
+    for (const child of Array.from(el.childNodes)) walk(child);
+    if (block && !out.endsWith("\n")) out += "\n";
+  };
+  for (const child of Array.from(holder.childNodes)) walk(child);
+  return out.replace(/\n+$/, "");
 }
 
 /**
@@ -1842,6 +2253,10 @@ const themeNeutralMarkdownComponents: Components = {
       const contentId = href.slice(8);
       const title = String(children ?? "").replace(/^@@/, "");
       return <MentionPill title={title} contentId={contentId} />;
+    }
+    if (href?.startsWith("wiki:")) {
+      const title = decodeURIComponent(href.slice(5));
+      return <WikiPill title={title} />;
     }
     return (
       <a
@@ -2134,6 +2549,99 @@ function extractCostDisplay(
       : undefined;
 }
 
+/**
+ * The turn's steps across every request, in order, from the persisted
+ * segment ledger — the ONLY source the step chain renders from. No live
+ * estimate, no client-side count: a number in the chain is a number the
+ * provider billed (`metadata.segments[].steps[].inputTokens`). Rows
+ * persisted before per-step context existed carry `inputTokens: null` and
+ * render without a context figure rather than with a guess.
+ */
+type StepChainRow = TurnStepSummary & { request: number };
+
+function extractStepChain(
+  metadata: Record<string, unknown> | undefined,
+): StepChainRow[] {
+  const m = metadata as { segments?: unknown; segment?: unknown } | undefined;
+  // A LIVE message carries this request's record as `segment` (singular,
+  // from the route's finish part); the accumulated `segments[]` exists once
+  // the binding hook has folded the turn. Read both — the persisted list
+  // first, then the live record if it is not already in it — so the chain
+  // opens during the turn, not only after a reload (owner, 2026-09-22).
+  const list: unknown[] = Array.isArray(m?.segments) ? [...m.segments] : [];
+  const live = readTurnSegment(m?.segment);
+  if (live && !list.some((raw) => readTurnSegment(raw)?.startedAt === live.startedAt)) {
+    list.push(m?.segment);
+  }
+  const rows: StepChainRow[] = [];
+  list.forEach((raw, i) => {
+    const seg = readTurnSegment(raw);
+    if (!seg) return;
+    for (const step of seg.steps) rows.push({ ...step, request: i + 1 });
+  });
+  return rows;
+}
+
+/** Compact token figure for the chain: 48,512 → "48.5k". */
+function formatTokensShort(n: number): string {
+  return n >= 1000 ? `${(n / 1000).toFixed(n >= 10_000 ? 0 : 1)}k` : String(n);
+}
+
+/**
+ * The expandable step chain. Each row: request·step, the tools it called,
+ * the context it read, what it wrote, its cache hit — and a fold marker
+ * whenever the context is SMALLER than the previous step's, so a drop in
+ * the meter is legible as the fold working rather than as a glitch.
+ */
+function StepChain({ steps }: { steps: StepChainRow[] }) {
+  return (
+    <div className="mt-1 max-h-56 overflow-auto border-t border-black/10 dark:border-white/10 pt-1">
+      <div className="mb-0.5 text-[9px] uppercase tracking-wide text-gray-400 dark:text-gray-500">
+        steps · context read per step
+      </div>
+      {steps.map((s, i) => {
+        const prev = i > 0 ? steps[i - 1].inputTokens : null;
+        const folded =
+          s.inputTokens != null && prev != null && s.inputTokens < prev
+            ? prev - s.inputTokens
+            : null;
+        const cachePct =
+          s.inputTokens != null && s.inputTokens > 0 && s.cachedInputTokens != null
+            ? Math.round((100 * s.cachedInputTokens) / s.inputTokens)
+            : null;
+        return (
+          <div
+            key={i}
+            className="flex items-baseline gap-1.5 whitespace-nowrap py-px text-[10px] leading-snug"
+          >
+            <span className="w-8 shrink-0 tabular-nums text-gray-400 dark:text-gray-500">
+              {s.request}.{i + 1}
+            </span>
+            <span className="min-w-0 flex-1 truncate text-gray-600 dark:text-gray-300">
+              {s.tools.length > 0 ? s.tools.join(", ") : s.finishReason === "stop" ? "reply" : "—"}
+            </span>
+            <span className="shrink-0 tabular-nums text-gray-700 dark:text-gray-200">
+              {s.inputTokens != null ? formatTokensShort(s.inputTokens) : "·"}
+            </span>
+            <span className="w-9 shrink-0 text-right tabular-nums text-gray-400 dark:text-gray-500">
+              {s.outputTokens != null ? `+${formatTokensShort(s.outputTokens)}` : ""}
+            </span>
+            <span className="w-8 shrink-0 text-right tabular-nums text-gray-400 dark:text-gray-500">
+              {cachePct != null ? `${cachePct}%` : ""}
+            </span>
+            <span className="w-12 shrink-0 text-right tabular-nums text-emerald-600 dark:text-emerald-400">
+              {folded != null ? `−${formatTokensShort(folded)}` : ""}
+            </span>
+          </div>
+        );
+      })}
+      <div className="mt-0.5 text-[9px] text-gray-400 dark:text-gray-500">
+        context · +output · cache hit · folded
+      </div>
+    </div>
+  );
+}
+
 /** Human duration: "0.8s", "12s", "1m 05s". */
 function formatDuration(ms: number): string {
   const totalSec = ms / 1000;
@@ -2174,6 +2682,17 @@ function AssistantAvatar({
   const tooltipRef = useRef<HTMLDivElement | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [portalReady, setPortalReady] = useState(false);
+  // Click pins the card open with the step chain expanded (owner design,
+  // 2026-09-21): hover is a glance — provider, model, the headline numbers
+  // and a one-line hint; click is the inspection surface. While pinned the
+  // card ignores mouse-leave and closes on a second click or Escape.
+  const [pinned, setPinned] = useState(false);
+  // Mirrored into a ref for the mouse-leave handler (stable identity, reads
+  // the latest value) — written in an effect, never during render.
+  const pinnedRef = useRef(false);
+  useEffect(() => {
+    pinnedRef.current = pinned;
+  }, [pinned]);
 
   const theme = getProviderTheme(providerId, useResolvedTheme());
   const provider = PROVIDER_CATALOG.find((p) => p.id === providerId);
@@ -2186,6 +2705,26 @@ function AssistantAvatar({
     () => extractCostDisplay(metadata, providerId, modelId),
     [metadata, providerId, modelId],
   );
+  const steps = useMemo(() => extractStepChain(metadata), [metadata]);
+  // The headline: the LATEST step's context — what the model read on its
+  // last call — never the segment sum (a two-step request reports 2× the
+  // context) and never the turn total (which only ever grows).
+  const latestContext = useMemo(() => {
+    for (let i = steps.length - 1; i >= 0; i--) {
+      const v = steps[i].inputTokens;
+      if (v != null) return v;
+    }
+    return null;
+  }, [steps]);
+
+  useEffect(() => {
+    if (!pinned) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setPinned(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [pinned]);
 
   useEffect(() => {
     // One-shot SSR/hydration boundary marker so we only render the
@@ -2216,8 +2755,25 @@ function AssistantAvatar({
 
   const handleLeave = useCallback(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
+    if (pinnedRef.current) return;
     setTooltipAnchor(null);
     setTooltipPosition(null);
+  }, []);
+
+  const handleClick = useCallback(() => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    if (pinnedRef.current) {
+      setPinned(false);
+      setTooltipAnchor(null);
+      setTooltipPosition(null);
+      return;
+    }
+    const rect = anchorRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    setPinned(true);
+    // Re-anchor so the positioning pass re-measures the (taller) pinned card.
+    setTooltipPosition(null);
+    setTooltipAnchor({ top: rect.top, bottom: rect.bottom, left: rect.left });
   }, []);
 
   // Two-phase measure-then-position, the same shape ContextMenu uses
@@ -2277,9 +2833,15 @@ function AssistantAvatar({
       className="shrink-0"
       onMouseEnter={handleEnter}
       onMouseLeave={handleLeave}
+      onClick={handleClick}
+      role="button"
+      tabIndex={0}
+      aria-expanded={pinned}
+      aria-label="Turn usage — click for the step chain"
+      title={pinned ? undefined : "click for steps"}
     >
       <div
-        className="flex h-7 w-7 items-center justify-center rounded-full"
+        className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-full"
         style={{
           background: theme.bubbleTint,
           color: theme.brandColor,
@@ -2308,7 +2870,7 @@ function AssistantAvatar({
                     visibility: "hidden" as const,
                   }),
             }}
-            className="pointer-events-none whitespace-nowrap rounded-md border border-black/10 bg-white text-gray-700 dark:border-white/10 dark:bg-[#1a1a1a] dark:text-gray-200 px-2.5 py-1.5 text-[10px] shadow-xl"
+            className={`${pinned ? "pointer-events-auto min-w-[20rem]" : "pointer-events-none"} whitespace-nowrap rounded-md border border-black/10 bg-white text-gray-700 dark:border-white/10 dark:bg-[#1a1a1a] dark:text-gray-200 px-2.5 py-1.5 text-[10px] shadow-xl`}
           >
             <div className="flex items-center gap-1.5">
               <span
@@ -2320,6 +2882,21 @@ function AssistantAvatar({
             {modelName && (
               <div className="mt-0.5 text-gray-500 dark:text-gray-400">
                 {modelName}
+              </div>
+            )}
+            {/* Headline: the latest step's CONTEXT — what the model last
+                read — from the persisted step ledger. The turn total below
+                stays for cost; this is the number to watch for leanness. */}
+            {latestContext != null && (
+              <div className="mt-1 border-t border-black/10 dark:border-white/10 pt-1 text-gray-500">
+                <span className="text-gray-500">context</span>{" "}
+                <span className="tabular-nums text-gray-700 dark:text-gray-300">
+                  {latestContext.toLocaleString()}
+                </span>
+                <span className="text-gray-400 dark:text-gray-500">
+                  {" "}
+                  · latest step{steps.length > 1 ? ` of ${steps.length}` : ""}
+                </span>
               </div>
             )}
             {usage && (usage.inputTokens != null || usage.outputTokens != null) && (
@@ -2421,6 +2998,18 @@ function AssistantAvatar({
                 )}
               </div>
             )}
+            {/* Hover: a one-line hint that there is more. Click: the chain. */}
+            {steps.length > 0 && !pinned && (
+              <div className="mt-1 border-t border-black/10 dark:border-white/10 pt-1 text-gray-400 dark:text-gray-500">
+                click for steps ({steps.length})
+              </div>
+            )}
+            {pinned && steps.length > 0 && <StepChain steps={steps} />}
+            {pinned && (
+              <div className="mt-1 text-[9px] text-gray-400 dark:text-gray-500">
+                click the avatar or press Esc to close
+              </div>
+            )}
           </div>,
           document.body,
         )}
@@ -2436,6 +3025,11 @@ function MentionPill({ title, contentId }: { title: string; contentId: string })
       onClick={() => {
         useContentStore.getState().setSelectedContentId(contentId);
       }}
+      // Same data contract as the composer's pills, so a copy from a bubble
+      // serializes to `@[Title](id)` (serializeSelectionForCopy).
+      data-mention="true"
+      data-label={title}
+      data-id={contentId}
       className="inline-flex items-center gap-0.5 rounded bg-blue-500/15 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300 px-1.5 py-0.5 text-xs font-medium hover:bg-blue-500/25 dark:hover:bg-blue-500/30 transition-colors cursor-pointer"
     >
       @{title}
@@ -2471,7 +3065,7 @@ function parseAudioPayload(result: unknown): AudioPayload | null {
   return null;
 }
 
-/** Parse a note payload (createNote / updateNote) from a tool result. */
+/** Parse a note payload (create_note / update_note) from a tool result. */
 function parseNotePayload(result: unknown): NotePayload | null {
   if (result === undefined) return null;
   const str = typeof result === "string" ? result : JSON.stringify(result);
@@ -2496,6 +3090,79 @@ function parseOutputDatabaseProposal(
     const parsed = JSON.parse(str);
     if (parsed.__outputDatabaseProposal) {
       return parsed as OutputDatabaseProposalPayload;
+    }
+  } catch {
+    /* not valid JSON */
+  }
+  return null;
+}
+
+
+/**
+ * A proposal sentinel this build has no card for.
+ *
+ * Every propose_* tool returns `{"__<something>Proposal": true, ...}` and a
+ * matching card renders it. When the SERVER is ahead of the browser — a tab
+ * opened before a deploy — the sentinel arrives for a card that does not
+ * exist in the loaded bundle, and the turn's whole point vanishes: the model
+ * says "a review card is now available" and the user sees raw JSON, or
+ * nothing they recognize.
+ *
+ * Returns the sentinel's name so that case can SAY so. Silence here cost a
+ * production session (2026-09-12) that read as a feature failure.
+ */
+function detectUnknownProposal(result: unknown): string | null {
+  if (result === undefined) return null;
+  const str = typeof result === "string" ? result : JSON.stringify(result);
+  if (!str.includes("Proposal\"")) return null;
+  try {
+    const parsed = JSON.parse(str) as Record<string, unknown>;
+    const key = Object.keys(parsed).find(
+      (k) => k.startsWith("__") && k.endsWith("Proposal") && parsed[k] === true
+    );
+    return key ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** "__linkedDatabasesProposal" → "linked databases". */
+function readableProposalName(sentinel: string): string {
+  return sentinel
+    .replace(/^__/, "")
+    .replace(/Proposal$/, "")
+    .replace(/([A-Z])/g, " $1")
+    .trim()
+    .toLowerCase();
+}
+
+function parseLinkedDatabasesProposal(
+  result: unknown
+): LinkedDatabasesProposalPayload | null {
+  if (result === undefined) return null;
+  const str = typeof result === "string" ? result : JSON.stringify(result);
+  if (!str.includes('"__linkedDatabasesProposal"')) return null;
+  try {
+    const parsed = JSON.parse(str);
+    if (parsed.__linkedDatabasesProposal) {
+      return parsed as LinkedDatabasesProposalPayload;
+    }
+  } catch {
+    /* not valid JSON */
+  }
+  return null;
+}
+
+function parseDatabaseColumnsProposal(
+  result: unknown
+): DatabaseColumnsProposalPayload | null {
+  if (result === undefined) return null;
+  const str = typeof result === "string" ? result : JSON.stringify(result);
+  if (!str.includes('"__databaseColumnsProposal"')) return null;
+  try {
+    const parsed = JSON.parse(str);
+    if (parsed.__databaseColumnsProposal) {
+      return parsed as DatabaseColumnsProposalPayload;
     }
   } catch {
     /* not valid JSON */
@@ -2866,13 +3533,74 @@ function ApprovalPreview({
       ? (a[key] as string)
       : undefined;
 
+  // Bulk database read above the user's threshold (plan §4.1): the number
+  // on the card is the number the model was quoted.
+  if (toolName === "query_database") {
+    return <QueryDatabaseApprovalPreview args={args} a={a} str={str} />;
+  }
+
   // Document tools: render the note/document as it will actually look.
   if (
-    toolName === "createNote" ||
-    toolName === "updateNote" ||
-    toolName === "renameNote" ||
+    toolName === "create_note" ||
+    toolName === "update_note" ||
+    toolName === "rename_note" ||
     toolName === "create_docx"
   ) {
+    return <DocumentApprovalPreview toolName={toolName} args={args} str={str} />;
+  }
+
+  return <ApprovalPreviewRest toolName={toolName} args={args} a={a} str={str} />;
+}
+
+function QueryDatabaseApprovalPreview({
+  args,
+  a,
+  str,
+}: {
+  args: unknown;
+  a: Record<string, unknown>;
+  str: (key: string) => string | undefined;
+}) {
+  const ref = str("databaseId");
+  const fetchedTitle = useNodeTitle(ref);
+  const label = fetchedTitle ?? (ref && !UUID_LIKE.test(ref) ? ref : null);
+  {
+    const budget = Number(a.budget);
+    const cols = Array.isArray(a.columns)
+      ? (a.columns as unknown[]).map(String).join(", ")
+      : typeof a.columns === "string"
+        ? a.columns
+        : "index tier";
+    return (
+      <>
+        <div className="mx-3 mb-1.5 rounded-md border border-black/10 dark:border-white/10 bg-white/70 dark:bg-black/25 px-3 py-2 text-[11px] leading-snug text-gray-700 dark:text-gray-300">
+          <div className="text-[12.5px] font-semibold text-gray-800 dark:text-gray-200">
+            Read {label ? `"${label}"` : "this database"} — up to{" "}
+            {Number.isFinite(budget) ? budget.toLocaleString() : "?"} tokens
+          </div>
+          <div className="mt-0.5">Columns: {cols}</div>
+          {str("search") && <div>Search: {str("search")}</div>}
+          {str("lifetime") && <div>Kept: {str("lifetime")}</div>}
+          <div className="mt-0.5 text-gray-500 dark:text-gray-400">
+            Larger than your approval threshold (Settings → AI → Database read approval).
+          </div>
+        </div>
+        <ApprovalRawJson args={args} />
+      </>
+    );
+  }
+}
+
+function DocumentApprovalPreview({
+  toolName,
+  args,
+  str,
+}: {
+  toolName: string;
+  args: unknown;
+  str: (key: string) => string | undefined;
+}) {
+  {
     const title = str("title") ?? str("fileName") ?? "(untitled)";
     const abstract = str("abstract");
     const content = str("content") ?? str("markdown");
@@ -2908,6 +3636,19 @@ function ApprovalPreview({
     );
   }
 
+}
+
+function ApprovalPreviewRest({
+  toolName,
+  args,
+  a,
+  str,
+}: {
+  toolName: string;
+  args: unknown;
+  a: Record<string, unknown>;
+  str: (key: string) => string | undefined;
+}) {
   // Workflow authoring: graph summary, not the graph JSON.
   if (toolName === "propose_workflow" || toolName === "update_workflow") {
     const graph = (
@@ -2963,9 +3704,15 @@ function ApprovalPreview({
   // renders first-class (database chip + admission rule), never buried in
   // raw JSON while the generic fields show.
   if (toolName === "propose_item_iteration") {
+    // The schema accepts a bare string as an item's label (registry: "a
+    // 20-item enumeration was rejected wholesale for being strings"), so the
+    // card must read strings too — prod 2026-09-21 rendered 24 real job
+    // titles as the word "item" because only objects were expected here.
     const items = Array.isArray(a.items)
-      ? (a.items as Array<{ label?: string; url?: string }>)
+      ? (a.items as Array<string | { label?: string; url?: string; title?: string; href?: string }>)
       : [];
+    const itemText = (it: (typeof items)[number]): string =>
+      typeof it === "string" ? it : (it.label ?? it.title ?? it.url ?? it.href ?? "item");
     const capture = (
       typeof a.captureTo === "object" && a.captureTo !== null
         ? a.captureTo
@@ -3038,7 +3785,7 @@ function ApprovalPreview({
                   {idx + 1}.
                 </span>
                 <span className="truncate text-gray-700 dark:text-gray-200">
-                  {it.label ?? it.url ?? "item"}
+                  {itemText(it)}
                 </span>
               </div>
             ))}
@@ -3084,10 +3831,13 @@ function ToolApprovalCard({
   onRespond,
   expired = false,
   charterAttached,
+  standingReads = [],
 }: {
   toolName: string;
   args: unknown;
   approvalId: string;
+  /** query_database reads in this message before the proposal (pinned for the run). */
+  standingReads?: Array<{ table: string; rows: number; tokens: number }>;
   onRespond?: (opts: {
     id: string;
     approved: boolean;
@@ -3117,6 +3867,31 @@ function ToolApprovalCard({
         </span>
       </div>
       <ApprovalPreview toolName={toolName} args={args} />
+      {toolName === "propose_item_iteration" &&
+        (standingReads.length > 0 || charterAttached) && (
+          <div className="mx-3 mb-1.5 rounded-md border border-black/10 dark:border-white/10 bg-white/70 dark:bg-black/25 px-3 py-1.5 text-[11px] leading-snug text-gray-700 dark:text-gray-300">
+            <div className="font-semibold">Standing context for this run</div>
+            {standingReads.map((r, idx) => (
+              <div key={idx}>
+                • {r.table} — {r.rows} rows · {fmtTokens(r.tokens)} · read this turn
+              </div>
+            ))}
+            {charterAttached && (
+              <div>
+                • Tables the charter declares as standing context (Reference
+                tables on its master ledger) are read once and kept — each
+                read&apos;s chip shows its size.
+              </div>
+            )}
+            {standingReads.length > 0 && (
+              <div className="mt-0.5 text-gray-500 dark:text-gray-400">
+                {fmtTokens(standingReads.reduce((n, r) => n + r.tokens, 0))} are
+                re-sent with every item. These reads stay until the
+                run ends, then fold.
+              </div>
+            )}
+          </div>
+        )}
       {/* Pre-approval charter guard (owner foot-gun, hit three runs
           straight): a quest declared with NO charter attached runs as a
           legacy pass — no quest ledger, no dedup — and the model can only
@@ -3175,6 +3950,7 @@ function ToolCallBubble({
   errorText,
   isRevertable = false,
   onRevertEdit,
+  pinState = null,
 }: {
   toolName: string;
   toolCallId?: string;
@@ -3182,6 +3958,8 @@ function ToolCallBubble({
   args: unknown;
   result?: unknown;
   errorText?: string;
+  /** Bulk database reads: pinned-run / pinned-chat / kept (plan §4.8). */
+  pinState?: BulkReadFoldState | null;
   isRevertable?: boolean;
   onRevertEdit?: (toolCallId: string) => void;
 }) {
@@ -3260,6 +4038,22 @@ function ToolCallBubble({
         /* fall through to default summary */
       }
     }
+    // Bulk database read: rows · tokens · pin state (the header line is
+    // the durable trace; plan §4.8).
+    if (toolName === "query_database" && typeof result === "string") {
+      const h = parseReadHeader(result);
+      if (h) {
+        const pin =
+          pinState === "pinned-run"
+            ? h.lifetimeOrigin === "charter"
+              ? " · pinned for this run (charter)"
+              : " · pinned for this run"
+            : pinState === "pinned-chat"
+              ? " · pinned"
+              : "";
+        return `${h.rows} of ${h.total} rows · ${fmtTokens(h.tokens)}${pin}`;
+      }
+    }
     if (typeof result === "string") {
       const len = result.length;
       return `${len.toLocaleString()} char${len === 1 ? "" : "s"}`;
@@ -3272,7 +4066,7 @@ function ToolCallBubble({
       return `${keys.length} field${keys.length === 1 ? "" : "s"}`;
     }
     return "ok";
-  }, [isRunning, wasStopped, hasError, hasResult, result]);
+  }, [isRunning, wasStopped, hasError, hasResult, result, toolName, pinState]);
 
   // Human action phrase — describes what the tool is *doing* (present
   // tense while running, past tense when done) rather than echoing the
@@ -3289,8 +4083,8 @@ function ToolCallBubble({
         if (phase) return `Phase checkpoint: ${phase}`;
       }
       // Name the note being read (smoke finding: "Read a note" didn't say
-      // WHICH note). The getCurrentNote result is "Title: <title>\n…".
-      if (toolName === "getCurrentNote" && typeof result === "string") {
+      // WHICH note). The read_content result is "Title: <title>\n…".
+      if (toolName === "read_content" && typeof result === "string") {
         const m = result.match(/^Title:\s*(.+)$/m);
         if (m?.[1]?.trim()) {
           return `${isRunning ? "Reading" : "Read"} note: ${m[1].trim()}`;
@@ -3551,16 +4345,22 @@ const TOOL_ACTION_LABELS: Record<string, [running: string, done: string]> = {
   read_next_chunk: ["Reading further", "Read further"],
   read_previous_chunk: ["Reading the earlier section", "Read the earlier section"],
   apply_diff: ["Editing the document", "Edited the document"],
+  list_document_outline: ["Listing the document's blocks", "Listed the document's blocks"],
+  append_to_document: ["Adding to the document", "Added to the document"],
   replace_document: ["Rewriting the document", "Rewrote the document"],
   insert_image: ["Inserting an image", "Inserted an image"],
   plan: ["Planning the approach", "Planned the approach"],
   ask_user: ["Asking you a question", "Asked a question"],
   finish_with_summary: ["Wrapping up", "Wrapped up"],
+  search_content: ["Searching your garden", "Searched your garden"],
+  // Retired 2026-09-10 (renamed to search_content); kept so transcripts
+  // recorded before the rename still render a verb instead of a raw id.
   searchNotes: ["Searching your notes", "Searched your notes"],
-  getCurrentNote: ["Reading a note", "Read a note"],
-  createNote: ["Creating a note", "Created a note"],
-  updateNote: ["Updating a note", "Updated a note"],
-  renameNote: ["Renaming", "Renamed"],
+  read_content: ["Reading", "Read"],
+  summon: ["Loading tools", "Loaded tools"],
+  create_note: ["Creating a note", "Created a note"],
+  update_note: ["Updating a note", "Updated a note"],
+  rename_note: ["Renaming", "Renamed"],
   generate_image: ["Generating an image", "Generated an image"],
 };
 
@@ -3588,11 +4388,48 @@ function toolActionLabel(toolName: string, isRunning: boolean): string {
  * The second line names the effective tree container after persistence, so
  * referenced outputs and folder-targeted outputs are distinguishable.
  */
+/** Title separators after which sibling titles tend to diverge. */
+const TITLE_SEPARATORS = [" — ", " – ", ": ", " - ", " · "];
+
+/**
+ * Chip labels for a group of receipts in ONE message. When every title shares
+ * a prefix that ends at a separator, the chip shows the distinguishing TAIL
+ * with a leading ellipsis; otherwise the full title.
+ *
+ * Owner report 2026-09-25: a run created "SeatGeek Technical Architect —
+ * Positioning…", "… — Tailored Resume Draft" and "… — Employer Research
+ * Update"; the 220px chip truncated all three at the shared prefix, so one
+ * item's three artifacts read as the same file three times. The full title
+ * stays in the tooltip.
+ */
+export function siblingReceiptLabels(titles: string[]): string[] {
+  if (titles.length < 2) return titles;
+  const first = titles[0];
+  let common = 0;
+  while (common < first.length && titles.every((t) => t[common] === first[common])) common += 1;
+  const shared = first.slice(0, common);
+  // Cut back to the last separator inside the shared prefix; no separator →
+  // the titles only happen to start alike, and the full title is clearer.
+  let cut = -1;
+  for (const sep of TITLE_SEPARATORS) {
+    const at = shared.lastIndexOf(sep);
+    if (at > 0) cut = Math.max(cut, at + sep.length);
+  }
+  if (cut <= 0) return titles;
+  return titles.map((t) => {
+    const tail = t.slice(cut).trim();
+    return tail ? `…${tail}` : t;
+  });
+}
+
 function ContentWriteReceiptCard({
   receipt,
+  label,
   midRunPaneOpen = false,
 }: {
   receipt: ContentWriteReceipt;
+  /** Sibling-aware chip text (siblingReceiptLabels); the tooltip keeps the full title. */
+  label?: string;
   midRunPaneOpen?: boolean;
 }) {
   const selectedContentId = useContentStore((s) => s.selectedContentId);
@@ -3680,7 +4517,7 @@ function ContentWriteReceiptCard({
             ate the panel). The operation + location moved to the tooltip;
             the icon + green tone already signal "AI wrote this". */}
         <span className="truncate font-medium text-gray-800 group-hover:text-emerald-800 dark:text-gray-100 dark:group-hover:text-emerald-300">
-          {receipt.title}
+          {label ?? receipt.title}
         </span>
       </button>
       {menuPos && (
@@ -3699,7 +4536,7 @@ function ContentWriteReceiptCard({
 }
 
 /**
- * Inline card rendered when createNote / updateNote tool returns. Replaces
+ * Inline card rendered when create_note / update_note tool returns. Replaces
  * the raw "Created note (id: …)" string with a clickable affordance that
  * opens the note in the main panel. Compact so it doesn't dominate the
  * assistant turn — Bug C target.

@@ -195,7 +195,7 @@ export function MermaidToolbar({
     <div className="flex items-center justify-between border-t border-black/10 dark:border-white/10 px-4 py-3 bg-gray-50 dark:bg-[#1a2530]">
       <div className="flex items-center gap-2">
         {/* Auto-save status (text) */}
-        <span className="text-xs text-gray-500">
+        <span className="text-xs text-gray-500 dark:text-gray-400">
           {isSaving && "• Saving..."}
           {!isSaving && isModified && "• Unsaved changes"}
           {!isSaving && !isModified && "• All changes saved"}

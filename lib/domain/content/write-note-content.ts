@@ -355,11 +355,27 @@ async function writeNotePayload({
   }
 
   const wordCount = searchText.split(/\s+/).filter(Boolean).length;
+  // MERGE, never replace (prod bug 2026-09-11). This path owns only the
+  // derived-stats keys; writing a fresh object wiped everything else the
+  // payload's metadata carries — the charter flag and description, the
+  // master-ledger stamp, run-ledger keys, capture and quest config — the
+  // moment the starter scaffold (or any AI note edit) came through here.
+  // The content PATCH route and the collaboration store hook already
+  // merge; this fallback did not.
+  const existingPayload = await prisma.notePayload.findUnique({
+    where: { contentId },
+    select: { metadata: true },
+  });
+  const priorMeta =
+    existingPayload?.metadata && typeof existingPayload.metadata === "object"
+      ? (existingPayload.metadata as Record<string, unknown>)
+      : {};
   const metadata = {
+    ...priorMeta,
     wordCount,
     characterCount: searchText.length,
     readingTime: Math.ceil(wordCount / 200),
-  };
+  } as unknown as Prisma.InputJsonValue;
 
   await prisma.notePayload.upsert({
     where: { contentId },

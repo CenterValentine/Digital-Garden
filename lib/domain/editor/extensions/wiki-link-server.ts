@@ -1,5 +1,17 @@
 import { Node, mergeAttributes } from "@tiptap/core";
 
+import {
+  wikiLinkAttrSpec,
+  wikiLinkDisplayText,
+  wikiLinkRenderAttrs,
+  wikiLinkSourceText,
+} from "./wiki-link-attrs";
+
+/**
+ * Server-safe wikiLink node. Attributes, rendered-span attrs and the
+ * `[[…]]` text form all come from wiki-link-attrs.ts, shared with the
+ * client node — the two cannot drift.
+ */
 export const ServerWikiLink = Node.create({
   name: "wikiLink",
   group: "inline",
@@ -7,35 +19,7 @@ export const ServerWikiLink = Node.create({
   atom: true,
 
   addAttributes() {
-    return {
-      // Stable ContentNode id of the target — survives renames. See the client
-      // WikiLink extension for the full rationale.
-      targetId: {
-        default: null,
-        parseHTML: (element) => element.getAttribute("data-target-id"),
-        renderHTML: (attributes) =>
-          attributes.targetId ? { "data-target-id": attributes.targetId } : {},
-      },
-      targetTitle: {
-        default: null,
-        parseHTML: (element) => element.getAttribute("data-target-title"),
-        renderHTML: (attributes) =>
-          attributes.targetTitle ? { "data-target-title": attributes.targetTitle } : {},
-      },
-      displayText: {
-        default: null,
-        parseHTML: (element) => element.getAttribute("data-display-text"),
-        renderHTML: (attributes) =>
-          attributes.displayText ? { "data-display-text": attributes.displayText } : {},
-      },
-      // In-document heading target (derived slug) — see client WikiLink.
-      headingSlug: {
-        default: null,
-        parseHTML: (element) => element.getAttribute("data-heading-slug"),
-        renderHTML: (attributes) =>
-          attributes.headingSlug ? { "data-heading-slug": attributes.headingSlug } : {},
-      },
-    };
+    return wikiLinkAttrSpec();
   },
 
   parseHTML() {
@@ -45,20 +29,12 @@ export const ServerWikiLink = Node.create({
   renderHTML({ node, HTMLAttributes }) {
     return [
       "span",
-      mergeAttributes(HTMLAttributes, {
-        "data-type": "wiki-link",
-        class: "wiki-link",
-      }),
-      node.attrs.displayText || node.attrs.targetTitle || "Unknown",
+      mergeAttributes(HTMLAttributes, wikiLinkRenderAttrs(node.attrs)),
+      wikiLinkDisplayText(node.attrs),
     ];
   },
 
   renderText({ node }) {
-    const { targetTitle, displayText, headingSlug } = node.attrs;
-    const title = `${headingSlug ? "#" : ""}${targetTitle ?? ""}`;
-    if (displayText) {
-      return `[[${title}|${displayText}]]`;
-    }
-    return `[[${title}]]`;
+    return wikiLinkSourceText(node.attrs);
   },
 });

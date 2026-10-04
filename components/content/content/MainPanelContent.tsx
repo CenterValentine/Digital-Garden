@@ -9,6 +9,11 @@
 "use client";
 
 import { createElement, useState, useEffect, useCallback, useMemo, useRef } from "react";
+import {
+  sameProjectedText,
+  sameCanonicalJson,
+} from "@/lib/domain/content/conflict-diff";
+import type { SaveMeta } from "@/lib/domain/content/save-meta";
 import { usePathname } from "next/navigation";
 import { AlertTriangle } from "lucide-react";
 import { ToolSurfaceProvider } from "@/lib/domain/tools";
@@ -29,6 +34,8 @@ import {
   type WorkspacePaneId,
 } from "@/state/content-store";
 import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
+import { useLeftPanelCollapseStore } from "@/state/left-panel-collapse-store";
+import { useTreeRevealStore } from "@/state/tree-reveal-store";
 import { usePageTemplateStore } from "@/state/page-template-store";
 import {
   useSaveConflictStore,
@@ -37,10 +44,14 @@ import {
   clearConflictDraft,
 } from "@/state/save-conflict-store";
 import { SaveConflictBanner } from "./SaveConflictBanner";
+import { SaveConflictDiff } from "./SaveConflictDiff";
 import { ContentPathBreadcrumb } from "./ContentPathBreadcrumb";
 import { EditorSkeleton } from "@/components/content/skeletons/EditorSkeleton";
 import { useTreeStateStore } from "@/state/tree-state-store";
 import {
+  listExtensionLinkAnchors,
+  suggestExtensionLinkAnchors,
+  resolveExtensionVirtualContentType,
   useExtensionContentViewer,
   useExtensionMainWorkspace,
 } from "@/lib/extensions/client-registry";
@@ -80,6 +91,13 @@ import type { JSONContent } from "@tiptap/core";
 import type { EditorStats } from "../editor/MarkdownEditor";
 import type { OutlineHeading } from "@/lib/domain/content/outline-extractor";
 import { extractOutline } from "@/lib/domain/content/outline-extractor";
+import { useViewportMemory } from "@/lib/domain/content/use-viewport-memory";
+import {
+  cacheTabPayload,
+  invalidateTabPayload,
+  readTabPayload,
+  shouldApplyRevalidation,
+} from "@/lib/domain/content/tab-payload-cache";
 import { getViewerExtensions } from "@/lib/domain/editor/extensions-client";
 import { sanitizeTipTapJsonWithExtensions } from "@/lib/domain/editor/unsupported-content";
 import { resolveWikiLinkTarget } from "@/lib/domain/editor/wiki-link-resolve";
@@ -114,6 +132,12 @@ import {
 import { tiptapToMarkdown, markdownToTiptapResult } from "@/lib/domain/content/markdown";
 import { useEditorInstanceStore } from "@/state/editor-instance-store";
 import { MarkdownSourceView } from "../editor/MarkdownSourceView";
+import { useContentFullscreenStore } from "@/state/content-fullscreen-store";
+import { useContentAnchorStore } from "@/state/content-anchor-store";
+import { usePanelStore } from "@/state/panel-store";
+import { useIsMobile } from "@/components/common/useIsMobile";
+
+import { setLinkAnchorLister, setLinkAnchorSuggester } from "@/lib/domain/content/link-anchor";
 
 interface ContentResponse {
   success: boolean;
@@ -154,6 +178,7 @@ interface ContentResponse {
     external?: {
       url: string;
       subtype: string | null;
+      resourceType?: string | null;
       preview: Record<string, unknown>;
     };
     chat?: {
@@ -178,6 +203,9 @@ interface ContentResponse {
       engine: string;
       definition: Record<string, unknown>;
       enabled: boolean;
+    };
+    file?: {
+      mimeType: string;
     };
   };
   error?: {
@@ -272,9 +300,46 @@ interface PageTemplateResponse {
   error?: string;
 }
 
+/** Width of the collapsed left icon rail (ResizablePanels' hidden mode, w-12). */
+const LEFT_RAIL_WIDTH_PX = 48;
+
+const EMPTY_DOC: JSONContent = { type: "doc", content: [{ type: "paragraph" }] };
+
+/**
+ * The note body a payload carries, as the editor will take it — or the empty
+ * document when the payload has none, is malformed, or fails to parse. Pure:
+ * no logging, no state, so it can run during render (the warm paint) as well
+ * as in the load effect. The flags let the effect log what happened.
+ */
+function parseNotePayload(data: ContentResponse["data"]): {
+  json: JSONContent;
+  rewrittenCount: number;
+  problem: "invalid_structure" | "parse_failed" | null;
+} {
+  if (!data.note?.tiptapJson) return { json: EMPTY_DOC, rewrittenCount: 0, problem: null };
+  try {
+    const content =
+      typeof data.note.tiptapJson === "string"
+        ? JSON.parse(data.note.tiptapJson)
+        : data.note.tiptapJson;
+    if (!content || typeof content !== "object" || !content.type) {
+      return { json: EMPTY_DOC, rewrittenCount: 0, problem: "invalid_structure" };
+    }
+    const sanitized = sanitizeTipTapJsonWithExtensions(
+      content as JSONContent,
+      getViewerExtensions()
+    );
+    return { json: sanitized.json, rewrittenCount: sanitized.rewritten.length, problem: null };
+  } catch {
+    return { json: EMPTY_DOC, rewrittenCount: 0, problem: "parse_failed" };
+  }
+}
+
 export function MainPanelContent({ paneId, initialContent = null }: MainPanelContentProps) {
   const pathname = usePathname();
   const isEmbedMode = pathname?.startsWith("/embed/") ?? false;
+
+
   const { activeView, setActiveView } = useLeftPanelViewStore();
   const { position: notesPanelPosition } = useNotesPanelStore();
   const activePaneId = useContentStore((state) => state.activePaneId);
@@ -282,6 +347,33 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
   const selectedContentId = useContentStore((state) =>
     getPaneActiveContentId(state, paneId)
   );
+
+  // Full screen (content toolbar): this panel fills the window. Leaving the
+  // browser's full screen (Esc, F11), pressing Esc, switching content or
+  // unmounting leaves ours too.
+  const contentFullscreen = useContentFullscreenStore(
+    (s) => s.active && !!selectedContentId && s.contentId === selectedContentId
+  );
+  const leftSidebarVisible = usePanelStore((s) => s.leftSidebarVisible);
+  const isMobileLayout = useIsMobile();
+  const fullscreenLeftInset = leftSidebarVisible && !isMobileLayout ? LEFT_RAIL_WIDTH_PX : 0;
+  useEffect(() => {
+    if (!contentFullscreen) return;
+    const store = useContentFullscreenStore.getState;
+    const onFullscreenChange = () => {
+      if (!document.fullscreenElement && store().enteredBrowser) store().exit();
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !document.fullscreenElement && !event.defaultPrevented) store().exit();
+    };
+    document.addEventListener("fullscreenchange", onFullscreenChange);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("fullscreenchange", onFullscreenChange);
+      window.removeEventListener("keydown", onKey);
+      store().exit();
+    };
+  }, [contentFullscreen]);
   const activeTab = useContentStore((state) => getPaneActiveTab(state, paneId));
   const activeTabId = activeTab?.id ?? null;
   const isPageTemplateTab = activeTab?.contentType === "page-template";
@@ -309,16 +401,30 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
   const [titleDraft, setTitleDraft] = useState("");
   const titleInputRef = useRef<HTMLInputElement>(null);
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
-  // Read-only "their version" preview for the save-conflict "Open theirs"
-  // action — tabs are contentId-keyed, so we can't open a second tab for the
-  // same doc; a modal lets the user compare before choosing keep/take.
-  const [theirsPreview, setTheirsPreview] = useState<{
-    title: string;
-    content: JSONContent;
-  } | null>(null);
+  // Conflict comparison. Holds the SERVER copy; "mine" comes from the live
+  // conflict record, which now tracks the editor on every refused save.
+  const [conflictDiff, setConflictDiff] = useState<{
+    open: boolean;
+    theirs: JSONContent | null;
+    theirsUpdatedAt: string | null;
+    loading: boolean;
+    error: string | null;
+  }>({ open: false, theirs: null, theirsUpdatedAt: null, loading: false, error: null });
   const [contentCustomIcon, setContentCustomIcon] = useState<string | null>(null);
   const [contentIconColor, setContentIconColor] = useState<string | null>(null);
   const [contentType, setContentType] = useState<string | null>(null);
+  // File payload MIME type — lets an extension claim a file viewer by format
+  // (e.g. the reader owns application/epub+zip).
+  const [contentMimeType, setContentMimeType] = useState<string | null>(null);
+  // External payload resourceType — lets an extension claim a kind of link
+  // node (the reader owns resourceType "scripture": scripture sessions).
+  const [contentExternalResourceType, setContentExternalResourceType] = useState<string | null>(null);
+  // Which content id the type fields above describe. They update only when
+  // that content's load commits, so between a switch and the new load they
+  // still describe the PREVIOUS item — extension viewers must not match the
+  // new id on them (an EPUB's "file"+mime opened the next item — a scripture
+  // session, a note — in the book reader: "This book could not be found").
+  const [contentTypeFor, setContentTypeFor] = useState<string | null>(null);
   const [contentParentId, setContentParentId] = useState<string | null>(null);
   const [contentIsPublished, setContentIsPublished] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- TODO(any-epic-phase-3d): payload is a discriminated union (folder/note/external/chat/viz/data/hope/workflow) — model as `ContentPayload` union in api-types.ts and switch each viewer branch to a narrowed value
@@ -339,6 +445,68 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
   const [ownedByNote, setOwnedByNote] = useState<{ id: string; title: string } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Which content id the warm (cached) payload was applied for DURING RENDER
+  // — see the derived-state block before the early returns below.
+  const [warmAppliedFor, setWarmAppliedFor] = useState<string | null>(null);
+
+  // The PURE half of "turn a content payload into on-screen state": state
+  // setters only — no refs, no stores, no logging — so it may run during
+  // render. The warm-cache paint needs that: applied in an effect it lands
+  // after the first paint, and the render guard (`contentTypeFor !==
+  // selectedContentId` → skeleton) has already drawn a skeleton AND unmounted
+  // the editor subtree for that frame — the very thing the warm path exists
+  // to avoid. The side-effecting half lives in the load effect.
+  const applyContentFacts = useCallback(
+    (data: ContentResponse["data"]) => {
+      setError(null);
+      setNoteTitle(data.title);
+      setContentParentId(data.parentId);
+      setContentIsPublished(Boolean(data.isPublished));
+      setContentType(data.contentType);
+      setContentMimeType(data.file?.mimeType ?? null);
+      setContentExternalResourceType(data.external?.resourceType ?? null);
+      // Stamp WHICH item these type facts describe: the render guard exists
+      // because viewers were drawing a new id using the previous item's type
+      // facts. These come from the payload FOR THIS id, so it is satisfied
+      // honestly.
+      setContentTypeFor(selectedContentId);
+      setContentCustomIcon(data.customIcon ?? null);
+      setContentIconColor(data.iconColor ?? null);
+      setOwnedByNote(data.ownedByNote ?? null);
+      setPromotedFromRow(
+        data.promotedFromRow
+          ? { ...data.promotedFromRow, role: data.role ?? "primary" }
+          : null
+      );
+      switch (data.contentType) {
+        case "folder":
+          setContentData(data.folder);
+          break;
+        case "external":
+          setContentData(data.external);
+          break;
+        case "chat":
+          setContentData(data.chat);
+          break;
+        case "visualization":
+          setContentData(data.visualization);
+          break;
+        case "data":
+          setContentData(data.data);
+          break;
+        case "hope":
+          setContentData(data.hope);
+          break;
+        case "workflow":
+          setContentData(data.workflow);
+          break;
+        default:
+          setContentData(null);
+      }
+      setNoteContent(parseNotePayload(data).json);
+    },
+    [selectedContentId]
+  );
   const [refreshTrigger, setRefreshTrigger] = useState(0); // Used to force refetch
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [shareEmail, setShareEmail] = useState("");
@@ -473,6 +641,20 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
     initialContent: contentType === "note" ? noteContent : null,
   });
 
+  // Whether this pane is currently bound to a live collaborative document,
+  // held in a ref so the fetch effect can consult it without taking the
+  // runtime object as a reactive dependency (its identity changes often).
+  //
+  // "Collaborative" here means the editor is bound to a Y.Doc — both
+  // `canonical` and `localFallback` are, and only `plainFallback` is reading
+  // the REST payload. Re-applying REST content over a Y.Doc-bound editor is
+  // the rival-document mistake CONTENT-LOAD-CASCADE §9.4 warns about.
+  const isCollaborativeRef = useRef(false);
+  isCollaborativeRef.current = Boolean(
+    collaborationRuntime &&
+      collaborationRuntime.state.availabilityState !== "plainFallback"
+  );
+
   // AbortController for in-flight save requests. When the user navigates to
   // a different document, we abort any pending fetch to prevent Doc A's content
   // from being written to Doc B's API endpoint.
@@ -530,6 +712,7 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
       setContentCustomIcon(null);
       setContentIconColor(null);
       setContentType("person-profile");
+      setContentTypeFor(selectedContentId);
       setOwnedByNote(null);
       return;
     }
@@ -545,6 +728,26 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
       setContentCustomIcon(null);
       setContentIconColor(null);
       setContentType("dm-thread");
+      setContentTypeFor(selectedContentId);
+      setOwnedByNote(null);
+      return;
+    }
+
+    // Extension-owned synthetic ids (e.g. reader:library) — no ContentNode
+    // fetch; the owning extension's content viewer drives its own data.
+    const virtualContentType = resolveExtensionVirtualContentType(selectedContentId);
+    if (virtualContentType) {
+      setIsLoading(false);
+      setError(null);
+      setNoteContent(null);
+      setContentParentId(null);
+      setContentData(null);
+      setContentMimeType(null);
+      setContentExternalResourceType(null);
+      setContentCustomIcon(null);
+      setContentIconColor(null);
+      setContentType(virtualContentType);
+      setContentTypeFor(selectedContentId);
       setOwnedByNote(null);
       return;
     }
@@ -558,6 +761,7 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
       setNoteContent(null);
       setNoteTitle("");
       setContentType(null);
+      setContentTypeFor(selectedContentId);
       setContentData(null);
       setOwnedByNote(null);
       return;
@@ -571,8 +775,104 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
     // the commit, not the fetch.
     let cancelled = false;
 
+    // The side-effecting half of applying a payload: refs, stores, logging,
+    // the stashed-draft check. Paired with applyContentFacts (component scope,
+    // pure); the network path runs both, the warm path runs only this when
+    // render already applied the facts.
+    const applyContentSideEffects = (data: ContentResponse["data"]) => {
+      // Capture the optimistic-concurrency baseline for the plain/REST save
+      // path. (SSR fast-path results have no note.bodyHash; that's fine —
+      // the first real save just proceeds without an If-Match.)
+      bodyHashRef.current = data.note?.bodyHash ?? null;
+
+      // Provide creation/updated dates to inline-timestamp nodes
+      setDocumentDates(
+        data.createdAt ? new Date(data.createdAt).toISOString().slice(0, 10) : "",
+        data.updatedAt ? new Date(data.updatedAt).toISOString().slice(0, 10) : ""
+      );
+      updateContentTab(selectedContentId, {
+        title: data.title,
+        contentType: data.contentType,
+        isTemporary: false,
+      });
+
+      const parsed = parseNotePayload(data);
+      if (parsed.problem === "invalid_structure") {
+        clientLogger.warn({
+          layer: "editor",
+          event: "tiptap_load:invalid_structure",
+          summary: "invalid TipTap JSON, using empty document",
+          attrs: { content_id: selectedContentId },
+        });
+      } else if (parsed.problem === "parse_failed") {
+        clientLogger.error({
+          layer: "editor",
+          event: "tiptap_load:parse_failed",
+          summary: "failed to parse TipTap JSON, using empty document",
+          attrs: { content_id: selectedContentId },
+        });
+      } else if (parsed.rewrittenCount > 0 && process.env.NODE_ENV === "development") {
+        clientLogger.warn({
+          layer: "editor",
+          event: "tiptap_load:rewrote_unsupported",
+          summary: "rewrote unsupported TipTap content while loading note",
+          attrs: { content_id: selectedContentId, rewritten_count: parsed.rewrittenCount },
+        });
+      }
+      setOutline(selectedContentId, extractOutline(parsed.json));
+
+      if (!cancelled && !isPageTemplateTab) {
+        const draft = loadConflictDraft(selectedContentId);
+        if (draft && bodyHashRef.current) {
+          const serverJson = (data.note?.tiptapJson ?? null) as JSONContent | null;
+          if (serverJson && sameProjectedText(draft, serverJson)) {
+            const structuralOnly = !sameCanonicalJson(draft, serverJson);
+            clearConflictDraft(selectedContentId);
+            clientLogger.info({
+              layer: "ui",
+              event: "save_conflict:stale_draft_cleared",
+              summary: structuralOnly
+                ? "stashed conflict draft read the same as the server copy (structural difference only); cleared without raising"
+                : "stashed conflict draft matched the server copy; cleared without raising",
+              attrs: {
+                content_id: selectedContentId,
+                structural_only: structuralOnly,
+              },
+            });
+          } else {
+            setConflict({
+              contentId: selectedContentId,
+              mine: draft,
+              theirHash: bodyHashRef.current,
+            });
+            setNoteContent(draft);
+            setOutline(selectedContentId, extractOutline(draft));
+          }
+        }
+      }
+    };
+
+    // Everything that turns a payload into on-screen state — the network
+    // path's single entry point, so it and the warm path paint through the
+    // same cascade.
+    const applyContentData = (data: ContentResponse["data"]) => {
+      applyContentFacts(data);
+      applyContentSideEffects(data);
+    };
+
+    const warm = isPageTemplateTab
+      ? undefined
+      : readTabPayload<ContentResponse["data"]>(selectedContentId);
+    if (warm) {
+      // Render already painted the facts for this id (the derived-state block
+      // below the hooks); doing it again here would hand the editor a NEW
+      // noteContent object for the same document and reset the caret.
+      if (warmAppliedFor !== selectedContentId) applyContentFacts(warm.data);
+      applyContentSideEffects(warm.data);
+    }
+
     const fetchNote = async () => {
-      setIsLoading(true);
+      if (!warm) setIsLoading(true);
       setError(null);
 
       try {
@@ -608,6 +908,7 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
           setContentParentId(null);
           setContentIsPublished(false);
           setContentType("page-template");
+          setContentTypeFor(selectedContentId);
           setContentCustomIcon(result.customIcon ?? null);
           setContentIconColor(result.iconColor ?? null);
           setOwnedByNote(null);
@@ -704,160 +1005,87 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
 
         if (cancelled) return;
 
-        // Capture the optimistic-concurrency baseline for the plain/REST save
-        // path. (SSR fast-path results have no note.bodyHash; that's fine —
-        // the first real save just proceeds without an If-Match.)
-        bodyHashRef.current = result.data.note?.bodyHash ?? null;
-
-        setNoteTitle(result.data.title);
-        setContentParentId(result.data.parentId);
-        setContentIsPublished(Boolean(result.data.isPublished));
-        setContentType(result.data.contentType);
-        setContentCustomIcon(result.data.customIcon ?? null);
-        setContentIconColor(result.data.iconColor ?? null);
-        setOwnedByNote(result.data.ownedByNote ?? null);
-        // Provide creation/updated dates to inline-timestamp nodes
-        setDocumentDates(
-          result.data.createdAt ? new Date(result.data.createdAt).toISOString().slice(0, 10) : "",
-          result.data.updatedAt ? new Date(result.data.updatedAt).toISOString().slice(0, 10) : ""
-        );
-        updateContentTab(selectedContentId, {
-          title: result.data.title,
-          contentType: result.data.contentType,
-          isTemporary: false,
+        // Feed the MRU cache regardless of which path painted — the next
+        // switch back to this tab is the one that benefits.
+        cacheTabPayload(selectedContentId, result.data, {
+          bodyHash: result.data.note?.bodyHash ?? null,
+          updatedAt: result.data.updatedAt ?? null,
         });
 
-        setPromotedFromRow(
-          result.data.promotedFromRow
-            ? {
-                ...result.data.promotedFromRow,
-                role: result.data.role ?? "primary",
-              }
-            : null
-        );
+        if (warm) {
+          // Revalidation: the reader is ALREADY looking at the cached copy.
+          // Overwriting it is a real risk (see shouldApplyRevalidation), so
+          // the policy decides — the default is to leave the screen alone.
+          const freshBodyHash = result.data.note?.bodyHash ?? null;
+          // Read imperatively: pulling these in as reactive values would add
+          // them to this effect's dep array, and a dirty-flag flip would
+          // re-run the whole fetch cascade mid-edit.
+          const stats = useEditorStatsStore.getState();
+          const editorIsDirty = stats.hasUnsavedChanges || stats.isSaving;
 
-        // Store payload data for Phase 2 content types
-        switch (result.data.contentType) {
-          case "folder":
-            setContentData(result.data.folder);
-            break;
-          case "external":
-            setContentData(result.data.external);
-            break;
-          case "chat":
-            setContentData(result.data.chat);
-            break;
-          case "visualization":
-            setContentData(result.data.visualization);
-            break;
-          case "data":
-            setContentData(result.data.data);
-            break;
-          case "hope":
-            setContentData(result.data.hope);
-            break;
-          case "workflow":
-            setContentData(result.data.workflow);
-            break;
-          default:
-            setContentData(null);
-        }
+          const apply = shouldApplyRevalidation({
+            cachedBodyHash: warm.bodyHash,
+            freshBodyHash,
+            cachedUpdatedAt: warm.updatedAt,
+            freshUpdatedAt: result.data.updatedAt ?? null,
+            editorIsDirty,
+            isCollaborative: isCollaborativeRef.current,
+          });
+          if (!apply) {
+            // NOTE: we deliberately do NOT advance `bodyHashRef` here. It is
+            // tempting — a fresh hash would stop the next save from 409-ing.
+            // But the screen still shows the CACHED copy, so adopting the
+            // server's newer hash would let that stale copy overwrite the
+            // change we just declined to display, silently.
 
-        // Load note content (or empty document if no payload)
-        if (result.data.note?.tiptapJson) {
-          try {
-            // tiptapJson is stored as Prisma Json type, ensure it's proper JSONContent
-            const content = typeof result.data.note.tiptapJson === 'string'
-              ? JSON.parse(result.data.note.tiptapJson)
-              : result.data.note.tiptapJson;
+            // THE 50-300ms WINDOW. We painted from cache, the reader started
+            // typing before this revalidation landed, and the server's copy
+            // has genuinely moved. Their keystrokes are real and exist nowhere
+            // else, so we must not apply — but leaving it there means they
+            // keep writing onto a base that is already superseded, and only
+            // discover it when the autosave 409s a couple of seconds later.
+            //
+            // We already know, right now, what that save will find. So raise
+            // the conflict immediately instead of waiting to be told: same
+            // resolver, same three exits (Keep mine / Take theirs / Compare),
+            // nothing overwritten, just surfaced at the moment it became true
+            // rather than at the moment it became unavoidable.
+            const serverMoved =
+              freshBodyHash !== null &&
+              warm.bodyHash !== null &&
+              freshBodyHash !== warm.bodyHash;
 
-            // Validate that it's a valid TipTap document
-            if (!content || typeof content !== 'object' || !content.type) {
-              clientLogger.warn({
-                layer: "editor",
-                event: "tiptap_load:invalid_structure",
-                summary: "invalid TipTap JSON, using empty document",
-                attrs: { content_id: selectedContentId },
-              });
-              const emptyDoc = {
-                type: "doc",
-                content: [{ type: "paragraph" }],
-              };
-              setNoteContent(emptyDoc);
-
-              // Extract initial outline
-              const initialOutline = extractOutline(emptyDoc);
-              setOutline(selectedContentId, initialOutline);
-            } else {
-              const validContent = content as JSONContent;
-              const sanitized = sanitizeTipTapJsonWithExtensions(
-                validContent,
-                getViewerExtensions()
-              );
-              if (
-                sanitized.rewritten.length > 0 &&
-                process.env.NODE_ENV === "development"
-              ) {
-                clientLogger.warn({
-                  layer: "editor",
-                  event: "tiptap_load:rewrote_unsupported",
-                  summary: "rewrote unsupported TipTap content while loading note",
-                  attrs: { content_id: selectedContentId, rewritten_count: sanitized.rewritten.length },
+            if (serverMoved && editorIsDirty && !isCollaborativeRef.current) {
+              const live = useEditorInstanceStore
+                .getState()
+                .getEditor(selectedContentId)
+                ?.getJSON();
+              // Read the store directly rather than the reactive selector —
+              // same dep-array reason as above. Never stack a second conflict
+              // on top of one already showing.
+              const alreadyConflicted =
+                useSaveConflictStore.getState().conflicts[selectedContentId];
+              if (live && !alreadyConflicted) {
+                stashConflictDraft(selectedContentId, live);
+                setConflict({
+                  contentId: selectedContentId,
+                  mine: live,
+                  theirHash: freshBodyHash,
+                });
+                clientLogger.info({
+                  layer: "ui",
+                  event: "save_conflict:raised_from_revalidation",
+                  summary:
+                    "warm-painted copy diverged from server while the reader was editing; conflict raised before the save could 409",
+                  attrs: { content_id: selectedContentId },
                 });
               }
-              setNoteContent(sanitized.json);
-
-              // Extract initial outline from loaded content
-              const initialOutline = extractOutline(sanitized.json);
-              setOutline(selectedContentId, initialOutline);
             }
-          } catch (parseError) {
-            clientLogger.error({
-              layer: "editor",
-              event: "tiptap_load:parse_failed",
-              summary: "failed to parse TipTap JSON, using empty document",
-              attrs: { content_id: selectedContentId },
-              error: parseError,
-            });
-            const emptyDoc = {
-              type: "doc",
-              content: [{ type: "paragraph" }],
-            };
-            setNoteContent(emptyDoc);
-
-            // Extract initial outline
-            const initialOutline = extractOutline(emptyDoc);
-            setOutline(selectedContentId, initialOutline);
-          }
-        } else {
-          // No note payload — render empty doc
-          const emptyDoc = {
-            type: "doc",
-            content: [{ type: "paragraph" }],
-          };
-          setNoteContent(emptyDoc);
-
-          // Extract initial outline from loaded content
-          const initialOutline = extractOutline(emptyDoc);
-          setOutline(selectedContentId, initialOutline);
-        }
-
-        // Reload mid-conflict: if a prior session stashed unsaved edits for
-        // this doc, the server copy we just loaded is "theirs". Show the
-        // user's draft (not the server copy) and re-raise the conflict so it
-        // can be resolved — this is what preserves edits across a reload.
-        if (!cancelled && !isPageTemplateTab) {
-          const draft = loadConflictDraft(selectedContentId);
-          if (draft && bodyHashRef.current) {
-            setConflict({
-              contentId: selectedContentId,
-              mine: draft,
-              theirHash: bodyHashRef.current,
-            });
-            setNoteContent(draft);
-            setOutline(selectedContentId, extractOutline(draft));
+            return;
           }
         }
+
+        applyContentData(result.data);
       } catch (err) {
         if (cancelled) return;
         clientLogger.error({
@@ -886,6 +1114,8 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
     closeContentTabs,
     isPageTemplateTab,
     setOutline,
+    applyContentFacts,
+    warmAppliedFor,
     updateContentTab,
     initialContent,
     setConflict,
@@ -915,7 +1145,10 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
             setNoteTitle(updates.title);
             updateContentTab(contentId, { title: updates.title });
           } else {
-            // Other changes, trigger full refetch
+            // Other changes, trigger full refetch. Drop the cached payload
+            // first — a forced refresh must not warm-paint the copy it is
+            // refreshing away from.
+            invalidateTabPayload(contentId);
             setRefreshTrigger(prev => prev + 1);
         }
       }
@@ -928,7 +1161,7 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
   }, [selectedContentId, updateContentTab]);
 
   // Targeted notes-only refresh — fired by `use-conversation-engine`'s
-  // onFinish when the AI's updateNote tool writes new note content.
+  // onFinish when the AI's update_note tool writes new note content.
   // Why a separate path from `content-updated`: that listener triggers
   // `refreshTrigger++`, which re-runs `fetchNote`, which resets loading
   // state, re-extracts the outline, syncs the tab title, and reloads
@@ -1015,10 +1248,7 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
   // the API call, we verify it still matches the currently-viewed document.
   // An AbortController cancels any in-flight fetch if the user navigates away.
   const handleSave = useCallback(
-    async (
-      content: JSONContent,
-      meta?: { userInitiated?: boolean; secondsSinceInput?: number },
-    ) => {
+    async (content: JSONContent, meta?: SaveMeta) => {
       if (!selectedContentId) return;
       if (typeof navigator !== "undefined" && !navigator.onLine) {
         setHasUnsavedChanges(true);
@@ -1027,8 +1257,15 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
 
       // GUARD: Only discard saves when this pane has navigated to a different
       // document. Another pane becoming focused should not cancel the save.
+      //
+      // Not on a FLUSH. A flush fires precisely because the pane navigated (or
+      // the page is going away) with a save still pending, and the editor
+      // bound it to the document the edit came from: this closure's
+      // `selectedContentId` IS that document, and the PATCH URL below targets
+      // it. Re-checking the active pane here would reject every flush and
+      // restore the silent loss the flush exists to fix.
       const currentId = getPaneActiveContentId(useContentStore.getState(), paneId);
-      if (currentId !== selectedContentId) {
+      if (!meta?.flush && currentId !== selectedContentId) {
         clientLogger.warn({
           layer: "ui",
           event: "save:cross_document_blocked",
@@ -1044,16 +1281,46 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
       // (not the closure) so a conflict raised after this callback was created
       // still pauses it.
       if (useSaveConflictStore.getState().getConflict(selectedContentId)) {
+        // Refresh the stash so it holds the user's LATEST work, not a snapshot
+        // frozen at the moment of the 409. The stash used to be written once,
+        // there, and never again — so everything typed while the banner sat
+        // unanswered was neither saved nor stashed, and vanished on the next
+        // reload or tab close. It also meant "Keep mine" wrote a stale version.
+        // Re-stashing on every refused save makes the draft track the editor.
+        const openConflict = useSaveConflictStore
+          .getState()
+          .getConflict(selectedContentId);
+        stashConflictDraft(selectedContentId, content);
+        if (openConflict) {
+          // `mine` is what "Keep mine" writes, so it has to move with the
+          // editor too — otherwise resolving publishes the version frozen at
+          // the 409 and silently drops everything typed since.
+          useSaveConflictStore
+            .getState()
+            .setConflict({ ...openConflict, mine: content });
+        }
+        // Never let this be silent again: a paused save with no request and
+        // no log is indistinguishable from "the app is broken".
+        clientLogger.warn({
+          layer: "ui",
+          event: "save:paused_conflict",
+          summary: "save paused — an unresolved conflict is open; draft re-stashed",
+          attrs: { content_id: selectedContentId },
+        });
         setHasUnsavedChanges(true);
         return;
       }
 
-      // Cancel any previous in-flight save
-      if (saveAbortControllerRef.current) {
-        saveAbortControllerRef.current.abort();
-      }
+      // Cancel any previous in-flight save. A flush stays OUT of this: it is
+      // the last write for a document we are leaving, and the next document's
+      // first save must not be able to abort it.
       const abortController = new AbortController();
-      saveAbortControllerRef.current = abortController;
+      if (!meta?.flush) {
+        if (saveAbortControllerRef.current) {
+          saveAbortControllerRef.current.abort();
+        }
+        saveAbortControllerRef.current = abortController;
+      }
 
       setIsSaving(true);
       setHasUnsavedChanges(true);
@@ -1096,7 +1363,9 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
               secondsSinceInput: meta.secondsSinceInput,
             }),
           }),
-          signal: abortController.signal,
+          // keepalive lets the request outlive a page that is unloading; an
+          // abort signal would be moot there, so it is omitted for that case.
+          ...(meta?.keepalive ? { keepalive: true } : { signal: abortController.signal }),
           }
         );
 
@@ -1165,6 +1434,12 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
         // Keep parent state in sync so re-mounts (e.g., ExpandableEditor
         // collapse/reopen) receive the latest persisted content
         setNoteContent(content);
+
+        // The MRU cache still holds the PRE-save payload. Left there, a switch
+        // away and back would warm-paint the old body over freshly saved work
+        // — which reads as lost writing even though the server has it. Drop
+        // the entry so the next visit re-fetches.
+        invalidateTabPayload(selectedContentId);
       } catch (err: unknown) {
         // AbortError is expected when we cancel a save due to navigation —
         // not worth a log line, the navigation that triggered it is the signal.
@@ -1204,48 +1479,90 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
   );
 
   // ── Save-conflict resolution (stale-tab overwrite mitigation) ───────────
+  // Closing the tab or reloading with a conflict open discards whatever the
+  // user typed since: the stash survives, but only the editor holds the live
+  // document, and no save can leave while the conflict stands. The browser's
+  // own confirmation is the last thing between that work and a click on the
+  // close button. Modern browsers ignore custom text and show their own
+  // wording, so returnValue is set purely to arm the prompt.
+  // Keyed on the BOOLEAN, not the conflict object: re-stashing replaces that
+  // object on every refused save, which would otherwise detach and re-attach
+  // the listener every couple of seconds for no behavioural gain.
+  const hasOpenConflict = Boolean(activeConflict);
+  useEffect(() => {
+    if (!hasOpenConflict) return;
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [hasOpenConflict]);
+
   // Keep mine: re-save the user's edits, deliberately overwriting the newer
   // server copy. Advancing the baseline to the server's current hash makes the
   // forced PATCH's If-Match match, so it wins in one round-trip.
+  const closeConflictDiff = useCallback(() => {
+    setConflictDiff((prev) => ({ ...prev, open: false }));
+  }, []);
+
   const handleConflictKeepMine = useCallback(() => {
     if (!activeConflict || !selectedContentId) return;
     bodyHashRef.current = activeConflict.theirHash;
     const mine = activeConflict.mine;
     clearConflict(selectedContentId);
     clearConflictDraft(selectedContentId);
+    closeConflictDiff();
     void handleSave(mine, { userInitiated: true });
-  }, [activeConflict, selectedContentId, clearConflict, handleSave]);
+  }, [activeConflict, selectedContentId, clearConflict, handleSave, closeConflictDiff]);
 
   // Take theirs: discard local edits and reload the latest server version.
   const handleConflictTakeTheirs = useCallback(() => {
     if (!selectedContentId) return;
     clearConflict(selectedContentId);
     clearConflictDraft(selectedContentId);
+    closeConflictDiff();
+    // "Take theirs" means specifically: go get the server's copy. A warm
+    // repaint of our cached copy would be the exact opposite.
+    invalidateTabPayload(selectedContentId);
     setRefreshTrigger((n) => n + 1);
-  }, [selectedContentId, clearConflict]);
+  }, [selectedContentId, clearConflict, closeConflictDiff]);
 
-  // Open theirs: fetch the latest server copy into a read-only preview so the
-  // user can compare/copy before deciding.
-  const handleConflictOpenTheirs = useCallback(async () => {
+  // Compare: fetch the server copy and open the diff. Opens FIRST with a
+  // loading state rather than after the round trip, so the click is
+  // acknowledged immediately and a slow fetch cannot look like a dead button.
+  const handleConflictCompare = useCallback(async () => {
     if (!selectedContentId) return;
+    setConflictDiff({
+      open: true,
+      theirs: null,
+      theirsUpdatedAt: null,
+      loading: true,
+      error: null,
+    });
     try {
       const res = await fetch(`/api/content/content/${selectedContentId}`, {
         credentials: "include",
       });
       const json = await res.json();
       const rawJson = json?.data?.note?.tiptapJson;
-      if (json?.success && rawJson) {
-        const parsed =
-          typeof rawJson === "string" ? JSON.parse(rawJson) : rawJson;
-        setTheirsPreview({
-          title: json.data.title ?? "Their version",
-          content: parsed as JSONContent,
-        });
-      } else {
-        toast.error("Couldn't load the other version.");
+      if (!json?.success || !rawJson) {
+        throw new Error(json?.error?.message ?? "no note body in the response");
       }
-    } catch {
-      toast.error("Couldn't load the other version.");
+      const parsed = typeof rawJson === "string" ? JSON.parse(rawJson) : rawJson;
+      setConflictDiff({
+        open: true,
+        theirs: parsed as JSONContent,
+        theirsUpdatedAt: json.data.note?.updatedAt ?? null,
+        loading: false,
+        error: null,
+      });
+    } catch (err) {
+      setConflictDiff((prev) => ({
+        ...prev,
+        loading: false,
+        error: err instanceof Error ? err.message : "request failed",
+      }));
     }
   }, [selectedContentId]);
 
@@ -1344,12 +1661,20 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
     setSourceDraft("");
   }, [selectedContentId]);
 
+  // The link menu's `[[Title#` step lists spots inside a target through the
+  // enabled extensions (the reader: book highlights). Installed, never
+  // cleared — every pane installs the same lister.
+  useEffect(() => {
+    setLinkAnchorLister(listExtensionLinkAnchors);
+    setLinkAnchorSuggester(suggestExtensionLinkAnchors);
+  }, []);
+
   // Wiki-link click handler — resolves by stable id first, then by title.
   // Renaming a note used to orphan every inbound link (title-only lookup, and
   // a miss did nothing at all, which read as a dead click).
   const handleWikiLinkClick = useCallback(
     async (target: WikiLinkClickTarget) => {
-      const { targetId, targetTitle, headingSlug, heal, markBroken } = target;
+      const { targetId, targetTitle, headingSlug, anchor, heal, markBroken } = target;
 
       // In-document heading link: same-document navigation, no lookup. The
       // scroll-to-heading listener expands any fold hiding the target. A
@@ -1362,7 +1687,47 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
         return;
       }
 
+      // An extension's virtual content (a scripture collection): no node to
+      // resolve — open its tab, and its viewer takes the anchor.
+      const virtualContentType = targetId ? resolveExtensionVirtualContentType(targetId) : null;
+      if (targetId && virtualContentType) {
+        if (anchor) useContentAnchorStore.getState().request(targetId, anchor);
+        setSelectedContentId(targetId, { title: targetTitle, contentType: virtualContentType, paneId });
+        return;
+      }
+
+      // A link that carries an id opens AT ONCE, named by its own text: the
+      // tab is on screen and the content loading before any lookup — the
+      // resolve used to stand between the click and the tab (a full content
+      // GET, then the open), which read as "did that do anything?". The
+      // lookup still runs, for the one job only it can do: a stale id that
+      // resolves by title heals the link and moves the tab to the real note.
+      // A dead id with no title match is closed by the loader's own 404 path.
+      const openedEarly = Boolean(targetId);
+      if (targetId) {
+        setSelectedContentId(targetId, { title: targetTitle, paneId });
+      }
+
       const resolved = await resolveWikiLinkTarget({ targetId, targetTitle });
+
+      if (openedEarly && resolved && targetId && resolved.id === targetId) {
+        return; // already open; the loader fills in title and type
+      }
+      if (openedEarly && resolved && targetId && resolved.id !== targetId) {
+        heal(resolved.id);
+        if (anchor) useContentAnchorStore.getState().request(resolved.id, anchor);
+        closeContentTabs([targetId]);
+        setSelectedContentId(resolved.id, {
+          title: resolved.title,
+          contentType: resolved.contentType,
+          paneId,
+        });
+        return;
+      }
+      if (openedEarly && !resolved) {
+        markBroken(); // the loader's 404 already closed the tab and said so
+        return;
+      }
 
       if (!resolved) {
         clientLogger.warn({
@@ -1383,13 +1748,17 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
         heal(resolved.id);
       }
 
+      // Anchored link: the target's viewer takes this on open and jumps there
+      // (lib/domain/content/link-anchor.ts).
+      if (anchor) useContentAnchorStore.getState().request(resolved.id, anchor);
+
       setSelectedContentId(resolved.id, {
         title: resolved.title,
         contentType: resolved.contentType,
         paneId,
       });
     },
-    [paneId, setSelectedContentId]
+    [paneId, setSelectedContentId, closeContentTabs]
   );
 
   // Handle wiki-link "Open" context menu action.
@@ -1398,17 +1767,19 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
   // this path resolves but doesn't write back.
   useEffect(() => {
     const handleOpen = (e: Event) => {
-      const { targetId, targetTitle, headingSlug } = (
+      const { targetId, targetTitle, headingSlug, anchor } = (
         e as CustomEvent<{
           targetId?: string | null;
           targetTitle: string;
           headingSlug?: string | null;
+          anchor?: string | null;
         }>
       ).detail;
       void handleWikiLinkClick({
         targetId: targetId ?? null,
         targetTitle,
         headingSlug: headingSlug ?? null,
+        anchor: anchor ?? null,
         heal: () => {},
         markBroken: () => {},
       });
@@ -1454,11 +1825,20 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
       }
 
       type NoteItem = { id: string; title: string; slug: string; contentType: string };
-      // Notes AND folders (FOLDER-CONTEXT-CAPSULE follow-up): a folder
-      // wiki-link navigates to the folder and, in playbooks/chat, injects
-      // its context capsule like a chat mention.
+      // EVERY navigable content type, not just notes and folders. The filter
+      // used to be `note || folder`, which silently dropped databases from the
+      // dropdown — typing a table's exact name returned "No matches found"
+      // while the table sat in the tree beside it (owner report, 2026-09-16).
+      // Nothing upstream was missing: the search route returns all types, so
+      // this line was the whole gap.
+      //
+      // The denylist is deliberately short and holds only types that cannot be
+      // a meaningful link DESTINATION — a template is a thing you instantiate
+      // rather than reference, and a shortcut is already a pointer, so linking
+      // one would add a second hop to the same place.
+      const NON_LINKABLE = new Set(['template', 'shortcut']);
       const notes = ((result.data?.items as NoteItem[] | undefined) || [])
-        .filter((item) => item.contentType === 'note' || item.contentType === 'folder')
+        .filter((item) => !NON_LINKABLE.has(item.contentType))
         .map((item) => ({
           id: item.id,
           title: item.title,
@@ -2184,7 +2564,24 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
 
   // Handlers passed as prop to ToolSurfaceProvider (can't use useRegisterToolHandler
   // here because this component renders the provider — useContext sees the parent, not self)
+  // "Show in file tree": make the tree visible (full sidebar, files view),
+  // then ask it to open the item's ancestors — adding to what the user has
+  // open, never collapsing — scroll it into view only if it is out of view,
+  // and pulse the row. The tree consumes the request once it holds the item,
+  // so this works even while the sidebar is still mounting.
+  const handleRevealInTree = useCallback(() => {
+    if (!selectedContentId) return;
+    useLeftPanelCollapseStore.getState().setMode("full");
+    setActiveView("files");
+    useTreeRevealStore.getState().requestReveal(selectedContentId, {
+      align: "smart",
+      flash: true,
+      explicit: true,
+    });
+  }, [selectedContentId, setActiveView]);
+
   const toolHandlers = useMemo(() => ({
+    "reveal-in-tree": handleRevealInTree,
     "import-markdown": handleImportMarkdown,
     "export-markdown": handleExportMarkdown,
     "export-chat": handleExportChat,
@@ -2192,7 +2589,7 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
     "save-as-template": handleSaveAsTemplate,
     "share": handleShareOpen,
     "markdown-source": toggleSourceMode,
-  }), [handleImportMarkdown, handleExportMarkdown, handleExportChat, handleCopyLink, handleSaveAsTemplate, handleShareOpen, toggleSourceMode]);
+  }), [handleRevealInTree, handleImportMarkdown, handleExportMarkdown, handleExportChat, handleCopyLink, handleSaveAsTemplate, handleShareOpen, toggleSourceMode]);
 
   // Toggle state for the toolbar. Unlike handlers (held in a ref), this must
   // flow as a prop so the pressed styling re-renders when the mode flips.
@@ -2203,12 +2600,67 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
 
   // Extension workspace — shown in pane 1 when an extension view is active
   const ExtensionMainWorkspace = useExtensionMainWorkspace(activeView);
-  const ExtensionContentViewer = useExtensionContentViewer({
-    selectedContentId,
-    contentType,
+  const extensionViewerMatch = useMemo(
+    () =>
+      // Type facts about another item never claim this one (see contentTypeFor).
+      // Synthetic ids (reader:…) still match on their prefix.
+      contentTypeFor === selectedContentId
+        ? {
+            selectedContentId,
+            contentType,
+            mimeType: contentMimeType,
+            externalResourceType: contentExternalResourceType,
+          }
+        : { selectedContentId, contentType: null, mimeType: null, externalResourceType: null },
+    [selectedContentId, contentTypeFor, contentType, contentMimeType, contentExternalResourceType]
+  );
+  const ExtensionContentViewer = useExtensionContentViewer(extensionViewerMatch);
+
+  // The content's own scroll region — the folder grid/list/kanban, the database
+  // table, the PDF page, the image. Separate from the "note" region that
+  // `ExpandableEditor` / `MarkdownEditor` own, because both render for the SAME
+  // contentId and would otherwise fight over one remembered offset.
+  //
+  // The ref goes on the WRAPPER, not the real scroller: `FolderViewer`
+  // delegates to per-view components that each own their own `overflow-auto`,
+  // and `DataTableViewer` scrolls its virtualized container. The hook's
+  // capture-phase listener and scroller lookup find whichever one is live, so
+  // no viewer needs to be touched individually.
+  //
+  // DISABLED when an extension owns the viewer. Such a viewer keeps position in
+  // its own, better vocabulary — the reader saves a CFI locator through
+  // `readerApi.saveProgress`, a semantic spot in the book — and a pixel offset
+  // would be both meaningless against repagination and a second writer racing
+  // the first. It is also where `findScrollableElement` is least trustworthy:
+  // the reader nests TOC, annotations and details scrollers around the text.
+  // Gated on the registry answer, not on a content-type list, so a disabled
+  // extension needs no conditional here and a new viewer inherits the rule.
+  const primaryViewportRef = useViewportMemory(selectedContentId, "primary", {
+    enabled: !ExtensionContentViewer,
   });
 
   // Inbox core view — full-panel takeover in the primary pane
+  // WARM PAINT DURING RENDER (CONTENT-LOAD-CASCADE §3.9, completed). The load
+  // effect's warm path runs after the first paint; by then the render guard
+  // below has already returned a skeleton for the new id — one visible frame,
+  // and an unmount of the editor subtree (and its collaboration provider),
+  // which is exactly what caching the payload was meant to prevent. React's
+  // "adjust state when a prop changes" form applies the cached facts here,
+  // before anything commits: a synchronous re-render, no skeleton, no unmount.
+  // Pure setters only (applyContentFacts); the effect does the rest.
+  if (
+    selectedContentId &&
+    !isPageTemplateTab &&
+    contentTypeFor !== selectedContentId &&
+    warmAppliedFor !== selectedContentId
+  ) {
+    const warmNow = readTabPayload<ContentResponse["data"]>(selectedContentId);
+    if (warmNow) {
+      setWarmAppliedFor(selectedContentId);
+      applyContentFacts(warmNow.data);
+    }
+  }
+
   if (activeView === "inbox" && paneId === "top-left") {
     return (
       <ToolSurfaceProvider contentType={null} handlers={toolHandlers}>
@@ -2244,6 +2696,14 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
     return <EditorSkeleton />;
   }
 
+  // The type/data state still describes the PREVIOUS item (the first render
+  // after a switch runs before the load effect): no viewer may draw the new
+  // id with it — a link viewer auto-fetched the old URL's preview under the
+  // new id, the book reader opened a session. Errors still show.
+  if (!error && contentTypeFor !== selectedContentId) {
+    return <EditorSkeleton />;
+  }
+
   // Render content based on type
   let contentElement: React.ReactNode;
   const isReadOnlyPageTemplate =
@@ -2270,8 +2730,8 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
     contentElement = (
       <ExtensionContentViewer
         paneId={paneId}
+        {...extensionViewerMatch}
         selectedContentId={selectedContentId}
-        contentType={contentType}
       />
     );
   } else if (contentType === "file" && selectedContentId) {
@@ -2478,15 +2938,6 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
           </div>
         ) : null}
 
-        {/* Save-conflict resolution (stale-tab / concurrent-edit overwrite) */}
-        <SaveConflictBanner
-          active={Boolean(activeConflict)}
-          onKeepMine={handleConflictKeepMine}
-          onTakeTheirs={handleConflictTakeTheirs}
-          onOpenTheirs={handleConflictOpenTheirs}
-          theirsPreview={theirsPreview}
-          onCloseTheirs={() => setTheirsPreview(null)}
-        />
 
         {/* Editor — kept MOUNTED (hidden) in source mode so the collab Y.doc
             connection and the live editor instance survive; applySourceMode
@@ -2547,7 +2998,11 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
 
   // For non-note content types, append the expandable notes editor
   // This lets any content type (file, folder, external, etc.) have attached notes
+  const isVirtualExtensionContent = Boolean(
+    selectedContentId && resolveExtensionVirtualContentType(selectedContentId)
+  );
   const isNonNoteContent =
+    !isVirtualExtensionContent &&
     contentType &&
     contentType !== "note" &&
     contentType !== "page-template" &&
@@ -2567,7 +3022,12 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
       activeToolIds={activeToolIds}
     >
       <div
-        className="flex h-full min-h-0 flex-col overflow-hidden"
+        className={`flex min-h-0 flex-col overflow-hidden ${
+          contentFullscreen ? "fixed inset-y-0 right-0 z-[200] bg-background" : "h-full"
+        }`}
+        // Full screen stops at the collapsed left rail (48px) so it never
+        // covers it; the expanded sidebar (and the right panel) may overlap.
+        style={contentFullscreen ? { left: fullscreenLeftInset } : undefined}
         onPointerDownCapture={() => {
           if (activeTabId) {
             pinContentTab(activeTabId);
@@ -2581,8 +3041,36 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
       >
         {selectedContentId &&
           !selectedContentId.startsWith("person:") &&
+          !isVirtualExtensionContent &&
           contentType !== "page-template" &&
           !isEmbedMode && <ContentToolbar contentId={selectedContentId} />}
+
+        {/* Save-conflict resolution (stale-tab / concurrent-edit overwrite).
+            Mounted at the TOP LEVEL, above every layout branch, deliberately.
+            It used to sit inside the note editor's title header, which only the
+            note branch renders — so a conflict raised on a folder/charter body,
+            a database, or any other non-note content had no visible exit: the
+            stashed draft replaced the view on every load and handleSave paused
+            every save, silently and indefinitely ("Career Hunt II",
+            2026-09-15). Whatever can raise a conflict must be able to show its
+            way out, so this renders regardless of content type. */}
+        <SaveConflictBanner
+          active={Boolean(activeConflict)}
+          onKeepMine={handleConflictKeepMine}
+          onTakeTheirs={handleConflictTakeTheirs}
+          onCompare={handleConflictCompare}
+        />
+        <SaveConflictDiff
+          open={conflictDiff.open}
+          mine={activeConflict?.mine ?? null}
+          theirs={conflictDiff.theirs}
+          theirsUpdatedAt={conflictDiff.theirsUpdatedAt}
+          loading={conflictDiff.loading}
+          error={conflictDiff.error}
+          onKeepMine={handleConflictKeepMine}
+          onTakeTheirs={handleConflictTakeTheirs}
+          onClose={closeConflictDiff}
+        />
         {isNonNoteContent ? (
           <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
             {notesPanelPosition === "above" && (
@@ -2603,7 +3091,12 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
             )}
             {promotedRowBanner}
             {propsStripAbove}
-            <div className="flex-1 min-h-[150px] overflow-auto">{contentElement}</div>
+            <div
+              ref={primaryViewportRef}
+              className="flex-1 min-h-[150px] overflow-auto"
+            >
+              {contentElement}
+            </div>
             {propsStripBelow}
             {notesPanelPosition !== "above" && (
               <ExpandableEditor

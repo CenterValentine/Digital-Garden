@@ -17,6 +17,7 @@ import {
 } from "@/state/content-store";
 import { useWorkspaceStore } from "@/state/workspace-store";
 import { useTreeDragStore } from "@/state/tree-drag-store";
+import { TAB_DRAG_MIME, useTabDragStore } from "@/state/tab-drag-store";
 import {
   collectPaneAttachedTabs,
   getEffectiveTabFilters,
@@ -28,6 +29,7 @@ import { getTabIcon, getTabIconGroupKey } from "./tab-icons";
 import { PaneTabAddButton } from "./PaneTabAddButton";
 import { useExtensionShellTabMenuSections } from "@/lib/extensions/client-registry";
 import { getCollaborationBrowserSessionId } from "@/lib/domain/collaboration/runtime";
+import { registerPollingTask } from "@/lib/core/polling/scheduler";
 import { prefetchContent } from "@/lib/domain/content/prefetch";
 import { BorrowedTabBadge } from "@/extensions/workplaces/components/BorrowedTabBadge";
 
@@ -586,11 +588,28 @@ export function MainPanelHeader({
     };
 
     void fetchPresence();
-    const interval = window.setInterval(fetchPresence, PRESENCE_POLL_INTERVAL_MS);
+    // Hidden tabs do not poll — presence is advisory chrome, and nobody is
+    // looking at the tab strip in a backgrounded window. Each call is a
+    // Postgres read, so an ungated 10 s interval keeps the database from ever
+    // reaching its autosuspend threshold.
+    // per-tab: this polls THIS tab's open contentIds, so another tab's answer
+    // would be the wrong one.
+    const unregisterPoll = registerPollingTask({
+      id: "main-panel-tab-presence",
+      intervalMs: PRESENCE_POLL_INTERVAL_MS,
+      run: fetchPresence,
+    });
+    // Catch up immediately on return rather than making someone stare at stale
+    // tab chrome for up to a full interval.
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") void fetchPresence();
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
       isCancelled = true;
-      window.clearInterval(interval);
+      unregisterPoll();
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [tabContentIds]);
 
@@ -663,6 +682,21 @@ export function MainPanelHeader({
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [closeContentTab, isActivePane, pane?.activeTabId]);
+
+  // Keep the active tab on screen. The strip is `overflow-x-auto` with the
+  // scrollbar hidden, so once it overflows a newly opened tab lands past the
+  // right edge and the only sign it opened is a sliver of its title. `inline:
+  // "nearest"` scrolls the minimum distance and is a no-op when the tab is
+  // already visible, so an ordinary click on a visible tab never moves the
+  // strip. `block: "nearest"` keeps this from scrolling the PAGE vertically,
+  // which `scrollIntoView` otherwise does for free.
+  useEffect(() => {
+    const activeTabId = pane?.activeTabId;
+    if (!activeTabId) return;
+    const element = tabElementsRef.current.get(activeTabId);
+    if (!element || !tabScrollerRef.current) return;
+    element.scrollIntoView({ inline: "nearest", block: "nearest" });
+  }, [pane?.activeTabId]);
 
   useEffect(() => {
     // Wait for the workspace snapshot: backfillTabMeta names tabs from
@@ -792,9 +826,23 @@ export function MainPanelHeader({
                 onDragStart={(event) => {
                   event.dataTransfer.effectAllowed = "move";
                   event.dataTransfer.setData("text/plain", tab.id);
+                  event.dataTransfer.setData(TAB_DRAG_MIME, tab.id);
+                  // Targets outside this pane subtree (the workplaces
+                  // affordance) read the drag from the store, not from
+                  // dataTransfer, which is opaque until the drop.
+                  useTabDragStore.getState().setDraggingTab({
+                    id: tab.id,
+                    contentId: tab.contentId,
+                    title: tab.title,
+                    contentType: tab.contentType,
+                    paneId,
+                  });
                   onTabDragStart(tab.id, paneId);
                 }}
-                onDragEnd={onTabDragEnd}
+                onDragEnd={() => {
+                  useTabDragStore.getState().setDraggingTab(null);
+                  onTabDragEnd();
+                }}
                 onDragOver={(event) => {
                   if (!draggedTabId || draggedTabId === tab.id) return;
                   event.preventDefault();

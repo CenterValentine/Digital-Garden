@@ -92,7 +92,7 @@ export function JSONDebugView({ content, title }: JSONDebugViewProps) {
           {Array.from({ length: lineCount }, (_, i) => (
             <div
               key={i + 1}
-              className="text-right pr-3 text-gray-500"
+              className="text-right pr-3 text-gray-500 dark:text-gray-400"
               style={{ height: "19.2px" }}
             >
               {i + 1}

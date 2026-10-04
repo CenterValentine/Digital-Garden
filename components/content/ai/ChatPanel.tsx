@@ -20,12 +20,23 @@ import { PROVIDER_CATALOG } from "@/lib/domain/ai/providers/catalog";
 import { getProviderTheme } from "@/lib/design/system/ai-providers";
 import { useResolvedTheme } from "@/lib/features/theme/useResolvedTheme";
 import { ProviderIcon } from "./ProviderIcon";
+import {
+  PROPOSAL_REVISE_EVENT,
+  latestProposalIndexByKind,
+  useExistingDatabases,
+} from "./use-proposal-revision";
 import { toast } from "sonner";
 import { useEditorInstanceStore } from "@/state/editor-instance-store";
 import {
   AiEditOrchestrator,
+  buildOutline,
   findTextInDoc,
+  formatOutline,
+  handleMissMessage,
   parseEditPayload,
+  resolveHandle,
+  visibleTextBetween,
+  type SearchRange,
 } from "@/lib/domain/editor/ai";
 import { ChatMessage } from "./ChatMessage";
 import {
@@ -34,7 +45,13 @@ import {
 } from "./ModelSwitchDivider";
 import { ChatControlPanel } from "./ChatControlPanel";
 import { computeModelRouteDecorations } from "@/lib/domain/ai/model-directive";
-import { findIterationFoldBoundary } from "@/lib/domain/ai/context-diet";
+import {
+  bulkReadFoldStates,
+  duplicatePartStates,
+  perceptionFoldStates,
+  supersedeBulkReads,
+  supersedePerceptionHistory,
+} from "@/lib/domain/ai/context-diet";
 import { aggregateSessionUsage } from "@/lib/features/ai-connections/usage/pricing";
 import { REVERT_SNAPSHOT_KEY } from "@/lib/domain/ai/compact-tool-outputs";
 import { deriveTargetSeed } from "@/lib/domain/ai/output-target";
@@ -214,6 +231,8 @@ export function ChatPanel({
     handleModelChange,
     modelPinned,
     setModelPinned,
+    searchBackend,
+    setSearchBackend,
     mentionResults,
     handleMentionSearch,
     handleResolveMention,
@@ -221,6 +240,7 @@ export function ChatPanel({
     folderGates,
     commandItems,
     activeCharter,
+    activeQuest,
     attachCharter,
     detachCharter,
     outputTarget,
@@ -234,6 +254,9 @@ export function ChatPanel({
     getMessageStamp,
     seedMessageStamps,
   } = useConversationEngine({
+    // A side chat is opened ON something; its outputs belong to that
+    // content, not to the conversation about it (owner, 2026-09-13).
+    defaultOutputTargetMode: contentId ? "underContent" : undefined,
     conversationKey,
     contentId,
     conversationId,
@@ -317,8 +340,12 @@ export function ChatPanel({
     id: string;
     title: string | null;
   } | null>(null);
+  // The rooted content's OWN title (the location above is its folder).
+  // Names the "Under <file>" / "Beside <file>" output options.
+  const [originTitle, setOriginTitle] = useState<string | null>(null);
   useEffect(() => {
     setLocationFallback(null);
+    setOriginTitle(null);
     if (!contentId) return;
     let cancelled = false;
     (async () => {
@@ -337,6 +364,7 @@ export function ChatPanel({
         };
         const node = body?.data;
         if (!node || cancelled) return;
+        setOriginTitle(node.title ?? null);
         if (node.contentType === "folder") {
           setLocationFallback({ id: contentId, title: node.title ?? null });
           return;
@@ -663,27 +691,105 @@ export function ChatPanel({
         return {
           applied: false,
           message:
-            "The document is not open in an editor right now, so nothing was changed. Ask the user to open it, or use updateNote to write to it directly.",
+            "The document is not open in an editor right now, so nothing was read or changed. Ask the user to open it, or use update_note to write to it directly.",
         };
+      }
+
+      // A truthful write receipt, shaped as a note payload so the existing chip
+      // and content-refresh path pick it up. Only emitted AFTER the orchestrator
+      // reports the edit actually landed.
+      const writeReceipt = (editMode: string): string =>
+        JSON.stringify({
+          __notePayload: true,
+          kind: "updated",
+          contentId: contentIdRef.current,
+          title: documentTitle(),
+          editMode,
+          applied: true,
+        });
+
+      // ─── list_document_outline ──────────────────────────────────────────
+      // A read, not an edit: it never touches the orchestrator queue. Handles
+      // are derived here, from the live document, so they describe the same
+      // representation apply_diff will resolve them against.
+      if (request.type === "list_document_outline") {
+        return {
+          // `applied` means "the document changed". A read never changes it.
+          applied: false,
+          message: formatOutline(buildOutline(editor.state.doc)),
+        };
+      }
+
+      // ─── append_to_document ─────────────────────────────────────────────
+      // No address to validate — the insertion point is read at apply time.
+      if (request.type === "append_to_document") {
+        const appendResult = await orchestrator.applyAndWait({
+          __editPayload: true,
+          type: "append_to_document",
+          markdown: request.markdown,
+          documentTitle: documentTitle(),
+          action: `Appended "${request.markdown.slice(0, 50)}"`,
+          toolCallId: request.toolCallId,
+        });
+
+        if (!appendResult.success) {
+          return {
+            applied: false,
+            message: `Nothing was appended: ${appendResult.error ?? "unknown error"}.`,
+          };
+        }
+        return { applied: true, message: writeReceipt("append_to_document") };
+      }
+
+      // ─── apply_diff ─────────────────────────────────────────────────────
+      // Resolve the optional block scope first. A stale handle is refused here
+      // rather than silently widened to a whole-document search, which would
+      // reintroduce the wrong-target edit the handle exists to prevent.
+      let range: SearchRange | undefined;
+      if (request.handle) {
+        const resolved = resolveHandle(editor.state.doc, request.handle);
+        if (!resolved.ok) {
+          return {
+            applied: false,
+            message: handleMissMessage(request.handle, resolved.reason),
+          };
+        }
+        range = { from: resolved.entry.from, to: resolved.entry.to };
       }
 
       // Pre-check in the SAME representation the orchestrator searches, so the
       // model gets a specific reason plus the text it should have quoted.
-      const found = findTextInDoc(editor.state.doc, request.before);
+      const found = findTextInDoc(editor.state.doc, request.before, range);
       if (!found || "count" in found) {
-        const actual = editor.state.doc.textBetween(
-          0,
-          Math.min(editor.state.doc.content.size, 4000),
-          "\n",
-        );
-        const reason =
-          found && "count" in found
-            ? `Found ${found.count} occurrences of that text, so the target is ambiguous. Include more surrounding context.`
-            : "That exact text does not appear in the document. NOTE: matching is against the document's rendered text — markdown syntax (#, **, -) and any HTML markup you saw are not part of it.";
-        return {
-          applied: false,
-          message: `Edit NOT applied. ${reason}\n\nThe document currently reads:\n"""\n${actual}\n"""`,
-        };
+        const doc = editor.state.doc;
+        let reason: string;
+
+        if (found && "count" in found) {
+          // Quote each match with its containing block handle, so the model can
+          // pick one instead of guessing at a longer unique passage.
+          const outline = buildOutline(doc);
+          const options = found.matches
+            .map((m, i) => {
+              const owner = outline.find((e) => m.from >= e.from && m.from < e.to);
+              // Visible text only — private (commented-out) content next to
+              // a match must not ride along into the model's context.
+              const context = visibleTextBetween(
+                doc,
+                Math.max(0, m.from - 40),
+                Math.min(doc.content.size, m.to + 40),
+                " ",
+              ).trim();
+              return `  ${i + 1}. ${owner ? owner.handle : "?"} — …${context}…`;
+            })
+            .join("\n");
+          reason = `Found ${found.count} occurrences of that text, so the target is ambiguous. Re-run apply_diff with the \`handle\` of the block you mean:\n${options}`;
+        } else {
+          reason = request.handle
+            ? `That exact text does not appear in block ${request.handle}. Call list_document_outline again to see what that block currently contains.`
+            : `That exact text does not appear in the document. NOTE: matching is against the document's rendered text — markdown syntax (#, **, -) and any HTML markup you saw are not part of it.\n\nThe document currently reads:\n"""\n${visibleTextBetween(doc, 0, Math.min(doc.content.size, 4000), "\n")}\n"""`;
+        }
+
+        return { applied: false, message: `Edit NOT applied. ${reason}` };
       }
 
       const action =
@@ -696,6 +802,7 @@ export function ChatPanel({
         type: "apply_diff",
         before: request.before,
         after: request.after,
+        ...(request.handle ? { handle: request.handle } : {}),
         documentTitle: documentTitle(),
         action,
         toolCallId: request.toolCallId,
@@ -708,19 +815,7 @@ export function ChatPanel({
         };
       }
 
-      // Only NOW is a write receipt truthful. Shaped as a note payload so the
-      // existing chip + content-refresh path pick it up.
-      return {
-        applied: true,
-        message: JSON.stringify({
-          __notePayload: true,
-          kind: "updated",
-          contentId: contentIdRef.current,
-          title: documentTitle(),
-          editMode: "apply_diff",
-          applied: true,
-        }),
-      };
+      return { applied: true, message: writeReceipt("apply_diff") };
     };
     return () => {
       editExecutorRef.current = null;
@@ -858,6 +953,24 @@ export function ChatPanel({
       );
   }, [setInput]);
 
+  // Proposal cards' "Modify" button (2026-09-15). Same deliberate loop-back
+  // as above: the card withdraws itself and we PRE-FILL the composer rather
+  // than submitting, because the useful part is the user saying what should
+  // change. Re-proposing was never blocked server-side — what was missing
+  // was an exit for the superseded card, so two live Apply buttons cannot
+  // coexist in the transcript.
+  useEffect(() => {
+    function handleRevise(e: Event) {
+      const detail = (e as CustomEvent).detail as
+        | { prompt?: string }
+        | undefined;
+      if (detail?.prompt) setInput(detail.prompt);
+    }
+    window.addEventListener(PROPOSAL_REVISE_EVENT, handleRevise);
+    return () =>
+      window.removeEventListener(PROPOSAL_REVISE_EVENT, handleRevise);
+  }, [setInput]);
+
   // Trash button semantics:
   //   - Transient mode (no conversationId): clear local messages
   //   - Conversation-bound: delete the Conversation entirely and let
@@ -926,19 +1039,41 @@ export function ChatPanel({
   // exists (same endpoint the full-view button uses), then copy its
   // ?content= URL — WITHOUT navigating. The link reopens the chat in the
   // full-page viewer.
+  //
+  // Why the write is handed a PROMISE: the first click used to fail and the
+  // second succeed (owner report, 2026-09-26). A clipboard write must happen
+  // inside the click's user activation; on the first click the ensure-node
+  // POST is slow (it creates the node) and the activation has expired by the
+  // time `writeText` runs, so the browser refuses. On the second click the
+  // POST is a fast no-op and the write squeaks in. `ClipboardItem` accepts a
+  // pending value, which keeps the write synchronous with the gesture; the
+  // resolved node id is also cached so later clicks skip the round trip.
+  const chatLinkNodeIdRef = useRef<{ conversationId: string; nodeId: string } | null>(null);
   const handleCopyChatLink = useCallback(async () => {
     if (!conversationId) return;
+    const resolveLink = async (): Promise<string> => {
+      const cached = chatLinkNodeIdRef.current;
+      let nodeId = cached?.conversationId === conversationId ? cached.nodeId : undefined;
+      if (!nodeId) {
+        const res = await fetch(
+          `/api/conversations/${encodeURIComponent(conversationId)}/open-in-page`,
+          { method: "POST", credentials: "include" },
+        );
+        if (!res.ok) throw new Error("Could not create the chat link");
+        const body = await res.json();
+        nodeId = (body?.data?.contentNodeId as string | undefined) ?? undefined;
+        if (!nodeId) throw new Error("Could not create the chat link");
+        chatLinkNodeIdRef.current = { conversationId, nodeId };
+      }
+      return `${window.location.origin}/content?content=${encodeURIComponent(nodeId)}`;
+    };
     try {
-      const res = await fetch(
-        `/api/conversations/${encodeURIComponent(conversationId)}/open-in-page`,
-        { method: "POST", credentials: "include" },
-      );
-      if (!res.ok) throw new Error("Could not create the chat link");
-      const body = await res.json();
-      const nodeId: string | undefined = body?.data?.contentNodeId;
-      if (!nodeId) throw new Error("Could not create the chat link");
-      const link = `${window.location.origin}/content?content=${encodeURIComponent(nodeId)}`;
-      await navigator.clipboard.writeText(link);
+      if (typeof ClipboardItem !== "undefined" && typeof navigator.clipboard?.write === "function") {
+        const pending = resolveLink().then((link) => new Blob([link], { type: "text/plain" }));
+        await navigator.clipboard.write([new ClipboardItem({ "text/plain": pending })]);
+      } else {
+        await navigator.clipboard.writeText(await resolveLink());
+      }
       toast.success("Chat link copied");
     } catch (e) {
       toast.error(
@@ -957,8 +1092,39 @@ export function ChatPanel({
   );
   // P4c: the active iteration run's fold boundary — parts before it render
   // collapsed, mirroring exactly what the model-facing assembly stubs.
-  const iterationFoldBoundary = useMemo(
-    () => findIterationFoldBoundary(messages),
+  // Which message last carried a proposal of each kind. An older unapplied
+  // card demotes when a newer one arrives (see use-proposal-revision) —
+  // the net under the typed-reply path, where the user asks for changes in
+  // prose instead of clicking Modify and nothing withdraws on its own.
+  const latestProposalIndex = useMemo(
+    () => latestProposalIndexByKind(messages),
+    [messages]
+  );
+
+  // What already exists on the SERVER, so a card cannot offer to create a
+  // database that is already there. Fetched only when this conversation
+  // actually contains a database proposal — most chats never do.
+  const hasDatabaseProposal =
+    latestProposalIndex.linkedDatabases !== undefined ||
+    latestProposalIndex.outputDatabase !== undefined;
+  const existingDatabases = useExistingDatabases(hasDatabaseProposal);
+
+  // Perception / read parts the model no longer sees render collapsed —
+  // the same map the model-facing assembly stubs from.
+  const perceptionFolds = useMemo(
+    () => perceptionFoldStates(messages),
+    [messages],
+  );
+  // Bulk database reads: folded / pinned per lifetime — the same predicate
+  // the model-facing assembly applies (AI-BULK-ROW-READING-PLAN §4.6).
+  const bulkReadFolds = useMemo(() => bulkReadFoldStates(messages), [messages]);
+  // Repeated tool parts: computed on the FOLDED shape, as the route does, so
+  // a part the folds already stubbed is never double-labelled here.
+  const duplicateFolds = useMemo(
+    () =>
+      duplicatePartStates(
+        supersedeBulkReads(supersedePerceptionHistory(messages)),
+      ),
     [messages],
   );
   // P3 owner ask: cumulative session usage for the avatar popover — each
@@ -1087,7 +1253,11 @@ export function ChatPanel({
                 <ChatMessage
                   message={message}
                   messageIndex={i}
-                  foldBoundary={iterationFoldBoundary}
+                  perceptionFolds={perceptionFolds}
+                  duplicateFolds={duplicateFolds}
+                  latestProposalIndex={latestProposalIndex}
+                  existingDatabases={existingDatabases}
+                  bulkReadFolds={bulkReadFolds}
                   sessionUsage={sessionUsage}
                   charterAttached={charterAttached}
                   providerId={stamp.providerId}
@@ -1161,6 +1331,13 @@ export function ChatPanel({
         commandItems={commandItems}
         onAttachCharter={attachCharter}
         activeCharter={activeCharter}
+        activeQuest={activeQuest}
+        onOpenQuestLedger={(nodeId) =>
+          useContentStore.getState().setSelectedContentId(nodeId)
+        }
+        onOpenCharter={(nodeId) =>
+          useContentStore.getState().setSelectedContentId(nodeId)
+        }
         onDetachCharter={detachCharter}
         attachments={attachments}
         onAddFiles={addAttachmentFiles}
@@ -1187,8 +1364,13 @@ export function ChatPanel({
               outputTarget={outputTarget}
               onOutputTargetChange={setOutputTarget}
               hasOrigin={Boolean(contentId)}
+              originTitle={originTitle}
               modelPinned={modelPinned}
               onModelPinnedChange={setModelPinned}
+              providerId={providerId}
+              modelId={modelId}
+              searchBackend={searchBackend}
+              onSearchBackendChange={setSearchBackend}
               activeContextId={activeContextId}
               onContextChange={handleContextChange}
               busy={isActive}

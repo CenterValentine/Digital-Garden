@@ -9,12 +9,28 @@
  */
 
 import type { ContextMenuActionProvider, ContextMenuSection, ContextMenuAction } from "./types";
-import type { JSONContent } from "@tiptap/core";
+import type { Editor, JSONContent } from "@tiptap/core";
 import { useTemplateStore } from "@/state/template-store";
 import { useSnippetStore } from "@/state/snippet-store";
 import { useEditorInstanceStore } from "@/state/editor-instance-store";
+import { useSettingsStore } from "@/state/settings-store";
 import { instantiateTemplateContent } from "@/lib/domain/editor/template-instantiation";
 import { resolveWikiLinkTarget } from "@/lib/domain/editor/wiki-link-resolve";
+import {
+  LINK_VIEW_OPTIONS,
+  applyLinkView,
+  canWindowLink,
+  linkViewOfNode,
+  noteWindowPosByBlockId,
+  wikiLinkPosFromElement,
+  type LinkView,
+} from "@/lib/domain/editor/link-views";
+import { suggestNoteTitle } from "@/lib/domain/editor/selection-blocks";
+import {
+  MOVE_SELECTION_EVENT,
+  type MoveSelectionEventDetail,
+} from "@/components/content/editor/MoveSelectionPicker";
+import { resolveExtensionVirtualContentType } from "@/lib/extensions/client-registry";
 import { markdownPasteToTiptap } from "@/lib/domain/content/markdown";
 import { clipboardBlockedGuidance } from "@/lib/domain/content/markdown-detect";
 import { triggerBlobDownload } from "@/lib/core/download";
@@ -29,7 +45,7 @@ import {
   useContentStore,
   type WorkspacePaneId,
 } from "@/state/content-store";
-import { ArrowUpLeft, ArrowUpRight, ArrowDownLeft, ArrowDownRight } from "lucide-react";
+import { ArrowUpLeft, ArrowUpRight, ArrowDownLeft, ArrowDownRight, Check } from "lucide-react";
 
 /** Captured selection data — frozen when the context menu opens */
 interface SelectionCapture {
@@ -38,12 +54,36 @@ interface SelectionCapture {
 }
 
 /**
+ * The editor the right-click happened in. MarkdownEditor is multi-instance
+ * (split panes, Note Windows nest one editor inside another), and "the
+ * first editor in the store" was whichever note mounted first — a
+ * right-click inside a window acted on the host. The owning editor is the
+ * one whose DOM contains the clicked element.
+ */
+function editorForContext(contextTarget: Element | null): Editor | null {
+  const editors = Object.values(useEditorInstanceStore.getState().editorsByContentId).filter(
+    (e): e is Editor => Boolean(e),
+  );
+  if (contextTarget) {
+    const owner = editors.find((e) => e.view.dom.contains(contextTarget));
+    if (owner) return owner;
+  }
+  return editors[0] ?? null;
+}
+
+/** The contentId an editor instance is registered under (the note it shows). */
+function contentIdOfEditor(editor: Editor): string | null {
+  const entry = Object.entries(useEditorInstanceStore.getState().editorsByContentId).find(
+    ([, e]) => e === editor,
+  );
+  return entry?.[0] ?? null;
+}
+
+/**
  * Capture the current editor selection as TipTap JSON + plain text.
  * Must be called while the selection is still active (before menu closes).
  */
-function captureSelection(): SelectionCapture | null {
-  const { editorsByContentId } = useEditorInstanceStore.getState();
-  const editor = Object.values(editorsByContentId).find(Boolean) ?? null;
+function captureSelection(editor: Editor | null): SelectionCapture | null {
   if (!editor) return null;
 
   const { from, to } = editor.state.selection;
@@ -604,7 +644,12 @@ async function resolveWikiLinkAndOpen(
 ) {
   const { layoutMode, openContentInPane, setLayoutMode } = useContentStore.getState();
 
-  const match = await resolveWikiLinkTarget(ref);
+  // An extension's virtual content (a scripture collection) has no node.
+  const virtualContentType = ref.targetId ? resolveExtensionVirtualContentType(ref.targetId) : null;
+  const match =
+    ref.targetId && virtualContentType
+      ? { id: ref.targetId, title: ref.targetTitle, contentType: virtualContentType }
+      : await resolveWikiLinkTarget(ref);
   if (!match) { toast.error(`"${ref.targetTitle}" not found`); return; }
 
   const visible = new Set(getVisiblePaneIds(layoutMode));
@@ -623,17 +668,100 @@ async function resolveWikiLinkAndOpen(
  * IMPORTANT: Selection is captured HERE (while menu is open and selection active),
  * not in the onClick handlers (which run after menu closes and selection may be lost).
  */
+/**
+ * Flip a wiki-link's per-link context expansion.
+ *
+ * Links expand by default — a read of the document pulls in the target's
+ * prompt-assembly text — so only an opt-out is ever stored. Finds the node by
+ * position in the document rather than by identity, because the context menu
+ * hands us a DOM element, not a ProseMirror node.
+ */
+function toggleWikiLinkExpansion(editor: Editor | null, element: Element, nextExpand: boolean | null) {
+  if (!editor) return;
+  const pos = wikiLinkPosFromElement(editor, element);
+  if (pos === null) return;
+  const node = editor.state.doc.nodeAt(pos);
+  if (!node || node.type.name !== "wikiLink") return;
+  editor
+    .chain()
+    .focus()
+    .command(({ tr, dispatch }) => {
+      if (dispatch) {
+        tr.setNodeMarkup(pos, undefined, { ...node.attrs, expand: nextExpand });
+      }
+      return true;
+    })
+    .run();
+}
+
+/**
+ * "Display as" — the four link views (lib/domain/editor/link-views.ts) as
+ * menu items. The same vocabulary as the hover chooser and the window
+ * header; this is the keyboard-reachable, touch-reachable copy of it.
+ */
+function buildDisplayAsSubmenu(
+  editor: Editor | null,
+  resolvePos: () => number | null,
+  current: LinkView | null,
+  windowDisabledReason: string | null,
+): ContextMenuAction[] {
+  return LINK_VIEW_OPTIONS.map((option) => {
+    const disabled = option.id === "window" && Boolean(windowDisabledReason);
+    return {
+      id: `link-view-${option.id}`,
+      label: option.label,
+      icon: current === option.id ? <Check className="h-4 w-4" /> : undefined,
+      tooltip: disabled ? windowDisabledReason ?? undefined : option.description,
+      disabled,
+      onClick: () => {
+        if (!editor) return;
+        const pos = resolvePos();
+        if (pos === null) return;
+        const windowHeight = useSettingsStore.getState().editor?.noteWindowDefaultHeight ?? null;
+        applyLinkView(editor, pos, option.id, { windowHeight });
+      },
+    };
+  });
+}
+
 export const editorActionProvider: ContextMenuActionProvider = (ctx) => {
   const hasSelection = ctx.hasSelection === true;
   const sections: ContextMenuSection[] = [];
 
-  // --- Wiki-link actions (Open / Open in Pane) ---
   const contextTarget = ctx.contextTarget as Element | null;
+  const contextEditor = editorForContext(contextTarget);
+
+  // --- Note Window header: display as link / chip / card ---
+  const windowHeader = contextTarget?.closest?.(".nw-header");
+  const windowBlockId = windowHeader
+    ?.closest?.("[data-note-window-block-id]")
+    ?.getAttribute("data-note-window-block-id");
+  if (windowBlockId && contextEditor?.isEditable) {
+    sections.push({
+      actions: [
+        {
+          id: "note-window-display-as",
+          label: "Display as",
+          submenu: buildDisplayAsSubmenu(
+            contextEditor,
+            () => noteWindowPosByBlockId(contextEditor, windowBlockId),
+            "window",
+            null,
+          ),
+        },
+      ],
+    });
+  }
+
+  // --- Wiki-link actions (Open / Open in Pane / Display as) ---
   const wikiLinkEl = contextTarget?.closest?.('[data-type="wiki-link"]');
   if (wikiLinkEl) {
     const targetTitle = wikiLinkEl.getAttribute("data-target-title");
     const targetId = wikiLinkEl.getAttribute("data-target-id");
     const headingSlug = wikiLinkEl.getAttribute("data-heading-slug");
+    const anchor = wikiLinkEl.getAttribute("data-anchor");
+    // Default is EXPAND, so only an explicit "false" opts out.
+    const isExpanded = wikiLinkEl.getAttribute("data-expand") !== "false";
 
     // In-document heading link: "Open" scrolls to the heading; opening in
     // another pane is a note-level concept and doesn't apply.
@@ -669,7 +797,7 @@ export const editorActionProvider: ContextMenuActionProvider = (ctx) => {
             label: "Open",
             onClick: () => {
               window.dispatchEvent(
-                new CustomEvent("open-wiki-link", { detail: { targetId, targetTitle } })
+                new CustomEvent("open-wiki-link", { detail: { targetId, targetTitle, anchor } })
               );
             },
           },
@@ -687,6 +815,43 @@ export const editorActionProvider: ContextMenuActionProvider = (ctx) => {
               },
             })),
           },
+          // Per-link context expansion. Reads as a PROPERTY of the link rather
+          // than a command, because that is what it is — hence the check, not a
+          // verb. Only an explicit opt-out is stored, so an untouched link
+          // carries no attribute at all.
+          {
+            id: "wiki-link-include-context",
+            label: "Include context",
+            icon: isExpanded ? <Check className="h-4 w-4" /> : undefined,
+            tooltip: isExpanded
+              ? `Reading this note also reads ${targetTitle}'s summary. Turn off to link without pulling its context in.`
+              : `This link is a plain reference — ${targetTitle}'s summary is not read with this note. Turn on to include it.`,
+            onClick: () => {
+              toggleWikiLinkExpansion(contextEditor, wikiLinkEl, isExpanded ? false : null);
+            },
+          },
+          ...(contextEditor?.isEditable
+            ? [
+                {
+                  id: "wiki-link-display-as",
+                  label: "Display as",
+                  submenu: buildDisplayAsSubmenu(
+                    contextEditor,
+                    () => wikiLinkPosFromElement(contextEditor, wikiLinkEl),
+                    (() => {
+                      const pos = wikiLinkPosFromElement(contextEditor, wikiLinkEl);
+                      const node = pos === null ? null : contextEditor.state.doc.nodeAt(pos);
+                      return node ? linkViewOfNode(node) : null;
+                    })(),
+                    anchor
+                      ? "An anchored link points inside its note"
+                      : targetId && !canWindowLink({ targetId })
+                        ? "This target cannot be windowed"
+                        : null,
+                  ),
+                } satisfies ContextMenuAction,
+              ]
+            : []),
         ],
       });
     }
@@ -711,7 +876,7 @@ export const editorActionProvider: ContextMenuActionProvider = (ctx) => {
   }
 
   // Capture selection NOW, before any menu interaction
-  const capture = hasSelection ? captureSelection() : null;
+  const capture = hasSelection ? captureSelection(contextEditor) : null;
 
   // --- Bubble menu shortcut: show only the relevant save submenu ---
   if (ctx.bubbleMenuAction && capture) {
@@ -728,7 +893,7 @@ export const editorActionProvider: ContextMenuActionProvider = (ctx) => {
 
   // --- Undo / Redo ---
   const historyActions: ContextMenuAction[] = [];
-  const editorRef = Object.values(useEditorInstanceStore.getState().editorsByContentId).find(Boolean) ?? null;
+  const editorRef = contextEditor;
 
   historyActions.push({
     id: "undo",
@@ -814,6 +979,12 @@ export const editorActionProvider: ContextMenuActionProvider = (ctx) => {
         return;
       }
       if (!text) return;
+      // Inside a code block the clipboard is code, not markdown: insert it
+      // literally (a code block cannot hold the block nodes parsing yields).
+      if (editor.state.selection.$from.parent.type.spec.code) {
+        editor.view.dispatch(editor.state.tr.insertText(text.replace(/\r\n?/g, "\n")));
+        return;
+      }
       const parsed = markdownPasteToTiptap(text).content ?? [];
       if (parsed.length === 0) return;
       editor.chain().focus().insertContent(parsed).run();
@@ -828,6 +999,50 @@ export const editorActionProvider: ContextMenuActionProvider = (ctx) => {
   });
 
   sections.push({ actions: clipboardActions });
+
+  // --- Move the selection out of this note. Context-menu only, by design:
+  // reorganisation, not formatting. ONE item, no submenu: the point is to
+  // build content out from this note into others, so a link always stays
+  // here and the moved text always ends with a link back (the user can
+  // delete either). The tree picker's "+ New Note" is the way to make a new
+  // note for it (named from the selection). The picker is hosted by this
+  // editor's MarkdownEditor (MoveSelectionPicker) and addressed by editor
+  // instance, so only this editor's picker opens.
+  //
+  // Disabled offline: the move writes two notes and may create a third, and
+  // a half-done move (text gone here, never arrived there) is the one
+  // outcome worth refusing up front. Same `navigator.onLine` read the
+  // backlinks panel and the save path use.
+  if (capture && contextEditor?.isEditable) {
+    const hostContentId = contentIdOfEditor(contextEditor);
+    const suggestedTitle = suggestNoteTitle(capture);
+    const offline = typeof navigator !== "undefined" && navigator.onLine === false;
+    sections.push({
+      actions: [
+        {
+          id: "move-to-note",
+          label: "Move highlight to note",
+          disabled: offline,
+          tooltip: offline
+            ? "Moving needs a connection — you're offline"
+            : "Append the selection to the end of a note you pick; a link to it stays here and the moved text ends with a link back",
+          onClick: () => {
+            window.dispatchEvent(
+              new CustomEvent(MOVE_SELECTION_EVENT, {
+                detail: {
+                  editor: contextEditor,
+                  x: typeof ctx.contextX === "number" ? ctx.contextX : 0,
+                  y: typeof ctx.contextY === "number" ? ctx.contextY : 0,
+                  suggestedTitle,
+                  hostContentId,
+                } satisfies MoveSelectionEventDetail,
+              }),
+            );
+          },
+        },
+      ],
+    });
+  }
 
   const templateStore = useTemplateStore.getState();
   const snippetStore = useSnippetStore.getState();

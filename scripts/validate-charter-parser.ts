@@ -2,6 +2,11 @@ import assert from "node:assert/strict";
 import type { JSONContent } from "@tiptap/core";
 
 import { parseCharter } from "@/lib/domain/ai/charters/parse";
+import {
+  buildCharterStarterDoc,
+  CHARTER_STARTER_PHASE_TITLES,
+  countStarterPlaceholderPhases,
+} from "@/lib/domain/ai/charters/starter";
 import { renderCharterSectionPlain } from "@/lib/domain/ai/charters/render";
 import {
   bindCharterToLatestUserMessage,
@@ -120,8 +125,8 @@ configurePhaseCheckpointGate(checkpointGate, {
 assert.deepEqual(getPhaseCheckpointGateStatus(checkpointGate), {
   ready: false,
   missingRequirements: [
-    "Complete at least one web research call with search_web or read_page.",
-    "Read at least one linked extension with getCurrentNote.",
+    "Complete at least one web research call (search_web, read_page, or read_page_headless_or_browser).",
+    "Read at least one linked extension with read_content.",
   ],
 });
 assert.match(
@@ -130,31 +135,47 @@ assert.match(
 );
 assert.match(
   renderPhaseCheckpointGateInstruction(checkpointGate),
-  /getCurrentNote/,
+  /read_content/,
 );
+// The browser reader satisfies the research requirement like search_web
+// does (prod ecf1d0e5, 2026-09-28: it was ignored and the checkpoint was
+// rejected as "no research" after a real read attempt).
 recordCompletedPhaseTools(
   checkpointGate,
   [
     {
-      toolCallId: "search-call",
-      toolName: "search_web",
-      input: { query: "Acme employer research" },
+      toolCallId: "browser-read-call",
+      toolName: "read_page_headless_or_browser",
+      input: { url: "https://acme.example/about" },
     },
   ],
-  [{ toolCallId: "search-call" }],
+  [{ toolCallId: "browser-read-call" }],
 );
 assert.deepEqual(getPhaseCheckpointGateStatus(checkpointGate), {
   ready: false,
   missingRequirements: [
-    "Read at least one linked extension with getCurrentNote.",
+    "Read at least one linked extension with read_content.",
   ],
 });
+// A garden search is NOT web research.
+const gardenOnlyGate = createPhaseCheckpointGate();
+configurePhaseCheckpointGate(gardenOnlyGate, {
+  phaseTitle: "Phase 1: Understand the employer",
+  phaseText: "Research as needed using web resources.",
+  referenceContentIds: [],
+});
+recordCompletedPhaseTools(
+  gardenOnlyGate,
+  [{ toolCallId: "garden-call", toolName: "search_content", input: { query: "Acme" } }],
+  [{ toolCallId: "garden-call" }],
+);
+assert.equal(getPhaseCheckpointGateStatus(gardenOnlyGate).ready, false);
 recordCompletedPhaseTools(
   checkpointGate,
   [
     {
       toolCallId: "read-call",
-      toolName: "getCurrentNote",
+      toolName: "read_content",
       input: { contentId: "11111111-1111-4111-8111-111111111111" },
     },
   ],
@@ -187,7 +208,7 @@ recordCompletedPhaseToolsFromMessages(resumedCheckpointGate, [
         output: [],
       },
       {
-        type: "tool-getCurrentNote",
+        type: "tool-read_content",
         toolCallId: "persisted-read",
         state: "output-available",
         input: { contentId: "11111111-1111-4111-8111-111111111111" },
@@ -456,4 +477,117 @@ assert.match(
   "checkpoint-summary fallback should remain human-searchable",
 );
 
+// ---------------------------------------------------------------------------
+// Starter template (D5) — the scaffold must PARSE into the shape it claims.
+//
+// The template's whole value is that it teaches the real format. A heading
+// level drift, a stray blockquote, or a reworded "Done when:" would leave the
+// user editing a document that looks like a charter and parses as one blob —
+// the exact failure the scaffold exists to prevent, and one nothing else would
+// catch. So the document is round-tripped through the real parser here.
+// ---------------------------------------------------------------------------
+{
+  const starter = buildCharterStarterDoc("Career Hunt I");
+  const parsed = parseCharter(starter);
+
+  assert.equal(
+    parsed.phases.length,
+    CHARTER_STARTER_PHASE_TITLES.length,
+    "starter template must yield exactly its declared phases",
+  );
+  assert.deepEqual(
+    parsed.phases.map((phase) => phase.title),
+    [...CHARTER_STARTER_PHASE_TITLES],
+    "starter phase headings must survive parsing in order",
+  );
+  assert.ok(
+    parsed.standingRules.content.length > 0,
+    "starter must place standing rules BEFORE the first phase heading",
+  );
+  // hasBody (registry.ts / the mark route) is what flips the empty-charter
+  // warning off. A scaffold that still read as empty would be worse than none.
+  assert.ok(
+    parsed.phases.length > 0 || parsed.standingRules.content.length > 0,
+    "a scaffolded charter must not still report as empty",
+  );
+  assert.ok(
+    parsed.standingRules.content.length > 0 &&
+      renderCharterSectionPlain(parsed.standingRules.content).includes(
+        "Career Hunt I",
+      ),
+    "the opening line should name the charter so the page is not generic",
+  );
+  // `Done when:` is a phase's stop condition (system-prompt.ts). The template
+  // must actually ship one on each work phase, not merely mention the idea.
+  for (const phase of parsed.phases.slice(1)) {
+    assert.match(
+      renderCharterSectionPlain(phase.content),
+      /Done when:/,
+      `phase "${phase.title}" must carry a Done when: stop condition`,
+    );
+  }
+  // No section may begin with a live `model:` directive: the template
+  // describes that convention rather than arming it (see starter.ts).
+  assert.equal(
+    parsed.standingRules.modelDirective,
+    undefined,
+    "starter standing rules must not arm a model: directive",
+  );
+  for (const phase of parsed.phases) {
+    assert.equal(
+      phase.modelDirective,
+      undefined,
+      `starter phase "${phase.title}" must not arm a model: directive`,
+    );
+  }
+  // The output example must be REAL syntax — if it stopped parsing, the
+  // template would be teaching a convention that does not exist.
+  const starterDirectives = extractCharterOutputDirectives(parsed);
+  assert.ok(
+    starterDirectives.some((d) => d.location === "under_content"),
+    "the starter's output example must parse as a real routing directive",
+  );
+  // A literal [[wiki-link]] would ship a dead reference; the template
+  // describes the convention in prose instead.
+  assert.equal(
+    parsed.standingRules.references.length,
+    0,
+    "starter must not ship dead wiki-link references",
+  );
+}
+
 console.log("Charter parser checks passed.");
+
+// ── Starter placeholder detection (mark + attached-context warning) ─────────
+// The scaffold's two phase headings still read "[name the … phase]" until the
+// user edits them; real sections pasted BELOW the scaffold parse alongside
+// them, and a run would start on the placeholder.
+const untouchedStarter = parseCharter(buildCharterStarterDoc("Career Hunt"));
+assert.equal(countStarterPlaceholderPhases(untouchedStarter), 2);
+const pastedBelowScaffold = parseCharter({
+  type: "doc",
+  content: [
+    ...(buildCharterStarterDoc("Career Hunt").content ?? []),
+    heading(2, "Charter purpose"),
+    paragraph("Discover promising roles and capture them before they vanish."),
+    heading(2, "Initial screening criteria"),
+    paragraph("Remote, product operations, senior or above."),
+  ],
+});
+assert.equal(pastedBelowScaffold.phases.length, untouchedStarter.phases.length + 2);
+assert.equal(countStarterPlaceholderPhases(pastedBelowScaffold), 2);
+const oneRenamed = parseCharter({
+  type: "doc",
+  content: (buildCharterStarterDoc("Career Hunt").content ?? []).map((node) =>
+    node.type === "heading" &&
+    node.content?.[0]?.text === CHARTER_STARTER_PHASE_TITLES[1]
+      ? heading(2, "Phase 1 — Discover openings")
+      : node,
+  ),
+});
+assert.equal(countStarterPlaceholderPhases(oneRenamed), 1);
+assert.equal(
+  countStarterPlaceholderPhases(parseCharter({ type: "doc", content: [] })),
+  0,
+);
+console.log("charter placeholder detection ok");
