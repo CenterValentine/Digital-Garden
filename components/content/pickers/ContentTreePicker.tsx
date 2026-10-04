@@ -23,7 +23,7 @@
  *     was somewhere different than they are targeting in the file tree").
  *   - recents: optional caller-supplied list shown above the tree.
  *   - scope header: the file-tree-style root representation, styled as
- *     a HEADER (border, tint, bold title, count chip) so it reads as the
+ *     a HEADER (border, tint, bold title) so it reads as the
  *     tree's frame rather than its first row — mirroring RootNodeHeader.
  *     Shows the current view scope ("Root" = everything, or a workspace
  *     view's name). Clicking it lists the available scopes — ordered
@@ -249,21 +249,6 @@ function flattenEligible(
 }
 
 /**
- * Every node in the raw tree, children recursed — the same count the file
- * tree's header chip shows (`countTotalNodes` in LeftSidebarContent), so
- * the picker's header reads "295 files" when the tree does, not the
- * smaller number of rows that survived `eligibleTypes`.
- */
-function countTreeNodes(nodes: TreeNodeLite[]): number {
-  let count = 0;
-  for (const node of nodes) {
-    count += 1;
-    if (node.children?.length) count += countTreeNodes(node.children);
-  }
-  return count;
-}
-
-/**
  * Destinations the tree itself proves: for every parent (null = the scope's
  * top, remapped to the view root by the caller), the newest `createdAt`
  * among its direct content children. This is what makes the "Recent
@@ -441,8 +426,6 @@ export function ContentTreePicker({
   // folder outside the current scope widens to Root first).
   const pendingRevealRef = useRef<string | null>(null);
   const [tree, setTree] = useState<FlatRow[] | null>(null);
-  // Raw node count for the scope header's chip (see countTreeNodes).
-  const [totalCount, setTotalCount] = useState(0);
   // Expansion starts as the FILE TREE'S expansion (seeded when a tree
   // loads — see the fetch effect) and then belongs to the picker: single
   // click toggles; double-click picks the container itself. Rows the
@@ -602,7 +585,6 @@ export function ContentTreePicker({
             }
           }
           setExpandedIds(seed);
-          setTotalCount(countTreeNodes(nodes));
           // Top-level creates in a scoped tree live under the view root —
           // record them by its real id, as every create path does.
           setDerivedDestinations(
@@ -1020,6 +1002,27 @@ export function ContentTreePicker({
         </button>
       ) : null}
 
+      {/* Pinned like the search box, NOT part of the scrolling list: the picker
+          opens scrolled to the row where the user is, which pushed these pills
+          out of sight. Hidden while typing — search results need the room. */}
+      {quickCreate &&
+      !activeQuery &&
+      (activeTarget || destinations.length > 0 || openDestinations.length > 0) ? (
+        <JumpTo
+          active={activeTarget}
+          onCreateActive={() =>
+            activeTarget ? void quickCreateAfter(activeTarget.row) : undefined
+          }
+          recent={destinations}
+          open={openDestinations}
+          section={destinationsSection}
+          onSection={setDestinationsSection}
+          noun={createNoun}
+          lookupTitle={(id) => (id ? (lookupNode(id)?.title ?? null) : null)}
+          onJump={jumpToDestination}
+          onCreate={(d) => void quickCreateAtDestination(d)}
+        />
+      ) : null}
       <div
         ref={listRef}
         // No top padding in browse mode: the sticky scope header must sit
@@ -1063,23 +1066,7 @@ export function ContentTreePicker({
           )
         ) : (
           <>
-            {quickCreate &&
-            (activeTarget || destinations.length > 0 || openDestinations.length > 0) ? (
-              <JumpTo
-                active={activeTarget}
-                onCreateActive={() =>
-                  activeTarget ? void quickCreateAfter(activeTarget.row) : undefined
-                }
-                recent={destinations}
-                open={openDestinations}
-                section={destinationsSection}
-                onSection={setDestinationsSection}
-                noun={createNoun}
-                lookupTitle={(id) => (id ? (lookupNode(id)?.title ?? null) : null)}
-                onJump={jumpToDestination}
-                onCreate={(d) => void quickCreateAtDestination(d)}
-              />
-            ) : null}
+
 
             {recents.length > 0 ? (
               <>
@@ -1114,7 +1101,7 @@ export function ContentTreePicker({
                 would otherwise paint over this sticky header as rows scroll under it. */}
             {/* Scope HEADER — the root representation, framed like the file
                 tree's RootNodeHeader (border, tint, bold title, gold view
-                icon, count chip) so it reads as the tree's header rather
+                icon) so it reads as the tree's header rather
                 than its first row. Click the title to unfold the view list
                 beneath it; "+ New Note" creates at the top of the current
                 scope. */}
@@ -1166,16 +1153,10 @@ export function ContentTreePicker({
                   />
                 ) : null}
               </button>
-              {tree ? (
-                <span className="ml-auto shrink-0 rounded-full bg-black/[0.05] px-2 py-px text-[10px] text-gray-500 dark:bg-white/[0.08] dark:text-gray-400">
-                  {totalCount} {totalCount === 1 ? "file" : "files"}
-                </span>
-              ) : null}
               {quickCreate ? (
                 <QuickCreateButton
                   noun={createNoun}
                   onClick={() => void quickCreateInside(null)}
-                  className={tree ? "ml-0" : undefined}
                 />
               ) : null}
             </div>
@@ -1515,7 +1496,7 @@ function JumpTo({
   return (
     // No bottom border or margin: the scope header right below carries its own
     // top border, and a second rule plus a gap between them read as a hole.
-    <div className="pb-1">
+    <div className="shrink-0 pb-1">
       <div className="flex w-full flex-nowrap items-center gap-1.5 py-1 pl-3 pr-2 text-xs">
         {active ? activePill() : null}
         {recent.length > 0
@@ -1526,39 +1507,43 @@ function JumpTo({
           : null}
       </div>
 
-      {list.map((d) => (
-        <div
-          key={d.id ?? "root"}
-          className="group flex w-full items-center gap-2 py-1.5 pr-2 pl-3 text-xs transition-colors hover:bg-black/[0.04] dark:hover:bg-white/5"
-        >
-          <button
-            type="button"
-            onClick={() => onJump(d)}
-            title="Go there in the tree"
-            className="flex min-w-0 flex-1 items-center gap-2 text-left"
+      {list.length > 0 ? (
+        <div className="max-h-40 overflow-y-auto">
+        {list.map((d) => (
+          <div
+            key={d.id ?? "root"}
+            className="group flex w-full items-center gap-2 py-1.5 pr-2 pl-3 text-xs transition-colors hover:bg-black/[0.04] dark:hover:bg-white/5"
           >
-            {destIcon(d, "h-3.5 w-3.5 shrink-0 text-yellow-500/80")}
-            <span className="truncate text-gray-700 dark:text-gray-300">
-              {titleOf(d)}
-            </span>
-            {pathOf(d) ? (
-              <span className="truncate text-[10px] text-gray-400 dark:text-gray-500">
-                {pathOf(d)}
+            <button
+              type="button"
+              onClick={() => onJump(d)}
+              title="Go there in the tree"
+              className="flex min-w-0 flex-1 items-center gap-2 text-left"
+            >
+              {destIcon(d, "h-3.5 w-3.5 shrink-0 text-yellow-500/80")}
+              <span className="truncate text-gray-700 dark:text-gray-300">
+                {titleOf(d)}
               </span>
-            ) : null}
-            {section === "open" && d.count && d.count > 1 ? (
-              <span className="ml-auto shrink-0 rounded-full bg-black/[0.05] px-1.5 text-[10px] text-gray-500 dark:bg-white/[0.08] dark:text-gray-400">
-                {d.count} open
-              </span>
-            ) : null}
-          </button>
-          <QuickCreateButton
-            noun={noun}
-            title={`+ New ${noun} in ${titleOf(d)}`}
-            onClick={() => onCreate(d)}
-          />
+              {pathOf(d) ? (
+                <span className="truncate text-[10px] text-gray-400 dark:text-gray-500">
+                  {pathOf(d)}
+                </span>
+              ) : null}
+              {section === "open" && d.count && d.count > 1 ? (
+                <span className="ml-auto shrink-0 rounded-full bg-black/[0.05] px-1.5 text-[10px] text-gray-500 dark:bg-white/[0.08] dark:text-gray-400">
+                  {d.count} open
+                </span>
+              ) : null}
+            </button>
+            <QuickCreateButton
+              noun={noun}
+              title={`+ New ${noun} in ${titleOf(d)}`}
+              onClick={() => onCreate(d)}
+            />
+          </div>
+        ))}
         </div>
-      ))}
+      ) : null}
     </div>
   );
 }
