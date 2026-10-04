@@ -728,6 +728,18 @@ export function ContentTreePicker({
     };
   }, [tree, activeContentId, lookupNode]);
 
+  // The header's create target: the active tab's folder when the tree can
+  // place it, else the latest create, else the first open folder.
+  const createTarget = useMemo<{
+    dest: CreateDestination;
+    kind: TargetKind;
+  } | null>(() => {
+    if (activeTarget) return { dest: activeTarget, kind: "active" };
+    if (destinations[0]) return { dest: destinations[0], kind: "recent" };
+    if (openDestinations[0]) return { dest: openDestinations[0], kind: "open" };
+    return null;
+  }, [activeTarget, destinations, openDestinations]);
+
   // Where the list opens: ON THE USER'S PERSPECTIVE. The first time a tree is
   // on screen, the row where the user is (tree selection, else the active
   // content) is centred, so the picker opens at the place they already see.
@@ -990,6 +1002,25 @@ export function ContentTreePicker({
       }}
       className="z-[130] flex flex-col rounded-lg border border-black/10 dark:border-white/10 bg-white dark:bg-[#1a1a1a] shadow-xl overflow-hidden"
     >
+      {quickCreate && createTarget ? (
+        <TargetRow
+          target={createTarget.dest}
+          kind={createTarget.kind}
+          noun={createNoun}
+          title={
+            createTarget.dest.id === null
+              ? "Root"
+              : (lookupNode(createTarget.dest.id)?.title ?? createTarget.dest.title)
+          }
+          path={
+            createTarget.dest.parentPath.length > 0
+              ? createTarget.dest.parentPath.join(" / ")
+              : null
+          }
+          onJump={() => jumpToDestination(createTarget.dest)}
+          onCreate={() => void quickCreateAtDestination(createTarget.dest)}
+        />
+      ) : null}
       <input
         value={query}
         onChange={(e) => setQuery(e.target.value)}
@@ -1045,10 +1076,9 @@ export function ContentTreePicker({
           )
         ) : (
           <>
-            {quickCreate &&
-            (activeTarget || destinations.length > 0 || openDestinations.length > 0) ? (
+            {quickCreate && (destinations.length > 0 || openDestinations.length > 0) ? (
               <JumpTo
-                active={activeTarget}
+                excludeId={createTarget ? createTarget.dest.id : undefined}
                 recent={destinations}
                 open={openDestinations}
                 section={destinationsSection}
@@ -1369,22 +1399,18 @@ function QuickCreateButton({
 }
 
 /**
- * Jump-to — the picker's top block. A TARGET ROW first: the folder a new item
- * will land in, with its "+" — the active tab's folder (drawn in the tree's
- * deep gold, so it reads as "beside what I'm working on") or, when the tree
- * can't place the active tab, the last place you created. Beneath it, one
- * compact chip row holds two reference lists: "Recent" (folders you last
- * created in, minus the target) and "Open" (folders holding the content open
- * in this workspace). Click a chip to unfold its list IN PLACE (one at a
- * time), click again to fold it. Each listed folder: click = go there in the
- * browse tree, "+" = create inside it. (A hover flyout was tried and removed
- * 2026-10-04: the picker sits at the screen edge, so a flyout beside it has
- * nowhere good to go; a bare icon+name beside the chip row's "+" was tried
- * and dropped the same day as cramped.) Promoted above the tree because it is
- * most useful exactly when it differs from where the file tree is pointing.
+ * Jump-to — the reference lists under the target header: ONE compact chip row
+ * holding "Recent" (folders you last created in, minus the target) and "Open"
+ * (folders holding the content open in this workspace). Click a chip to
+ * unfold its list IN PLACE (one at a time), click again to fold it. Each
+ * listed folder: click = go there in the browse tree, "+" = create inside it.
+ * (A hover flyout was tried and removed 2026-10-04: the picker sits at the
+ * screen edge, so a flyout beside it has nowhere good to go.) Promoted above
+ * the tree because it is most useful exactly when it differs from where the
+ * file tree is pointing.
  */
 function JumpTo({
-  active,
+  excludeId,
   recent,
   open,
   section,
@@ -1394,8 +1420,8 @@ function JumpTo({
   onJump,
   onCreate,
 }: {
-  /** The active tab's folder, when the tree can place it. */
-  active: CreateDestination | null;
+  /** The target header's folder — not repeated in Recent. undefined = none. */
+  excludeId: string | null | undefined;
   recent: CreateDestination[];
   open: OpenDestination[];
   section: "recent" | "open" | null;
@@ -1406,17 +1432,8 @@ function JumpTo({
   onJump: (destination: CreateDestination) => void;
   onCreate: (destination: CreateDestination) => void;
 }) {
-  // The row's "+" target: the ACTIVE tab's folder when the tree can place it
-  // (the row is drawn in the tree's active gold so it reads as "this tab's
-  // place"), else the latest create, else the first open folder. Whatever it
-  // is, it is not listed again below — deduped from Recent by id.
-  const kind: "active" | "recent" | "open" = active
-    ? "active"
-    : recent.length > 0
-      ? "recent"
-      : "open";
-  const latest = active ?? recent[0] ?? open[0];
-  const recentList = recent.filter((d) => d.id !== latest.id);
+  const recentList =
+    excludeId === undefined ? recent : recent.filter((d) => d.id !== excludeId);
   const titleOf = (d: CreateDestination) =>
     d.id === null ? "Root" : (lookupTitle(d.id) ?? d.title);
   const pathOf = (d: CreateDestination) =>
@@ -1469,68 +1486,6 @@ function JumpTo({
 
   return (
     <div className="border-b border-black/5 dark:border-white/5 pb-1 mb-1">
-      {/* The create target. Drawn in the tree's ACTIVE tone (deep gold + rail)
-          when it is the active tab's folder, neutral when it is only the last
-          place you created. Click the name to see it in the tree; "+" creates. */}
-      <div
-        className={cn(
-          "flex w-full items-center gap-2 py-1.5 pl-3 pr-2 text-xs",
-          kind === "active"
-            ? "bg-gold-primary/[0.22] shadow-[inset_2px_0_0_0_var(--gold-primary)] dark:bg-gold-primary/[0.28]"
-            : "bg-black/[0.03] dark:bg-white/[0.04]",
-        )}
-      >
-        <button
-          type="button"
-          onClick={() => onJump(latest)}
-          title="Show this folder in the tree"
-          className="flex min-w-0 flex-1 items-center gap-2 text-left outline-none"
-        >
-          {destIcon(
-            latest,
-            cn(
-              "h-3.5 w-3.5 shrink-0",
-              kind === "active" ? "text-gold-primary" : "text-yellow-500/80",
-            ),
-          )}
-          <span className="flex min-w-0 flex-col leading-tight">
-            <span
-              className={cn(
-                "text-[10px] font-medium uppercase tracking-wider",
-                kind === "active" ? "text-gold-primary/80" : "text-gray-500",
-              )}
-            >
-              {kind === "active"
-                ? `New ${noun.toLowerCase()} beside this tab`
-                : kind === "recent"
-                  ? `New ${noun.toLowerCase()} where you last created`
-                  : `New ${noun.toLowerCase()} in an open folder`}
-            </span>
-            <span
-              className={cn(
-                "truncate",
-                kind === "active"
-                  ? "font-medium text-gold-primary"
-                  : "text-gray-700 dark:text-gray-300",
-              )}
-            >
-              {titleOf(latest)}
-              {pathOf(latest) ? (
-                <span className="ml-1 text-[10px] font-normal text-gray-400 dark:text-gray-500">
-                  · {pathOf(latest)}
-                </span>
-              ) : null}
-            </span>
-          </span>
-        </button>
-        <QuickCreateButton
-          noun={noun}
-          title={`+ New ${noun} in ${titleOf(latest)}`}
-          onClick={() => onCreate(latest)}
-          className="ml-0"
-        />
-      </div>
-
       {recentList.length > 0 || open.length > 0 ? (
         <div className="flex w-full items-center gap-1.5 py-1 pl-3 pr-2 text-xs">
           {recentList.length > 0
@@ -1575,6 +1530,97 @@ function JumpTo({
           />
         </div>
       ))}
+    </div>
+  );
+}
+
+type TargetKind = "active" | "recent" | "open";
+
+/**
+ * Target header — ABOVE the search box, always visible, one line: where a new
+ * item will land, with its "+". `[tag] [icon] [name…] [+]`. The tag is the
+ * only fixed-width part (`shrink-0`, no wrap); the name is the one flexible
+ * part (`min-w-0 flex-1 truncate`), so a long folder name ellipsizes instead
+ * of pushing the tag or the "+" out of the row, and the full name + path ride
+ * in the tooltip. In the tree's deep gold with its rail when the target is
+ * the active tab's folder; neutral for the last-created / open fallbacks.
+ */
+function TargetRow({
+  target,
+  kind,
+  noun,
+  title,
+  path,
+  onJump,
+  onCreate,
+}: {
+  target: CreateDestination;
+  kind: TargetKind;
+  noun: string;
+  /** Live title from the loaded tree. */
+  title: string;
+  path: string | null;
+  onJump: () => void;
+  onCreate: () => void;
+}) {
+  const tag =
+    kind === "active" ? "Active tab" : kind === "recent" ? "Last created" : "Open";
+  const full = path ? `${path} / ${title}` : title;
+  return (
+    <div
+      className={cn(
+        "flex w-full shrink-0 items-center gap-2 border-b border-black/5 py-1.5 pl-3 pr-2 text-xs dark:border-white/5",
+        kind === "active"
+          ? "bg-gold-primary/[0.22] shadow-[inset_2px_0_0_0_var(--gold-primary)] dark:bg-gold-primary/[0.28]"
+          : "bg-black/[0.03] dark:bg-white/[0.04]",
+      )}
+    >
+      <button
+        type="button"
+        onClick={onJump}
+        title={`${tag} destination: ${full} — click to show it in the tree`}
+        className="flex min-w-0 flex-1 items-center gap-2 text-left outline-none"
+      >
+        <span
+          className={cn(
+            "shrink-0 whitespace-nowrap text-[10px] font-medium uppercase tracking-wider",
+            kind === "active" ? "text-gold-primary/80" : "text-gray-500",
+          )}
+        >
+          {tag}
+        </span>
+        {target.id === null ? (
+          <Home
+            className={cn(
+              "h-3.5 w-3.5 shrink-0",
+              kind === "active" ? "text-gold-primary" : "text-yellow-500/80",
+            )}
+          />
+        ) : (
+          <Folder
+            className={cn(
+              "h-3.5 w-3.5 shrink-0",
+              kind === "active" ? "text-gold-primary" : "text-yellow-500/80",
+            )}
+          />
+        )}
+        <span
+          className={cn(
+            "min-w-0 flex-1 truncate",
+            kind === "active"
+              ? "font-medium text-gold-primary"
+              : "text-gray-700 dark:text-gray-300",
+          )}
+        >
+          {title}
+        </span>
+      </button>
+      <QuickCreateButton
+        noun={noun}
+        title={`+ New ${noun} in ${title}`}
+        onClick={onCreate}
+        className="ml-0"
+      />
     </div>
   );
 }
