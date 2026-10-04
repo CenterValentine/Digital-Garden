@@ -449,8 +449,14 @@ export function ContentTreePicker({
   // twice in a row (the user scrolled away and clicked it again).
   const [reveal, setReveal] = useState<{ id: string; nonce: number } | null>(
     () => {
+      // Where the user is: the tree's single selection, else the content
+      // open in the main panel (a Note Window's host note, a tab opened
+      // from search — anything the tree isn't selecting).
       const ids = useTreeStateStore.getState().selectedIds;
-      const only = ids.length === 1 ? ids[0] : null;
+      const only =
+        ids.length === 1
+          ? ids[0]
+          : useContentStore.getState().selectedContentId;
       return only && !only.startsWith("temp-") ? { id: only, nonce: 0 } : null;
     },
   );
@@ -567,7 +573,9 @@ export function ContentTreePicker({
           // The selected row must be VISIBLE, whatever the tree has
           // collapsed above it — unfold its ancestors.
           const selectedOnly =
-            treeState.selectedIds.length === 1 ? treeState.selectedIds[0] : null;
+            treeState.selectedIds.length === 1
+              ? treeState.selectedIds[0]
+              : useContentStore.getState().selectedContentId;
           if (selectedOnly && idsInTree.has(selectedOnly)) {
             for (const id of ancestorIds(selectedOnly, parentById)) seed.add(id);
           }
@@ -648,20 +656,30 @@ export function ContentTreePicker({
       .slice(0, 6);
   }, [recentDestinations, derivedDestinations, lookupNode]);
 
-  // Where the list opens. The first time a tree is on screen, scroll so the
-  // scope HEADER sits at the top — the root/view is what you browse from —
-  // leaving "Recent destinations" just above, one scroll-up away (owner,
-  // 2026-10-04). Then, if the revealed row (the tree's selection, or a
-  // destination just jumped to) is outside the visible window, bring it in
-  // with the MINIMUM scroll ("nearest"), never re-centring over the header.
-  // Rows carry scroll-mt so a row scrolled to the top clears the sticky
-  // header. Runs after paint (rows must exist) and reads the DOM through
-  // refs — never during render.
+  // Where the list opens: ON THE USER'S PERSPECTIVE. The first time a tree is
+  // on screen, the row where the user is (tree selection, else the active
+  // content) is centred, so the picker opens at the place they already see.
+  // With nothing to focus, the scope HEADER goes to the top instead (recents
+  // one scroll-up above). Later reveals (a destination jump) re-centre the
+  // target. Rows carry scroll-mt so a row scrolled to the edge clears the
+  // sticky header. Runs after paint (rows must exist) and reads the DOM
+  // through refs — never during render.
   const didAlignRef = useRef(false);
   useEffect(() => {
     if (!tree) return;
     const list = listRef.current;
-    if (list && !didAlignRef.current) {
+    if (!list) return;
+    const target = reveal
+      ? list.querySelector<HTMLElement>(
+          `[data-row-id="${CSS.escape(reveal.id)}"]`,
+        )
+      : null;
+    if (target) {
+      didAlignRef.current = true;
+      target.scrollIntoView({ block: "center" });
+      return;
+    }
+    if (!didAlignRef.current) {
       didAlignRef.current = true;
       const header = list.querySelector<HTMLElement>("[data-scope-header]");
       if (header) {
@@ -669,10 +687,6 @@ export function ContentTreePicker({
           header.getBoundingClientRect().top - list.getBoundingClientRect().top;
       }
     }
-    if (!reveal) return;
-    list
-      ?.querySelector<HTMLElement>(`[data-row-id="${CSS.escape(reveal.id)}"]`)
-      ?.scrollIntoView({ block: "nearest" });
   }, [reveal, tree]);
 
   // Debounced server search while typing.
