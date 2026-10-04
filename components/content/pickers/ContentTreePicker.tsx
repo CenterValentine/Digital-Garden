@@ -1057,7 +1057,14 @@ export function ContentTreePicker({
         </button>
       ) : null}
 
-      <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto py-1">
+      <div
+        ref={listRef}
+        // No top padding in browse mode: the sticky scope header must sit
+        // flush with whatever is above it, and padding here left a strip
+        // above it that scrolled rows showed through. Search results have no
+        // header, so they keep the breathing room.
+        className={cn("min-h-0 flex-1 overflow-y-auto pb-1", activeQuery && "pt-1")}
+      >
         {createError ? (
           <div className="px-3 py-1 text-[11px] text-red-500">{createError}</div>
         ) : null}
@@ -1502,7 +1509,9 @@ function JumpTo({
   };
 
   return (
-    <div className="border-b border-black/5 dark:border-white/5 pb-1 mb-1">
+    // No bottom border or margin: the scope header right below carries its own
+    // top border, and a second rule plus a gap between them read as a hole.
+    <div className="pb-1">
       {recentList.length > 0 || open.length > 0 ? (
         <div className="flex w-full items-center gap-1.5 py-1 pl-3 pr-2 text-xs">
           {recentList.length > 0
