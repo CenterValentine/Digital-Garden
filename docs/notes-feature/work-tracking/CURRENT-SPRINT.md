@@ -9,6 +9,30 @@ last_updated: 2026-05-13
 
 # Current Sprint Addendum
 
+## October 3, 2026 — Wiki-link views + move to note
+
+**Tree**: worktree `.claude/worktrees/wikilink-views`, branch `feat/wikilink-views` (off `origin/main` at `2d3797f3`)
+**Status**: typecheck / lint 151 (0 errors, none new) / markdown:blocks (+15 fixtures, +13 shape assertions) / collab:schema / private:content green; **owner browser smoke pending**. **⚠ Hocuspocus redeploy required post-merge** (schema 1.20.0: `wikiLink.view` attr — an un-redeployed collab server drops it from live documents). Plan: `WIKILINK-VIEWS-PLAN.md`.
+
+### Shipped
+- **One link, four displays.** `wikiLink.view` ∈ link (default) / chip / card; the window stays the `noteWindow` block and `applyLinkView` (`lib/domain/editor/link-views.ts`) converts both ways (paragraph split on the way out, paragraph-with-link on the way back). Chip/card are a vanilla-DOM NodeView over renderHTML's own span (`wiki-link-node-view.ts`); card text from `link-preview.ts` (one cache per target, `content-updated` invalidates, private content stripped).
+- **Chosen in place.** Hover chooser (`wiki-link-hover.tsx`, tippy + `LinkViewChooser`), the same chooser in the window header ("Display as…"), and a "Display as" submenu in the context menu on links and window headers. Window needs a ContentNode id: title-only links resolve + heal first; heading/anchored/virtual targets say why they can't.
+- **Shared underneath.** `wiki-link-attrs.ts` is the one attr spec for both nodes; a `![[Title]]` with no id resolves by title via `resolveWikiLinkTarget` (the click rule). Autosuggest and the window picker untouched.
+- **Markdown.** `wiki-link-markdown.ts` grammar + `dgWikiLink`/`dgNoteWindow` turndown rules + `wikiLinkCodec`/`noteWindowCodec` reTags: `[[Title|alias]]{#id .card .no-context label="…" slug=…}`, `![[Title]]{#id block=… height=… .no-border view=… row=…}`. `ServerNoteWindow.renderHTML` symmetric; public safety moved to `publicSafeNoteWindows` in `TipTapContent`.
+- ~~Send to New Note~~ — folded into Move to Note (owner, round 7): the picker's "+ New Note" is the one way to make a new note for the selection.
+- **Context menu** acts on the clicked editor (`editorForContext`), not the first in the store.
+- **Move highlight to note** (`move-selection.ts`, `selection-blocks.ts`, `MoveSelectionPicker.tsx`, `POST /api/content/content/[id]/append`): one item, no submenu, always leaves a link (round 9 — "No link" removed; the point is building content out into other notes). The shared tree picker targets an existing note or creates one in place via "+ New Note" (named from the selection's first heading/line); blocks append to the end of the target (buffer paragraph when non-empty) followed by a `From [[Host]]` provenance stamp, through the live editor or the collab-safe server writer; the selection here becomes a link in the last-used display (`lastUsedLinkView`, localStorage) — whole blocks replaced by one paragraph, no empty block left. **Disabled offline**, and refused at pick time if the connection dropped meanwhile.
+- **Chooser polish** (owner rounds 2–5): skeleton tiles instead of icons, slimmer, editable label (same box, scroll inside), window header opens on hover beside its button, window Open is a workspace tab (#278's destination rule).
+
+### Smoke checklist (owner)
+1. Type `[[` → pick a note → hover the link → chooser appears; pick Card → excerpt shows; pick Window → block appears, paragraph split around it; in the window header "Display as…" → Link → back to a paragraph.
+2. Source view: a paragraph with a link reads `see [[Title]]{#…}`; a window reads `![[Title]]{#… block=…}`; toggle back → identical.
+3. Type `![[Some existing note]]` in source view → apply → the window resolves by title and shows the note.
+4. Select two paragraphs → right-click → Move highlight to note → "+ New Note" on this note's folder → a note named from the selection's first line is created there with the blocks followed by `From [[This note]]`; the two paragraphs here become one line holding a link; toast Open works.
+5. Move highlight to note → pick an OPEN note → the paragraphs appear at its end after a blank line, then the stamp. Repeat on a note that is NOT open → the target shows the blocks and the stamp when opened; the link here uses the display you last chose.
+6. Publish a note with a window → published HTML shows "Windowed note: Title" with no ids.
+7. Turn the network off (DevTools → Network → Offline) → right-click a selection → "Move highlight to note" is greyed out with "you're offline" on hover.
+
 ## September 25, 2026 — Private content (comment out prose)
 
 **Tree**: worktree `.claude/worktrees/private-text`, branch `feat/private-text` (off `origin/main` at `e171048f`)

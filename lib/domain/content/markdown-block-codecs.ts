@@ -14,6 +14,16 @@
  */
 
 import type { JSONContent } from "@tiptap/core";
+import {
+  NOTE_WINDOW_MARKDOWN_RE,
+  WIKI_LINK_MARKDOWN_RE,
+  noteWindowAttrsToHtml,
+  noteWindowToMarkdown,
+  parseNoteWindowMarkdown,
+  parseWikiLinkMarkdown,
+  wikiLinkAttrsToHtml,
+  type NoteWindowMarkdownAttrs,
+} from "./wiki-link-markdown";
 
 export interface BlockMarkdownCodec {
   /** Node type this codec handles (e.g. "callout"). */
@@ -248,12 +258,79 @@ const accordionCodec: BlockMarkdownCodec = {
   },
 };
 
+/** Apply `fn` only to the text between tags — never inside a tag's attributes. */
+function outsideTags(html: string, fn: (text: string) => string): string {
+  return html
+    .split(/(<[^>]+>)/g)
+    .map((part, i) => (i % 2 === 1 ? part : fn(part)))
+    .join("");
+}
+
+/**
+ * Note Window ⇄ `![[Title]]{#id …}` — Obsidian's transclusion syntax, which
+ * is what a window is. Grammar in lib/domain/content/wiki-link-markdown.ts
+ * (shared with the inline link below and the turndown rule that writes a
+ * window nested inside another container). An unassigned window, or a
+ * title the grammar can't carry, declines and fences.
+ *
+ * marked leaves `![[…]]` alone (image syntax needs a parenthesised source),
+ * so it arrives as a one-line paragraph; reTag swaps that paragraph for the
+ * `div[data-block-type="noteWindow"]` the block's parseHTML reads.
+ */
+const noteWindowCodec: BlockMarkdownCodec = {
+  type: "noteWindow",
+  toMarkdown(node) {
+    return noteWindowToMarkdown((node.attrs ?? {}) as NoteWindowMarkdownAttrs);
+  },
+  reTag(html) {
+    return outsideCode(html, (segment) =>
+      segment.replace(NOTE_WINDOW_MARKDOWN_RE, (whole, body: string, brace: string | undefined) => {
+        const attrs = parseNoteWindowMarkdown(body, brace ?? null);
+        return attrs ? noteWindowAttrsToHtml(attrs) : whole;
+      }),
+    );
+  },
+};
+
+/**
+ * Wiki-link ⇄ `[[Title|alias]]{#id .card …}`.
+ *
+ * Serialize side is the `dgWikiLink` turndown rule (an inline node has no
+ * block-level codec slot — the private-text precedent); this entry is the
+ * parse-side half. marked leaves the brackets as literal text, so reTag
+ * rewrites them into `span[data-type="wiki-link"]` — outside code, where
+ * the characters are content, and outside tags, so a title that happens to
+ * sit in an attribute (an accordion header) is left alone. Literal `[[x]]`
+ * in ordinary prose re-parses as a link, fails self-verify, and fences:
+ * lossless, just opaque, for that input.
+ */
+const wikiLinkCodec: BlockMarkdownCodec = {
+  type: "wikiLink",
+  toMarkdown() {
+    return null; // inline — the turndown tier writes it
+  },
+  reTag(html) {
+    return outsideCode(html, (segment) =>
+      outsideTags(segment, (text) =>
+        text.replace(WIKI_LINK_MARKDOWN_RE, (whole, body: string, brace: string | undefined) => {
+          const attrs = parseWikiLinkMarkdown(body, brace ?? null);
+          return attrs ? wikiLinkAttrsToHtml(attrs) : whole;
+        }),
+      ),
+    );
+  },
+};
+
 export const BLOCK_CODECS: BlockMarkdownCodec[] = [
   calloutCodec,
   headingCodec,
   privateBlockCodec,
   privateTextCodec,
   accordionCodec,
+  // The window reTag consumes `![[…]]` paragraphs before the inline link
+  // reTag sees them (its regex also refuses a leading `!`, belt and braces).
+  noteWindowCodec,
+  wikiLinkCodec,
 ];
 
 const CODEC_BY_TYPE = new Map(BLOCK_CODECS.map((c) => [c.type, c]));

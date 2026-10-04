@@ -23,6 +23,7 @@ import { AiImageGenDialog } from "@/components/content/ai/AiImageGenDialog";
 import { BubbleMenu } from "./BubbleMenu";
 import { TemplatePicker } from "./TemplatePicker";
 import { SnippetPicker } from "./SnippetPicker";
+import { MoveSelectionPicker } from "./MoveSelectionPicker";
 import { TableBubbleMenu } from "./TableBubbleMenu";
 import { ImageBubbleMenu } from "./ImageBubbleMenu";
 import { extractOutline, type OutlineHeading } from "@/lib/domain/content/outline-extractor";
@@ -1798,6 +1799,9 @@ export function MarkdownEditor({
       {/* Template / Snippet pickers — event-driven, no props needed */}
       <TemplatePicker />
       <SnippetPicker />
+
+      {/* "Move to Note" target picker — event-driven, addressed to THIS editor */}
+      <MoveSelectionPicker editor={editor} />
 
       {/* /ai-image slash command target — mounted only when triggered.
           The new image becomes "referenced" (hidden behind the

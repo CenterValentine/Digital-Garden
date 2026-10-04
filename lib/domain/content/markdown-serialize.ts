@@ -35,6 +35,7 @@ import TurndownService from "turndown";
 import { gfm } from "turndown-plugin-gfm";
 import { serializeUnknownBlock, restoreDgBlocks, DG_BLOCK_PREFIX } from "./markdown-fences";
 import { getBlockCodec, applyBlockReTags } from "./markdown-block-codecs";
+import { noteWindowToMarkdown, wikiLinkToMarkdown } from "./wiki-link-markdown";
 
 /**
  * The TipTap HTML (de)serialization pair. Injectable so the CI gate can supply a
@@ -156,6 +157,50 @@ export function createTurndown(
     filter: (node) =>
       node.nodeName === "DIV" && node.getAttribute("data-private") === "block",
     replacement: (content) => `\n\n%%\n\n${content.trim()}\n\n%%\n\n`,
+  });
+  // Wiki-links → `[[Title|alias]]{#id .card …}`; a Note Window nested inside
+  // another container (callout, column, blockquote) → `![[Title]]{#id …}`.
+  // Grammar shared with the parse side in wiki-link-markdown.ts; top-level
+  // windows take the codec path, which emits the identical shape. Before
+  // this rule a paragraph holding a link fell to the HTML tier — the source
+  // view showed `<span data-type="wiki-link" …>` for every linked sentence.
+  // A link the grammar can't carry keeps turndown's default (its text),
+  // which fails self-verify and falls to that HTML tier as before.
+  td.addRule("dgWikiLink", {
+    filter: (node) =>
+      node.nodeName === "SPAN" && node.getAttribute("data-type") === "wiki-link",
+    replacement: (content, node) => {
+      const el = node as HTMLElement;
+      const md = wikiLinkToMarkdown({
+        targetId: el.getAttribute("data-target-id"),
+        targetTitle: el.getAttribute("data-target-title"),
+        displayText: el.getAttribute("data-display-text"),
+        headingSlug: el.getAttribute("data-heading-slug"),
+        anchor: el.getAttribute("data-anchor"),
+        anchorLabel: el.getAttribute("data-anchor-label"),
+        expand: el.getAttribute("data-expand") === "false" ? false : null,
+        view: el.getAttribute("data-view"),
+      });
+      return md ?? content;
+    },
+  });
+  td.addRule("dgNoteWindow", {
+    filter: (node) =>
+      node.nodeName === "DIV" && node.getAttribute("data-block-type") === "noteWindow",
+    replacement: (content, node) => {
+      const el = node as HTMLElement;
+      const height = Number(el.getAttribute("data-height"));
+      const md = noteWindowToMarkdown({
+        blockId: el.getAttribute("data-block-id"),
+        targetContentId: el.getAttribute("data-target-content-id"),
+        targetTitle: el.getAttribute("data-target-title"),
+        targetViewId: el.getAttribute("data-target-view-id"),
+        targetRowId: el.getAttribute("data-target-row-id"),
+        height: Number.isFinite(height) && el.hasAttribute("data-height") ? height : null,
+        showBorder: el.getAttribute("data-show-border") === "false" ? false : null,
+      });
+      return md ? `\n\n${md}\n\n` : content;
+    },
   });
   // TipTap tables need our own rules — the GFM plugin's don't fit its HTML:
   //   • it only converts a table whose first row is a heading row, and that test

@@ -264,6 +264,47 @@ authoritative, so the edit is written **through the live editor instance**
 a REST PATCH of `NotePayload`, which would diverge the two stores. Plain notes
 use REST. See `MainPanelContent`'s `applySourceMode`.
 
+### 5e. Inline nodes with attributes markdown can't say (the wiki-link lesson)
+
+A `[[link]]` is an inline atom whose attrs are the whole point — the
+rename-durable target id, the alias, the chosen display. Turndown's default
+emitted its text, that re-parsed as plain text, and every paragraph holding a
+link fell to the HTML tier (`<p>see <span data-type="wiki-link" …>`).
+
+The shape that works is **one pure grammar module used by both halves**:
+`lib/domain/content/wiki-link-markdown.ts` serializes (`wikiLinkToMarkdown`,
+`noteWindowToMarkdown`) and parses (`parseWikiLinkMarkdown`,
+`parseNoteWindowMarkdown`), and the turndown rules (`dgWikiLink`,
+`dgNoteWindow`) and codec reTags (`wikiLinkCodec`, `noteWindowCodec`) are
+thin wrappers over it, so write and read cannot disagree. Attributes markdown
+has no syntax for ride in a pandoc-style brace after the link — the same
+grammar as `{.collapsed}`:
+
+```
+[[Title|alias]]{#<targetId> .card .no-context label="…" slug=…}
+![[Title]]{#<targetId> block=<blockId> height=300 .no-border}
+```
+
+Three rules this adds to the recipe:
+
+- **Decline, don't approximate.** A title the grammar can't carry (`[ ] { } |`
+  newline) returns `null` from the serializer, so turndown keeps its default
+  and the paragraph takes the HTML tier. Half-pretty output would be rejected
+  by the self-verify anyway; declining is just faster and clearer.
+- **Rewrite only text.** The reTag runs `outsideCode` AND `outsideTags`, so
+  `[[…]]` inside a `<code>` run or inside another block's attribute value (an
+  accordion `data-header`) is left alone.
+- **Make the block's HTML symmetric first, then move any public-safety
+  stripping to the public seam.** `ServerNoteWindow.renderHTML` used to emit a
+  title-only placeholder (no UUID in published HTML), which made
+  `generateJSON(generateHTML(window)) ≠ window` and barred any pretty form. It
+  now renders every attr, and `components/public/TipTapContent.tsx` strips all
+  but the title before serialising (`publicSafeNoteWindows`) — exactly how
+  private content is handled. One explicit seam, not a lossy renderer.
+
+The gate asserts the shapes (`wiki-link markdown — …`), the declines, and the
+inline-attr sweep covers every attr on the node automatically.
+
 ---
 
 ## 6. Running the gate

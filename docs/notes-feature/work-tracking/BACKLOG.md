@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-10-02
+last_updated: 2026-10-03
 ---
 
 # Sprint Backlog
@@ -56,6 +56,14 @@ while browsing beside my work" is wanted, it is a `pin: true` on that call
 path and probably belongs to the same control.
 
 ---
+## Wiki-link views — follow-ups (2026-10-03, plan `WIKILINK-VIEWS-PLAN.md`)
+
+- [ ] **Hocuspocus redeploy** after `feat/wikilink-views` merges (schema 1.20.0, `wikiLink.view`).
+- [ ] **Card preview for non-note targets** — folders, databases and files show the type word as the excerpt; a per-type summary (row count, file size, child count) is the nicety.
+- [ ] **Window → link drops `targetViewId` / `targetRowId`** (database windows); re-windowing picks the default view. Revisit with DATABASE Phase 2.
+- [ ] **"Send to…" destination picker** — `Send to New Note` creates beside the host; a `ContentTreePicker` flavor could offer a folder. Not built: the sibling placement is the structurally sound default.
+- [ ] **Typed input rule for the braced form** — typing `[[Title]]{#id}` by hand goes through the bare rule; the brace stays as text. Paste-as-markdown handles it.
+- [ ] **Hover chooser on touch** — no hover on touch devices; the context menu "Display as" is the reachable copy today.
 
 ## One tree-browse menu — proposed (2026-10-02, owner; PR #277 context)
 
