@@ -15,8 +15,8 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
-import { Bug, ExternalLink, Lightbulb, Loader2, MessageSquarePlus, Wrench } from "lucide-react";
+import { useEffect, useRef, useState, type ClipboardEvent, type DragEvent, type ReactNode } from "react";
+import { Bug, ChevronDown, ExternalLink, Lightbulb, Loader2, MessageSquarePlus, Plus, Wrench, X } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -26,6 +26,7 @@ import {
   DialogTitle,
 } from "@/components/ui/glass/dialog";
 import { Button } from "@/components/ui/glass/button";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/client/ui/tooltip";
 import { cn } from "@/lib/core/utils";
 import { useThemePreference } from "@/lib/features/theme";
 import {
@@ -33,14 +34,25 @@ import {
   FEEDBACK_KINDS,
   FEEDBACK_KIND_ORDER,
   FEEDBACK_LIMITS,
+  FEEDBACK_TYPE_FLAGS,
   buildGitHubNewIssueUrl,
   composeIssue,
+  extraLabelCandidates,
   missingRequired,
   type ClientDiagnostics,
   type FeedbackInput,
   type FeedbackKind,
+  type RepoLabel,
 } from "@/lib/domain/feedback/issue-templates";
+import {
+  FEEDBACK_IMAGE_TYPES,
+  imageMarkdown,
+  insertAtSelection,
+  isLocalOrigin,
+  uploadPlaceholder,
+} from "@/lib/domain/feedback/attachments";
 import { useFeedbackDialogStore } from "@/state/feedback-dialog-store";
+import { uploadFeedbackScreenshot } from "./upload-screenshot";
 
 const KIND_ICONS: Record<FeedbackKind, typeof Bug> = {
   bug: Bug,
@@ -53,10 +65,47 @@ const inputClass =
 
 const labelClass = "text-[11px] uppercase tracking-wide text-gray-400";
 
+const chipClass = "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs transition-colors";
+const chipIdleClass =
+  "border-black/10 text-gray-500 hover:border-black/20 hover:text-gray-900 dark:border-white/10 dark:text-gray-400 dark:hover:border-white/25 dark:hover:text-gray-100";
+
 interface FeedbackConfig {
   inApp: boolean;
   repo: string;
   username: string | null;
+  /** Repo labels this user may apply; null when GitHub couldn't be reached. */
+  labels: RepoLabel[] | null;
+}
+
+function LabelDot({ color }: { color: string }) {
+  return <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: `#${color}` }} />;
+}
+
+/** Hover card for a label chip: the GitHub label's name and description. */
+function LabelTip({
+  name,
+  info,
+  note,
+  children,
+}: {
+  name: string;
+  info?: RepoLabel;
+  note?: string;
+  children: ReactNode;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{children}</TooltipTrigger>
+      {/* z above the dialog (z-[300]); the shared tooltip defaults to z-50. */}
+      <TooltipContent side="top" className="z-[400] max-w-xs border border-white/10 bg-gray-900 text-gray-100">
+        <p className="font-medium">
+          {info && <LabelDot color={info.color} />} <span className="font-mono">{name}</span>
+        </p>
+        <p className="text-gray-300">{info?.description ?? "No description on GitHub yet."}</p>
+        {note && <p className="mt-1 text-gray-400">{note}</p>}
+      </TooltipContent>
+    </Tooltip>
+  );
 }
 
 export function FeedbackDialog() {
@@ -103,26 +152,33 @@ function Body({ onClose }: { onClose: () => void }) {
   const [config, setConfig] = useState<FeedbackConfig | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{ text: string; fallbackUrl?: string } | null>(null);
+  const [showMoreLabels, setShowMoreLabels] = useState(false);
+  const [labelFilter, setLabelFilter] = useState("");
+  const [uploading, setUploading] = useState(0);
+  const uploadSeq = useRef(0);
+  const [localOrigin] = useState(() => isLocalOrigin(window.location.origin));
 
   useEffect(() => {
     let mounted = true;
-    Promise.all([
-      fetch("/api/feedback", { credentials: "include" }).then((r) => r.json()),
-      fetch("/api/auth/session", { credentials: "include" }).then((r) => r.json()),
-    ])
-      .then(([fb, auth]) => {
+    fetch("/api/feedback", { credentials: "include" })
+      .then((r) => r.json())
+      .then((json) => {
         if (!mounted) return;
-        const data = (fb as { data?: { inApp?: boolean; repo?: string } }).data;
-        const user = (auth as { data?: { user?: { username?: string } } | null }).data?.user;
+        const data = (
+          json as {
+            data?: { inApp?: boolean; repo?: string; username?: string; labels?: RepoLabel[] | null };
+          }
+        ).data;
         setConfig({
           inApp: !!data?.inApp,
           repo: data?.repo ?? "",
-          username: user?.username ?? null,
+          username: data?.username ?? null,
+          labels: data?.labels ?? null,
         });
       })
       .catch(() => {
         // Unknown → assume the GitHub fallback; it always works.
-        if (mounted) setConfig({ inApp: false, repo: "", username: null });
+        if (mounted) setConfig({ inApp: false, repo: "", username: null, labels: null });
       });
     return () => {
       mounted = false;
@@ -135,16 +191,125 @@ function Body({ onClose }: { onClose: () => void }) {
     title: draft.title,
     fields: draft.fields,
     areas: draft.areas,
+    flags: kind === "modification" ? draft.flags : [],
+    extraLabels: draft.extraLabels,
     severe: kind === "bug" && draft.severe,
     diagnostics: includeDiagnostics ? diagnostics : null,
   };
+  const labelInfo = new Map((config?.labels ?? []).map((l) => [l.name, l]));
+  const extraCandidates = config?.labels ? extraLabelCandidates(config.labels) : [];
+  const permittedExtras = new Set(extraCandidates.map((l) => l.name));
   const missing = missingRequired(input);
-  const preview = composeIssue(input);
+  const preview = composeIssue(input, undefined, { permittedExtras });
   const inApp = config?.inApp ?? false;
   const hasDraft =
     !!draft.title.trim() ||
     Object.values(draft.fields).some((v) => v.trim()) ||
-    draft.areas.length > 0;
+    draft.areas.length > 0 ||
+    draft.flags.length > 0 ||
+    draft.extraLabels.length > 0;
+  const filterText = labelFilter.trim().toLowerCase();
+  const visibleCandidates = extraCandidates.filter(
+    (l) =>
+      !draft.extraLabels.includes(l.name) &&
+      (!filterText ||
+        l.name.toLowerCase().includes(filterText) ||
+        (l.description ?? "").toLowerCase().includes(filterText)),
+  );
+  const extrasFull = draft.extraLabels.length >= FEEDBACK_LIMITS.extras;
+
+  /** Switching forms keeps the title if the other form hasn't got one yet. */
+  function switchKind(next: FeedbackKind) {
+    if (next === kind) return;
+    const target = useFeedbackDialogStore.getState().drafts[next];
+    if (!target.title.trim() && draft.title.trim()) updateDraft(next, { title: draft.title });
+    setKind(next);
+  }
+
+  function clickFlag(flag: (typeof FEEDBACK_TYPE_FLAGS)[number]) {
+    if (kind === "modification") {
+      const has = draft.flags.includes(flag.label);
+      updateDraft(kind, {
+        flags: has ? draft.flags.filter((f) => f !== flag.label) : [...draft.flags, flag.label],
+      });
+    } else if (flag.kind !== kind) {
+      switchKind(flag.kind);
+    }
+  }
+
+  function flagNote(flag: (typeof FEEDBACK_TYPE_FLAGS)[number], active: boolean): string {
+    if (kind === "modification") {
+      return active ? "Click to remove." : "Adds this label alongside minor-modification.";
+    }
+    return flag.kind === kind
+      ? "This form always carries it."
+      : `Switches to the ${FEEDBACK_KINDS[flag.kind].label} form; your title comes along.`;
+  }
+
+  /**
+   * Swap an upload placeholder for its result, reading the field fresh from
+   * the store: the user may have kept typing (or closed the dialog) while
+   * the upload ran.
+   */
+  function replacePlaceholder(forKind: FeedbackKind, fieldId: string, placeholder: string, replacement: string) {
+    const fields = useFeedbackDialogStore.getState().drafts[forKind].fields;
+    updateDraft(forKind, {
+      fields: { ...fields, [fieldId]: (fields[fieldId] ?? "").replace(placeholder, replacement) },
+    });
+  }
+
+  /** Paste/drop screenshots GitHub-style: placeholder now, `![name](url)` when uploaded. */
+  function attachImages(fieldId: string, files: File[], el: HTMLTextAreaElement) {
+    const forKind = kind;
+    const placeholders = files.map((f) => uploadPlaceholder(++uploadSeq.current, f.name || "image"));
+    const { value, cursor } = insertAtSelection(
+      el.value,
+      el.selectionStart ?? el.value.length,
+      el.selectionEnd ?? el.value.length,
+      placeholders.join("\n"),
+    );
+    setField(fieldId, value);
+    requestAnimationFrame(() => el.setSelectionRange(cursor, cursor));
+
+    files.forEach((file, i) => {
+      setUploading((n) => n + 1);
+      uploadFeedbackScreenshot(file)
+        .then(({ name, url }) => replacePlaceholder(forKind, fieldId, placeholders[i], imageMarkdown(name, url)))
+        .catch((error: unknown) => {
+          replacePlaceholder(forKind, fieldId, placeholders[i], "");
+          setNotice({
+            text: `Couldn't attach ${file.name || "the image"}: ${error instanceof Error ? error.message : "upload failed"}`,
+          });
+        })
+        .finally(() => setUploading((n) => n - 1));
+    });
+  }
+
+  function imageFiles(list: FileList | null | undefined): File[] {
+    return Array.from(list ?? []).filter((f) => FEEDBACK_IMAGE_TYPES.has(f.type));
+  }
+
+  function onFieldPaste(fieldId: string, e: ClipboardEvent<HTMLTextAreaElement>) {
+    const files = imageFiles(e.clipboardData?.files);
+    if (files.length === 0) return; // plain text pastes normally
+    e.preventDefault();
+    attachImages(fieldId, files, e.currentTarget);
+  }
+
+  function onFieldDrop(fieldId: string, e: DragEvent<HTMLTextAreaElement>) {
+    const files = imageFiles(e.dataTransfer?.files);
+    if (files.length === 0) return;
+    e.preventDefault();
+    attachImages(fieldId, files, e.currentTarget);
+  }
+
+  function toggleExtra(name: string) {
+    const has = draft.extraLabels.includes(name);
+    if (!has && extrasFull) return;
+    updateDraft(kind, {
+      extraLabels: has ? draft.extraLabels.filter((l) => l !== name) : [...draft.extraLabels, name],
+    });
+  }
 
   function setField(id: string, value: string) {
     updateDraft(kind, { fields: { ...draft.fields, [id]: value } });
@@ -159,7 +324,7 @@ function Body({ onClose }: { onClose: () => void }) {
   }
 
   async function handleSubmit() {
-    if (busy || missing.length > 0) return;
+    if (busy || missing.length > 0 || uploading > 0) return;
 
     if (!inApp) {
       // Synchronous inside the click — popup blockers allow it.
@@ -244,7 +409,7 @@ function Body({ onClose }: { onClose: () => void }) {
                   type="button"
                   role="radio"
                   aria-checked={active}
-                  onClick={() => setKind(k)}
+                  onClick={() => switchKind(k)}
                   className={cn(
                     "flex items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-sm transition-colors",
                     active
@@ -290,42 +455,179 @@ function Body({ onClose }: { onClose: () => void }) {
               maxLength={FEEDBACK_LIMITS.field}
               value={draft.fields[f.id] ?? f.starter ?? ""}
               onChange={(e) => setField(f.id, e.target.value)}
+              onPaste={(e) => onFieldPaste(f.id, e)}
+              onDrop={(e) => onFieldDrop(f.id, e)}
+              onDragOver={(e) => {
+                if (e.dataTransfer?.types?.includes("Files")) e.preventDefault();
+              }}
               placeholder={f.placeholder}
               className={cn(inputClass, "resize-y leading-relaxed")}
             />
           </div>
         ))}
 
-        {/* Areas */}
-        <div className="space-y-1.5">
-          <span className={labelClass}>
-            Area <span className="normal-case tracking-normal">(optional, up to {FEEDBACK_LIMITS.areas})</span>
-          </span>
-          <div className="flex flex-wrap gap-1.5">
-            {FEEDBACK_AREAS.map((a) => {
-              const selected = draft.areas.includes(a.label);
-              const full = !selected && draft.areas.length >= FEEDBACK_LIMITS.areas;
-              return (
-                <button
-                  key={a.label}
-                  type="button"
-                  aria-pressed={selected}
-                  disabled={full}
-                  onClick={() => toggleArea(a.label)}
-                  className={cn(
-                    "rounded-full border px-2.5 py-0.5 text-xs transition-colors",
-                    selected
-                      ? "border-gold-primary/60 bg-gold-primary/15 text-gold-primary"
-                      : "border-black/10 text-gray-500 hover:border-black/20 hover:text-gray-900 dark:border-white/10 dark:text-gray-400 dark:hover:border-white/25 dark:hover:text-gray-100",
-                    full && "cursor-not-allowed opacity-40",
-                  )}
+        <p className="-mt-2 text-[11px] text-gray-400">
+          Paste or drop screenshots into any box. They&apos;re saved to your{" "}
+          <span className="text-gray-500 dark:text-gray-300">Feedback attachments</span> folder and shown
+          publicly in the issue.
+          {localOrigin && (
+            <span className="block text-amber-600 dark:text-amber-400">
+              This is a local server, so GitHub can&apos;t load images linked from it. They&apos;ll show as broken
+              links on the issue.
+            </span>
+          )}
+        </p>
+
+        {/* Labels — the type flags lead, then areas, then any other repo label. */}
+        <TooltipProvider delayDuration={200}>
+          <div className="space-y-2">
+            <span className={labelClass}>Labels</span>
+
+            <div className="flex flex-wrap items-center gap-1.5">
+              {FEEDBACK_TYPE_FLAGS.map((flag) => {
+                const active =
+                  kind === flag.kind || (kind === "modification" && draft.flags.includes(flag.label));
+                const color = labelInfo.get(flag.label)?.color ?? flag.color;
+                return (
+                  <LabelTip key={flag.label} name={flag.label} info={labelInfo.get(flag.label)} note={flagNote(flag, active)}>
+                    <button
+                      type="button"
+                      aria-pressed={active}
+                      onClick={() => clickFlag(flag)}
+                      className={cn(
+                        "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-medium transition-colors",
+                        active ? "text-gray-900 dark:text-gray-100" : chipIdleClass,
+                      )}
+                      style={active ? { borderColor: `#${color}`, backgroundColor: `#${color}33` } : undefined}
+                    >
+                      <LabelDot color={color} />
+                      {flag.display}
+                    </button>
+                  </LabelTip>
+                );
+              })}
+              {kind === "modification" && (
+                <LabelTip
+                  name={FEEDBACK_KINDS.modification.githubLabel}
+                  info={labelInfo.get(FEEDBACK_KINDS.modification.githubLabel)}
+                  note="Small changes always carry this label."
                 >
-                  {a.display}
+                  <span className={cn(chipClass, "cursor-default border-black/10 text-gray-500 dark:border-white/10 dark:text-gray-400")}>
+                    <LabelDot color={labelInfo.get(FEEDBACK_KINDS.modification.githubLabel)?.color ?? "E3CE01"} />
+                    {FEEDBACK_KINDS.modification.githubLabel}
+                  </span>
+                </LabelTip>
+              )}
+            </div>
+
+            <div className="space-y-1">
+              <span className="text-[11px] text-gray-400">Area (up to {FEEDBACK_LIMITS.areas})</span>
+              <div className="flex flex-wrap gap-1.5">
+                {FEEDBACK_AREAS.map((a) => {
+                  const selected = draft.areas.includes(a.label);
+                  const full = !selected && draft.areas.length >= FEEDBACK_LIMITS.areas;
+                  return (
+                    <LabelTip
+                      key={a.label}
+                      name={a.label}
+                      info={labelInfo.get(a.label)}
+                      note={full ? `Up to ${FEEDBACK_LIMITS.areas} areas; remove one first.` : undefined}
+                    >
+                      <button
+                        type="button"
+                        aria-pressed={selected}
+                        aria-disabled={full}
+                        onClick={() => !full && toggleArea(a.label)}
+                        className={cn(
+                          chipClass,
+                          selected ? "border-gold-primary/60 bg-gold-primary/15 text-gold-primary" : chipIdleClass,
+                          full && "cursor-not-allowed opacity-40",
+                        )}
+                      >
+                        {a.display}
+                      </button>
+                    </LabelTip>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <div className="flex flex-wrap items-center gap-1.5">
+                {draft.extraLabels.map((name) => {
+                  const info = labelInfo.get(name);
+                  return (
+                    <LabelTip key={name} name={name} info={info} note="Click to remove.">
+                      <button
+                        type="button"
+                        onClick={() => toggleExtra(name)}
+                        className={cn(chipClass, "border-gold-primary/60 bg-gold-primary/15 text-gold-primary")}
+                      >
+                        {info && <LabelDot color={info.color} />}
+                        {name}
+                        <X className="h-3 w-3" />
+                      </button>
+                    </LabelTip>
+                  );
+                })}
+                <button
+                  type="button"
+                  aria-expanded={showMoreLabels}
+                  disabled={!config?.labels || extraCandidates.length === 0}
+                  title={
+                    config === null
+                      ? "Loading the repository's labels…"
+                      : !config.labels
+                        ? "Couldn't load the repository's labels."
+                        : undefined
+                  }
+                  onClick={() => setShowMoreLabels((v) => !v)}
+                  className={cn(chipClass, "border-dashed", chipIdleClass, "disabled:cursor-not-allowed disabled:opacity-40")}
+                >
+                  {showMoreLabels ? <ChevronDown className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
+                  {showMoreLabels ? "Fewer labels" : "More labels"}
                 </button>
-              );
-            })}
+              </div>
+
+              {showMoreLabels && (
+                <div className="space-y-2 rounded-md border border-black/10 p-2 dark:border-white/10">
+                  <input
+                    type="text"
+                    value={labelFilter}
+                    onChange={(e) => setLabelFilter(e.target.value)}
+                    placeholder="Filter labels"
+                    aria-label="Filter labels"
+                    className={cn(inputClass, "py-1 text-xs")}
+                  />
+                  {extrasFull && (
+                    <p className="text-[11px] text-gray-400">
+                      Up to {FEEDBACK_LIMITS.extras} extra labels; remove one to add another.
+                    </p>
+                  )}
+                  <div className="flex max-h-32 flex-wrap gap-1.5 overflow-y-auto">
+                    {visibleCandidates.length === 0 ? (
+                      <span className="text-xs text-gray-400">No other labels match.</span>
+                    ) : (
+                      visibleCandidates.map((l) => (
+                        <LabelTip key={l.name} name={l.name} info={l}>
+                          <button
+                            type="button"
+                            aria-disabled={extrasFull}
+                            onClick={() => toggleExtra(l.name)}
+                            className={cn(chipClass, chipIdleClass, extrasFull && "cursor-not-allowed opacity-40")}
+                          >
+                            <LabelDot color={l.color} />
+                            {l.name}
+                          </button>
+                        </LabelTip>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+        </TooltipProvider>
 
         {kind === "bug" && (
           <label className="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-300">
@@ -427,7 +729,11 @@ function Body({ onClose }: { onClose: () => void }) {
           </button>
         )}
         <span className="ml-auto hidden text-[11px] text-gray-400 sm:inline">
-          {missing.length > 0 ? `Needs: ${missing.join(", ")}` : "⌘/Ctrl + Enter to send"}
+          {uploading > 0
+            ? `Uploading ${uploading} image${uploading === 1 ? "" : "s"}…`
+            : missing.length > 0
+              ? `Needs: ${missing.join(", ")}`
+              : "⌘/Ctrl + Enter to send"}
         </span>
         <Button type="button" variant="ghost" size="sm" onClick={onClose} disabled={busy}>
           Cancel
@@ -436,7 +742,7 @@ function Body({ onClose }: { onClose: () => void }) {
           type="button"
           size="sm"
           onClick={() => void handleSubmit()}
-          disabled={busy || missing.length > 0 || config === null}
+          disabled={busy || missing.length > 0 || uploading > 0 || config === null}
           className="gap-1.5"
         >
           {busy ? (

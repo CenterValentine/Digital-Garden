@@ -184,9 +184,10 @@ export const FEEDBACK_KINDS: Record<FeedbackKind, FeedbackKindDefinition> = {
 export const FEEDBACK_KIND_ORDER: FeedbackKind[] = ["bug", "feature", "modification"];
 
 /**
- * Area labels a submitter may pick. Every entry is an EXISTING label on the
- * repo — the API applies nothing outside this list, so a client can't attach
- * triage labels like `hard-bug` or `wontfix`.
+ * The curated area chips, each an EXISTING repo label with a friendlier name.
+ * Every other repo label is reachable through "More labels", which the
+ * server checks against the live repo list and the submitter's role (see
+ * `permittedRepoLabels`), so a member can't attach `hard-bug` or `wontfix`.
  */
 export const FEEDBACK_AREAS: ReadonlyArray<{ label: string; display: string }> = [
   { label: "Content Note", display: "Editor & notes" },
@@ -207,6 +208,25 @@ export const FEEDBACK_AREAS: ReadonlyArray<{ label: string; display: string }> =
   { label: "Mobile App", display: "Mobile app" },
 ];
 
+/**
+ * The two type labels triage sorts by, shown first in the dialog's Labels
+ * row in the repo's own label colours. Each is ALSO a kind's githubLabel:
+ * on a Bug or Feature form the matching flag is that kind (always on), and
+ * the other flag switches the form. On a Small change both are optional
+ * extras, so a small fix tagged `bug` still reaches /bug-triage.
+ * `feedback:check` pins flag ↔ kind agreement.
+ */
+export const FEEDBACK_TYPE_FLAGS: ReadonlyArray<{
+  label: string;
+  display: string;
+  /** The repo label's colour (GitHub hex, no #). */
+  color: string;
+  kind: FeedbackKind;
+}> = [
+  { label: "bug", display: "Bug", color: "e99695", kind: "bug" },
+  { label: "enhancement", display: "Enhancement", color: "a2eeef", kind: "feature" },
+];
+
 /** The repo's existing high-severity label, applied when a bug blocks work or loses data. */
 export const FEEDBACK_SEVERE_LABEL = "Fatal";
 
@@ -214,6 +234,7 @@ export const FEEDBACK_LIMITS = {
   title: 200,
   field: 6_000,
   areas: 4,
+  extras: 4,
 } as const;
 
 /** Captured in the browser; shown to the submitter before anything is sent. */
@@ -237,6 +258,10 @@ export interface FeedbackInput {
   title: string;
   fields: Record<string, string>;
   areas: string[];
+  /** Small change only: extra type flags (`bug` / `enhancement`). Ignored for other kinds, whose flag is the kind. */
+  flags?: string[];
+  /** Any other repo labels ("More labels"); applied only if in composeIssue's permitted set. */
+  extraLabels?: string[];
   /** Bug only: blocks work or lost data → the severe label. */
   severe?: boolean;
   diagnostics?: ClientDiagnostics | null;
@@ -249,6 +274,7 @@ export interface ComposedIssue {
 }
 
 const AREA_LABELS = new Set(FEEDBACK_AREAS.map((a) => a.label));
+const FLAG_LABELS = new Set(FEEDBACK_TYPE_FLAGS.map((f) => f.label));
 
 function clamp(value: string, max: number): string {
   const trimmed = value.trim();
@@ -295,7 +321,11 @@ function diagnosticsRows(
  * the preview the submitter reads is byte-for-byte what gets filed (minus
  * the server-only diagnostics rows).
  */
-export function composeIssue(input: FeedbackInput, server?: ServerDiagnostics): ComposedIssue {
+export function composeIssue(
+  input: FeedbackInput,
+  server?: ServerDiagnostics,
+  options?: { permittedExtras?: ReadonlySet<string> },
+): ComposedIssue {
   const def = FEEDBACK_KINDS[input.kind];
   const rawTitle = clamp(input.title.replace(/\s+/g, " "), FEEDBACK_LIMITS.title);
   const title =
@@ -319,14 +349,85 @@ export function composeIssue(input: FeedbackInput, server?: ServerDiagnostics): 
   }
   sections.push("<sub>Submitted from the in-app feedback form.</sub>");
 
+  // Type flags lead the labels, as they lead the dialog's Labels row.
   const labels = [def.githubLabel];
+  if (input.kind === "modification") {
+    for (const flag of input.flags ?? []) {
+      if (FLAG_LABELS.has(flag) && !labels.includes(flag)) labels.unshift(flag);
+    }
+  }
+  let areaCount = 0;
   for (const area of input.areas) {
-    if (AREA_LABELS.has(area) && !labels.includes(area)) labels.push(area);
-    if (labels.length > FEEDBACK_LIMITS.areas) break;
+    if (areaCount >= FEEDBACK_LIMITS.areas) break;
+    if (AREA_LABELS.has(area) && !labels.includes(area)) {
+      labels.push(area);
+      areaCount++;
+    }
   }
   if (input.kind === "bug" && input.severe) labels.push(FEEDBACK_SEVERE_LABEL);
 
+  // "More labels": any other repo label, but only from the caller's
+  // permitted set (the server builds it from the live repo list and the
+  // submitter's role). No set → no extras.
+  let extraCount = 0;
+  for (const extra of input.extraLabels ?? []) {
+    if (extraCount >= FEEDBACK_LIMITS.extras) break;
+    if (options?.permittedExtras?.has(extra) && !labels.includes(extra)) {
+      labels.push(extra);
+      extraCount++;
+    }
+  }
+
   return { title, body: sections.join("\n\n"), labels };
+}
+
+/** A label as GitHub's REST API returns it (colour is hex without #). */
+export interface RepoLabel {
+  name: string;
+  color: string;
+  description: string | null;
+}
+
+/**
+ * Labels that encode the owner's triage decisions. Hidden from members
+ * and guests (owners and admins see every label); `hard-bug` in particular
+ * excludes an issue from automated triage.
+ */
+export const FEEDBACK_TRIAGE_ONLY_LABELS: ReadonlySet<string> = new Set([
+  "hard-bug",
+  "wontfix",
+  "duplicate",
+  "invalid",
+  "blocked",
+  "good first issue",
+  "help wanted",
+]);
+
+export function canUseTriageLabels(role: string | null | undefined): boolean {
+  return role === "owner" || role === "admin";
+}
+
+/** The repo labels this role may apply at all. */
+export function permittedRepoLabels(all: RepoLabel[], role: string | null | undefined): RepoLabel[] {
+  return canUseTriageLabels(role)
+    ? all
+    : all.filter((l) => !FEEDBACK_TRIAGE_ONLY_LABELS.has(l.name));
+}
+
+/**
+ * The "More labels" candidates: permitted labels the dialog doesn't already
+ * offer as a type flag, kind, area, or the severity checkbox.
+ */
+export function extraLabelCandidates(permitted: RepoLabel[]): RepoLabel[] {
+  const shown = new Set<string>([
+    ...FEEDBACK_TYPE_FLAGS.map((f) => f.label),
+    ...FEEDBACK_KIND_ORDER.map((k) => FEEDBACK_KINDS[k].githubLabel),
+    ...FEEDBACK_AREAS.map((a) => a.label),
+    FEEDBACK_SEVERE_LABEL,
+  ]);
+  return permitted
+    .filter((l) => !shown.has(l.name))
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
 }
 
 /** GitHub caps new-issue URLs around 8k characters; stay well under. */

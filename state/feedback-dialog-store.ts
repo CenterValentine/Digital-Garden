@@ -20,6 +20,10 @@ export interface FeedbackDraft {
   title: string;
   fields: Record<string, string>;
   areas: string[];
+  /** Small change only: extra type flags (`bug` / `enhancement`). */
+  flags: string[];
+  /** "More labels" picks — any other repo label this user may apply. */
+  extraLabels: string[];
   severe: boolean;
 }
 
@@ -27,6 +31,8 @@ export const emptyFeedbackDraft = (): FeedbackDraft => ({
   title: "",
   fields: {},
   areas: [],
+  flags: [],
+  extraLabels: [],
   severe: false,
 });
 

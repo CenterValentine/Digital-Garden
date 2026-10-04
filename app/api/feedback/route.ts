@@ -3,10 +3,12 @@
  *
  * GET  /api/feedback — whether this deployment files issues directly
  *   (`inApp`), so the dialog can say "Submit" or "Continue on GitHub"
- *   before the user writes anything.
+ *   before the user writes anything; plus the repo labels this user may
+ *   apply (live from GitHub, role-filtered) and their username.
  * POST /api/feedback — validates the structured form, recomposes the issue
  *   server-side with `composeIssue` (labels from the allowlist only, server
- *   diagnostics added here), rate-limits per user, and files it. Without a
+ *   diagnostics added here; "More labels" re-checked against the live repo
+ *   list and the submitter's role), rate-limits per user, and files it. Without a
  *   token, or when GitHub refuses, it answers with a prefilled GitHub link
  *   (`fallbackUrl`) so what the user wrote is never lost.
  *
@@ -24,7 +26,9 @@ import {
   FEEDBACK_LIMITS,
   buildGitHubNewIssueUrl,
   composeIssue,
+  extraLabelCandidates,
   missingRequired,
+  permittedRepoLabels,
   type FeedbackInput,
   type ServerDiagnostics,
 } from "@/lib/domain/feedback/issue-templates";
@@ -32,6 +36,7 @@ import {
   createGitHubIssue,
   feedbackRepo,
   isGitHubFeedbackConfigured,
+  listRepoLabels,
 } from "@/lib/domain/feedback/github";
 
 const ROUTE_PATH = "/api/feedback";
@@ -43,6 +48,8 @@ const FeedbackBodySchema = z.object({
   title: z.string().max(FEEDBACK_LIMITS.title * 2),
   fields: z.record(z.string(), z.string().max(FEEDBACK_LIMITS.field * 2)),
   areas: z.array(z.string().max(60)).max(20).default([]),
+  flags: z.array(z.string().max(40)).max(4).default([]),
+  extraLabels: z.array(z.string().max(60)).max(20).default([]),
   severe: z.boolean().optional(),
   includeUsername: z.boolean().optional(),
   diagnostics: z
@@ -62,15 +69,23 @@ function fail(status: number, code: string, message: string, extra?: Record<stri
 }
 
 export async function GET() {
+  let session;
   try {
-    await requireAuth();
-    return NextResponse.json({
-      success: true,
-      data: { inApp: isGitHubFeedbackConfigured(), repo: feedbackRepo() },
-    });
+    session = await requireAuth();
   } catch {
     return fail(401, "UNAUTHORIZED", "Sign in to send feedback.");
   }
+  const labels = await listRepoLabels();
+  return NextResponse.json({
+    success: true,
+    data: {
+      inApp: isGitHubFeedbackConfigured(),
+      repo: feedbackRepo(),
+      username: session.user.username,
+      // null → GitHub unreachable; the dialog then hides "More labels".
+      labels: labels ? permittedRepoLabels(labels, session.user.role) : null,
+    },
+  });
 }
 
 export async function POST(req: NextRequest) {
@@ -98,6 +113,8 @@ export async function POST(req: NextRequest) {
       title: body.title,
       fields: body.fields,
       areas: body.areas,
+      flags: body.flags,
+      extraLabels: body.extraLabels,
       severe: body.severe,
       diagnostics: body.diagnostics ?? null,
     };
@@ -136,7 +153,13 @@ export async function POST(req: NextRequest) {
         }
       : { reporter };
 
-    const issue = composeIssue(input, server);
+    // Extras are honoured only if the live repo has them and this role may
+    // use them. GitHub unreachable → no extras (the issue still files).
+    const repoLabels = body.extraLabels.length > 0 ? await listRepoLabels() : null;
+    const permittedExtras = new Set(
+      extraLabelCandidates(permittedRepoLabels(repoLabels ?? [], session.user.role)).map((l) => l.name),
+    );
+    const issue = composeIssue(input, server, { permittedExtras });
     const fallbackUrl = buildGitHubNewIssueUrl(issue, feedbackRepo());
 
     if (!isGitHubFeedbackConfigured()) {

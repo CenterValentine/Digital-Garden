@@ -11,7 +11,7 @@
  *   GITHUB_FEEDBACK_REPO — "owner/name"; defaults to this project's repo.
  */
 
-import { FEEDBACK_REPO_DEFAULT, type ComposedIssue } from "./issue-templates";
+import { FEEDBACK_REPO_DEFAULT, type ComposedIssue, type RepoLabel } from "./issue-templates";
 
 export function feedbackRepo(): string {
   const repo = process.env.GITHUB_FEEDBACK_REPO?.trim();
@@ -68,4 +68,55 @@ export async function createGitHubIssue(issue: ComposedIssue): Promise<CreateIss
     // Non-JSON error body; the status line is enough.
   }
   return { ok: false, status: res.status, message };
+}
+
+const LABELS_TTL_MS = 10 * 60_000;
+let labelsCache: { repo: string; at: number; labels: RepoLabel[] } | null = null;
+
+/**
+ * The repo's labels (name, colour, description), cached per server instance
+ * for ten minutes. Uses the token when set; a public repo also answers
+ * unauthenticated (60 requests/hour per IP), which the cache keeps well
+ * under. Returns null when GitHub can't be reached. Callers then offer and
+ * accept no extra labels, rather than trusting an unchecked list.
+ */
+export async function listRepoLabels(): Promise<RepoLabel[] | null> {
+  const repo = feedbackRepo();
+  if (labelsCache && labelsCache.repo === repo && Date.now() - labelsCache.at < LABELS_TTL_MS) {
+    return labelsCache.labels;
+  }
+  const token = process.env.GITHUB_FEEDBACK_TOKEN?.trim();
+  const headers: Record<string, string> = {
+    Accept: "application/vnd.github+json",
+    "X-GitHub-Api-Version": "2022-11-28",
+    "User-Agent": "digital-garden-feedback",
+  };
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  try {
+    const labels: RepoLabel[] = [];
+    // ~30 labels today; three pages of 100 is a generous ceiling.
+    for (let page = 1; page <= 3; page++) {
+      const res = await fetch(
+        `https://api.github.com/repos/${repo}/labels?per_page=100&page=${page}`,
+        { headers, signal: AbortSignal.timeout(8_000) },
+      );
+      if (!res.ok) return labelsCache?.repo === repo ? labelsCache.labels : null;
+      const batch = (await res.json()) as Array<{ name?: unknown; color?: unknown; description?: unknown }>;
+      for (const l of batch) {
+        if (typeof l.name !== "string") continue;
+        labels.push({
+          name: l.name,
+          color: typeof l.color === "string" ? l.color : "aaaaaa",
+          description: typeof l.description === "string" && l.description.trim() ? l.description : null,
+        });
+      }
+      if (batch.length < 100) break;
+    }
+    labelsCache = { repo, at: Date.now(), labels };
+    return labels;
+  } catch {
+    // Serve a stale list over none; it was valid within the last session.
+    return labelsCache?.repo === repo ? labelsCache.labels : null;
+  }
 }
