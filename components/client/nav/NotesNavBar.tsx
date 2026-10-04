@@ -3,6 +3,7 @@
 import NotesLogo from "../logo/NotesLogo";
 import ProfileMenu from "./ProfileMenu";
 import NotificationBell from "../notifications/NotificationBell";
+import { FeedbackDialog } from "../feedback/FeedbackDialog";
 import { getSurfaceStyles } from "@/lib/design/system";
 
 /**
@@ -36,6 +37,9 @@ export default function NotesNavBar() {
           <ProfileMenu />
         </div>
       </div>
+      {/* Portals to <body>; mounted here so it exists wherever ProfileMenu
+          does (IDE, settings, admin) and the editor's slash command can open it. */}
+      <FeedbackDialog />
     </nav>
   );
 }

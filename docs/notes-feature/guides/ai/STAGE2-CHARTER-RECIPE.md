@@ -59,7 +59,21 @@ Charters maintain a **single source** — never copied per run, per company, or 
 
 Combined with `overwriteContentId`, the whole materials lifecycle is single-source: one artifact node, mirrored wherever useful, updated in place.
 
-## 5. Quests tie the stages together
+## 5. URL field guide — which links can actually be read
+
+Learned the expensive way (first production sittings, 2026-09: five of nine URLs were unreadable). What each URL shape does under the default headless tier — see `ACQUISITION-QUICK-REFERENCE.md` for the escalation ladder that changes some of these:
+
+| URL shape | Headless outcome | Guidance |
+|---|---|---|
+| `job-boards.greenhouse.io/<company>/jobs/<id>`, Lever/Ashby postings, company career pages | ✅ Reads fully | The canonical posting form — prefer these |
+| `linkedin.com/jobs/view/<id>` | ⚠ Partial — sidebar/summary only, often enough for an honest score | Fine for scan passes; use browser escalation for full text |
+| `indeed.com/…?vjk=<id>` | ❌ HTTP 403 (bot wall) | Needs the visible-tab tier, or find the employer's own posting |
+| Any search-results page (Indeed SERP, LinkedIn search) | ❌ Not a posting — nothing scoreable | Never feed a SERP as an item; extract the posting links first |
+| `my.greenhouse.io/applications/<id>` | ❌ HTTP 406 — your logged-in candidate PORTAL, structurally never a posting | No tier can turn this into a job description; find the public posting |
+
+Two rules of thumb: **a URL that shows YOUR data (portals, dashboards) is never an item**, and **a URL that lists many things is a source to extract from, not an item to score**. Unreadable items are recorded honestly (`unreadable` status with the HTTP reason) — never scored from guesswork.
+
+## 6. Quests tie the stages together
 
 With the charter attached, both stages run inside the same **quest**: one quest ledger remembers every item any sitting scored (rejects included — the cross-sitting dedup), one quest log holds the narrative, and the charter's master ledger links quest ledger + output table + quest log on the quest's row. A stage-2 run continues the quest by name; already-scored items skip automatically unless you ask for a refresh.
 

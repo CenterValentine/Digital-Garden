@@ -54,6 +54,13 @@ most- to least-required:
 | `N8N_BASE_URL`, `N8N_API_KEY` | Outbound calls to your n8n instance |
 | `WORKFLOWS_CALLBACK_BASE_URL` | **Public** URL n8n calls back to — must be reachable from the n8n host (a localhost dev server is not; use a deployed URL or tunnel) |
 
+### In-app feedback (optional)
+
+| Var | Purpose |
+|---|---|
+| `GITHUB_FEEDBACK_TOKEN` | Fine-grained PAT scoped to the repo with **Issues: Read and write**. Lets the profile menu's feedback form (and `/Report an Issue`) file issues directly. Unset → the form opens a prefilled GitHub new-issue page instead. Issues land on a **public** repo under the token owner's account. |
+| `GITHUB_FEEDBACK_REPO` | `owner/name` to file into; defaults to `CenterValentine/Digital-Garden` |
+
 ### Storage providers (configure at least one)
 
 `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_ENDPOINT` ·

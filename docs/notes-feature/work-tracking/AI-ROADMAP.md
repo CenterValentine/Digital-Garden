@@ -88,10 +88,15 @@ Two sprints, one milestone:
   re-derives). Single-source the two chips across both surfaces so expand is
   loss-less.
 
-### T6 — Acquisition explainer  (LAST)
-Architecture walkthrough doc of the Acquisition Service (envelope, policy
-engine, native search, server-fetch/read_page, garden hydration, app-executed
-BYOK search). A doc + walkthrough, not a versioned build.
+### T6 — Acquisition explainer  ← CLOSED AS SLIMMED (owner call, 2026-09-04)
+Delivered as the two artifacts that answer real questions instead of a
+six-chapter walkthrough: **`guides/ai/ACQUISITION-QUICK-REFERENCE.md`**
+(envelope contract, 4-tier escalation ladder with receipts, gate matrix,
+LOCATE-before-read, hydration in one paragraph) and the **URL field guide**
+folded into `guides/ai/STAGE2-CHARTER-RECIPE.md` §5. Rationale: the full
+walkthrough changed no behavior; the field guide and gate matrix are the
+parts that would have saved real time in production. **The 3.x line is now
+COMPLETE.** Next horizon: V4 memory bank (out-of-line section below).
 
 ## Out of the 3.x line
 

@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+`AGENTS.md` is a symlink to this file, so every coding agent (Codex included) reads the same instructions. Edit this file, never the link.
+
 ## Product Principles
 
 **Read [docs/notes-feature/core/PRODUCT-PRINCIPLES.md](docs/notes-feature/core/PRODUCT-PRINCIPLES.md) before designing a feature.** It records what this product is *for*, so a design can be judged before it is built. The first principle in short: **make the user's existing file/folder structure the path of least resistance** — prefer projecting the structure a user already maintains over letting them build a parallel one, because the convenient route and the structurally sound route should be the same route. Workbenches (PR #177) are the worked example: folders are the only vocabulary, deliberately. The second: **unrefined → structured is the core loop** — notes accumulate repeated units, and the product's job is the path from a note's own blocks into linked database rows (and back), with gaps recorded as deliberate placeholders rather than silence.
@@ -15,13 +17,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Development Commands
 
 ```bash
-pnpm dev              # Start dev server (http://localhost:3015)
-pnpm build            # prisma generate → build:tokens → tsc → collab:schema:check → lint → next build
+pnpm dev              # Start dev server (http://localhost:3015); predev auto-starts the Docker Postgres when LOCAL_POSTGRES=1
+pnpm dev:collab       # Local Hocuspocus (ws://localhost:1234) — REQUIRED in dev, run from the same checkout as pnpm dev
+pnpm build            # tsc + 26 validation gates + lint + 2 workspace smokes, then next build — see "Build pipeline" below
 pnpm typecheck        # tsc --noEmit only (fast type check)
 pnpm start            # Production server
-pnpm lint             # ESLint with --max-warnings 175 ratchet (fails if count grows)
+pnpm lint             # ESLint with a --max-warnings ratchet (number lives in package.json; fails if count grows)
+pnpm preflight        # Optional: CI gates locally + migration drift (needs SHADOW_DATABASE_URL) → PASS/FAIL summary
 pnpm build:tokens     # Regenerate CSS variables from design tokens
+pnpm db:local:up      # Start local Docker Postgres (db:local:down / db:local:reset to stop / wipe)
+pnpm db:local:bootstrap  # First-time local DB: start container → migrate deploy → db push → seed (refuses to run against Neon)
+pnpm db:target        # Print which DB the env points at; fails if LOCAL_POSTGRES disagrees with the DATABASE_URL host
 pnpm db:seed          # Seed database with test ContentNode data
+pnpm trace:view       # Render the latest dev-logger trace (.local/debug-payloads) to HTML; --list, <trace_id>, --open
 pnpm collab:schema:check  # CI gate: validate collaboration schema covers all editor extensions
 pnpm ai:drift:check   # CI gate: AI parallel-table drift (provider catalog ↔ connection templates ↔ type unions ↔ settings enum; tool inventory ↔ settings metadata; prompt tool references; adapter branches; run-loop schemas describe-only)
 pnpm context:diet:check  # CI gate: the model-facing transcript folds (distillation/turn), dedupe, write-input supersession, header retention — fixture transcripts, mutation-tested
@@ -43,11 +51,13 @@ npx prisma db push    # Push schema changes in dev (no migration file)
 npx prisma studio     # Database GUI (http://localhost:5555)
 ```
 
+**There is no unit-test runner (no Jest/Vitest).** Logic is pinned by standalone `tsx` scripts in `scripts/` — `validate-*.ts` gates wired as `pnpm <name>:check`, and `*-smoke.ts` harnesses wired as `pnpm <name>:smoke`. Run one with its `pnpm` script, or directly with `npx tsx scripts/<file>.ts`. When a `pnpm build` gate fails, rerun just that script to iterate. Run a single Playwright spec with `pnpm exec playwright test tests/e2e/dark-mode/home.spec.ts --project=dark` (add `-g "<test title>"` to filter).
+
 **Worktrees live in `.claude/worktrees/<name>` — always.** Every git worktree for this repo is created inside the repo at `.claude/worktrees/<short-name>` (e.g. `git worktree add .claude/worktrees/reader <branch>`), never as a sibling directory (`../Digital-Garden-foo`) or anywhere else. When giving the owner worktree commands, use this path. Copy `.env.local` into the new worktree, and run `pnpm dev` and `pnpm dev:collab` from inside it (Hocuspocus loads that checkout's schema).
 
 **Primary verification is still manual** — `pnpm build` must pass, then smoke-test in browser. The Playwright harness adds visual regression coverage but only for signed-out routes today (auth fixture pending).
 
-**Build pipeline:** `prisma generate` → `pnpm build:tokens` (style-dictionary) → `tsc --noEmit` → `pnpm collab:schema:check` → `pnpm lint` → `next build --turbopack`.
+**Build pipeline:** `prisma generate` → `pnpm build:tokens` (style-dictionary) → `tsc --noEmit` → ~26 `tsx` validation gates (collab schema, note-edit ops, markdown block safety, private content, block ids/handles, reference block, shortcut mirror, extensions registry, polling, conflict banner, dark contrast, the AI gates — charters, output targets, prompt cache, diagnostics, model routing, pricing, inspector, drift, context diet, proposal shape, run harness, capability matrix, data read — and the feedback form's template/label check) → `pnpm lint` → workspace smokes (`workspace:pane-placement:smoke`, `workspace:cold-load:smoke`) → `next build --turbopack`. The `build` script in `package.json` is the authoritative list; the chain stops at the first failure.
 
 **Vercel build** skips the `tsc --noEmit` and `lint` steps (`vercel-build` script). Those gates are enforced locally and in CI; Vercel stays minimal for fast deploys. Migrations are run manually via `npx prisma migrate deploy`.
 
@@ -62,118 +72,32 @@ NODE_OPTIONS='--max-old-space-size=8192' pnpm build
 CI runners (GitHub Actions, Vercel) have larger heaps by default and don't need this. Add it to your shell rc or build-script alias if you're on a machine with <16 GB RAM.
 
 **CI gates** (`.github/workflows/`):
-- **quality.yml** — runs `pnpm lint` (with the `--max-warnings 175` ratchet) and `pnpm typecheck` on every PR. Lint failures or warning count growth block merge.
+- **quality.yml** — runs `pnpm lint` (with the `--max-warnings` ratchet) and `pnpm typecheck` + `charters:check` + `output-targets:check` + `markdown:blocks:check` + `markdown:smoke` on every PR. Lint failures or warning count growth block merge.
+- **migration-drift.yml** — on PRs touching `prisma/schema.prisma` or `prisma/migrations/**`: replays every migration into a Postgres 16 service DB and asserts it reproduces `schema.prisma`. A schema change without a migration fails here (see Database Workflows).
 - **collaboration-hardening.yml** — runs `pnpm collab:schema:check` on collab-touching PRs. Scans all TipTap extension source files for `Node.create`/`Mark.create` and asserts every discovered node/mark is covered in `getCollaborationServerExtensions()`. Every new TipTap Node/Mark **must** export a `Server*` variant and be registered in `lib/domain/collaboration/extensions.ts`.
 - **ai-drift.yml** — runs `pnpm ai:drift:check` on AI-touching PRs (`lib/domain/ai/**`, `lib/features/ai-connections/**`, the chat route, settings validation). Guards the AI subsystem's parallel tables: every direct-vendor template model must have a `PROVIDER_CATALOG` entry (the catalog is load-bearing — it supplies the per-model output ceiling and reasoning config), contextWindows must agree across files, type unions/settings enum must match the catalog, every tool must be classified user-configurable (settings metadata) or harness-internal, prompt/description tool references must resolve, and every `AdapterKind` needs a resolver branch. Full rationale: `docs/notes-feature/work-tracking/AI-DRIFT-GATES-PLAN.md`.
 - **publishing-visual.yml** — runs on PRs touching the publishing surface (`extensions/publishing/`, `components/public/`, `app/(public)/`, `app/(test)/test/publishing-fixtures/`, `app/globals.css`, the publishing fixtures/spec/schema scripts). Two jobs: `schema` (typecheck + `publishing:schema:check` + `publishing:audit:defaults`) and `visual` (Playwright per-block snapshot suite against the synthetic fixture route). Visual job uploads diff PNGs as an artifact on failure. Hard-gate; failures block merge. Can be temporarily skipped via repo var `PUBLISHING_VISUAL_GATE=skip`.
 
 ## Visual Regression Testing (Playwright)
 
-**Two layers in one harness** — operational dark-mode screenshot coverage running today, plus non-operational stubs scaffolding future regression categories. See [tests/e2e/README.md](tests/e2e/README.md) for the full conventions.
+Full conventions: [tests/e2e/README.md](tests/e2e/README.md). The parts that bite:
 
-### One-time setup (per machine)
-
-```bash
-pnpm install                              # Playwright is in devDependencies
-pnpm exec playwright install chromium     # Browser binary, ~92MB
-```
-
-### Daily workflow
-
-```bash
-pnpm dev                # in one terminal — Playwright assumes it's already running
-pnpm test:e2e           # in another — runs all e2e tests against http://localhost:3015
-```
-
-A typical run reports `n passed, m skipped`. Skipped tests are intentional stubs (see Stub Convention below) and their reasons surface in the reporter — keep an eye on the skipped count as a "remaining work" signal.
-
-### When you intentionally change visual output
-
-```bash
-pnpm test:e2e:update    # regenerates ALL snapshots
-```
-
-Review the regenerated PNGs in `tests/e2e/__snapshots__/` before committing — those PNGs ARE the visual contract going forward. Diffs against them in CI mean either a real regression or an undocumented intentional change.
-
-### Project structure
-
-```
-tests/e2e/
-├── _fixtures/theme.ts         # themedGoto: seeds notes:settings localStorage before nav
-├── dark-mode/                 # OPERATIONAL — runs every CI invocation
-│   ├── home.spec.ts
-│   ├── sign-in.spec.ts
-│   ├── sign-up.spec.ts
-│   ├── embed-blank.spec.ts
-│   └── authenticated-routes.spec.ts  # currently test.skip — needs auth fixture
-├── auth/ editor/ file-tree/ content/ search/ extensions/
-│   └── *.spec.ts              # STUBS — test.skip() with docstring describing scope
-└── __snapshots__/             # committed baseline screenshots, per-spec per-project
-```
-
-Two Playwright projects run every spec: `light` and `dark`. Snapshots auto-suffix with the project name (e.g., `home-light.png`, `home-dark.png`).
-
-### Theme propagation in tests
-
-Tests **MUST** import from `_fixtures/theme.ts` (not `@playwright/test` directly) so theme preference is set before navigation:
-
-```ts
-import { test, expect } from "../_fixtures/theme";
-
-test("my surface renders correctly in both themes", async ({ page, themedGoto }) => {
-  await themedGoto("/my/route");
-  await expect(page).toHaveScreenshot("my-surface.png");
-});
-```
-
-`themedGoto` writes `notes:settings.state.ui.theme` to localStorage before navigation, so the pre-hydration FOUC script in [lib/features/theme/script.ts](lib/features/theme/script.ts) applies the correct `.dark` class on first paint.
-
-### Stub convention (non-operational specs)
-
-Stubs document *what should be tested* without yet implementing it. Each stub file:
-
-1. Has a top-level JSDoc with **Scope** (what to cover) and **Blocked on** (what's needed to enable).
-2. Uses `test.skip("description", async ({ page }) => { void page; })` per scenario — empty body with `void page;` to satisfy the linter.
-3. Does NOT depend on unmerged infrastructure.
-
-To activate a stub:
-
-1. Remove `.skip` from `test.skip(...)`.
-2. Implement the test body.
-3. Update the file's top-level docstring with new scope.
-4. Run the test; commit any new snapshot PNG.
-
-### Adding a new operational test
-
-1. Decide if the surface needs auth. **Without auth** → put it in `tests/e2e/dark-mode/`. **With auth** → it stays stubbed in `dark-mode/authenticated-routes.spec.ts` until the auth fixture lands.
-2. Use the `themedGoto` fixture (not raw `page.goto`).
-3. Wait for a stable element before snapshotting (avoids flake from font/hydration timing): `await expect(page.getByRole("...")).toBeVisible();`
-4. Run `pnpm test:e2e:update` to capture baselines, then `pnpm test:e2e` to verify.
-5. Commit both the spec and the generated PNG(s).
-
-### Known gaps (followups in BACKLOG.md)
-
-- **Auth fixture** for `tests/e2e/_fixtures/auth.ts` — should sign in a seeded test user and persist `storageState`. Unblocks 5 stubbed authenticated dark-mode tests.
-- **Hocuspocus fixture** for collaboration tests (`tests/e2e/editor/collaboration.spec.ts`) — needs a local Hocuspocus server or mock provider.
-- **Seeded fixture content** for tests that depend on specific note state.
-
-### CI integration
-
-`playwright.config.ts` is **soft-gate by default**: failures surface in the PR but don't block merge automatically. Set `forbidOnly` and adjust `retries` in config if you want strict gating. For CI environments where the dev server isn't already running, set `PLAYWRIGHT_AUTOSTART=1` and the `webServer` block activates.
-
-### When NOT to add a Playwright test
-
-- Pure type/logic changes — `pnpm typecheck` is the right gate.
-- API contract changes — write a unit test against the route handler, not a screenshot test.
-- Animation timing — Playwright disables animations by default; capture the end state, not the motion.
+- **Setup once:** `pnpm exec playwright install chromium`. Playwright expects `pnpm dev` already running on :3015; `PLAYWRIGHT_AUTOSTART=1` makes it start one (CI).
+- **Every spec runs twice, in the `light` and `dark` projects.** Snapshot names get the project name as a suffix. They live in `tests/e2e/__snapshots__/` and are the visual contract. `pnpm test:e2e:update` rewrites **all** of them, so review the regenerated PNGs before committing.
+- **Import `test`/`expect` from `tests/e2e/_fixtures/theme.ts`, never from `@playwright/test`, and navigate with `themedGoto`.** It seeds the theme in localStorage before the pre-hydration script (`lib/features/theme/script.ts`) runs. Wait for a stable element before snapshotting.
+- **Live specs:** `dark-mode/`, `publishing/` and two in `editor/`. Everything else is a `test.skip` stub whose docstring gives its **Scope** and what it's **Blocked on**, mostly the missing auth fixture. The skipped count is remaining work, not failure.
+- **Soft gate** by default (`playwright.config.ts`). The exception is `publishing-visual.yml`, which hard-gates the publishing block snapshots.
+- **Don't add a screenshot test** for pure logic (typecheck or a `tsx` script is the gate), API contracts, or animation timing.
 
 ## Environment Setup
 
+**Dev database = local Docker Postgres; Neon = production.** First-time setup per [docs/notes-feature/guides/database/LOCAL-POSTGRES.md](docs/notes-feature/guides/database/LOCAL-POSTGRES.md) (per-worktree DBs: `PER-WORKTREE-DATABASES.md` in the same folder):
+
 ```bash
-# Create .env.local with required vars
-npx prisma generate           # Generate Prisma client
-npx prisma migrate reset --force  # Dev only! Creates tables + seeds
-pnpm dev
+# .env.local needs LOCAL_POSTGRES=1 and a localhost DATABASE_URL (template: .env.docker.example)
+pnpm db:local:bootstrap   # container → migrate deploy → db push → seed
+pnpm dev                  # terminal 1
+pnpm dev:collab           # terminal 2 — set NEXT_PUBLIC_HOCUSPOCUS_URL=ws://localhost:1234
 ```
 
 **Required:** `DATABASE_URL` (PostgreSQL), `STORAGE_ENCRYPTION_KEY` (32-byte hex)
@@ -238,7 +162,7 @@ First-party feature modules with clear ownership boundaries. Each extension live
 - `server/` — Services, types, route handlers
 - `state/` — Extension-local Zustand stores
 
-**Active extensions:** `daily-notes`, `flashcards`, `people`, `workplaces`, `calendar`, `publishing`, `speed-reader`, `browser-bookmarks`, `reader` (e-reader + book library — `docs/notes-feature/work-tracking/EREADER-PLAN.md`)
+**Active extensions:** `daily-notes`, `flashcards`, `people`, `workplaces` (workspaces — named tab sets + pane layouts), `calendar`, `publishing`, `speed-reader`, `browser-bookmarks`, `workflows`, `studio` (Folder Studio), `reader` (e-reader + book library — `docs/notes-feature/work-tracking/EREADER-PLAN.md`)
 
 **Key rules:**
 - Disabled extensions disappear through registry filters — never add direct conditionals in shared UI
@@ -285,6 +209,7 @@ All stores in `state/`. Pattern: `create<T>()(persist((set, get) => ({...}), { n
 - `left-panel-view-store.ts` / `left-panel-collapse-store.ts` — Left sidebar view/collapse
 - `right-panel-collapse-store.ts` — Right sidebar collapse state
 - `ai-chat-store.ts` — AI chat panel state
+- `workspace-store.ts` / `workspace-tab-filter-store.ts` — Client side of workspaces; server rows, membership and `baseUpdatedAt` conflict checks live in `extensions/workplaces/server/`. Debug with the tracer **before** theorising: `localStorage.setItem("dg:trace:workspace", "1")` (`lib/core/workspace-trace.ts`). Placement/cold-load regressions are pinned by the `workspace:*:smoke` scripts in `build`.
 
 ### TipTap Editor
 
@@ -398,100 +323,20 @@ AI SDK v6 integration with BYOK (Bring Your Own Key) support.
 
 ## API Routes
 
-All content endpoints under `app/api/content/`:
+Handlers live under `app/api/<area>/`; `ls app/api` is the index. Content lives under `app/api/content/`: CRUD, tree, move, search, backlinks, tags, export, and the two-phase upload (`upload/initiate` returns a presigned URL, then `upload/finalize`). Its request/response types are in `lib/domain/content/api-types.ts`. AI routes are under `app/api/ai/`, with `chat/` as the main entry (see AI-ARCHITECTURE.md). Extension-owned areas (`workflows/`, `studio/`, …) are thin handlers that import from `extensions/<name>/server/`.
 
-```
-GET/POST         /content/content              # List/create
-GET/PATCH/DELETE /content/content/[id]         # CRUD
-GET              /content/content/tree         # Hierarchical tree
-POST             /content/content/move         # Drag-and-drop reorder
-POST             /content/content/create-document
-POST             /content/content/duplicate
-POST             /content/content/upload/initiate   # Presigned URL
-POST             /content/content/upload/finalize
-POST             /content/content/upload/simple
-GET              /content/content/[id]/download
-GET/PATCH        /content/folder/[id]/view     # Folder view settings
-GET              /content/search
-GET              /content/backlinks
-GET/POST         /content/tags
-GET              /content/tags/content/[id]
-GET/POST         /content/storage
-POST             /content/export/[id]
-POST             /content/export/vault          # Bulk ZIP export
-POST             /content/external/preview      # Open Graph metadata fetch
-```
+## Where Code Lives
 
-Other API areas: `app/api/admin/`, `app/api/auth/`, `app/api/google-drive/`, `app/api/onlyoffice/`, `app/api/visualization/`, `app/api/categories/`, `app/api/user/`, `app/api/periodic-notes/`, `app/api/calendar/`, `app/api/conversations/` (persisted chat history), `app/api/flashcards/`, `app/api/publishing/`, `app/api/speed-reader/`, `app/api/media/`, `app/api/integrations/`, `app/api/trash/`, `app/api/logs/`, `app/api/cron/`
-
-**AI-specific routes:** `app/api/ai/chat/`, `app/api/ai/speech/` (TTS), `app/api/ai/transcribe/` (STT), `app/api/ai/image/`, `app/api/ai/inject-media/`, `app/api/ai/follow-ups/`, `app/api/ai/folder-assist/`
-
-**Type definitions:** `lib/domain/content/api-types.ts`
-
-## Directory Structure
-
-```
-app/
-├── (authenticated)/content/    # Content IDE routes
-├── api/                        # API routes
-└── globals.css                 # Global styles + generated design tokens
-
-extensions/                     # First-party feature extensions
-├── daily-notes/                # Periodic notes (manifest, client, components)
-├── flashcards/
-├── people/
-├── workplaces/
-├── calendar/
-├── publishing/                 # Public site publishing
-├── speed-reader/               # RSVP speed reader (global-dialog surface)
-└── browser-bookmarks/          # Browser extension + embed iframe integration
-
-components/content/
-├── ai/                         # AI chat panel components
-├── editor/                     # TipTap editor + BubbleMenu
-├── toolbar/                    # ContentToolbar, ToolDebugPanel
-├── tool-belt/                  # Tool management providers
-├── folder-views/               # List, Grid, Kanban view components
-├── external/                   # External link viewer + dialog
-├── file-tree/                  # Tree node rendering
-├── headers/                    # Left/Right sidebar headers
-├── context-menu/               # Right-click context menu
-├── viewer/                     # File type viewers (image, PDF, code, etc.)
-├── dialogs/                    # Modal dialogs
-└── skeletons/                  # Loading skeletons
-
-lib/
-├── core/                       # utils.ts (cn()), deep-merge, menu-positioning, glass-utils
-├── database/                   # client.ts (Prisma singleton), generated/prisma/
-├── domain/
-│   ├── admin/                  # Admin panel + audit logging
-│   ├── content/                # ContentNode utilities, OG fetcher, external validation
-│   ├── collaboration/          # Hocuspocus runtime, documents, extensions, content-safety
-│   ├── editor/                 # TipTap extensions (extensions/, commands/), schema-version, unsupported-content
-│   ├── export/                 # Converters, metadata sidecars, bulk export, migrations
-│   ├── periodic-notes/         # Period math, settings, types (daily/weekly notes domain)
-│   ├── search/                 # Search filters
-│   ├── ai/                     # AI SDK v6 integration (providers, middleware, tools)
-│   ├── tools/                  # Tool Surfaces registry + context provider
-│   └── visualization/          # Excalidraw, Mermaid, diagrams.net collaboration
-├── extensions/                 # Extension registry infrastructure (client-registry, server-registry, types)
-├── infrastructure/
-│   ├── auth/                   # OAuth, sessions, middleware (barrel: index.ts)
-│   ├── crypto/                 # Encryption utilities
-│   ├── media/                  # File processing
-│   └── storage/                # Multi-cloud provider abstraction
-├── features/
-│   ├── navigation/             # Branch builder
-│   ├── office/                 # Blank document generator
-│   └── settings/               # User settings CRUD (barrel: index.ts)
-└── design/
-    ├── system/                 # Liquid Glass tokens (surfaces, intents, motion)
-    └── integrations/           # Third-party UI utilities
-
-state/                          # Zustand stores
-prisma/                         # schema.prisma, migrations/, seed.ts
-scripts/                        # validate-collaboration-schema.ts, check-hocuspocus-env.ts
-```
+- `app/`: Next.js routes. `(authenticated)/content/` is the IDE, `(public)/` the published site, `api/` the handlers.
+- `components/content/`: IDE UI (editor, file tree, viewers, toolbar, sidebars, dialogs). `components/public/`: published-site rendering.
+- `extensions/<name>/`: feature modules (see Extension System). `lib/extensions/` is the registry that loads them.
+- `lib/domain/`: product logic by subject (content, editor, collaboration, ai, data, workspaces, reader, …).
+- `lib/features/`: cross-cutting app features (settings, theme, AI connections, observability).
+- `lib/infrastructure/`: auth, storage, crypto, rate limiting.
+- `lib/core/`: small shared utilities (`cn()`, menu positioning, the workspace tracer).
+- `lib/design/system/`: Liquid Glass tokens.
+- `state/`: Zustand stores. `prisma/`: schema + migrations (owner-protected).
+- `scripts/`: validation gates and smoke harnesses (the test suite), plus DB/trace tooling. `server/hocuspocus/`: the collaboration server (`pnpm dev:collab`; deployed to Cloud Run). `tests/e2e/`: Playwright.
 
 ## Design System: Liquid Glass
 
@@ -508,7 +353,8 @@ const glass0 = getSurfaceStyles("glass-0");
 ## Key Patterns & Conventions
 
 ### Code Standards
-- TypeScript strict mode, **no `any` types**. Use `unknown` and narrow, `Record<string, unknown>` for loose objects, or a proper type. If genuinely unfixable (untyped third-party lib, etc.) flag with `// eslint-disable-next-line @typescript-eslint/no-explicit-any -- TODO(...): <reason>`.
+- **`tsconfig.json` has `"strict": false`** — the strict posture is lint-enforced conventions, not the compiler. Practical consequence: without `strictNullChecks`, tsc does **not** narrow a union by a boolean discriminant (`if (!r.ok) r.code` → TS2339), so don't write `{ok:true…}|{ok:false…}` Result types; use a flat interface with optional fields + runtime guards (worked example: `DataDeckOutcome` in `lib/domain/flashcards/from-data.ts`). Incremental `pnpm typecheck` can also serve a stale green after branch switches — the build's `tsc` is authoritative.
+- **No `any` types**. Use `unknown` and narrow, `Record<string, unknown>` for loose objects, or a proper type. If genuinely unfixable (untyped third-party lib, etc.) flag with `// eslint-disable-next-line @typescript-eslint/no-explicit-any -- TODO(...): <reason>`.
 - Ignore directories with " 2" suffix (e.g., `content 2`, `editor 2`) — filesystem artifacts, not part of the build
 - Inline SVG for server component icons; `lucide-react` OK in client components only
 - Import from barrel exports: `lib/domain/editor`, `lib/infrastructure/auth`, `lib/features/settings`, `lib/domain/tools`
@@ -528,25 +374,16 @@ The only pre-PR concern beyond the normal gates is **migrations**: a PR that add
 The workflow is `typecheck → lint → build`. Each gates the next:
 
 1. **`pnpm typecheck`** — fast. Run continuously while editing. Must be clean before lint.
-2. **`pnpm lint`** — uses `--max-warnings 175` ratchet. **Zero new warnings, zero errors.** If you must introduce a warning, fix an equal-or-greater number elsewhere or update the ratchet number with justification.
-3. **`pnpm build`** — full production build (runs both the above plus `collab:schema:check`). Final gate before declaring complete.
+2. **`pnpm lint`** — uses the `--max-warnings` ratchet in `package.json`. **Zero new warnings, zero errors.** If you must introduce a warning, fix an equal-or-greater number elsewhere or update the ratchet number with justification.
+3. **`pnpm build`** — full production build (runs both the above plus every validation gate and workspace smoke). Final gate before declaring complete. Locally needs `NODE_OPTIONS='--max-old-space-size=8192'`; pipe it through `set -o pipefail` if you `| tail` the output, or a red build reads as green.
 4. **Browser smoke test** — for any UI change, manually exercise the feature in a browser. Type checks verify correctness; they don't verify behavior.
 
-Rules for specific lint signals:
+Rules for specific lint signals. Treat React Compiler errors as bug reports, not style complaints: the Apr 2026 lint-cleanup epic found real ones (a stale `useCallback` mention callback in ChatInput, a render-time ref write in DiagramsNetEditor that doubled under StrictMode).
 - **`react-hooks/exhaustive-deps`** — the missing dep is almost always a real bug. Add it. If you genuinely can't (callback should be stable, dep would cause infinite loop), restructure with `useCallback`/`useRef` or add `// eslint-disable-next-line react-hooks/exhaustive-deps -- <why>`. Don't suppress silently.
 - **`react-hooks/rules-of-hooks`** — never suppress. Hoist all hooks above early-return branches.
 - **`react-hooks/immutability` (React Compiler)** — "cannot modify value": you're mutating something derived from a prop or hook argument. Fix patterns: (a) move the mutation into a `useEffect` and use a ref the component owns, (b) extract to a module-scope helper function (parameter rebinding breaks lineage analysis).
 - **"Compilation Skipped" (React Compiler)** — the compiler found incorrect manual memoization (typically a `useCallback`/`useMemo` dep array that disagrees with what it would generate). Fix the dep array; don't suppress.
-- **"Cannot access refs during render" / "Cannot call impure function during render"** — render must be pure. Move ref writes and `Date.now()`/`Math.random()`/etc. into effects. `useId()` is the pure alternative to `Date.now()` for unique IDs.
-
-### Lessons learned (recorded in the lint-cleanup epic, Apr 2026)
-
-Bugs found by the React Compiler and the type cleanup that we'd otherwise have missed:
-- **OnlyOfficeEditor iframe reload churn** — `key: \`${contentId}-${Date.now()}\`` regenerated every render. Replaced with `useId()` for stable-per-mount keys.
-- **ChatInput stale mention callback** — `handleSelect`'s `useCallback` dep array was missing `onMentionInserted`, leaving the parent's tracking callback frozen at its first identity.
-- **DiagramsNetEditor StrictMode hazard** — `xmlRef.current = xml` ran during render, doubling under StrictMode. Moved into `useEffect(() => { ref.current = x }, [x])`.
-
-These were all caught by enforcing the React Compiler rules during lint. Treat compiler errors as bug reports, not stylistic complaints.
+- **"Cannot access refs during render" / "Cannot call impure function during render"** — render must be pure. Move ref writes and `Date.now()`/`Math.random()`/etc. into effects. `useId()` is the pure alternative to `Date.now()` for unique IDs. A ``key: `${contentId}-${Date.now()}` `` once remounted OnlyOfficeEditor's iframe on every render.
 
 ### Adding a New TipTap Extension
 
