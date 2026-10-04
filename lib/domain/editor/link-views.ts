@@ -46,6 +46,32 @@ export function isLinkView(value: unknown): value is LinkView {
   return value === "window" || isWikiLinkInlineView(value);
 }
 
+/**
+ * The display the user chose most recently — what a link the app creates
+ * on their behalf (the trace left by "Move to Note") defaults to, so they
+ * are never asked to pick a view in order to use the feature, and can
+ * still change it afterwards from the hover chooser. Per browser
+ * (localStorage): a preference, not content.
+ */
+const LAST_LINK_VIEW_KEY = "dg:link-view:last";
+
+export function rememberLinkView(view: LinkView): void {
+  try {
+    window.localStorage.setItem(LAST_LINK_VIEW_KEY, view);
+  } catch {
+    // storage unavailable — the default stands
+  }
+}
+
+export function lastUsedLinkView(): LinkView {
+  try {
+    const raw = window.localStorage.getItem(LAST_LINK_VIEW_KEY);
+    return isLinkView(raw) ? raw : DEFAULT_WIKI_LINK_VIEW;
+  } catch {
+    return DEFAULT_WIKI_LINK_VIEW;
+  }
+}
+
 /** The display a node currently has. */
 export function linkViewOfNode(node: PMNode): LinkView | null {
   if (node.type.name === "noteWindow") return "window";
@@ -89,27 +115,28 @@ export function applyLinkView(
   const node = editor.state.doc.nodeAt(pos);
   if (!node) return false;
 
+  let applied = false;
   if (node.type.name === "wikiLink") {
     if (view !== "window") {
       const next = view === DEFAULT_WIKI_LINK_VIEW ? null : view;
-      if ((node.attrs.view ?? null) === next) return true;
-      return editor
-        .chain()
-        .command(({ tr }) => {
-          tr.setNodeMarkup(pos, undefined, { ...node.attrs, view: next });
-          return true;
-        })
-        .run();
+      applied =
+        (node.attrs.view ?? null) === next ||
+        editor
+          .chain()
+          .command(({ tr }) => {
+            tr.setNodeMarkup(pos, undefined, { ...node.attrs, view: next });
+            return true;
+          })
+          .run();
+    } else {
+      applied = linkToWindow(editor, pos, node, options);
     }
-    return linkToWindow(editor, pos, node, options);
+  } else if (node.type.name === "noteWindow") {
+    applied = view === "window" || windowToLink(editor, pos, node, view);
   }
 
-  if (node.type.name === "noteWindow") {
-    if (view === "window") return true;
-    return windowToLink(editor, pos, node, view);
-  }
-
-  return false;
+  if (applied) rememberLinkView(view);
+  return applied;
 }
 
 /**

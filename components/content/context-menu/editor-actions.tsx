@@ -26,6 +26,10 @@ import {
   type LinkView,
 } from "@/lib/domain/editor/link-views";
 import { sendSelectionToNewNote, suggestNoteTitle } from "@/lib/domain/editor/send-to-new-note";
+import {
+  MOVE_SELECTION_EVENT,
+  type MoveSelectionEventDetail,
+} from "@/components/content/editor/MoveSelectionPicker";
 import { resolveExtensionVirtualContentType } from "@/lib/extensions/client-registry";
 import { markdownPasteToTiptap } from "@/lib/domain/content/markdown";
 import { clipboardBlockedGuidance } from "@/lib/domain/content/markdown-detect";
@@ -996,11 +1000,30 @@ export const editorActionProvider: ContextMenuActionProvider = (ctx) => {
 
   sections.push({ actions: clipboardActions });
 
-  // --- Send to a new note: the selection becomes a sibling note, the
-  // selection becomes a link to it. Context-menu only, by design. ---
+  // --- Move the selection out of this note. Context-menu only, by design:
+  // reorganisation, not formatting.
+  //   Send to New Note      → a sibling note, named inline, link left here
+  //   Move to Note…         → pick the target (tree picker); nothing stays
+  //   Move to Note, Link…   → the same, a link to the target stays here
+  // The picker is hosted by this editor's MarkdownEditor (MoveSelectionPicker)
+  // and addressed by editor instance, so only this editor's picker opens.
   if (capture && contextEditor?.isEditable) {
     const hostContentId = contentIdOfEditor(contextEditor);
     const suggestedTitle = suggestNoteTitle(capture);
+    const requestMove = (trace: "none" | "link") => {
+      window.dispatchEvent(
+        new CustomEvent(MOVE_SELECTION_EVENT, {
+          detail: {
+            editor: contextEditor,
+            trace,
+            x: typeof ctx.contextX === "number" ? ctx.contextX : 0,
+            y: typeof ctx.contextY === "number" ? ctx.contextY : 0,
+            suggestedTitle,
+            hostContentId,
+          } satisfies MoveSelectionEventDetail,
+        }),
+      );
+    };
     sections.push({
       actions: [
         {
@@ -1014,6 +1037,18 @@ export const editorActionProvider: ContextMenuActionProvider = (ctx) => {
               await sendSelectionToNewNote(contextEditor, hostContentId, title);
             },
           },
+        },
+        {
+          id: "move-to-note",
+          label: "Move to Note…",
+          tooltip: "Append the selection to the end of another note and remove it here",
+          onClick: () => requestMove("none"),
+        },
+        {
+          id: "move-to-note-link",
+          label: "Move to Note, Leave Link…",
+          tooltip: "Append the selection to the end of another note and leave a link to it here",
+          onClick: () => requestMove("link"),
         },
       ],
     });

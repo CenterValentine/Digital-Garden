@@ -125,6 +125,32 @@ Context-menu only, by design: it is an act of reorganisation, not formatting.
 From there the hover chooser turns the link into a card or windows the note
 back in.
 
+### 4a. Move to Note (an existing or newly placed note)
+
+Two more context-menu items on a selection: **Move to Note…** (nothing
+stays here) and **Move to Note, Leave Link…** (a link to the target stays).
+Both open the shared tree picker (`ContentTreePicker`, the Note Window's
+flavor — collapsed tree, view-scope row, "+ New Note" on folders and
+insertion gaps) hosted by the editor that was right-clicked
+(`MoveSelectionPicker`, addressed by editor instance so split panes and
+nested windows do not each open one). A note created from the picker is
+named from the selection's first heading or line, so it is named before it
+has content. The picker lists notes only.
+
+The selected blocks are appended to the **end** of the target with one empty
+paragraph of buffer when the target already has content (none when it is
+empty). The target is written through its live editor when it is open in
+this session, otherwise through the new `POST /api/content/content/[id]/append`,
+which goes through `writeNoteContent` — the one collaboration-safe server
+writer — so an open editor elsewhere sees the blocks. The host is always
+edited through its own editor. Positions are re-checked after the round-trip;
+a changed selection leaves the host alone and says so.
+
+**The trace link's display is the one the user chose most recently**
+(`lastUsedLinkView`, recorded by every `applyLinkView`; per browser), so the
+feature never asks for a view; the hover chooser changes it afterwards. A
+remembered "window" makes the trace a Note Window block.
+
 ---
 
 ## 5. Decisions

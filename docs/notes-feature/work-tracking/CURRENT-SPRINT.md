@@ -21,8 +21,12 @@ last_updated: 2026-05-13
 - **Markdown.** `wiki-link-markdown.ts` grammar + `dgWikiLink`/`dgNoteWindow` turndown rules + `wikiLinkCodec`/`noteWindowCodec` reTags: `[[Title|alias]]{#id .card .no-context label="…" slug=…}`, `![[Title]]{#id block=… height=… .no-border view=… row=…}`. `ServerNoteWindow.renderHTML` symmetric; public safety moved to `publicSafeNoteWindows` in `TipTapContent`.
 - **Send to New Note** (`send-to-new-note.ts`): context-menu inline title input (first heading / first line suggested), note created beside the host (`move` to displayOrder+1), selection replaced by the link through the editor, toast with Open.
 - **Context menu** acts on the clicked editor (`editorForContext`), not the first in the store.
+- **Move to Note… / Move to Note, Leave Link…** (`move-selection.ts`, `MoveSelectionPicker.tsx`, `POST /api/content/content/[id]/append`): the shared tree picker targets an existing note or creates one in place (named from the selection); blocks append to the end of the target (buffer paragraph when non-empty) through the live editor or the collab-safe server writer; the host deletes the selection or leaves a link in the last-used display (`lastUsedLinkView`, localStorage).
+- **Chooser polish** (owner rounds 2–5): skeleton tiles instead of icons, slimmer, editable label (same box, scroll inside), window header opens on hover beside its button, window Open is a workspace tab (#278's destination rule).
 
 ### Smoke checklist (owner)
+6. Select two paragraphs → right-click → Move to Note… → pick an open note → the paragraphs appear at its end after a blank line and are gone here. Repeat with "Leave Link…" on a note that is NOT open → link stays here (in the display you last used), the target shows the blocks when opened.
+7. In the picker, "+ New Note" on a folder → a note named from the selection's first line is created there and receives the blocks.
 1. Type `[[` → pick a note → hover the link → chooser appears; pick Card → excerpt shows; pick Window → block appears, paragraph split around it; in the window header "Display as…" → Link → back to a paragraph.
 2. Source view: a paragraph with a link reads `see [[Title]]{#…}`; a window reads `![[Title]]{#… block=…}`; toggle back → identical.
 3. Type `![[Some existing note]]` in source view → apply → the window resolves by title and shows the note.

@@ -9,11 +9,13 @@
  * note back in place.
  *
  * Context-menu only, by design: it is an act of reorganisation, not
- * formatting.
+ * formatting. Its sibling, "Move to Note…" (move-selection.ts), targets an
+ * existing or picker-placed note instead.
  */
 
 import type { Editor, JSONContent } from "@tiptap/core";
 import { toast } from "sonner";
+import { captureSelectionBlocks, capturedStillThere, replaceCapturedRange } from "./selection-blocks";
 
 export interface SelectionForNote {
   tiptapJson: { type: string; content: unknown[] };
@@ -80,21 +82,8 @@ export async function sendSelectionToNewNote(
   hostContentId: string | null,
   title: string,
 ): Promise<{ id: string; title: string } | null> {
-  const { from, to } = editor.state.selection;
-  if (from === to) return null;
-  const $from = editor.state.doc.resolve(from);
-  const $to = editor.state.doc.resolve(to);
-  const singleTextblock = $from.sameParent($to) && $from.parent.isTextblock;
-  const slice = editor.state.doc.slice(from, to);
-  const blocks: JSONContent[] = [];
-  slice.content.forEach((node) => {
-    const json = node.toJSON() as JSONContent;
-    // An open slice from one textblock arrives already wrapped in that
-    // block; a bare inline node (defensive) gets a paragraph.
-    blocks.push(node.isInline ? { type: "paragraph", content: [json] } : json);
-  });
-  if (blocks.length === 0) return null;
-  const expectedText = editor.state.doc.textBetween(from, to, "\n");
+  const captured = captureSelectionBlocks(editor);
+  if (!captured) return null;
   const finalTitle = title.trim() || "Untitled";
 
   const placement = hostContentId
@@ -110,7 +99,7 @@ export async function sendSelectionToNewNote(
       body: JSON.stringify({
         title: finalTitle,
         parentId: placement.parentId,
-        tiptapJson: { type: "doc", content: blocks },
+        tiptapJson: { type: "doc", content: captured.blocks },
       }),
     });
     const body = (await res.json().catch(() => null)) as {
@@ -149,16 +138,12 @@ export async function sendSelectionToNewNote(
   // network round-trips; if the text there has changed meanwhile (a remote
   // edit, the user kept typing), leave the host alone rather than cut the
   // wrong range.
-  const stillThere =
-    to <= editor.state.doc.content.size &&
-    editor.state.doc.textBetween(from, to, "\n") === expectedText;
-  const link: JSONContent = { type: "wikiLink", attrs: { targetId: newId, targetTitle: finalTitle } };
-  if (stillThere) {
-    editor
-      .chain()
-      .focus()
-      .insertContentAt({ from, to }, singleTextblock ? link : { type: "paragraph", content: [link] })
-      .run();
+  if (capturedStillThere(editor, captured)) {
+    replaceCapturedRange(
+      editor,
+      captured,
+      editor.schema.nodes.wikiLink.create({ targetId: newId, targetTitle: finalTitle }),
+    );
   }
 
   toast.success(`Sent to “${finalTitle}”`, {
