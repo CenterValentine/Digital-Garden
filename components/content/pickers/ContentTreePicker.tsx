@@ -1571,7 +1571,8 @@ function TargetRow({
     <div
       className={cn(
         // A menu row, not a banner: flat like its neighbours, in the tree's
-        // active tone (gold wash + the thin gold rail) but SOFTER — the same
+        // active gold wash but SOFTER, and WITHOUT the tree's left rail (owner:
+        // this is a context-menu item, not a tree row) — the same
         // alpha that reads muted over the tree's lighter panel turns brown and
         // loud over this popup's near-black surface, so the dark wash is
         // roughly half the tree's. The whole row reacts to hover; the label
@@ -1579,7 +1580,7 @@ function TargetRow({
         // pointer and click area agree.
         "flex w-full shrink-0 items-center border-b pr-2 text-xs transition-colors",
         gold
-          ? "border-black/5 bg-gold-primary/[0.13] shadow-[inset_2px_0_0_0_var(--gold-primary)] hover:bg-gold-primary/[0.20] dark:border-white/5 dark:bg-gold-primary/[0.12] dark:hover:bg-gold-primary/[0.18]"
+          ? "border-black/5 bg-gold-primary/[0.13] hover:bg-gold-primary/[0.20] dark:border-white/5 dark:bg-gold-primary/[0.12] dark:hover:bg-gold-primary/[0.18]"
           : "border-black/5 bg-black/[0.03] hover:bg-black/[0.07] dark:border-white/5 dark:bg-white/[0.04] dark:hover:bg-white/[0.09]",
       )}
     >
