@@ -111,8 +111,8 @@ plus the decline cases, and the inline-attr sweep covers `view` automatically.
 
 ## 4. Move the selection to a note
 
-Right-click a selection → **Move to Note** › **Leave a link here** or
-**Leave nothing here**. One item, two choices (owner, 2026-10-03; an
+Right-click a selection → **Move to Note** › **Leave link** or
+**No link**. One item, two choices (owner, 2026-10-03; an
 earlier "Send to New Note" with an inline title was folded in — the picker's
 "+ New Note" is the one way to make a new note for the selection). Both
 open the shared tree picker (`ContentTreePicker`, the Note Window's flavor —
@@ -140,6 +140,11 @@ a changed selection leaves the host alone and says so.
 (`lastUsedLinkView`, recorded by every `applyLinkView`; per browser), so the
 feature never asks for a view; the hover chooser changes it afterwards. A
 remembered "window" makes the trace a Note Window block.
+
+**Provenance stamp.** With Leave link, the moved blocks are followed by a
+`From [[Host]]` paragraph in the target, so the two notes point at each
+other and the moved text says where it came from. No link means no trace
+either way: nothing stays here and nothing points back.
 
 ---
 
