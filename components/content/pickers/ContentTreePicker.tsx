@@ -1538,11 +1538,11 @@ type TargetKind = "active" | "recent" | "open";
 
 /**
  * Target header — ABOVE the search box, always visible, one line: where a new
- * item will land, with its "+". `[tag] [icon] [name…] [+]`. The tag is the
- * only fixed-width part (`shrink-0`, no wrap); the name is the one flexible
- * part (`min-w-0 flex-1 truncate`), so a long folder name ellipsizes instead
- * of pushing the tag or the "+" out of the row, and the full name + path ride
- * in the tooltip. In the tree's deep gold with its rail when the target is
+ * item will land, with its "+". `[icon] [name…] [· tag] [+]` — the folder
+ * leads, the tag trails as a quiet qualifier. The tag is fixed-width
+ * (`shrink-0`, no wrap); the name is the one part that ellipsizes
+ * (`min-w-0 truncate`), so a long folder name never pushes the tag or the
+ * "+" out of the row, and the full name + path ride in the tooltip. In the tree's deep gold with its rail when the target is
  * the active tab's folder; neutral for the last-created / open fallbacks.
  */
 function TargetRow({
@@ -1566,16 +1566,21 @@ function TargetRow({
   const tag =
     kind === "active" ? "Active tab" : kind === "recent" ? "Last created" : "Open";
   const full = path ? `${path} / ${title}` : title;
+  const gold = kind === "active";
   return (
     <div
       className={cn(
-        // The whole row reacts to hover — the label button below fills it
-        // (its own padding carries the row's left inset), so the tint, the
-        // pointer and the click area all agree.
-        "flex w-full shrink-0 items-center border-b border-black/5 pr-2 text-xs transition-colors dark:border-white/5",
-        kind === "active"
-          ? "bg-gold-primary/[0.22] shadow-[inset_2px_0_0_0_var(--gold-primary)] hover:bg-gold-primary/[0.32] dark:bg-gold-primary/[0.28] dark:hover:bg-gold-primary/[0.38]"
-          : "bg-black/[0.03] hover:bg-black/[0.07] dark:bg-white/[0.04] dark:hover:bg-white/[0.09]",
+        // A menu row, not a banner: flat like its neighbours, in the tree's
+        // active tone (gold wash + the thin gold rail) but SOFTER — the same
+        // alpha that reads muted over the tree's lighter panel turns brown and
+        // loud over this popup's near-black surface, so the dark wash is
+        // roughly half the tree's. The whole row reacts to hover; the label
+        // button fills it (its padding carries the left inset) so tint,
+        // pointer and click area agree.
+        "flex w-full shrink-0 items-center border-b pr-2 text-xs transition-colors",
+        gold
+          ? "border-black/5 bg-gold-primary/[0.13] shadow-[inset_2px_0_0_0_var(--gold-primary)] hover:bg-gold-primary/[0.20] dark:border-white/5 dark:bg-gold-primary/[0.12] dark:hover:bg-gold-primary/[0.18]"
+          : "border-black/5 bg-black/[0.03] hover:bg-black/[0.07] dark:border-white/5 dark:bg-white/[0.04] dark:hover:bg-white/[0.09]",
       )}
     >
       <button
@@ -1584,45 +1589,50 @@ function TargetRow({
         title={`${tag} destination: ${full} — click to show it in the tree`}
         className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 py-1.5 pl-3 text-left outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-gold-primary/60"
       >
-        <span
-          className={cn(
-            "shrink-0 whitespace-nowrap text-[10px] font-medium uppercase tracking-wider",
-            kind === "active" ? "text-gold-primary/80" : "text-gray-500",
-          )}
-        >
-          {tag}
-        </span>
         {target.id === null ? (
           <Home
             className={cn(
               "h-3.5 w-3.5 shrink-0",
-              kind === "active" ? "text-gold-primary" : "text-yellow-500/80",
+              gold ? "text-gold-primary" : "text-yellow-500/80",
             )}
           />
         ) : (
           <Folder
             className={cn(
               "h-3.5 w-3.5 shrink-0",
-              kind === "active" ? "text-gold-primary" : "text-yellow-500/80",
+              gold ? "text-gold-primary" : "text-yellow-500/80",
             )}
           />
         )}
         <span
           className={cn(
-            "min-w-0 flex-1 truncate",
-            kind === "active"
-              ? "font-medium text-gold-primary"
-              : "text-gray-700 dark:text-gray-300",
+            "min-w-0 truncate font-medium",
+            gold ? "text-gold-primary" : "text-gray-700 dark:text-gray-300",
           )}
         >
           {title}
+        </span>
+        {/* The tag trails the name as a quiet qualifier — the folder leads. It
+            is the only fixed-width part; the name above is the one that
+            ellipsizes. */}
+        <span
+          className={cn(
+            "shrink-0 whitespace-nowrap text-[10px]",
+            gold ? "text-gold-primary/60" : "text-gray-400 dark:text-gray-500",
+          )}
+        >
+          · {tag.toLowerCase()}
         </span>
       </button>
       <QuickCreateButton
         noun={noun}
         title={`+ New ${noun} in ${title}`}
         onClick={onCreate}
-        className="ml-0"
+        className={cn(
+          "ml-0",
+          gold &&
+            "text-gold-primary/70 hover:bg-gold-primary/15 hover:text-gold-primary dark:hover:bg-gold-primary/20 dark:hover:text-gold-primary",
+        )}
       />
     </div>
   );
