@@ -1569,17 +1569,20 @@ function TargetRow({
   return (
     <div
       className={cn(
-        "flex w-full shrink-0 items-center gap-2 border-b border-black/5 py-1.5 pl-3 pr-2 text-xs dark:border-white/5",
+        // The whole row reacts to hover — the label button below fills it
+        // (its own padding carries the row's left inset), so the tint, the
+        // pointer and the click area all agree.
+        "flex w-full shrink-0 items-center border-b border-black/5 pr-2 text-xs transition-colors dark:border-white/5",
         kind === "active"
-          ? "bg-gold-primary/[0.22] shadow-[inset_2px_0_0_0_var(--gold-primary)] dark:bg-gold-primary/[0.28]"
-          : "bg-black/[0.03] dark:bg-white/[0.04]",
+          ? "bg-gold-primary/[0.22] shadow-[inset_2px_0_0_0_var(--gold-primary)] hover:bg-gold-primary/[0.32] dark:bg-gold-primary/[0.28] dark:hover:bg-gold-primary/[0.38]"
+          : "bg-black/[0.03] hover:bg-black/[0.07] dark:bg-white/[0.04] dark:hover:bg-white/[0.09]",
       )}
     >
       <button
         type="button"
         onClick={onJump}
         title={`${tag} destination: ${full} — click to show it in the tree`}
-        className="flex min-w-0 flex-1 items-center gap-2 text-left outline-none"
+        className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 py-1.5 pl-3 text-left outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-gold-primary/60"
       >
         <span
           className={cn(
