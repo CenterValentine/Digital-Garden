@@ -706,11 +706,19 @@ export function ContentTreePicker({
   // folder): the "+" row's natural target — "add beside what I'm working
   // on". Absent when nothing is active or the loaded tree can't see it
   // (virtual tabs), in which case the row falls back to the latest create.
-  const activeTarget = useMemo<CreateDestination | null>(() => {
+  const activeTarget = useMemo<{
+    dest: CreateDestination;
+    row: FlatRow;
+  } | null>(() => {
     if (!tree || !activeContentId) return null;
     const row = tree.find((r) => r.id === activeContentId);
-    if (!row) return null;
-    const folderId = row.contentType === "folder" ? row.id : row.parentId;
+    // A reference row (an attachment) lives in a separate index space from
+    // its parent's primary children, so "right after it" has no meaning.
+    if (!row || row.isReference) return null;
+    // ADJACENT, not inside: the destination is the active item's own parent
+    // folder — even when the active item is itself a folder, a click lands
+    // BESIDE it (the row is a sibling slot, see quickCreateAfter).
+    const folderId = row.parentId;
     const node = folderId ? lookupNode(folderId) : null;
     const parentPath: string[] = [];
     let cursor = node?.parentId ?? null;
@@ -721,20 +729,26 @@ export function ContentTreePicker({
       cursor = ancestor.parentId;
     }
     return {
-      id: folderId,
-      title: folderId === null ? "Root" : (node?.title ?? "Folder"),
-      parentPath,
-      at: 0,
+      dest: {
+        id: folderId,
+        title: folderId === null ? "Root" : (node?.title ?? "Folder"),
+        parentPath,
+        at: 0,
+      },
+      row,
     };
   }, [tree, activeContentId, lookupNode]);
 
-  // The header's create target: the active tab's folder when the tree can
-  // place it, else the latest create, else the first open folder.
+  // The header's create target: the slot right AFTER the active tab's content
+  // when the tree can place it (kind "active", carrying that row), else the
+  // top of the latest-created folder, else the top of the first open folder.
   const createTarget = useMemo<{
     dest: CreateDestination;
     kind: TargetKind;
+    afterRow?: FlatRow;
   } | null>(() => {
-    if (activeTarget) return { dest: activeTarget, kind: "active" };
+    if (activeTarget)
+      return { dest: activeTarget.dest, kind: "active", afterRow: activeTarget.row };
     if (destinations[0]) return { dest: destinations[0], kind: "recent" };
     if (openDestinations[0]) return { dest: openDestinations[0], kind: "open" };
     return null;
@@ -1017,8 +1031,11 @@ export function ContentTreePicker({
               ? createTarget.dest.parentPath.join(" / ")
               : null
           }
-          onJump={() => jumpToDestination(createTarget.dest)}
-          onCreate={() => void quickCreateAtDestination(createTarget.dest)}
+          onCreate={() =>
+            void (createTarget.afterRow
+              ? quickCreateAfter(createTarget.afterRow)
+              : quickCreateAtDestination(createTarget.dest))
+          }
         />
       ) : null}
       <input
@@ -1537,13 +1554,19 @@ function JumpTo({
 type TargetKind = "active" | "recent" | "open";
 
 /**
- * Target header — ABOVE the search box, always visible, one line: where a new
- * item will land, with its "+". `[icon] [name…] [· tag] [+]` — the folder
- * leads, the tag trails as a quiet qualifier. The tag is fixed-width
- * (`shrink-0`, no wrap); the name is the one part that ellipsizes
- * (`min-w-0 truncate`), so a long folder name never pushes the tag or the
- * "+" out of the row, and the full name + path ride in the tooltip. In the tree's deep gold with its rail when the target is
- * the active tab's folder; neutral for the last-created / open fallbacks.
+ * Target header — ABOVE the search box, always visible, one line, and ONE
+ * button: clicking anywhere on it creates a new item at the target.
+ * `[icon] [name…] [· tag] [+]`.
+ *  - "active tab": the new item lands LITERALLY NEXT TO the active content —
+ *    same folder, the very next slot after it (the name shown is that
+ *    folder). Owner: "the user clicking this affordance gets a new note in
+ *    the same place next to the active content."
+ *  - "last created" / "open" fallbacks: the top of that folder.
+ * The "+" is the row's visible verb, not a separate button. Only the name
+ * ellipsizes (`min-w-0 truncate`); the tag and "+" are `shrink-0`, so a long
+ * folder name never displaces them, and the full path rides in the tooltip.
+ * A flat menu row in the tree's active gold wash (no gradient, no rail —
+ * it is a menu item, not a tree row), softer on this dark popup.
  */
 function TargetRow({
   target,
@@ -1551,7 +1574,6 @@ function TargetRow({
   noun,
   title,
   path,
-  onJump,
   onCreate,
 }: {
   target: CreateDestination;
@@ -1560,82 +1582,70 @@ function TargetRow({
   /** Live title from the loaded tree. */
   title: string;
   path: string | null;
-  onJump: () => void;
   onCreate: () => void;
 }) {
   const tag =
-    kind === "active" ? "Active tab" : kind === "recent" ? "Last created" : "Open";
+    kind === "active" ? "active tab" : kind === "recent" ? "last created" : "open";
   const full = path ? `${path} / ${title}` : title;
   const gold = kind === "active";
+  const noun1 = noun.toLowerCase();
   return (
-    <div
+    <button
+      type="button"
+      onClick={onCreate}
+      title={
+        kind === "active"
+          ? `New ${noun1} right next to the active tab, in ${full}`
+          : `New ${noun1} at the top of ${full}`
+      }
       className={cn(
-        // A menu row, not a banner: flat like its neighbours, in the tree's
-        // active gold wash but SOFTER, and WITHOUT the tree's left rail (owner:
-        // this is a context-menu item, not a tree row) — the same
-        // alpha that reads muted over the tree's lighter panel turns brown and
-        // loud over this popup's near-black surface, so the dark wash is
-        // roughly half the tree's. The whole row reacts to hover; the label
-        // button fills it (its padding carries the left inset) so tint,
-        // pointer and click area agree.
-        "flex w-full shrink-0 items-center border-b pr-2 text-xs transition-colors",
+        // Flat like its neighbours; the whole row is the click target and
+        // reacts to hover (tint + pointer).
+        "flex w-full shrink-0 cursor-pointer items-center gap-2 border-b py-1.5 pl-3 pr-2 text-left text-xs outline-none transition-colors focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-gold-primary/60",
         gold
           ? "border-black/5 bg-gold-primary/[0.13] hover:bg-gold-primary/[0.20] dark:border-white/5 dark:bg-gold-primary/[0.12] dark:hover:bg-gold-primary/[0.18]"
           : "border-black/5 bg-black/[0.03] hover:bg-black/[0.07] dark:border-white/5 dark:bg-white/[0.04] dark:hover:bg-white/[0.09]",
       )}
     >
-      <button
-        type="button"
-        onClick={onJump}
-        title={`${tag} destination: ${full} — click to show it in the tree`}
-        className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 py-1.5 pl-3 text-left outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-gold-primary/60"
-      >
-        {target.id === null ? (
-          <Home
-            className={cn(
-              "h-3.5 w-3.5 shrink-0",
-              gold ? "text-gold-primary" : "text-yellow-500/80",
-            )}
-          />
-        ) : (
-          <Folder
-            className={cn(
-              "h-3.5 w-3.5 shrink-0",
-              gold ? "text-gold-primary" : "text-yellow-500/80",
-            )}
-          />
-        )}
-        <span
+      {target.id === null ? (
+        <Home
           className={cn(
-            "min-w-0 truncate font-medium",
-            gold ? "text-gold-primary" : "text-gray-700 dark:text-gray-300",
+            "h-3.5 w-3.5 shrink-0",
+            gold ? "text-gold-primary" : "text-yellow-500/80",
           )}
-        >
-          {title}
-        </span>
-        {/* The tag trails the name as a quiet qualifier — the folder leads. It
-            is the only fixed-width part; the name above is the one that
-            ellipsizes. */}
-        <span
+        />
+      ) : (
+        <Folder
           className={cn(
-            "shrink-0 whitespace-nowrap text-[10px]",
-            gold ? "text-gold-primary/60" : "text-gray-400 dark:text-gray-500",
+            "h-3.5 w-3.5 shrink-0",
+            gold ? "text-gold-primary" : "text-yellow-500/80",
           )}
-        >
-          · {tag.toLowerCase()}
-        </span>
-      </button>
-      <QuickCreateButton
-        noun={noun}
-        title={`+ New ${noun} in ${title}`}
-        onClick={onCreate}
+        />
+      )}
+      <span
         className={cn(
-          "ml-0",
-          gold &&
-            "text-gold-primary/70 hover:bg-gold-primary/15 hover:text-gold-primary dark:hover:bg-gold-primary/20 dark:hover:text-gold-primary",
+          "min-w-0 truncate font-medium",
+          gold ? "text-gold-primary" : "text-gray-700 dark:text-gray-300",
+        )}
+      >
+        {title}
+      </span>
+      <span
+        className={cn(
+          "shrink-0 whitespace-nowrap text-[10px]",
+          gold ? "text-gold-primary/60" : "text-gray-400 dark:text-gray-500",
+        )}
+      >
+        · {tag}
+      </span>
+      <Plus
+        aria-hidden="true"
+        className={cn(
+          "ml-auto h-3.5 w-3.5 shrink-0",
+          gold ? "text-gold-primary/80" : "text-gray-500 dark:text-gray-400",
         )}
       />
-    </div>
+    </button>
   );
 }
 
