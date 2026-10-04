@@ -20,6 +20,7 @@ import { publishSignedOut } from "@/lib/infrastructure/auth/client-session-event
 import { clientLogger } from "@/lib/core/logger/client";
 import { useThemePreference, type ThemePreference } from "@/lib/features/theme";
 import { useSettingsStore } from "@/state/settings-store";
+import { openFeedbackDialog } from "@/state/feedback-dialog-store";
 
 const THEME_OPTIONS: Array<{
   value: ThemePreference;
@@ -246,27 +247,31 @@ export default function ProfileMenu() {
             {/* Divider */}
             <div className="h-px bg-white/10 my-1" />
 
-            {/* Send Feedback */}
-            <a
-              href="https://github.com/CenterValentine/Digital-Garden/issues"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="w-full px-4 py-2 flex items-center gap-3 text-sm text-foreground hover:bg-white/5 transition-colors"
+            {/* Send Feedback / Report an Issue — the in-app form (FeedbackDialog),
+                opened on the matching template. */}
+            <button
+              type="button"
+              onClick={() => {
+                setIsOpen(false);
+                openFeedbackDialog("feature");
+              }}
+              className="w-full px-4 py-2 flex items-center gap-3 text-sm text-foreground hover:bg-white/5 transition-colors text-left cursor-pointer"
             >
               <MessageSquare className="h-4 w-4 text-gold-primary" />
               <span>Send Feedback</span>
-            </a>
+            </button>
 
-            {/* Report an Issue */}
-            <a
-              href="https://github.com/CenterValentine/Digital-Garden/issues/new"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="w-full px-4 py-2 flex items-center gap-3 text-sm text-foreground hover:bg-white/5 transition-colors"
+            <button
+              type="button"
+              onClick={() => {
+                setIsOpen(false);
+                openFeedbackDialog("bug");
+              }}
+              className="w-full px-4 py-2 flex items-center gap-3 text-sm text-foreground hover:bg-white/5 transition-colors text-left cursor-pointer"
             >
               <Bug className="h-4 w-4 text-gold-primary" />
               <span>Report an Issue</span>
-            </a>
+            </button>
 
             {/* Divider */}
             <div className="h-px bg-white/10 my-1" />

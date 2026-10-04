@@ -93,6 +93,8 @@ import { SlashCommandsList, type SlashCommandsListRef } from "./slash-commands-m
 import { getExtensionSlashCommands } from "@/lib/extensions/editor-client-registry";
 import { useTimestampFormatStore } from "@/state/timestamp-format-store";
 import { useSettingsStore } from "@/state/settings-store";
+import { openFeedbackDialog } from "@/state/feedback-dialog-store";
+import { FEEDBACK_REPO_DEFAULT } from "@/lib/domain/feedback/issue-templates";
 import { getDefaultPeriodicSummaryDate } from "@/lib/domain/periodic-summary";
 import { createDefaultStopwatchAttrs } from "@/lib/domain/stopwatch";
 import { createDefaultHabitTrackerAttrs } from "../extensions/blocks/habit-tracker";
@@ -1173,8 +1175,15 @@ export function getSlashCommands(): SlashCommand[] {
       command: ({ editor, range }) => {
         // Delete the slash command text
         editor.chain().focus().deleteRange(range).run();
-        // Open GitHub issues in a new tab
-        window.open("https://github.com/CenterValentine/Digital-Garden/issues/new", "_blank", "noopener,noreferrer");
+        // The in-app form (mounted with the nav bar); an editor with no nav
+        // bar (embeds) has no dialog host, so it opens GitHub instead.
+        if (!openFeedbackDialog("bug")) {
+          window.open(
+            `https://github.com/${FEEDBACK_REPO_DEFAULT}/issues/new`,
+            "_blank",
+            "noopener,noreferrer",
+          );
+        }
       },
       aliases: ["bug", "issue", "feedback", "report"],
     },

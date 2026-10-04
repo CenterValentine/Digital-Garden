@@ -19,7 +19,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```bash
 pnpm dev              # Start dev server (http://localhost:3015); predev auto-starts the Docker Postgres when LOCAL_POSTGRES=1
 pnpm dev:collab       # Local Hocuspocus (ws://localhost:1234) — REQUIRED in dev, run from the same checkout as pnpm dev
-pnpm build            # tsc + 25 validation gates + lint + 2 workspace smokes, then next build — see "Build pipeline" below
+pnpm build            # tsc + 26 validation gates + lint + 2 workspace smokes, then next build — see "Build pipeline" below
 pnpm typecheck        # tsc --noEmit only (fast type check)
 pnpm start            # Production server
 pnpm lint             # ESLint with a --max-warnings ratchet (number lives in package.json; fails if count grows)
@@ -57,7 +57,7 @@ npx prisma studio     # Database GUI (http://localhost:5555)
 
 **Primary verification is still manual** — `pnpm build` must pass, then smoke-test in browser. The Playwright harness adds visual regression coverage but only for signed-out routes today (auth fixture pending).
 
-**Build pipeline:** `prisma generate` → `pnpm build:tokens` (style-dictionary) → `tsc --noEmit` → ~25 `tsx` validation gates (collab schema, note-edit ops, markdown block safety, private content, block ids/handles, reference block, shortcut mirror, extensions registry, polling, conflict banner, dark contrast, the AI gates — charters, output targets, prompt cache, diagnostics, model routing, pricing, inspector, drift, context diet, proposal shape, run harness, capability matrix, data read) → `pnpm lint` → workspace smokes (`workspace:pane-placement:smoke`, `workspace:cold-load:smoke`) → `next build --turbopack`. The `build` script in `package.json` is the authoritative list; the chain stops at the first failure.
+**Build pipeline:** `prisma generate` → `pnpm build:tokens` (style-dictionary) → `tsc --noEmit` → ~26 `tsx` validation gates (collab schema, note-edit ops, markdown block safety, private content, block ids/handles, reference block, shortcut mirror, extensions registry, polling, conflict banner, dark contrast, the AI gates — charters, output targets, prompt cache, diagnostics, model routing, pricing, inspector, drift, context diet, proposal shape, run harness, capability matrix, data read — and the feedback form's template/label check) → `pnpm lint` → workspace smokes (`workspace:pane-placement:smoke`, `workspace:cold-load:smoke`) → `next build --turbopack`. The `build` script in `package.json` is the authoritative list; the chain stops at the first failure.
 
 **Vercel build** skips the `tsc --noEmit` and `lint` steps (`vercel-build` script). Those gates are enforced locally and in CI; Vercel stays minimal for fast deploys. Migrations are run manually via `npx prisma migrate deploy`.
 

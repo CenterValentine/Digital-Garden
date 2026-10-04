@@ -33,6 +33,9 @@ export const RATE_LIMITS = {
   CONNECTION_INVITES_PER_DAY: { limit: 10, windowSeconds: 86_400 },
   DM_MESSAGES_PER_HOUR: { limit: 120, windowSeconds: 3_600 },
   AI_NOTIFY_PER_HOUR: { limit: 10, windowSeconds: 3_600 },
+  // In-app feedback files PUBLIC GitHub issues under the owner's token.
+  FEEDBACK_ISSUES_PER_HOUR: { limit: 5, windowSeconds: 3_600 },
+  FEEDBACK_ISSUES_PER_DAY: { limit: 15, windowSeconds: 86_400 },
 } as const;
 
 export async function consumeRateLimit(
