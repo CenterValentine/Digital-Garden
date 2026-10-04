@@ -75,6 +75,7 @@ path and probably belongs to the same control.
 - [ ] **Flashcard deck tree / People panel** — their own trees for their own data; align tones, do not migrate.
 - [ ] Once migrated, `folder-move-store` recents and `create-destination-store` recents should become one "recent folders" source with a `kind` (moved into / created into).
 - [ ] **Four private copies of the UUID regex** (`relation-cells.ts`, `linked-schema.ts`, `resolve.ts`, `read-format.ts`) could adopt `isUuid` from `lib/domain/content/uuid.ts`. (The single-tab workplace routes' guard — the other half of this item — shipped after PR #277.)
+- [ ] **The remembered workspace is per-browser** (found with the cold-load fix, 2026-10-04) — "where you were last" is `localStorage["workspace-active-id"]`, so a new device, a cleared profile or a private window still opens Main. A server-side last-active-workspace would fix it, but it is the one "active view" R3 says never syncs, so it needs a decision before it is built (and a column or a user-settings key — migration/four-registrations).
 - [ ] **Picker polish to revisit only if reported** — the Active pill's folder name truncates hard at the picker's 300px (`MENU_WIDTH`; widening ~20px is one constant); `deriveDestinations` ignores `createdAt` ties; `jumpToDestination` forgets a folder absent at Root without telling the user.
 
 ---
