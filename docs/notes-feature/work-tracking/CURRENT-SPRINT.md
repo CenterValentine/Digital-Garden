@@ -4,15 +4,27 @@ epoch: 12 (Main Panel Tabs + Split Workspace)
 duration: multi-session
 branch: epoch-12/sprint-55-wire-blocks
 status: complete
-last_updated: 2026-05-13
+last_updated: 2026-10-04
 ---
 
 # Current Sprint Addendum
 
-## October 4, 2026 — Coming back lands you where you were (workspace cold-load restore)
+## October 4, 2026 — The AI 3.x line closes; CLAUDE.md matches the build (PR #211)
 
-**Tree**: worktree `.claude/worktrees/workspace-restore`, branch `fix/workspace-cold-load-restore` (off `origin/main` at `80502511`)
-**Status**: typecheck / lint 151 (0 errors, none new) / `workspace:pane-placement:smoke` 132 / `workspace:cold-load:smoke` 23 (new, in `build`) / `workspace:tab-move:smoke` / `polling:check` green; no schema, TipTap or extension change → no Hocuspocus redeploy. Owner browser smoke pending.
+**Tree**: worktree `.claude/worktrees/t6-closeout`, branch `docs/t6-acquisition-closeout` (Sep 4; merged with `origin/main` at `45d697ba`)
+**Status**: docs + one workflow comment + one script comment; every CLAUDE.md path checked to exist. No code, schema or TipTap change → no Hocuspocus redeploy.
+
+### Shipped
+
+- `ACQUISITION-QUICK-REFERENCE.md` (T6, slim), re-verified against main. It now names both `search_web` paths: native by default, or the user's search connection per chat (#273). §9.1 has two open checks, not one.
+- URL field guide in `STAGE2-CHARTER-RECIPE.md` §5; AI-ROADMAP marks T6 closed-as-slimmed and the 3.x line complete.
+- CLAUDE.md: false statements fixed (lint ratchet, build chain, `strict: false`, local-Docker setup, extension list, CI list). Added: no unit-test runner, single-gate/single-spec commands, the workspace tracer. Copied inventories (Playwright, API routes, directory tree, Apr 2026 lessons) replaced with pointers. `AGENTS.md` → symlink.
+- BACKLOG: the D+D "writer unidentified" item is probably closed by #278/#282; it stays open pending an owner check on dev.
+
+## October 4, 2026 — Coming back lands you where you were (workspace cold-load restore) (PR #282, merged `45d697ba`)
+
+**Tree**: branch `fix/workspace-cold-load-restore` (merged 2026-10-04)
+**Status**: typecheck / lint 151 (0 errors, none new) / `workspace:pane-placement:smoke` 132 / `workspace:cold-load:smoke` 23 (new, in `build`) / `workspace:tab-move:smoke` / `polling:check` green; no schema, TipTap or extension change → no Hocuspocus redeploy. Owner smoked it: 6/6 checklist lines ticked.
 
 ### Shipped
 - **Return to the last workspace**: `loadWorkspaces` resolved candidates with `getWorkspace` (falls back to Main), so the persisted last-workspace was dead code. Strict lookups; Main is the last resort.
