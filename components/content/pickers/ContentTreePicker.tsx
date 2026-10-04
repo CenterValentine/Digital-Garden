@@ -1445,8 +1445,8 @@ function JumpTo({
   // click creates a new item literally next to the active content (its folder,
   // the next slot after it). In the tree's active gold. The leading icon
   // swaps to a "+" on hover/focus; the name of the folder it will land in
-  // trails, truncated, so a long name can't blow the row out (the chip row
-  // also wraps). Touch has no hover, so it keeps a "+" glyph instead.
+  // trails and is the ONE flexible part of the row: it ellipsizes so all three
+  // pills always sit on one line (the owner's rule). Touch has no hover, so it keeps a "+" glyph instead.
   const activePill = () => {
     if (!active) return null;
     const title = titleOf(active.dest);
@@ -1457,7 +1457,7 @@ function JumpTo({
         type="button"
         onClick={onCreateActive}
         title={`New ${noun.toLowerCase()} right next to the active tab, in ${full}`}
-        className="group/active inline-flex max-w-full cursor-pointer items-center gap-1 rounded-full bg-gold-primary/[0.14] px-2 py-0.5 text-[11px] text-gold-primary outline-none transition-colors hover:bg-gold-primary/[0.26] focus-visible:ring-1 focus-visible:ring-gold-primary/60 dark:bg-gold-primary/[0.16] dark:hover:bg-gold-primary/[0.28]"
+        className="group/active inline-flex min-w-0 shrink cursor-pointer items-center gap-1 overflow-hidden rounded-full bg-gold-primary/[0.14] px-2 py-0.5 text-[11px] text-gold-primary outline-none transition-colors hover:bg-gold-primary/[0.26] focus-visible:ring-1 focus-visible:ring-gold-primary/60 dark:bg-gold-primary/[0.16] dark:hover:bg-gold-primary/[0.28]"
       >
         <span className="relative inline-flex h-3 w-3 shrink-0 items-center justify-center">
           {active.dest.id === null ? (
@@ -1470,10 +1470,8 @@ function JumpTo({
             className="absolute inset-0 h-3 w-3 opacity-0 transition-opacity group-hover/active:opacity-100 group-focus-visible/active:opacity-100 [@media(hover:none)]:opacity-100"
           />
         </span>
-        Active
-        <span className="min-w-0 max-w-[96px] truncate text-[10px] opacity-70">
-          · {title}
-        </span>
+        <span className="shrink-0">Active</span>
+        <span className="min-w-0 truncate text-[10px] opacity-70">· {title}</span>
       </button>
     );
   };
@@ -1496,7 +1494,7 @@ function JumpTo({
             : "Folders holding content open in this workspace"
         }
         className={cn(
-          "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] outline-none transition-colors",
+          "inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] outline-none transition-colors",
           active
             ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
             : "bg-black/[0.05] text-gray-600 hover:bg-black/[0.09] dark:bg-white/[0.07] dark:text-gray-300 dark:hover:bg-white/[0.12]",
@@ -1507,12 +1505,9 @@ function JumpTo({
         {count !== null ? (
           <span className="text-[10px] opacity-70">{count}</span>
         ) : null}
-        <ChevronDown
-          className={cn(
-            "h-3 w-3 shrink-0 opacity-60 transition-transform",
-            !active && "-rotate-90",
-          )}
-        />
+        {/* Only the unfolded pill carries a chevron — three pills with one each
+            did not fit on a line. The pill's tint already says "toggle". */}
+        {active ? <ChevronDown className="h-3 w-3 shrink-0 opacity-60" /> : null}
       </button>
     );
   };
@@ -1521,7 +1516,7 @@ function JumpTo({
     // No bottom border or margin: the scope header right below carries its own
     // top border, and a second rule plus a gap between them read as a hole.
     <div className="pb-1">
-      <div className="flex w-full flex-wrap items-center gap-1.5 py-1 pl-3 pr-2 text-xs">
+      <div className="flex w-full flex-nowrap items-center gap-1.5 py-1 pl-3 pr-2 text-xs">
         {active ? activePill() : null}
         {recent.length > 0
           ? chip("recent", "Recent", null, <History className="h-3 w-3 shrink-0" />)
