@@ -13,7 +13,8 @@
  *     only to bugs.
  *  3. Opt-ins: no Diagnostics block without diagnostics; the reporter row
  *     appears only when the server passes one.
- *  4. Starter scaffolds don't count as content, and required fields block.
+ *  4. Starter scaffolds and empty list items don't count as content (and are
+ *     dropped from the body), and required fields block.
  *  5. The GitHub fallback URL stays under its length cap with a huge body.
  *  6. Type flags: each flag IS a kind's githubLabel; flags add labels only
  *     on a Small change; unknown flags are dropped.
@@ -127,6 +128,12 @@ const base = (over: Partial<FeedbackInput> = {}): FeedbackInput => ({
 {
   const starterOnly = composeIssue(base({ fields: { description: "x", reproduce: "1. \n2. \n3. " } }));
   check(!starterOnly.body.includes("To Reproduce"), "an untouched starter scaffold is not emitted");
+  const partial = composeIssue(base({ fields: { description: "x", reproduce: "1. this\n2. \n3. " } }));
+  check(partial.body.includes("**To Reproduce**\n1. this\n\n"), `empty starter items dropped: got ${JSON.stringify(partial.body.slice(0, 120))}`);
+  const blankBoxes = composeIssue({ ...base(), kind: "modification", fields: { existing: "a", change: "b", acceptance: "- [ ] \n- [ ] " } });
+  check(!blankBoxes.body.includes("Acceptance criteria"), "a field of empty checkboxes is not emitted");
+  check(missingRequired({ kind: "bug", title: "t", fields: { description: "1. \n2. " } }).join(",") === "What happened",
+    "a required field holding only empty list items is still missing");
   check(missingRequired({ kind: "bug", title: "", fields: {} }).join(",") === "Title,What happened", "required: title + description");
   check(missingRequired({ kind: "modification", title: "t", fields: { existing: "a" } }).join(",") === "The change", "required: modification change");
 }

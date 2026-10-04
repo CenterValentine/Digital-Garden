@@ -18,6 +18,8 @@
 import { useEffect, useRef, useState, type ClipboardEvent, type DragEvent, type ReactNode } from "react";
 import { Bug, ChevronDown, ExternalLink, Lightbulb, Loader2, MessageSquarePlus, Plus, Wrench, X } from "lucide-react";
 import { toast } from "sonner";
+import ReactMarkdown, { type Components } from "react-markdown";
+import remarkGfm from "remark-gfm";
 import {
   Dialog,
   DialogContent,
@@ -108,6 +110,39 @@ function LabelTip({
   );
 }
 
+/** `![alt](url)` occurrences with a real URL (upload placeholders have none). */
+const IMAGE_MD = /!\[([^\]]*)\]\((https?:\/\/[^)\s]+)\)/g;
+
+function imagesIn(value: string): Array<{ markdown: string; alt: string; url: string }> {
+  return Array.from(value.matchAll(IMAGE_MD), (m) => ({ markdown: m[0], alt: m[1], url: m[2] }));
+}
+
+/**
+ * The preview renders like GitHub's Preview tab. Raw HTML (the Diagnostics
+ * <details>, the footer <sub>) is skipped rather than parsed; the table and
+ * everything else render.
+ */
+const previewComponents: Components = {
+  p: ({ children }) => <p className="my-1.5">{children}</p>,
+  strong: ({ children }) => <strong className="font-semibold text-gray-900 dark:text-gray-100">{children}</strong>,
+  ol: ({ children }) => <ol className="my-1 list-decimal pl-5">{children}</ol>,
+  ul: ({ children }) => <ul className="my-1 list-disc pl-5">{children}</ul>,
+  a: ({ children, href }) => (
+    <a href={href} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline dark:text-blue-400">
+      {children}
+    </a>
+  ),
+  img: ({ src, alt }) =>
+    typeof src === "string" ? (
+      // eslint-disable-next-line @next/next/no-img-element -- user-pasted screenshot behind a /f/ redirect; next/image can't optimise it
+      <img src={src} alt={alt ?? ""} loading="lazy" className="my-1 max-h-56 max-w-full rounded border border-black/10 dark:border-white/10" />
+    ) : null,
+  table: ({ children }) => <table className="my-1 border-collapse text-[11px]">{children}</table>,
+  td: ({ children }) => <td className="border border-black/10 px-1.5 py-0.5 dark:border-white/10">{children}</td>,
+  th: ({ children }) => <th className="border border-black/10 px-1.5 py-0.5 dark:border-white/10">{children}</th>,
+  code: ({ children }) => <code className="rounded bg-black/5 px-1 font-mono text-[11px] dark:bg-white/10">{children}</code>,
+};
+
 export function FeedbackDialog() {
   const open = useFeedbackDialogStore((s) => s.open);
   const close = useFeedbackDialogStore((s) => s.close);
@@ -157,6 +192,7 @@ function Body({ onClose }: { onClose: () => void }) {
   const [uploading, setUploading] = useState(0);
   const uploadSeq = useRef(0);
   const [localOrigin] = useState(() => isLocalOrigin(window.location.origin));
+  const [previewMode, setPreviewMode] = useState<"rendered" | "markdown">("rendered");
 
   useEffect(() => {
     let mounted = true;
@@ -463,6 +499,32 @@ function Body({ onClose }: { onClose: () => void }) {
               placeholder={f.placeholder}
               className={cn(inputClass, "resize-y leading-relaxed")}
             />
+            {imagesIn(draft.fields[f.id] ?? "").length > 0 && (
+              <div className="flex flex-wrap gap-2 pt-1">
+                {imagesIn(draft.fields[f.id] ?? "").map((img) => (
+                  <div key={img.markdown} className="group relative">
+                    <a href={img.url} target="_blank" rel="noopener noreferrer" title={img.alt}>
+                      {/* eslint-disable-next-line @next/next/no-img-element -- user-pasted screenshot behind a /f/ redirect */}
+                      <img
+                        src={img.url}
+                        alt={img.alt}
+                        loading="lazy"
+                        className="h-16 max-w-[8rem] rounded border border-black/10 object-cover dark:border-white/10"
+                      />
+                    </a>
+                    <button
+                      type="button"
+                      aria-label={`Remove ${img.alt}`}
+                      title="Remove from the report (the file stays in Feedback attachments)"
+                      onClick={() => setField(f.id, (draft.fields[f.id] ?? "").replace(img.markdown, "").replace(/\n{3,}/g, "\n\n"))}
+                      className="absolute -right-1.5 -top-1.5 hidden rounded-full bg-gray-900 p-0.5 text-white shadow group-hover:block group-focus-within:block"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         ))}
 
@@ -692,11 +754,40 @@ function Body({ onClose }: { onClose: () => void }) {
             Preview the issue
           </summary>
           <div className="mt-2 space-y-1.5 rounded-md bg-black/[0.03] p-2 dark:bg-white/[0.04]">
-            <p className="font-medium text-gray-900 dark:text-gray-100">{preview.title || "(no title yet)"}</p>
+            <div className="flex items-start gap-2">
+              <p className="min-w-0 flex-1 font-medium text-gray-900 dark:text-gray-100">
+                {preview.title || "(no title yet)"}
+              </p>
+              <div role="tablist" aria-label="Preview format" className="flex shrink-0 gap-0.5 rounded border border-black/10 p-0.5 dark:border-white/10">
+                {(["rendered", "markdown"] as const).map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    role="tab"
+                    aria-selected={previewMode === mode}
+                    onClick={() => setPreviewMode(mode)}
+                    className={cn(
+                      "rounded px-1.5 py-0.5 text-[10px]",
+                      previewMode === mode ? "bg-gold-primary/20 text-gold-primary" : "text-gray-400 hover:text-gray-700 dark:hover:text-gray-200",
+                    )}
+                  >
+                    {mode === "rendered" ? "Preview" : "Markdown"}
+                  </button>
+                ))}
+              </div>
+            </div>
             <p className="text-gray-400">Labels: {preview.labels.join(", ")}</p>
-            <pre className="whitespace-pre-wrap break-words font-mono text-[11px] text-gray-600 dark:text-gray-300">
-              {preview.body}
-            </pre>
+            {previewMode === "rendered" ? (
+              <div className="break-words text-gray-700 dark:text-gray-300">
+                <ReactMarkdown remarkPlugins={[remarkGfm]} skipHtml components={previewComponents}>
+                  {preview.body}
+                </ReactMarkdown>
+              </div>
+            ) : (
+              <pre className="whitespace-pre-wrap break-words font-mono text-[11px] text-gray-600 dark:text-gray-300">
+                {preview.body}
+              </pre>
+            )}
           </div>
         </details>
 

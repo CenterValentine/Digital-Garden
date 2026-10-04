@@ -281,11 +281,25 @@ function clamp(value: string, max: number): string {
   return trimmed.length > max ? `${trimmed.slice(0, max - 1)}…` : trimmed;
 }
 
-/** A field counts as filled only when it says more than its starter scaffold. */
-export function isFieldFilled(field: FeedbackField, value: string | undefined): boolean {
-  const v = (value ?? "").trim();
-  if (!v) return false;
-  return field.starter ? v !== field.starter.trim() : true;
+/** An empty list item: "2.", "-", "- [ ]" with nothing after it. */
+const EMPTY_LIST_ITEM = /^\s*(?:\d+[.)]|[-*+])(?:\s+\[[ xX]\])?\s*$/;
+
+/**
+ * A field's text as the issue should carry it: empty list items (the
+ * unused rest of a "1. 2. 3." starter, a blank "- [ ]") are dropped, so a
+ * report reads like it was written, not like a form.
+ */
+export function cleanFieldValue(value: string | undefined): string {
+  return (value ?? "")
+    .split("\n")
+    .filter((line) => !EMPTY_LIST_ITEM.test(line))
+    .join("\n")
+    .trim();
+}
+
+/** A field counts as filled only when it says something beyond its starter scaffold. */
+export function isFieldFilled(_field: FeedbackField, value: string | undefined): boolean {
+  return cleanFieldValue(value).length > 0;
 }
 
 /** Required fields still empty, by label, for the dialog's submit guard. */
@@ -337,7 +351,7 @@ export function composeIssue(
   for (const f of def.fields) {
     const value = input.fields[f.id];
     if (!isFieldFilled(f, value)) continue;
-    sections.push(`**${f.heading}**\n${clamp(value ?? "", FEEDBACK_LIMITS.field)}`);
+    sections.push(`**${f.heading}**\n${clamp(cleanFieldValue(value), FEEDBACK_LIMITS.field)}`);
   }
 
   const rows = diagnosticsRows(input.diagnostics, server);
