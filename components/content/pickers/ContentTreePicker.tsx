@@ -85,6 +85,7 @@ import { calculateMenuPosition } from "@/lib/core/menu-positioning";
 import { useWorkspaceStore } from "@/state/workspace-store";
 import { useTreeStateStore } from "@/state/tree-state-store";
 import { useContentStore } from "@/state/content-store";
+import { collectPaneAttachedTabs } from "@/state/workspace-tab-filter-store";
 import {
   recordCreateDestination,
   useCreateDestinationStore,
@@ -163,6 +164,11 @@ export function useWorkspaceViewOptions(): {
     const active = views.find((v) => v.id === activeWorkspaceId);
     return { views, defaultViewId: active?.id ?? null };
   }, [workspaces, activeWorkspaceId]);
+}
+
+/** A folder holding open content, with how many open items it holds. */
+interface OpenDestination extends CreateDestination {
+  count: number;
 }
 
 interface FlatRow {
@@ -469,7 +475,10 @@ export function ContentTreePicker({
     (s) => s.recentDestinations,
   );
   const forgetDestination = useCreateDestinationStore((s) => s.forgetDestination);
-  const [destinationsOpen, setDestinationsOpen] = useState(false);
+  // Which jump-to list is unfolded in place (one at a time), if any.
+  const [destinationsSection, setDestinationsSection] = useState<
+    "recent" | "open" | null
+  >(null);
   // Destinations the loaded tree proves (see deriveDestinations), keyed by
   // server-space parent id. Merged with the recorded ones below.
   const [derivedDestinations, setDerivedDestinations] = useState<
@@ -656,6 +665,43 @@ export function ContentTreePicker({
       .slice(0, 6);
   }, [recentDestinations, derivedDestinations, lookupNode]);
 
+  // Open destinations: the folders that hold the content open in THIS
+  // workspace's panes (a folder that is itself open counts as its own
+  // destination). A second point of reference beside "recent" — places the
+  // user is already working in. Only tabs the loaded tree can see count;
+  // virtual tabs (reader:…) have no folder.
+  const panes = useContentStore((s) => s.panes);
+  const tabs = useContentStore((s) => s.tabs);
+  const openDestinations = useMemo<OpenDestination[]>(() => {
+    if (!tree) return [];
+    const rowById = new Map(tree.map((r) => [r.id, r]));
+    const byFolder = new Map<string | null, number>();
+    for (const tab of collectPaneAttachedTabs(panes, tabs)) {
+      const row = rowById.get(tab.contentId);
+      if (!row) continue;
+      const folderId = row.contentType === "folder" ? row.id : row.parentId;
+      byFolder.set(folderId, (byFolder.get(folderId) ?? 0) + 1);
+    }
+    return Array.from(byFolder, ([id, count]) => {
+      const node = id ? lookupNode(id) : null;
+      const parentPath: string[] = [];
+      let cursor = node?.parentId ?? null;
+      while (cursor && parentPath.length < 2) {
+        const ancestor = lookupNode(cursor);
+        if (!ancestor) break;
+        parentPath.unshift(ancestor.title);
+        cursor = ancestor.parentId;
+      }
+      return {
+        id,
+        title: id === null ? "Root" : (node?.title ?? "Folder"),
+        parentPath,
+        at: 0,
+        count,
+      };
+    }).slice(0, 8);
+  }, [tree, panes, tabs, lookupNode]);
+
   // Where the list opens: ON THE USER'S PERSPECTIVE. The first time a tree is
   // on screen, the row where the user is (tree selection, else the active
   // content) is centred, so the picker opens at the place they already see.
@@ -836,7 +882,7 @@ export function ContentTreePicker({
   // Absent even at Root → the folder is gone; forget it.
   const jumpToDestination = useCallback(
     (destination: CreateDestination) => {
-      setDestinationsOpen(false);
+      setDestinationsSection(null);
       if (destination.id === null) {
         // Root: the top of the tree. Scroll to the top, nothing to unfold.
         if (viewId !== null) selectScope(null);
@@ -973,11 +1019,12 @@ export function ContentTreePicker({
           )
         ) : (
           <>
-            {quickCreate && destinations.length > 0 ? (
-              <RecentDestinations
-                destinations={destinations}
-                open={destinationsOpen}
-                onToggle={() => setDestinationsOpen((o) => !o)}
+            {quickCreate && (destinations.length > 0 || openDestinations.length > 0) ? (
+              <JumpTo
+                recent={destinations}
+                open={openDestinations}
+                section={destinationsSection}
+                onSection={setDestinationsSection}
                 noun={createNoun}
                 lookupTitle={(id) => (id ? (lookupNode(id)?.title ?? null) : null)}
                 onJump={jumpToDestination}
@@ -1294,36 +1341,39 @@ function QuickCreateButton({
 }
 
 /**
- * Recent destinations — ONE row at the top of the picker naming the folder
- * that last received a create, with a "+" that creates there again. Click
- * the row (chevron) to unfold the last few IN PLACE, pushing the list down.
- * (A hover sub-menu flyout was tried 2026-10-04 and REMOVED: the picker sits
- * at the screen edge, so a flyout beside it has nowhere good to go.) Each
- * destination: click = go there in the browse tree, "+" = create inside it.
- * The owner's framing: "a single item that is expanded to several parent
- * locations the user created content for before" — promoted above the tree
- * because it is most useful exactly when it differs from where the file
- * tree is pointing.
+ * Jump-to — ONE compact row at the top of the picker holding BOTH reference
+ * lists: "Recent" (folders you last created in) and "Open" (folders holding
+ * the content open in this workspace). Two chips share the row; click a chip
+ * to unfold its list IN PLACE (one at a time), click again to fold it. The
+ * trailing "+" creates in the latest destination — recent if there is one,
+ * else the first open folder — so the common case stays one click. Each
+ * listed folder: click = go there in the browse tree, "+" = create inside it.
+ * (A hover flyout was tried and removed 2026-10-04: the picker sits at the
+ * screen edge, so a flyout beside it has nowhere good to go.) Promoted above
+ * the tree because it is most useful exactly when it differs from where the
+ * file tree is pointing.
  */
-function RecentDestinations({
-  destinations,
+function JumpTo({
+  recent,
   open,
-  onToggle,
+  section,
+  onSection,
   noun,
   lookupTitle,
   onJump,
   onCreate,
 }: {
-  destinations: CreateDestination[];
-  open: boolean;
-  onToggle: () => void;
+  recent: CreateDestination[];
+  open: OpenDestination[];
+  section: "recent" | "open" | null;
+  onSection: (section: "recent" | "open" | null) => void;
   noun: string;
   /** Live title from the loaded tree, when it can see the folder. */
   lookupTitle: (id: string | null) => string | null;
   onJump: (destination: CreateDestination) => void;
   onCreate: (destination: CreateDestination) => void;
 }) {
-  const latest = destinations[0];
+  const latest = recent[0] ?? open[0];
   const titleOf = (d: CreateDestination) =>
     d.id === null ? "Root" : (lookupTitle(d.id) ?? d.title);
   const pathOf = (d: CreateDestination) =>
@@ -1332,89 +1382,97 @@ function RecentDestinations({
   // inside render remounts on every render (react/no-unstable-nested-components).
   const destIcon = (d: CreateDestination, className: string) =>
     d.id === null ? <Home className={className} /> : <Folder className={className} />;
+  const list: Array<CreateDestination & { count?: number }> =
+    section === "recent" ? recent : section === "open" ? open : [];
+
+  const chip = (
+    key: "recent" | "open",
+    label: string,
+    count: number | null,
+    icon: React.ReactNode,
+  ) => {
+    const active = section === key;
+    return (
+      <button
+        type="button"
+        onClick={() => onSection(active ? null : key)}
+        aria-expanded={active}
+        title={
+          key === "recent"
+            ? "Folders you last created in"
+            : "Folders holding content open in this workspace"
+        }
+        className={cn(
+          "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] outline-none transition-colors",
+          active
+            ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+            : "bg-black/[0.05] text-gray-600 hover:bg-black/[0.09] dark:bg-white/[0.07] dark:text-gray-300 dark:hover:bg-white/[0.12]",
+        )}
+      >
+        {icon}
+        {label}
+        {count !== null ? (
+          <span className="text-[10px] opacity-70">{count}</span>
+        ) : null}
+        <ChevronDown
+          className={cn(
+            "h-3 w-3 shrink-0 opacity-60 transition-transform",
+            !active && "-rotate-90",
+          )}
+        />
+      </button>
+    );
+  };
 
   return (
     <div className="border-b border-black/5 dark:border-white/5 pb-1 mb-1">
-      {/* Summary row: the LATEST destination, one click from creating there. */}
-      <div
-        className={cn(
-          "group flex w-full items-center gap-2 py-1.5 pl-3 pr-2 text-xs transition-colors hover:bg-black/[0.04] dark:hover:bg-white/5",
-          open && "bg-black/[0.03] dark:bg-white/[0.04]",
-        )}
-      >
-        <button
-          type="button"
-          onClick={onToggle}
-          aria-expanded={open}
-          title={
-            open
-              ? "Hide recent destinations"
-              : `Where you last created: ${titleOf(latest)} — click for more`
-          }
-          className="flex min-w-0 flex-1 items-center gap-2 text-left outline-none"
-        >
-          {open ? (
-            <ChevronDown className="h-3 w-3 shrink-0 text-gray-400" />
-          ) : (
-            <ChevronRight className="h-3 w-3 shrink-0 text-gray-400" />
-          )}
-          <FolderInput className="h-3.5 w-3.5 shrink-0 text-emerald-600/80 dark:text-emerald-400/80" />
-          <span className="flex min-w-0 flex-col leading-tight">
-            <span className="text-[10px] uppercase tracking-wider text-gray-500 font-medium">
-              Recent destinations
-            </span>
-            {!open ? (
-              <span className="truncate text-gray-700 dark:text-gray-300">
-                {titleOf(latest)}
-                {pathOf(latest) ? (
-                  <span className="ml-1 text-gray-400 dark:text-gray-500">
-                    · {pathOf(latest)}
-                  </span>
-                ) : null}
-              </span>
-            ) : null}
-          </span>
-        </button>
-        {!open ? (
-          <QuickCreateButton
-            noun={noun}
-            title={`+ New ${noun} in ${titleOf(latest)}`}
-            onClick={() => onCreate(latest)}
-          />
-        ) : null}
+      <div className="flex w-full items-center gap-1.5 py-1 pl-3 pr-2 text-xs">
+        {recent.length > 0
+          ? chip("recent", "Recent", null, <History className="h-3 w-3 shrink-0" />)
+          : null}
+        {open.length > 0
+          ? chip("open", "Open", open.length, <FolderInput className="h-3 w-3 shrink-0" />)
+          : null}
+        <QuickCreateButton
+          noun={noun}
+          title={`+ New ${noun} in ${titleOf(latest)}`}
+          onClick={() => onCreate(latest)}
+        />
       </div>
 
-      {open
-        ? destinations.map((d) => (
-            <div
-              key={d.id ?? "root"}
-              className="group flex w-full items-center gap-2 py-1.5 pr-2 pl-3 text-xs transition-colors hover:bg-black/[0.04] dark:hover:bg-white/5"
-            >
-              <button
-                type="button"
-                onClick={() => onJump(d)}
-                title="Go there in the tree"
-                className="flex min-w-0 flex-1 items-center gap-2 text-left"
-              >
-                <span className="w-3 shrink-0" aria-hidden />
-                {destIcon(d, "h-3.5 w-3.5 shrink-0 text-yellow-500/80")}
-                <span className="truncate text-gray-700 dark:text-gray-300">
-                  {titleOf(d)}
-                </span>
-                {pathOf(d) ? (
-                  <span className="truncate text-[10px] text-gray-400 dark:text-gray-500">
-                    {pathOf(d)}
-                  </span>
-                ) : null}
-              </button>
-              <QuickCreateButton
-                noun={noun}
-                title={`+ New ${noun} in ${titleOf(d)}`}
-                onClick={() => onCreate(d)}
-              />
-            </div>
-          ))
-        : null}
+      {list.map((d) => (
+        <div
+          key={d.id ?? "root"}
+          className="group flex w-full items-center gap-2 py-1.5 pr-2 pl-3 text-xs transition-colors hover:bg-black/[0.04] dark:hover:bg-white/5"
+        >
+          <button
+            type="button"
+            onClick={() => onJump(d)}
+            title="Go there in the tree"
+            className="flex min-w-0 flex-1 items-center gap-2 text-left"
+          >
+            {destIcon(d, "h-3.5 w-3.5 shrink-0 text-yellow-500/80")}
+            <span className="truncate text-gray-700 dark:text-gray-300">
+              {titleOf(d)}
+            </span>
+            {pathOf(d) ? (
+              <span className="truncate text-[10px] text-gray-400 dark:text-gray-500">
+                {pathOf(d)}
+              </span>
+            ) : null}
+            {section === "open" && d.count && d.count > 1 ? (
+              <span className="ml-auto shrink-0 rounded-full bg-black/[0.05] px-1.5 text-[10px] text-gray-500 dark:bg-white/[0.08] dark:text-gray-400">
+                {d.count} open
+              </span>
+            ) : null}
+          </button>
+          <QuickCreateButton
+            noun={noun}
+            title={`+ New ${noun} in ${titleOf(d)}`}
+            onClick={() => onCreate(d)}
+          />
+        </div>
+      ))}
     </div>
   );
 }
