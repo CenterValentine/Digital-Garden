@@ -12,6 +12,7 @@ export interface SearchBackendMeta {
   label: string;
   apiKeyHint: string;
   apiKeyDocsURL: string;
+  model?: string;
 }
 
 export const SEARCH_BACKENDS_META: readonly SearchBackendMeta[] =
@@ -20,4 +21,12 @@ export const SEARCH_BACKENDS_META: readonly SearchBackendMeta[] =
     label: p.label,
     apiKeyHint: p.apiKeyHint,
     apiKeyDocsURL: p.apiKeyDocsURL,
+    ...(p.model ? { model: p.model } : {}),
   }));
+
+/** How a search service is named in the UI: a search model by its model id. */
+export function searchServiceDisplayName(providerId: string): string {
+  const meta = SEARCH_BACKENDS_META.find((m) => m.id === providerId);
+  if (!meta) return providerId;
+  return meta.model ? `${meta.label} · ${meta.model}` : meta.label;
+}

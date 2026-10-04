@@ -8,6 +8,7 @@
  */
 
 import type { ReactNode } from "react";
+import type { PaneHotkeyTarget } from "@/lib/features/content/pane-hotkeys";
 
 /**
  * Context menu action definition
@@ -53,13 +54,19 @@ export interface ContextMenuAction {
    * item is opened. Reuses the submenu hover/positioning machinery. Carries
    * the data the flyout needs so it stays self-contained.
    */
-  customFlyout?: {
-    kind: "folder-search";
-    selectedIds: string[];
-    excludeIds: string[];
-    /** Show the AI "Folder assistant" entry at the top of the flyout. */
-    folderAssistant?: boolean;
-  };
+  customFlyout?:
+    | {
+        kind: "folder-search";
+        selectedIds: string[];
+        excludeIds: string[];
+        /** Show the AI "Folder assistant" entry at the top of the flyout. */
+        folderAssistant?: boolean;
+      }
+    | {
+        /** The 3×3 direction-key map (Q W E / A S D / Z X C). */
+        kind: "pane-grid";
+        onPick: (target: PaneHotkeyTarget) => void | Promise<void>;
+      };
   /** Secondary icon action (e.g. delete button on the right) */
   secondaryAction?: {
     icon: string;

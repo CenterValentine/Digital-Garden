@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-09-29
+last_updated: 2026-10-02
 ---
 
 # Sprint Backlog
@@ -7,6 +7,53 @@ last_updated: 2026-09-29
 **Prioritized work items for upcoming sprints, organized by epoch.**
 
 **Sprint Execution Protocol**: Before commencing any sprint, always ask the user for input before planning and executing — there may be additions or modifications.
+
+---
+
+## Split Pane Placement — behaviour as a setting (2026-10-02, from `feat/open-into-opposite-pane`)
+
+Where content opened from the file tree lands in a split workspace is a
+preference, and some of it is already built. The **seam exists and is
+covered**; what is missing is the control that reaches it.
+
+**Already shipped on that branch** — nothing below needs re-deriving:
+
+- `settings.ui.openDestination` in the Zod schema, with `"fill"` in
+  `DEFAULT_SETTINGS` (`lib/features/settings/validation.ts`). It sits under
+  `ui` on purpose: `saveToBackend` sends `ui` wholesale and `setUISettings`
+  already patches it, so registrations 3 and 4 of the four-registration rule
+  are satisfied by construction and the "saves, then silently reverts" trap
+  cannot apply.
+- `resolveOpenDestinationPane(layoutMode, activePaneId, isPaneEmpty, mode)`
+  in `state/content-store.ts` takes the mode and honours all three values.
+- The tree's open path reads the preference through the real store, so the
+  default is exercised end-to-end rather than hardcoded.
+- All three modes are pinned in `pnpm workspace:pane-placement:smoke`,
+  including the two nothing can select yet — an unreachable branch rots
+  before the control that exposes it lands, and then the settings PR gets
+  blamed for behaviour it did not write.
+
+**What is left: the UI only.**
+
+- A control in the appearance/workspace settings area with the three values:
+  - **Beside your work** (`fill`, default) — the opposite pane first, then any
+    empty pane, then back to the opposite. In a quad this fills the room
+    before stacking.
+  - **Always opposite** (`opposite`) — never spreads into the other panes.
+  - **In the active pane** (`active`) — how this behaved before the rule, for
+    anyone who wants it back.
+- Write through `setUISettings({ openDestination })`; do NOT add a new setter
+  or a new `saveToBackend` line.
+- Settings-page conventions apply: `"use client"`, Glass-0 `SettingSection`
+  cards, sonner toast on save.
+- Copy should say what each does to the pane you are reading in, since that is
+  the thing the default protects.
+
+**Worth deciding at the same time:** a tree click is a *preview* open, so a
+second one replaces the first in the destination pane rather than stacking.
+That is pinned as current behaviour, not asserted as correct. If "accumulate
+while browsing beside my work" is wanted, it is a `pin: true` on that call
+path and probably belongs to the same control.
 
 ---
 
@@ -54,6 +101,9 @@ LDS standard works as a shared read-only corpus (seeded from the public-domain `
 - [ ] **Run cost levers (plan §10) — remaining.**
   - L1, L2, L3a and L4a are built (#270, #271). L3b was superseded by L2. Round 3 is on `fix/docx-cache-volley`: budget on tool results, DOCX hyperlinks and file-extracted check text, GPT-5.6+ write pricing, gpt-6 cache key, Anthropic breakpoints, and the approval volley.
   - **Verify on the next run:** `cachedInputTokens` climbs inside a request now that the trailing notice is gone. If it still freezes, export `ai:prompt_wire` again.
+  - **Prefix diagnostic → per-conversation owner toggle** that writes the divergence summary into the turn's metadata (readable with pg-read), replacing the env var and the Vercel log export. Keep the env var until then (unset).
+  - **Search delegation trial:** the OpenAI search backend is built (#273). Run one charter job with Chat controls → Web search set to `gpt-5-search-api`, then compare against `36237eb8` (native: 12 searches, $0.12 in fees). Compare `searchCostUsd` summed from the transcript plus the chat meter, and research quality. The per-search fee question ("search actions incur a tool call cost") is settled by the first OpenAI bill.
+  - **Fold backend search cost into the chat meter:** `searchCostUsd` rides the tool result but isn't added to the turn's cost.
   - **DOCX layout render (optional):** a DOCX → PDF tool (OnlyOffice conversion) returning the page count and an image of page one, for a true layout check. Until then the charter hands visual review to the owner.
   - Open decision **D8 (revised):** should charter turns on OpenAI use the app-run search backend instead of native search, so search is refusable, repeat-guarded and budgetable, at the cost of OpenAI's integrated citations?
   - **Model watch:** a weekly routine reporting gaps between new model releases and our catalog, pricing, constraints, adapter and gateway rows to a GitHub Issue. Waits on the owner: provider keys as repo secrets, and Issue versus Wiki.
@@ -145,7 +195,7 @@ Principle: `core/PRODUCT-PRINCIPLES.md` §2. Each item below serves the general 
 - [ ] **Mention pill character-count tooltip.** The `@mention` pill's `title` (`makeMentionPill`, `ChatInput.tsx`) should show the note's length and what the capsule will inject: e.g. `28,103 chars — first 2,000 injected`. Needs the count on the suggestion payload (`/api/content/content?search=` → add `charCount` from `searchText`, and the data/row suggest route) or a lazy fetch on hover. Small; intended to ship in the same session as the brainstorm if time allows.
 - [ ] **Model-aware mention budget** — replace the flat `slice(0, 2000)` (`app/api/ai/chat/route.ts`) with a budget derived from the model's `contextWindow` + cost tier (`PROVIDER_CATALOG`), a global default in `settings.ai` (compact / standard / full or an explicit number), a per-model override, and a per-turn chip override ("Full text"). Budget in tokens, allocated across mentions rather than per note; outline-first when truncating (headings + accordion `headerText`s via `outline-extractor.ts`); and *say* it's truncated (`showing 2,000 of 28,103 — read_content_chunk to continue`).
 - [ ] **Note character limit at the 1M-token equivalent.** Hard cap so a single note can never exceed ~1M tokens (≈ 3.5–4M characters; pick the constant from the catalog's largest context window and document the tokens-per-char assumption). Enforce in the editor — `CharacterCount` is already loaded in both extension sets; check TipTap's built-in `limit` option first — so typing/pasting past the cap is refused, with a sonner toast each time the user tries. Also enforce server-side on the note write path (REST + `write-note-content.ts`) so imports and scripts can't exceed it either. Prevention, not truncation: never drop content silently.
-- [ ] **Accordion markdown codec** — `accordion` has no codec in `markdown-block-codecs.ts`, so chunk reads / source view emit it as a Tier-2 HTML div. A `<details><summary>headerText</summary>` (or heading) codec makes accordion-heavy notes legible to the model and to humans in source view. Guarded by `markdown:blocks:check`.
+- [x] **Accordion markdown codec** — *Shipped 2026-09-26* (`feat/accordion-markdown-codec`). Accordions were falling to the **Tier-3 opaque fence** (not the Tier-2 HTML div the original note assumed): six attrs plus a blockId with no markdown form. They now serialize as `<details data-*>` + `<summary>` with the body as real markdown after a blank line (CommonMark type-6 HTML block), and `reTag` folds marked's output back into `div[data-block-type="accordion"]`. Nested accordions resolve innermost-first; a newline in the header declines to the fence. The gate asserts pretty, nested, and the decline; mutation-tested. Guide §5a records the tempered-regex lesson.
 - [ ] **Deliberate-gap semantics for cells** (raw). A row can be "incomplete on purpose" (the source was never captured) vs "not yet processed". Today only conventions distinguish them (placeholder rows, `Readiness: Needs detail`, `Evidence strength: Needs verification`, column descriptions saying blanks may be deliberate). Consider a first-class marker — a per-cell *unknown* sentinel or a table-level "gaps are deliberate" description the schema digest surfaces — so DG's AI neither fills gaps with invention nor treats them as work to redo.
 - [ ] **Flashcards → database schema (cleanup, very raw).** Flashcards carry their own Prisma models (`FlashcardDeck`, `Flashcard`, `FlashcardReviewAttempt`) beside the general `DataPayload` / `DataColumn` / `DataRow` schema that arrived later. Explore reducing flashcards to a *database with a review runtime*: a deck = a table with a locked system column set (front/back/media/FSRS state), the player and scheduler read rows, and `propose_cards_from_media` becomes an instance of note → rows. Data II already proved the Database → deck direction (PR #195). Owner intends to expand this later; record only the basis for now.
 

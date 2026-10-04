@@ -20,6 +20,14 @@ export interface AppSearchResult {
   publishedAt?: string;
 }
 
+/**
+ * What a backend returns: a result list, or — for a backend that answers
+ * (a search MODEL) — the list plus its cited answer and what the call cost.
+ */
+export type AppSearchResponse =
+  | AppSearchResult[]
+  | { results: AppSearchResult[]; answer?: string; costUsd?: number };
+
 export interface AppSearchProvider {
   /** Stable id, e.g. "tavily" — matches SearchConnection.provider. */
   id: string;
@@ -29,6 +37,8 @@ export interface AppSearchProvider {
   apiKeyDocsURL: string;
   /** Hint shown under the key field in settings. */
   apiKeyHint: string;
+  /** The model a search-MODEL backend runs on — shown beside its name. */
+  model?: string;
   /**
    * Run a search with the user's BYOK key (resolved from SearchConnection,
    * NOT env). Implementations must throw on transport/auth errors so the
@@ -38,5 +48,5 @@ export interface AppSearchProvider {
   search(
     query: string,
     opts: { apiKey: string; maxResults?: number; signal?: AbortSignal },
-  ): Promise<AppSearchResult[]>;
+  ): Promise<AppSearchResponse>;
 }

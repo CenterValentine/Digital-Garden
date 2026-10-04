@@ -1,6 +1,12 @@
 "use client";
 
+import { traceWorkspace } from "@/lib/core/workspace-trace";
 import { createElement, useEffect, useState, type ReactNode } from "react";
+import {
+  PANE_HOTKEY_GRID,
+  placementForHotkeyCell,
+} from "@/lib/features/content/pane-hotkeys";
+import { KeyGlyph } from "@/components/content/context-menu/PaneKeyGrid";
 import { Allotment } from "allotment";
 import { usePathname } from "next/navigation";
 import {
@@ -35,12 +41,6 @@ interface TabDropRequest {
   placementMode?: "layout-aware" | "explicit";
   requestedLayoutMode?: WorkspaceLayoutMode;
   complementPaneId?: WorkspacePaneId | null;
-}
-
-interface DragIndicatorPosition {
-  x: number;
-  y: number;
-  side: "left" | "right";
 }
 
 function WorkspacePane({
@@ -121,311 +121,96 @@ function WorkspacePane({
   );
 }
 
+/**
+ * Where a dragged tab can go, drawn as the direction-key map — the same 3×3
+ * the context menu's Open In Pane shows and the held-key open uses, so one
+ * picture answers "where can this go" everywhere. Each cell is a drop zone:
+ * dropping takes the layout the key MEANS (a corner → a quad corner, A/D → a
+ * side-by-side split, W/X → a stacked split, S → one pane), exactly as the
+ * old reshape targets did with their six boxes. Replaces those: they offered
+ * different boxes per layout and none in a quad.
+ *
+ * No letters here, deliberately: a native drag swallows keyboard events for
+ * its whole duration, and a hand on the mouse is not reaching for a key
+ * anyway (owner call, 2026-10-03). The letters stay on the context menu's
+ * copy of this map, where a key IS the gesture.
+ */
 function WorkspaceReshapeTargets({
-  layoutMode,
   draggedTabId,
   sourcePaneId,
   hoveredTargetId,
-  dragIndicatorPosition,
-  onDragPreviewMove,
   onTargetHover,
   onTargetDrop,
 }: {
-  layoutMode: WorkspaceLayoutMode;
   draggedTabId: string | null;
   sourcePaneId: WorkspacePaneId | null;
   hoveredTargetId: string | null;
-  dragIndicatorPosition: DragIndicatorPosition | null;
-  onDragPreviewMove: (position: DragIndicatorPosition) => void;
   onTargetHover: (targetId: string | null) => void;
   onTargetDrop: (request: TabDropRequest) => void;
 }) {
   if (!draggedTabId) return null;
 
-  const allEdgeTargets: Array<{
-    id: string;
-    paneId: WorkspacePaneId;
-    complementPaneId: WorkspacePaneId;
-    requestedLayoutMode: WorkspaceLayoutMode;
-    label: string;
-    className: string;
-  }> = [
-    {
-      id: "split-left",
-      paneId: TOP_LEFT_PANE_ID,
-      complementPaneId: TOP_RIGHT_PANE_ID,
-      requestedLayoutMode: "dual-vertical",
-      label: "V. Split Left",
-      className: "left-0 top-0 bottom-0 w-[80px]",
-    },
-    {
-      id: "split-right",
-      paneId: TOP_RIGHT_PANE_ID,
-      complementPaneId: TOP_LEFT_PANE_ID,
-      requestedLayoutMode: "dual-vertical",
-      label: "V. Split Right",
-      className: "right-0 top-0 bottom-0 w-[80px]",
-    },
-    {
-      id: "split-top",
-      paneId: TOP_LEFT_PANE_ID,
-      complementPaneId: BOTTOM_LEFT_PANE_ID,
-      requestedLayoutMode: "dual-horizontal",
-      label: "H. Split Top",
-      className: "left-[80px] right-[80px] top-0 h-[72px]",
-    },
-    {
-      id: "split-bottom",
-      paneId: BOTTOM_LEFT_PANE_ID,
-      complementPaneId: TOP_LEFT_PANE_ID,
-      requestedLayoutMode: "dual-horizontal",
-      label: "H. Split Bottom",
-      className: "bottom-0 left-[80px] right-[80px] h-[72px]",
-    },
-  ];
-
-  const edgeTargets = allEdgeTargets.filter((target) => {
-    if (layoutMode === "single") return true;
-    if (layoutMode === "dual-horizontal") {
-      return target.requestedLayoutMode === "dual-vertical";
-    }
-    if (layoutMode === "dual-vertical") {
-      return target.requestedLayoutMode === "dual-horizontal";
-    }
-    return false;
-  });
-
-  const quadTargets: Array<{
-    id: string;
-    paneId: WorkspacePaneId;
-    complementPaneId: WorkspacePaneId;
-    label: string;
-    className: string;
-  }> = [
-    {
-      id: "quad-top-left",
-      paneId: TOP_LEFT_PANE_ID,
-      complementPaneId: TOP_RIGHT_PANE_ID,
-      label: "Top Left",
-      className: "left-0 top-0",
-    },
-    {
-      id: "quad-top-right",
-      paneId: TOP_RIGHT_PANE_ID,
-      complementPaneId: TOP_LEFT_PANE_ID,
-      label: "Top Right",
-      className: "right-0 top-0",
-    },
-    {
-      id: "quad-bottom-left",
-      paneId: BOTTOM_LEFT_PANE_ID,
-      complementPaneId: TOP_LEFT_PANE_ID,
-      label: "Bottom Left",
-      className: "bottom-0 left-0",
-    },
-    {
-      id: "quad-bottom-right",
-      paneId: BOTTOM_RIGHT_PANE_ID,
-      complementPaneId: TOP_LEFT_PANE_ID,
-      label: "Bottom Right",
-      className: "bottom-0 right-0",
-    },
-  ];
-
-  const compactOverlayClass =
-    layoutMode === "dual-horizontal"
-      ? sourcePaneId === BOTTOM_LEFT_PANE_ID
-        ? "left-4 top-[calc(50%+44px)] w-[260px]"
-        : "left-4 top-[56px] w-[260px]"
-      : layoutMode === "dual-vertical"
-        ? sourcePaneId === TOP_RIGHT_PANE_ID
-          ? "left-[calc(50%+12px)] top-[56px] w-[260px]"
-          : "left-4 top-[56px] w-[260px]"
-        : null;
-
-  const dragIndicator = dragIndicatorPosition ? (
-    layoutMode === "single" ? (
-      <div
-        className="pointer-events-none fixed z-40 rounded-full border border-gold-primary/18 bg-white/88 dark:bg-black/60 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.2em] text-gold-primary/75 shadow-[0_10px_30px_rgba(15,23,42,0.08)] backdrop-blur-sm"
-        style={{
-          left: dragIndicatorPosition.x,
-          top: dragIndicatorPosition.y,
-          transform:
-            dragIndicatorPosition.side === "left"
-              ? "translate(calc(-100% - 14px), calc(-100% - 12px))"
-              : "translate(14px, calc(-100% - 12px))",
-        }}
-      >
-        Drag To Reshape Workspace
-      </div>
-    ) : null
-  ) : null;
+  // Sit at the top of the pane the tab came from, out from under the cursor.
+  const fromRight =
+    sourcePaneId === TOP_RIGHT_PANE_ID || sourcePaneId === BOTTOM_RIGHT_PANE_ID;
+  const fromBottom =
+    sourcePaneId === BOTTOM_LEFT_PANE_ID || sourcePaneId === BOTTOM_RIGHT_PANE_ID;
+  const overlayClass = `${fromRight ? "left-[calc(50%+12px)]" : "left-4"} ${
+    fromBottom ? "top-[calc(50%+44px)]" : "top-[56px]"
+  }`;
 
   return (
-    <div
-      className="pointer-events-none absolute inset-0 z-30"
-      onDragOverCapture={(event) => {
-        const rootTop = event.currentTarget.getBoundingClientRect().top;
-        const selectionZonesTop =
-          layoutMode === "single"
-            ? rootTop + 52
-            : layoutMode === "dual-horizontal" && sourcePaneId === BOTTOM_LEFT_PANE_ID
-              ? rootTop + window.innerHeight * 0.5
-              : rootTop + 52;
-
-        if (event.clientY < selectionZonesTop) {
-          onTargetHover(null);
-          return;
-        }
-
-        onDragPreviewMove({
-          x: event.clientX,
-          y: event.clientY,
-          side: event.clientX > window.innerWidth * 0.6 ? "left" : "right",
-        });
-      }}
-    >
-      {dragIndicator}
-
-      {layoutMode === "single" ? (
-        <div className="absolute inset-x-3 bottom-3 top-[52px]">
-          {edgeTargets.map((target) => (
-            <div
-              key={target.id}
-              className={`pointer-events-auto absolute overflow-hidden rounded-2xl border border-dashed transition-colors ${
-                hoveredTargetId === target.id
-                  ? "border-gold-primary/55 bg-gold-primary/[0.09] shadow-[inset_0_0_0_1px_rgba(201,168,108,0.18)]"
-                  : "border-gold-primary/26 bg-gold-primary/[0.025]"
-              } ${target.className}`}
-              onDragOver={(event) => {
-                event.preventDefault();
-                event.dataTransfer.dropEffect = "move";
-                onTargetHover(target.id);
-              }}
-              onDrop={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                onTargetDrop({
-                  paneId: target.paneId,
-                  placementMode: "explicit",
-                  requestedLayoutMode: target.requestedLayoutMode,
-                  complementPaneId: target.complementPaneId,
-                });
-              }}
-            >
-              <div className="absolute left-2.5 top-2.5 rounded-full border border-gold-primary/14 bg-white/55 dark:bg-black/40 px-2 py-1 text-[10px] font-medium uppercase tracking-[0.18em] text-gold-primary/70 backdrop-blur-sm">
-                {target.label}
-              </div>
-            </div>
-          ))}
-
-          <div className="pointer-events-none absolute bottom-[76px] left-[84px] right-[84px] top-[76px]">
-            <div className="absolute inset-0 rounded-[26px] border border-dashed border-gold-primary/24 bg-gold-primary/[0.018]" />
-            <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 border-l border-dashed border-gold-primary/26" />
-            <div className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 border-t border-dashed border-gold-primary/26" />
-
-            {quadTargets.map((target) => (
-              <div
-                key={target.id}
-                className={`pointer-events-auto absolute flex h-1/2 w-1/2 items-start justify-start rounded-[22px] border border-dashed p-4 transition-colors ${
-                  hoveredTargetId === target.id
-                    ? "border-gold-primary/55 bg-gold-primary/[0.09] shadow-[inset_0_0_0_1px_rgba(201,168,108,0.18)]"
-                    : "border-transparent bg-transparent"
-                } ${target.className}`}
-                onDragOver={(event) => {
-                  event.preventDefault();
-                  event.dataTransfer.dropEffect = "move";
-                  onTargetHover(target.id);
-                }}
-                onDrop={(event) => {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  onTargetDrop({
-                    paneId: target.paneId,
-                    placementMode: "explicit",
-                    requestedLayoutMode: "quad",
-                    complementPaneId: target.complementPaneId,
-                  });
-                }}
-              >
-                <div className="rounded-full border border-gold-primary/16 bg-white/55 dark:bg-black/40 px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.18em] text-gold-primary/70 backdrop-blur-sm">
-                  {target.label}
-                </div>
-              </div>
-            ))}
-          </div>
+    <div className="pointer-events-none absolute inset-0 z-30">
+      <div
+        className={`pointer-events-auto absolute w-[232px] rounded-[20px] border border-white/30 dark:border-white/15 bg-white/80 dark:bg-black/60 p-2 shadow-[0_12px_34px_rgba(15,23,42,0.12)] backdrop-blur-md ${overlayClass}`}
+        onDragLeave={(event) => {
+          // Leaving the card (not moving between its cells) clears the hover.
+          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+            onTargetHover(null);
+          }
+        }}
+      >
+        <div className="mb-1.5 text-center text-[10px] font-medium uppercase tracking-[0.18em] text-gold-primary/75">
+          Drop to place
         </div>
-      ) : compactOverlayClass ? (
-        <div
-          className={`pointer-events-none absolute rounded-[24px] border border-white/30 dark:border-white/15 bg-white/72 dark:bg-black/55 p-3 shadow-[0_12px_34px_rgba(15,23,42,0.12)] backdrop-blur-md ${compactOverlayClass}`}
-        >
-          <div className="mb-2 rounded-full border border-gold-primary/14 bg-white/55 dark:bg-black/40 px-2.5 py-1 text-center text-[10px] font-medium uppercase tracking-[0.18em] text-gold-primary/75">
-            Drag To Reshape Workspace
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            {edgeTargets.map((target) => (
+        <div className="grid grid-cols-3 gap-1">
+          {PANE_HOTKEY_GRID.flat().map((cellDef) => {
+            const placement = placementForHotkeyCell(cellDef);
+            const hovered = hoveredTargetId === cellDef.code;
+            return (
               <div
-                key={target.id}
-                className={`pointer-events-auto relative min-h-16 overflow-hidden rounded-2xl border border-dashed transition-colors ${
-                  hoveredTargetId === target.id
-                    ? "border-gold-primary/55 bg-gold-primary/[0.09] shadow-[inset_0_0_0_1px_rgba(201,168,108,0.18)]"
-                    : "border-gold-primary/26 bg-gold-primary/[0.025]"
+                key={cellDef.code}
+                title={cellDef.description}
+                className={`flex min-h-[52px] flex-col items-center justify-center gap-0.5 rounded-xl border border-dashed px-1 py-1 transition-colors ${
+                  hovered
+                    ? "border-gold-primary/55 bg-gold-primary/[0.09] text-gold-primary shadow-[inset_0_0_0_1px_rgba(201,168,108,0.18)]"
+                    : "border-gold-primary/24 bg-gold-primary/[0.025] text-gold-primary/75"
                 }`}
                 onDragOver={(event) => {
                   event.preventDefault();
                   event.dataTransfer.dropEffect = "move";
-                  onTargetHover(target.id);
+                  onTargetHover(cellDef.code);
                 }}
                 onDrop={(event) => {
                   event.preventDefault();
                   event.stopPropagation();
                   onTargetDrop({
-                    paneId: target.paneId,
+                    paneId: placement.paneId,
                     placementMode: "explicit",
-                    requestedLayoutMode: target.requestedLayoutMode,
-                    complementPaneId: target.complementPaneId,
+                    requestedLayoutMode: placement.requestedLayoutMode,
+                    complementPaneId: placement.complementPaneId,
                   });
                 }}
               >
-                <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 text-center text-[10px] font-medium uppercase tracking-[0.18em] text-gold-primary/75">
-                  {target.label}
-                </div>
+                <KeyGlyph glyph={cellDef.glyph} />
+                <span className="text-[9px] uppercase tracking-[0.12em] opacity-80">
+                  {cellDef.caption}
+                </span>
               </div>
-            ))}
-          </div>
-          <div className="mt-2 grid grid-cols-2 gap-2">
-            {quadTargets.map((target) => (
-              <div
-                key={target.id}
-                className={`pointer-events-auto relative min-h-14 overflow-hidden rounded-2xl border border-dashed transition-colors ${
-                  hoveredTargetId === target.id
-                    ? "border-gold-primary/55 bg-gold-primary/[0.09] shadow-[inset_0_0_0_1px_rgba(201,168,108,0.18)]"
-                    : "border-gold-primary/22 bg-gold-primary/[0.02]"
-                }`}
-                onDragOver={(event) => {
-                  event.preventDefault();
-                  event.dataTransfer.dropEffect = "move";
-                  onTargetHover(target.id);
-                }}
-                onDrop={(event) => {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  onTargetDrop({
-                    paneId: target.paneId,
-                    placementMode: "explicit",
-                    requestedLayoutMode: "quad",
-                    complementPaneId: target.complementPaneId,
-                  });
-                }}
-              >
-                <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 text-center text-[10px] font-medium uppercase tracking-[0.18em] text-gold-primary/75">
-                  {target.label}
-                </div>
-              </div>
-            ))}
-          </div>
+            );
+          })}
         </div>
-      ) : null}
+      </div>
     </div>
   );
 }
@@ -457,21 +242,17 @@ export function MainPanelWorkspace({
   const [draggedTabId, setDraggedTabId] = useState<string | null>(null);
   const [draggedFromPaneId, setDraggedFromPaneId] = useState<WorkspacePaneId | null>(null);
   const [hoveredSinglePaneTargetId, setHoveredSinglePaneTargetId] = useState<string | null>(null);
-  const [dragIndicatorPosition, setDragIndicatorPosition] =
-    useState<DragIndicatorPosition | null>(null);
 
   const handleTabDragStart = (tabId: string, paneId: WorkspacePaneId) => {
     setDraggedTabId(tabId);
     setDraggedFromPaneId(paneId);
     setHoveredSinglePaneTargetId(null);
-    setDragIndicatorPosition(null);
   };
 
   const resetDragState = () => {
     setDraggedTabId(null);
     setDraggedFromPaneId(null);
     setHoveredSinglePaneTargetId(null);
-    setDragIndicatorPosition(null);
   };
 
   const handleTabDrop = ({
@@ -490,6 +271,7 @@ export function MainPanelWorkspace({
     });
     resetDragState();
   };
+
 
   useEffect(() => {
     if (openContentIds.length > 0) return;
@@ -546,6 +328,13 @@ export function MainPanelWorkspace({
       // Deep-linked tabs are a LOCAL open that hasn't been published yet. Mark
       // the intent so a background reconcile arriving before the debounced
       // write can't erase them (see markLocalOpenIntents).
+      traceWorkspace("url:restore", {
+        contentIdFromUrl,
+        tabsFromUrl,
+        secondaryTabsFromUrl,
+        paneTabContentIds: hasPaneTabs ? paneTabContentIds : null,
+        href: window.location.href,
+      });
       markLocalOpenIntents([
         contentIdFromUrl,
         ...Object.values(paneTabContentIds).flatMap((ids) => ids ?? []),
@@ -719,18 +508,15 @@ export function MainPanelWorkspace({
             draggedTabId={draggedTabId}
             onDrop={resetDragState}
           />
-        ) : layoutMode !== "quad" ? (
+        ) : (
           <WorkspaceReshapeTargets
-            layoutMode={layoutMode}
             draggedTabId={draggedTabId}
             sourcePaneId={draggedFromPaneId}
             hoveredTargetId={hoveredSinglePaneTargetId}
-            dragIndicatorPosition={dragIndicatorPosition}
-            onDragPreviewMove={setDragIndicatorPosition}
             onTargetHover={setHoveredSinglePaneTargetId}
             onTargetDrop={handleTabDrop}
           />
-        ) : null}
+        )}
       </div>
       {!isFocusMode
         ? shellControllers.map((Controller) =>

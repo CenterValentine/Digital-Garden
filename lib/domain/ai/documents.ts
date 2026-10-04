@@ -236,7 +236,8 @@ export async function createDocxDocument(
   input: CreateDocxInput,
 ): Promise<{ contentNodeId: string; fileName: string }> {
   const tiptap = markdownToTiptap(input.markdown);
-  const converter = new DOCXConverter();
+  // Compact layout: AI documents are resumes, letters, briefs (§10 round 5).
+  const converter = new DOCXConverter({ compact: true });
   const result = await converter.convert(tiptap, {
     format: "docx",
     settings: DEFAULT_EXPORT_BACKUP_SETTINGS,

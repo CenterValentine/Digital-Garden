@@ -320,9 +320,16 @@ import {
 import { summarizeRejections, unknownOptionError } from "../lib/domain/data/cells";
 import {
   CHARTER_TURN_TOOLS,
+  reservedTailTools,
   tailRefusalNotice,
   withBudgetNotice,
 } from "../lib/domain/ai/tools/iteration-proposal";
+import { nativeSearchLabel } from "../lib/domain/ai/use-chat-search-backend";
+import { citationsToResults } from "../lib/domain/ai/acquisition/search/openai";
+import { getSearchProviderImpl } from "../lib/domain/ai/acquisition/search/registry";
+import { searchServiceDisplayName } from "../lib/domain/ai/acquisition/search/metadata";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import {
   cacheLifetimeMinutes,
   cacheVolleyDelayMs,
@@ -331,6 +338,8 @@ import {
 } from "../lib/domain/ai/cache-volley";
 import { docxHtmlToCheckText } from "../lib/domain/ai/docx-check-text";
 import { DOCXConverter } from "../lib/domain/export/converters/docx";
+import { AUTO_CLOSED_CHECKPOINT_NEXT, autoApprovedToolsFrom, toolAutoApproves } from "../lib/domain/ai/tools/approval-policy";
+import { BULK_READ_DEFAULT_TOKENS, effectiveBulkReadThreshold } from "../lib/features/settings/validation";
 import JSZip from "jszip";
 
 {
@@ -502,6 +511,199 @@ import JSZip from "jszip";
     webSearchCallUsd("gpt-4.1", "openai") === 0.025 && webSearchCallUsd("gpt-6-sol", "openai") === 0.01 && webSearchCallUsd("claude-opus-5-5", "anthropic") === 0,
     "§10 L4a: per-call fee — OpenAI reasoning $0.01, other OpenAI $0.025, unverified vendors 0",
   );
+}
+
+{
+  // §10 round 4 — the model can check what it wrote inside the tail; the
+  // web-search preference applies only to models with their own search, and
+  // travels on every request body.
+  assert(reservedTailTools(["create_docx"]).includes("read_content"), "round 4: read_content is a tail tool (check the document just written)");
+  assert(reservedTailTools(["create_docx"], { record: false, extra: ["phase_checkpoint"] }).includes("read_content"), "round 4: charter-turn tails keep read_content too");
+  assert(nativeSearchLabel("openai", "gpt-6-sol") === "OpenAI" && nativeSearchLabel("vercel-gateway", "anthropic/claude-sonnet-5") === "Claude", "round 4: models with their own search are named");
+  assert(nativeSearchLabel("deepseek", "deepseek-chat") === null && nativeSearchLabel(null, null) === null, "round 4: no own search → no web-search control");
+  const routeSrc4 = readFileSync(path.join(process.cwd(), "app/api/ai/chat/route.ts"), "utf8");
+  assert(
+    /body\.searchBackend === "app" &&\s*!!nativeSearch &&\s*searchEnabled &&\s*\(await userHasSearchConnection\(session\.user\.id\)\)/.test(routeSrc4) &&
+      routeSrc4.indexOf("if (preferAppSearch)") < routeSrc4.indexOf("} else if (nativeSearch && searchEnabled)"),
+    "round 4: the route honours the app-search preference only with a connection, before the native branch",
+  );
+  const engineSrc4 = readFileSync(path.join(process.cwd(), "lib/domain/ai/use-conversation-engine.ts"), "utf8");
+  const bodies = (engineSrc4.match(/modelPinned,\n\s*searchBackend,/g) ?? []).length;
+  assert(bodies >= 8, `round 4: searchBackend rides every per-call body and its dependency list beside modelPinned (found ${bodies} of 8)`);
+}
+
+{
+  // §10 round 4 — OpenAI as a search service: its cited answer becomes one
+  // result per distinct URL, snippet = the supporting sentence without the
+  // inline citation markup; it is named by its model in the UI.
+  const content =
+    "LeanData is hiring a Technical Support Specialist. The role is remote in the US ([jobs.ashbyhq.com](https://jobs.ashbyhq.com/x)). Pay is listed. OTE is $70K–$90K ([jobs.ashbyhq.com](https://jobs.ashbyhq.com/x)).";
+  const citeStart = content.indexOf("The role");
+  const citeEnd = content.indexOf("Pay is") - 1;
+  const results = citationsToResults(
+    content,
+    [
+      { type: "url_citation", url_citation: { url: "https://jobs.ashbyhq.com/x", title: "LeanData — Technical Support", start_index: citeStart, end_index: citeEnd } },
+      { type: "url_citation", url_citation: { url: "https://jobs.ashbyhq.com/x", title: "dup", start_index: 0, end_index: 10 } },
+      { type: "url_citation", url_citation: { url: "https://leandata.com", title: "", start_index: 0, end_index: 40 } },
+    ],
+    6,
+  );
+  assert(
+    results.length === 2 &&
+      results[0].title === "LeanData — Technical Support" &&
+      results[0].snippet === "The role is remote in the US ." &&
+      results[1].title === "https://leandata.com",
+    `round 4: citations become one result per URL with the supporting sentence (got ${JSON.stringify(results)})`,
+  );
+  assert(citationsToResults(content, undefined, 6).length === 0, "round 4: no citations → no results (the answer still travels)");
+  assert(getSearchProviderImpl("openai")?.model === "gpt-5-search-api", "round 4: OpenAI is a registered search backend running gpt-5-search-api");
+  assert(
+    searchServiceDisplayName("openai") === "OpenAI · gpt-5-search-api" && searchServiceDisplayName("tavily") === "Tavily",
+    "round 4: a search model is named by its model; other services by their label",
+  );
+}
+
+{
+  // §10 round 5 — `Ingest in full:` is a line-start directive: it names the
+  // databases loaded whole; prose, code and quotes never trigger it.
+  const wl = (title: string, id?: string) => ({ type: "wikiLink", attrs: { targetTitle: title, ...(id ? { targetId: id } : {}) } });
+  const para = (...content: unknown[]) => ({ type: "paragraph", content });
+  const doc = {
+    type: "doc",
+    content: [
+      { type: "heading", attrs: { level: 1 }, content: [{ type: "text", text: "Resume charter" }] },
+      para({ type: "text", text: "Ingest in full: " }, wl("Career Evidence Library", "cel-1"), { type: "text", text: ", " }, wl("Experience Gaps Library")),
+      para({ type: "text", text: "We could ingest in full: " }, wl("Job Opportunities Library")),
+      { type: "codeBlock", content: [{ type: "text", text: "Ingest in full: [[Secrets]]" }] },
+      { type: "bulletList", content: [{ type: "listItem", content: [para({ type: "text", text: "INGEST IN FULL: " }, wl("Career Evidence Library", "cel-1"))] }] },
+      para({ type: "text", text: "Inputs\nIngest in full: [[Style Guide]]\nThe rest of the note." }),
+    ],
+  };
+  const parsed = parseCharter(doc as never);
+  const ingest = parsed.ingest ?? [];
+  assert(
+    ingest.map((r) => r.targetTitle).join("|") === "Career Evidence Library|Experience Gaps Library|Style Guide" &&
+      ingest[0].targetId === "cel-1",
+    `round 5: ingest lines name their databases (ids kept, duplicates once, prose/code ignored, markdown-like lines read) — got ${JSON.stringify(ingest)}`,
+  );
+  assert(parseCharter({ type: "doc", content: [para({ type: "text", text: "No directive here." })] } as never).ingest === undefined, "round 5: no directive → no ingest");
+}
+
+void (async () => {
+  // §10 round 5 — documents carry one font family, black headings, US
+  // Letter; AI documents use the compact layout (0.6 in margins, 10.5 pt).
+  const doc = { type: "doc", content: [{ type: "heading", attrs: { level: 1 }, content: [{ type: "text", text: "Name" }] }, { type: "paragraph", content: [{ type: "text", text: "Body" }] }] };
+  const compact = await new DOCXConverter({ compact: true }).convert(doc, { format: "docx", settings: {} as never });
+  const zip = await JSZip.loadAsync(Buffer.from(compact.files[0].content as Buffer));
+  const xml = await zip.file("word/document.xml")!.async("string");
+  const styles = await zip.file("word/styles.xml")!.async("string");
+  const h1 = styles.slice(styles.indexOf('w:styleId="Heading1"'), styles.indexOf("</w:style>", styles.indexOf('w:styleId="Heading1"')));
+  assert(
+    /w:top="864"/.test(xml) && /w:w="12240"/.test(xml) && /w:ascii="Calibri"/.test(h1) && /w:val="000000"/.test(h1) && !/2F5496/i.test(h1),
+    "round 5: compact AI documents — 0.6 in margins, US Letter, Calibri black Heading 1 (not Word's blue theme heading)",
+  );
+  const standard = await new DOCXConverter().convert(doc, { format: "docx", settings: {} as never });
+  const xml2 = await (await JSZip.loadAsync(Buffer.from(standard.files[0].content as Buffer))).file("word/document.xml")!.async("string");
+  assert(/w:top="1440"/.test(xml2), "round 5: exports keep the standard 1 in margins");
+  if (errors.length > 0) {
+    console.error(`\n✖ run-harness:check (round 5 DOCX) failed — ${errors.length} problem(s):\n`);
+    for (const e of errors) console.error(`  ${e}\n`);
+    process.exit(1);
+  }
+})();
+
+{
+  // §10 round 5 — wiring: ingestion is appended to the charter context
+  // before the prompt-cache key is computed; both charter paths feed it.
+  const routeSrc5 = readFileSync(path.join(process.cwd(), "app/api/ai/chat/route.ts"), "utf8");
+  const ingestAt = routeSrc5.indexOf("await buildCharterIngest(session.user.id, charterParsedForIngest)");
+  const keyAt = routeSrc5.indexOf("buildPromptCachePolicy({");
+  assert(
+    ingestAt > 0 && keyAt > ingestAt && (routeSrc5.match(/charterParsedForIngest = parsed;/g) ?? []).length === 2,
+    "round 5: both charter paths feed ingestion, which lands in charterContext before the prompt-cache key",
+  );
+  const promptSrc = readFileSync(path.join(process.cwd(), "lib/domain/ai/system-prompt.ts"), "utf8");
+  assert(
+    promptSrc.includes("Reading before concluding: a partial read is not an absence") &&
+      promptSrc.includes("Facts of record:") &&
+      promptSrc.includes("Closing a charter's work:"),
+    "round 5: the general reading and facts-of-record rules and the charter gate check are in the system prompt",
+  );
+}
+
+{
+  // §10 round 6c — per-tool approvals: the user turns off a tool's card;
+  // the exceptions stay (overwrites of pre-existing files, checkpoints
+  // between phases, run proposals).
+  const all = autoApprovedToolsFrom({
+    create_docx: { autoApprove: true },
+    create_note: { autoApprove: true, enabled: true },
+    phase_checkpoint: { autoApprove: true },
+    propose_item_iteration: { autoApprove: true },
+    search_web: { enabled: false },
+  });
+  assert(
+    [...all].sort().join(",") === "create_docx,create_note,phase_checkpoint",
+    `round 6c: only the auto-approvable tools are read from toolConfig (got ${[...all].join(",")})`,
+  );
+  assert(autoApprovedToolsFrom({ create_docx: { autoApprove: false } }).size === 0 && autoApprovedToolsFrom(undefined).size === 0, "round 6c: explicit false or no config → ask");
+  assert(toolAutoApproves(all, { tool: "create_docx" }) && toolAutoApproves(all, { tool: "create_note" }), "round 6c: creates run without a card when set");
+  assert(
+    toolAutoApproves(all, { tool: "create_docx", overwrite: { targetCreatedInThisChat: true } }) &&
+      !toolAutoApproves(all, { tool: "create_docx", overwrite: { targetCreatedInThisChat: false } }),
+    "round 6c: an overwrite skips the card only for a document this chat created",
+  );
+  assert(
+    toolAutoApproves(all, { tool: "phase_checkpoint", finalPhase: true }) &&
+      !toolAutoApproves(all, { tool: "phase_checkpoint", finalPhase: false }),
+    "round 6c: only the final checkpoint closes without a pause",
+  );
+  const onlyNotes = autoApprovedToolsFrom({ create_note: { autoApprove: true } });
+  assert(!toolAutoApproves(onlyNotes, { tool: "create_docx" }) && !toolAutoApproves(undefined, { tool: "create_note" }), "round 6c: each tool is its own switch; none set → ask");
+  assert(!/APPROVED/.test(AUTO_CLOSED_CHECKPOINT_NEXT) && /setting/.test(AUTO_CLOSED_CHECKPOINT_NEXT), "round 6c: an auto-closed checkpoint never claims the user approved it");
+
+  const registrySrc = readFileSync(path.join(process.cwd(), "lib/domain/ai/tools/registry.ts"), "utf8");
+  const between = (from: string, to: string) => registrySrc.slice(registrySrc.indexOf(from), registrySrc.indexOf(to, registrySrc.indexOf(from)));
+  const docx = between("    create_docx: tool({", "description:");
+  const note = between("    create_note: tool({", "description:");
+  const checkpoint = between("    phase_checkpoint: tool({", "description:");
+  const propose = between("    propose_item_iteration: tool({", "inputSchema");
+  assert(/tool: "create_docx"/.test(docx) && /contentCreatedInThisChat\(ctx, overwriteId\)/.test(docx), "round 6c: create_docx reads the policy, overwrite-aware");
+  assert(/toolAutoApproves\(ctx.autoApprovedTools, \{ tool: "create_note" \}\)/.test(note), "round 6c: create_note reads the policy");
+  assert(/finalPhase: ctx.charterFinalPhase === true/.test(checkpoint), "round 6c: the checkpoint's pause is lifted only for the final phase");
+  assert(/needsApproval: true/.test(propose), "round 6c: a run proposal always asks (scope and item budget are a decision)");
+  const routeSrc6 = readFileSync(path.join(process.cwd(), "app/api/ai/chat/route.ts"), "utf8");
+  assert(
+    routeSrc6.includes("autoApprovedTools: autoApprovedToolsFrom(") &&
+      routeSrc6.includes("toolCtx.charterFinalPhase = phaseIndex === parsed.phases.length - 1") &&
+      routeSrc6.includes("toolCtx.charterFinalPhase = parsed.phases.length <= 1"),
+    "round 6c: the route passes the user's approvals and marks the final phase on both charter paths",
+  );
+  const hookSrc = readFileSync(path.join(process.cwd(), "components/content/ai/use-tool-approvals.ts"), "utf8");
+  assert(
+    hookSrc.includes("autoApprove: on }") && !/delete entry\.autoApprove/.test(hookSrc),
+    "round 6c: the toggle writes an explicit true/false — the settings PATCH deep-merges, so a deleted key could never switch off",
+  );
+}
+
+{
+  // §10 round 6b — the read-approval default is 25k; a stored 6,000 is the
+  // old default persisted by whole-snapshot saves, not a choice. Both
+  // approval settings live in Chat controls too, through the same store.
+  assert(BULK_READ_DEFAULT_TOKENS === 25_000, "round 6b: the read-approval default is 25k");
+  assert(effectiveBulkReadThreshold(6_000) === 25_000 && effectiveBulkReadThreshold(undefined) === 25_000, "round 6b: unset or the legacy 6,000 → 25k");
+  assert(effectiveBulkReadThreshold(8_000) === 8_000 && effectiveBulkReadThreshold(40_000) === 40_000, "round 6b: a value the user chose is kept");
+  assert(effectiveBulkReadThreshold(500) === 1_000 && effectiveBulkReadThreshold(500_000) === 100_000, "round 6b: stored values clamp to 1k–100k");
+  const panelSrc = readFileSync(path.join(process.cwd(), "components/content/ai/ChatControlPanel.tsx"), "utf8");
+  assert(
+    panelSrc.includes("useToolApprovals()") &&
+      panelSrc.includes("setAISettings({ bulkReadTokenThreshold: clamped })") &&
+      panelSrc.includes("effectiveBulkReadThreshold(aiSettings?.bulkReadTokenThreshold)"),
+    "round 6b: Chat controls carries the per-tool approvals and the read threshold, through the settings store",
+  );
+  const dataSrc6b = readFileSync(path.join(process.cwd(), "lib/domain/ai/tools/data-tools.ts"), "utf8");
+  assert(dataSrc6b.includes("return effectiveBulkReadThreshold(settings?.ai?.bulkReadTokenThreshold);"), "round 6b: the server reads the effective threshold");
 }
 
 {

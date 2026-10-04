@@ -360,6 +360,8 @@ const REVIEWED_RECURRING_TIMEOUTS: Record<string, string> = {
     "scheduleNextRun — genuinely recurring, but the delay is getNextPeriodicRolloverDelay(): it fires at the next DAILY rollover. One request per day.",
   "components/content/ai-context/ContextAiPanel.tsx":
     "saveDirectives — debounced save, armed by user edits.",
+  "extensions/reader/components/BookReader.tsx":
+    "openSideView / visiblePage — false positive; every timer here is armed by a user event, never by itself. progressTimer is a 1500ms debounce re-armed only by the reader's `relocate` event (saveProgress, one write per settled move); the pointerup timer lets a selection settle before reading it; contentsHoldTimer is the press-and-hold gesture; the 2000ms one is a race guard around a single speed-reader page read. Stop reading, nothing re-arms.",
   "components/settings/ui/save-state.ts":
     "send / clearTimer — the settings autosave debounce.",
   "lib/domain/ai/acquisition/server-fetch.ts":

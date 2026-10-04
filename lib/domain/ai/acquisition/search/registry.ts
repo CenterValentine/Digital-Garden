@@ -8,11 +8,13 @@
 import type { AppSearchProvider } from "./types";
 import { tavilyProvider } from "./tavily";
 import { braveProvider } from "./brave";
+import { openaiSearchProvider } from "./openai";
 
 /** Registration order = the order shown in the settings backend picker. */
 export const SEARCH_PROVIDER_IMPLS: readonly AppSearchProvider[] = [
   tavilyProvider,
   braveProvider,
+  openaiSearchProvider,
 ];
 
 /** Look up a backend implementation by its id ("tavily" | "brave" | …). */

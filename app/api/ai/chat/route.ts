@@ -103,7 +103,7 @@ import {
   reservedTailTools,
   stepsRemainingNotice,
 } from "@/lib/domain/ai/tools/iteration-proposal";
-import { DEFAULT_BULK_READ_THRESHOLD } from "@/lib/domain/ai/tools/data-tools";
+import { effectiveBulkReadThreshold } from "@/lib/features/settings/validation";
 import {
   MAX_STEP_SUMMARIES,
   type MaxTokensSource,
@@ -291,6 +291,9 @@ import type {
   ResolvedModelRoute,
 } from "@/lib/domain/ai/model-directive";
 import { renderCharterSection } from "@/lib/domain/ai/charters/render";
+import { buildCharterIngest } from "@/lib/domain/ai/charters/ingest";
+import { autoApprovedToolsFrom } from "@/lib/domain/ai/tools/approval-policy";
+import type { ParsedCharter } from "@/lib/domain/ai/charters/parse";
 import { getServerExtensions } from "@/lib/domain/editor/extensions-server";
 import {
   isCharterMetadata,
@@ -544,7 +547,7 @@ export async function POST(request: Request) {
       // Pinned bulk reads (AI-BULK-ROW-READING-PLAN §4.6) may hold twice
       // the user's approval threshold, newest first.
       const bulkReadPinnedAllowance =
-        2 * (aiSettings.bulkReadTokenThreshold ?? DEFAULT_BULK_READ_THRESHOLD);
+        2 * effectiveBulkReadThreshold(aiSettings.bulkReadTokenThreshold);
       // Auto-pronounce: when on (default), the model is told to attach spoken
       // audio to non-English vocab cards by default. The proposal gate still
       // gates the actual TTS spend, so "default on" never auto-bills.
@@ -1468,6 +1471,13 @@ export async function POST(request: Request) {
         // Filled in AFTER playbook resolution below (tools close over this
         // object, so a later property assignment is visible at execute time).
         activeCharter: undefined as { contentId: string; title: string } | undefined,
+        // Per-tool approvals (§10 round 6c): the tools the user set to run
+        // without a card, and whether the charter's current phase is its
+        // last (set below).
+        autoApprovedTools: autoApprovedToolsFrom(
+          (aiSettings as { toolConfig?: unknown }).toolConfig,
+        ),
+        charterFinalPhase: false,
         // Executed model identity (cost metering): lets ledger stamps
         // price the run's tokens. Bare id + vendor, post-resolution.
         executedModel: {
@@ -1668,7 +1678,20 @@ export async function POST(request: Request) {
       // Native search attaches AFTER the run narrowing above, so it must be
       // advertised explicitly — otherwise it would sit in `tools` unannounced
       // and the model would never know it could search.
-      if (nativeSearch && searchEnabled) {
+      // Per-chat preference (owner, 2026-09-30): the model's own search by
+      // default; "app" routes through the user's search connection even when
+      // the model has its own — repeat-guarded, refusable in the reserved
+      // tail, priced by that service. Honoured only when a connection exists.
+      const preferAppSearch =
+        body.searchBackend === "app" &&
+        !!nativeSearch &&
+        searchEnabled &&
+        (await userHasSearchConnection(session.user.id));
+      if (preferAppSearch) {
+        (tools as Record<string, unknown>)["search_web"] =
+          createAppWebSearchTool(session.user.id);
+        advertised.add("search_web");
+      } else if (nativeSearch && searchEnabled) {
         // Big-four: provider-native search (integrated, well-cited).
         (tools as Record<string, unknown>)["search_web"] = nativeSearch;
         advertised.add("search_web");
@@ -2285,6 +2308,9 @@ export async function POST(request: Request) {
       // itself marked as a playbook) are called out so the model follows
       // their own directives rather than treating them as passive reading.
       let charterContext = "";
+      // The charter parsed on either context path below — its `Ingest in
+      // full:` tables are loaded once both paths have run (§10 round 5).
+      let charterParsedForIngest: ParsedCharter | null = null;
       let attachedCharterResolved = false;
       let rootedCharterResolved = false;
       let attachedPlaybookTitle = "";
@@ -2337,6 +2363,7 @@ export async function POST(request: Request) {
             const parsed = parseCharter(
               charterNode.notePayload.tiptapJson as JSONContent,
             );
+            charterParsedForIngest = parsed;
             // LEDGER AWARENESS (owner directive 2026-09-11). The master
             // ledger is minted at mark and referenced to this charter, but
             // no prompt string ever said so — "create the charter's
@@ -2390,6 +2417,7 @@ export async function POST(request: Request) {
                 parsed.phases.length - 1,
               );
               const phase = parsed.phases[phaseIndex];
+              toolCtx.charterFinalPhase = phaseIndex === parsed.phases.length - 1;
               charterOutputDirectives.push(
                 ...extractCharterOutputDirectives(parsed, [phaseIndex]),
               );
@@ -2491,7 +2519,11 @@ export async function POST(request: Request) {
             const parsed = parseCharter(
               rootedNode.notePayload.tiptapJson as JSONContent,
             );
+            charterParsedForIngest = parsed;
             rootedCharterResolved = true;
+            // Rooted execution shows every phase at once, so only a
+            // one-phase charter's checkpoint is known to be the last.
+            toolCtx.charterFinalPhase = parsed.phases.length <= 1;
             attachedPlaybookTitle = rootedNode.title;
             // Context diet (S7-C2): same pointer rule for rooted execution.
             toolCtx.activeCharter = {
@@ -2557,6 +2589,37 @@ export async function POST(request: Request) {
             summary:
               "explicit rooted playbook injection failed — continuing without it",
             error: rootedPlaybookError,
+          });
+        }
+      }
+
+      // INGEST IN FULL (§10 round 5, owner decision 2026-09-30). A charter
+      // that names a database with `Ingest in full: [[…]]` gets it — every
+      // row, every column, and the tables it links to — in its context, so
+      // the model reads the whole profile instead of choosing what to read.
+      // Appended to the charter context: part of the system prompt, the
+      // same on every request of the turn, cached after the first step.
+      if (charterParsedForIngest && charterContext) {
+        try {
+          const ingested = await buildCharterIngest(session.user.id, charterParsedForIngest);
+          if (ingested) {
+            charterContext += ingested.text;
+            logger.info({
+              layer: "ai",
+              event: "charter:ingested",
+              summary: `ingested ${ingested.tables.length} database(s) in full — ~${ingested.tokens} tokens`,
+              attrs: {
+                tables: ingested.tables.map((t) => `${t.title}:${t.rows}${t.truncatedAfter !== undefined ? `(cut@${t.truncatedAfter})` : ""}`).join(", "),
+                tokens: ingested.tokens,
+              },
+            });
+          }
+        } catch (ingestError) {
+          logger.warn({
+            layer: "ai",
+            event: "charter:ingest_failed",
+            summary: "charter ingestion failed — continuing without the ingested section",
+            error: ingestError,
           });
         }
       }

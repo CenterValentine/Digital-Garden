@@ -153,9 +153,23 @@ export function SaveConflictDiff({
                 </p>
               )}
 
-              {comparison.identical && (
+              {/* Three states, not two. A save is refused on a hash over the
+                  whole node tree; this diff compares the TEXT. When those two
+                  disagree, saying "identical" over a live block is the app
+                  contradicting itself — so the middle case is named instead. */}
+              {comparison.textIdentical && comparison.structurallyIdentical && (
                 <p className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-300">
                   The two versions are identical. Either button resolves this safely.
+                </p>
+              )}
+              {comparison.textIdentical && !comparison.structurallyIdentical && (
+                <p className="mt-3 rounded-lg bg-sky-50 px-3 py-2 text-xs text-sky-900 dark:bg-sky-500/10 dark:text-sky-200">
+                  <span className="font-medium">The text is identical.</span> The
+                  difference is structural — formatting, alignment, or block
+                  metadata — which this comparison doesn&apos;t show. Not a word of
+                  your writing is at stake either way;{" "}
+                  <span className="font-medium">Keep mine</span> also preserves
+                  your formatting.
                 </p>
               )}
             </>

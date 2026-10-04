@@ -12,6 +12,27 @@ const uiSettingsSchema = z
   .object({
     theme: z.enum(["light", "dark", "system"]).optional(),
     fontSize: z.number().min(10).max(24).optional(),
+    /**
+     * Where content opened from the file tree lands when the workspace is
+     * split — `resolveOpenDestinationPane` in `state/content-store.ts`.
+     *
+     *  fill     — beside your work, filling empty panes before reusing the
+     *             opposite one (the default, and the only value anything sets
+     *             today)
+     *  opposite — always the opposite pane, never the other empties
+     *  active   — the pane you are working in, replacing what is there (how
+     *             this behaved before the rule existed)
+     *
+     * The alternatives are deliberately unreachable from the UI for now: the
+     * seam exists so the choice is a settings control rather than a rewrite.
+     * See BACKLOG "Split Pane Placement".
+     *
+     * Lives under `ui` deliberately. `saveToBackend` already sends `ui`
+     * wholesale and `setUISettings` already patches it, so this needs no new
+     * setter and cannot hit the "saves, then silently reverts" trap that a new
+     * top-level section does (the fourth registration everyone forgets).
+     */
+    openDestination: z.enum(["fill", "opposite", "active"]).optional(),
     panelLayout: z
       .object({
         leftSidebarWidth: z.number().min(200).max(600).optional(),
@@ -129,6 +150,9 @@ const aiSettingsSchema = z
         z
           .object({
             enabled: z.boolean().optional(),
+            // Run without an approval card (create_docx, create_note, the
+            // final phase_checkpoint — tools/approval-policy.ts). Absent = ask.
+            autoApprove: z.boolean().optional(),
             routeOverride: z
               .object({
                 presetId: z.string(),
@@ -384,12 +408,38 @@ export const userSettingsSchema = z.object({
 
 export type UserSettings = z.infer<typeof userSettingsSchema>;
 
+/**
+ * Database reads larger than this many estimated tokens ask for approval
+ * (AI-BULK-ROW-READING-PLAN D3). Raised from 6k to 25k on 2026-09-30 (owner):
+ * a whole evidence table or a job row with its full description ran 9–12k,
+ * so every useful read paused the turn.
+ */
+export const BULK_READ_DEFAULT_TOKENS = 25_000;
+/** The previous default — whole-snapshot saves wrote it into user profiles. */
+export const LEGACY_BULK_READ_DEFAULT_TOKENS = 6_000;
+export const BULK_READ_MIN_TOKENS = 1_000;
+export const BULK_READ_MAX_TOKENS = 100_000;
+
+/**
+ * The threshold in force for a stored value. A stored 6,000 is the OLD
+ * DEFAULT, not a choice: earlier whole-snapshot settings saves persisted it
+ * for every user who never touched the field (prod 2026-09-30: the only
+ * account held exactly 6000). Same precedent as the stored-4096 maxTokens
+ * normalization. Any other stored value is the user's and is kept.
+ */
+export function effectiveBulkReadThreshold(stored: unknown): number {
+  const n = typeof stored === "number" && Number.isFinite(stored) ? Math.floor(stored) : null;
+  if (n === null || n <= 0 || n === LEGACY_BULK_READ_DEFAULT_TOKENS) return BULK_READ_DEFAULT_TOKENS;
+  return Math.min(Math.max(n, BULK_READ_MIN_TOKENS), BULK_READ_MAX_TOKENS);
+}
+
 // Default settings (all optional fields filled with sensible defaults)
 export const DEFAULT_SETTINGS: UserSettings = {
   version: 1,
   ui: {
     theme: "system",
     fontSize: 14,
+    openDestination: "fill",
     panelLayout: {
       leftSidebarWidth: 200,
       leftSidebarVisible: true,
@@ -547,7 +597,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
     // null = model maximum (catalog-resolved per executed model). A flat
     // numeric default here silently truncated reasoning-heavy models.
     maxTokens: null,
-    bulkReadTokenThreshold: 6_000,
+    bulkReadTokenThreshold: BULK_READ_DEFAULT_TOKENS,
     streamingEnabled: true,
     typingEffect: true,
     conversationHistory: true,
