@@ -41,6 +41,15 @@ import {
 } from "../extensions/workplaces/state/workspace-store";
 import { DEFAULT_SETTINGS } from "../lib/features/settings/validation";
 import {
+  cacheTabPayload,
+  clearTabPayloadCache,
+  invalidateTabPayload,
+  readTabPayload,
+  tabPayloadCacheStats,
+  TAB_PAYLOAD_CACHE_BUDGET_BYTES,
+  TAB_PAYLOAD_MAX_AGE_MS,
+} from "../lib/domain/content/tab-payload-cache";
+import {
   paneForHotkeyCode,
   hotkeyLettersForPane,
   hotkeyCellForCode,
@@ -709,6 +718,41 @@ console.log("\nreset pane memory (owner request, 2026-10-03)");
   check("undo restores the old memory: P4 is bottom-right again", paneContents("bottom-right"), ["P4"]);
 }
 
+console.log("\nthe tab payload cache is bounded by memory, not by a tab count (owner, 2026-10-03)");
+{
+  // Least-recently-viewed entries drop off the bottom until the budget fits;
+  // a payload larger than the whole budget is never admitted. The 5-minute
+  // age is untouched — it matches the collaboration runtime's idle eviction
+  // (the Cloud Run cost measure) and is pinned here so a later tuning can't
+  // move one without the other on purpose.
+  clearTabPayloadCache();
+  const mb = (n: number) => "x".repeat(n * 1024 * 1024 / 2); // n MB as UTF-16
+  cacheTabPayload("big-1", { body: mb(6) });
+  cacheTabPayload("big-2", { body: mb(6) });
+  check("two 6 MB payloads fit a 16 MB budget", tabPayloadCacheStats().ids, ["big-1", "big-2"]);
+  readTabPayload("big-1"); // big-1 is now the most recently viewed
+  cacheTabPayload("big-3", { body: mb(6) });
+  check(
+    "a third evicts the LEAST recently viewed, not the oldest written",
+    tabPayloadCacheStats().ids,
+    ["big-1", "big-3"],
+  );
+  check("…and the budget holds", tabPayloadCacheStats().bytes <= TAB_PAYLOAD_CACHE_BUDGET_BYTES, true);
+  cacheTabPayload("huge", { body: mb(17) });
+  check("a payload past the whole budget is never admitted (and evicts nothing)", tabPayloadCacheStats().ids, ["big-1", "big-3"]);
+  for (let i = 0; i < 40; i += 1) cacheTabPayload(`small-${i}`, { body: mb(0.25) });
+  check("many small payloads are not capped by a count", tabPayloadCacheStats().entries > 5, true);
+  invalidateTabPayload("big-1");
+  check("invalidating returns its bytes", tabPayloadCacheStats().ids.includes("big-1"), false);
+  clearTabPayloadCache();
+  check("cleared is empty", tabPayloadCacheStats(), { entries: 0, bytes: 0, ids: [] });
+  check(
+    "the age cap is the collaboration runtime's idle eviction (5 min) — change both or neither",
+    TAB_PAYLOAD_MAX_AGE_MS,
+    5 * 60_000,
+  );
+}
+
 console.log("\nclicking around between opens");
 {
   // Reading a pane focuses it (`focusPane` on pointerdown), so the anchor the
@@ -1237,6 +1281,26 @@ console.log("\nlayout-record rebuild (the reconcile's re-arrangement)");
       patches: [] as Array<{ base: string | null; panes: Record<string, string[]>; status: number }>,
       /** When set, state PATCHes wait on it — a slow server, for interleaving. */
       hold: null as Promise<void> | null,
+      // A second, NON-Main workspace: opens there go through the open-intent
+      // check, which is where the provisional-open contract lives.
+      row2: {
+        id: "ws-view", name: "view", slug: "view", isMain: false, isLocked: false, isView: false,
+        viewRootContentId: null, viewRoot: null, parentWorkspaceId: null,
+        status: "active", expiresAt: null, archivedAt: null,
+        layoutMode: "dual-vertical", activePaneId: "top-left",
+        paneState: {
+          layoutMode: "dual-vertical", activePaneId: "top-left", activeContentId: "A",
+          paneTabContentIds: { "top-left": { contentIds: ["A"], activeContentId: "A" } },
+        },
+        settings: {}, createdAt: "", updatedAt: "2026-10-03T16:00:00.000Z", items: [], contentMeta: {},
+      } as Row,
+      intents: [] as Array<Record<string, unknown>>,
+      assignments: [] as Array<Record<string, unknown>>,
+      intentHold: null as Promise<void> | null,
+      intentFail: false,
+      intentAnswer: { allowed: true, alreadyCovered: false, conflict: null } as Record<string, unknown>,
+      /** State PATCHes the view workspace received, in order. */
+      patches2: [] as Array<{ panes: Record<string, string[]>; status: number }>,
     };
     const json = (status: number, body: unknown) =>
       new Response(JSON.stringify(body), {
@@ -1280,6 +1344,36 @@ console.log("\nlayout-record rebuild (the reconcile's re-arrangement)");
       }
       if (url.endsWith("/layout-records") || url.endsWith("/tabs")) {
         return json(200, { success: true, data: {} });
+      }
+      if (url.endsWith("/workspaces/open-intent") && method === "POST") {
+        if (server.intentHold) await server.intentHold;
+        if (server.intentFail) {
+          return json(500, { success: false, error: { message: "intent check failed" } });
+        }
+        server.intents.push(body ?? {});
+        return json(200, { success: true, data: server.intentAnswer });
+      }
+      if (url.endsWith(`/workspaces/${server.row2.id}/assignments`) && method === "POST") {
+        server.assignments.push(body ?? {});
+        return json(200, { success: true, data: server.row2 });
+      }
+      if (url.endsWith(`/workspaces/${server.row2.id}/state`) && method === "PATCH") {
+        const snapshot = body as unknown as Snapshot;
+        server.row2 = {
+          ...server.row2,
+          updatedAt: nextStamp(),
+          paneState: {
+            layoutMode: snapshot.layoutMode,
+            activePaneId: snapshot.activePaneId,
+            activeContentId: snapshot.activeContentId,
+            paneTabContentIds: snapshot.paneTabContentIds,
+          },
+        };
+        server.patches2.push({ panes: panesOf(snapshot), status: 200 });
+        return json(200, { success: true, data: server.row2 });
+      }
+      if (url.endsWith(`/workspaces/${server.row2.id}`) && method === "PATCH") {
+        return json(200, { success: true, data: server.row2 });
       }
       throw new Error(`unexpected fetch ${method} ${url}`);
     }) as typeof fetch;
@@ -1429,6 +1523,115 @@ console.log("\nlayout-record rebuild (the reconcile's re-arrangement)");
         paneContents("top-right"),
         [],
       );
+
+      // ── the tab is on screen before the server has agreed ─────────────
+      // In a non-Main workspace an open used to WAIT on the open-intent POST
+      // (and an assignment POST) before the tab existed. Now the tab shows at
+      // once; the row is not persisted until the server agrees; a refusal
+      // keeps the tab under the dialog and cancelling takes it back.
+      console.log("\nopening in a view workspace shows the tab before the server agrees");
+      const WS2 = server.row2.id;
+      useWorkspaceStore.setState({
+        workspaces: [server.row as never, server.row2 as never],
+        activeWorkspaceId: WS2,
+      });
+      await useWorkspaceStore.getState().updateWorkspace(WS2, {});
+      seedSplit();
+      const open = (id: string) =>
+        useWorkspaceStore.getState().requestOpenContent(id, { title: `Note ${id}`, pin: true });
+
+      // allowed, slow server
+      let releaseIntent!: () => void;
+      server.intentHold = new Promise<void>((resolve) => { releaseIntent = resolve; });
+      server.patches2.length = 0;
+      const opening = open("N");
+      check("the tab exists the moment it is asked for", paneContents("top-left"), ["A", "N"]);
+      await persist();
+      check("…but the row is not written while the server is still deciding", server.patches2.length, 0);
+      releaseIntent();
+      server.intentHold = null;
+      await opening;
+      check("once allowed, the claim is made first…", server.assignments.map((a) => a.contentId), ["N"]);
+      check(
+        "…and the deferred write follows, carrying the tab",
+        server.patches2.at(-1)?.panes["top-left"],
+        ["A", "N"],
+      );
+
+      // refused → cancel
+      server.intentAnswer = {
+        allowed: false,
+        conflict: {
+          conflictType: "overlap", workspaceId: "ws-other", workspaceName: "Other",
+          contentId: "M", contentTitle: "Note M", claimContentId: "M", claimContentTitle: "Note M",
+          scope: "item", folderScopeContentId: null, folderScopeContentTitle: null,
+        },
+      };
+      server.patches2.length = 0;
+      await open("M");
+      check("a refused open keeps the tab on screen under the dialog", [paneContents("top-left").includes("M"), useWorkspaceStore.getState().conflict !== null], [true, true]);
+      await persist();
+      check("…still unwritten while the dialog is up", server.patches2.length, 0);
+      useWorkspaceStore.getState().cancelOpenConflict();
+      check("cancel takes the tab back", paneContents("top-left").includes("M"), false);
+      await new Promise((r) => setTimeout(r, 0));
+      // The deferred persist ran — and found nothing to say: after the
+      // rollback the local snapshot is exactly what the server holds, so the
+      // echo check skips the write. The server never saw M.
+      check(
+        "…the server never saw it, and nothing is left to write",
+        [
+          server.row2.paneState.paneTabContentIds["top-left"]?.contentIds,
+          JSON.stringify(useContentStore.getState().getWorkspaceStateSnapshot().paneTabContentIds) ===
+            JSON.stringify(server.row2.paneState.paneTabContentIds),
+        ],
+        [["A", "N"], true],
+      );
+
+      // refused → borrow
+      server.assignments.length = 0;
+      await open("K");
+      await useWorkspaceStore.getState().borrowPendingContent("2026-12-01T00:00:00.000Z");
+      check("borrowing keeps the tab and claims it borrowed", [paneContents("top-left").includes("K"), server.assignments[0]?.assignmentType], [true, "borrowed"]);
+
+      // refused → cancel, after an open that GREW the layout. The side-by-side
+      // open lands in the empty right pane; closing the only tab there would
+      // fold the split (the removal rule). The user never had this tab, so
+      // the rollback restores the arrangement exactly — pane management and
+      // provisional opens must not trip over each other.
+      server.intentAnswer = {
+        allowed: false,
+        conflict: {
+          conflictType: "overlap", workspaceId: "ws-other", workspaceName: "Other",
+          contentId: "R", contentTitle: "Note R", claimContentId: "R", claimContentTitle: "Note R",
+          scope: "item", folderScopeContentId: null, folderScopeContentTitle: null,
+        },
+      };
+      useContentStore.getState().closeContentTabs(["N", "K"]);
+      clearPendingWorkspaceIntents();
+      useContentStore.getState().restoreWorkspace({
+        activeContentId: "A", activePaneId: "top-left", layoutMode: "dual-vertical",
+        paneTabContentIds: { "top-left": ["A"], "top-right": [] },
+      });
+      await useWorkspaceStore.getState().requestOpenContent("R", { title: "Note R", paneId: "top-right", focusPane: false });
+      check("a refused side-by-side open sits in the empty pane meanwhile", [useContentStore.getState().layoutMode, paneContents("top-right")], ["dual-vertical", ["R"]]);
+      useWorkspaceStore.getState().cancelOpenConflict();
+      check(
+        "…and cancelling puts the layout back exactly, not folded by the removal rule",
+        [useContentStore.getState().layoutMode, paneContents("top-left"), paneContents("top-right"), useContentStore.getState().activePaneId],
+        ["dual-vertical", ["A"], [], "top-left"],
+      );
+
+      // the server never answers
+      server.intentAnswer = { allowed: true, alreadyCovered: false, conflict: null };
+      server.intentFail = true;
+      let threw = false;
+      await open("F").catch(() => { threw = true; });
+      server.intentFail = false;
+      check("an intent check that fails takes the tab back and reports", [paneContents("top-left").includes("F"), threw], [false, true]);
+      check("nothing is left provisional afterwards (the next write goes through)", await persist().then(() => server.patches2.length > 0), true);
+
+      useWorkspaceStore.setState({ workspaces: [server.row as never], activeWorkspaceId: WS });
     } finally {
       globalThis.fetch = realFetch;
       (globalThis as { window?: unknown }).window = realWindow;

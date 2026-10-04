@@ -301,6 +301,38 @@ interface PageTemplateResponse {
 /** Width of the collapsed left icon rail (ResizablePanels' hidden mode, w-12). */
 const LEFT_RAIL_WIDTH_PX = 48;
 
+const EMPTY_DOC: JSONContent = { type: "doc", content: [{ type: "paragraph" }] };
+
+/**
+ * The note body a payload carries, as the editor will take it — or the empty
+ * document when the payload has none, is malformed, or fails to parse. Pure:
+ * no logging, no state, so it can run during render (the warm paint) as well
+ * as in the load effect. The flags let the effect log what happened.
+ */
+function parseNotePayload(data: ContentResponse["data"]): {
+  json: JSONContent;
+  rewrittenCount: number;
+  problem: "invalid_structure" | "parse_failed" | null;
+} {
+  if (!data.note?.tiptapJson) return { json: EMPTY_DOC, rewrittenCount: 0, problem: null };
+  try {
+    const content =
+      typeof data.note.tiptapJson === "string"
+        ? JSON.parse(data.note.tiptapJson)
+        : data.note.tiptapJson;
+    if (!content || typeof content !== "object" || !content.type) {
+      return { json: EMPTY_DOC, rewrittenCount: 0, problem: "invalid_structure" };
+    }
+    const sanitized = sanitizeTipTapJsonWithExtensions(
+      content as JSONContent,
+      getViewerExtensions()
+    );
+    return { json: sanitized.json, rewrittenCount: sanitized.rewritten.length, problem: null };
+  } catch {
+    return { json: EMPTY_DOC, rewrittenCount: 0, problem: "parse_failed" };
+  }
+}
+
 export function MainPanelContent({ paneId, initialContent = null }: MainPanelContentProps) {
   const pathname = usePathname();
   const isEmbedMode = pathname?.startsWith("/embed/") ?? false;
@@ -411,6 +443,68 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
   const [ownedByNote, setOwnedByNote] = useState<{ id: string; title: string } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Which content id the warm (cached) payload was applied for DURING RENDER
+  // — see the derived-state block before the early returns below.
+  const [warmAppliedFor, setWarmAppliedFor] = useState<string | null>(null);
+
+  // The PURE half of "turn a content payload into on-screen state": state
+  // setters only — no refs, no stores, no logging — so it may run during
+  // render. The warm-cache paint needs that: applied in an effect it lands
+  // after the first paint, and the render guard (`contentTypeFor !==
+  // selectedContentId` → skeleton) has already drawn a skeleton AND unmounted
+  // the editor subtree for that frame — the very thing the warm path exists
+  // to avoid. The side-effecting half lives in the load effect.
+  const applyContentFacts = useCallback(
+    (data: ContentResponse["data"]) => {
+      setError(null);
+      setNoteTitle(data.title);
+      setContentParentId(data.parentId);
+      setContentIsPublished(Boolean(data.isPublished));
+      setContentType(data.contentType);
+      setContentMimeType(data.file?.mimeType ?? null);
+      setContentExternalResourceType(data.external?.resourceType ?? null);
+      // Stamp WHICH item these type facts describe: the render guard exists
+      // because viewers were drawing a new id using the previous item's type
+      // facts. These come from the payload FOR THIS id, so it is satisfied
+      // honestly.
+      setContentTypeFor(selectedContentId);
+      setContentCustomIcon(data.customIcon ?? null);
+      setContentIconColor(data.iconColor ?? null);
+      setOwnedByNote(data.ownedByNote ?? null);
+      setPromotedFromRow(
+        data.promotedFromRow
+          ? { ...data.promotedFromRow, role: data.role ?? "primary" }
+          : null
+      );
+      switch (data.contentType) {
+        case "folder":
+          setContentData(data.folder);
+          break;
+        case "external":
+          setContentData(data.external);
+          break;
+        case "chat":
+          setContentData(data.chat);
+          break;
+        case "visualization":
+          setContentData(data.visualization);
+          break;
+        case "data":
+          setContentData(data.data);
+          break;
+        case "hope":
+          setContentData(data.hope);
+          break;
+        case "workflow":
+          setContentData(data.workflow);
+          break;
+        default:
+          setContentData(null);
+      }
+      setNoteContent(parseNotePayload(data).json);
+    },
+    [selectedContentId]
+  );
   const [refreshTrigger, setRefreshTrigger] = useState(0); // Used to force refetch
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [shareEmail, setShareEmail] = useState("");
@@ -679,34 +773,16 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
     // the commit, not the fetch.
     let cancelled = false;
 
-    // Everything that turns a content payload into on-screen state. Extracted
-    // so the warm-cache path and the network path paint through EXACTLY the
-    // same cascade — a second copy of this would be a drift bug waiting to
-    // happen.
-    const applyContentData = (data: ContentResponse["data"]) => {
+    // The side-effecting half of applying a payload: refs, stores, logging,
+    // the stashed-draft check. Paired with applyContentFacts (component scope,
+    // pure); the network path runs both, the warm path runs only this when
+    // render already applied the facts.
+    const applyContentSideEffects = (data: ContentResponse["data"]) => {
       // Capture the optimistic-concurrency baseline for the plain/REST save
       // path. (SSR fast-path results have no note.bodyHash; that's fine —
       // the first real save just proceeds without an If-Match.)
       bodyHashRef.current = data.note?.bodyHash ?? null;
 
-      setNoteTitle(data.title);
-      setContentParentId(data.parentId);
-      setContentIsPublished(Boolean(data.isPublished));
-      setContentType(data.contentType);
-      setContentMimeType(data.file?.mimeType ?? null);
-      setContentExternalResourceType(data.external?.resourceType ?? null);
-      // Stamp WHICH item these type facts describe. The render guard
-      // (`contentTypeFor !== selectedContentId` → skeleton) exists because
-      // viewers were drawing a new id using the previous item's type facts —
-      // a link viewer fetched the old URL's preview, the book reader opened a
-      // session. The warm-cache path must stamp it too: these facts come from
-      // the cached payload FOR THIS id, so the guard is satisfied honestly,
-      // and without this the warm paint would hit the skeleton anyway and the
-      // whole no-unmount switch would be defeated.
-      setContentTypeFor(selectedContentId);
-      setContentCustomIcon(data.customIcon ?? null);
-      setContentIconColor(data.iconColor ?? null);
-      setOwnedByNote(data.ownedByNote ?? null);
       // Provide creation/updated dates to inline-timestamp nodes
       setDocumentDates(
         data.createdAt ? new Date(data.createdAt).toISOString().slice(0, 10) : "",
@@ -718,152 +794,34 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
         isTemporary: false,
       });
 
-      setPromotedFromRow(
-        data.promotedFromRow
-          ? {
-              ...data.promotedFromRow,
-              role: data.role ?? "primary",
-            }
-          : null
-      );
-
-      // Store payload data for Phase 2 content types
-      switch (data.contentType) {
-        case "folder":
-          setContentData(data.folder);
-          break;
-        case "external":
-          setContentData(data.external);
-          break;
-        case "chat":
-          setContentData(data.chat);
-          break;
-        case "visualization":
-          setContentData(data.visualization);
-          break;
-        case "data":
-          setContentData(data.data);
-          break;
-        case "hope":
-          setContentData(data.hope);
-          break;
-        case "workflow":
-          setContentData(data.workflow);
-          break;
-        default:
-          setContentData(null);
+      const parsed = parseNotePayload(data);
+      if (parsed.problem === "invalid_structure") {
+        clientLogger.warn({
+          layer: "editor",
+          event: "tiptap_load:invalid_structure",
+          summary: "invalid TipTap JSON, using empty document",
+          attrs: { content_id: selectedContentId },
+        });
+      } else if (parsed.problem === "parse_failed") {
+        clientLogger.error({
+          layer: "editor",
+          event: "tiptap_load:parse_failed",
+          summary: "failed to parse TipTap JSON, using empty document",
+          attrs: { content_id: selectedContentId },
+        });
+      } else if (parsed.rewrittenCount > 0 && process.env.NODE_ENV === "development") {
+        clientLogger.warn({
+          layer: "editor",
+          event: "tiptap_load:rewrote_unsupported",
+          summary: "rewrote unsupported TipTap content while loading note",
+          attrs: { content_id: selectedContentId, rewritten_count: parsed.rewrittenCount },
+        });
       }
+      setOutline(selectedContentId, extractOutline(parsed.json));
 
-      // Load note content (or empty document if no payload)
-      if (data.note?.tiptapJson) {
-        try {
-          // tiptapJson is stored as Prisma Json type, ensure it's proper JSONContent
-          const content = typeof data.note.tiptapJson === 'string'
-            ? JSON.parse(data.note.tiptapJson)
-            : data.note.tiptapJson;
-
-          // Validate that it's a valid TipTap document
-          if (!content || typeof content !== 'object' || !content.type) {
-            clientLogger.warn({
-              layer: "editor",
-              event: "tiptap_load:invalid_structure",
-              summary: "invalid TipTap JSON, using empty document",
-              attrs: { content_id: selectedContentId },
-            });
-            const emptyDoc = {
-              type: "doc",
-              content: [{ type: "paragraph" }],
-            };
-            setNoteContent(emptyDoc);
-
-            // Extract initial outline
-            const initialOutline = extractOutline(emptyDoc);
-            setOutline(selectedContentId, initialOutline);
-          } else {
-            const validContent = content as JSONContent;
-            const sanitized = sanitizeTipTapJsonWithExtensions(
-              validContent,
-              getViewerExtensions()
-            );
-            if (
-              sanitized.rewritten.length > 0 &&
-              process.env.NODE_ENV === "development"
-            ) {
-              clientLogger.warn({
-                layer: "editor",
-                event: "tiptap_load:rewrote_unsupported",
-                summary: "rewrote unsupported TipTap content while loading note",
-                attrs: { content_id: selectedContentId, rewritten_count: sanitized.rewritten.length },
-              });
-            }
-            setNoteContent(sanitized.json);
-
-            // Extract initial outline from loaded content
-            const initialOutline = extractOutline(sanitized.json);
-            setOutline(selectedContentId, initialOutline);
-          }
-        } catch (parseError) {
-          clientLogger.error({
-            layer: "editor",
-            event: "tiptap_load:parse_failed",
-            summary: "failed to parse TipTap JSON, using empty document",
-            attrs: { content_id: selectedContentId },
-            error: parseError,
-          });
-          const emptyDoc = {
-            type: "doc",
-            content: [{ type: "paragraph" }],
-          };
-          setNoteContent(emptyDoc);
-
-          // Extract initial outline
-          const initialOutline = extractOutline(emptyDoc);
-          setOutline(selectedContentId, initialOutline);
-        }
-      } else {
-        // No note payload — render empty doc
-        const emptyDoc = {
-          type: "doc",
-          content: [{ type: "paragraph" }],
-        };
-        setNoteContent(emptyDoc);
-
-        // Extract initial outline from loaded content
-        const initialOutline = extractOutline(emptyDoc);
-        setOutline(selectedContentId, initialOutline);
-      }
-
-      // Reload mid-conflict: if a prior session stashed unsaved edits for
-      // this doc, the server copy we just loaded is "theirs". Show the
-      // user's draft (not the server copy) and re-raise the conflict so it
-      // can be resolved — this is what preserves edits across a reload.
       if (!cancelled && !isPageTemplateTab) {
         const draft = loadConflictDraft(selectedContentId);
         if (draft && bodyHashRef.current) {
-          // A stash IDENTICAL to the server copy has nothing to resolve.
-          // Left in place, it re-raises a conflict on EVERY load of this
-          // document: the view is replaced with the stale draft ("my edits
-          // revert when I come back") and handleSave pauses every save
-          // while a conflict exists ("nothing saves, even after the
-          // debounce") — a silent, permanent, per-document trap, keyed to
-          // whichever document once got a 409.
-          //
-          // Compare on the PROJECTION the resolver shows, not on canonical
-          // JSON. Canonical JSON cannot close this trap, because the two
-          // sides are not comparable by construction: the stash is raw
-          // editor JSON, while the server copy has been through
-          // `sanitizeTipTapJsonWithExtensions` (content PATCH) or is a Y.doc
-          // snapshot serialized by the collaboration schema (store hook) —
-          // both of which materialize attributes differently for prose that
-          // is word-for-word the same. So the check never fired where it was
-          // needed most, and the resolver opened announcing "the two
-          // versions are identical" over a block it could not explain.
-          //
-          // TRADE-OFF (owner call, 2026-09-17): a stash differing ONLY in
-          // formatting is discarded here. No writing is lost — the prose is
-          // by definition already on the server — and an unresolvable
-          // permanent save-pause is the worse failure. Logged distinctly so
-          // the cost is observable if it ever bites.
           const serverJson = (data.note?.tiptapJson ?? null) as JSONContent | null;
           if (serverJson && sameProjectedText(draft, serverJson)) {
             const structuralOnly = !sameCanonicalJson(draft, serverJson);
@@ -892,17 +850,23 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
       }
     };
 
-    // WARM SWITCH (CONTENT-LOAD-CASCADE §3.9). If this document is still in the
-    // MRU cache, paint it synchronously and never raise `isLoading` — which is
-    // what keeps `if (isLoading) return <EditorSkeleton />` from unmounting the
-    // editor subtree, and so keeps the reader's scroll position, the editor
-    // instance and its collaboration provider alive across the switch.
+    // Everything that turns a payload into on-screen state — the network
+    // path's single entry point, so it and the warm path paint through the
+    // same cascade.
+    const applyContentData = (data: ContentResponse["data"]) => {
+      applyContentFacts(data);
+      applyContentSideEffects(data);
+    };
+
     const warm = isPageTemplateTab
       ? undefined
       : readTabPayload<ContentResponse["data"]>(selectedContentId);
     if (warm) {
-      setError(null);
-      applyContentData(warm.data);
+      // Render already painted the facts for this id (the derived-state block
+      // below the hooks); doing it again here would hand the editor a NEW
+      // noteContent object for the same document and reset the caret.
+      if (warmAppliedFor !== selectedContentId) applyContentFacts(warm.data);
+      applyContentSideEffects(warm.data);
     }
 
     const fetchNote = async () => {
@@ -1148,6 +1112,8 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
     closeContentTabs,
     isPageTemplateTab,
     setOutline,
+    applyContentFacts,
+    warmAppliedFor,
     updateContentTab,
     initialContent,
     setConflict,
@@ -1728,7 +1694,38 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
         return;
       }
 
+      // A link that carries an id opens AT ONCE, named by its own text: the
+      // tab is on screen and the content loading before any lookup — the
+      // resolve used to stand between the click and the tab (a full content
+      // GET, then the open), which read as "did that do anything?". The
+      // lookup still runs, for the one job only it can do: a stale id that
+      // resolves by title heals the link and moves the tab to the real note.
+      // A dead id with no title match is closed by the loader's own 404 path.
+      const openedEarly = Boolean(targetId);
+      if (targetId) {
+        setSelectedContentId(targetId, { title: targetTitle, paneId });
+      }
+
       const resolved = await resolveWikiLinkTarget({ targetId, targetTitle });
+
+      if (openedEarly && resolved && targetId && resolved.id === targetId) {
+        return; // already open; the loader fills in title and type
+      }
+      if (openedEarly && resolved && targetId && resolved.id !== targetId) {
+        heal(resolved.id);
+        if (anchor) useContentAnchorStore.getState().request(resolved.id, anchor);
+        closeContentTabs([targetId]);
+        setSelectedContentId(resolved.id, {
+          title: resolved.title,
+          contentType: resolved.contentType,
+          paneId,
+        });
+        return;
+      }
+      if (openedEarly && !resolved) {
+        markBroken(); // the loader's 404 already closed the tab and said so
+        return;
+      }
 
       if (!resolved) {
         clientLogger.warn({
@@ -1759,7 +1756,7 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
         paneId,
       });
     },
-    [paneId, setSelectedContentId]
+    [paneId, setSelectedContentId, closeContentTabs]
   );
 
   // Handle wiki-link "Open" context menu action.
@@ -2624,6 +2621,27 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
   });
 
   // Inbox core view — full-panel takeover in the primary pane
+  // WARM PAINT DURING RENDER (CONTENT-LOAD-CASCADE §3.9, completed). The load
+  // effect's warm path runs after the first paint; by then the render guard
+  // below has already returned a skeleton for the new id — one visible frame,
+  // and an unmount of the editor subtree (and its collaboration provider),
+  // which is exactly what caching the payload was meant to prevent. React's
+  // "adjust state when a prop changes" form applies the cached facts here,
+  // before anything commits: a synchronous re-render, no skeleton, no unmount.
+  // Pure setters only (applyContentFacts); the effect does the rest.
+  if (
+    selectedContentId &&
+    !isPageTemplateTab &&
+    contentTypeFor !== selectedContentId &&
+    warmAppliedFor !== selectedContentId
+  ) {
+    const warmNow = readTabPayload<ContentResponse["data"]>(selectedContentId);
+    if (warmNow) {
+      setWarmAppliedFor(selectedContentId);
+      applyContentFacts(warmNow.data);
+    }
+  }
+
   if (activeView === "inbox" && paneId === "top-left") {
     return (
       <ToolSurfaceProvider contentType={null} handlers={toolHandlers}>

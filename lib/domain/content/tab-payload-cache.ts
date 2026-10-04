@@ -29,17 +29,40 @@
 // Caching the payload buys the same instant switch with one editor and one
 // provider.
 //
-// BOUNDS (§3.9): capped at N most-recently-used, never "cache every open tab".
+// BOUNDS (§3.9): bounded by MEMORY, not by a tab count (owner, 2026-10-03):
+// a handful of large notes and a hundred small ones should not get the same
+// five slots. Least-recently-viewed entries drop off the bottom until the
+// budget fits.
 
-/** §3.9 recommends N≈3-5. */
-const MAX_ENTRIES = 5;
+/** Total budget for cached payloads, in (estimated) bytes. */
+export const TAB_PAYLOAD_CACHE_BUDGET_BYTES = 16 * 1024 * 1024;
 
 /**
  * How long a cached payload may be painted before it is considered too cold to
  * show without a skeleton. Beyond this we fall back to the normal loading path
  * rather than flash content that may be badly out of date.
+ *
+ * Deliberately equal to the collaboration runtime's IDLE_EVICTION_MS: a
+ * provider nobody has looked at for five minutes is evicted so the Cloud Run
+ * socket can close (a cost measure). A revisit after that is a cold load
+ * regardless, so a payload that outlived the provider would only paint
+ * something the Y.Doc is about to replace. Do not raise this on its own.
  */
-const MAX_AGE_MS = 5 * 60_000;
+export const TAB_PAYLOAD_MAX_AGE_MS = 5 * 60_000;
+const MAX_AGE_MS = TAB_PAYLOAD_MAX_AGE_MS;
+
+/**
+ * Bytes a payload will occupy, estimated from its JSON length. JS strings are
+ * UTF-16, so two bytes a character; the real object graph is larger than its
+ * serialization, but the estimate is proportional, which is all a budget needs.
+ */
+function estimateBytes(data: unknown): number {
+  try {
+    return JSON.stringify(data).length * 2;
+  } catch {
+    return Number.POSITIVE_INFINITY; // uncacheable (cyclic) — never admitted
+  }
+}
 
 type CacheEntry = {
   /** The `data` object from a successful content GET. */
@@ -50,9 +73,19 @@ type CacheEntry = {
   updatedAt: string | null;
   /** Epoch ms this entry was written — MRU key and staleness input. */
   at: number;
+  /** Estimated size, for the budget. */
+  bytes: number;
 };
 
 const entries = new Map<string, CacheEntry>();
+let totalBytes = 0;
+
+function remove(contentId: string): void {
+  const entry = entries.get(contentId);
+  if (!entry) return;
+  entries.delete(contentId);
+  totalBytes -= entry.bytes;
+}
 
 function touch(contentId: string): void {
   // Map preserves insertion order, so delete+set moves an entry to the back.
@@ -63,11 +96,16 @@ function touch(contentId: string): void {
 }
 
 function evictIfNeeded(): void {
-  while (entries.size > MAX_ENTRIES) {
+  while (totalBytes > TAB_PAYLOAD_CACHE_BUDGET_BYTES) {
     const oldest = entries.keys().next();
     if (oldest.done) return;
-    entries.delete(oldest.value);
+    remove(oldest.value);
   }
+}
+
+/** What the cache holds right now — for the harness and for a debug readout. */
+export function tabPayloadCacheStats(): { entries: number; bytes: number; ids: string[] } {
+  return { entries: entries.size, bytes: totalBytes, ids: [...entries.keys()] };
 }
 
 export function cacheTabPayload(
@@ -76,13 +114,19 @@ export function cacheTabPayload(
   meta: { bodyHash?: string | null; updatedAt?: string | null } = {}
 ): void {
   if (!contentId || contentId.startsWith("temp-")) return;
-  entries.delete(contentId);
+  const bytes = estimateBytes(data);
+  remove(contentId);
+  // A single payload past the whole budget is never admitted — it would
+  // evict everything else to sit alone, and still be too big to keep.
+  if (bytes > TAB_PAYLOAD_CACHE_BUDGET_BYTES) return;
   entries.set(contentId, {
     data,
     bodyHash: meta.bodyHash ?? null,
     updatedAt: meta.updatedAt ?? null,
     at: Date.now(),
+    bytes,
   });
+  totalBytes += bytes;
   evictIfNeeded();
 }
 
@@ -109,7 +153,7 @@ export function readTabPayload<T>(
 
   const ageMs = Date.now() - entry.at;
   if (ageMs > MAX_AGE_MS) {
-    entries.delete(contentId);
+    remove(contentId);
     return undefined;
   }
 
@@ -130,12 +174,13 @@ export function invalidateTabPayload(
   contentId: string | null | undefined
 ): void {
   if (!contentId) return;
-  entries.delete(contentId);
+  remove(contentId);
 }
 
 /** Drop everything — for sign-out and workspace switch. */
 export function clearTabPayloadCache(): void {
   entries.clear();
+  totalBytes = 0;
 }
 
 /**

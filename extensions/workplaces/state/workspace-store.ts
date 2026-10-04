@@ -212,6 +212,61 @@ const lastAppliedSnapshotJson: Record<string, string> = {};
  */
 const persistInFlight = new Map<string, Promise<void>>();
 const persistDirty = new Set<string>();
+
+/**
+ * Opens shown BEFORE the server has agreed to them.
+ *
+ * In a non-Main workspace an open used to wait on the open-intent POST (five
+ * sequential queries on Neon) and often an assignment POST after it, and only
+ * then create the tab — so a tree click or a wiki-link showed nothing for
+ * hundreds of milliseconds, and the user was left guessing whether anything
+ * was coming (owner, prod, 2026-10-03: "the biggest lag observed"). The tab now
+ * appears at once and the content starts loading; the intent check runs
+ * alongside. If the server refuses, the conflict dialog opens over the tab
+ * exactly as it did, and cancelling closes it.
+ *
+ * While an open is provisional the workspace row is NOT persisted: the state
+ * PATCH folds the pane lists into membership, and writing it would mint the
+ * very claim the intent check exists to gate. The persist is deferred, not
+ * dropped — it runs the moment the last provisional open settles.
+ */
+const provisionalOpens = new Map<string, { layoutModeBefore: WorkspaceLayoutMode }>();
+let persistDeferredByProvisional = false;
+
+function settleProvisionalOpen(contentId: string) {
+  provisionalOpens.delete(contentId);
+  if (provisionalOpens.size === 0 && persistDeferredByProvisional) {
+    persistDeferredByProvisional = false;
+    void useWorkspaceStore
+      .getState()
+      .persistActiveWorkspace()
+      .catch((error) => {
+        console.error(
+          "[Workspace Store] Failed to persist after a provisional open settled:",
+          error,
+        );
+      });
+  }
+}
+
+/**
+ * The server said no (or never answered): take the provisional tab back —
+ * and the layout with it. An open can grow the layout (a side-by-side open
+ * into the empty pane, an aimed open into a quad) and closing the only tab in
+ * a pane folds it (the removal rule); either way the user never had this tab,
+ * so the arrangement must be exactly what it was before they asked.
+ */
+function rollbackProvisionalOpen(contentId: string) {
+  const provisional = provisionalOpens.get(contentId);
+  if (!provisional) return;
+  traceWorkspace("open:provisional:rollback", { contentId });
+  const cs = useContentStore.getState();
+  cs.closeContentTabs([contentId]);
+  if (useContentStore.getState().layoutMode !== provisional.layoutModeBefore) {
+    useContentStore.getState().setLayoutMode(provisional.layoutModeBefore);
+  }
+  settleProvisionalOpen(contentId);
+}
 let onMutationBroadcast: (() => void) | null = null;
 const WORKSPACE_MUTATION_TIMEOUT_MS = 12_000;
 /** How long a move/send toast offers Undo — matches the clear-tabs control. */
@@ -1767,6 +1822,12 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
 
     async function persistNow() {
       if (!hasWorkspace(get().workspaces, activeWorkspaceId)) return;
+      // An open the server has not agreed to yet must not reach the row (see
+      // provisionalOpens). Deferred: settleProvisionalOpen re-runs this.
+      if (provisionalOpens.size > 0) {
+        persistDeferredByProvisional = true;
+        return;
+      }
       saveTreeSnapshotForWorkspace(activeWorkspaceId);
 
       if (typeof navigator !== "undefined" && !navigator.onLine) {
@@ -1902,21 +1963,44 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       return;
     }
 
-    const response = await fetch("/api/content/workspaces/open-intent", {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        workspaceId: activeWorkspace.id,
-        contentId,
-      }),
+    // Show it NOW; ask alongside (see provisionalOpens). The content fetch
+    // and the intent check overlap instead of queueing.
+    provisionalOpens.set(contentId, {
+      layoutModeBefore: useContentStore.getState().layoutMode,
     });
-    const result = await parseResponse<WorkspaceOpenIntentResponse>(
-      response,
-      "Failed to resolve workspace conflict",
-    );
+    traceWorkspace("open:provisional", { contentId, workspaceId: activeWorkspace.id });
+    directOpenContent(contentId, options);
+
+    let result: WorkspaceOpenIntentResponse;
+    try {
+      const response = await fetch("/api/content/workspaces/open-intent", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          workspaceId: activeWorkspace.id,
+          contentId,
+        }),
+      });
+      result = await parseResponse<WorkspaceOpenIntentResponse>(
+        response,
+        "Failed to resolve workspace conflict",
+      );
+    } catch (error) {
+      // No answer is not a yes: the tab goes back.
+      rollbackProvisionalOpen(contentId);
+      throw error;
+    }
+
+    // The user may have closed the tab (or switched workspace) while the
+    // server was thinking. Nothing to confirm; nothing to persist for it.
+    if (!provisionalOpens.has(contentId)) return;
 
     if (result.allowed) {
+      // Agreed — the tab is no longer provisional, so the deferred persist may
+      // run. The assignment below is what the row's membership would mint
+      // anyway; ordering it first keeps the claim's TYPE right.
+      //
       // A covered open (direct assignment or a recursive folder claim held by
       // this workspace) must not create a new item: the upsert would overwrite
       // the existing claim's type (borrowed/shared → primary) or permanently
@@ -1927,7 +2011,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
           scope: "item",
         });
       }
-      directOpenContent(contentId, options);
+      settleProvisionalOpen(contentId);
       void get()
         .persistActiveWorkspace()
         .catch((error) => {
@@ -1939,6 +2023,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       return;
     }
 
+    // Refused: the tab stays on screen under the dialog (the user sees what
+    // they asked for and decides); it stays provisional until they do.
     set({
       conflict: result.conflict,
       pendingOpenIntent: { contentId, options },
@@ -1968,6 +2054,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     });
     directOpenContent(pending.contentId, pending.options);
     set({ conflict: null, pendingOpenIntent: null });
+    settleProvisionalOpen(pending.contentId);
   },
 
   sharePendingContent: async (options) => {
@@ -1992,12 +2079,16 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     });
     directOpenContent(pending.contentId, pending.options);
     set({ conflict: null, pendingOpenIntent: null });
+    settleProvisionalOpen(pending.contentId);
   },
 
   switchToConflictWorkspace: async () => {
     const conflict = get().conflict;
     if (!conflict) return;
     const pending = get().pendingOpenIntent;
+    // The provisional tab belongs to the workspace we are LEAVING; take it
+    // back before the switch-away write can fold it into that row.
+    if (pending) rollbackProvisionalOpen(pending.contentId);
     await get().activateWorkspace(conflict.workspaceId);
     if (pending) {
       directOpenContent(pending.contentId, pending.options);
@@ -2005,7 +2096,11 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     set({ conflict: null, pendingOpenIntent: null });
   },
 
-  cancelOpenConflict: () => set({ conflict: null, pendingOpenIntent: null }),
+  cancelOpenConflict: () => {
+    const pending = get().pendingOpenIntent;
+    set({ conflict: null, pendingOpenIntent: null });
+    if (pending) rollbackProvisionalOpen(pending.contentId);
+  },
 
   assignContentToWorkspace: async (workspaceId, contentId, options) => {
     const response = await fetch(
