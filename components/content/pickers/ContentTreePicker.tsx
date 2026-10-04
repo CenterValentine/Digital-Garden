@@ -1373,7 +1373,12 @@ function JumpTo({
   onJump: (destination: CreateDestination) => void;
   onCreate: (destination: CreateDestination) => void;
 }) {
+  // The latest destination (the most recent create; else the first open
+  // folder) is what the row's "+" targets, so it is shown NEXT TO that "+" —
+  // plain icon and name, unboxed — rather than listed again below. Deduped
+  // from Recent; an Open fallback stays in its own list.
   const latest = recent[0] ?? open[0];
+  const recentList = recent.slice(1);
   const titleOf = (d: CreateDestination) =>
     d.id === null ? "Root" : (lookupTitle(d.id) ?? d.title);
   const pathOf = (d: CreateDestination) =>
@@ -1383,7 +1388,7 @@ function JumpTo({
   const destIcon = (d: CreateDestination, className: string) =>
     d.id === null ? <Home className={className} /> : <Folder className={className} />;
   const list: Array<CreateDestination & { count?: number }> =
-    section === "recent" ? recent : section === "open" ? open : [];
+    section === "recent" ? recentList : section === "open" ? open : [];
 
   const chip = (
     key: "recent" | "open",
@@ -1427,16 +1432,25 @@ function JumpTo({
   return (
     <div className="border-b border-black/5 dark:border-white/5 pb-1 mb-1">
       <div className="flex w-full items-center gap-1.5 py-1 pl-3 pr-2 text-xs">
-        {recent.length > 0
+        {recentList.length > 0
           ? chip("recent", "Recent", null, <History className="h-3 w-3 shrink-0" />)
           : null}
         {open.length > 0
           ? chip("open", "Open", open.length, <FolderInput className="h-3 w-3 shrink-0" />)
           : null}
+        {/* Where the "+" will create: the latest destination, unboxed. */}
+        <span
+          title={`The "+" creates a new ${noun.toLowerCase()} in ${titleOf(latest)}`}
+          className="flex min-w-0 flex-1 items-center justify-end gap-1.5 text-[11px] text-gray-600 dark:text-gray-300"
+        >
+          {destIcon(latest, "h-3.5 w-3.5 shrink-0 text-yellow-500/80")}
+          <span className="truncate">{titleOf(latest)}</span>
+        </span>
         <QuickCreateButton
           noun={noun}
           title={`+ New ${noun} in ${titleOf(latest)}`}
           onClick={() => onCreate(latest)}
+          className="ml-0"
         />
       </div>
 
