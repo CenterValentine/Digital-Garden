@@ -739,21 +739,6 @@ export function ContentTreePicker({
     };
   }, [tree, activeContentId, lookupNode]);
 
-  // The header's create target: the slot right AFTER the active tab's content
-  // when the tree can place it (kind "active", carrying that row), else the
-  // top of the latest-created folder, else the top of the first open folder.
-  const createTarget = useMemo<{
-    dest: CreateDestination;
-    kind: TargetKind;
-    afterRow?: FlatRow;
-  } | null>(() => {
-    if (activeTarget)
-      return { dest: activeTarget.dest, kind: "active", afterRow: activeTarget.row };
-    if (destinations[0]) return { dest: destinations[0], kind: "recent" };
-    if (openDestinations[0]) return { dest: openDestinations[0], kind: "open" };
-    return null;
-  }, [activeTarget, destinations, openDestinations]);
-
   // Where the list opens: ON THE USER'S PERSPECTIVE. The first time a tree is
   // on screen, the row where the user is (tree selection, else the active
   // content) is centred, so the picker opens at the place they already see.
@@ -1016,28 +1001,6 @@ export function ContentTreePicker({
       }}
       className="z-[130] flex flex-col rounded-lg border border-black/10 dark:border-white/10 bg-white dark:bg-[#1a1a1a] shadow-xl overflow-hidden"
     >
-      {quickCreate && createTarget ? (
-        <TargetRow
-          target={createTarget.dest}
-          kind={createTarget.kind}
-          noun={createNoun}
-          title={
-            createTarget.dest.id === null
-              ? "Root"
-              : (lookupNode(createTarget.dest.id)?.title ?? createTarget.dest.title)
-          }
-          path={
-            createTarget.dest.parentPath.length > 0
-              ? createTarget.dest.parentPath.join(" / ")
-              : null
-          }
-          onCreate={() =>
-            void (createTarget.afterRow
-              ? quickCreateAfter(createTarget.afterRow)
-              : quickCreateAtDestination(createTarget.dest))
-          }
-        />
-      ) : null}
       <input
         value={query}
         onChange={(e) => setQuery(e.target.value)}
@@ -1100,9 +1063,13 @@ export function ContentTreePicker({
           )
         ) : (
           <>
-            {quickCreate && (destinations.length > 0 || openDestinations.length > 0) ? (
+            {quickCreate &&
+            (activeTarget || destinations.length > 0 || openDestinations.length > 0) ? (
               <JumpTo
-                excludeId={createTarget ? createTarget.dest.id : undefined}
+                active={activeTarget}
+                onCreateActive={() =>
+                  activeTarget ? void quickCreateAfter(activeTarget.row) : undefined
+                }
                 recent={destinations}
                 open={openDestinations}
                 section={destinationsSection}
@@ -1423,18 +1390,23 @@ function QuickCreateButton({
 }
 
 /**
- * Jump-to — the reference lists under the target header: ONE compact chip row
- * holding "Recent" (folders you last created in, minus the target) and "Open"
- * (folders holding the content open in this workspace). Click a chip to
- * unfold its list IN PLACE (one at a time), click again to fold it. Each
- * listed folder: click = go there in the browse tree, "+" = create inside it.
- * (A hover flyout was tried and removed 2026-10-04: the picker sits at the
- * screen edge, so a flyout beside it has nowhere good to go.) Promoted above
- * the tree because it is most useful exactly when it differs from where the
- * file tree is pointing.
+ * Jump-to — ONE compact chip row at the top of the picker. Three pills:
+ *  - "Active": an ACTION (gold). One click creates a new item literally next
+ *    to the active content — its folder, the next slot after it. The leading
+ *    icon becomes a "+" on hover. Shown only when the tree can place the
+ *    active tab (not for reader pages).
+ *  - "Recent" (folders you last created in) and "Open" (folders holding
+ *    content open in this workspace): toggles that unfold their list IN PLACE
+ *    (one at a time), click again to fold. Each listed folder: click = go
+ *    there in the browse tree, "+" = create at the top of it.
+ * (A hover flyout and a pinned gold header above the search box were both
+ * tried and dropped 2026-10-04: the picker sits at the screen edge, and the
+ * header never blended into the menu.) Promoted above the tree because it is
+ * most useful exactly when it differs from where the file tree is pointing.
  */
 function JumpTo({
-  excludeId,
+  active,
+  onCreateActive,
   recent,
   open,
   section,
@@ -1444,8 +1416,10 @@ function JumpTo({
   onJump,
   onCreate,
 }: {
-  /** The target header's folder — not repeated in Recent. undefined = none. */
-  excludeId: string | null | undefined;
+  /** The active tab's folder + its row, when the tree can place it. */
+  active: { dest: CreateDestination; row: FlatRow } | null;
+  /** Create a new item right after the active content. */
+  onCreateActive: () => void;
   recent: CreateDestination[];
   open: OpenDestination[];
   section: "recent" | "open" | null;
@@ -1456,8 +1430,6 @@ function JumpTo({
   onJump: (destination: CreateDestination) => void;
   onCreate: (destination: CreateDestination) => void;
 }) {
-  const recentList =
-    excludeId === undefined ? recent : recent.filter((d) => d.id !== excludeId);
   const titleOf = (d: CreateDestination) =>
     d.id === null ? "Root" : (lookupTitle(d.id) ?? d.title);
   const pathOf = (d: CreateDestination) =>
@@ -1467,7 +1439,44 @@ function JumpTo({
   const destIcon = (d: CreateDestination, className: string) =>
     d.id === null ? <Home className={className} /> : <Folder className={className} />;
   const list: Array<CreateDestination & { count?: number }> =
-    section === "recent" ? recentList : section === "open" ? open : [];
+    section === "recent" ? recent : section === "open" ? open : [];
+
+  // The "Active" pill: not a toggle like its neighbours but an ACTION — one
+  // click creates a new item literally next to the active content (its folder,
+  // the next slot after it). In the tree's active gold. The leading icon
+  // swaps to a "+" on hover/focus; the name of the folder it will land in
+  // trails, truncated, so a long name can't blow the row out (the chip row
+  // also wraps). Touch has no hover, so it keeps a "+" glyph instead.
+  const activePill = () => {
+    if (!active) return null;
+    const title = titleOf(active.dest);
+    const path = pathOf(active.dest);
+    const full = path ? `${path} / ${title}` : title;
+    return (
+      <button
+        type="button"
+        onClick={onCreateActive}
+        title={`New ${noun.toLowerCase()} right next to the active tab, in ${full}`}
+        className="group/active inline-flex max-w-full cursor-pointer items-center gap-1 rounded-full bg-gold-primary/[0.14] px-2 py-0.5 text-[11px] text-gold-primary outline-none transition-colors hover:bg-gold-primary/[0.26] focus-visible:ring-1 focus-visible:ring-gold-primary/60 dark:bg-gold-primary/[0.16] dark:hover:bg-gold-primary/[0.28]"
+      >
+        <span className="relative inline-flex h-3 w-3 shrink-0 items-center justify-center">
+          {active.dest.id === null ? (
+            <Home className="h-3 w-3 transition-opacity group-hover/active:opacity-0 group-focus-visible/active:opacity-0 [@media(hover:none)]:hidden" />
+          ) : (
+            <Folder className="h-3 w-3 transition-opacity group-hover/active:opacity-0 group-focus-visible/active:opacity-0 [@media(hover:none)]:hidden" />
+          )}
+          <Plus
+            aria-hidden="true"
+            className="absolute inset-0 h-3 w-3 opacity-0 transition-opacity group-hover/active:opacity-100 group-focus-visible/active:opacity-100 [@media(hover:none)]:opacity-100"
+          />
+        </span>
+        Active
+        <span className="min-w-0 max-w-[96px] truncate text-[10px] opacity-70">
+          · {title}
+        </span>
+      </button>
+    );
+  };
 
   const chip = (
     key: "recent" | "open",
@@ -1512,16 +1521,15 @@ function JumpTo({
     // No bottom border or margin: the scope header right below carries its own
     // top border, and a second rule plus a gap between them read as a hole.
     <div className="pb-1">
-      {recentList.length > 0 || open.length > 0 ? (
-        <div className="flex w-full items-center gap-1.5 py-1 pl-3 pr-2 text-xs">
-          {recentList.length > 0
-            ? chip("recent", "Recent", null, <History className="h-3 w-3 shrink-0" />)
-            : null}
-          {open.length > 0
-            ? chip("open", "Open", open.length, <FolderInput className="h-3 w-3 shrink-0" />)
-            : null}
-        </div>
-      ) : null}
+      <div className="flex w-full flex-wrap items-center gap-1.5 py-1 pl-3 pr-2 text-xs">
+        {active ? activePill() : null}
+        {recent.length > 0
+          ? chip("recent", "Recent", null, <History className="h-3 w-3 shrink-0" />)
+          : null}
+        {open.length > 0
+          ? chip("open", "Open", open.length, <FolderInput className="h-3 w-3 shrink-0" />)
+          : null}
+      </div>
 
       {list.map((d) => (
         <div
@@ -1557,123 +1565,6 @@ function JumpTo({
         </div>
       ))}
     </div>
-  );
-}
-
-type TargetKind = "active" | "recent" | "open";
-
-/**
- * Target header — ABOVE the search box, always visible, one line, and ONE
- * button: clicking anywhere on it creates a new item at the target.
- * `[icon] [name…] [· tag]`, with a "+" that appears centred over the row on
- * hover/focus (nothing else changes but the tint) (a small trailing "+" on touch, which has no hover).
- *  - "active tab": the new item lands LITERALLY NEXT TO the active content —
- *    same folder, the very next slot after it (the name shown is that
- *    folder). Owner: "the user clicking this affordance gets a new note in
- *    the same place next to the active content."
- *  - "last created" / "open" fallbacks: the top of that folder.
- * Only the name ellipsizes (`min-w-0 truncate`); the tag is `shrink-0`, so a
- * long folder name never displaces it, and the full path rides in the tooltip.
- * A flat menu row in the tree's active gold wash (no gradient, no rail —
- * it is a menu item, not a tree row), softer on this dark popup.
- */
-function TargetRow({
-  target,
-  kind,
-  noun,
-  title,
-  path,
-  onCreate,
-}: {
-  target: CreateDestination;
-  kind: TargetKind;
-  noun: string;
-  /** Live title from the loaded tree. */
-  title: string;
-  path: string | null;
-  onCreate: () => void;
-}) {
-  const tag =
-    kind === "active" ? "active tab" : kind === "recent" ? "last created" : "open";
-  const full = path ? `${path} / ${title}` : title;
-  const gold = kind === "active";
-  const noun1 = noun.toLowerCase();
-  return (
-    <button
-      type="button"
-      onClick={onCreate}
-      title={
-        kind === "active"
-          ? `New ${noun1} right next to the active tab, in ${full}`
-          : `New ${noun1} at the top of ${full}`
-      }
-      className={cn(
-        // Flat like its neighbours; the whole row is the click target and
-        // reacts to hover (tint + pointer).
-        "group/target relative flex w-full shrink-0 cursor-pointer items-center gap-2 border-b py-1.5 pl-3 pr-2 text-left text-xs outline-none transition-colors focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-gold-primary/60",
-        gold
-          ? "border-black/5 bg-gold-primary/[0.13] hover:bg-gold-primary/[0.20] dark:border-white/5 dark:bg-gold-primary/[0.12] dark:hover:bg-gold-primary/[0.18]"
-          : "border-black/5 bg-black/[0.03] hover:bg-black/[0.07] dark:border-white/5 dark:bg-white/[0.04] dark:hover:bg-white/[0.09]",
-      )}
-    >
-      {/* The row's content. It does not change on hover — only the "+" appears
-          — and the name stays the only part that ellipsizes (the tag is
-          shrink-0). */}
-      <span className="flex min-w-0 flex-1 items-center gap-2">
-        {target.id === null ? (
-          <Home
-            className={cn(
-              "h-3.5 w-3.5 shrink-0",
-              gold ? "text-gold-primary" : "text-yellow-500/80",
-            )}
-          />
-        ) : (
-          <Folder
-            className={cn(
-              "h-3.5 w-3.5 shrink-0",
-              gold ? "text-gold-primary" : "text-yellow-500/80",
-            )}
-          />
-        )}
-        <span
-          className={cn(
-            "min-w-0 truncate font-medium",
-            gold ? "text-gold-primary" : "text-gray-700 dark:text-gray-300",
-          )}
-        >
-          {title}
-        </span>
-        <span
-          className={cn(
-            "shrink-0 whitespace-nowrap text-[10px]",
-            gold ? "text-gold-primary/60" : "text-gray-400 dark:text-gray-500",
-          )}
-        >
-          · {tag}
-        </span>
-      </span>
-      {/* The verb: a "+" that appears CENTRED in the row on hover/focus (the
-          whole row is the button, so there is no corner target to aim at). */}
-      <span
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-0 transition-opacity group-hover/target:opacity-100 group-focus-visible/target:opacity-100 [@media(hover:none)]:hidden"
-      >
-        <Plus
-          className={cn(
-            "h-4 w-4",
-            gold ? "text-gold-primary" : "text-gray-700 dark:text-gray-200",
-          )}
-        />
-      </span>
-      {/* Touch has no hover, so it keeps a small trailing "+" as the cue. */}
-      <Plus
-        aria-hidden="true"
-        className={cn(
-          "hidden h-3.5 w-3.5 shrink-0 [@media(hover:none)]:block",
-          gold ? "text-gold-primary/80" : "text-gray-500 dark:text-gray-400",
-        )}
-      />
-    </button>
   );
 }
 
