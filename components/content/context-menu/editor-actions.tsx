@@ -25,7 +25,7 @@ import {
   wikiLinkPosFromElement,
   type LinkView,
 } from "@/lib/domain/editor/link-views";
-import { sendSelectionToNewNote, suggestNoteTitle } from "@/lib/domain/editor/send-to-new-note";
+import { suggestNoteTitle } from "@/lib/domain/editor/selection-blocks";
 import {
   MOVE_SELECTION_EVENT,
   type MoveSelectionEventDetail,
@@ -1001,10 +1001,9 @@ export const editorActionProvider: ContextMenuActionProvider = (ctx) => {
   sections.push({ actions: clipboardActions });
 
   // --- Move the selection out of this note. Context-menu only, by design:
-  // reorganisation, not formatting.
-  //   Send to New Note      → a sibling note, named inline, link left here
-  //   Move to Note…         → pick the target (tree picker); nothing stays
-  //   Move to Note, Link…   → the same, a link to the target stays here
+  // reorganisation, not formatting. ONE item, two choices — a link stays
+  // here, or nothing does — and both open the tree picker, whose "+ New
+  // Note" is the way to make a new note for it (named from the selection).
   // The picker is hosted by this editor's MarkdownEditor (MoveSelectionPicker)
   // and addressed by editor instance, so only this editor's picker opens.
   if (capture && contextEditor?.isEditable) {
@@ -1027,28 +1026,22 @@ export const editorActionProvider: ContextMenuActionProvider = (ctx) => {
     sections.push({
       actions: [
         {
-          id: "send-to-new-note",
-          label: "Send to New Note",
-          tooltip: "Move the selection into a new note next to this one and leave a link in its place",
-          inlineInput: {
-            placeholder: suggestedTitle,
-            inputLabel: "New note title",
-            onSubmit: async (title: string) => {
-              await sendSelectionToNewNote(contextEditor, hostContentId, title);
-            },
-          },
-        },
-        {
           id: "move-to-note",
-          label: "Move to Note…",
-          tooltip: "Append the selection to the end of another note and remove it here",
-          onClick: () => requestMove("none"),
-        },
-        {
-          id: "move-to-note-link",
-          label: "Move to Note, Leave Link…",
-          tooltip: "Append the selection to the end of another note and leave a link to it here",
-          onClick: () => requestMove("link"),
+          label: "Move to Note",
+          submenu: [
+            {
+              id: "move-to-note-link",
+              label: "Leave a link here",
+              tooltip: "Append the selection to the end of a note you pick; a link to it stays in its place",
+              onClick: () => requestMove("link"),
+            },
+            {
+              id: "move-to-note-none",
+              label: "Leave nothing here",
+              tooltip: "Append the selection to the end of a note you pick and remove it from this note",
+              onClick: () => requestMove("none"),
+            },
+          ],
         },
       ],
     });

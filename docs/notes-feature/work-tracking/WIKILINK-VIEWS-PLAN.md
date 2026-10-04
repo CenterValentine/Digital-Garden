@@ -109,33 +109,23 @@ plus the decline cases, and the inline-attr sweep covers `view` automatically.
 
 ---
 
-## 4. Send the selection to a new note
+## 4. Move the selection to a note
 
-Right-click a selection → **Send to New Note** (an inline title input,
-pre-filled with the first heading in the selection or its first line). The
-selected blocks become the new note's body; the note is created **next to the
-host** (same folder, immediately after it — Principle 1: the extracted thought
-lands in the structure the user already keeps); the selection is replaced by a
-link to it, written through the editor (collab-safe). The toast's **Open**
-action opens it. Positions are re-checked after the network round-trips —
-if the text moved under a remote edit, the host is left alone and the note
-still exists.
+Right-click a selection → **Move to Note** › **Leave a link here** or
+**Leave nothing here**. One item, two choices (owner, 2026-10-03; an
+earlier "Send to New Note" with an inline title was folded in — the picker's
+"+ New Note" is the one way to make a new note for the selection). Both
+open the shared tree picker (`ContentTreePicker`, the Note Window's flavor —
+collapsed tree, view-scope row, "+ New Note" on folders and insertion gaps)
+hosted by the editor that was right-clicked (`MoveSelectionPicker`,
+addressed by editor instance so split panes and nested windows do not each
+open one). A note created from the picker is named from the selection's
+first heading or line, so it is named before it has content. The picker
+lists notes only.
 
-Context-menu only, by design: it is an act of reorganisation, not formatting.
-From there the hover chooser turns the link into a card or windows the note
-back in.
-
-### 4a. Move to Note (an existing or newly placed note)
-
-Two more context-menu items on a selection: **Move to Note…** (nothing
-stays here) and **Move to Note, Leave Link…** (a link to the target stays).
-Both open the shared tree picker (`ContentTreePicker`, the Note Window's
-flavor — collapsed tree, view-scope row, "+ New Note" on folders and
-insertion gaps) hosted by the editor that was right-clicked
-(`MoveSelectionPicker`, addressed by editor instance so split panes and
-nested windows do not each open one). A note created from the picker is
-named from the selection's first heading or line, so it is named before it
-has content. The picker lists notes only.
+Context-menu only, by design: it is an act of reorganisation, not
+formatting. From there the hover chooser turns the trace link into a card
+or windows the note back in.
 
 The selected blocks are appended to the **end** of the target with one empty
 paragraph of buffer when the target already has content (none when it is

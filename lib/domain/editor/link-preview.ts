@@ -93,7 +93,7 @@ export function fetchLinkPreview(ref: WikiLinkTargetRef): Promise<LinkPreview | 
   if (hit && now - hit.at < TTL_MS) return hit.value;
   const value = load(ref).then((preview) => {
     // A miss is not cached for the full TTL — the note may be about to be
-    // created (the send-to-new-note flow links before the tree refreshes).
+    // created (a move's trace link can land before the tree refreshes).
     if (!preview) cache.delete(key);
     return preview;
   });

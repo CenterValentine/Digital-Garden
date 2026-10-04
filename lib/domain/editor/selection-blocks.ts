@@ -1,7 +1,8 @@
 /**
- * The selection as blocks that can leave this note — shared by "Send to
- * New Note" and "Move to Note" (lib/domain/editor/send-to-new-note.ts,
- * move-selection.ts): capture once, replace once, the same way.
+ * The selection as blocks that can leave this note — the capture, title
+ * suggestion and replacement behind "Move to Note" (move-selection.ts),
+ * kept apart so any later "selection leaves the note" feature does it the
+ * same way.
  *
  * Capture turns the selection into standalone blocks (an open slice from
  * one textblock arrives already wrapped in that block). Replacement is the
@@ -54,6 +55,42 @@ export function captureSelectionBlocks(editor: Editor): CapturedSelection | null
     singleTextblock,
     expectedText: doc.textBetween(from, to, "\n"),
   };
+}
+
+const TITLE_MAX = 60;
+
+function firstHeadingText(nodes: unknown[]): string | null {
+  for (const raw of nodes) {
+    const node = raw as JSONContent;
+    if (!node || typeof node !== "object") continue;
+    if (node.type === "heading") {
+      const text = (node.content ?? [])
+        .map((child) => (child.type === "text" ? child.text ?? "" : ""))
+        .join("")
+        .trim();
+      if (text) return text;
+    }
+    if (Array.isArray(node.content)) {
+      const nested = firstHeadingText(node.content);
+      if (nested) return nested;
+    }
+  }
+  return null;
+}
+
+/**
+ * A title for a note made from a selection: its first heading, else its
+ * first line, clipped at a word — what the picker's "+ New Note" names the
+ * note, so it is named before it has content.
+ */
+export function suggestNoteTitle(capture: { tiptapJson: { content: unknown[] }; plainText: string }): string {
+  const heading = firstHeadingText(capture.tiptapJson.content);
+  const firstLine = (heading ?? capture.plainText).split("\n").find((l) => l.trim()) ?? "";
+  const flat = firstLine.replace(/\s+/g, " ").trim();
+  if (flat.length <= TITLE_MAX) return flat || "Untitled";
+  const cut = flat.slice(0, TITLE_MAX);
+  const atWord = cut.lastIndexOf(" ");
+  return (atWord > TITLE_MAX * 0.5 ? cut.slice(0, atWord) : cut).trim();
 }
 
 /** Is the captured text still at its positions (nothing moved it meanwhile)? */
