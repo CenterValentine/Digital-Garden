@@ -7,7 +7,7 @@
  * Returns null when no toolbar tools are available.
  */
 
-import { BookmarkPlus, Code2, Download, Layers, Link2, Maximize2, Minimize2, Share2, Upload, Zap } from "lucide-react";
+import { BookmarkPlus, Code2, Download, FolderTree, Layers, Link2, Maximize2, Minimize2, Share2, Upload, Zap } from "lucide-react";
 import { useToolSurface } from "@/lib/domain/tools";
 import { useCallback, useEffect, useState, type ComponentType } from "react";
 import {
@@ -48,6 +48,7 @@ const ICON_MAP: Record<string, ComponentType<{ className?: string }>> = {
   BookmarkPlus,
   Code2,
   Download,
+  FolderTree,
   Layers,
   Link2,
   Share2,

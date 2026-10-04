@@ -12,6 +12,7 @@
  * snapshot reconciles do not churn it.
  */
 
+import { onlyUuids } from "@/lib/domain/content/uuid";
 import { prisma } from "@/lib/database/client";
 import type { WorkspacePaneId } from "./types";
 
@@ -289,10 +290,12 @@ export async function syncMembershipFromSurfaceSnapshot(
       for (const id of clean) allIds.add(id);
     }
   }
-  if (!allIds.size) return { added: 0 };
+  // Virtual extension tabs (`reader:…`) are not content — see onlyUuids.
+  const lookupIds = onlyUuids([...allIds]);
+  if (!lookupIds.length) return { added: 0 };
 
   const owned = await prisma.contentNode.findMany({
-    where: { id: { in: [...allIds] }, ownerId, deletedAt: null },
+    where: { id: { in: lookupIds }, ownerId, deletedAt: null },
     select: { id: true },
   });
   const ownedSet = new Set(owned.map((row) => row.id));

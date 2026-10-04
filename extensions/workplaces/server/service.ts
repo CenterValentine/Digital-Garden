@@ -14,6 +14,7 @@ import {
 import { generateSlug } from "@/lib/domain/content";
 import { logger } from "@/lib/core/logger";
 import { reconcileMembershipFromSnapshot } from "./membership";
+import { onlyUuids } from "@/lib/domain/content/uuid";
 import { LAYOUT_RECORD_MAX_AGE_DAYS } from "./layout-records";
 import type {
   ContentWorkspaceResponse,
@@ -947,9 +948,16 @@ export async function saveWorkspaceState(
         normalizeWorkspaceStatePayload(state),
       );
   const requestedContentIds = getStateContentIds(normalizedState);
-  const ownedContentIds = requestedContentIds.length
+  // Extension tabs (the reader's library/scripture pages) sit in the strip
+  // with ids like `reader:library` — not content, so never persisted. They
+  // must be dropped BEFORE the lookup: a non-UUID id in a `@db.Uuid` filter
+  // throws, which turned every save with such a tab open into a 500 and a
+  // noisy "Failed to save workspace state" on each debounce. Dropping them
+  // here is what the "no such row" result would have done anyway.
+  const lookupContentIds = onlyUuids(requestedContentIds);
+  const ownedContentIds = lookupContentIds.length
     ? await prisma.contentNode.findMany({
-        where: { ownerId, id: { in: requestedContentIds }, deletedAt: null },
+        where: { ownerId, id: { in: lookupContentIds }, deletedAt: null },
         select: { id: true },
       })
     : [];
