@@ -22,13 +22,12 @@ import {
   useWorkspaceViewOptions,
   type PickerTarget,
 } from "@/components/content/pickers/ContentTreePicker";
-import { moveSelectionToNote, type MoveTrace } from "@/lib/domain/editor/move-selection";
+import { moveSelectionToNote } from "@/lib/domain/editor/move-selection";
 
 export const MOVE_SELECTION_EVENT = "dg:move-selection";
 
 export interface MoveSelectionEventDetail {
   editor: Editor;
-  trace: MoveTrace;
   /** Viewport point to hang the picker from (the right-click position). */
   x: number;
   y: number;
@@ -63,7 +62,7 @@ export function MoveSelectionPicker({ editor }: { editor: Editor | null }) {
       const current = request;
       setRequest(null);
       if (!current || !editor) return;
-      void moveSelectionToNote(editor, target, current.trace, current.hostContentId);
+      void moveSelectionToNote(editor, target, current.hostContentId);
     },
     [request, editor],
   );
@@ -89,9 +88,7 @@ export function MoveSelectionPicker({ editor }: { editor: Editor | null }) {
           views={views}
           defaultViewId={defaultViewId}
           eligibleTypes={NOTE_ONLY}
-          searchPlaceholder={
-            request.trace === "link" ? "Move to… (a link stays here)" : "Move to… (nothing stays here)"
-          }
+          searchPlaceholder="Move to… (a link stays here)"
         />
       ) : null}
     </>

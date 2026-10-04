@@ -1,12 +1,15 @@
 /**
  * Move the selection out of this note into another one.
  *
- * Two traces, one move: the selected blocks are appended to the END of the
- * target note (on their own line — one empty paragraph of buffer when the
- * target already has content), then the selection is either deleted
- * ("without a trace") or replaced by a link to the target, in the display
- * the user chose most recently (lib/domain/editor/link-views.ts) so nobody
- * is asked to pick one.
+ * The point is to build content OUT from one note into others, so a move
+ * always leaves a trail both ways (owner, 2026-10-04 — the earlier "no
+ * link" choice was removed; the user deletes a link they don't want):
+ *  - the selected blocks are appended to the END of the target (on their
+ *    own line — one empty paragraph of buffer when the target already has
+ *    content), followed by a `From [[Host]]` provenance stamp;
+ *  - the selection here is replaced by a link to the target, in the display
+ *    the user chose most recently (lib/domain/editor/link-views.ts) so
+ *    nobody is asked to pick one.
  *
  * The target is chosen with the shared tree picker (ContentTreePicker —
  * the owner-canonical picker, same affordances as the Note Window's): an
@@ -31,8 +34,6 @@ import { useSettingsStore } from "@/state/settings-store";
 import { applyLinkView, lastUsedLinkView } from "./link-views";
 import { invalidateLinkPreview } from "./link-preview";
 import { captureSelectionBlocks, capturedStillThere, replaceCapturedRange } from "./selection-blocks";
-
-export type MoveTrace = "none" | "link";
 
 export interface MoveTarget {
   id: string;
@@ -96,9 +97,9 @@ async function fetchTitle(contentId: string): Promise<string | null> {
 }
 
 /**
- * The provenance stamp that follows the moved blocks when a link is left
- * behind: `From [[Host]]` — so the two notes point at each other, and the
- * moved text says where it came from.
+ * The provenance stamp that follows the moved blocks: `From [[Host]]` — so
+ * the two notes point at each other, and the moved text says where it came
+ * from.
  */
 function provenanceStamp(host: { id: string; title: string }): JSONContent {
   return {
@@ -113,20 +114,25 @@ function provenanceStamp(host: { id: string; title: string }): JSONContent {
 /**
  * Move the current selection into `target`. Returns true when the blocks
  * landed in the target (the host edit is best-effort after that).
- * `hostContentId` is the note the selection leaves; with a link trace, the
- * moved blocks end with a stamp linking back to it.
+ * `hostContentId` is the note the selection leaves — the moved blocks end
+ * with a stamp linking back to it.
  */
 export async function moveSelectionToNote(
   editor: Editor,
   target: MoveTarget,
-  trace: MoveTrace,
   hostContentId: string | null = null,
 ): Promise<boolean> {
+  // The menu item is disabled offline; this catches a connection that
+  // dropped while the picker was open, before anything is written.
+  if (typeof navigator !== "undefined" && navigator.onLine === false) {
+    toast.error("You're offline — the selection was not moved");
+    return false;
+  }
   const captured = captureSelectionBlocks(editor);
   if (!captured) return false;
 
   let outgoing = captured.blocks;
-  if (trace === "link" && hostContentId) {
+  if (hostContentId) {
     const hostTitle = await fetchTitle(hostContentId);
     if (hostTitle) outgoing = [...captured.blocks, provenanceStamp({ id: hostContentId, title: hostTitle })];
   }
@@ -136,24 +142,20 @@ export async function moveSelectionToNote(
 
   const stillThere = capturedStillThere(editor, captured);
   if (stillThere) {
-    if (trace === "none") {
-      replaceCapturedRange(editor, captured, null);
-    } else {
-      const view = lastUsedLinkView();
-      const link = editor.schema.nodes.wikiLink.create({
-        targetId: target.id,
-        targetTitle: target.title,
-        view: view === "window" || view === "link" ? null : view,
-      });
-      replaceCapturedRange(editor, captured, link);
-      // "Window" is a block, not a view attr: convert the link just placed.
-      if (view === "window") {
-        const pos = findLinkNear(editor, captured.blockFrom, target.id);
-        if (pos !== null) {
-          applyLinkView(editor, pos, "window", {
-            windowHeight: useSettingsStore.getState().editor?.noteWindowDefaultHeight ?? null,
-          });
-        }
+    const view = lastUsedLinkView();
+    const link = editor.schema.nodes.wikiLink.create({
+      targetId: target.id,
+      targetTitle: target.title,
+      view: view === "window" || view === "link" ? null : view,
+    });
+    replaceCapturedRange(editor, captured, link);
+    // "Window" is a block, not a view attr: convert the link just placed.
+    if (view === "window") {
+      const pos = findLinkNear(editor, captured.blockFrom, target.id);
+      if (pos !== null) {
+        applyLinkView(editor, pos, "window", {
+          windowHeight: useSettingsStore.getState().editor?.noteWindowDefaultHeight ?? null,
+        });
       }
     }
   }

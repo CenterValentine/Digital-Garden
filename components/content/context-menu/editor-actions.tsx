@@ -1001,48 +1001,44 @@ export const editorActionProvider: ContextMenuActionProvider = (ctx) => {
   sections.push({ actions: clipboardActions });
 
   // --- Move the selection out of this note. Context-menu only, by design:
-  // reorganisation, not formatting. ONE item, two choices — a link stays
-  // here, or nothing does — and both open the tree picker, whose "+ New
-  // Note" is the way to make a new note for it (named from the selection).
-  // The picker is hosted by this editor's MarkdownEditor (MoveSelectionPicker)
-  // and addressed by editor instance, so only this editor's picker opens.
+  // reorganisation, not formatting. ONE item, no submenu: the point is to
+  // build content out from this note into others, so a link always stays
+  // here and the moved text always ends with a link back (the user can
+  // delete either). The tree picker's "+ New Note" is the way to make a new
+  // note for it (named from the selection). The picker is hosted by this
+  // editor's MarkdownEditor (MoveSelectionPicker) and addressed by editor
+  // instance, so only this editor's picker opens.
+  //
+  // Disabled offline: the move writes two notes and may create a third, and
+  // a half-done move (text gone here, never arrived there) is the one
+  // outcome worth refusing up front. Same `navigator.onLine` read the
+  // backlinks panel and the save path use.
   if (capture && contextEditor?.isEditable) {
     const hostContentId = contentIdOfEditor(contextEditor);
     const suggestedTitle = suggestNoteTitle(capture);
-    const requestMove = (trace: "none" | "link") => {
-      window.dispatchEvent(
-        new CustomEvent(MOVE_SELECTION_EVENT, {
-          detail: {
-            editor: contextEditor,
-            trace,
-            x: typeof ctx.contextX === "number" ? ctx.contextX : 0,
-            y: typeof ctx.contextY === "number" ? ctx.contextY : 0,
-            suggestedTitle,
-            hostContentId,
-          } satisfies MoveSelectionEventDetail,
-        }),
-      );
-    };
+    const offline = typeof navigator !== "undefined" && navigator.onLine === false;
     sections.push({
       actions: [
         {
           id: "move-to-note",
-          label: "Move to Note",
-          submenu: [
-            {
-              id: "move-to-note-link",
-              label: "Leave link",
-              tooltip:
-                "Append the selection to the end of a note you pick; a link to it stays here and the moved text ends with a link back",
-              onClick: () => requestMove("link"),
-            },
-            {
-              id: "move-to-note-none",
-              label: "No link",
-              tooltip: "Append the selection to the end of a note you pick and remove it from this note",
-              onClick: () => requestMove("none"),
-            },
-          ],
+          label: "Move highlight to note",
+          disabled: offline,
+          tooltip: offline
+            ? "Moving needs a connection — you're offline"
+            : "Append the selection to the end of a note you pick; a link to it stays here and the moved text ends with a link back",
+          onClick: () => {
+            window.dispatchEvent(
+              new CustomEvent(MOVE_SELECTION_EVENT, {
+                detail: {
+                  editor: contextEditor,
+                  x: typeof ctx.contextX === "number" ? ctx.contextX : 0,
+                  y: typeof ctx.contextY === "number" ? ctx.contextY : 0,
+                  suggestedTitle,
+                  hostContentId,
+                } satisfies MoveSelectionEventDetail,
+              }),
+            );
+          },
         },
       ],
     });

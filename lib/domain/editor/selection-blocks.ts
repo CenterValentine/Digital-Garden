@@ -101,24 +101,20 @@ export function capturedStillThere(editor: Editor, captured: CapturedSelection):
 
 /**
  * Replace the captured range with `inline` (when the selection sat inside
- * one textblock) or with a paragraph holding it, or delete the range when
- * `inline` is null. Goes through the editor, so a collab note writes into
- * its Y.Doc.
+ * one textblock) or with a paragraph holding it (when it spanned blocks —
+ * the blocks are replaced whole). Goes through the editor, so a collab
+ * note writes into its Y.Doc.
  */
 export function replaceCapturedRange(
   editor: Editor,
   captured: CapturedSelection,
-  inline: PMNode | null,
+  inline: PMNode,
 ): boolean {
   const { from, to, blockFrom, blockTo, singleTextblock } = captured;
   return editor
     .chain()
     .focus()
     .command(({ tr, state }) => {
-      if (inline === null) {
-        tr.delete(blockFrom, blockTo);
-        return true;
-      }
       if (singleTextblock) {
         tr.replaceWith(from, to, inline);
         return true;
