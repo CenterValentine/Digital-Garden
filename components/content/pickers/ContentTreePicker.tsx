@@ -1566,7 +1566,7 @@ type TargetKind = "active" | "recent" | "open";
  * Target header — ABOVE the search box, always visible, one line, and ONE
  * button: clicking anywhere on it creates a new item at the target.
  * `[icon] [name…] [· tag]`, with a "+" that appears centred over the row on
- * hover/focus (a small trailing "+" on touch, which has no hover).
+ * hover/focus (nothing else changes but the tint) (a small trailing "+" on touch, which has no hover).
  *  - "active tab": the new item lands LITERALLY NEXT TO the active content —
  *    same folder, the very next slot after it (the name shown is that
  *    folder). Owner: "the user clicking this affordance gets a new note in
@@ -1616,10 +1616,10 @@ function TargetRow({
           : "border-black/5 bg-black/[0.03] hover:bg-black/[0.07] dark:border-white/5 dark:bg-white/[0.04] dark:hover:bg-white/[0.09]",
       )}
     >
-      {/* The row's content. It dims on hover/focus so the centred "+" below
-          reads as the verb, and the name stays the only part that ellipsizes
-          (the tag is shrink-0). */}
-      <span className="flex min-w-0 flex-1 items-center gap-2 transition-opacity group-hover/target:opacity-25 group-focus-visible/target:opacity-25">
+      {/* The row's content. It does not change on hover — only the "+" appears
+          — and the name stays the only part that ellipsizes (the tag is
+          shrink-0). */}
+      <span className="flex min-w-0 flex-1 items-center gap-2">
         {target.id === null ? (
           <Home
             className={cn(
