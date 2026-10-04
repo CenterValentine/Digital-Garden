@@ -703,8 +703,6 @@ export function ContentTreePicker({
     const onDown = (e: MouseEvent) => {
       const t = e.target as Node;
       if (scopeMenuRef.current?.contains(t)) return;
-      // Portaled flyouts (recent destinations) are part of the picker.
-      if ((t as Element).closest?.("[data-picker-flyout]")) return;
       if (menuRef.current?.contains(t) || anchorEl.contains(t)) {
         if (scopeAnchor && !scopeAnchor.contains(t)) setScopeAnchor(null);
         return;
@@ -947,7 +945,7 @@ export function ContentTreePicker({
               <RecentDestinations
                 destinations={destinations}
                 open={destinationsOpen}
-                onOpenChange={setDestinationsOpen}
+                onToggle={() => setDestinationsOpen((o) => !o)}
                 noun={createNoun}
                 lookupTitle={(id) => (id ? (lookupNode(id)?.title ?? null) : null)}
                 onJump={jumpToDestination}
@@ -1261,33 +1259,22 @@ function QuickCreateButton({
   );
 }
 
-const DESTINATIONS_FLYOUT_WIDTH = 280;
-const DESTINATIONS_FLYOUT_MAX_HEIGHT = 260;
-/** Hover intent: a brush-over must not open the flyout (owner: "< 1 sec"). */
-const DESTINATIONS_OPEN_DELAY_MS = 350;
-/** Grace for the diagonal trip from the row into the flyout. */
-const DESTINATIONS_CLOSE_DELAY_MS = 220;
-
 /**
  * Recent destinations — ONE row at the top of the picker naming the folder
- * that last received a create, with a "+" that creates there again. Resting
- * the pointer on it (hover intent, ~350ms — a brush-over does nothing)
- * unfolds a SUB-MENU flyout beside the row with the last few; click or
- * keyboard toggles it too, for touch and a11y. Each destination: click = go
- * there in the browse tree, "+" = create inside it. The owner's framing: "a
- * single item that is expanded to several parent locations the user
- * created content for before" — promoted above the tree because it is most
- * useful exactly when it differs from where the file tree is pointing.
- *
- * The flyout is portaled + fixed (the picker's list scrolls and clips) and
- * carries `data-picker-flyout` so the picker's click-away treats it as
- * inside. Positioned with the app's menu helper so it flips left near the
- * viewport edge.
+ * that last received a create, with a "+" that creates there again. Click
+ * the row (chevron) to unfold the last few IN PLACE, pushing the list down.
+ * (A hover sub-menu flyout was tried 2026-10-04 and REMOVED: the picker sits
+ * at the screen edge, so a flyout beside it has nowhere good to go.) Each
+ * destination: click = go there in the browse tree, "+" = create inside it.
+ * The owner's framing: "a single item that is expanded to several parent
+ * locations the user created content for before" — promoted above the tree
+ * because it is most useful exactly when it differs from where the file
+ * tree is pointing.
  */
 function RecentDestinations({
   destinations,
   open,
-  onOpenChange,
+  onToggle,
   noun,
   lookupTitle,
   onJump,
@@ -1295,67 +1282,13 @@ function RecentDestinations({
 }: {
   destinations: CreateDestination[];
   open: boolean;
-  onOpenChange: (open: boolean) => void;
+  onToggle: () => void;
   noun: string;
   /** Live title from the loaded tree, when it can see the folder. */
   lookupTitle: (id: string | null) => string | null;
   onJump: (destination: CreateDestination) => void;
   onCreate: (destination: CreateDestination) => void;
 }) {
-  const rowRef = useRef<HTMLDivElement | null>(null);
-  const openTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Anchor rect captured when the flyout opens (never read during render).
-  const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null);
-
-  const clearTimers = useCallback(() => {
-    if (openTimerRef.current) clearTimeout(openTimerRef.current);
-    if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
-    openTimerRef.current = null;
-    closeTimerRef.current = null;
-  }, []);
-  useEffect(() => clearTimers, [clearTimers]);
-
-  const openNow = useCallback(() => {
-    clearTimers();
-    setAnchorRect(rowRef.current?.getBoundingClientRect() ?? null);
-    onOpenChange(true);
-  }, [clearTimers, onOpenChange]);
-  const closeNow = useCallback(() => {
-    clearTimers();
-    onOpenChange(false);
-  }, [clearTimers, onOpenChange]);
-  const scheduleOpen = useCallback(() => {
-    if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
-    closeTimerRef.current = null;
-    if (open || openTimerRef.current) return;
-    openTimerRef.current = setTimeout(openNow, DESTINATIONS_OPEN_DELAY_MS);
-  }, [open, openNow]);
-  const scheduleClose = useCallback(() => {
-    if (openTimerRef.current) clearTimeout(openTimerRef.current);
-    openTimerRef.current = null;
-    if (!open) return;
-    if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
-    closeTimerRef.current = setTimeout(closeNow, DESTINATIONS_CLOSE_DELAY_MS);
-  }, [open, closeNow]);
-  const cancelClose = useCallback(() => {
-    if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
-    closeTimerRef.current = null;
-  }, []);
-
-  const flyoutPos = useMemo(() => {
-    if (!anchorRect) return null;
-    return calculateMenuPosition({
-      triggerPosition: { x: anchorRect.right - 6, y: anchorRect.top },
-      menuDimensions: {
-        width: DESTINATIONS_FLYOUT_WIDTH,
-        height: DESTINATIONS_FLYOUT_MAX_HEIGHT,
-      },
-      preferredPlacementX: "right",
-      preferredPlacementY: "bottom",
-    });
-  }, [anchorRect]);
-
   const latest = destinations[0];
   const titleOf = (d: CreateDestination) =>
     d.id === null ? "Root" : (lookupTitle(d.id) ?? d.title);
@@ -1368,122 +1301,85 @@ function RecentDestinations({
 
   return (
     <div className="border-b border-black/5 dark:border-white/5 pb-1 mb-1">
-      {/* Summary row: the LATEST destination, one click from creating there;
-          rest on it to unfold the others. */}
+      {/* Summary row: the LATEST destination, one click from creating there. */}
       <div
-        ref={rowRef}
-        onPointerEnter={(e) => {
-          if (e.pointerType === "touch") return;
-          scheduleOpen();
-        }}
-        onPointerLeave={(e) => {
-          if (e.pointerType === "touch") return;
-          scheduleClose();
-        }}
         className={cn(
           "group flex w-full items-center gap-2 py-1.5 pl-3 pr-2 text-xs transition-colors hover:bg-black/[0.04] dark:hover:bg-white/5",
-          open && "bg-black/[0.04] dark:bg-white/[0.06]",
+          open && "bg-black/[0.03] dark:bg-white/[0.04]",
         )}
       >
         <button
           type="button"
-          onClick={() => (open ? closeNow() : openNow())}
-          aria-haspopup="menu"
+          onClick={onToggle}
           aria-expanded={open}
-          title={`Where you last created: ${titleOf(latest)} — more on hover`}
+          title={
+            open
+              ? "Hide recent destinations"
+              : `Where you last created: ${titleOf(latest)} — click for more`
+          }
           className="flex min-w-0 flex-1 items-center gap-2 text-left outline-none"
         >
+          {open ? (
+            <ChevronDown className="h-3 w-3 shrink-0 text-gray-400" />
+          ) : (
+            <ChevronRight className="h-3 w-3 shrink-0 text-gray-400" />
+          )}
           <FolderInput className="h-3.5 w-3.5 shrink-0 text-emerald-600/80 dark:text-emerald-400/80" />
           <span className="flex min-w-0 flex-col leading-tight">
             <span className="text-[10px] uppercase tracking-wider text-gray-500 font-medium">
               Recent destinations
             </span>
-            <span className="truncate text-gray-700 dark:text-gray-300">
-              {titleOf(latest)}
-              {pathOf(latest) ? (
-                <span className="ml-1 text-gray-400 dark:text-gray-500">
-                  · {pathOf(latest)}
-                </span>
-              ) : null}
-            </span>
+            {!open ? (
+              <span className="truncate text-gray-700 dark:text-gray-300">
+                {titleOf(latest)}
+                {pathOf(latest) ? (
+                  <span className="ml-1 text-gray-400 dark:text-gray-500">
+                    · {pathOf(latest)}
+                  </span>
+                ) : null}
+              </span>
+            ) : null}
           </span>
-          {destinations.length > 1 ? (
-            <ChevronRight
-              className={cn(
-                "ml-auto h-3 w-3 shrink-0 text-gray-400 transition-transform",
-                open && "translate-x-0.5",
-              )}
-            />
-          ) : null}
         </button>
-        <QuickCreateButton
-          noun={noun}
-          title={`+ New ${noun} in ${titleOf(latest)}`}
-          onClick={() => onCreate(latest)}
-          className="ml-0"
-        />
+        {!open ? (
+          <QuickCreateButton
+            noun={noun}
+            title={`+ New ${noun} in ${titleOf(latest)}`}
+            onClick={() => onCreate(latest)}
+          />
+        ) : null}
       </div>
 
-      {open && flyoutPos
-        ? createPortal(
+      {open
+        ? destinations.map((d) => (
             <div
-              data-picker-flyout
-              role="menu"
-              onPointerEnter={cancelClose}
-              onPointerLeave={(e) => {
-                if (e.pointerType === "touch") return;
-                scheduleClose();
-              }}
-              style={{
-                position: "fixed",
-                left: flyoutPos.x,
-                top: flyoutPos.y,
-                width: DESTINATIONS_FLYOUT_WIDTH,
-                maxHeight: flyoutPos.maxHeight ?? DESTINATIONS_FLYOUT_MAX_HEIGHT,
-              }}
-              className="z-[140] flex flex-col overflow-y-auto rounded-lg border border-black/10 bg-white py-1 shadow-xl dark:border-white/10 dark:bg-[#1a1a1a]"
+              key={d.id ?? "root"}
+              className="group flex w-full items-center gap-2 py-1.5 pr-2 pl-3 text-xs transition-colors hover:bg-black/[0.04] dark:hover:bg-white/5"
             >
-              <div className="px-3 pt-1 pb-0.5 text-[10px] font-medium uppercase tracking-wider text-gray-500">
-                Where you created recently
-              </div>
-              {destinations.map((d) => (
-                <div
-                  key={d.id ?? "root"}
-                  role="menuitem"
-                  className="group flex w-full items-center gap-2 py-1.5 pl-3 pr-2 text-xs transition-colors hover:bg-black/[0.04] dark:hover:bg-white/5"
-                >
-                  <button
-                    type="button"
-                    onClick={() => {
-                      closeNow();
-                      onJump(d);
-                    }}
-                    title="Go there in the tree"
-                    className="flex min-w-0 flex-1 items-center gap-2 text-left"
-                  >
-                    {destIcon(d, "h-3.5 w-3.5 shrink-0 text-yellow-500/80")}
-                    <span className="truncate text-gray-700 dark:text-gray-300">
-                      {titleOf(d)}
-                    </span>
-                    {pathOf(d) ? (
-                      <span className="truncate text-[10px] text-gray-400 dark:text-gray-500">
-                        {pathOf(d)}
-                      </span>
-                    ) : null}
-                  </button>
-                  <QuickCreateButton
-                    noun={noun}
-                    title={`+ New ${noun} in ${titleOf(d)}`}
-                    onClick={() => {
-                      closeNow();
-                      onCreate(d);
-                    }}
-                  />
-                </div>
-              ))}
-            </div>,
-            document.body,
-          )
+              <button
+                type="button"
+                onClick={() => onJump(d)}
+                title="Go there in the tree"
+                className="flex min-w-0 flex-1 items-center gap-2 text-left"
+              >
+                <span className="w-3 shrink-0" aria-hidden />
+                {destIcon(d, "h-3.5 w-3.5 shrink-0 text-yellow-500/80")}
+                <span className="truncate text-gray-700 dark:text-gray-300">
+                  {titleOf(d)}
+                </span>
+                {pathOf(d) ? (
+                  <span className="truncate text-[10px] text-gray-400 dark:text-gray-500">
+                    {pathOf(d)}
+                  </span>
+                ) : null}
+              </button>
+              <QuickCreateButton
+                noun={noun}
+                title={`+ New ${noun} in ${titleOf(d)}`}
+                onClick={() => onCreate(d)}
+              />
+            </div>
+          ))
         : null}
     </div>
   );
