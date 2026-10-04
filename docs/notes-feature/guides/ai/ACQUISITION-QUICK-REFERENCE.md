@@ -1,6 +1,6 @@
 # Acquisition quick reference
 
-**T6 of the AI 3.x roadmap, delivered slim (owner call, 2026-09-04):** the two artifacts that answer real questions — the tier/receipt table and the gate matrix — instead of a six-chapter walkthrough. Code anchors verified on `main` at writing time: `lib/domain/browser-extension/acquire-url.ts`, `lib/domain/ai/tools/read-page-in-browser.ts`, `open-tab-and-read.ts`, tool metadata's browser-tools note.
+**T6 of the AI 3.x roadmap, delivered slim (owner call, 2026-09-04):** the two artifacts that answer real questions — the tier/receipt table and the gate matrix — instead of a six-chapter walkthrough. Code anchors (re-verified on `main` 2026-10-04): `lib/domain/browser-extension/acquire-url.ts` (the ladder and `AcquireVia`), `lib/domain/ai/tools/read-page-in-browser.ts`, `open-tab-and-read.ts`, `lib/domain/ai/acquisition/search/tool.ts` (the app-run search backend), tool metadata's browser-tools note.
 
 ## The envelope (what every fetched page arrives as)
 
@@ -39,7 +39,16 @@ Corollaries proven in production (job-hunt smoke, 2026-09): a main-app run repor
 
 ## Acquisition conservatism (the cost rule)
 
-**LOCATE, then read; stop on acquire.** Search (`search_web`, BYOK app-executed, results arrive as `untrustedWebResults`) exists to *find* the one page you need — never crawl a site to discover it (the Greenhouse-crawl incident, 2026-09-02, is the cautionary tale; prompt guidance shipped the same day). Measurement of this rule in real runs is the one still-open §9.1 checkbox.
+**LOCATE, then read; stop on acquire.** Search exists to *find* the one page you need — never crawl a site to discover it (the Greenhouse-crawl incident, 2026-09-02, is the cautionary tale; prompt guidance shipped the same day). Measurement of this rule in real runs is still open in §9.1 (alongside model-role routing).
+
+Which service answers `search_web` (since PR #273):
+
+| Chat's model | Default | Per-chat override (Chat controls → Web search) |
+|---|---|---|
+| Has native search (Anthropic, OpenAI, Google, xAI) | The provider's own search, billed on the meter as `webSearch` | The user's search connection — Tavily, Brave, or OpenAI `gpt-5-search-api` — offered only when one exists |
+| No native search | The app-run backend when a search connection is configured; otherwise no `search_web` | — |
+
+App-run results arrive as `untrustedWebResults` (plus `untrustedAnswer` with citations and `searchCostUsd` from `gpt-5-search-api`), under the same `search_web` name, so it is repeat-guarded, refusable in the reserved tail, and priced by that service. The whole family is off when the user disables `search_web` in tool settings (`app/api/ai/chat/route.ts`, the native-search block). As with reads, the receipt tells you which path ran: a `providerTools` step means native, a sources list means the app backend.
 
 ## After acquisition: hydration in one paragraph
 

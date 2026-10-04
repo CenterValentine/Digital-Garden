@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-10-03
+last_updated: 2026-10-04
 ---
 
 # Sprint Backlog
@@ -285,6 +285,8 @@ The `/f/<token>` capability link (FilePayload.publicToken → 302 to a presigned
 ## Workspace layout: multi-tab last-writer-wins reverts D+D (2026-09-04; owner repro; lands with layout-intent "P4 live fan-in")
 
 **PARTIAL FIX SHIPPED (PR #210, merged 2026-09-04):** the null-base write path now returns `conflict` instead of blind-overwriting (a writer with no compare base never loaded what it overwrites) — the adopt-and-retry loop converges in one round. The remaining items below (writer recency for PRIMED-but-stale writers, URL-re-projection question) still ride the fan-in phase.
+
+**Since then (2026-10-04 review):** two later PRs fixed writers that produce this exact symptom, so the "Writer UNIDENTIFIED" item below may already be closed. Confirm on dev before ticking it. **PR #278** (merged 2026-10-03): concurrent `persistActiveWorkspace` calls shared one `baseUpdatedAt`. The server 409'd all but one, and the 409 branch adopted the stale row in **open** mode, re-applying the old arrangement. That is a revert *with* writes, i.e. a surface racing itself. Now there is one write in flight per workspace, and 409 adoption uses reconcile mode. **PR #282** (merged 2026-10-04): cold-load restore kept another workspace's tabs and fell back to Main. The settling diagnostic is now the tracer, not a DB diff: `localStorage.setItem("dg:trace:workspace", "1")`, drag, wait 30 s, `copy(window.__dgWorkspaceTrace)`. A `restoreContentWorkspace` with no `commit ← <user action>` before it names the writer.
 
 Owner report during the Release-4 smoke: split-pane tab D+D "repeatedly regressed/ignored" on dev; prod unaffected; hard refresh helps. Diagnosed, not fixed (the fix IS the planned live fan-in phase, not a drive-by):
 
