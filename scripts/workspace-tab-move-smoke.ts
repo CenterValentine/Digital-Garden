@@ -181,6 +181,30 @@ async function main() {
       content.id,
     );
 
+    console.log("\nvirtual extension tabs (reader:…) are refused, not thrown");
+    // A non-UUID in a @db.Uuid filter makes Prisma THROW (invalid input
+    // syntax for type uuid), not match nothing — so before the guard these
+    // were 500s, not 404s. The snapshot paths were fixed in PR #277; these two
+    // single-tab paths are the other way a reader tab id reaches Prisma.
+    for (const virtualId of ["reader:library", "reader:scripture/bofm"]) {
+      check(
+        `openWorkspaceTab refuses ${virtualId}`,
+        await openWorkspaceTab(ownerId, source.id, virtualId).then(
+          (r) => r,
+          (e: unknown) => `THREW: ${e instanceof Error ? e.message.split("\n")[0] : e}`,
+        ),
+        null,
+      );
+      check(
+        `moveWorkspaceTab refuses ${virtualId}`,
+        await moveWorkspaceTab(ownerId, target.id, virtualId, source.id).then(
+          (r) => r,
+          (e: unknown) => `THREW: ${e instanceof Error ? e.message.split("\n")[0] : e}`,
+        ),
+        null,
+      );
+    }
+
     console.log("\nopenWorkspaceTab (content sent from the tree)");
     const beforeOpen = await stamps();
     await new Promise((resolve) => setTimeout(resolve, 5));

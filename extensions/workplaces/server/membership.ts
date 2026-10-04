@@ -12,7 +12,7 @@
  * snapshot reconciles do not churn it.
  */
 
-import { onlyUuids } from "@/lib/domain/content/uuid";
+import { isUuid, onlyUuids } from "@/lib/domain/content/uuid";
 import { prisma } from "@/lib/database/client";
 import type { WorkspacePaneId } from "./types";
 
@@ -65,6 +65,9 @@ export async function openWorkspaceTab(
   contentId: string,
   affinity?: unknown,
 ) {
+  // A virtual extension tab (`reader:library`) is not content; handing its id
+  // to a @db.Uuid filter throws rather than matching nothing — see onlyUuids.
+  if (!isUuid(contentId)) return null;
   const workspace = await findOwnedActiveWorkspace(ownerId, workspaceId);
   if (!workspace) return null;
 
@@ -148,6 +151,7 @@ export async function moveWorkspaceTab(
   affinity?: unknown,
 ) {
   if (toWorkspaceId === fromWorkspaceId) return null;
+  if (!isUuid(contentId)) return null; // see openWorkspaceTab
   const [target, source, content] = await Promise.all([
     findOwnedActiveWorkspace(ownerId, toWorkspaceId),
     findOwnedActiveWorkspace(ownerId, fromWorkspaceId),
