@@ -35,6 +35,15 @@ The join duplication is fixed at its three sources (`lib/domain/collaboration/li
 
 ---
 
+## OCR paste — planned (2026-10-06, plan `OCR-PASTE-PLAN.md`)
+
+Decisions settled with the owner 2026-10-06; three PRs sequenced in the plan. Tesseract.js is already a dependency and already runs in the speed-reader; the work is lifting it into `lib/features/ocr/` and adding the surfaces.
+
+- [ ] **PR 1 — shared local engine + self-hosted assets** — `lib/features/ocr/`, `public/ocr/` copied at prebuild (never CDN code in the `/embed/panel` page: it is the trust-gated bridge to `chrome.debugger`), fast language pack (2 MB), one worker per page with 120 s idle termination, speed-reader rewired, `ocr:blocks:check` gate mutation-tested.
+- [ ] **PR 2 — paste an image as its text** — Cmd+Shift+V ("paste as text" extended to images; Shift tracked by the editor, not `view.input`), right-click image → "Extract text from image" / "Replace image with its text", clipboard "Paste text from image"; fix the existing Paste items to use `contextEditor` (they pick the first registered editor and can paste into the wrong pane).
+- [ ] **PR 3 — co-browse `read_screen`** — `co_browse_act` action that screenshots the BOUND tab via `Page.captureScreenshot` on the debugger session (not `captureVisibleTab`), OCRs it app-side after the bridge returns, answers as `untrustedWebContent`. Extension 5.5.0. Smoke on a backgrounded bound tab.
+- Deferred in the plan §4: `ai` engine behind `editor.ocrEngine`, full-page strips, OCR as an automatic read-ladder rung, multimodal tool output.
+
 ## Split Pane Placement — behaviour as a setting (2026-10-02, from `feat/open-into-opposite-pane`)
 
 Where content opened from the file tree lands in a split workspace is a
