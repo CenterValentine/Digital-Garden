@@ -1075,11 +1075,33 @@ console.log("\nthe sort menu: one level, a folder keeps it (source pins)");
     assert.ok(fileTree.includes("const shownData = useMemo(() => showKeptSorts(data, rootTreeSort ?? null), [data, rootTreeSort]);"));
     assert.ok(/expandReferences\(\s*shownData,/.test(fileTree));
   });
-  check("memory lives on folders only — never in user settings; no checkmarks, no focus ring", () => {
+  check("a folder's sort lives on the folder (never in user settings); no checkmarks, no focus ring", () => {
     assert.equal(validation.includes("fileTreeSort"), false);
-    assert.equal(/useSettingsStore|DropdownMenuCheckboxItem/.test(menu), false);
+    assert.equal(/DropdownMenuCheckboxItem/.test(menu), false);
     assert.ok(menu.includes("onCloseAutoFocus={(event) => event.preventDefault()}"));
     assert.ok(sidebar.includes("remembers: !virtual && serverParentId !== null,"));
+  });
+  check("a shortcut's own sort is a view-only setting: it never posts a reorder to the folder", () => {
+    const runShortcut = menu.slice(menu.indexOf("const runShortcut = async"), menu.indexOf("const run = async"));
+    assert.ok(runShortcut.includes("await settings.setUISettings({ shortcutSorts: after });"));
+    assert.equal(runShortcut.includes("postReorder("), false);
+    assert.ok(menu.includes("if (isShortcut) return runShortcut(mode);"));
+    assert.ok(/shortcutSorts: z\s*\.record\(/.test(validation));
+  });
+  check("the mirror applies a shortcut's own sort; selecting a shortcut sorts THAT shortcut", () => {
+    assert.ok(/hiddenNestedShortcutIds,\s*0,\s*shortcutSorts,\s*\);/.test(fileTree));
+    assert.ok(sidebar.includes('selectedRow && selectedRow.contentType === "shortcut" && isFolderLike(selectedRow)'));
+    assert.ok(sidebar.includes("kept: shortcutSorts?.[selectedRow.id] ?? null,"));
+    assert.ok(menu.includes("const target = useTreeTargetStore((state) => state.sortTarget);"));
+  });
+  check("a row inside a shortcut targets the shortcut for '+' and sort, not the top level", () => {
+    assert.ok(sidebar.includes("selectedIds: useTreeStateStore.getState().selectedIds.map(targetRowOfSelection),"));
+  });
+  check("reordering inside a sorted shortcut turns its sort off (restored if the move fails)", () => {
+    const move = sliceBetween("const handleMove = async", "const handleRename");
+    assert.ok(move.includes("dropRowId && dropRowId !== parentId && shortcutSorts?.[dropRowId] &&"));
+    assert.ok(move.includes("void useSettingsStore.getState().setUISettings({ shortcutSorts: without });"));
+    assert.equal((move.match(/restoreShortcutSort\(\);/g) ?? []).length, 2);
   });
   check("a kept sort shows as its glyph in light gold in the header; Stop sorting forgets it", () => {
     assert.ok(menu.includes("<SortGlyph kept={kept} className=\"h-4 w-4\" />"));
@@ -1096,11 +1118,10 @@ console.log("\nthe sort menu: one level, a folder keeps it (source pins)");
     assert.ok((menu.match(/\$\{label\}/g) ?? []).length >= 6);
   });
   check("both header buttons name their target, published by the tree as the selection changes", () => {
-    assert.ok(menu.includes("const target = useTreeTargetStore((state) => state.target);"));
     assert.ok(add.includes("? `Add a file or folder to ${addTarget.label}`"));
     assert.ok(sidebar.includes("const treeParentId = resolveTreeParent(null, treeData, scopedRootParentId);"));
-    assert.ok(sidebar.includes("useTreeTargetStore.getState().setTarget({"));
-    assert.ok(sidebar.includes("}, [treeData, treeSelectedIds, scopedRootParentId, scopedRootTitle, rootTreeSort]);"));
+    assert.ok(sidebar.includes("useTreeTargetStore.getState().setTargets({ addTarget, sortTarget });"));
+    assert.ok(sidebar.includes("}, [treeData, treeSelectedIds, scopedRootParentId, scopedRootTitle, rootTreeSort, shortcutSorts]);"));
   });
   check("a sort offers Undo, which posts the previous numbers (and sort) back", () => {
     assert.ok(menu.includes("restore: previous,"));

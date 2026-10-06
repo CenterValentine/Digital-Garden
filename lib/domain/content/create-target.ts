@@ -101,6 +101,13 @@ export function resolveServerCreateParent(explicitParentId: string | null): stri
  * the tree changes, so the header can name it and show its sort.
  */
 export interface TreeLevelTarget {
+  /**
+   * A folder's items (written to the folder), or a SHORTCUT's view of its
+   * folder (a view-only sort kept in user settings; never touches the folder).
+   */
+  kind: "folder" | "shortcut";
+  /** For `kind: "shortcut"`, the shortcut's id. */
+  shortcutId?: string;
   /** Server-space parent id (null = the vault's top level). */
   serverParentId: string | null;
   /** How to name it to the user: `“Career Pathways”`, or "the top level". */

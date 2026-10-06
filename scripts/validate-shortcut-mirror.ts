@@ -32,6 +32,7 @@ import {
   contentIdOfRowId,
   shortcutIdOfMirrorRowId,
   deleteTargetsOfRowIds,
+  targetRowOfSelection,
   SHORTCUT_MIRROR_PREFIX,
   MAX_MIRROR_DEPTH,
 } from "@/lib/features/content/shortcut-mirror";
@@ -563,11 +564,39 @@ function findRow(nodes: TreeNode[], id: string): TreeNode | null {
   );
 }
 
+// ── A shortcut's OWN sort (view-only; never the folder's) ───────────────────
+// Owner, 2026-10-06: a shortcut can keep its own sort, kept in user settings,
+// that changes only how the shortcut shows its folder.
+{
+  const folder = node("lib", {
+    contentType: "folder",
+    children: [node("zeta"), node("alpha"), node("sub", { contentType: "folder", children: [node("y"), node("x")] })],
+  });
+  const tree = [folder, node("home", { contentType: "folder", children: [shortcutTo("sc2", "lib")] })];
+  const index = buildTreeIndex(tree);
+  const mirrorOf = (sorts: Record<string, { name?: "asc" | "desc"; float?: "folders" | "nested" }>, expanded: string[]) => {
+    const out = expandShortcutMirrors(tree, new Set(expanded), index, new Set(), 0, sorts);
+    return findRow(out, "sc2")?.children ?? [];
+  };
+  const realIds = (rows: TreeNode[]) => rows.map((row) => row.mirrorOf).join(",");
+
+  check("without its own sort, a shortcut shows its folder's order", realIds(mirrorOf({}, ["sc2"])) === "zeta,alpha,sub", realIds(mirrorOf({}, ["sc2"])));
+  check("with its own sort, the shortcut shows it — the folder's data is untouched", realIds(mirrorOf({ sc2: { name: "asc" } }, ["sc2"])) === "alpha,sub,zeta" && folder.children.map((c) => c.id).join() === "zeta,alpha,sub", realIds(mirrorOf({ sc2: { name: "asc" } }, ["sc2"])));
+  check("a float works the same way", realIds(mirrorOf({ sc2: { float: "folders" } }, ["sc2"])) === "sub,zeta,alpha", realIds(mirrorOf({ sc2: { float: "folders" } }, ["sc2"])));
+  // A–Z, so a sort leaking into the sub-folder would turn its "y,x" into "x,y".
+  const subRow = mirrorOf({ sc2: { name: "asc" } }, ["sc2", shortcutMirrorId("sc2", "sub")]).find((row) => row.mirrorOf === "sub");
+  check("only the shortcut's own level: a mirrored sub-folder keeps its folder's order", realIds(subRow?.children ?? []) === "y,x", realIds(subRow?.children ?? []));
+
+  check("a selected row inside a shortcut stands for the shortcut", targetRowOfSelection(shortcutMirrorId(shortcutMirrorId("sc2", "sub"), "x")) === "sc2");
+  check("a selected window row stands for its note", targetRowOfSelection(windowReferenceRowId("host-note", "t")) === "host-note");
+  check("any other selection stands for itself", targetRowOfSelection("plain") === "plain");
+}
+
 if (failures > 0) {
   console.error(`\nshortcut-mirror:check — ${failures} check(s) failed.\n`);
   process.exit(1);
 }
 
 console.log(
-  "shortcut-mirror:check — OK (identity, mirroring, broken targets, laziness, cycles, drop forwarding, nested-shortcut hiding, out-of-view targets, row actions, view reach)",
+  "shortcut-mirror:check — OK (identity, mirroring, broken targets, laziness, cycles, drop forwarding, nested-shortcut hiding, out-of-view targets, row actions, view reach, shortcut sorts)",
 );

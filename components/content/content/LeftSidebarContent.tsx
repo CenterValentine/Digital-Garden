@@ -44,11 +44,13 @@ import {
   registerCreateTargetResolver,
   resolveCreateParent,
   toServerParent,
+  type TreeLevelTarget,
 } from "@/lib/domain/content/create-target";
 import {
   deleteTargetsOfRowIds,
   resolveDropForwardTarget,
   shortcutIdOfMirrorRowId,
+  targetRowOfSelection,
 } from "@/lib/features/content/shortcut-mirror";
 import { ContentTreePicker } from "@/components/content/pickers/ContentTreePicker";
 
@@ -270,7 +272,10 @@ function resolveTreeParent(
 ): string | null {
   return resolveCreateParent({
     explicitParentId,
-    selectedIds: useTreeStateStore.getState().selectedIds,
+    // A row inside a shortcut (or a note's window row) stands for its
+    // shortcut (or note): its own id names nothing in the tree data, and used
+    // to fall through to the top level.
+    selectedIds: useTreeStateStore.getState().selectedIds.map(targetRowOfSelection),
     findNode: (id) => (treeData ? findTreeNodeById(treeData, id) : null),
     viewRootId,
   });
@@ -568,6 +573,7 @@ export function LeftSidebarContent({
   // …and publishes it for the header's "+" and sort menu, which name it in
   // their tooltips and show the sort it keeps (state/tree-target-store.ts).
   const treeSelectedIds = useTreeStateStore((state) => state.selectedIds);
+  const shortcutSorts = useSettingsStore((state) => state.ui?.shortcutSorts);
   useEffect(() => {
     const treeParentId = resolveTreeParent(null, treeData, scopedRootParentId);
     const virtual =
@@ -578,7 +584,8 @@ export function LeftSidebarContent({
     const holder = treeParentId && treeData ? findTreeNodeById(treeData, treeParentId) : null;
     const level = (treeParentId ? holder?.children : treeData) ?? [];
     const serverParentId = toServerParent(treeParentId, scopedRootParentId);
-    useTreeTargetStore.getState().setTarget({
+    const addTarget: TreeLevelTarget = {
+      kind: "folder",
       serverParentId,
       label: holder
         ? `“${holder.title}”`
@@ -598,9 +605,28 @@ export function LeftSidebarContent({
           folderLike: isFolderLike(row),
           nested: (row.children?.length ?? 0) > 0,
         })),
-    });
-  }, [treeData, treeSelectedIds, scopedRootParentId, scopedRootTitle, rootTreeSort]);
-  useEffect(() => () => useTreeTargetStore.getState().setTarget(null), []);
+    };
+    // A shortcut to a folder selected (or a row inside one): the sort menu
+    // sorts THAT SHORTCUT's view — kept in user settings, never written to
+    // the folder (owner, 2026-10-06). "+" still adds beside the shortcut.
+    const selected = treeSelectedIds.length === 1 ? targetRowOfSelection(treeSelectedIds[0]) : null;
+    const selectedRow = selected && treeData ? findTreeNodeById(treeData, selected) : null;
+    const sortTarget: TreeLevelTarget =
+      selectedRow && selectedRow.contentType === "shortcut" && isFolderLike(selectedRow)
+        ? {
+            kind: "shortcut",
+            shortcutId: selectedRow.id,
+            serverParentId: null,
+            label: `shortcut “${selectedRow.title}”`,
+            sortable: true,
+            remembers: true,
+            kept: shortcutSorts?.[selectedRow.id] ?? null,
+            rows: [],
+          }
+        : addTarget;
+    useTreeTargetStore.getState().setTargets({ addTarget, sortTarget });
+  }, [treeData, treeSelectedIds, scopedRootParentId, scopedRootTitle, rootTreeSort, shortcutSorts]);
+  useEffect(() => () => useTreeTargetStore.getState().setTargets({ addTarget: null, sortTarget: null }), []);
 
   const rootDropTarget = useMemo(
     () =>
@@ -1345,6 +1371,9 @@ export function LeftSidebarContent({
     // destination here, before anything optimistic or networked happens, is
     // what keeps the rule "nothing is ever stored under a shortcut" true
     // without the rest of the move path needing to know shortcuts exist.
+    // The row the drop landed on, before forwarding — a shortcut's own row
+    // when the drop went among its contents.
+    const dropRowId = parentId;
     if (parentId) {
       const dropRow = findTreeNodeById(originalTree, parentId);
       const forwardTo = dropRow ? resolveDropForwardTarget(dropRow) : null;
@@ -1485,6 +1514,28 @@ export function LeftSidebarContent({
             );
           });
     if (everyDragIsNoop) return;
+
+    // Reordering inside a shortcut that keeps its OWN sort (a view-only
+    // setting): the shortcut has no hand-set order of its own, so the drop
+    // goes to its folder like any shortcut drag, and the shortcut's sort
+    // turns off — your order wins, as in a sorted folder. Undone if the
+    // move fails.
+    const sortedShortcutId =
+      dropRowId && dropRowId !== parentId && shortcutSorts?.[dropRowId] &&
+      dragged.every(({ id }) => positions.get(id)?.currentParentId === parentId)
+        ? dropRowId
+        : null;
+    const shortcutSortsBefore = shortcutSorts;
+    if (sortedShortcutId && shortcutSortsBefore) {
+      const without = { ...shortcutSortsBefore };
+      delete without[sortedShortcutId];
+      void useSettingsStore.getState().setUISettings({ shortcutSorts: without });
+    }
+    const restoreShortcutSort = () => {
+      if (sortedShortcutId && shortcutSortsBefore) {
+        void useSettingsStore.getState().setUISettings({ shortcutSorts: shortcutSortsBefore });
+      }
+    };
 
     beginTreeEdit();
 
@@ -1643,6 +1694,7 @@ export function LeftSidebarContent({
         setTreeData(originalTree);
         setShortcutTargetTrees(targetTreesBefore);
         setRootTreeSort(rootTreeSortBefore);
+        restoreShortcutSort();
         const desc =
           failures.length === dragged.length
             ? failures[0].message
@@ -1664,6 +1716,13 @@ export function LeftSidebarContent({
       if (peopleDragged.length > 0) {
         window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
         window.dispatchEvent(new CustomEvent("dg:people-refresh"));
+      }
+
+      if (sortedShortcutId) {
+        const shortcutTitle = findTreeNodeById(originalTree, sortedShortcutId)?.title ?? "this shortcut";
+        toast(`Sorting turned off for shortcut “${shortcutTitle}”`, {
+          description: "Your drop went to its folder, so the shortcut now shows the folder's own order.",
+        });
       }
 
       if (sortCleared) {
@@ -1705,6 +1764,7 @@ export function LeftSidebarContent({
       setTreeData(originalTree);
       setShortcutTargetTrees(targetTreesBefore);
       setRootTreeSort(rootTreeSortBefore);
+      restoreShortcutSort();
 
       // Show user-friendly error notification
       const errorMessage = err instanceof Error ? err.message : "An unexpected error occurred";

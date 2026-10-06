@@ -31,12 +31,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/client/ui/dropdown-menu";
 import {
+  nextKeptSort,
   nextNameDirection,
   type KeptSort,
   type LevelSortMode,
   type NameDirection,
 } from "@/lib/domain/content/sibling-order";
 import { useTreeTargetStore } from "@/state/tree-target-store";
+import { useSettingsStore } from "@/state/settings-store";
 
 interface FileTreeSortMenuProps {
   /** The header row's idle button tone. */
@@ -92,7 +94,9 @@ async function postReorder(body: Record<string, unknown>) {
 }
 
 export function FileTreeSortMenu({ className }: FileTreeSortMenuProps) {
-  const target = useTreeTargetStore((state) => state.target);
+  const target = useTreeTargetStore((state) => state.sortTarget);
+  // A shortcut's own sort only changes how the shortcut shows its folder.
+  const isShortcut = target?.kind === "shortcut";
   const label = target?.label ?? "this folder";
   const kept = target?.kept ?? null;
   const remembers = target?.remembers ?? false;
@@ -107,14 +111,51 @@ export function FileTreeSortMenu({ className }: FileTreeSortMenuProps) {
     ? "Sort the items in a folder"
     : !target.sortable
       ? `${label} can't be sorted`
-      : kept
-        ? `${label} is kept sorted: ${describeKept(kept)} — new items take their place. Click to change.`
-        : remembers
-          ? `Sort ${label} — only the items directly inside it`
-          : `Sort ${label} once — the top level can't keep a sort`;
+      : isShortcut
+        ? kept
+          ? `${label} shows its folder sorted: ${describeKept(kept)} — the folder itself isn't touched. Click to change.`
+          : `Sort ${label} — only how this shortcut shows its folder; the folder itself isn't touched`
+        : kept
+          ? `${label} is kept sorted: ${describeKept(kept)} — new items take their place. Click to change.`
+          : remembers
+            ? `Sort ${label} — only the items directly inside it`
+            : `Sort ${label} once — the top level can't keep a sort`;
+
+  /** A shortcut's sort: a view-only setting (`ui.shortcutSorts`), never written to its folder. */
+  const runShortcut = async (mode: LevelSortMode | "stop") => {
+    const shortcutId = target?.shortcutId;
+    if (!shortcutId) return;
+    const where = label;
+    const settings = useSettingsStore.getState();
+    const before = { ...(settings.ui?.shortcutSorts ?? {}) };
+    const previous = before[shortcutId] ?? null;
+    const next = nextKeptSort(previous, mode);
+    const after = { ...before };
+    if (next) after[shortcutId] = next;
+    else delete after[shortcutId];
+    try {
+      await settings.setUISettings({ shortcutSorts: after });
+      const title = where.charAt(0).toUpperCase() + where.slice(1);
+      toast.success(next ? `${title} shows its folder sorted: ${describeKept(next)}` : `${title} follows its folder's order again`, {
+        description: "Only how this shortcut shows its folder changed — the folder itself isn't touched.",
+        action: {
+          label: "Undo",
+          onClick: () => {
+            const current = { ...(useSettingsStore.getState().ui?.shortcutSorts ?? {}) };
+            if (previous) current[shortcutId] = previous;
+            else delete current[shortcutId];
+            void useSettingsStore.getState().setUISettings({ shortcutSorts: current });
+          },
+        },
+      });
+    } catch {
+      toast.error("Couldn't sort the shortcut");
+    }
+  };
 
   const run = async (mode: LevelSortMode | "stop") => {
     if (!target || !canSort) return;
+    if (isShortcut) return runShortcut(mode);
     const { serverParentId, label: where } = target;
     try {
       const result = await postReorder({ parentId: serverParentId, mode });
@@ -163,8 +204,11 @@ export function FileTreeSortMenu({ className }: FileTreeSortMenuProps) {
     }
   };
 
-  const scope = "Only this level is sorted; what's inside its folders isn't touched.";
-  const keeps = remembers ? "It stays sorted as items arrive." : "The top level sorts once.";
+  const scope = isShortcut
+    ? "Only this shortcut's view changes — the folder keeps its own order."
+    : "Only this level is sorted; what's inside its folders isn't touched.";
+  const keeps = isShortcut ? "" : remembers ? "It stays sorted as items arrive." : "The top level sorts once.";
+  const tail = [keeps, scope].filter(Boolean).join(" ");
 
   return (
     <DropdownMenu>
@@ -190,7 +234,7 @@ export function FileTreeSortMenu({ className }: FileTreeSortMenuProps) {
           title={
             kept?.float === "folders"
               ? `On — the folders in ${label} stay on top. Choose it again to turn it off.`
-              : `Moves the folders in ${label} to the top, each part keeping its order. ${keeps} ${scope}`
+              : `Moves the folders in ${label} to the top, each part keeping its order. ${tail}`
           }
         >
           <FolderUp />
@@ -204,7 +248,7 @@ export function FileTreeSortMenu({ className }: FileTreeSortMenuProps) {
           title={
             kept?.float === "nested"
               ? `On — items in ${label} that hold other items stay on top. Choose it again to turn it off.`
-              : `Moves the items in ${label} that hold other items — folders with contents, notes with sub-pages — to the top, each part keeping its order. ${keeps} ${scope}`
+              : `Moves the items in ${label} that hold other items — folders with contents, notes with sub-pages — to the top, each part keeping its order. ${tail}`
           }
         >
           <ListTree />
@@ -215,7 +259,7 @@ export function FileTreeSortMenu({ className }: FileTreeSortMenuProps) {
           disabled={!canSort}
           className={kept?.name ? ACTIVE_ITEM : undefined}
           onSelect={() => void run("name")}
-          title={`Sorts ${label} ${nameNext === "asc" ? "A–Z (0–9 first, numbers by value)" : "Z–A"}; choose it again to flip. Floated items stay on top, each part sorted. ${keeps} ${scope}`}
+          title={`Sorts ${label} ${nameNext === "asc" ? "A–Z (0–9 first, numbers by value)" : "Z–A"}; choose it again to flip. Floated items stay on top, each part sorted. ${tail}`}
         >
           {nameNext === "asc" ? <ArrowDownAZ /> : <ArrowDownZA />}
           Name
@@ -228,7 +272,11 @@ export function FileTreeSortMenu({ className }: FileTreeSortMenuProps) {
             <DropdownMenuSeparator />
             <DropdownMenuItem
               onSelect={() => void run("stop")}
-              title={`Forget ${label}'s sort. Its items stay where they are now; new ones land at the top again.`}
+              title={
+                isShortcut
+                  ? `${label} goes back to showing its folder's own order.`
+                  : `Forget ${label}'s sort. Its items stay where they are now; new ones land at the top again.`
+              }
             >
               <X />
               Stop sorting

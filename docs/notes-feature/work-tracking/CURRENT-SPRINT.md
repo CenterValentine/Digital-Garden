@@ -12,7 +12,7 @@ last_updated: 2026-05-13
 ## October 5, 2026 — The file tree stops flashing; deleting is instant; rows keep their order; view shortcuts show their folder and act on it safely
 
 **Tree**: worktree `.claude/worktrees/smooth-delete`, branch `fix/smooth-delete` (off `origin/main` at `49b94490`)
-**Status**: typecheck / lint 151 (0 errors, none new) / `tree:smooth:check` 152 (new, in the quality workflow) / `shortcut-mirror:check` (out-of-view cases, row actions, view reach) / tree + workspace gates / `pnpm build` green; no schema, TipTap or browser-extension change → no Hocuspocus redeploy. Owner browser smoke pending.
+**Status**: typecheck / lint 151 (0 errors, none new) / `tree:smooth:check` 156 (new, in the quality workflow) / `shortcut-mirror:check` (out-of-view cases, row actions, view reach) / tree + workspace gates / `pnpm build` green; no schema, TipTap or browser-extension change → no Hocuspocus redeploy. Owner browser smoke pending.
 
 ### Shipped
 - **Skeleton = a scope's first load only** (`tree-refresh.ts`): every refresh of a tree already on screen is quiet — covers create, duplicate, links, uploads, folder view, the header refresh and all `dg:tree-refresh` dispatchers. Stale-scope responses are dropped.
@@ -27,6 +27,7 @@ last_updated: 2026-05-13
 - **Every arriving row lands deliberately** (`slotForArrival` + `sibling-slot.ts`, under the same per-list lock): uploads at the top in the order picked, referenced content appended; the Folder assistant at the top in order, with Undo restoring the old place; deduped bookmarks re-filed get the appended slot; Studio outputs newest-first.
 - **Sort menu** (beside + in the tree header): **Float folders**, **Float nested**, **Name** (A–Z ↔ Z–A), **Stop sorting** — for the ONE folder the tree targets (the same one + adds to); nothing nested touched. **A folder remembers its sort and stays sorted** (arrivals and renames take their place; a drag inside it turns the sort off, with a toast); the header icon shows the kept sort's glyph in light gold. The vault's top level sorts once. Undo on every sort. Both header buttons' tooltips name the target.
 - **Referenced-items chip**: its above/below arrow shows only while the referenced items are on screen (and, as before, only on a row that also has sub-items to place them against).
+- **A shortcut can keep its own sort, view-only**: selecting a shortcut (or a row in one) makes the sort menu sort that shortcut's view — kept in user settings, never written to its folder; without one, a shortcut follows its folder's order. Rows inside a shortcut now target the shortcut for "+" and sort (they fell to the top level).
 - **Moves wait out a slow database** (locked transactions get 15 s to start, 30 s to run, not Prisma's 5 s), and **a shortcut can't trick a folder into itself**: drops are checked by real ids, so dragging a folder a shortcut shows into its own sub-folder is refused before release.
 
 ### Smoke checklist (owner)
@@ -74,6 +75,10 @@ last_updated: 2026-05-13
 42. Check the sort menu, glyph and tooltips in light and dark mode → readable, matching the app's other menus.
 43. Drag an item OUT of an expanded shortcut into a folder of your tree → it moves there (and is gone from the shortcut's folder).
 44. Put a shortcut inside one of the sub-folders of the folder it points at (A/B/C with a shortcut in C → A); expand it, drag the mirrored B onto the real C → no drop line, nothing is sent (C is inside B).
+45. Select a shortcut to a folder → the sort icon's tooltip says "Sort shortcut “…”"; choose Name → the shortcut's contents sort A–Z and the icon shows the A→Z glyph; open the real folder → its order is unchanged.
+46. Sort the real folder (e.g. Float folders) with the shortcut NOT sorted → the shortcut shows the new order at once; give the shortcut its own sort → it keeps its own order regardless.
+47. Select a row inside the shortcut → "+" and the sort both name the shortcut's targets (no longer "the top level"); press + → the new item lands beside the shortcut, not at the top level.
+48. With the shortcut sorted, drag one of its rows to a new spot inside it → a toast says sorting is off for that shortcut; the row lands there and the shortcut shows the folder's own order.
 
 ## October 4, 2026 — Coming back lands you where you were (workspace cold-load restore)
 

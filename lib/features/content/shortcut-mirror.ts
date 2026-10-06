@@ -33,6 +33,7 @@
  * in ./reference-group, including its identity contract.
  */
 import type { TreeNode } from "@/lib/domain/content/types";
+import { applyKeptSort, isFolderLike, type KeptSort } from "@/lib/domain/content/sibling-order";
 import { WINDOW_REFERENCE_PREFIX } from "./window-reference";
 
 /** Namespaced so a mirror row id can never collide with a ContentNode uuid. */
@@ -191,6 +192,8 @@ function mirrorChildrenOf(
   expandedIds: Set<string>,
   hideNested: boolean,
   depth: number,
+  /** The shortcut's OWN sort, for its top level only (null = the folder's order). */
+  ownSort: KeptSort | null = null,
 ): TreeNode[] {
   if (depth > MAX_MIRROR_DEPTH) return [];
   const source = index.get(sourceId);
@@ -200,9 +203,25 @@ function mirrorChildrenOf(
   // shortcut can surface more shortcuts, each expanding into another mirror.
   // Legitimate, but noisy, and it is the shape that puts a cycle one click
   // away. Hiding them is per-shortcut and opt-in.
-  const sourceChildren = (source.children ?? []).filter(
+  const shown = (source.children ?? []).filter(
     (child) => !(hideNested && child.contentType === "shortcut"),
   );
+  // A shortcut can keep its own sort (owner, 2026-10-06): it changes how THIS
+  // shortcut shows the folder, never the folder. Without one, the shortcut
+  // follows the folder's order — including a sort the folder keeps.
+  const sourceChildren = ownSort
+    ? applyKeptSort(
+        shown.map((child) => ({
+          id: child.id,
+          title: child.title,
+          displayOrder: child.displayOrder ?? 0,
+          folderLike: isFolderLike(child),
+          nested: (child.children?.length ?? 0) > 0,
+          child,
+        })),
+        ownSort,
+      ).map((row) => row.child)
+    : shown;
   return sourceChildren.map((child, i) => {
     const row = toMirrorRow(child, parentRowId, i, sourceChildren.length);
     // Only descend into levels the user has actually opened — this is what
@@ -239,6 +258,8 @@ export function expandShortcutMirrors(
   index: Map<string, TreeNode>,
   hiddenNestedShortcutIds: Set<string> = new Set(),
   depth = 0,
+  /** Shortcuts' own sorts, by shortcut id (user settings `ui.shortcutSorts`). */
+  shortcutSorts: Readonly<Record<string, KeptSort>> = {},
 ): TreeNode[] {
   let changed = false;
 
@@ -254,6 +275,7 @@ export function expandShortcutMirrors(
       index,
       hiddenNestedShortcutIds,
       depth + 1,
+      shortcutSorts,
     );
 
     if (!shouldMirror) {
@@ -269,6 +291,7 @@ export function expandShortcutMirrors(
       expandedIds,
       hiddenNestedShortcutIds.has(node.id),
       depth + 1,
+      shortcutSorts[node.id] ?? null,
     );
     if (mirrored.length === 0 && nextChildren === children) return node;
 
@@ -297,4 +320,21 @@ export function resolveDropForwardTarget(node: TreeNode): string | null {
     return node.contentType === "folder" ? (node.mirrorOf ?? null) : null;
   }
   return mirrorableTargetId(node);
+}
+
+/**
+ * The tree row a SELECTION stands for when deciding where "+" adds and what
+ * the sort menu sorts. A row inside a shortcut stands for that shortcut (the
+ * head of its path); a note's window row stands for its note. Their own ids
+ * name nothing the tree's data holds, so they used to fall through to "the
+ * top level" — the "+" tooltip named one place and the sort another.
+ */
+export function targetRowOfSelection(rowId: string): string {
+  const shortcutId = shortcutIdOfMirrorRowId(rowId);
+  if (shortcutId) return shortcutId;
+  if (rowId.startsWith(WINDOW_REFERENCE_PREFIX)) {
+    const host = rowId.slice(WINDOW_REFERENCE_PREFIX.length).split("/")[0];
+    return host || rowId;
+  }
+  return rowId;
 }

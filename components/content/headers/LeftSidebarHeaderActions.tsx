@@ -334,7 +334,7 @@ export function LeftSidebarHeaderActions({
   ...callbacks
 }: LeftSidebarHeaderActionsProps) {
   const [showMenu, setShowMenu] = useState(false);
-  const addTarget = useTreeTargetStore((state) => state.target);
+  const addTarget = useTreeTargetStore((state) => state.addTarget);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const submenuRef = useRef<HTMLDivElement>(null);

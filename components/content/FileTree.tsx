@@ -39,7 +39,11 @@ import {
 } from "@/lib/features/content/drop-rules";
 import { dropEdgeFor } from "@/lib/features/content/drop-edge";
 import { showKeptSorts } from "@/lib/features/content/kept-sort-display";
+import { useSettingsStore } from "@/state/settings-store";
 import type { KeptSort } from "@/lib/domain/content/sibling-order";
+
+/** A stable empty map, so the mirror memo doesn't rebuild for "no sorts". */
+const NO_SHORTCUT_SORTS: Readonly<Record<string, KeptSort>> = {};
 
 interface FileTreeProps {
   data: TreeNode[];
@@ -330,6 +334,8 @@ export function FileTree({
   // an optimistic change takes its sorted place at once and a shortcut's
   // contents follow the folder's own sort.
   const shownData = useMemo(() => showKeptSorts(data, rootTreeSort ?? null), [data, rootTreeSort]);
+  // Shortcuts' own sorts (view-only — they never change the folder).
+  const shortcutSorts = useSettingsStore((state) => state.ui?.shortcutSorts ?? NO_SHORTCUT_SORTS);
   // Real parent of every loaded row (mirror rows excluded — they are views),
   // plus the view root's ancestors: what `wouldNestInItself` walks.
   const realParentOf = useMemo(() => {
@@ -363,8 +369,10 @@ export function FileTree({
       expandedIds,
       buildTreeIndex(withReferences, shownTargets),
       hiddenNestedShortcutIds,
+      0,
+      shortcutSorts,
     );
-  }, [shownData, shownTargets, expandedIds, referencesAtStartIds, hiddenNestedShortcutIds]);
+  }, [shownData, shownTargets, expandedIds, referencesAtStartIds, hiddenNestedShortcutIds, shortcutSorts]);
 
   // Get initial open state from persisted IDs
   const initialOpenState = useMemo(() => {
