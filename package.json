@@ -5,7 +5,7 @@
   "packageManager": "pnpm@10.25.0",
   "scripts": {
     "predev": "pnpm clean:traces",
-    "postinstall": "prisma generate && node scripts/copy-ocr-assets.mjs",
+    "postinstall": "prisma generate",
     "dev": "tsx scripts/predev.ts && pnpm ocr:assets && next dev --port 3015",
     "clean:traces": "tsx scripts/archive-traces.ts",
     "dev:collab": "tsx server/hocuspocus/bootstrap.ts",

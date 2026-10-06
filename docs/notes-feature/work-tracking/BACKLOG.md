@@ -35,14 +35,15 @@ The join duplication is fixed at its three sources (`lib/domain/collaboration/li
 
 ---
 
-## OCR paste — planned (2026-10-06, plan `OCR-PASTE-PLAN.md`)
+## OCR paste — follow-ups (2026-10-06, branch `feat/ocr-paste`; plan `OCR-PASTE-PLAN.md`)
 
-Decisions settled with the owner 2026-10-06; three PRs sequenced in the plan. Tesseract.js is already a dependency and already runs in the speed-reader; the work is lifting it into `lib/features/ocr/` and adding the surfaces.
+Built on the branch (engine + self-hosted assets, ⇧⌘V / image context actions / clipboard item, and the AI's `read_image_text` with `read_content` naming a note's images); owner smoke pending — the checklist is in the plan §3. Remaining:
 
-- [ ] **PR 1 — shared local engine + self-hosted assets** — `lib/features/ocr/`, `public/ocr/` copied at prebuild (never CDN code in the `/embed/panel` page: it is the trust-gated bridge to `chrome.debugger`), pinned LSTM language pack (2.9 MB, cached in IndexedDB), one worker per page with 120 s idle termination, speed-reader rewired, `ocr:blocks:check` gate mutation-tested.
-- [ ] **PR 2 — paste an image as its text** — Cmd+Shift+V ("paste as text" extended to images; Shift tracked by the editor, not `view.input`), right-click image → "Extract text from image" / "Replace image with its text", clipboard "Paste text from image"; fix the existing Paste items to use `contextEditor` (they pick the first registered editor and can paste into the wrong pane).
-- [ ] **PR 3 — co-browse `read_screen` (POSTPONED 2026-10-06, owner: waits on a prerequisite feature; built in this run only if that feature lands first)** — `co_browse_act` action that screenshots the BOUND tab via `Page.captureScreenshot` on the debugger session (not `captureVisibleTab`), OCRs it app-side after the bridge returns, answers as `untrustedWebContent`. Extension 5.5.0. Smoke on a backgrounded bound tab.
-- Deferred in the plan §4: `ai` engine behind `editor.ocrEngine`, full-page strips, OCR as an automatic read-ladder rung, multimodal tool output.
+- [ ] **Co-browse `read_screen` (POSTPONED 2026-10-06, owner)** — waits on a prerequisite feature the owner named; not built in this run because that feature was not. Design in the plan D5: a `co_browse_act` action that screenshots the BOUND tab via `Page.captureScreenshot` on the debugger session (not `captureVisibleTab`), OCRs it app-side after the bridge returns, answers as `untrustedWebContent`. Extension 5.5.0. Smoke on a backgrounded bound tab.
+- [ ] **Safari ⇧⌘V** — record whether Safari fires a paste event for the chord (smoke item). If not, the context-menu item is the Safari path; do not add a second chord.
+- [ ] **`ai` OCR engine** behind an `editor.ocrEngine` setting — the user's vision connection as the second `OcrEngine` member (precedent: the flashcards media route); needs a vision-capability check and client-side downscale for the 4.5 MB body limit.
+- [ ] **External-URL images for the AI** — `read_content` lists them, but `read_image_text` takes a content id only (a cross-origin fetch usually cannot read the pixels). A server-side fetch-and-hand-off would close it.
+- Also deferred in the plan §4: full-page co-browse strips, OCR as an automatic read-ladder rung, multimodal tool output, self-hosting the language pack.
 
 ## Split Pane Placement — behaviour as a setting (2026-10-02, from `feat/open-into-opposite-pane`)
 

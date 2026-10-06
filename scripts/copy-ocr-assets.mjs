@@ -18,8 +18,11 @@
  *
  * The language pack (data, not code) stays on the CDN — see local-engine.ts.
  *
- * Plain Node, zero dependencies: it runs from `postinstall`, where dev
- * tooling such as tsx may not be installed. Output is gitignored.
+ * Runs from `dev`, `build`, `vercel-build` and the app Dockerfile — every
+ * entry point that serves `public/`. NOT from `postinstall`: both Dockerfiles
+ * install before `COPY . .`, when this script is not in the image yet, so a
+ * postinstall hook would fail the Hocuspocus image build. Idempotent (skips
+ * up-to-date files) and plain Node with zero dependencies. Output is gitignored.
  */
 import { copyFileSync, existsSync, mkdirSync, statSync } from "node:fs";
 import { createRequire } from "node:module";

@@ -1,6 +1,6 @@
 ---
 last_updated: 2026-10-06
-status: building PRs 1+2 (branch `feat/ocr-paste`); PR 3 (co-browse) postponed — conditional on a prerequisite feature
+status: built on `feat/ocr-paste` (engine, editor surfaces, AI read_image_text) — gates green, owner smoke pending, not pushed; co-browse read_screen backlogged
 ---
 
 # OCR paste — paste an image, keep only its text
@@ -97,8 +97,9 @@ Clipboard section, beside "Paste as Markdown":
 3. **Paste text from image** — `navigator.clipboard.read()`, take the first
    `image/*` item, OCR, insert at the context editor's selection. Read the
    clipboard **before** awaiting the engine import: the read must happen inside
-   the user gesture or Safari voids it. Reuse `clipboardBlockedGuidance()` from
-   `lib/domain/content/markdown-detect.ts` when the read is refused.
+   the user gesture or Safari voids it. A refused read gets its own message
+   pointing at ⇧⌘V (`clipboardBlockedGuidance()` points at the markdown
+   toast, which is the wrong fallback for an image).
 
 **Adjacent fix, same change:** the existing Paste and Paste as Markdown items
 pick `Object.values(editorsByContentId).find(Boolean)` (the first registered
@@ -138,7 +139,7 @@ owns:
   ```ts
   export interface OcrEngine {
     id: "local";                       // "ai" is a planned second member
-    recognize(input: Blob, opts?: { signal?: AbortSignal }): Promise<OcrResult>;
+    recognize(image: Blob, opts?: { onProgress?: (p: OcrProgress) => void }): Promise<OcrResult>;
   }
   export interface OcrResult { text: string; confidence: number; engine: OcrEngine["id"]; }
   ```
@@ -166,10 +167,13 @@ parsed by the WASM). Decision:
   "/ocr/worker.min.js"`, `corePath: "/ocr"` (a directory: the library appends
   the right variant), and **`workerBlobURL: false`** — by default tesseract.js
   spawns the worker from a `blob:` URL, which `script-src 'self'` blocks just
-  as it blocks a CDN. The copy runs from `postinstall` (so Vercel and every
-  fresh install get it) and again from `dev`, `build` and `vercel-build` as an
-  idempotent safety net. It is plain Node because `postinstall` cannot assume
-  tsx is installed.
+  as it blocks a CDN. The copy (`pnpm ocr:assets`, idempotent, plain Node)
+  runs from `dev`, `build`, `vercel-build` and the app `Dockerfile` — every
+  entry point that serves `public/`. **Not from `postinstall`** (tried first,
+  reverted during the build): both Dockerfiles run `pnpm install` before
+  `COPY . .`, so the script is not in the image yet and the hook would fail
+  the Hocuspocus image build. ESLint ignores `public/ocr/**` (minified
+  third-party code; CI installs before linting).
 - **Language pack stays on the CDN** (jsdelivr, pinned, see D3). It is
   data, not code; the embed CSP's `connect-src` already allows https.
 
@@ -331,76 +335,68 @@ vision-model engine stays the planned second `OcrEngine` member (§4).
 
 ---
 
-## 2. Architecture
+## 2. Architecture (as built)
 
 ```
-lib/features/ocr/
-├── index.ts            # recognize(blob), ocrTextToBlocks(text), OcrEngine types
-├── engine.ts           # OcrEngine interface + `getOcrEngine()` (returns local)
-├── local-tesseract.ts  # lazy spawn, shared worker, job queue, IDLE_MS termination,
-│                       #   workerPath/corePath → /ocr, langPath → pinned 4.0.0_best_int
-└── text-to-blocks.ts   # D6 rule set (pure, no DOM) — gated by ocr:blocks:check
+lib/features/ocr/                     # client-only; importing it loads nothing heavy
+├── index.ts          # barrel: getOcrEngine(), ocrTextToContent(), isLocalOcrSupported()
+├── types.ts          # OcrEngine / OcrResult / OcrProgress — "local" today, "ai" planned
+├── local-engine.ts   # lazy spawn, ONE shared worker, per-job progress routing,
+│                     #   OCR_IDLE_MS = 120 s termination, failed spawn self-clears;
+│                     #   /ocr worker+core, workerBlobURL:false, pinned jsdelivr lang pack
+├── reflow.ts         # D6 rule set (pure) — pinned by ocr:blocks:check
+├── to-content.ts     # buildOcrContent(raw, parser) — parser injected (tsx-safe gate)
+├── paste-modifier.ts # window-level Shift tracker for ⇧⌘V (D1)
+├── editor-ocr.ts     # pasteImageAsText / pasteClipboardImageAsText / imageNodeToText
+└── read-for-model.ts # client half of read_image_text (D8); never throws
 
-scripts/copy-ocr-assets.ts       # node_modules → public/ocr (prebuild; gitignored output)
-scripts/validate-ocr-blocks.ts   # D6 fixtures
+scripts/copy-ocr-assets.mjs     # node_modules → public/ocr (gitignored, eslint-ignored)
+scripts/validate-ocr-blocks.ts  # pnpm ocr:blocks:check — 17 fixtures, quality.yml
 
-components/content/editor/MarkdownEditor.tsx
-  handleDOMEvents.keydown/keyup/blur → shiftHeldRef
-  handlePaste: image file + shiftHeldRef → ocrPasteFromFile(file) else existing upload
-lib/domain/editor/hooks/use-image-paste.ts   # same branch for the flashcards editor
+components/content/editor/MarkdownEditor.tsx    # ⇧ + image paste → OCR (ref, frozen-closure safe)
+lib/domain/editor/hooks/use-image-paste.ts      # same branch for the flashcards editor
 components/content/context-menu/editor-actions.tsx
-  image section: extract-text-from-image, replace-image-with-text
-  clipboard section: paste-text-from-image (+ contextEditor fix on paste/paste-markdown)
-extensions/speed-reader/lib/extractors/ocr.ts → re-export from lib/features/ocr
+  image section:     Extract text from image · Replace image with its text
+  clipboard section: Paste text from image (⇧⌘V) · Cut/Paste/Paste as Markdown → contextEditor
+extensions/speed-reader/lib/extractors/ocr.ts   # thin adapter; no terminate (shared worker)
 
-extensions/browser-bookmarks/browser-extension/
-  src/background/index.js   "cobrowse-screenshot" (Page.captureScreenshot on bound session)
-  src/panel/index.js        CO_BROWSE_OPS += "screenshot"
-  manifest.json             5.5.0
-lib/domain/browser-extension/co-browse.ts    coBrowseReadScreen()
-lib/domain/ai/tools/co-browse-tools.ts       action enum += "read_screen" (+ describe())
-lib/domain/ai/use-conversation-engine.ts     onToolCall: read_screen → capture → OCR → addToolResult
+lib/domain/ai/tools/read-image-text.ts   # client-safe contract (name, schema, description)
+lib/domain/content/note-images.ts        # listNoteImages — private-content seam
+lib/domain/ai/tools/registry.ts          # readImageTextTool; read_content lists images
+app/api/ai/chat/route.ts                 # localOcrAvailable gate; imageTextReadable
+lib/domain/ai/use-conversation-engine.ts # body flag ×2, resume predicate, onToolCall
+lib/domain/ai/tools/{metadata,menu}.ts   # user-configurable; reading family
 ```
 
-Rules that apply (from CLAUDE.md): the shared module lives in `lib/`, not in
-an extension, because two extensions and the shared editor consume it. No new
-TipTap node or mark, so no schema bump and no Hocuspocus redeploy. The
-`co_browse_act` schema change is additive; run `pnpm ai:drift:check` (prompt
-tool references, settings metadata).
+No new TipTap node or mark: no schema bump, **no Hocuspocus redeploy**. The
+Hocuspocus image is unaffected (the asset copy is not in `postinstall`).
 
 ---
 
-## 3. Build sequence (three PRs, each independently shippable)
+## 3. Build sequence (as built — one branch, `feat/ocr-paste`)
 
-1. **`feat(ocr): shared local engine + self-hosted assets`** — `lib/features/ocr/`,
-   copy script + `build`/`vercel-build` wiring, `.gitignore` entry,
-   speed-reader rewired, `ocr:blocks:check` gate (mutation-tested). No UX
-   change. Smoke: speed-reader OCR of an image still works and the Network
-   tab shows `/ocr/worker.min.js` and `/ocr/…wasm` from this origin, the
-   language pack from jsdelivr `@tesseract.js-data/eng@1.0.0`; worker terminates ~2 min after
-   the last job (visible in the Memory / Workers panel).
-2. **`feat(editor): paste an image as its text`** — D1, D2, D6, D7, the
-   `contextEditor` fix, the flashcards hook branch. Smoke lines for the PR
-   body, one per surface:
-   - Cmd+Shift+V with a screenshot on the clipboard → text appears, no image
-     uploaded (check the tree: no new file under the note's folder).
-   - Cmd+V with the same screenshot → image uploads as before.
-   - Right-click an image → Extract text from image → text below, image kept.
-   - Right-click an image → Replace image with its text → image gone, text in
-     its place, single Cmd+Z restores the image.
-   - Paste text from image (context menu) in the **right-hand** pane of a
-     split → text lands in that pane's note.
-   - Screenshot of a bulleted list → inserts a real bullet list.
-   - Safari: Cmd+Shift+V — record whether the paste event fires.
-3. **POSTPONED — conditional on the owner's prerequisite feature (see D5).**
-   **`feat(co-browse): read the bound tab off its pixels`** — D5. Extension
-   release. Smoke: bind a tab, switch away from it, ask the AI to "read the
-   screen"; result text matches what the tab shows; the panel's Network tab
-   shows OCR assets from this origin only (CSP intact).
+| Commit | Slice |
+|---|---|
+| `01ddcf19` | Shared engine + self-hosted assets + reflow gate; speed reader rewired |
+| `17f1ead9` | Two fixtures added after the first mutation run |
+| `4086503f` | Editor: ⇧⌘V, image context actions, clipboard item, contextEditor fix |
+| `e0778d22` | AI: `read_image_text` + `read_content` lists images |
+| later | Lint ignore for `public/ocr`; asset copy moved out of `postinstall` |
 
-Each PR: `pnpm typecheck` → `pnpm lint` (ratchet 175, zero new warnings) →
-`NODE_OPTIONS='--max-old-space-size=8192' pnpm build`; PR 3 also builds the
-extension. Update `STATUS.md` and this file's `status` line per PR.
+Co-browse `read_screen` (D5): **backlogged**, see the D5 note.
+
+**Smoke lines (owner, in the browser):**
+
+- [ ] ⇧⌘V with a screenshot on the clipboard → its text appears; no image file is created in the tree.
+- [ ] ⌘V with the same screenshot → the image uploads as before.
+- [ ] Right-click an image → Extract text from image → text below it, image kept.
+- [ ] Right-click an image → Replace image with its text → image replaced; one ⌘Z brings it back.
+- [ ] Context menu → Paste text from image, in the **right** pane of a split → text lands in that pane's note.
+- [ ] Screenshot of a bulleted list → a real bullet list.
+- [ ] Network tab on first use → `/ocr/worker.min.js` and one `/ocr/tesseract-core-*.wasm.js` from this origin, `eng.traineddata.gz` from jsdelivr; nothing on later uses until ~2 min idle, then the worker is gone.
+- [ ] AI chat on a note holding a screenshot: "what does the image say?" → `read_content` lists the image, `read_image_text` returns its text, the chip reads "Read text in an image (N characters)".
+- [ ] Side panel (extension): the same AI question works there (embed CSP + fetch bridge).
+- [ ] Safari: ⇧⌘V — record whether the paste event fires; if not, the context-menu item is the path.
 
 ---
 
@@ -416,7 +412,7 @@ extension. Update `STATUS.md` and this file's `status` line per PR.
 - **Multimodal tool output** (hand the screenshot itself to a vision model as
   the tool result) — depends on AI SDK tool-result media support.
 - **Self-hosting the language pack** too, if a fully offline / zero-third-party
-  build is ever wanted; it is 2 MB and would join `public/ocr/`.
+  build is ever wanted; it is 2.9 MB and would join `public/ocr/`.
 - **Upload-dialog `enableOCR`** (server-side, Node worker files) — separate
   problem, separate fix; a server engine would be a fourth consumer of
   `OcrEngine`, not a reason to change it.

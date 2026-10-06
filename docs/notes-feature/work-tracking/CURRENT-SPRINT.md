@@ -61,6 +61,21 @@ Branch `refactor/remove-workplace-claims` · plan [WORKPLACE-RESTRICTIONS-REMOVA
 
 **Post-merge (owner):** Vercel deploy live → run the drop migration (handoff script in the PR) → Hocuspocus redeploy from a tree matching `origin/main`, `/readyz` ×5.
 
+## October 6, 2026 — Paste an image as its text; the assistant reads images (OCR)
+
+**Tree**: worktree `.claude/worktrees/ocr-paste`, branch `feat/ocr-paste` (off `main` at `45d697ba`), not pushed. Plan: `OCR-PASTE-PLAN.md`.
+**Status**: full `pnpm build` green — typecheck / lint 151 (0 errors, none new) / new `ocr:blocks:check` (17 fixtures, 13 mutants killed, in `quality.yml`) / `ai:drift:check` / `private:content:check` (+1 seam; extended gates 5 mutants killed). Headless-Chromium runtime smoke under the `/embed` CSP passed (control with a `blob:` worker blocked, as designed). No schema, TipTap or extension change → no Hocuspocus redeploy. Owner browser smoke pending.
+
+### Shipped
+- **Shared OCR engine** (`lib/features/ocr/`): lazy, one worker per page, 120 s idle termination, self-hosted worker + core (`public/ocr/`), pinned language pack. The speed reader uses it.
+- **Editor**: ⇧⌘V pastes an image's text only; image context menu *Extract text from image* / *Replace image with its text*; clipboard *Paste text from image*. Same ⇧⌘V branch in the flashcards editor.
+- **AI**: `read_content` lists a note's images (it dropped them before); new client-executed `read_image_text` reads one on the device.
+- **Fix**: editor context-menu Cut / Paste / Paste as Markdown act on the right-clicked editor (they used the first registered one).
+- **Postponed (owner)**: co-browse `read_screen` → backlog.
+
+### Smoke checklist (owner)
+The ten lines in `OCR-PASTE-PLAN.md` §3 — ⇧⌘V vs ⌘V, both image actions (and one-step undo), the split-pane paste, a bulleted-list screenshot, the Network tab on first use and after 2 min idle, the AI question in the main chat and in the side panel, and Safari ⇧⌘V.
+
 ## October 5, 2026 — The file tree stops flashing; deleting is instant; rows keep their order; view shortcuts show their folder and act on it safely (PR #284, merged `c48218d3`)
 
 **Tree**: worktree `.claude/worktrees/smooth-delete`, branch `fix/smooth-delete` (off `origin/main` at `49b94490`)
