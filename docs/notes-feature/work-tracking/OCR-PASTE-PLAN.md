@@ -1,6 +1,6 @@
 ---
 last_updated: 2026-10-06
-status: planned — decisions settled with the owner 2026-10-06; handed to the implementing agent; no code yet
+status: building PRs 1+2 (branch `feat/ocr-paste`); PR 3 (co-browse) postponed — conditional on a prerequisite feature
 ---
 
 # OCR paste — paste an image, keep only its text
@@ -40,7 +40,7 @@ page's DOM and accessibility tree give it nothing.
   → `chrome.tabs.captureVisibleTab`, JPEG q70). It is user-triggered only and
   captures the *active* tab, not the co-browse-bound tab.
 - First-run download sizes, measured: worker 111 KB, SIMD-LSTM core 3.9 MB,
-  `eng.traineddata.gz` 10.9 MB (default `4.0.0`) or 2.0 MB (`4.0.0_fast`).
+  `eng.traineddata.gz` 2.9 MB (`4.0.0_best_int`, v7's LSTM default; the 10.9 MB `4.0.0` pack is legacy-engine only).
   The language pack is cached in IndexedDB by tesseract.js after the first run.
 
 ---
@@ -122,10 +122,15 @@ owns:
   hours. The speed-reader currently keeps its worker for the page's life; after
   the rewire it inherits the idle timeout, which is fine for a reading session
   (each chunk's OCR happens up front).
-- **Fast language pack.** `langPath: "https://tessdata.projectnaptha.com/4.0.0_fast"`
-  → 2.0 MB instead of 10.9 MB on first run. Slightly lower accuracy on poor
-  scans; negligible on screenshots of rendered text, which is the dominant
-  paste case. Cached in IndexedDB afterwards (`cacheMethod` default `"write"`).
+- **Language pack: v7's own LSTM default, pinned.** `langPath:
+  "https://cdn.jsdelivr.net/npm/@tesseract.js-data/eng@1.0.0/4.0.0_best_int"`
+  (2.9 MB gzipped). *Corrected 2026-10-06 during the build:* the 10.9 MB
+  figure first measured is the legacy+LSTM pack, which v7 only loads for the
+  legacy engine; for LSTM-only it already defaults to `4.0.0_best_int`. The
+  `4.0.0_fast` pack (2.0 MB) would save ~1 MB at lower accuracy, so it was
+  dropped. Pinning `@1.0.0` makes the URL immutable. Cached in IndexedDB
+  afterwards under the same key the speed reader already used, so a user who
+  ran the speed reader never downloads it again.
 - **An engine interface** with one implementation today:
 
   ```ts
@@ -150,13 +155,20 @@ tesseract.js loads three remote things: the worker script, the WASM core
 parsed by the WASM). Decision:
 
 - **Worker + core are served from this origin** under `public/ocr/`, copied
-  from `node_modules` by a prebuild script (`scripts/copy-ocr-assets.ts`,
-  wired into both `build` and `vercel-build`; `public/ocr/` is gitignored).
-  Files: `worker.min.js` plus the LSTM core variants tesseract.js picks between
-  via `wasm-feature-detect` — `tesseract-core-{simd-lstm,relaxedsimd-lstm,lstm}.wasm.js`
-  and their `.wasm` siblings. Set `workerPath: "/ocr/worker.min.js"`,
-  `corePath: "/ocr"` (a directory: the library appends the right variant).
-- **Language pack stays on the tessdata CDN** (`4.0.0_fast`, see D3). It is
+  from `node_modules` by `scripts/copy-ocr-assets.mjs` (`public/ocr/` is
+  gitignored). Files: `worker.min.js` plus the LSTM core variants tesseract.js
+  picks between via `wasm-feature-detect` —
+  `tesseract-core-{relaxedsimd-lstm,simd-lstm,lstm}.wasm.js`. Each `.wasm.js`
+  embeds its WASM inline, so the `.wasm` siblings are not copied; a browser
+  downloads exactly one variant (3.9 MB). Set `workerPath:
+  "/ocr/worker.min.js"`, `corePath: "/ocr"` (a directory: the library appends
+  the right variant), and **`workerBlobURL: false`** — by default tesseract.js
+  spawns the worker from a `blob:` URL, which `script-src 'self'` blocks just
+  as it blocks a CDN. The copy runs from `postinstall` (so Vercel and every
+  fresh install get it) and again from `dev`, `build` and `vercel-build` as an
+  idempotent safety net. It is plain Node because `postinstall` cannot assume
+  tsx is installed.
+- **Language pack stays on the CDN** (jsdelivr, pinned, see D3). It is
   data, not code; the embed CSP's `connect-src` already allows https.
 
 Why self-host rather than widen the CSP for jsdelivr: the side panel page
@@ -168,6 +180,12 @@ has `'unsafe-eval'`, which also satisfies WebAssembly compilation; if that is
 ever tightened, `'wasm-unsafe-eval'` is the narrow replacement.
 
 ### D5 — Co-browse: `read_screen` reads the bound tab off its pixels
+
+> **POSTPONED (owner, 2026-10-06).** The AI co-browsing / scraping slice waits
+> on another feature the owner named as its prerequisite. Rule: if that
+> feature is built by the time PRs 1 and 2 are written, PR 3 is built in this
+> run; otherwise PR 3 moves to the backlog unchanged. The design below stays
+> as the record of what PR 3 will be.
 
 A new `co_browse_act` action for pages whose DOM / accessibility tree is thin
 (canvas, image-rendered text, anti-scrape markup):
@@ -259,7 +277,7 @@ lib/features/ocr/
 ├── index.ts            # recognize(blob), ocrTextToBlocks(text), OcrEngine types
 ├── engine.ts           # OcrEngine interface + `getOcrEngine()` (returns local)
 ├── local-tesseract.ts  # lazy spawn, shared worker, job queue, IDLE_MS termination,
-│                       #   workerPath/corePath → /ocr, langPath → 4.0.0_fast
+│                       #   workerPath/corePath → /ocr, langPath → pinned 4.0.0_best_int
 └── text-to-blocks.ts   # D6 rule set (pure, no DOM) — gated by ocr:blocks:check
 
 scripts/copy-ocr-assets.ts       # node_modules → public/ocr (prebuild; gitignored output)
@@ -298,7 +316,7 @@ tool references, settings metadata).
    speed-reader rewired, `ocr:blocks:check` gate (mutation-tested). No UX
    change. Smoke: speed-reader OCR of an image still works and the Network
    tab shows `/ocr/worker.min.js` and `/ocr/…wasm` from this origin, the
-   language pack from tessdata `4.0.0_fast`; worker terminates ~2 min after
+   language pack from jsdelivr `@tesseract.js-data/eng@1.0.0`; worker terminates ~2 min after
    the last job (visible in the Memory / Workers panel).
 2. **`feat(editor): paste an image as its text`** — D1, D2, D6, D7, the
    `contextEditor` fix, the flashcards hook branch. Smoke lines for the PR
@@ -313,7 +331,8 @@ tool references, settings metadata).
      split → text lands in that pane's note.
    - Screenshot of a bulleted list → inserts a real bullet list.
    - Safari: Cmd+Shift+V — record whether the paste event fires.
-3. **`feat(co-browse): read the bound tab off its pixels`** — D5. Extension
+3. **POSTPONED — conditional on the owner's prerequisite feature (see D5).**
+   **`feat(co-browse): read the bound tab off its pixels`** — D5. Extension
    release. Smoke: bind a tab, switch away from it, ask the AI to "read the
    screen"; result text matches what the tab shows; the panel's Network tab
    shows OCR assets from this origin only (CSP intact).
