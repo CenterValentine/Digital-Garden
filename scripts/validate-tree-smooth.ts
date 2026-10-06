@@ -893,8 +893,9 @@ console.log("\nrows arriving by other routes land deliberately (source pins)");
     assert.ok(assist.includes("? { displayOrder: Math.trunc(prevOrder) }"));
     assert.equal((assist.match(/undo: \{ prevParents, prevOrders,/g) ?? []).length, 3);
   });
-  check("bookmark dedupe: a re-filed bookmark takes the appended slot; one staying put keeps its place", () => {
-    assert.ok(bookmarks.includes("...(dedupeTarget.parentId !== parentId ? { displayOrder } : {}),"));
+  check("bookmarks: each saved bookmark is its own new row, appended — no dedupe pulling an existing link out of its folder", () => {
+    assert.equal(/dedupe/i.test(bookmarks), false, "bookmark dedupe was removed (owner, 2026-10-06)");
+    assert.ok(bookmarks.includes("const displayOrder = await nextDisplayOrder(parentId);"));
   });
   check("Studio outputs land newest-first at the top of the outputs folder", () => {
     assert.equal((studio.match(/await placeExistingRow\(\{ ownerId: ctx\.userId, rowId: (node\.id|speech\.contentId), parentId: outputsFolderId, placement: "top" \}\);/g) ?? []).length, 3);

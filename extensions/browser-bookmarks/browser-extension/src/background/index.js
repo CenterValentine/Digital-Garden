@@ -21,7 +21,6 @@ const DEFAULT_CONFIG = {
   defaultConnectionId: "",
   nativeSaveBehavior: "silent-defaults",
   defaults: {
-    dedupeEnabled: false,
     preserveHtml: false,
     domainIntelligenceEnabled: true,
   },
@@ -1157,7 +1156,6 @@ async function handleNativeBookmarkCreated(id, bookmark) {
         title: bookmark.title,
         url: bookmark.url,
         faviconUrl: activeTabMetadata.faviconUrl,
-        dedupeEnabled: Boolean(ruleOptions.dedupeEnabled),
         resourceType: ruleOptions.resourceType || null,
         resourceRelationship: ruleOptions.resourceRelationship || null,
         userIntent: ruleOptions.userIntent || null,
@@ -1421,10 +1419,6 @@ async function quickSaveCurrentTab(payload = {}) {
         resourceType: payload.resourceType || null,
         resourceRelationship: payload.resourceRelationship || null,
         userIntent: payload.userIntent || null,
-        dedupeEnabled:
-          payload.dedupeEnabled !== undefined
-            ? payload.dedupeEnabled
-            : Boolean(config.defaults.dedupeEnabled),
         preserveHtml:
           payload.preserveHtml !== undefined
             ? payload.preserveHtml
@@ -1479,10 +1473,6 @@ async function quickSaveCurrentTab(payload = {}) {
       resourceType: payload.resourceType || null,
       resourceRelationship: payload.resourceRelationship || null,
       userIntent: payload.userIntent || null,
-      dedupeEnabled:
-        payload.dedupeEnabled !== undefined
-          ? payload.dedupeEnabled
-          : Boolean(config.defaults.dedupeEnabled),
       preserveHtml:
         payload.preserveHtml !== undefined
           ? payload.preserveHtml
@@ -1598,7 +1588,6 @@ async function captureCurrentSession(payload = {}) {
       resourceType: payload.resourceType || null,
       resourceRelationship: payload.resourceRelationship || null,
       userIntent: payload.userIntent || null,
-      dedupeEnabled: Boolean(payload.dedupeEnabled),
       preserveHtml: Boolean(payload.preserveHtml),
       captureMetadata: {
         source: "session-capture",
@@ -3469,7 +3458,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           exportedAt: new Date().toISOString(),
           nativeSaveBehavior: config.nativeSaveBehavior,
           defaults: config.defaults,
-          dedupeDefaults: { dedupeEnabled: config.defaults.dedupeEnabled },
           routingRules: config.rules,
           connections: [],
         },
