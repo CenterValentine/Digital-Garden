@@ -687,6 +687,42 @@ console.log("\nwhen the active tab leaves a pane, the pane shows what it showed 
   check("with no memory, closing A → its right neighbour B", paneActive("top-left"), "B");
 }
 
+console.log("\na restore focuses the pane that HOLDS the active content (owner trace, 2026-10-06)");
+{
+  // URL: content=C, tabs_top_left=A, tabs_top_right=B,C — and no pane= (it
+  // is only written when focus is off top-left). The restore asked for
+  // top-left; C is on the right. Before: top-left got no active tab, the
+  // resolver focused the pane that had one, and the page opened on B.
+  // A COLD start: no pane is showing anything yet (seedSplit would leave A
+  // active on the left, which is the reconcile case below, not this one).
+  useContentStore.getState().clearAllWorkspaceTabs();
+  clearPendingWorkspaceIntents();
+  useContentStore.getState().restoreWorkspace({
+    activeContentId: "C",
+    activePaneId: "top-left",
+    layoutMode: "dual-vertical",
+    paneTabContentIds: { "top-left": ["A"], "top-right": ["B", "C"] },
+  });
+  check(
+    "the URL's content is what shows, in the pane that holds it",
+    [useContentStore.getState().activePaneId, useContentStore.getState().selectedContentId, paneActive("top-right")],
+    ["top-right", "C", "C"],
+  );
+  check("…and the other pane still shows its own tab", paneActive("top-left"), "A");
+
+  // The same pair on a RECONCILE — the focused pane is showing something —
+  // must not move focus (R3). The stale-poll scenarios pin this too; this is
+  // the direct form.
+  useContentStore.getState().focusPane("top-left");
+  useContentStore.getState().restoreWorkspace({
+    activeContentId: "C",
+    activePaneId: "top-left",
+    layoutMode: "dual-vertical",
+    paneTabContentIds: { "top-left": ["A"], "top-right": ["B", "C"] },
+  });
+  check("…but a stale server activeContentId never moves a focused pane that shows something", useContentStore.getState().activePaneId, "top-left");
+}
+
 console.log("\na restore never collapses — only a user's removal does (owner rule, 2026-10-03)");
 {
   // "If a tab flickers and leaves a section empty it collapses the tab view,

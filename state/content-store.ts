@@ -2413,6 +2413,34 @@ export const useContentStore = create<ContentState>((set, get) => ({
       // merging, so a snapshot predating a local change silently undoes it —
       // in both directions. Mutating normalizedWorkspace (not just the loop
       // below) keeps the activeContentId re-add further down consistent.
+      // The active CONTENT outranks the requested active PANE. A URL carries
+      // `content=` always but `pane=` only when the focused pane is not
+      // top-left, and a snapshot can name an activeContentId that lives in a
+      // pane other than its activePaneId. Before: the focused pane got no
+      // active tab (the content was not in it → fell to its first tab, or to
+      // nothing), resolveActivePaneForLayout then focused whichever pane HAD
+      // an active tab, and the page opened on a different note than the URL
+      // named (owner trace, 2026-10-06: `content=Capture`, restore asked for
+      // top-left, committed focus=top-right on W41). Focus the pane that
+      // holds the content.
+      // …but only when the requested pane has nothing local to keep (a cold
+      // start, or an empty pane). A reconcile whose focused pane is showing
+      // something keeps it — R3: a stale server activeContentId never moves
+      // this surface's focus.
+      if (normalizedWorkspace.activeContentId) {
+        const requested = normalizedWorkspace.activePaneId;
+        const requestedShowsSomething = Boolean(
+          requested && state.panes[requested]?.activeTabId
+        );
+        const holder = requestedPaneIds.find((paneId) =>
+          (normalizedWorkspace.paneTabContentIds?.[paneId] ?? []).includes(
+            normalizedWorkspace.activeContentId as string
+          )
+        );
+        if (holder && holder !== requested && !requestedShowsSomething) {
+          normalizedWorkspace.activePaneId = holder;
+        }
+      }
       const intentPaneId =
         normalizedWorkspace.activePaneId &&
         requestedPaneIds.includes(normalizedWorkspace.activePaneId)
