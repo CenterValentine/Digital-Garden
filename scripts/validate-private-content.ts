@@ -22,6 +22,7 @@ import {
   stripPrivateContent,
 } from "@/lib/domain/content/private-content";
 import { extractSearchTextFromTipTap } from "@/lib/domain/content/search-text";
+import { listNoteImages } from "@/lib/domain/content/note-images";
 
 let failures = 0;
 function check(label: string, condition: boolean, detail?: string) {
@@ -68,6 +69,18 @@ const canon = (v: unknown) => JSON.stringify(v);
   const searchText = extractSearchTextFromTipTap(input);
   check("searchText never contains private text", !/secret|hidden|only private|gone|cell/.test(searchText), searchText);
   check("searchText keeps visible text", /keep/.test(searchText) && /stay/.test(searchText), searchText);
+
+  // The AI's read_content lists a note's images (OCR plan D8): an image inside
+  // a private block must never be offered to the model.
+  const img = (contentId: string): JSONContent => ({
+    type: "image",
+    attrs: { src: `/api/content/content/${contentId}/download?stream=true`, alt: contentId, contentId },
+  });
+  const shown = "11111111-1111-4111-8111-111111111111";
+  const hidden = "22222222-2222-4222-8222-222222222222";
+  const listed = listNoteImages(doc(img(shown), block(img(hidden)))).map((i) => i.contentId);
+  check("note images: a private block's image is not listed", !listed.includes(hidden), listed.join(","));
+  check("note images: a visible image is listed", listed.includes(shown), listed.join(","));
 }
 
 // --- 2. The seams ----------------------------------------------------------
@@ -90,6 +103,8 @@ const SEAMS: Array<[string, RegExp]> = [
   ["app/api/ai/inject-media/route.ts", /stripPrivateContent\(/],
   ["lib/domain/ai/tools/editor-tools.ts", /stripPrivateContent\(/],
   ["lib/domain/browser-extension/service.ts", /stripPrivateContent\(/],
+  // The images a note holds, as the AI's read_content lists them (OCR plan D8).
+  ["lib/domain/content/note-images.ts", /stripPrivateContent\(/],
 ];
 for (const [file, pattern] of SEAMS) {
   const source = readFileSync(resolve(process.cwd(), file), "utf8");

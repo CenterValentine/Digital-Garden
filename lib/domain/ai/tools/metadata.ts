@@ -54,6 +54,7 @@ export const BASE_TOOL_IDS = [
   "search_content",
   "search_charters",
   "read_content",
+  "read_image_text",
   "create_note",
   "update_note",
   "rename_note",
@@ -130,6 +131,11 @@ export const BASE_TOOL_METADATA: Record<BaseToolId, BaseToolMeta> = {
     name: "Read Content",
     description:
       "Read any item by id — a note, a folder's own notes, a database (schema plus a row preview), a file's extracted text, a saved link, code or a page",
+  },
+  read_image_text: {
+    name: "Read Image Text",
+    description:
+      "Read the words in an image — a screenshot, a photo of a page, a receipt — on your device, so the assistant can use what an image says. Reads text only; it does not describe pictures",
   },
   create_note: {
     name: "Create Note",

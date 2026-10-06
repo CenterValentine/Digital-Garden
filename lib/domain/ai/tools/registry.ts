@@ -142,6 +142,11 @@ import {
   LIST_TABS_DESCRIPTION,
   listTabsInputSchema,
 } from "./co-browse-tools";
+import {
+  READ_IMAGE_TEXT_DESCRIPTION,
+  readImageTextInputSchema,
+} from "./read-image-text";
+import { describeNoteImages, listNoteImages } from "@/lib/domain/content/note-images";
 
 /**
  * `read_page_in_browser` — CLIENT-EXECUTED (no server `execute`). The chat route
@@ -205,6 +210,17 @@ export const readCurrentPageTool = tool({
 export const listTabsTool = tool({
   description: LIST_TABS_DESCRIPTION,
   inputSchema: listTabsInputSchema,
+});
+
+/**
+ * `read_image_text` — CLIENT-EXECUTED (no server `execute`). OCR-PASTE-PLAN.md
+ * D8. Registered only when the client reports it can run local OCR; the
+ * engine's onToolCall downloads the image and reads it with the shared engine
+ * in lib/features/ocr, on the user's device.
+ */
+export const readImageTextTool = tool({
+  description: READ_IMAGE_TEXT_DESCRIPTION,
+  inputSchema: readImageTextInputSchema,
 });
 
 /**
@@ -2837,7 +2853,16 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             : "";
           const text =
             liveText || content.notePayload.searchText || "(empty note)";
-          return `${header}\nContent:\n${text}`;
+          // The text extractor drops image nodes, so without this the model
+          // cannot tell a note holds a screenshot at all. Private content is
+          // stripped inside listNoteImages (a registered egress seam).
+          const images = content.notePayload.tiptapJson
+            ? describeNoteImages(
+                listNoteImages(content.notePayload.tiptapJson as JSONContent),
+                ctx.imageTextReadable === true,
+              )
+            : null;
+          return `${header}\nContent:\n${text}${images ? `\n\n${images}` : ""}`;
         };
 
         /**
@@ -2908,9 +2933,13 @@ export function createBaseTools(ctx: ToolExecuteContext) {
                 : "\n\nNo extracted text is held for this book.";
               return `${header}\n\n${facts}${capsule ? `\n\n${capsule}` : ""}${excerpt}`;
             }
+            const noText =
+              f.mimeType.startsWith("image/") && ctx.imageTextReadable === true
+                ? "\n\nNo extracted text is held for this image. Read its text with read_image_text (this content id)."
+                : "\n\nNo extracted text is held for this file. Attach it to the conversation if its contents are needed.";
             const body = f.searchText.trim()
               ? `\n\nExtracted text:\n${f.searchText.trim()}`
-              : "\n\nNo extracted text is held for this file. Attach it to the conversation if its contents are needed.";
+              : noText;
             return `${header}\n\n${facts}${body}`;
           },
 

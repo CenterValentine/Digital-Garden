@@ -62,6 +62,10 @@ import {
   READ_PAGE_HEADLESS_OR_BROWSER_DESCRIPTION,
 } from "../lib/domain/ai/tools/read-page-in-browser";
 import {
+  READ_IMAGE_TEXT,
+  READ_IMAGE_TEXT_DESCRIPTION,
+} from "../lib/domain/ai/tools/read-image-text";
+import {
   OPEN_TAB_AND_READ,
   OPEN_TAB_AND_READ_DESCRIPTION,
 } from "../lib/domain/ai/tools/open-tab-and-read";
@@ -351,6 +355,7 @@ const CLIENT_TOOLS: Array<{ name: string; description: string }> = [
   { name: CO_BROWSE_ACT, description: CO_BROWSE_ACT_DESCRIPTION },
   { name: READ_CURRENT_PAGE, description: READ_CURRENT_PAGE_DESCRIPTION },
   { name: LIST_TABS, description: LIST_TABS_DESCRIPTION },
+  { name: READ_IMAGE_TEXT, description: READ_IMAGE_TEXT_DESCRIPTION },
 ];
 
 const realToolNames = new Set<string>([
@@ -453,6 +458,7 @@ const scriptConstants = new Set([
   "CO_BROWSE_ACT",
   "READ_CURRENT_PAGE",
   "LIST_TABS",
+  "READ_IMAGE_TEXT",
 ]);
 for (const c of routeBracketConstants) {
   if (!scriptConstants.has(c)) {

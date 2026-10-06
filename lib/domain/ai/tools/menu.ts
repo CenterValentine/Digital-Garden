@@ -51,6 +51,7 @@ export const TOOL_MENU: Readonly<Record<string, ToolMenuEntry>> = {
   read_content: { family: "reading", selectWhen: "Read any item by id — note, folder notes, database (schema + row preview), file text, link, code, page" },
   search_content: { family: "reading", selectWhen: "Find items by text when you do not have an id" },
   read_folder_context: { family: "reading", selectWhen: "Read a folder's selected sources and children" },
+  read_image_text: { family: "reading", selectWhen: "Read the text in an image (screenshot, photo of a page) by its content id" },
   search_charters: { family: "reading", selectWhen: "Find a charter/playbook note by name when none is loaded" },
 
   // ── writing ────────────────────────────────────────────────────────────

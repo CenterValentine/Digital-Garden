@@ -26,3 +26,12 @@ export function ocrTextToContent(raw: string): JSONContent[] {
 export function getOcrEngine(): OcrEngine {
   return localOcrEngine;
 }
+
+/**
+ * Can this runtime run the local engine? A browser with Web Workers and
+ * WebAssembly. The chat engine sends this as `localOcrAvailable`, which gates
+ * the AI's read_image_text tool server-side.
+ */
+export function isLocalOcrSupported(): boolean {
+  return typeof window !== "undefined" && typeof Worker !== "undefined" && typeof WebAssembly === "object";
+}

@@ -48,6 +48,9 @@ import {
   LIST_TABS,
   stripTrackingParams,
 } from "@/lib/domain/ai/tools/co-browse-tools";
+import { READ_IMAGE_TEXT } from "@/lib/domain/ai/tools/read-image-text";
+import { isLocalOcrSupported } from "@/lib/features/ocr";
+import { readImageTextForModel } from "@/lib/features/ocr/read-for-model";
 import { countRepeatedFailures } from "@/lib/domain/ai/tools/repair";
 import {
   isCoBrowseAvailable,
@@ -897,7 +900,10 @@ function lastMessageHasResolvedBrowserRead({
         part.type === `tool-${CO_BROWSE_OPEN}` ||
         part.type === `tool-${CO_BROWSE_ACT}` ||
         part.type === `tool-${READ_CURRENT_PAGE}` ||
-        part.type === `tool-${LIST_TABS}`,
+        part.type === `tool-${LIST_TABS}` ||
+        // Not a browser tool, but read the same way: client-executed, result
+        // via addToolResult, and the model needs the text to continue.
+        part.type === `tool-${READ_IMAGE_TEXT}`,
     ) as Array<{ state?: string }>;
   return (
     browserReadParts.length > 0 &&
@@ -2466,6 +2472,18 @@ export function useConversationEngine({
       // panel's content-script capture: no new tab, no re-fetch, no debugger
       // banner. Distinct from read_page (refetches a URL) and co_browse_open
       // (opens a fresh tab). For "summarize this page".
+      // read_image_text (OCR-PASTE-PLAN D8): download the image and read its
+      // text with the shared local engine, on this device. Every outcome is a
+      // result the model can act on — readImageTextForModel never throws.
+      if (toolCall.toolName === READ_IMAGE_TEXT) {
+        const { contentId } = (toolCall.input ?? {}) as { contentId?: string };
+        chat.addToolResult({
+          tool: READ_IMAGE_TEXT,
+          toolCallId: toolCall.toolCallId,
+          output: await readImageTextForModel(contentId ?? ""),
+        });
+        return;
+      }
       if (toolCall.toolName === READ_CURRENT_PAGE) {
         try {
           const captured = await capturePageContent("full");
@@ -3053,6 +3071,8 @@ export function useConversationEngine({
       browserExtensionAvailable: isExtensionAcquireAvailable(),
       // Slice 5c: co-browse is trust-gated to the side panel — true only there.
       coBrowseAvailable: isCoBrowseAvailable(),
+      // OCR-PASTE-PLAN D8: this browser can run local OCR → read_image_text.
+      localOcrAvailable: isLocalOcrSupported(),
     }));
     return () => {
       chatBodyResolvers.delete(conversationKey);
@@ -3528,6 +3548,8 @@ export function useConversationEngine({
           browserExtensionAvailable: isExtensionAcquireAvailable(),
           // Slice 5c co-browse gate — same per-call-body requirement.
           coBrowseAvailable: isCoBrowseAvailable(),
+          // read_image_text gate (OCR-PASTE-PLAN D8) — same requirement.
+          localOcrAvailable: isLocalOcrSupported(),
         },
       },
     );

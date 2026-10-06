@@ -241,7 +241,9 @@ import {
   coBrowseActTool,
   readCurrentPageTool,
   listTabsTool,
+  readImageTextTool,
 } from "@/lib/domain/ai/tools/registry";
+import { READ_IMAGE_TEXT } from "@/lib/domain/ai/tools/read-image-text";
 import { READ_PAGE_HEADLESS_OR_BROWSER } from "@/lib/domain/ai/tools/read-page-in-browser";
 import { OPEN_TAB_AND_READ } from "@/lib/domain/ai/tools/open-tab-and-read";
 import {
@@ -627,6 +629,10 @@ export async function POST(request: Request) {
       // panel (the client sends true only from the /embed/panel surface); gates
       // the client-executed co_browse_* tools.
       const coBrowseAvailable = body.coBrowseAvailable === true;
+      // OCR-PASTE-PLAN D8: the client reports it can run local OCR (a browser
+      // with Worker + WebAssembly). Gates the client-executed read_image_text,
+      // so a headless caller is never offered a tool nothing would execute.
+      const localOcrAvailable = body.localOcrAvailable === true;
       // Agentic Browsing Phase 1: derive the active research run's page budget
       // from the conversation history — the propose_research_run result always
       // rides in body.messages, whereas a client body flag can't reliably reach
@@ -1478,6 +1484,8 @@ export async function POST(request: Request) {
           (aiSettings as { toolConfig?: unknown }).toolConfig,
         ),
         charterFinalPhase: false,
+        // Set after tool filtering below (read_content reads it at execute time).
+        imageTextReadable: false,
         // Executed model identity (cost metering): lets ledger stamps
         // price the run's tokens. Bare id + vendor, post-resolution.
         executedModel: {
@@ -1553,6 +1561,13 @@ export async function POST(request: Request) {
               [LIST_TABS]: listTabsTool,
             }
           : {}),
+        // OCR-PASTE-PLAN D8: CLIENT-executed (no server `execute`). The engine's
+        // onToolCall downloads the image and reads its text on the user's device.
+        ...(localOcrAvailable
+          ? {
+              [READ_IMAGE_TEXT]: readImageTextTool,
+            }
+          : {}),
       };
       const toolConfig = (aiSettings as { toolConfig?: Record<
         string,
@@ -1588,6 +1603,9 @@ export async function POST(request: Request) {
             !(browserExtensionAvailable && id === "read_page"),
         ),
       );
+      // read_content points at an image's text only when something can read it
+      // this turn — registered (a browser asked for it) AND not switched off.
+      toolCtx.imageTextReadable = READ_IMAGE_TEXT in tools;
 
       // What the model is TOLD it has. The `tools` object above stays
       // complete for the rest of this request: `activeTools` narrows only what
