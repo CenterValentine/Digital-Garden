@@ -19,6 +19,7 @@ import { IconSelector } from "../IconSelector";
 import { LeftSidebarStatusBar } from "../LeftSidebarStatusBar";
 import { RootNodeHeader, type RootScopeOption } from "../file-tree/RootNodeHeader";
 import {
+  getVisiblePaneIds,
   useContentStore,
   resolveOpenDestinationPane,
   resolveLayoutModeForPane,
@@ -1970,6 +1971,23 @@ export function LeftSidebarContent({
       if (viaRowId !== id) standIns.remember(id, viaRowId);
       else standIns.forget(id);
       standIns.setActiveRow(viaRowId);
+      // Content already on screen is ACTIVATED where it is, not moved. The
+      // side-by-side rule chooses a pane for content that is not open yet;
+      // applied to an open tab it relocates it — a click on the row of the
+      // note you are reading hopped it to the other pane. An aimed open (a
+      // held direction key) is an explicit placement and still moves it.
+      if (!heldPaneTarget()) {
+        const cs = useContentStore.getState();
+        for (const paneId of getVisiblePaneIds(cs.layoutMode)) {
+          const tabId = cs.panes[paneId]?.tabIds.find(
+            (candidate) => cs.tabs[candidate]?.contentId === id,
+          );
+          if (tabId) {
+            cs.activateContentTab(tabId);
+            return;
+          }
+        }
+      }
       setSelectedContentId(id, meta);
     };
 

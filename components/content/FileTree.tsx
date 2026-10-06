@@ -757,7 +757,18 @@ export function FileTree({
     if (tree) {
       Promise.resolve(tree.scrollTo(id, align)).then(() => {
         const node = treeRef.current?.get(id);
-        if (node && !node.isSelected) node.select();
+        if (node && !node.isSelected) {
+          // A reveal SELECTS the row to show where the active content lives;
+          // it must never OPEN it. react-arborist reports this select through
+          // the same onSelect a click uses, and the open handler sends a tree
+          // open to the pane OPPOSITE the active one (#278) — so the tree
+          // following a tab click (#277) re-opened that content across the
+          // split: every activation moved a tab, drops landed the wrong tab,
+          // and "clicking a tab moved everything to the other pane" (owner,
+          // 2026-10-06). Same flag a shift-click / folder click sets.
+          selectionOnlyRef.current = true;
+          node.select();
+        }
         if (flash) useTreeRevealStore.getState().flashNode(id);
       });
     }
