@@ -42,8 +42,8 @@ export async function POST(request: NextRequest) {
       const role = formData.get("role") as "primary" | "referenced" | null;
       // Where the new file goes (sibling-order.ts `slotForArrival`): at the
       // top of its folder — or right after the previous file of the same
-      // batch, so a multi-file upload keeps its order there. An attachment is
-      // appended instead (attachments read in the order they were added).
+      // batch, so a multi-file upload keeps its order there. Referenced content
+      // (an image pasted into a note) is appended instead, in the order added.
       // Every upload used to store 0: it tied with the folder's first row
       // and was then ordered by title.
       const afterUploadId = formData.get("afterId");

@@ -56,7 +56,7 @@ export function isUndraggableRow(row: Pick<DropRuleRow, "id" | "isShortcutMirror
  *    `temp-`, people mount) takes nothing — its id names no content;
  *  - a shortcut that isn't a live folder pointer takes nothing;
  *  - a shortcut may be stored under any content;
- *  - a note takes referenced content (attachments);
+ *  - a note takes referenced content;
  *  - a database takes its own promoted rows back, and other databases.
  */
 export function acceptsDropInto(parent: DropRuleRow, drags: readonly DropRuleRow[]): boolean {

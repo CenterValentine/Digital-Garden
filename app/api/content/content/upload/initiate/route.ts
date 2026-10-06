@@ -139,7 +139,7 @@ export async function POST(request: NextRequest) {
         { attrs: { kind: "file", ext: fileExtension, bytes: fileSize } },
         async (span) => {
           // Same placement as the tree's uploads (upload/simple): a file
-          // lands at the top of its folder, an attachment (an image dropped
+          // lands at the top of its folder, referenced content (an image dropped
           // into a note, a recording) is appended after the others. Claimed
           // and written under the folder's order lock.
           const created = await prisma.$transaction(async (tx) => {

@@ -24,9 +24,9 @@ last_updated: 2026-05-13
 - **Inside a shortcut, Delete removes the shortcut; reference actions reach the original** (owner rule): open, open in pane, copy, download, AI context and table→deck act on the original (`contentIdOfRowId`); Delete — menu or ⌥D — removes the shortcut the row is seen through, never the original (`deleteTargetsOfRowIds`, applied in `handleDelete`), labelled `Remove Shortcut “<name>”` and announced with Undo; a window row deletes nothing. Other edits stay off projection rows (⌥R included).
 - **What a view's shortcuts show is in the view** (owner rule): the open guard's view-scope check counts the view root's subtree AND whatever shortcuts inside the view reach — their targets' subtrees, along chains of shortcuts (`viewReachRoots`). Locked-workspace overlap checks are unchanged.
 - **Drags stick** (owner report: "sometimes dragging doesn't stick"): the drop rules finally run (`disableDrop`/`disableDrag` — react-arborist never read the old `canDrop`); a drop over the middle of a note or file lands beside it, above/below by the pointer's half, with a line preview; placement is one locked transaction and drags are sent in order, so quick successive moves can't undo each other; renumbering touches only changed rows and never `updatedAt`; paste and Move to folder place by anchor; folder views use the tree's order; window rows can't be dragged.
-- **Every arriving row lands deliberately** (`slotForArrival` + `sibling-slot.ts`, under the same per-list lock): uploads at the top in the order picked, attachments appended; the Folder assistant at the top in order, with Undo restoring the old place; deduped bookmarks re-filed get the appended slot; Studio outputs newest-first.
+- **Every arriving row lands deliberately** (`slotForArrival` + `sibling-slot.ts`, under the same per-list lock): uploads at the top in the order picked, referenced content appended; the Folder assistant at the top in order, with Undo restoring the old place; deduped bookmarks re-filed get the appended slot; Studio outputs newest-first.
 - **Sort menu** (beside + in the tree header): **Float folders**, **Float nested**, **Name** (A–Z ↔ Z–A), **Stop sorting** — for the ONE folder the tree targets (the same one + adds to); nothing nested touched. **A folder remembers its sort and stays sorted** (arrivals and renames take their place; a drag inside it turns the sort off, with a toast); the header icon shows the kept sort's glyph in light gold. The vault's top level sorts once. Undo on every sort. Both header buttons' tooltips name the target.
-- **Attachments chip**: its above/below arrow shows only while the block is on screen.
+- **Referenced-items chip**: its above/below arrow shows only while the referenced items are on screen (and, as before, only on a row that also has sub-items to place them against).
 - **Moves wait out a slow database** (locked transactions get 15 s to start, 30 s to run, not Prisma's 5 s), and **a shortcut can't trick a folder into itself**: drops are checked by real ids, so dragging a folder a shortcut shows into its own sub-folder is refused before release.
 
 ### Smoke checklist (owner)
@@ -51,14 +51,14 @@ last_updated: 2026-05-13
 19. In that view, open an item from a folder that no shortcut in the view points to → the "outside this view" dialog still appears.
 20. In a folder of notes, drag a note over the MIDDLE of another note → a line appears on that note's top or bottom edge (following the pointer); release → the dragged note lands there. No bounce, no "Cannot move content into a non-folder item".
 21. Drag a note over the middle of a folder → the folder highlights; release → the note goes inside it.
-22. Drag an attached image out of a note's reference block over the middle of another note → that note highlights; release → it becomes that note's attachment.
+22. Drag a referenced image out of a note's referenced items over the middle of another note → that note highlights; release → it becomes one of that note's referenced items.
 23. In one folder, make two drags within a second of each other → reload → both stayed where you put them.
 24. Copy a note, right-click another note → Paste → it lands directly below the clicked note (try it in a folder where you've deleted or uploaded things).
 25. Select three items, Move → pick a folder → they land at the top of that folder in the order they were in.
 26. Hover a file to see its "modified" time, drag a different file within the same folder, hover the first again → its modified time hasn't changed.
 27. Try to drag a note's window row (in its reference drawer) → it doesn't lift.
 28. Drop three files onto a folder (or upload them with + → File) → they appear at the top of the folder in the order you picked them.
-29. Paste an image into a note → its attachment appears at the END of the note's attachments.
+29. Paste an image into a note → it appears at the END of the note's referenced items.
 30. File two items with the Folder assistant → they land at the top of the target folder in order; click Undo → each goes back to its old folder AND its old position there.
 31. With bookmark dedupe on, save a bookmark you already have into a different folder → it appears at the bottom of that folder.
 32. Run a Studio tool (infographic or slide deck) → the new output is first in "Studio outputs".
@@ -70,7 +70,7 @@ last_updated: 2026-05-13
 38. Drag an item to a new spot inside that sorted folder → it stays where you dropped it, a toast says sorting is off for that folder, the header icon is plain again, nothing else moved.
 39. Sort it again, choose Stop sorting → nothing moves; the glyph goes away. Sort once more and click Undo on the toast → the previous order and sort come back.
 40. Select nothing (vault top level), sort by Name → it sorts once (toast says so); no glyph appears; Name again → Z–A.
-41. Collapse a note whose attachment block was open → its chip turns grey and the ⇅ arrow disappears; open the note → the gold chip and arrow return.
+41. Collapse a note (one with sub-items too) whose referenced items were open → its chip turns grey and the ⇅ arrow disappears; open the note → the gold chip and arrow return.
 42. Check the sort menu, glyph and tooltips in light and dark mode → readable, matching the app's other menus.
 43. Drag an item OUT of an expanded shortcut into a folder of your tree → it moves there (and is gone from the shortcut's folder).
 44. Put a shortcut inside one of the sub-folders of the folder it points at (A/B/C with a shortcut in C → A); expand it, drag the mirrored B onto the real C → no drop line, nothing is sent (C is inside B).

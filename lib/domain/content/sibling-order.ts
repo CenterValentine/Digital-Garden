@@ -113,7 +113,7 @@ export function renumbering(
  *
  * - `"top"`: before every sibling (what you put somewhere lands where you
  *   look: inline create, Move to folder, uploads).
- * - `"bottom"`: after every sibling (appended: attachments, bookmarks).
+ * - `"bottom"`: after every sibling (appended: referenced content, bookmarks).
  * - `{ afterId }`: right after that sibling — how a batch keeps its order at
  *   the top (each item goes after the one before it). An `afterId` that isn't
  *   a sibling falls back to the top.

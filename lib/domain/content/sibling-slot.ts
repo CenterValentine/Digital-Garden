@@ -166,7 +166,7 @@ export async function writeKeptSort(tx: Tx, folderId: string, kept: KeptSort | n
  * The live rows directly under `parentId`, in `compareSiblings` order, with
  * what a sort reads: folder-likeness (a folder, or a shortcut to a live one)
  * and whether each holds other items (live primary children — a note's
- * attachments are stored in its folder, so they don't count).
+ * referenced items are stored in its folder, so they don't count).
  */
 export async function loadLevelRows(tx: Tx, ownerId: string, parentId: string | null): Promise<LevelSortRow[]> {
   const siblings = await tx.contentNode.findMany({

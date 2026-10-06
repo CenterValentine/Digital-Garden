@@ -676,7 +676,7 @@ console.log("\nwhat a row takes inside it, and drops beside it (drop-rules.ts)")
     assert.equal(acceptsDropInto(file, [primaryNote]), false);
   });
   check("a folder takes anything", () => assert.equal(acceptsDropInto(folder, [primaryNote, reference]), true));
-  check("a note takes attachments; a table its own rows and other tables; any content a shortcut", () => {
+  check("a note takes referenced items; a table its own rows and other tables; any content a shortcut", () => {
     assert.equal(acceptsDropInto(note, [reference]), true);
     assert.equal(acceptsDropInto(table, [promotedRow]), true);
     assert.equal(acceptsDropInto(table, [row(U(12), "data")]), true);
@@ -874,7 +874,7 @@ console.log("\nrows arriving by other routes land deliberately (source pins)");
     const lock = fn.indexOf("await lockSiblingOrder(tx, ownerId, [parentId]);");
     assert.ok(lock > 0 && fn.indexOf("tx.contentNode.findMany(") > lock);
   });
-  check("uploads: top of the folder, a batch in order, attachments appended — slot and row in one transaction", () => {
+  check("uploads: top of the folder, a batch in order, referenced content appended — slot and row in one transaction", () => {
     assert.ok(/role === "referenced"\s*\?\s*"bottom"\s*:\s*typeof afterUploadId === "string" && afterUploadId\s*\?\s*\{ afterId: afterUploadId \}\s*:\s*"top"/.test(upload));
     assert.ok(/created = await prisma\.\$transaction\(async \(tx\) => \{\s*const displayOrder = await claimSiblingSlot\(tx,/.test(upload));
     assert.ok(/return tx\.contentNode\.create\(\{\s*data: \{[\s\S]*?\n\s*displayOrder,\n\s*\},\s*\}\);\s*\}(?:, ORDER_TRANSACTION)?\);/.test(upload), "the claimed slot must be what the upload stores");
@@ -1171,7 +1171,7 @@ console.log("\nthe real-id check and the lock timeouts are wired (source pins)")
   });
 }
 
-console.log("\nthe attachments chip (source pin)");
+console.log("\nthe referenced-items chip (source pin)");
 {
   const fileNode = readFileSync(join(__dirname, "../components/content/FileNode.tsx"), "utf8");
   check("its placement arrow shows only while the block is on screen (flag on AND row open)", () => {
