@@ -83,6 +83,11 @@ import {
   type OptimisticTreeRow,
   type TreeOptimisticDetail,
 } from "@/lib/features/content/tree-optimistic";
+import {
+  collectRemovedIds,
+  removeNodesFromTree,
+  withoutIds,
+} from "@/lib/domain/content/tree-remove";
 
 interface TreeApiResponse {
   success: boolean;
@@ -2502,7 +2507,38 @@ ${workbenchWarning}`
   };
 
   // Handler: Perform actual delete after confirmation (supports batch delete)
+  //
+  // OPTIMISTIC. The rows leave the tree the moment the delete is confirmed,
+  // and the tree reconciles QUIETLY afterwards (`loadTree(true)`). It used to
+  // wait for every request and then `fetchTree()`, whose skeleton unmounted
+  // react-arborist: each delete flashed the whole tree and dropped the user
+  // back at the top. A failure puts the failed rows back where they were,
+  // rebuilt from the pre-delete snapshot.
   const handleDeleteConfirmed = async (ids: string[]) => {
+    const treeBefore = treeData;
+    const requested = new Set(ids);
+    setTreeData((current) =>
+      current ? removeNodesFromTree(current, requested) : current
+    );
+    // Without the remount, nothing else prunes selection: FileTree only drops
+    // vanished ids on its first mount.
+    if (treeBefore) {
+      const removed = collectRemovedIds(treeBefore, requested);
+      const treeState = useTreeStateStore.getState();
+      const keptTreeSelection = withoutIds(treeState.selectedIds, removed);
+      if (keptTreeSelection !== treeState.selectedIds) {
+        treeState.setSelectedIds([...keptTreeSelection]);
+      }
+      const contentState = useContentStore.getState();
+      const keptMultiSelection = withoutIds(contentState.multiSelectedIds, removed);
+      if (keptMultiSelection !== contentState.multiSelectedIds) {
+        contentState.setMultiSelect([...keptMultiSelection]);
+      }
+    }
+    // Tabs close with their rows. Only the requested ids: the server trashes
+    // the node itself, and its descendants stay readable (restored with it).
+    closeContentTabs(ids);
+
     try {
       // Get node titles and Google Drive metadata before deleting
       const findNode = (nodes: TreeNode[], targetId: string): TreeNode | null => {
@@ -2653,11 +2689,16 @@ ${workbenchWarning}`
           title: `Failed to delete ${failures.length} of ${ids.length} items`,
           message: errorMessage,
         });
-      }
 
-      // Refresh tree to remove deleted items (even if some failed)
-      closeContentTabs(successes.map((item) => item.id));
-      await fetchTree();
+        // Put the failed rows back where they were: the snapshot minus only
+        // what the server actually deleted. Their tabs stay closed (reopen
+        // from the tree) — the row coming back is the signal.
+        if (treeBefore) {
+          setTreeData(
+            removeNodesFromTree(treeBefore, new Set(successes.map((item) => item.id)))
+          );
+        }
+      }
     } catch (err) {
       clientLogger.error({
         layer: "ui",
@@ -2669,6 +2710,12 @@ ${workbenchWarning}`
         title: "Failed to delete",
         message: "An unexpected error occurred. Please try again.",
       });
+      // Nothing is known to have been deleted: show the tree as it was.
+      if (treeBefore) setTreeData(treeBefore);
+    } finally {
+      // Settle against the server without the skeleton — the tree stays
+      // mounted, so scroll position and expansion are untouched.
+      void loadTree(true);
     }
   };
 
