@@ -7,6 +7,14 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import {
+  applyKeptSort,
+  compareSiblings,
+  isFolderLike,
+  parseKeptSort,
+  type KeptSort,
+} from "@/lib/domain/content/sibling-order";
+import { outOfScopeShortcutTargets } from "@/lib/domain/content/shortcut-targets";
 import { prisma } from "@/lib/database/client";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import { logger, spanPayload, withRouteTrace, withSpan } from "@/lib/core/logger";
@@ -81,6 +89,11 @@ type ContentTreeNode = {
   contentType: string;
   treeNodeKind: "content" | "peopleGroup" | "person";
   role: string;
+  reference?: {
+    via: "text" | "filed";
+    inTextOf: { id: string; title: string } | null;
+    filedWithNote?: boolean;
+  };
   /** The database this node is a promoted row of, if any (plan Phase 5). */
   promotedFromTableId?: string | null;
   children: ContentTreeNode[];
@@ -104,6 +117,7 @@ type ContentTreeNode = {
     viewMode: string;
     sortMode: string | null;
     includeReferencedContent: boolean;
+    treeSort?: KeptSort | null;
   };
   file?: {
     fileName: string;
@@ -265,6 +279,7 @@ export async function GET(request: NextRequest) {
                   viewMode: true,
                   sortMode: true,
                   includeReferencedContent: true,
+                  viewPrefs: true,
                 },
               },
               externalPayload: {
@@ -377,6 +392,8 @@ export async function GET(request: NextRequest) {
       // Per-row debug logs of displayOrder removed — too noisy for the trace.
       const nodeMap = new Map<string, ContentTreeNode>();
       const rootNodes: ContentTreeNode[] = [];
+      let rootTreeSort: KeptSort | null = null;
+      const rootAncestry: string[] = [];
 
       // References display as CHILDREN of their owning note (2026-07-16
       // model change; previously siblings). Display-only re-homing: storage
@@ -394,25 +411,39 @@ export async function GET(request: NextRequest) {
       // reference dragged out to a folder re-nests while its embed persists
       // — it IS still embedded there; full detach applies to non-embedded
       // references only.
+      //
+      // The same edges also say WHY each referenced row sits under its note
+      // (`node.reference`): in a note's text (an embed edge from a live note)
+      // or filed under it (ownedByNoteId, no embed). Read for every
+      // referenced row — an owned row can be in a note's text too.
       const referencedIds = allContent
-        .filter((item) => item.role === "referenced" && !item.ownedByNoteId)
+        .filter((item) => item.role === "referenced")
         .map((item) => item.id);
       const linkOwnerByTarget = new Map<string, string>();
+      const inTextOfByTarget = new Map<string, string>();
       if (referencedIds.length > 0) {
         const embedLinks = await prisma.contentLink.findMany({
           where: {
             targetId: { in: referencedIds },
             linkType: { in: ["image-ref", "audio-ref"] },
+            source: { deletedAt: null },
           },
           select: { targetId: true, sourceId: true },
           orderBy: { createdAt: "asc" },
         });
         for (const link of embedLinks) {
-          if (!linkOwnerByTarget.has(link.targetId)) {
-            linkOwnerByTarget.set(link.targetId, link.sourceId);
+          if (!inTextOfByTarget.has(link.targetId)) {
+            inTextOfByTarget.set(link.targetId, link.sourceId);
+          }
+        }
+        for (const item of allContent) {
+          const embedder = inTextOfByTarget.get(item.id);
+          if (embedder && item.role === "referenced" && !item.ownedByNoteId) {
+            linkOwnerByTarget.set(item.id, embedder);
           }
         }
       }
+      const titleById = new Map(allContent.map((item) => [item.id, item.title]));
 
       // First pass: Create all nodes
       for (const item of allContent) {
@@ -442,6 +473,22 @@ export async function GET(request: NextRequest) {
           contentType: item.contentType,
           treeNodeKind: "content",
           role: item.role,
+          ...(item.role === "referenced"
+            ? {
+                reference: (() => {
+                  const embedder = inTextOfByTarget.get(item.id);
+                  const title = embedder ? titleById.get(embedder) : undefined;
+                  // Filed with a note (ownedByNoteId): placed by that, never by
+                  // text — it stays where it is when a note's text takes it or
+                  // lets it go (the client shows that ahead of the save:
+                  // lib/features/content/in-text-media.ts).
+                  const filedWithNote = !!item.ownedByNoteId;
+                  return embedder && title !== undefined
+                    ? { via: "text" as const, inTextOf: { id: embedder, title }, filedWithNote }
+                    : { via: "filed" as const, inTextOf: null, filedWithNote };
+                })(),
+              }
+            : {}),
           promotedFromTableId: item.promotedFromRow?.tableId ?? null,
           children: [],
           references: [],
@@ -459,6 +506,9 @@ export async function GET(request: NextRequest) {
             viewMode: item.folderPayload.viewMode,
             sortMode: item.folderPayload.sortMode,
             includeReferencedContent: item.folderPayload.includeReferencedContent,
+            treeSort: parseKeptSort(
+              (item.folderPayload.viewPrefs as { treeSort?: unknown } | null)?.treeSort,
+            ),
           };
         }
         if (item.filePayload) {
@@ -677,9 +727,39 @@ export async function GET(request: NextRequest) {
         }
       }
 
+      // Folders that shortcuts inside a view point at, kept out of the view's
+      // rows but returned beside them (see shortcut-targets.ts).
+      const carriedNodes = new Map<string, ContentTreeNode>();
+      let carriedTargetIds: string[] = [];
+
       // View filtering
       if (viewRootContentId && nodeMap.has(viewRootContentId)) {
         const included = collectSubtreeIds(nodeMap, viewRootContentId);
+        const lite = new Map(
+          [...nodeMap.values()].map((node) => [
+            node.id,
+            {
+              id: node.id,
+              parentId: node.parentId,
+              contentType: node.contentType,
+              shortcutTargetId: node.shortcut?.targetDeleted ? null : (node.shortcut?.targetId ?? null),
+            },
+          ]),
+        );
+        const carried = outOfScopeShortcutTargets(lite, included);
+        carriedTargetIds = carried.targetIds;
+        for (const id of carried.carriedIds) {
+          const node = nodeMap.get(id);
+          if (node) carriedNodes.set(id, node);
+        }
+        // The view root and its ancestors (outside the view), so the client
+        // can see that a folder a shortcut shows may CONTAIN the view — and
+        // refuse a drop that would put a folder inside itself before it is
+        // sent (drop-rules.ts `wouldNestInItself`).
+        for (let at: string | null = viewRootContentId, hops = 0; at && hops < 64; hops++) {
+          rootAncestry.push(at);
+          at = nodeMap.get(at)?.parentId ?? null;
+        }
         for (const id of [...nodeMap.keys()]) {
           if (!included.has(id)) nodeMap.delete(id);
         }
@@ -693,6 +773,7 @@ export async function GET(request: NextRequest) {
         // root as parent. Reference-role children land at the top level too,
         // where `partitionReferences` deliberately leaves parentless
         // references inline as ordinary rows rather than hiding them.
+        rootTreeSort = nodeMap.get(viewRootContentId)?.folder?.treeSort ?? null;
         nodeMap.delete(viewRootContentId);
       }
 
@@ -712,26 +793,57 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      function sortChildren(nodes: ContentTreeNode[]) {
-        nodes.sort((a, b) => {
-          if (a.displayOrder !== b.displayOrder) {
-            return a.displayOrder - b.displayOrder;
-          }
-          return a.title.localeCompare(b.title);
-        });
+      function sortChildren(nodes: ContentTreeNode[], kept: KeptSort | null) {
+        // The shared, TOTAL order (sibling-order.ts). Without the id tiebreak,
+        // siblings with equal displayOrder and title kept Postgres's row
+        // order — unspecified here (no orderBy), and it shifts on update.
+        nodes.sort(compareSiblings);
 
         for (const node of nodes) {
           if (node.children.length > 0) {
-            sortChildren(node.children);
+            sortChildren(node.children, node.folder?.treeSort ?? null);
           }
+        }
+
+        // A folder that keeps a sort is SHOWN in that order, whatever its
+        // stored numbers say: rows that arrived since (an upload, an AI note,
+        // a rename) take their sorted place without every writer having to
+        // know about sorts. Children first, so "holds other items" is known.
+        if (kept) {
+          const ordered = applyKeptSort(
+            nodes.map((node) => ({
+              id: node.id,
+              title: node.title,
+              displayOrder: node.displayOrder,
+              folderLike: isFolderLike(node),
+              nested: node.children.some((child) => child.role !== "referenced"),
+              node,
+            })),
+            kept,
+          ).map((row) => row.node);
+          nodes.splice(0, nodes.length, ...ordered);
         }
       }
 
-      sortChildren(rootNodes);
+      sortChildren(rootNodes, rootTreeSort);
 
       // Sort first, partition second — references keep the parent's sort order
       // among themselves instead of needing their own comparator.
       partitionReferences(rootNodes);
+
+      // Shortcut targets outside the view: same hierarchy, sort and partition as
+      // the tree, built from the carried nodes only (none of them is in
+      // nodeMap, so neither pass can attach them to view rows).
+      for (const node of carriedNodes.values()) {
+        if (carriedTargetIds.includes(node.id)) continue;
+        const parent = node.parentId ? carriedNodes.get(node.parentId) : undefined;
+        if (parent) parent.children.push(node);
+      }
+      const shortcutTargets = carriedTargetIds
+        .map((id) => carriedNodes.get(id))
+        .filter((node): node is ContentTreeNode => node !== undefined);
+      for (const target of shortcutTargets) sortChildren(target.children, target.folder?.treeSort ?? null);
+      partitionReferences(shortcutTargets);
 
       // Window reference rows: a note containing Note Window blocks surfaces
       // each windowed target in its Reference Drawer. Rows are DERIVED per
@@ -799,7 +911,13 @@ export async function GET(request: NextRequest) {
         success: true,
         data: {
           tree: rootNodes,
+          // The view root's own sort (its row isn't in the tree).
+          rootTreeSort,
+          // The view root, then its ancestors up to the top (empty when unscoped).
+          rootAncestry,
           stats,
+          // What out-of-view shortcuts mirror. Never rows of the tree.
+          shortcutTargets,
         },
       });
     } catch (error) {

@@ -37,9 +37,6 @@ async function loadState() {
     : "No install identifier is available yet.";
   document.getElementById("native-save-behavior").value =
     config.nativeSaveBehavior || "silent-defaults";
-  document.getElementById("default-dedupe-enabled").value = String(
-    Boolean(config.defaults?.dedupeEnabled)
-  );
   document.getElementById("default-preserve-html").value = String(
     Boolean(config.defaults?.preserveHtml)
   );
@@ -179,8 +176,6 @@ async function saveConfig() {
     defaultConnectionId: document.getElementById("default-connection").value,
     defaults: {
       ...(current.defaults || {}),
-      dedupeEnabled:
-        document.getElementById("default-dedupe-enabled").value === "true",
       preserveHtml:
         document.getElementById("default-preserve-html").value === "true",
     },

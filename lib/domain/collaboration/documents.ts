@@ -5,6 +5,7 @@ import * as Y from "yjs";
 import type { PrismaClient } from "@/lib/database/generated/prisma";
 import { extractSearchTextFromTipTap } from "@/lib/domain/content/search-text";
 import { syncWindowReferences } from "@/lib/domain/content/window-refs";
+import { syncImageReferences } from "@/lib/domain/content/image-refs";
 import {
   hasMeaningfulTipTapContent,
   ydocUpdateHasMeaningfulDefaultContent,
@@ -219,7 +220,7 @@ export async function storeCollaborationYDocState(
   const searchText = extractSearchTextFromTipTap(snapshot);
   const wordCount = searchText.split(/\s+/).filter(Boolean).length;
 
-  await prisma.$transaction(async (tx) => {
+  const ownerId = await prisma.$transaction(async (tx) => {
     const content = await tx.contentNode.findFirst({
       where: {
         id: contentId,
@@ -290,6 +291,7 @@ export async function storeCollaborationYDocState(
         },
       },
     });
+    return content.ownerId;
   });
 
   // Window-ref edges are derived from note content, and collaborative saves
@@ -298,6 +300,13 @@ export async function storeCollaborationYDocState(
   // the transaction (and non-throwing internally): edge syncing must never
   // fail or slow the store hook itself.
   await syncWindowReferences(prisma, contentId, snapshot);
+  // …and the same for the images and audio in the note's text. These links
+  // are what say an item is IN a note (the tree's "In this note's text"
+  // badge, the move rules that keep such items with their note), and they
+  // were only refreshed on REST saves — so during live editing a removed
+  // image still counted as embedded and a pasted one didn't yet. Links only:
+  // no trashing of now-unused media here (see `trashOrphans`).
+  await syncImageReferences(contentId, snapshot, ownerId, { trashOrphans: false });
 }
 
 export function parseCollaborationDocumentName(documentName: string): string {

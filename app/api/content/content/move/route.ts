@@ -13,6 +13,21 @@ import { prisma } from "@/lib/database/client";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import { updateMaterializedPath } from "@/lib/domain/content";
 import type { MoveContentRequest } from "@/lib/domain/content/api-types";
+import {
+  applyKeptSort,
+  compareSiblings,
+  placeAmongSiblings,
+  renumbering,
+  type SiblingPlacement,
+} from "@/lib/domain/content/sibling-order";
+import {
+  ORDER_TRANSACTION,
+  applyRenumbering,
+  loadLevelRows,
+  lockSiblingOrder,
+  readKeptSort,
+  writeKeptSort,
+} from "@/lib/domain/content/sibling-slot";
 import { logger, spanPayload, withRouteTrace, withSpan } from "@/lib/core/logger";
 
 const ROUTE_PATH = "/api/content/content/move";
@@ -28,6 +43,15 @@ export async function POST(request: NextRequest) {
       const body = (await request.json()) as MoveContentRequest;
 
       const { contentId, targetParentId, newDisplayOrder } = body;
+      // The row the item was dropped after (null = first). Preferred over
+      // newDisplayOrder, which indexes the client's VISIBLE rows — a different
+      // list from the sibling list below whenever a parent has referenced
+      // media, hidden rows or an expanded reference block. Shape-checked only;
+      // a name that isn't a sibling falls back to the index.
+      const afterId =
+        body.afterId === null || typeof body.afterId === "string"
+          ? body.afterId
+          : undefined;
 
       if (!contentId) {
         return NextResponse.json(
@@ -303,6 +327,37 @@ export async function POST(request: NextRequest) {
         }
       }
 
+      // Referenced content IN a note's text stays with that note (owner,
+      // 2026-10-06). Filing it under a DIFFERENT note used to succeed: the
+      // tree showed it there while the first note still displayed it, and
+      // deleting the new owner (which trashes what it owns) would trash an
+      // image another note still shows. A drop into a folder already snaps
+      // back for the same reason (`stillReferencedBy` below).
+      if (typeof ownerNoteUpdate === "string" && content.role === "referenced") {
+        const embeddedElsewhere = await prisma.contentLink.findFirst({
+          where: {
+            targetId: contentId,
+            linkType: { in: ["image-ref", "audio-ref"] },
+            sourceId: { not: ownerNoteUpdate },
+            source: { deletedAt: null },
+          },
+          orderBy: { createdAt: "asc" },
+          select: { source: { select: { title: true } } },
+        });
+        if (embeddedElsewhere) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: {
+                code: "STILL_EMBEDDED",
+                message: `This content is still embedded in “${embeddedElsewhere.source.title}”. Remove it from that note's text to move it.`,
+              },
+            },
+            { status: 400 }
+          );
+        }
+      }
+
       // Determine the final parent (storage home — a reference dropped onto
       // a note stores under the note's folder, displays under the note)
       const finalParentId =
@@ -322,7 +377,12 @@ export async function POST(request: NextRequest) {
         },
         async (span) => {
           // Per-row debug log of sibling order removed — too noisy.
-          const result = await moveContentToPosition(contentId, finalParentId, newDisplayOrder ?? 0);
+          const result = await moveContentToPosition(
+            contentId,
+            finalParentId,
+            { afterId, index: newDisplayOrder ?? 0 },
+            session.user.id,
+          );
           if (!result) {
             throw new Error('Failed to update content position');
           }
@@ -430,6 +490,9 @@ export async function POST(request: NextRequest) {
           parentId: updated.parentId,
           displayOrder: updated.displayOrder,
           stillReferencedBy,
+          // The folder kept a sort and this drag reordered it: the sort is
+          // off now, and the client says so.
+          sortCleared: updated.sortCleared,
           message: "Content moved successfully",
         },
       });
@@ -515,74 +578,71 @@ async function updateChildrenPaths(parentId: string) {
 async function moveContentToPosition(
   contentId: string,
   parentId: string | null,
-  visualIndex: number
+  placement: SiblingPlacement,
+  ownerId: string,
 ) {
-  const siblings = await prisma.contentNode.findMany({
-    where: {
-      parentId,
-      deletedAt: null,
-    },
-    select: {
-      id: true,
-      title: true,
-      displayOrder: true,
-      contentType: true,
-    },
-  });
-
-  siblings.sort((a, b) => {
-    if (a.displayOrder !== b.displayOrder) {
-      return a.displayOrder - b.displayOrder;
-    }
-    return a.title.localeCompare(b.title);
-  });
-
-  const movedItemIndex = siblings.findIndex(s => s.id === contentId);
-  let movedItem;
-  if (movedItemIndex >= 0) {
-    [movedItem] = siblings.splice(movedItemIndex, 1);
-  }
-
-  const targetIndex = Math.max(0, Math.min(visualIndex, siblings.length));
-
-  if (!movedItem) {
-    movedItem = await prisma.contentNode.findUnique({
+  // ONE transaction, holding the order lock of every list it changes. The
+  // sibling read used to sit outside the write: two moves into one folder
+  // made close together (two quick drags, a drag while a paste ran, another
+  // tab) each read the same list, and the later write renumbered every row
+  // from its stale read — undoing the earlier move. That is the "the drag
+  // didn't stick" a refresh revealed.
+  return prisma.$transaction(async (tx) => {
+    const current = await tx.contentNode.findUnique({
       where: { id: contentId },
-      select: {
-        id: true,
-        title: true,
-        displayOrder: true,
-        contentType: true,
-      },
+      select: { parentId: true },
     });
-    if (!movedItem) {
-      throw new Error('Content not found');
-    }
-  }
+    if (!current) throw new Error("Content not found");
 
-  siblings.splice(targetIndex, 0, movedItem);
+    // The destination's list, and the list the row leaves (a move within
+    // that list renumbers the row too).
+    await lockSiblingOrder(tx, ownerId, [parentId, current.parentId]);
 
-  const updates = siblings.map((sibling, index) => {
-    const updateData: { displayOrder: number; parentId?: string | null } = { displayOrder: index };
-
-    if (sibling.id === contentId) {
-      updateData.parentId = parentId;
-    }
-
-    return prisma.contentNode.update({
-      where: { id: sibling.id },
-      data: updateData,
+    // ownerId: without it, a move at the ROOT treated every user's root items
+    // as siblings — renumbering their displayOrder and offsetting the index by
+    // however many of them there were.
+    const siblings = await tx.contentNode.findMany({
+      where: { parentId, ownerId, deletedAt: null },
+      select: { id: true, title: true, displayOrder: true, contentType: true },
     });
-  });
+    // The same order the tree shows (sibling-order.ts) — renumbering from any
+    // other order would reshuffle rows the user never touched.
+    siblings.sort(compareSiblings);
 
-  await prisma.$transaction(updates);
+    // A drag WITHIN a folder that keeps a sort (owner, 2026-10-06): your
+    // order wins. Start from the order the folder SHOWS — its sort, which the
+    // stored numbers may not yet reflect for rows that arrived since — place
+    // the row there, and forget the folder's sort, so nothing else moves.
+    // A row arriving from elsewhere leaves the sort on: it takes its sorted
+    // place wherever it was dropped.
+    const kept =
+      current.parentId === parentId ? await readKeptSort(tx, ownerId, parentId) : null;
+    const base: Array<{ id: string; title: string; displayOrder: number }> = kept
+      ? applyKeptSort(await loadLevelRows(tx, ownerId, parentId), kept)
+      : siblings;
 
-  return await prisma.contentNode.findUnique({
-    where: { id: contentId },
-    select: {
-      id: true,
-      parentId: true,
-      displayOrder: true,
-    },
-  });
+    const movedItem =
+      base.find((s) => s.id === contentId) ??
+      (await tx.contentNode.findUnique({
+        where: { id: contentId },
+        select: { id: true, title: true, displayOrder: true, contentType: true },
+      }));
+    if (!movedItem) throw new Error("Content not found");
+
+    // The same placement the client's optimistic update uses, so the row
+    // lands where it was shown.
+    const ordered = placeAmongSiblings(base, movedItem, placement);
+
+    // Only rows whose number changes, in one statement, and without
+    // `updatedAt`: reordering is not editing (see `renumbering`).
+    await applyRenumbering(tx, renumbering(ordered, contentId));
+    if (kept && parentId) await writeKeptSort(tx, parentId, null);
+
+    const moved = await tx.contentNode.update({
+      where: { id: contentId },
+      data: { parentId, displayOrder: ordered.findIndex((row) => row.id === contentId) },
+      select: { id: true, parentId: true, displayOrder: true },
+    });
+    return { ...moved, sortCleared: Boolean(kept) };
+  }, ORDER_TRANSACTION);
 }

@@ -44,8 +44,14 @@ import {
   registerCreateTargetResolver,
   resolveCreateParent,
   toServerParent,
+  type TreeLevelTarget,
 } from "@/lib/domain/content/create-target";
-import { resolveDropForwardTarget } from "@/lib/features/content/shortcut-mirror";
+import {
+  deleteTargetsOfRowIds,
+  resolveDropForwardTarget,
+  shortcutIdOfMirrorRowId,
+  targetRowOfSelection,
+} from "@/lib/features/content/shortcut-mirror";
 import { ContentTreePicker } from "@/components/content/pickers/ContentTreePicker";
 
 /**
@@ -83,11 +89,52 @@ import {
   type OptimisticTreeRow,
   type TreeOptimisticDetail,
 } from "@/lib/features/content/tree-optimistic";
+import {
+  IN_TEXT_FETCH_MS,
+  IN_TEXT_RECONCILE_MS,
+  NO_IN_TEXT_EDITS,
+  missingInTextMedia,
+  settleInTextEdits,
+  settleWindowEdits,
+} from "@/lib/features/content/in-text-media";
+import { useInTextMediaStore } from "@/state/in-text-media-store";
+import { patchTreeNodeTitle } from "@/lib/domain/content/tree-patch";
+import { isUuid } from "@/lib/domain/content/uuid";
+import {
+  collectRemovedIds,
+  removeNodesFromTree,
+  withoutIds,
+} from "@/lib/domain/content/tree-remove";
+import {
+  refreshIsQuiet,
+  responseStillApplies,
+  treeResponseApplies,
+  treeScopeKey,
+} from "@/lib/domain/content/tree-refresh";
+import {
+  type KeptSort,
+  isFolderLike,
+  moveAcrossForests,
+  moveTouchesCarried,
+  placeAmongSiblings,
+  sortedInsertIndex,
+} from "@/lib/domain/content/sibling-order";
+import { clearKeptSort, orderKeptLevel } from "@/lib/features/content/kept-sort-display";
+import { useTreeTargetStore } from "@/state/tree-target-store";
+import { inTextElsewhere } from "@/lib/features/content/drop-rules";
+import { resolveTreeRow } from "@/lib/features/content/tree-stand-in";
+import { useTreeStandInStore } from "@/state/tree-stand-in-store";
 
 interface TreeApiResponse {
   success: boolean;
   data: {
     tree: TreeNode[];
+    /** Out-of-view folders that shortcuts in this view point at (shortcut-targets.ts). */
+    shortcutTargets?: TreeNode[];
+    /** The view root's kept sort (its own row isn't in the tree). */
+    rootTreeSort?: KeptSort | null;
+    /** The view root, then its ancestors (empty when unscoped). */
+    rootAncestry?: string[];
     stats: {
       totalNodes: number;
       rootNodes: number;
@@ -165,7 +212,11 @@ function renameTreeNodeId(nodes: TreeNode[], fromId: string, toId: string): Tree
   );
 }
 
-/** Placeholder row for a create made outside the tree (tree-optimistic.ts). */
+/**
+ * Placeholder row for a create made outside the tree (tree-optimistic.ts).
+ * `displayOrder: 0` is the server's default, which those creates store — it
+ * is what places the row correctly (see the sorted insert in the handler).
+ */
 function optimisticTreeNode(tempId: string, row: OptimisticTreeRow, treeParentId: string | null): TreeNode {
   const now = new Date();
   return {
@@ -196,33 +247,6 @@ function optimisticTreeNode(tempId: string, row: OptimisticTreeRow, treeParentId
   };
 }
 
-function patchTreeNodeTitle(
-  nodes: TreeNode[],
-  contentId: string,
-  newTitle: string,
-): TreeNode[] {
-  return nodes.map((node) => {
-    if (node.id === contentId) {
-      return { ...node, title: newTitle };
-    }
-
-    // Both arrays — a rename of content sitting in a parent's reference block
-    // has to patch there too, or the optimistic title never updates for it.
-    if (!node.children?.length && !node.references?.length) {
-      return node;
-    }
-
-    return {
-      ...node,
-      children: node.children?.length
-        ? patchTreeNodeTitle(node.children, contentId, newTitle)
-        : (node.children ?? []),
-      references: node.references?.length
-        ? patchTreeNodeTitle(node.references, contentId, newTitle)
-        : node.references,
-    };
-  });
-}
 
 /**
  * Tree-space parent for a "+" create (null = top of the current tree). The one
@@ -235,7 +259,10 @@ function resolveTreeParent(
 ): string | null {
   return resolveCreateParent({
     explicitParentId,
-    selectedIds: useTreeStateStore.getState().selectedIds,
+    // A row inside a shortcut (or a note's window row) stands for its
+    // shortcut (or note): its own id names nothing in the tree data, and used
+    // to fall through to the top level.
+    selectedIds: useTreeStateStore.getState().selectedIds.map(targetRowOfSelection),
     findNode: (id) => (treeData ? findTreeNodeById(treeData, id) : null),
     viewRootId,
   });
@@ -294,6 +321,16 @@ export function LeftSidebarContent({
   onCreateAiImage,
 }: LeftSidebarContentProps) {
   const [treeData, setTreeData] = useState<TreeNode[] | null>(null);
+  // What shortcuts in a view-scoped tree mirror when their target folder is
+  // outside the view (tree API `shortcutTargets`). Applied with the tree, by
+  // the same guarded load, so the two can never disagree about freshness.
+  const [shortcutTargetTrees, setShortcutTargetTrees] = useState<TreeNode[]>([]);
+  // The sort the top of a view keeps — the view root's own (a folder can
+  // remember its sort; the vault's top level can't). Loaded with the tree.
+  const [rootTreeSort, setRootTreeSort] = useState<KeptSort | null>(null);
+  // The view root and its ancestors — for refusing a drop that would put a
+  // folder inside itself when a shortcut shows a folder that contains the view.
+  const [rootAncestry, setRootAncestry] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedCount, setSelectedCount] = useState(0);
@@ -319,8 +356,12 @@ export function LeftSidebarContent({
     title: string;
     message: string;
     hasChildren: boolean;
-    hasGoogleDriveFiles: boolean;
+    /** Drive copies found by the probe that runs while the dialog is open. */
+    googleDriveFiles: Array<{ contentId: string; fileId: string }>;
+    /** Which probe this dialog belongs to — a slow answer from an earlier one is dropped. */
+    driveProbeToken: number;
   } | null>(null);
+  const driveProbeTokenRef = useRef(0);
   const [externalLinkDialog, setExternalLinkDialog] = useState<{
     open: boolean;
     mode: "create" | "edit";
@@ -516,6 +557,63 @@ export function LeftSidebarContent({
     );
     return () => registerCreateTargetResolver(null);
   }, [treeData, scopedRootParentId]);
+  // …and publishes it for the header's "+" and sort menu, which name it in
+  // their tooltips and show the sort it keeps (state/tree-target-store.ts).
+  const treeSelectedIds = useTreeStateStore((state) => state.selectedIds);
+  const shortcutSorts = useSettingsStore((state) => state.ui?.shortcutSorts);
+  useEffect(() => {
+    const treeParentId = resolveTreeParent(null, treeData, scopedRootParentId);
+    const virtual =
+      !!treeParentId &&
+      (treeParentId.startsWith("peopleGroup:") ||
+        treeParentId.startsWith("person:") ||
+        treeParentId.startsWith("temp-"));
+    const holder = treeParentId && treeData ? findTreeNodeById(treeData, treeParentId) : null;
+    const level = (treeParentId ? holder?.children : treeData) ?? [];
+    const serverParentId = toServerParent(treeParentId, scopedRootParentId);
+    const addTarget: TreeLevelTarget = {
+      kind: "folder",
+      serverParentId,
+      label: holder
+        ? `“${holder.title}”`
+        : !treeParentId && scopedRootTitle
+          ? `“${scopedRootTitle}”`
+          : "the top level",
+      sortable: !virtual,
+      // A folder can remember a sort; the vault's top level has no folder.
+      remembers: !virtual && serverParentId !== null,
+      kept: holder ? (holder.folder?.treeSort ?? null) : treeParentId ? null : rootTreeSort,
+      rows: level
+        .filter((row) => !isPeopleTreeNode(row))
+        .map((row) => ({
+          id: row.id,
+          title: row.title,
+          displayOrder: row.displayOrder ?? 0,
+          folderLike: isFolderLike(row),
+          nested: (row.children?.length ?? 0) > 0,
+        })),
+    };
+    // A shortcut to a folder selected (or a row inside one): the sort menu
+    // sorts THAT SHORTCUT's view — kept in user settings, never written to
+    // the folder (owner, 2026-10-06). "+" still adds beside the shortcut.
+    const selected = treeSelectedIds.length === 1 ? targetRowOfSelection(treeSelectedIds[0]) : null;
+    const selectedRow = selected && treeData ? findTreeNodeById(treeData, selected) : null;
+    const sortTarget: TreeLevelTarget =
+      selectedRow && selectedRow.contentType === "shortcut" && isFolderLike(selectedRow)
+        ? {
+            kind: "shortcut",
+            shortcutId: selectedRow.id,
+            serverParentId: null,
+            label: `shortcut “${selectedRow.title}”`,
+            sortable: true,
+            remembers: true,
+            kept: shortcutSorts?.[selectedRow.id] ?? null,
+            rows: [],
+          }
+        : addTarget;
+    useTreeTargetStore.getState().setTargets({ addTarget, sortTarget });
+  }, [treeData, treeSelectedIds, scopedRootParentId, scopedRootTitle, rootTreeSort, shortcutSorts]);
+  useEffect(() => () => useTreeTargetStore.getState().setTargets({ addTarget: null, sortTarget: null }), []);
 
   const rootDropTarget = useMemo(
     () =>
@@ -560,9 +658,28 @@ export function LeftSidebarContent({
     setScopeOverride(key === "parentView" || key === "root" ? key : null);
   };
 
+  // What the tree is showing (workspace + view root), the scope whose tree is
+  // actually on screen, and the scope a finishing request must still match.
+  // See lib/domain/content/tree-refresh.ts for the rule they implement.
+  const treeScope = treeScopeKey(activeWorkspaceId, effectiveViewRootContentId);
+  const loadedScopeRef = useRef<string | null>(null);
+  const currentScopeRef = useRef(treeScope);
+  // Local optimistic edits (move, delete): a counter bumped when one starts
+  // and the number still writing. See treeResponseApplies.
+  const treeEditGenRef = useRef(0);
+  const pendingTreeEditsRef = useRef(0);
+  const loadTreeRef = useRef<((quiet: boolean) => Promise<void>) | null>(null);
+  // Declared before the fetch effect below, so the scope is current by the
+  // time a scope change's own fetch is issued (effects run in order).
+  useEffect(() => {
+    currentScopeRef.current = treeScope;
+  }, [treeScope]);
+
   // Fetch tree data. `quiet` keeps the current tree on screen (no skeleton)
-  // while the refetch runs — used to reconcile after an optimistic row.
+  // while the refetch runs.
   const loadTree = useCallback(async (quiet: boolean) => {
+    const requestScope = treeScope;
+    const startedEditGen = treeEditGenRef.current;
     try {
       if (!quiet) setIsLoading(true);
       setError(null);
@@ -594,7 +711,40 @@ export function LeftSidebarContent({
         throw new Error(result.error?.message || "Failed to fetch tree");
       }
 
+      // Left this scope while the request was out, or a local edit started /
+      // is still writing: this response predates it — drop it rather than
+      // paint the old order (or the previous workspace's files) over it.
+      if (
+        !treeResponseApplies({
+          requestScope,
+          currentScope: currentScopeRef.current,
+          firstLoad: !quiet,
+          startedEditGen,
+          currentEditGen: treeEditGenRef.current,
+          pendingEdits: pendingTreeEditsRef.current,
+        })
+      ) {
+        // Evidence for "the tree stopped updating": an edit that never ended
+        // would drop every quiet refresh after it (owner report, 2026-10-06
+        // — creates and renames from the main panel didn't reach the tree).
+        if (pendingTreeEditsRef.current > 0) {
+          clientLogger.warn({
+            layer: "ui",
+            event: "tree_fetch:dropped_pending_edit",
+            summary: "tree refresh dropped: a local tree edit is still pending",
+            attrs: {
+              pending_edits: pendingTreeEditsRef.current,
+              edit_gen: treeEditGenRef.current,
+            },
+          });
+        }
+        return;
+      }
       setTreeData(result.data.tree);
+      setShortcutTargetTrees(result.data.shortcutTargets ?? []);
+      setRootTreeSort(result.data.rootTreeSort ?? null);
+      setRootAncestry(result.data.rootAncestry ?? []);
+      loadedScopeRef.current = requestScope;
       // Feed the charter-id cache so metadata-less surfaces (workspace
       // tabs) can render the ScrollText identity consistently.
       useCharterIdsStore.getState().setFromTree(result.data.tree);
@@ -607,12 +757,53 @@ export function LeftSidebarContent({
         error: err,
       });
       // A quiet reconcile that fails keeps the tree it already shows.
-      if (!quiet) setError(err instanceof Error ? err.message : "Failed to load file tree");
+      if (!quiet && responseStillApplies(requestScope, currentScopeRef.current)) {
+        setError(err instanceof Error ? err.message : "Failed to load file tree");
+      }
     } finally {
-      if (!quiet) setIsLoading(false);
+      // A superseded scope's request must not drop the skeleton the CURRENT
+      // scope's first load is still showing.
+      if (!quiet && responseStillApplies(requestScope, currentScopeRef.current)) {
+        setIsLoading(false);
+      }
     }
-  }, [activeWorkspaceId, effectiveViewRootContentId]);
-  const fetchTree = useCallback(() => loadTree(false), [loadTree]);
+  }, [activeWorkspaceId, effectiveViewRootContentId, treeScope]);
+  // Every refresh goes through here — post-mutation calls, the header's
+  // refresh button, `dg:tree-refresh` (via refreshTrigger). The skeleton is
+  // shown only for a scope's FIRST load; once its tree is on screen a refresh
+  // swaps the data in place, so react-arborist stays mounted and the user
+  // keeps their place.
+  const fetchTree = useCallback(
+    () => loadTree(refreshIsQuiet(loadedScopeRef.current, treeScope)),
+    [loadTree, treeScope]
+  );
+  useEffect(() => {
+    loadTreeRef.current = loadTree;
+  }, [loadTree]);
+
+  // Press-and-hold on the refresh button: reload from scratch, skeleton and
+  // all (owner, 2026-10-06 — "a hard refresh that flashes"). The only
+  // deliberate skeleton load of a tree already on screen: react-arborist
+  // remounts (open state and scroll come back from the persisted store), and
+  // the in-text overlay is dropped, so what shows is exactly what the server
+  // has. A click stays the quiet refresh.
+  const hardReloadTree = useCallback(() => {
+    useInTextMediaStore.getState().settle(NO_IN_TEXT_EDITS);
+    void loadTree(false);
+  }, [loadTree]);
+
+  // Bracket every optimistic tree edit: begin before the tree is touched, end
+  // in a `finally` — a missed end would drop every refresh after it. The end
+  // of the last pending edit reconciles quietly with the CURRENT scope's
+  // loader (not a stale closure from before a workspace switch).
+  const beginTreeEdit = () => {
+    treeEditGenRef.current += 1;
+    pendingTreeEditsRef.current += 1;
+  };
+  const endTreeEdit = () => {
+    pendingTreeEditsRef.current = Math.max(0, pendingTreeEditsRef.current - 1);
+    if (pendingTreeEditsRef.current === 0) void loadTreeRef.current?.(true);
+  };
 
   // Initial load and refresh when trigger or active workspace changes.
   // Gated on `workspaceStoreReady` so we don't double-fetch (once for
@@ -731,15 +922,61 @@ export function LeftSidebarContent({
   // external selection only to VISIBLE rows, so an item inside a folder the
   // tree had collapsed stayed hidden while the picker showed it unfolded
   // (owner report, 2026-10-02). A row the tree itself just opened is skipped.
+  //
+  // It points at the row that STANDS FOR the content (tree-stand-in.ts): the
+  // shortcut — or row inside one — you opened it from, else its own row, else
+  // a shortcut leading to it. Opening through a shortcut used to move the
+  // selection to the original's row (and ⌥D then acted on the original).
+  // Tree data is read through refs: this follows the CONTENT, not refreshes
+  // (a refresh must not drag the selection back from wherever you moved it).
+  const treeDataRef = useRef(treeData);
+  const shortcutTargetTreesRef = useRef(shortcutTargetTrees);
   useEffect(() => {
-    if (!selectedContentId || selectedContentId.startsWith("temp-")) return;
-    setSelectedIds([selectedContentId]);
-    if (treeOpenedIdRef.current === selectedContentId) {
-      treeOpenedIdRef.current = null;
+    treeDataRef.current = treeData;
+    shortcutTargetTreesRef.current = shortcutTargetTrees;
+  }, [treeData, shortcutTargetTrees]);
+  const pointTreeAt = useCallback(
+    (contentId: string, reveal: boolean, onlyIfFound = false): void => {
+      const standIns = useTreeStandInStore.getState();
+      const standIn = treeDataRef.current
+        ? resolveTreeRow(
+            contentId,
+            treeDataRef.current,
+            shortcutTargetTreesRef.current,
+            standIns.standIns[contentId] ?? null,
+          )
+        : null;
+      // A retry that finds nothing leaves the selection alone — the user may
+      // have selected something else since.
+      if (!standIn && onlyIfFound) return;
+      const rowId = standIn?.rowId ?? contentId;
+      standIns.setActiveRow(standIn ? rowId : null);
+      // A row inside a shortcut exists only while the shortcut (and each
+      // folder on the way) is open.
+      for (const id of standIn?.expand ?? []) useTreeStateStore.getState().setExpanded(id, true);
+      setSelectedIds([rowId]);
+      if (reveal) requestReveal(rowId, { align: "auto", flash: false, explicit: false });
+    },
+    [setSelectedIds, requestReveal],
+  );
+  useEffect(() => {
+    if (!selectedContentId) {
+      useTreeStandInStore.getState().setActiveRow(null);
       return;
     }
-    requestReveal(selectedContentId, { align: "auto", flash: false, explicit: false });
-  }, [selectedContentId, setSelectedIds, requestReveal]);
+    if (selectedContentId.startsWith("temp-")) return;
+    const openedHere = treeOpenedIdRef.current === selectedContentId;
+    if (openedHere) treeOpenedIdRef.current = null;
+    pointTreeAt(selectedContentId, !openedHere);
+  }, [selectedContentId, pointTreeAt]);
+  // The tree arrived (or changed scope) while the open content had no row to
+  // point at: try again. Only then — never re-pointing a row the user has
+  // since moved away from.
+  useEffect(() => {
+    if (!treeData || !selectedContentId || selectedContentId.startsWith("temp-")) return;
+    if (useTreeStandInStore.getState().activeRowId !== null) return;
+    pointTreeAt(selectedContentId, true, true);
+  }, [treeData, selectedContentId, pointTreeAt]);
 
   // A reveal is handed to the tree only once the tree HOLDS the item: a
   // request for a row the fetched tree lacks would make react-arborist's
@@ -747,7 +984,10 @@ export function LeftSidebarContent({
   // that has it (the picker-created note arrives with the next refetch).
   const activeReveal = useMemo(() => {
     if (!revealRequest || !treeData) return null;
-    return findTreeNodeById(treeData, revealRequest.id) ? revealRequest : null;
+    // A row inside a shortcut isn't in the tree's data (it is built while the
+    // shortcut is open): it is held when its shortcut is.
+    const heldId = shortcutIdOfMirrorRowId(revealRequest.id) ?? revealRequest.id;
+    return findTreeNodeById(treeData, heldId) ? revealRequest : null;
   }, [revealRequest, treeData]);
   const handleRevealComplete = useCallback(() => {
     const current = useTreeRevealStore.getState().request;
@@ -781,6 +1021,8 @@ export function LeftSidebarContent({
       setTreeData((current) =>
         current ? patchTreeNodeTitle(current, contentId, updates.title!) : current,
       );
+      // Rows shown through a shortcut whose folder lives outside the view.
+      setShortcutTargetTrees((current) => patchTreeNodeTitle(current, contentId, updates.title!));
     };
 
     window.addEventListener(
@@ -873,11 +1115,25 @@ export function LeftSidebarContent({
           // A parent outside the visible tree: nothing to show until it's opened.
           if (treeParentId && !treeContainsId(current, treeParentId)) return current;
           const node = optimisticTreeNode(detail.tempId, detail.row, treeParentId);
-          if (!treeParentId) return [node, ...current];
+          // Where the create puts it, when the caller says (the picker: top,
+          // or right after a sibling). Otherwise where the server will sort
+          // it, not on top: those creates store the default displayOrder (0),
+          // so the real row lands by title among the other zeros — a
+          // placeholder pinned to the top jumped there on resolve.
+          // sortedInsertIndex is the tree API's own comparator.
+          const place = detail.row.place;
+          const insertSorted = (list: TreeNode[]): TreeNode[] => {
+            const anchor =
+              place && place !== "top" ? list.findIndex((row) => row.id === place.afterId) : -1;
+            const at =
+              place === "top" ? 0 : anchor !== -1 ? anchor + 1 : sortedInsertIndex(list, node);
+            return [...list.slice(0, at), node, ...list.slice(at)];
+          };
+          if (!treeParentId) return insertSorted(current);
           const insertUnder = (nodes: TreeNode[]): TreeNode[] =>
             nodes.map((candidate) =>
               candidate.id === treeParentId
-                ? { ...candidate, children: [node, ...(candidate.children ?? [])] }
+                ? { ...candidate, children: insertSorted(candidate.children ?? []) }
                 : candidate.children?.length
                   ? { ...candidate, children: insertUnder(candidate.children) }
                   : candidate
@@ -911,6 +1167,42 @@ export function LeftSidebarContent({
       window.removeEventListener(TREE_SYNC_EVENT, handleSync);
     };
   }, [scopedRootParentId, loadTree]);
+
+  // Media a note's text just gained or lost is shown with that note at once
+  // (FileTree, in-text-media.ts); these keep that honest. An edit the data
+  // already shows is dropped whenever the data changes — and only then does
+  // an old one expire, so the tree never falls back on its own to data from
+  // before the edit.
+  const inTextEdits = useInTextMediaStore((state) => state.edits);
+  const windowEdits = useInTextMediaStore((state) => state.windowEdits);
+  const inTextRecordedAt = useInTextMediaStore((state) => state.recordedAt);
+  useEffect(() => {
+    if (!treeData) return;
+    const settled = settleInTextEdits([treeData, shortcutTargetTrees], inTextEdits, Date.now());
+    if (settled !== inTextEdits) useInTextMediaStore.getState().settle(settled);
+  }, [treeData, shortcutTargetTrees, inTextEdits]);
+  useEffect(() => {
+    if (!treeData) return;
+    const settled = settleWindowEdits([treeData, shortcutTargetTrees], windowEdits, Date.now());
+    if (settled !== windowEdits) useInTextMediaStore.getState().settleWindows(settled);
+  }, [treeData, shortcutTargetTrees, windowEdits]);
+  // On each new edit: fetch at once a row the tree hasn't loaded (a fresh
+  // upload — the edit can't show it until it is here), and reconcile once
+  // the save has had time to land (Hocuspocus stores 2–10 s after an edit),
+  // so the edits settle and media a note let go of shows where it is kept.
+  useEffect(() => {
+    if (inTextRecordedAt === 0) return;
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    const missing = missingInTextMedia(
+      [treeDataRef.current ?? [], shortcutTargetTreesRef.current],
+      useInTextMediaStore.getState().edits,
+    );
+    if (missing.length > 0) {
+      timers.push(setTimeout(() => void loadTreeRef.current?.(true), IN_TEXT_FETCH_MS));
+    }
+    timers.push(setTimeout(() => void loadTreeRef.current?.(true), IN_TEXT_RECONCILE_MS));
+    return () => timers.forEach(clearTimeout);
+  }, [inTextRecordedAt]);
 
   // Imperative reveal request from outside the tree (main-panel path
   // breadcrumb): open the node's ancestors, scroll to it, and select it —
@@ -1014,7 +1306,12 @@ export function LeftSidebarContent({
     tree: TreeNode[],
     nodeId: string,
     newParentId: string | null,
-    newIndex: number
+    newIndex: number,
+    // The anchor from the drop (see sibling-order.ts). When present, the row
+    // is placed by placeAmongSiblings — the same function the move route
+    // uses — so the optimistic tree and the server agree. `undefined` keeps
+    // the index path for callers without one.
+    afterId?: string | null
   ): TreeNode[] => {
     // Find and remove the node from its current location
     let movedNode: TreeNode | null = null;
@@ -1083,6 +1380,9 @@ export function LeftSidebarContent({
     const insertNode = (nodes: TreeNode[]): TreeNode[] => {
       // If this is the target parent (or root if newParentId is null)
       if (newParentId === null) {
+        if (afterId !== undefined) {
+          return placeAmongSiblings(nodes, relocated, { afterId, index: adjustedIndex });
+        }
         // Insert at root level
         const newNodes = [...nodes];
         newNodes.splice(adjustedIndex, 0, relocated);
@@ -1092,6 +1392,15 @@ export function LeftSidebarContent({
       return nodes.map((node) => {
         if (node.id === newParentId) {
           const landing = { ...relocated, parentId: newParentId };
+          if (landsInReferences && afterId !== undefined) {
+            return {
+              ...node,
+              references: placeAmongSiblings(node.references ?? [], landing, {
+                afterId,
+                index: adjustedIndex,
+              }),
+            };
+          }
           if (landsInReferences) {
             const newReferences = [...(node.references ?? [])];
             // react-arborist's index counts rendered rows (primary children
@@ -1104,6 +1413,15 @@ export function LeftSidebarContent({
               landing,
             );
             return { ...node, references: newReferences };
+          }
+          if (afterId !== undefined) {
+            return {
+              ...node,
+              children: placeAmongSiblings(node.children ?? [], landing, {
+                afterId,
+                index: adjustedIndex,
+              }),
+            };
           }
           // Found the target parent, insert into its children
           const newChildren = [...(node.children || [])];
@@ -1133,16 +1451,25 @@ export function LeftSidebarContent({
   };
 
   // Handle node move (drag-and-drop)
+  // The tail of every move request sent so far (see handleMove).
+  const moveRequestChainRef = useRef<Promise<unknown>>(Promise.resolve());
+
   const handleMove = async (args: {
     dragIds: string[];
     parentId: string | null;
     index: number;
+    /** From FileTree: the row the drop landed after, read off the screen. */
+    afterId?: string | null;
+    /** From FileTree: the real folder a projection row stands for (mirror rows aren't in our data). */
+    forwardTo?: string | null;
   }) => {
-    const { dragIds, index } = args;
+    const { dragIds, index, afterId } = args;
     let { parentId } = args;
 
     // Store original tree state for rollback if any move fails
     const originalTree = treeData;
+    const targetTreesBefore = shortcutTargetTrees;
+    const rootTreeSortBefore = rootTreeSort;
 
     if (!originalTree || dragIds.length === 0) return;
 
@@ -1151,10 +1478,20 @@ export function LeftSidebarContent({
     // destination here, before anything optimistic or networked happens, is
     // what keeps the rule "nothing is ever stored under a shortcut" true
     // without the rest of the move path needing to know shortcuts exist.
+    // The row the drop landed on, before forwarding — a shortcut's own row
+    // when the drop went among its contents.
+    const dropRowId = parentId;
     if (parentId) {
       const dropRow = findTreeNodeById(originalTree, parentId);
-      const forwardTo = dropRow ? resolveDropForwardTarget(dropRow) : null;
+      const forwardTo = args.forwardTo ?? (dropRow ? resolveDropForwardTarget(dropRow) : null);
       if (forwardTo) parentId = forwardTo;
+    }
+    // Never send a row id that names no content (a projection the rules
+    // above didn't resolve): the server can only refuse it, after the row
+    // has already moved on screen.
+    if (parentId && !isUuid(parentId)) {
+      toast.error("Can't move there", { description: "That row doesn't stand for a folder." });
+      return;
     }
 
     // Find each dragged node's current position. Computed up-front so
@@ -1185,6 +1522,9 @@ export function LeftSidebarContent({
       }
     };
     findPositions(originalTree);
+    // A shortcut's row moves its real item, which in a view may live only in
+    // the carried out-of-view targets (shortcutTargetTrees).
+    findPositions(targetTreesBefore);
 
     // Resolve every dragged node, dropping any id that no longer names a live
     // row rather than aborting the whole drag.
@@ -1202,7 +1542,10 @@ export function LeftSidebarContent({
     // created item was unmovable until the tree was refetched (which cleared the
     // stale id as a side effect). Only bail when nothing at all resolves.
     const dragged = dragIds
-      .map((id) => ({ id, node: findTreeNodeById(originalTree, id) }))
+      .map((id) => ({
+        id,
+        node: findTreeNodeById(originalTree, id) ?? findTreeNodeById(targetTreesBefore, id),
+      }))
       .filter((x): x is { id: string; node: TreeNode } => x.node !== null);
     if (dragged.length === 0) {
       toast.error("Failed to move item", {
@@ -1234,98 +1577,236 @@ export function LeftSidebarContent({
       return;
     }
 
+    // Referenced content IN another note's text stays with that note (owner,
+    // 2026-10-06): dropping it onto a different note is refused with the
+    // reason, before anything moves — the same message a drop into a folder
+    // gives when it snaps back. The move route refuses it too.
+    if (parentId && findTreeNodeById(originalTree, parentId)?.contentType === "note") {
+      for (const { node } of dragged) {
+        const holder = inTextElsewhere(node, parentId);
+        if (holder) {
+          toast.warning("Unable to move referenced content", {
+            description: `This content is still embedded in “${holder.title}”. Remove it from that note's text to move it.`,
+          });
+          return;
+        }
+      }
+    }
+
     // Skip no-op drops: every dragged item is already at its target
     // position (same parent, adjacent index). React-arborist sometimes
     // fires `onMove` even when the user just released without changing
     // anything.
-    const everyDragIsNoop = dragged.every(({ id }) => {
+    // Each dragged row's anchor: the first goes after the drop's anchor, each
+    // next one after the row before it, so the group keeps its drag order.
+    const anchorFor = (i: number): string | null | undefined =>
+      afterId === undefined ? undefined : i === 0 ? afterId : dragged[i - 1].id;
+
+    // With an anchor, "no-op" means the placement leaves the list exactly as
+    // it is. The index comparison below can't be trusted then: `index` counts
+    // the rows on screen (an open reference block included) and
+    // `currentIndex` the data array, so with a block open at the start a real
+    // move to the top read as a no-op and was silently dropped.
+    const listHolding = (id: string): TreeNode[] | null => {
       const pos = positions.get(id);
-      if (!pos) return false;
-      const isSameParent = pos.currentParentId === parentId;
-      return (
-        isSameParent &&
-        (pos.currentIndex === index || pos.currentIndex === index - 1)
-      );
-    });
+      if (!pos) return null;
+      if (pos.currentParentId === null) return originalTree;
+      const holder =
+        findTreeNodeById(originalTree, pos.currentParentId) ??
+        findTreeNodeById(targetTreesBefore, pos.currentParentId);
+      if (!holder) return null;
+      if (holder.children?.some((c) => c.id === id)) return holder.children;
+      if (holder.references?.some((c) => c.id === id)) return holder.references ?? null;
+      return null;
+    };
+    const everyDragIsNoop =
+      afterId !== undefined
+        ? (() => {
+            const list = listHolding(dragged[0].id);
+            if (!list) return false;
+            const allHere = dragged.every(
+              ({ id }) => positions.get(id)?.currentParentId === parentId && listHolding(id) === list
+            );
+            if (!allHere) return false;
+            let order: TreeNode[] = list;
+            dragged.forEach(({ node }, i) => {
+              order = placeAmongSiblings(order, node, { afterId: anchorFor(i), index: index + i });
+            });
+            return order.map((n) => n.id).join("\n") === list.map((n) => n.id).join("\n");
+          })()
+        : dragged.every(({ id }) => {
+            const pos = positions.get(id);
+            if (!pos) return false;
+            const isSameParent = pos.currentParentId === parentId;
+            return (
+              isSameParent &&
+              (pos.currentIndex === index || pos.currentIndex === index - 1)
+            );
+          });
     if (everyDragIsNoop) return;
+
+    // Reordering inside a shortcut that keeps its OWN sort (a view-only
+    // setting): the shortcut has no hand-set order of its own, so the drop
+    // goes to its folder like any shortcut drag, and the shortcut's sort
+    // turns off — your order wins, as in a sorted folder. Undone if the
+    // move fails.
+    const sortedShortcutId =
+      dropRowId && dropRowId !== parentId && shortcutSorts?.[dropRowId] &&
+      dragged.every(({ id }) => positions.get(id)?.currentParentId === parentId)
+        ? dropRowId
+        : null;
+    const shortcutSortsBefore = shortcutSorts;
+    if (sortedShortcutId && shortcutSortsBefore) {
+      const without = { ...shortcutSortsBefore };
+      delete without[sortedShortcutId];
+      void useSettingsStore.getState().setUISettings({ shortcutSorts: without });
+    }
+    const restoreShortcutSort = () => {
+      if (sortedShortcutId && shortcutSortsBefore) {
+        void useSettingsStore.getState().setUISettings({ shortcutSorts: shortcutSortsBefore });
+      }
+    };
+
+    beginTreeEdit();
 
     try {
       // OPTIMISTIC UPDATE: walk every dragged id and apply each move to
       // the working tree, offsetting the index by i so items keep their
       // drag-order in the destination.
-      let optimisticTree = originalTree;
-      for (let i = 0; i < dragged.length; i++) {
-        optimisticTree = applyMoveToTree(
-          optimisticTree,
-          dragged[i].id,
+      // A move that touches the carried out-of-view shortcut targets — a
+      // shortcut's row dragged (its real item lives there), or a drop onto an
+      // out-of-view shortcut — moves rows ACROSS the two collections, so the
+      // shortcut's contents and the view both show the result now rather
+      // than after the reconcile. Everything else keeps the visible-tree path.
+      if (
+        moveTouchesCarried(
+          { main: originalTree, carried: targetTreesBefore },
+          dragged.map(({ id }) => id),
           parentId,
-          index + i,
+        )
+      ) {
+        const moved = moveAcrossForests(
+          { main: originalTree, carried: targetTreesBefore },
+          dragged.map(({ node }, i) => ({
+            node,
+            placement: { afterId: anchorFor(i), index: index + i },
+          })),
+          parentId,
         );
+        setTreeData(moved.main);
+        setShortcutTargetTrees(moved.carried);
+      } else {
+        // Reordering inside a folder that keeps a sort turns its sort off —
+        // your order wins (the move route does the same). Fix its rows in the
+        // order the sort showed first, so the drop lands among them as seen.
+        const destinationKept =
+          parentId === null
+            ? rootTreeSort
+            : (findTreeNodeById(originalTree, parentId)?.folder?.treeSort ?? null);
+        const reordersSortedFolder =
+          !!destinationKept &&
+          dragged.every(({ id }) => positions.get(id)?.currentParentId === parentId);
+        let optimisticTree = originalTree;
+        if (reordersSortedFolder) {
+          if (parentId === null) {
+            optimisticTree = orderKeptLevel(optimisticTree, destinationKept);
+            setRootTreeSort(null);
+          } else {
+            optimisticTree = clearKeptSort(optimisticTree, parentId);
+          }
+        }
+        for (let i = 0; i < dragged.length; i++) {
+          optimisticTree = applyMoveToTree(
+            optimisticTree,
+            dragged[i].id,
+            parentId,
+            index + i,
+            anchorFor(i),
+          );
+        }
+        setTreeData(optimisticTree);
       }
-      setTreeData(optimisticTree);
 
-      // Fire the moves sequentially. Parallel POSTs against the move
-      // endpoint would race each other on displayOrder slot assignment
-      // (the server computes the final slot from current children).
-      // Sequential keeps the contract simple and yields stable order.
+      // Fire the moves sequentially — and after every earlier drag's moves.
+      // Each POST re-reads the destination's siblings and renumbers them all,
+      // so two drags made in quick succession used to overlap: the second
+      // read the list before the first had written, and its renumbering
+      // undid the first drag ("the drag didn't stick" after the refresh).
+      // The server now also locks a folder's order while it places a row;
+      // this chain additionally keeps the moves in the order they were made,
+      // which the optimistic tree already assumes.
       const failures: Array<{ id: string; message: string }> = [];
       // A detached reference that's still embedded in a note will re-nest
       // under it on the next tree fetch (embed-graph ownership). Capture the
       // server's flag so the snap-back happens visibly after a beat, with an
       // explanation — not silently on some later refresh.
       let snapBackTo: { id: string; title: string } | null = null;
-      for (let i = 0; i < dragged.length; i++) {
-        const { id, node } = dragged[i];
-        const pos = positions.get(id);
-        const isSameParent = pos?.currentParentId === parentId;
-        const insertionIndex = index + i;
-        // react-arborist gives the insertion point; the server expects
-        // the final visual position. When moving DOWN within the same
-        // parent, subtract 1 to account for the item's own removal
-        // shifting everything left.
-        const apiIndex =
-          isSameParent && pos && pos.currentIndex < insertionIndex
-            ? insertionIndex - 1
-            : insertionIndex;
+      // The server turned a folder's sort off because this drag reordered it.
+      let sortCleared = false;
+      const sendMoves = async () => {
+        for (let i = 0; i < dragged.length; i++) {
+          const { id, node } = dragged[i];
+          const pos = positions.get(id);
+          const isSameParent = pos?.currentParentId === parentId;
+          const insertionIndex = index + i;
+          // react-arborist gives the insertion point; the server expects
+          // the final visual position. When moving DOWN within the same
+          // parent, subtract 1 to account for the item's own removal
+          // shifting everything left.
+          const apiIndex =
+            isSameParent && pos && pos.currentIndex < insertionIndex
+              ? insertionIndex - 1
+              : insertionIndex;
 
-        const response = isPeopleTreeNode(node)
-          ? await fetch("/api/people/mounts", {
-              method: "POST",
-              credentials: "include",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                target: toPeopleMountTarget(node),
-                contentParentId: parentId ?? scopedRootParentId,
-                displayOrder: apiIndex,
-                allowRemount: true,
-              }),
-            })
-          : await fetch("/api/content/content/move", {
-              method: "POST",
-              credentials: "include",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                contentId: id,
-                targetParentId: parentId ?? scopedRootParentId,
-                newDisplayOrder: apiIndex,
-              }),
+          const response = isPeopleTreeNode(node)
+            ? await fetch("/api/people/mounts", {
+                method: "POST",
+                credentials: "include",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  target: toPeopleMountTarget(node),
+                  contentParentId: parentId ?? scopedRootParentId,
+                  displayOrder: apiIndex,
+                  allowRemount: true,
+                }),
+              })
+            : await fetch("/api/content/content/move", {
+                method: "POST",
+                credentials: "include",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  contentId: id,
+                  targetParentId: parentId ?? scopedRootParentId,
+                  newDisplayOrder: apiIndex,
+                  // The placement that actually decides it (see sibling-order.ts);
+                  // newDisplayOrder stays as the server's fallback.
+                  afterId: anchorFor(i),
+                }),
+              });
+
+          const result = await response.json().catch(() => ({}) as { error?: { message?: string; code?: string }; success?: boolean });
+          if (!response.ok || !result.success) {
+            failures.push({
+              id,
+              message: result.error?.message ?? `HTTP ${response.status}`,
             });
-
-        const result = await response.json().catch(() => ({}) as { error?: { message?: string; code?: string }; success?: boolean });
-        if (!response.ok || !result.success) {
-          failures.push({
-            id,
-            message: result.error?.message ?? `HTTP ${response.status}`,
-          });
-        } else {
-          const moved = (
-            result as {
-              data?: { stillReferencedBy?: { id: string; title: string } | null };
-            }
-          ).data;
-          if (moved?.stillReferencedBy) snapBackTo = moved.stillReferencedBy;
+          } else {
+            const moved = (
+              result as {
+                data?: {
+                  stillReferencedBy?: { id: string; title: string } | null;
+                  sortCleared?: boolean;
+                };
+              }
+            ).data;
+            if (moved?.stillReferencedBy) snapBackTo = moved.stillReferencedBy;
+            if (moved?.sortCleared) sortCleared = true;
+          }
         }
-      }
+      };
+      const queued = moveRequestChainRef.current.then(sendMoves);
+      moveRequestChainRef.current = queued.catch(() => undefined);
+      await queued;
 
       if (failures.length > 0) {
         clientLogger.error({
@@ -1341,6 +1822,9 @@ export function LeftSidebarContent({
         });
         // Rollback to original tree state so the UI matches truth.
         setTreeData(originalTree);
+        setShortcutTargetTrees(targetTreesBefore);
+        setRootTreeSort(rootTreeSortBefore);
+        restoreShortcutSort();
         const desc =
           failures.length === dragged.length
             ? failures[0].message
@@ -1362,6 +1846,23 @@ export function LeftSidebarContent({
       if (peopleDragged.length > 0) {
         window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
         window.dispatchEvent(new CustomEvent("dg:people-refresh"));
+      }
+
+      if (sortedShortcutId) {
+        const shortcutTitle = findTreeNodeById(originalTree, sortedShortcutId)?.title ?? "this shortcut";
+        toast(`Sorting turned off for shortcut “${shortcutTitle}”`, {
+          description: "Your drop went to its folder, so the shortcut now shows the folder's own order.",
+        });
+      }
+
+      if (sortCleared) {
+        const folderTitle =
+          parentId === null
+            ? (scopedRootTitle ?? "this level")
+            : (findTreeNodeById(originalTree, parentId)?.title ?? "this folder");
+        toast(`Sorting turned off for “${folderTitle}”`, {
+          description: "You reordered it by hand, so your order is kept. Sort it again from the ⇅ menu.",
+        });
       }
 
       if (snapBackTo) {
@@ -1391,6 +1892,9 @@ export function LeftSidebarContent({
       });
       // Rollback to original tree state on any error
       setTreeData(originalTree);
+      setShortcutTargetTrees(targetTreesBefore);
+      setRootTreeSort(rootTreeSortBefore);
+      restoreShortcutSort();
 
       // Show user-friendly error notification
       const errorMessage = err instanceof Error ? err.message : "An unexpected error occurred";
@@ -1402,6 +1906,10 @@ export function LeftSidebarContent({
       }
 
       throw err;
+    } finally {
+      // Reconcile once the writes are in — a refresh that started during the
+      // drag was dropped (treeResponseApplies), so this is the one that lands.
+      endTreeEdit();
     }
   };
 
@@ -1451,8 +1959,17 @@ export function LeftSidebarContent({
     const openFromTree = (
       id: string,
       meta: Parameters<typeof setSelectedContentId>[1],
+      /** The row clicked — a shortcut or a row inside one opens another id. */
+      viaRowId: string = id,
     ) => {
       treeOpenedIdRef.current = id;
+      // Opened through a shortcut: that row stands in for the content while
+      // you work through it (tree-stand-in.ts); opened from its own row: the
+      // stand-in is forgotten. The tree keeps pointing where you clicked.
+      const standIns = useTreeStandInStore.getState();
+      if (viaRowId !== id) standIns.remember(id, viaRowId);
+      else standIns.forget(id);
+      standIns.setActiveRow(viaRowId);
       setSelectedContentId(id, meta);
     };
 
@@ -1521,11 +2038,15 @@ export function LeftSidebarContent({
     // is synthetic and path-scoped, so opening it means opening the REAL id —
     // otherwise the tab would hold an id no fetch can resolve.
     if (firstNode.isShortcutMirror && firstNode.mirrorOf) {
-      openFromTree(firstNode.mirrorOf, {
-        title: firstNode.title,
-        contentType: firstNode.contentType,
-        ...sideBySide,
-      });
+      openFromTree(
+        firstNode.mirrorOf,
+        {
+          title: firstNode.title,
+          contentType: firstNode.contentType,
+          ...sideBySide,
+        },
+        firstNode.id,
+      );
       return;
     }
 
@@ -1536,11 +2057,15 @@ export function LeftSidebarContent({
     if (firstNode.contentType === "shortcut") {
       const target = firstNode.shortcut;
       if (target?.targetId && !target.targetDeleted) {
-        openFromTree(target.targetId, {
-          title: target.targetTitle ?? firstNode.title,
-          contentType: target.targetContentType ?? undefined,
-          ...sideBySide,
-        });
+        openFromTree(
+          target.targetId,
+          {
+            title: target.targetTitle ?? firstNode.title,
+            contentType: target.targetContentType ?? undefined,
+            ...sideBySide,
+          },
+          firstNode.id,
+        );
       } else {
         openFromTree(firstNode.id, {
           title: firstNode.title,
@@ -1904,6 +2429,9 @@ export function LeftSidebarContent({
       const requestBody: Record<string, unknown> = {
         title: config.title,
         parentId: requestParentId,
+        // Where the placeholder row already is (insertTempNode puts it first),
+        // so the real row doesn't jump to its alphabetical spot on reconcile.
+        position: "top",
       };
       if (createTarget.peopleGroupId) {
         requestBody.peopleGroupId = createTarget.peopleGroupId;
@@ -2304,12 +2832,69 @@ export function LeftSidebarContent({
     }
   };
 
+  // A shortcut removed from inside its own mirror. The row the user acted on
+  // stood for content elsewhere, so the toast names the shortcut that went,
+  // says the original stayed, and offers it back: removal is a soft delete,
+  // and restoring keeps its parent and order.
+  const announceShortcutRemoval = (removedIds: string[], nodes: TreeNode[]) => {
+    const titles = nodes
+      .filter((node) => removedIds.includes(node.id))
+      .map((node) => node.title);
+    toast.success(
+      titles.length === 1
+        ? `Removed the shortcut “${titles[0]}”`
+        : `Removed ${removedIds.length} shortcuts`,
+      {
+        description: "The original is untouched.",
+        action: {
+          label: "Undo",
+          onClick: () => {
+            void (async () => {
+              const restored = await Promise.all(
+                removedIds.map((id) =>
+                  fetch("/api/trash/restore", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    credentials: "include",
+                    body: JSON.stringify({ kind: "content", id }),
+                  })
+                    .then((response) => response.ok)
+                    .catch(() => false)
+                )
+              );
+              if (restored.some((ok) => !ok)) {
+                toast.error("Couldn't put the shortcut back", {
+                  description: "It's in the trash — restore it from there.",
+                });
+              }
+              await fetchTree();
+            })();
+          },
+        },
+      }
+    );
+  };
+
   // Handler: Delete content nodes (soft delete) - supports batch delete
   const handleDelete = async (idsToDelete: string | string[]) => {
     // Normalize to array
-    const ids = Array.isArray(idsToDelete) ? idsToDelete : [idsToDelete];
+    const rowIds = Array.isArray(idsToDelete) ? idsToDelete : [idsToDelete];
 
-    if (ids.length === 0) return;
+    // Row ids → what actually goes. Here rather than in the menu because ⌥D
+    // arrives here too: a row seen through a shortcut removes the SHORTCUT,
+    // never the original it mirrors, and a window row removes nothing.
+    const ids = deleteTargetsOfRowIds(rowIds);
+    const viaShortcut = rowIds.some((id) => shortcutIdOfMirrorRowId(id) !== null);
+
+    if (ids.length === 0) {
+      if (rowIds.length > 0) {
+        toast("Nothing to delete here", {
+          description:
+            "This row shows a note's window. Remove the window in that note to remove the row.",
+        });
+      }
+      return;
+    }
 
     // Find all nodes to show titles in confirmation dialog
     const findNode = (nodes: TreeNode[], targetId: string): TreeNode | null => {
@@ -2440,41 +3025,6 @@ ${workbenchWarning}`
       node.children && node.children.length > 0
     );
 
-    // Check if any files have Google Drive metadata (async check)
-    let hasGoogleDriveFiles = false;
-    if (hasGoogleAuth) {
-      try {
-        // Check metadata for all items in parallel
-        const metadataChecks = ids.map(async (id) => {
-          try {
-            const response = await fetch(`/api/content/content/${id}`, {
-              credentials: "include",
-            });
-            if (response.ok) {
-              const data = await response.json();
-              const metadata = data.data?.file?.storageMetadata;
-              const googleDriveFileId = metadata?.externalProviders?.googleDrive?.fileId;
-              return !!googleDriveFileId;
-            }
-          } catch {
-            return false;
-          }
-          return false;
-        });
-
-        const results = await Promise.all(metadataChecks);
-        hasGoogleDriveFiles = results.some(hasGoogleDrive => hasGoogleDrive);
-      } catch (err) {
-        clientLogger.error({
-          layer: "ui",
-          event: "delete_gdrive_probe:caught",
-          summary: "google drive metadata probe failed (pre-confirm)",
-          error: err,
-        });
-        hasGoogleDriveFiles = false;
-      }
-    }
-
     // Removing a shortcut destroys nothing: it is a pointer, its target is
     // untouched, and neither delete cascade in the API can reach anything from
     // it (both walk ownedByNoteId / ContentLink, which a shortcut never has).
@@ -2487,24 +3037,116 @@ ${workbenchWarning}`
       nodesToDelete.length > 0 &&
       nodesToDelete.every((node) => node.contentType === "shortcut")
     ) {
-      await handleDeleteConfirmed(ids);
+      const removed = await handleDeleteConfirmed(ids);
+      // From inside a shortcut, the row clicked is not the row that goes —
+      // say which did, that the original stayed, and offer it back.
+      if (viaShortcut && removed.length > 0) announceShortcutRemoval(removed, nodesToDelete);
       return;
     }
 
-    // Show confirmation dialog with appropriate message
+    // Show the dialog NOW. The Google Drive check used to run first — one full
+    // content GET per selected item, awaited — so with Google connected, ⌥D sat
+    // there until every request came back. It runs behind the open dialog
+    // instead, only for file rows (Drive copies live in a FilePayload's
+    // storage metadata; notes and folders never have one), and the "Also
+    // delete from Google Drive" box appears when it finds something.
+    const driveProbeToken = ++driveProbeTokenRef.current;
     setDeleteConfirm({
       ids,
       title: confirmTitle,
       message: confirmMessage,
       hasChildren,
-      hasGoogleDriveFiles,
+      googleDriveFiles: [],
+      driveProbeToken,
     });
+
+    const fileIds = nodesToDelete.filter((node) => node.file).map((node) => node.id);
+    if (!hasGoogleAuth || fileIds.length === 0) return;
+    const found = await Promise.all(
+      fileIds.map(async (id) => {
+        try {
+          const response = await fetch(`/api/content/content/${id}`, {
+            credentials: "include",
+          });
+          if (!response.ok) return null;
+          const data = await response.json();
+          const fileId: unknown =
+            data.data?.file?.storageMetadata?.externalProviders?.googleDrive?.fileId;
+          return typeof fileId === "string" && fileId
+            ? { contentId: id, fileId }
+            : null;
+        } catch (err) {
+          clientLogger.error({
+            layer: "ui",
+            event: "delete_gdrive_probe:caught",
+            summary: "google drive metadata probe failed (dialog open)",
+            attrs: { content_id: id },
+            error: err,
+          });
+          return null;
+        }
+      })
+    );
+    const googleDriveFiles = found.filter(
+      (entry): entry is { contentId: string; fileId: string } => entry !== null
+    );
+    if (googleDriveFiles.length === 0) return;
+    // Only into the dialog it was started for — not a later one, not a closed one.
+    setDeleteConfirm((current) =>
+      current && current.driveProbeToken === driveProbeToken
+        ? { ...current, googleDriveFiles }
+        : current
+    );
   };
 
   // Handler: Perform actual delete after confirmation (supports batch delete)
-  const handleDeleteConfirmed = async (ids: string[]) => {
+  //
+  // OPTIMISTIC. The rows leave the tree the moment the delete is confirmed,
+  // and the tree reconciles QUIETLY afterwards (`loadTree(true)`). It used to
+  // wait for every request and then `fetchTree()`, whose skeleton unmounted
+  // react-arborist: each delete flashed the whole tree and dropped the user
+  // back at the top. A failure puts the failed rows back where they were,
+  // rebuilt from the pre-delete snapshot.
+  //
+  // `googleDriveFiles`: the Drive copies to delete as well — only ever what the
+  // dialog SHOWED the user (its probe's findings, with the box ticked). If they
+  // confirmed before the probe answered, nothing leaves Drive, whatever the
+  // saved preference says: deleting someone's Google data needs the choice to
+  // have been on screen.
+  // Resolves to the ids the server actually deleted.
+  const handleDeleteConfirmed = async (
+    ids: string[],
+    googleDriveFiles: Array<{ contentId: string; fileId: string }> = []
+  ): Promise<string[]> => {
+    const treeBefore = treeData;
+    const requested = new Set(ids);
+    setTreeData((current) =>
+      current ? removeNodesFromTree(current, requested) : current
+    );
+    // Without the remount, nothing else prunes selection: FileTree only drops
+    // vanished ids on its first mount.
+    if (treeBefore) {
+      const removed = collectRemovedIds(treeBefore, requested);
+      const treeState = useTreeStateStore.getState();
+      const keptTreeSelection = withoutIds(treeState.selectedIds, removed);
+      if (keptTreeSelection !== treeState.selectedIds) {
+        treeState.setSelectedIds([...keptTreeSelection]);
+      }
+      const contentState = useContentStore.getState();
+      const keptMultiSelection = withoutIds(contentState.multiSelectedIds, removed);
+      if (keptMultiSelection !== contentState.multiSelectedIds) {
+        contentState.setMultiSelect([...keptMultiSelection]);
+      }
+    }
+    // Tabs close with their rows. Only the requested ids: the server trashes
+    // the node itself, and its descendants stay readable (restored with it).
+    closeContentTabs(ids);
+
+    // Immediately before the try whose `finally` ends it (no await between,
+    // so a refresh already in flight still sees the bump before it lands).
+    beginTreeEdit();
     try {
-      // Get node titles and Google Drive metadata before deleting
+      // Node titles, for the error message if anything fails
       const findNode = (nodes: TreeNode[], targetId: string): TreeNode | null => {
         for (const node of nodes) {
           if (node.id === targetId) return node;
@@ -2517,43 +3159,11 @@ ${workbenchWarning}`
       };
 
       const nodeMap = new Map<string, string>();
-      const googleDriveFiles: Array<{ contentId: string; fileId: string }> = [];
-
-      if (treeData) {
-        // First, fetch metadata for all items to check for Google Drive files
-        const metadataPromises = ids.map(async (id) => {
-          const node = findNode(treeData, id);
-          if (node) {
-            nodeMap.set(id, node.title);
-
-            // Only check for Google Drive metadata if user wants to delete from Drive
-            if (hasGoogleAuth && deleteFromGoogleDrive) {
-              try {
-                const response = await fetch(`/api/content/content/${id}`, {
-                  credentials: "include",
-                });
-                if (response.ok) {
-                  const data = await response.json();
-                  const metadata = data.data?.file?.storageMetadata;
-                  const googleDriveFileId = metadata?.externalProviders?.googleDrive?.fileId;
-                  if (googleDriveFileId) {
-                    googleDriveFiles.push({ contentId: id, fileId: googleDriveFileId });
-                  }
-                }
-              } catch (err) {
-                clientLogger.error({
-                  layer: "ui",
-                  event: "delete_metadata_fetch:caught",
-                  summary: "content metadata fetch failed during delete",
-                  attrs: { content_id: id },
-                  error: err,
-                });
-              }
-            }
-          }
-        });
-
-        await Promise.all(metadataPromises);
+      if (treeBefore) {
+        for (const id of ids) {
+          const node = findNode(treeBefore, id);
+          if (node) nodeMap.set(id, node.title);
+        }
       }
 
       // Delete from Google Drive first (if applicable)
@@ -2653,11 +3263,17 @@ ${workbenchWarning}`
           title: `Failed to delete ${failures.length} of ${ids.length} items`,
           message: errorMessage,
         });
-      }
 
-      // Refresh tree to remove deleted items (even if some failed)
-      closeContentTabs(successes.map((item) => item.id));
-      await fetchTree();
+        // Put the failed rows back where they were: the snapshot minus only
+        // what the server actually deleted. Their tabs stay closed (reopen
+        // from the tree) — the row coming back is the signal.
+        if (treeBefore) {
+          setTreeData(
+            removeNodesFromTree(treeBefore, new Set(successes.map((item) => item.id)))
+          );
+        }
+      }
+      return successes.map((item) => item.id);
     } catch (err) {
       clientLogger.error({
         layer: "ui",
@@ -2669,6 +3285,13 @@ ${workbenchWarning}`
         title: "Failed to delete",
         message: "An unexpected error occurred. Please try again.",
       });
+      // Nothing is known to have been deleted: show the tree as it was.
+      if (treeBefore) setTreeData(treeBefore);
+      return [];
+    } finally {
+      // Settle against the server without the skeleton — the tree stays
+      // mounted, so scroll position and expansion are untouched.
+      endTreeEdit();
     }
   };
 
@@ -3133,6 +3756,7 @@ ${workbenchWarning}`
             onRefresh={() => {
               void fetchTree();
             }}
+            onHardRefresh={hardReloadTree}
             onClick={() => {
               setSelectedContentId(null);
               setSelectedIds([]);
@@ -3175,6 +3799,7 @@ ${workbenchWarning}`
             onRefresh={() => {
               void fetchTree();
             }}
+            onHardRefresh={hardReloadTree}
             onClick={() => {
               setSelectedContentId(null);
               setSelectedIds([]);
@@ -3182,6 +3807,9 @@ ${workbenchWarning}`
           />
           <FileTreeWithDropZone
             data={treeData}
+            shortcutTargets={shortcutTargetTrees}
+            rootTreeSort={rootTreeSort}
+            rootAncestry={rootAncestry}
             rootDropTarget={rootDropTarget}
             onMove={handleMove}
             onSelect={handleSelect}
@@ -3236,8 +3864,14 @@ ${workbenchWarning}`
         }
         confirmLabel="Delete"
         confirmVariant="danger"
-        onConfirm={() => deleteConfirm && handleDeleteConfirmed(deleteConfirm.ids)}
-        checkbox={hasGoogleAuth && deleteConfirm?.hasGoogleDriveFiles ? {
+        onConfirm={() =>
+          deleteConfirm &&
+          handleDeleteConfirmed(
+            deleteConfirm.ids,
+            hasGoogleAuth && deleteFromGoogleDrive ? deleteConfirm.googleDriveFiles : []
+          )
+        }
+        checkbox={hasGoogleAuth && (deleteConfirm?.googleDriveFiles.length ?? 0) > 0 ? {
           label: "Also delete from Google Drive",
           checked: deleteFromGoogleDrive,
           onChange: setDeleteFromGoogleDrive,

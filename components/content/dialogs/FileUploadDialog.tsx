@@ -180,7 +180,13 @@ export function FileUploadDialog({
    *
    * TODO: Switch to 2-phase direct upload once CORS is configured on R2 bucket
    */
-  const uploadSingleFile = async (file: File, fileIndex: number, customName?: string): Promise<string> => {
+  const uploadSingleFile = async (
+    file: File,
+    fileIndex: number,
+    customName?: string,
+    /** The previous file of this batch: the server puts this one right after it, so the batch keeps its order. */
+    afterId?: string | null,
+  ): Promise<{ slug: string; contentId: string | null }> => {
     // Update status to uploading
     setFileStatuses((prev) =>
       prev.map((status, idx) =>
@@ -198,6 +204,7 @@ export function FileUploadDialog({
       const formData = new FormData();
       formData.append("file", fileToUpload);
       if (selectedFolderId) formData.append("parentId", selectedFolderId);
+      if (afterId) formData.append("afterId", afterId);
       if (peopleGroupId) formData.append("peopleGroupId", peopleGroupId);
       if (personId) formData.append("personId", personId);
       formData.append("provider", selectedProvider);
@@ -250,7 +257,7 @@ export function FileUploadDialog({
         )
       );
 
-      return data.slug || "";
+      return { slug: data.slug || "", contentId: data.contentId ?? null };
     } catch (err) {
       clientLogger.error({
         layer: "ui",
@@ -296,12 +303,16 @@ export function FileUploadDialog({
 
     const results: { slug: string; success: boolean }[] = [];
 
-    // Upload files sequentially
+    // Upload files sequentially. The first lands at the top of the folder and
+    // each next one right after the one before, so the batch arrives in the
+    // order it was picked.
+    let previousUploadId: string | null = null;
     for (let i = 0; i < files.length; i++) {
       try {
         const customName = renamedFiles?.get(files[i]);
-        const slug = await uploadSingleFile(files[i], i, customName);
-        results.push({ slug, success: true });
+        const uploaded = await uploadSingleFile(files[i], i, customName, previousUploadId);
+        if (uploaded.contentId) previousUploadId = uploaded.contentId;
+        results.push({ slug: uploaded.slug, success: true });
 
         // Update overall progress
         setUploadProgress(((i + 1) / files.length) * 100);

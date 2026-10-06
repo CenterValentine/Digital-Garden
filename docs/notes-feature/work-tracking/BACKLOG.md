@@ -80,6 +80,25 @@ path and probably belongs to the same control.
 
 ---
 
+## File-tree order — remaining ties (2026-10-05, from `fix/smooth-delete`)
+
+The order audit fixed the causes that moved rows between refreshes (anchored drops, owner-scoped moves, one total comparator, stale refreshes dropped, new rows shown where they land). What's left can't reorder rows on its own any more — `compareSiblings` makes every order deterministic — but a few writes still pick a position that may not be the one the user expects:
+
+- [ ] **Duplicate lands tied with its original** (`duplicate/route.ts` copies `displayOrder`), so the copy sits above or below the original by title, then id. Placing it directly after the original needs a renumber, like the move route does.
+- [ ] **Restore from trash keeps the old `displayOrder`**; siblings renumbered since then can put it beside different neighbours. Restore could re-anchor after its old previous sibling if that still exists.
+- [ ] **People mounts keep their own order space** (`/api/people/mounts`, still index-based); a content row and a mount row can't be anchored to each other — anchors skip mount rows.
+- [x] **Re-parenting without a position landed mid-list** — Folder assistant (with Undo restoring position) and Studio outputs now place deliberately (2026-10-06, `sibling-slot.ts`); bookmark dedupe, the third writer, was removed the same day.
+- [ ] **Spring-opened tabs add back/forward history entries.** Resting a drag on a tab activates it through `activateContentTab`, and releasing switches back the same way; `MainPanelNavigation` records each change, so a drag through tabs leaves entries behind. Suppressing history for spring switches needs a flag the navigation recorder honours (`use-spring-tabs.ts`).
+- [ ] **A move out of a note saved over REST could trash the image.** Live collaborative saves never trash media, but a note saved through the REST path (only when live collaboration is unavailable) runs `syncImageReferences` with clean-up on: if the source note saves before the receiving note has saved its `image-ref` link, the moved image has no live link at that moment and is soft-deleted (recoverable from the trash). A short grace period before trashing, or a hint from the client that the media moved, would close it.
+- [ ] **Media deleted from a live note's text is never cleaned up.** Collaborative saves keep links exact but never trash (`trashOrphans: false` — a cut-then-paste across one save would trash the image in between), so an image deleted from a live note's text stays as content in its folder's referenced items. A deferred clean-up — trash referenced media with no live link after a grace period (a cron beside `app/api/cron/`), or on the note's next REST save — would close it. Deliberately not done in `fix/smooth-delete`.
+- [ ] **Main-panel List/Gallery views don't apply a folder's kept sort.** They read stored order (manual mode), so an item that arrives in a sorted folder after its last sort shows sorted in the tree but at the top there until the folder is sorted again. Fix: have the folder-children endpoint return the folder's `treeSort` with nested flags, and order by `applyKeptSort` there too.
+- [ ] **Creates that store displayOrder 0 still tie with the first row** — uploads are fixed (2026-10-06); still on 0: AI documents/images/speech (`lib/domain/ai/documents.ts`, `image/generate-and-store.ts`, `speech/generate-and-store.ts`), workflows (`extensions/workflows/server/documents.ts`, `dispatch.ts`), reader library/shelf, flashcards media, data promotion. Each needs only `claimSiblingSlot` (top for user-facing outputs, bottom for appended records) in its create transaction.
+- [ ] **The inline-create placeholder can be wiped** by a refresh that starts while the name is being typed (the stale-response guard brackets moves and deletes only; a create would need an end that runs on submit, cancel AND unmount — a missed end drops every later refresh).
+
+## File-tree shortcuts — decided (2026-10-05, from `fix/smooth-delete`)
+
+- [x] **Opening through a shortcut in a view raised the out-of-view warning.** Owner: "count view from a shortcut as in scope for any check related to the view targeting." Built on the same branch — `viewReachRoots` in the open guard's view-scope check; locked-workspace overlap checks unchanged.
+
 ## E-reader — proposed (2026-09-29, plan `EREADER-PLAN.md`)
 
 + → Reader → [Scriptures, Books]. One reader shell (foliate-js for EPUB/PDF, a corpus renderer for scriptures), one annotation store keyed by Readium Locators, and a library of book-source adapters (OPDS, Gutendex, Open Library, upload). Books are file nodes in a user-chosen library folder. Blocked on owner answers to the plan's §10.

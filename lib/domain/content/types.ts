@@ -6,6 +6,7 @@
  */
 
 import type { Prisma } from "@/lib/database/generated/prisma";
+import type { KeptSort } from "./sibling-order";
 
 // ============================================================
 // CONTENT TYPES (Explicit discriminant enum)
@@ -49,6 +50,23 @@ export interface TreeNode {
    * never interleave with primary content.
    */
   role?: "primary" | "referenced";
+  /**
+   * For referenced rows: how the row belongs to its note (tree API).
+   *  - "text"  — it is IN a note's text (an image or audio embedded there),
+   *    linked from that note; it stays with that note.
+   *  - "filed" — it is filed under the note (a chat replying to it, an AI
+   *    document made from it, something dragged onto it) but not in its
+   *    text; it can be moved to another note.
+   * `inTextOf` names the note whose text holds it (the oldest live one).
+   * `filedWithNote`: it is filed with a note (ownedByNoteId), which places
+   * it — a note's text taking it or letting it go never moves it
+   * (in-text-media.ts).
+   */
+  reference?: {
+    via: "text" | "filed";
+    inTextOf: { id: string; title: string } | null;
+    filedWithNote?: boolean;
+  };
   /**
    * Referenced children, held apart from `children`. The tree splices these
    * back in (flagged via `isNestedReference`) when the parent's chip is
@@ -113,6 +131,8 @@ export interface TreeNode {
     viewMode: string;
     sortMode: string | null;
     includeReferencedContent: boolean;
+    /** The sort this folder keeps (sibling-order.ts `KeptSort`); absent = manual. */
+    treeSort?: KeptSort | null;
   };
   file?: {
     fileName: string;
@@ -166,9 +186,12 @@ export interface TreeNode {
    */
   mirrorOf?: string;
   /**
-   * Marks that same synthesized row as VIEW-ONLY. It cannot be a drag source,
-   * nothing may be stored under it, and a drop onto it forwards to the real
-   * folder — the projection never becomes a second home for content.
+   * Marks that same synthesized row as a PROJECTION. Nothing may be stored
+   * under it — a drop onto it forwards to the real folder — so it never
+   * becomes a second home for content. Dragging a shortcut's row moves the
+   * real item it stands for (`mirrorOf`), not the row (owner call 2026-10-05:
+   * rearranging through a shortcut without going to the source folder).
+   * Window-reference rows (`windowRef`) stay undraggable: they're derived links.
    */
   isShortcutMirror?: boolean;
   /**

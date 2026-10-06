@@ -16,7 +16,10 @@
 
 import { useRef, useEffect, useMemo } from "react";
 import { Tree, type NodeApi, type TreeApi, type NodeRendererProps } from "react-arborist";
+import type { useDragDropManager } from "react-dnd";
+import { dropRowFor, resolveDropAnchor } from "@/lib/domain/content/sibling-order";
 import { FileNode } from "./FileNode";
+import { useSpringOpen } from "./use-spring-open";
 import { useTreeStateStore } from "@/state/tree-state-store";
 import { useTreeRevealStore, type TreeRevealRequest } from "@/state/tree-reveal-store";
 import { clientLogger } from "@/lib/core/logger/client";
@@ -27,13 +30,56 @@ import {
   buildTreeIndex,
   resolveDropForwardTarget,
 } from "@/lib/features/content/shortcut-mirror";
+import {
+  acceptsDropInto,
+  besideRowIndex,
+  dropRefused,
+  isUndraggableRow,
+  realIdOfRow,
+  wouldNestInItself,
+} from "@/lib/features/content/drop-rules";
+import { dropEdgeFor } from "@/lib/features/content/drop-edge";
+import { showKeptSorts } from "@/lib/features/content/kept-sort-display";
+import { showInTextEdits, showWindowEdits } from "@/lib/features/content/in-text-media";
+import { useSettingsStore } from "@/state/settings-store";
+import { useInTextMediaStore } from "@/state/in-text-media-store";
+import type { KeptSort } from "@/lib/domain/content/sibling-order";
+
+/** A stable empty map, so the mirror memo doesn't rebuild for "no sorts". */
+const NO_SHORTCUT_SORTS: Readonly<Record<string, KeptSort>> = {};
+const NO_CARRIED_TARGETS: TreeNode[] = [];
 
 interface FileTreeProps {
   data: TreeNode[];
+  /**
+   * Folders that shortcuts in a view-scoped tree point at but the view leaves
+   * out (tree API `shortcutTargets`). Only the shortcut mirror reads them.
+   */
+  shortcutTargets?: TreeNode[];
+  /**
+   * The sort the top level keeps — the view root's (tree API `rootTreeSort`).
+   * Folders below carry their own (`folder.treeSort`).
+   */
+  rootTreeSort?: KeptSort | null;
+  /** The view root, then its ancestors (tree API `rootAncestry`; empty when unscoped). */
+  rootAncestry?: string[];
   onMove?: (args: {
     dragIds: string[];
     parentId: string | null;
     index: number;
+    /**
+     * The row the drop landed after (null = first of its kind), read from the
+     * rows ON SCREEN. `index` counts those rows too — including a spliced-in
+     * reference block — so it is only meaningful in this list; the anchor
+     * means the same thing to the server. Absent when it can't be resolved.
+     */
+    afterId?: string | null;
+    /**
+     * The real folder the drop lands in when the row it landed on displays a
+     * folder that lives elsewhere (a folder-shortcut, or a folder or shortcut
+     * seen inside a shortcut) — resolved from the rendered row.
+     */
+    forwardTo?: string | null;
   }) => Promise<void>;
   onSelect?: (
     nodes: TreeNode[],
@@ -64,11 +110,15 @@ interface FileTreeProps {
    */
   revealRequest?: TreeRevealRequest | null;
   onRevealComplete?: () => void; // Called after the reveal request is consumed
-  dndManager?: unknown; // Optional: DndManager from parent DndProvider; opaque pass-through
+  /** Optional: the DnD manager of a parent DndProvider (FileTreeWithDropZone). */
+  dndManager?: ReturnType<typeof useDragDropManager>;
 }
 
 export function FileTree({
   data,
+  shortcutTargets,
+  rootTreeSort,
+  rootAncestry,
   onMove,
   onSelect,
   onRename,
@@ -289,19 +339,65 @@ export function FileTree({
   // row then never has to reason about reference blocks. Both transforms
   // preserve object identity when nothing changed — see their identity
   // contracts — so this pair still re-renders no more rows than it must.
+  //
+  // Folders that keep a sort are shown in it FIRST (kept-sort-display.ts), so
+  // an optimistic change takes its sorted place at once and a shortcut's
+  // contents follow the folder's own sort.
+  //
+  // Before that: media a note's text just gained or lost is shown with that
+  // note now, not after the save (in-text-media.ts). Across both forests, so
+  // an image can move between the tree and a carried shortcut target.
+  const inTextEdits = useInTextMediaStore((state) => state.edits);
+  // …and the window rows a note's Note Windows gain or lose.
+  const windowEdits = useInTextMediaStore((state) => state.windowEdits);
+  const [editedData, editedTargets] = useMemo(() => {
+    const withMedia = showInTextEdits([data, shortcutTargets ?? NO_CARRIED_TARGETS], inTextEdits);
+    const [tree, targets] = showWindowEdits(withMedia, windowEdits);
+    return [tree, shortcutTargets ? targets : shortcutTargets] as const;
+  }, [data, shortcutTargets, inTextEdits, windowEdits]);
+  const shownData = useMemo(
+    () => showKeptSorts(editedData, rootTreeSort ?? null),
+    [editedData, rootTreeSort],
+  );
+  // Shortcuts' own sorts (view-only — they never change the folder).
+  const shortcutSorts = useSettingsStore((state) => state.ui?.shortcutSorts ?? NO_SHORTCUT_SORTS);
+  // Real parent of every loaded row (mirror rows excluded — they are views),
+  // plus the view root's ancestors: what `wouldNestInItself` walks.
+  const realParentOf = useMemo(() => {
+    const parents = new Map<string, string | null>();
+    const index = (nodes: TreeNode[]) => {
+      for (const node of nodes) {
+        if (!node.isShortcutMirror) parents.set(node.id, node.parentId ?? null);
+        if (node.children?.length) index(node.children);
+        if (node.references?.length) index(node.references);
+      }
+    };
+    index(data);
+    if (shortcutTargets) index(shortcutTargets);
+    (rootAncestry ?? []).forEach((id, i) => {
+      if (!parents.has(id)) parents.set(id, rootAncestry?.[i + 1] ?? null);
+    });
+    return parents;
+  }, [data, shortcutTargets, rootAncestry]);
+  const shownTargets = useMemo(
+    () => (editedTargets ? showKeptSorts(editedTargets, null) : editedTargets),
+    [editedTargets],
+  );
   const treeData = useMemo(() => {
     const withReferences = expandReferences(
-      data,
+      shownData,
       expandedIds,
       referencesAtStartIds,
     );
     return expandShortcutMirrors(
       withReferences,
       expandedIds,
-      buildTreeIndex(withReferences),
+      buildTreeIndex(withReferences, shownTargets),
       hiddenNestedShortcutIds,
+      0,
+      shortcutSorts,
     );
-  }, [data, expandedIds, referencesAtStartIds, hiddenNestedShortcutIds]);
+  }, [shownData, shownTargets, expandedIds, referencesAtStartIds, hiddenNestedShortcutIds, shortcutSorts]);
 
   // Get initial open state from persisted IDs
   const initialOpenState = useMemo(() => {
@@ -316,10 +412,70 @@ export function FileTree({
     dragIds: string[];
     parentId: string | null;
     index: number;
+    parentNode?: NodeApi<TreeNode> | null;
+    dragNodes?: NodeApi<TreeNode>[];
   }) => {
     if (onMove) {
       try {
-        await onMove(args);
+        let parentNode = args.parentNode ?? null;
+        let parentId = args.parentId;
+        let index = args.index;
+        // Released over the middle of a row that can't take the drop (a note,
+        // a file): disableDrop only lets that through as "beside the row", so
+        // place it there — above or below, by the half the pointer was in,
+        // the same half the row drew its line on.
+        const drags = (args.dragNodes ?? []).map((dragNode) => dragNode.data);
+        if (parentNode && !parentNode.isRoot && !acceptsDropInto(parentNode.data, drags)) {
+          const row = parentNode;
+          const holder = row.parent && !row.parent.isRoot ? row.parent : null;
+          const siblings = (holder ? holder.children : treeRef.current?.root?.children) ?? [];
+          const rowIndex = siblings.findIndex((sibling) => sibling.id === row.id);
+          parentNode = holder;
+          parentId = holder ? holder.id : null;
+          index = besideRowIndex(rowIndex, dropEdgeFor(row.id));
+        }
+        // The rows the drop index counts: the new parent's rendered children
+        // (reference block and mirrors included), or the top level.
+        const visible: NodeApi<TreeNode>[] =
+          (parentNode
+            ? parentNode.children
+            : treeRef.current?.root?.children) ?? [];
+        const first = args.dragNodes?.[0]?.data;
+        // A referenced row dropped under a parent joins its reference block
+        // and is ordered among references; everything else among primaries.
+        // The top level has no block, so everything there is primary.
+        const kind =
+          parentId !== null && first?.role === "referenced" ? "reference" : "primary";
+        const afterId = resolveDropAnchor(
+          visible.map((row) => dropRowFor(row.data)),
+          index,
+          new Set(args.dragIds),
+          kind,
+        );
+        // A shortcut's row stands for real content: move THAT. (The anchor
+        // above still skips the dragged rows by their on-screen ids.)
+        const realDragIds = args.dragNodes?.length
+          ? [
+              ...new Set(
+                args.dragNodes.map((node) =>
+                  node.data.isShortcutMirror && node.data.mirrorOf ? node.data.mirrorOf : node.id,
+                ),
+              ),
+            ]
+          : args.dragIds;
+        // The real folder the drop lands in, decided from the row as rendered
+        // — a folder or a shortcut seen inside a shortcut exists only here,
+        // as a mirror row; the sidebar's own data can't resolve its id
+        // (owner report, 2026-10-06: such drops sent the mirror id and the
+        // server refused them).
+        const forwardTo = parentNode ? resolveDropForwardTarget(parentNode.data) : null;
+        await onMove({
+          dragIds: realDragIds,
+          parentId,
+          index,
+          afterId,
+          forwardTo,
+        });
       } catch (error) {
         clientLogger.error({
           layer: "ui",
@@ -359,95 +515,62 @@ export function FileTree({
     setScrollOffset(nextScrollOffset);
   };
 
-  // Allow dropping into folders
-  const canDrop = (args: { dragNodes: NodeApi<TreeNode>[]; parentNode: NodeApi<TreeNode> | null }) => {
-    const { dragNodes, parentNode } = args;
-
-    // A mirror row is a projection, not a place. Dragging one would offer to
-    // move content that does not live where it appears to.
-    if (dragNodes.some((dragNode) => dragNode.data.isShortcutMirror)) {
-      return false;
+  /**
+   * Whether `node` is `ancestor` or sits anywhere under it. (The function this
+   * replaces walked up from the DRAGGED row, so it refused a drop into any
+   * folder that already held the item — every reorder — but it lived in a
+   * `canDrop` react-arborist never called, so it never ran.)
+   */
+  const isWithin = (node: NodeApi<TreeNode> | null, ancestor: NodeApi<TreeNode>): boolean => {
+    for (let at = node; at; at = at.parent) {
+      if (at.id === ancestor.id) return true;
     }
-
-    // Always allow dropping at root level (parentNode is null)
-    if (!parentNode) return true;
-
-    // Dropping onto a folder-shortcut (real or mirrored) means "put this in
-    // the folder it points at". handleMove rewrites the destination to the
-    // real folder id before the move is sent, so nothing is ever stored under
-    // a shortcut. A broken one has no folder to forward to.
-    const shortcutTarget = resolveDropForwardTarget(parentNode.data);
-    if (shortcutTarget) return true;
-
-    // Nothing may nest under a shortcut that is not a live folder pointer.
-    if (parentNode.data.contentType === "shortcut") return false;
-
-    // A shortcut may be stored anywhere, including under content that hosts
-    // nothing else — putting a pointer where the user already looks is the
-    // whole point of the feature.
-    if (
-      dragNodes.length > 0 &&
-      dragNodes.every((dragNode) => dragNode.data.contentType === "shortcut")
-    ) {
-      return true;
-    }
-
-    // Only allow dropping into folders — with a short list of exceptions.
-    // Primary content generally cannot gain a leaf parent; this is
-    // deliberately not Notion-style nesting.
-    if (parentNode.data.contentType !== "folder") {
-      const allReferences =
-        dragNodes.length > 0 &&
-        dragNodes.every((dragNode) => dragNode.data.role === "referenced");
-      // A database accepts its own promoted rows back (plan Phase 5: rows
-      // are freely movable — that has to include the way home).
-      const allRowsOfThisTable =
-        dragNodes.length > 0 &&
-        dragNodes.every(
-          (dragNode) => dragNode.data.promotedFromTableId === parentNode.data.id
-        );
-      // …and it accepts other DATABASES (owner, 2026-09-13). A set of
-      // linked tables has a natural head — the index everything points at —
-      // and the tree should be able to say so. The nested table becomes a
-      // reference under its host and lives behind its chip; dragging it to a
-      // folder detaches it again, so nothing is locked in place.
-      const allDatabases =
-        dragNodes.length > 0 &&
-        dragNodes.every((dragNode) => dragNode.data.contentType === "data");
-      const noteOk = parentNode.data.contentType === "note" && allReferences;
-      const dataOk =
-        parentNode.data.contentType === "data" &&
-        (allRowsOfThisTable || allDatabases);
-      if (!noteOk && !dataOk) {
-        return false;
-      }
-    }
-
-    if (parentNode.data.treeNodeKind && parentNode.data.treeNodeKind !== "content") {
-      return false;
-    }
-
-    // Prevent dropping a folder into itself or its descendants
-    for (const dragNode of dragNodes) {
-      if (isDescendant(parentNode, dragNode)) {
-        return false;
-      }
-    }
-
-    return true;
+    return false;
   };
 
-  // Check if potentialDescendant is a descendant of node
-  const isDescendant = (node: NodeApi<TreeNode>, potentialDescendant: NodeApi<TreeNode>): boolean => {
-    if (node.id === potentialDescendant.id) return true;
-
-    let current = potentialDescendant.parent;
-    while (current) {
-      if (current.id === node.id) return true;
-      current = current.parent;
-    }
-
-    return false;
+  /**
+   * react-arborist asks this on every hover; `true` refuses the drop (no line,
+   * no highlight, nothing sent). It is the only drop hook react-arborist 3.4
+   * reads — the `canDrop` prop FileTree used to pass was never called, so the
+   * drop rules never ran and the server refused what they were meant to stop.
+   * The decision is `dropRefused` (drop-rules.ts); react-arborist itself
+   * already refuses a drop into the dragged rows or anything under them.
+   */
+  const disableDrop = ({
+    parentNode,
+    dragNodes,
+  }: {
+    parentNode: NodeApi<TreeNode>;
+    dragNodes: NodeApi<TreeNode>[];
+    index: number;
+  }): boolean => {
+    const holder = parentNode.isRoot || !parentNode.parent || parentNode.parent.isRoot
+      ? null
+      : parentNode.parent;
+    const drags = dragNodes.map((dragNode) => dragNode.data);
+    const refused = dropRefused({
+      target: parentNode.isRoot ? null : parentNode.data,
+      holder: holder?.data ?? null,
+      drags,
+      // The pointer is over the MIDDLE of the row: react-arborist reports
+      // that as "inside it" with no index.
+      insideRow: treeRef.current?.state.dnd.index === null,
+      holderWithinDrags: holder !== null && dragNodes.some((dragNode) => isWithin(holder, dragNode)),
+    });
+    if (refused) return true;
+    // Never a folder inside itself, judged by REAL ids: through a shortcut
+    // the same folder shows twice, so the on-screen check above can't see it
+    // (drop-rules.ts `wouldNestInItself`). The drop lands inside the row when
+    // the row takes it, otherwise beside it — in the row's own list.
+    const destination = parentNode.isRoot
+      ? null
+      : acceptsDropInto(parentNode.data, drags)
+        ? parentNode
+        : holder;
+    const destinationRealId = destination
+      ? (resolveDropForwardTarget(destination.data) ?? realIdOfRow(destination.data))
+      : (rootAncestry?.[0] ?? null);
+    return wouldNestInItself(destinationRealId, drags.map(realIdOfRow), (id) => realParentOf.get(id));
   };
 
   // Keyboard shortcuts (scoped to file tree)
@@ -495,6 +618,11 @@ export function FileTree({
         const tree = treeRef.current;
         if (tree?.selectedNodes?.length === 1) {
           const node = tree.selectedNodes[0];
+
+          // A row inside a shortcut (or a window row) is a projection: its
+          // name belongs to the original's own row. The menu greys Rename out
+          // here; the key does nothing.
+          if (node.data.isShortcutMirror) return;
 
           // Check if this is an external link
           if (node.data.contentType === "external") {
@@ -604,6 +732,10 @@ export function FileTree({
     onExpandComplete?.();
   }, [expandNodeId, onExpandComplete, setExpanded]);
 
+  // During a drag, a collapsed row held under the pointer opens, and closes
+  // again when the pointer leaves it (spring-open.ts).
+  useSpringOpen(treeRef, containerRef, setExpanded);
+
   // Reveal request (toolbar "show in file tree", breadcrumb, or the tree
   // following the active content): mirror a real selection of the node.
   // scrollTo opens every ancestor (firing onToggle per folder, which keeps
@@ -690,10 +822,8 @@ export function FileTree({
             onRename(id, name);
           }
         }}
-        disableDrag={!onMove}
-        disableDrop={!onMove}
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        {...({ canDrop } as any) /* canDrop exists at runtime in react-arborist 3.4 but not in the public type */}
+        disableDrag={onMove ? (row: TreeNode) => isUndraggableRow(row) : true}
+        disableDrop={onMove ? disableDrop : true}
         {...(dndManager && { dndManager })} // Pass dndManager if provided
       >
         {NodeWithCallbacks}

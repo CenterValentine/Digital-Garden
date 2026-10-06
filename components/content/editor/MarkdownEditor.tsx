@@ -42,6 +42,15 @@ import {
 import { MarkdownPasteToast } from "./MarkdownPasteToast";
 import { clientLogger } from "@/lib/core/logger/client";
 import { uploadImage } from "@/lib/domain/editor/hooks/use-image-upload";
+import { useInTextMediaTracker } from "@/lib/domain/editor/hooks/use-in-text-media-tracker";
+import {
+  dropForeignEditorDrag,
+  foreignEditorDrag,
+  isForeignEditorDropOn,
+  recordEditorDrag,
+  usePendingDragRemovals,
+} from "@/lib/domain/editor/hooks/use-cross-editor-drag";
+import { useEditorDragStore } from "@/state/editor-drag-store";
 import { isImageUrl } from "@/lib/domain/editor/utils/image-url";
 import { useEditorInstanceStore } from "@/state/editor-instance-store";
 import { useSettingsStore } from "@/state/settings-store";
@@ -596,7 +605,10 @@ export function MarkdownEditor({
           }
           return false;
         },
-        drop: () => false,
+        // Content dragged out of another note's editor is the wrapper's
+        // onDrop's to place (it also removes it from the source); claimed
+        // here so ProseMirror's built-in drop doesn't insert it a second time.
+        drop: (view) => isForeignEditorDropOn(view),
       },
       // Sprint 37: Image paste handler
       // Uses insertImageFromFileRef to avoid stale closure (see ref declaration)
@@ -1097,6 +1109,22 @@ export function MarkdownEditor({
       }
     };
   }, [contentId, editor]);
+
+  // Images and audio entering or leaving this note's text show in the file
+  // tree at once, not after the save (lib/features/content/in-text-media.ts).
+  useInTextMediaTracker(editor, contentId);
+  // Content dragged out of this note while its editor wasn't mounted (a tab
+  // opened by hovering it replaced the pane's editor) leaves it once it's back.
+  // Only once the editor is bound to the note's collaborative document
+  // (live or offline): a first paint from cache is replaced, so a removal
+  // made there would be lost. A plain editor is ready at once.
+  usePendingDragRemovals(
+    editor,
+    contentId,
+    !shouldUseCollaboration ||
+      editorMode === "collaboration" ||
+      editorMode === "collaboration-local",
+  );
 
   // Handle Cmd+K / Ctrl+K keyboard shortcut for link dialog
   useEffect(() => {
@@ -1606,15 +1634,29 @@ export function MarkdownEditor({
       <div
         ref={editorScrollRef}
         className="relative flex-1 overflow-y-auto"
+        onDragStart={() => {
+          // A drag ProseMirror just started here: recorded so another note's
+          // editor can take it (cross-editor-move.ts).
+          if (editor) recordEditorDrag(editor, contentId ?? null);
+        }}
+        onDragEnd={() => {
+          // Dropped nowhere that took it (or cancelled): forget it. A drop
+          // that took it already did; this fires after the drop.
+          const drag = useEditorDragStore.getState().drag;
+          if (drag && drag.editor === editor) useEditorDragStore.getState().clear();
+        }}
         onDragOver={(e) => {
           const isFile = e.dataTransfer.types.includes("Files");
           const isAiImage = e.dataTransfer.types.includes("application/x-dg-ai-image");
           const isInternalPMDrag = editor
             ? !!(editor.view as unknown as { dragging: unknown }).dragging
             : false;
-          if (isFile || isAiImage || isInternalPMDrag) {
+          // Content dragged out of another note's editor lands here too.
+          const foreign = foreignEditorDrag(editor);
+          if (isFile || isAiImage || isInternalPMDrag || foreign) {
             e.preventDefault();
-            e.dataTransfer.dropEffect = isInternalPMDrag ? "move" : "copy";
+            e.dataTransfer.dropEffect =
+              isInternalPMDrag || foreign?.move ? "move" : "copy";
           }
         }}
         onDragEnter={(e) => {
@@ -1623,9 +1665,11 @@ export function MarkdownEditor({
           const isInternalPMDrag = editor
             ? !!(editor.view as unknown as { dragging: unknown }).dragging
             : false;
-          if (isFile || isAiImage || isInternalPMDrag) {
+          const foreign = foreignEditorDrag(editor);
+          if (isFile || isAiImage || isInternalPMDrag || foreign) {
             e.preventDefault();
-            e.dataTransfer.dropEffect = isInternalPMDrag ? "move" : "copy";
+            e.dataTransfer.dropEffect =
+              isInternalPMDrag || foreign?.move ? "move" : "copy";
           }
         }}
         onContextMenu={(e) => {
@@ -1710,6 +1754,17 @@ export function MarkdownEditor({
             return;
           }
 
+          // Content dragged out of ANOTHER note's editor (another pane, or a
+          // tab opened by hovering it): insert it here, remove it there.
+          if (
+            editor &&
+            dropForeignEditorDrag(editor, contentId ?? null, { left: e.clientX, top: e.clientY })
+          ) {
+            e.preventDefault();
+            e.stopPropagation();
+            return;
+          }
+
           // Internal ProseMirror drag (node move): React's onDrop fires before PM's
           // native listener on view.dom, so view.dragging is still set here. We can't
           // reliably re-dispatch through PM's event pipeline (posAtCoords may return
@@ -1725,7 +1780,14 @@ export function MarkdownEditor({
             const pmDragging = (editor.view as unknown as { dragging: DraggingState | null }).dragging;
             if (pmDragging) {
               e.preventDefault();
-              const { slice, move, node: draggingNode } = pmDragging;
+              const { move, node: draggingNode } = pmDragging;
+              // The document's own content, not ProseMirror's drag slice —
+              // that one went through `transformCopied` (clipboard.ts),
+              // which rewrites image sources to public links for pasting
+              // OUTSIDE the app; a move within the note must not change them.
+              const slice = draggingNode
+                ? editor.state.doc.slice(draggingNode.from, draggingNode.to)
+                : editor.state.selection.content();
               const eventPos = editor.view.posAtCoords({ left: e.clientX, top: e.clientY });
               if (eventPos) {
                 const { state } = editor.view;
