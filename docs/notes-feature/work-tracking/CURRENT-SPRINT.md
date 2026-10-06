@@ -12,7 +12,7 @@ last_updated: 2026-05-13
 ## October 5, 2026 — The file tree stops flashing; deleting is instant; rows keep their order; view shortcuts show their folder and act on it safely
 
 **Tree**: worktree `.claude/worktrees/smooth-delete`, branch `fix/smooth-delete` (off `origin/main` at `49b94490`)
-**Status**: typecheck / lint 151 (0 errors, none new) / `tree:smooth:check` 189 (new, in the quality workflow) / `shortcut-mirror:check` (out-of-view cases, row actions, view reach) / tree + workspace gates / `pnpm build` green; no schema or TipTap change; **browser-extension change** (bookmark dedupe removed — `pnpm extension:build`, reload at chrome://extensions); **Hocuspocus redeploy required** (collaborative saves now refresh media links); run `scripts/backfill-media-links.ts --apply` once per environment. Owner browser smoke pending.
+**Status**: typecheck / lint 151 (0 errors, none new) / `tree:smooth:check` 200 (new, in the quality workflow) / `shortcut-mirror:check` (out-of-view cases, row actions, view reach) / tree + workspace gates / `pnpm build` green; no schema or TipTap change; **browser-extension change** (bookmark dedupe removed — `pnpm extension:build`, reload at chrome://extensions); **Hocuspocus redeploy required** (collaborative saves now refresh media links); run `scripts/backfill-media-links.ts --apply` once per environment. Owner browser smoke pending.
 
 ### Shipped
 - **Skeleton = a scope's first load only** (`tree-refresh.ts`): every refresh of a tree already on screen is quiet — covers create, duplicate, links, uploads, folder view, the header refresh and all `dg:tree-refresh` dispatchers. Stale-scope responses are dropped.
@@ -31,6 +31,7 @@ last_updated: 2026-05-13
 - **Referenced content in a note's text**: shown with a ¶ badge (filed items keep the link badge), kept with its note — dropping it onto another note is refused with "still embedded in …"; filed content (chats, AI documents) still moves between notes. Collaborative saves now keep the text links current (links only, never trashing); `scripts/backfill-media-links.ts` catches up existing notes.
 - **Opened through a shortcut, the tree keeps pointing at the shortcut**: selection, reveal and the gold tones follow the row that stands for the open content — the shortcut (or row inside one) you opened it from, else its own row, else a shortcut leading to it (`tree-stand-in.ts`).
 - **An image pasted into a note joins its referenced content at once** (`in-text-media.ts`): the note editor reports what its text gains and loses (paste, drop, /image, AI images, delete, cut, undo) and the tree shows it immediately, by the tree API's own placement rules; each edit holds until the tree's data agrees, so nothing flashes back; a fresh upload's row is fetched at once and the tree reconciles after the save window. Media filed with a note (`filedWithNote`) is never moved by text.
+- **Folders spring open as you drag over them** (`spring-open.ts`): rest a drag on a collapsed row's middle for half a second and it opens; nested rows open in turn; a row the drag opened closes again once the pointer leaves its displayed bounds, and all of them close when the drag leaves the tree. A drop in the tree keeps them open; a cancelled drag closes them. Works for tree rows, other surfaces' drags and OS files.
 - **Bookmark dedupe removed**: no Dedupe control in the capture popup or options, no rule action; every saved bookmark is its own new row. Quick-save still updates an existing Chrome bookmark for the same page.
 - **Moves wait out a slow database** (locked transactions get 15 s to start, 30 s to run, not Prisma's 5 s), and **a shortcut can't trick a folder into itself**: drops are checked by real ids, so dragging a folder a shortcut shows into its own sub-folder is refused before release.
 
@@ -95,6 +96,12 @@ last_updated: 2026-05-13
 58. Delete that image from the note (its toolbar's Delete, or Backspace) → it leaves the note's referenced content at once; ⌘Z → it's back at once.
 59. Cut an image from one note and paste it into another (both visible in the tree) → it moves to the second note's referenced content at once.
 60. Delete an image from a live note and wait 15 s → it shows in its folder's referenced content (kept, not trashed); nothing reappears under the note.
+61. Drag a note and rest it on the middle of a collapsed folder for about half a second → the folder opens; rest on a collapsed sub-folder inside it → that opens too.
+62. Keep dragging within the first folder (onto its other items) → it stays open; move the drag onto a row outside it → it closes, along with the sub-folder it opened.
+63. Spring a folder open, then drag out of the file tree (over the editor) → every folder the drag opened closes; folders you had open before the drag stay open.
+64. Spring two folders open and drop inside the inner one → the item lands there and both stay open. Spring one open and press Esc → it closes.
+65. Drag slowly along the top or bottom edge of a collapsed folder (the "beside" line shows) → it does NOT open; a drop there lands beside it.
+66. Drag a file from Finder over a collapsed folder → it opens after the pause; drag a row over a collapsed shortcut to a folder → it opens and shows the folder's items.
 
 ## October 4, 2026 — Coming back lands you where you were (workspace cold-load restore)
 
