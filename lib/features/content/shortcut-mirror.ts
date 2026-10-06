@@ -225,10 +225,16 @@ function mirrorChildrenOf(
   return sourceChildren.map((child, i) => {
     const row = toMirrorRow(child, parentRowId, i, sourceChildren.length);
     // Only descend into levels the user has actually opened — this is what
-    // keeps a cycle finite.
-    if (child.contentType === "folder" && expandedIds.has(row.id)) {
+    // keeps a cycle finite. A folder shows its own contents; a shortcut
+    // inside the mirror shows its target folder's (owner report,
+    // 2026-10-06: it showed as open with nothing under it, since only
+    // folders were descended into). The depth cap and lazy expansion bound
+    // a shortcut that leads back here exactly as they bound a folder.
+    const descendInto =
+      child.contentType === "folder" ? child.id : mirrorableTargetId(child);
+    if (descendInto && expandedIds.has(row.id)) {
       row.children = mirrorChildrenOf(
-        child.id,
+        descendInto,
         row.id,
         index,
         expandedIds,
@@ -305,20 +311,24 @@ export function expandShortcutMirrors(
 /**
  * If a drop lands on this row, which real folder should receive it?
  *
- * A folder-shortcut and a mirrored folder both DISPLAY a folder that lives
- * elsewhere. Dropping onto either means "put this in that folder", so the
- * destination is rewritten to the real id before the move is sent — which is
- * how "nothing is ever stored under a shortcut" survives contact with
- * drag-and-drop.
+ * A folder-shortcut, a mirrored folder and a shortcut seen inside a shortcut
+ * all DISPLAY a folder that lives elsewhere. Dropping onto any of them means
+ * "put this in that folder", so the destination is rewritten to the real id
+ * before the move is sent — which is how "nothing is ever stored under a
+ * shortcut" survives contact with drag-and-drop. (A shortcut inside a
+ * shortcut used to forward nowhere, so drops on it were refused — owner
+ * report, 2026-10-06.)
  *
  * Returns null for rows that are not projections, and for broken shortcuts:
  * there is no folder to forward to, so the drop is refused rather than
  * silently landing somewhere else.
  */
 export function resolveDropForwardTarget(node: TreeNode): string | null {
-  if (node.isShortcutMirror) {
-    return node.contentType === "folder" ? (node.mirrorOf ?? null) : null;
+  if (node.isShortcutMirror && node.contentType === "folder") {
+    return node.mirrorOf ?? null;
   }
+  // A shortcut — its own row, or seen inside another shortcut (a mirror row
+  // keeps the original's shortcut payload): its target folder, if live.
   return mirrorableTargetId(node);
 }
 

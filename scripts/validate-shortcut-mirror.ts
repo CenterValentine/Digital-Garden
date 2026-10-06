@@ -335,6 +335,57 @@ function findRow(nodes: TreeNode[], id: string): TreeNode | null {
       node("m2", { isShortcutMirror: true, mirrorOf: "note-a" }),
     ) === null,
   );
+  // Owner report, 2026-10-06: a shortcut seen inside another shortcut
+  // forwarded nowhere, so drops on it were refused.
+  check(
+    "a shortcut seen inside a shortcut forwards to ITS target folder",
+    resolveDropForwardTarget({
+      ...shortcutTo("inner-sc", "beta"),
+      id: "smirror:sc/inner-sc",
+      isShortcutMirror: true,
+      mirrorOf: "inner-sc",
+    }) === "beta",
+  );
+  check(
+    "a broken shortcut seen inside a shortcut forwards nowhere",
+    resolveDropForwardTarget({
+      ...shortcutTo("inner-bad", "beta", { targetDeleted: true }),
+      id: "smirror:sc/inner-bad",
+      isShortcutMirror: true,
+      mirrorOf: "inner-bad",
+    }) === null,
+  );
+}
+
+// --- 6b. A shortcut inside a shortcut opens onto its folder ----------------
+//
+// Owner report, 2026-10-06: it showed as open with nothing under it — the
+// mirror only descended into folders.
+{
+  const data: TreeNode[] = [
+    node("alpha", { contentType: "folder", children: [node("a-note"), shortcutTo("to-beta", "beta")] }),
+    node("beta", { contentType: "folder", children: [node("b-note")] }),
+    shortcutTo("sc", "alpha"),
+  ];
+  const nestedRow = shortcutMirrorId("sc", "to-beta");
+  const closed = findRow(run(data, ["sc"]), nestedRow);
+  check("a nested shortcut is mirrored but NOT descended into until opened", closed !== null && closed.children.length === 0);
+  const open = findRow(run(data, ["sc", nestedRow]), nestedRow);
+  check(
+    "opened, it shows its target folder's contents",
+    open?.children.map((child) => child.mirrorOf).join(",") === "b-note",
+    open?.children.map((child) => child.mirrorOf).join(","),
+  );
+  check(
+    "those rows are path-scoped under it (unique, and a drop among them forwards to the real folder)",
+    open?.children[0]?.id === shortcutMirrorId(nestedRow, "b-note") && resolveDropForwardTarget(open!) === "beta",
+  );
+  const broken: TreeNode[] = [
+    node("alpha", { contentType: "folder", children: [shortcutTo("to-gone", "gone", { targetDeleted: true })] }),
+    shortcutTo("sc", "alpha"),
+  ];
+  const brokenRow = shortcutMirrorId("sc", "to-gone");
+  check("a broken nested shortcut opens onto nothing", findRow(run(broken, ["sc", brokenRow]), brokenRow)?.children.length === 0);
 }
 
 // --- 7. Hiding nested shortcuts ------------------------------------------

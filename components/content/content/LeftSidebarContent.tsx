@@ -98,6 +98,7 @@ import {
 } from "@/lib/features/content/in-text-media";
 import { useInTextMediaStore } from "@/state/in-text-media-store";
 import { patchTreeNodeTitle } from "@/lib/domain/content/tree-patch";
+import { isUuid } from "@/lib/domain/content/uuid";
 import {
   collectRemovedIds,
   removeNodesFromTree,
@@ -1452,6 +1453,8 @@ export function LeftSidebarContent({
     index: number;
     /** From FileTree: the row the drop landed after, read off the screen. */
     afterId?: string | null;
+    /** From FileTree: the real folder a projection row stands for (mirror rows aren't in our data). */
+    forwardTo?: string | null;
   }) => {
     const { dragIds, index, afterId } = args;
     let { parentId } = args;
@@ -1473,8 +1476,15 @@ export function LeftSidebarContent({
     const dropRowId = parentId;
     if (parentId) {
       const dropRow = findTreeNodeById(originalTree, parentId);
-      const forwardTo = dropRow ? resolveDropForwardTarget(dropRow) : null;
+      const forwardTo = args.forwardTo ?? (dropRow ? resolveDropForwardTarget(dropRow) : null);
       if (forwardTo) parentId = forwardTo;
+    }
+    // Never send a row id that names no content (a projection the rules
+    // above didn't resolve): the server can only refuse it, after the row
+    // has already moved on screen.
+    if (parentId && !isUuid(parentId)) {
+      toast.error("Can't move there", { description: "That row doesn't stand for a folder." });
+      return;
     }
 
     // Find each dragged node's current position. Computed up-front so

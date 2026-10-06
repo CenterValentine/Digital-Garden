@@ -74,6 +74,12 @@ interface FileTreeProps {
      * means the same thing to the server. Absent when it can't be resolved.
      */
     afterId?: string | null;
+    /**
+     * The real folder the drop lands in when the row it landed on displays a
+     * folder that lives elsewhere (a folder-shortcut, or a folder or shortcut
+     * seen inside a shortcut) — resolved from the rendered row.
+     */
+    forwardTo?: string | null;
   }) => Promise<void>;
   onSelect?: (
     nodes: TreeNode[],
@@ -454,11 +460,18 @@ export function FileTree({
               ),
             ]
           : args.dragIds;
+        // The real folder the drop lands in, decided from the row as rendered
+        // — a folder or a shortcut seen inside a shortcut exists only here,
+        // as a mirror row; the sidebar's own data can't resolve its id
+        // (owner report, 2026-10-06: such drops sent the mirror id and the
+        // server refused them).
+        const forwardTo = parentNode ? resolveDropForwardTarget(parentNode.data) : null;
         await onMove({
           dragIds: realDragIds,
           parentId,
           index,
           afterId,
+          forwardTo,
         });
       } catch (error) {
         clientLogger.error({

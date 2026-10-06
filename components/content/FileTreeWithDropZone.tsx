@@ -30,6 +30,7 @@ interface FileTreeWithDropZoneProps {
     parentId: string | null;
     index: number;
     afterId?: string | null;
+    forwardTo?: string | null;
   }) => Promise<void>;
   onSelect?: (nodes: TreeNode[]) => void;
   onRename?: (id: string, name: string) => Promise<void>;

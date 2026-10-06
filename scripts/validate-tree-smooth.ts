@@ -1700,6 +1700,21 @@ console.log("\ncreates and renames outside the tree reach it at once (main-panel
   });
 }
 
+console.log("\ndrops onto rows inside a shortcut reach the real folder (source pins)");
+{
+  const fileTree = readFileSync(join(__dirname, "../components/content/FileTree.tsx"), "utf8");
+  const move = fileTree.slice(fileTree.indexOf("const handleMove = async"), fileTree.indexOf("const handleSelect = "));
+  check("FileTree resolves the destination from the row as rendered — after placing a mid-row drop beside it", () => {
+    const forward = move.indexOf("const forwardTo = parentNode ? resolveDropForwardTarget(parentNode.data) : null;");
+    assert.ok(forward > 0 && forward > move.indexOf("parentNode = holder;"), "computed from the FINAL parent (a beside-drop's holder can be a mirror row too)");
+    assert.ok(/await onMove\(\{[\s\S]*?forwardTo,\s*\}\);/.test(move));
+  });
+  check("the sidebar takes it (mirror rows aren't in its data) and never sends an id that names no content", () => {
+    assert.ok(source.includes("const forwardTo = args.forwardTo ?? (dropRow ? resolveDropForwardTarget(dropRow) : null);"));
+    assert.ok(/if \(parentId && !isUuid\(parentId\)\) \{\s*toast\.error\("Can't move there"/.test(source));
+  });
+}
+
 console.log("\nthe referenced-items chip (source pin)");
 {
   const fileNode = readFileSync(join(__dirname, "../components/content/FileNode.tsx"), "utf8");
