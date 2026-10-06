@@ -1751,6 +1751,12 @@ console.log("\ncreates and renames outside the tree reach it at once (main-panel
     assert.equal(patchTreeNodeTitle(before, "missing", "x"), before, "nothing to rename: the same array");
     assert.equal(patchTreeNodeTitle(before, "a", "A"), before, "same title: the same array");
   });
+  check("a rename also reaches rows that stand for the item — a Note Window's row in its note", () => {
+    const withWindow = [row("H", "Host", { references: [row("wref:H/a", "A", { mirrorOf: "a", isShortcutMirror: true })] }), row("a", "A")];
+    const renamed = patchTreeNodeTitle(withWindow, "a", "A2");
+    assert.equal(renamed[0].references?.[0].title, "A2");
+    assert.equal(renamed[1].title, "A2");
+  });
 
   const read9 = (rel: string) => readFileSync(join(__dirname, "..", rel), "utf8");
   const picker = read9("components/content/pickers/ContentTreePicker.tsx");

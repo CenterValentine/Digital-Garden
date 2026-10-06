@@ -19,7 +19,11 @@ export function patchTreeNodeTitle(
   // objects (react-arborist recycles rows by identity — see expandReferences).
   let changed = false;
   const next = nodes.map((node) => {
-    if (node.id === contentId) {
+    // The row itself, or a row that stands for it — a Note Window's row in
+    // its note's referenced content (`wref:` id, `mirrorOf` the windowed
+    // note). Owner report, 2026-10-06: renaming a windowed note left its
+    // window row showing the old name.
+    if (node.id === contentId || node.mirrorOf === contentId) {
       if (node.title === newTitle) return node;
       changed = true;
       return { ...node, title: newTitle };
