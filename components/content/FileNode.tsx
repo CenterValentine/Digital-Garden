@@ -69,6 +69,10 @@ import {
   hasTreeClipboard,
   ensureAltTracker,
 } from "@/lib/features/content/tree-clipboard";
+import {
+  contentIdOfRowId,
+  shortcutIdOfMirrorRowId,
+} from "@/lib/features/content/shortcut-mirror";
 
 /**
  * Row hover tooltip: modified + created, Obsidian-style. Answers "which of
@@ -749,21 +753,35 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
 
     // Tree clipboard (owner spec 2026-08-10): resolve ids to {id,title,type}
     // for the clipboard payload — titles come from the live selection, with
-    // the clicked node as fallback.
+    // the clicked node as fallback. A row inside a shortcut (or a window row)
+    // copies the ORIGINAL: its link and paste must reach real content, not a
+    // projection id that resolves to nothing.
     ensureAltTracker(); // Alt at Copy-click = strictly the URL
     const clipboardItems = (ids: string[]) => {
       const byId = new Map(
         (tree.selectedNodes ?? []).map((n: NodeApi<TreeNode>) => [n.id, n.data]),
       );
-      return ids.map((id) => {
+      const seen = new Set<string>();
+      return ids.flatMap((id) => {
+        const contentId = contentIdOfRowId(id);
+        if (seen.has(contentId)) return [];
+        seen.add(contentId);
         const d = id === data.id ? data : byId.get(id);
-        return {
-          id,
+        return [{
+          id: contentId,
           title: d?.title ?? "Untitled",
           contentType: d?.contentType ?? "note",
-        };
+        }];
       });
     };
+
+    // The shortcut a mirror row is seen through — what deleting the row
+    // removes, so the menu can name it. Its row is an open ancestor of this
+    // one, so the tree has it.
+    const mirrorShortcutId = shortcutIdOfMirrorRowId(data.id);
+    const mirrorShortcutTitle = mirrorShortcutId
+      ? (tree.get(mirrorShortcutId)?.data.title ?? null)
+      : null;
 
     openMenu(
       "file-tree",
@@ -792,7 +810,9 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
           // deletion, and can withhold destructive actions from projections.
           isShortcut,
           isShortcutMirror: isMirrorRow,
+          isWindowReference: Boolean(data.windowRef),
           mirrorOf: data.mirrorOf ?? null,
+          mirrorShortcutTitle,
           shortcutTargetId: shortcut?.targetId ?? null,
           shortcutTargetTitle: shortcut?.targetTitle ?? null,
           shortcutTargetContentType: shortcut?.targetContentType ?? null,

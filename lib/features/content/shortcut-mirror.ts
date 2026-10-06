@@ -23,13 +23,17 @@
  * never becomes a real parent. Dropping onto one forwards to the real folder
  * (see the move route); dragging one moves the real item it stands for
  * (FileTree passes `mirrorOf` up), so content can be rearranged from inside a
- * shortcut without visiting the source folder.
+ * shortcut without visiting the source folder. Actions that only REFER to the
+ * content (open, copy, download) reach the original; deleting a mirror row
+ * removes the shortcut, never the original (`deleteTargetsOfRowIds`); other
+ * edits stay with the content's own row.
  *
  * Pure and dependency-free by design so it can be exercised without standing
  * up react-arborist or a browser. Mirrors the structure of `expandReferences`
  * in ./reference-group, including its identity contract.
  */
 import type { TreeNode } from "@/lib/domain/content/types";
+import { WINDOW_REFERENCE_PREFIX } from "./window-reference";
 
 /** Namespaced so a mirror row id can never collide with a ContentNode uuid. */
 export const SHORTCUT_MIRROR_PREFIX = "smirror:";
@@ -51,6 +55,55 @@ export function shortcutMirrorId(parentRowId: string, realId: string): string {
 /** The real ContentNode id a mirror row stands for. */
 export function realIdOfMirrorRow(node: TreeNode): string | null {
   return node.mirrorOf ?? null;
+}
+
+function isProjectionRowId(rowId: string): boolean {
+  return rowId.startsWith(SHORTCUT_MIRROR_PREFIX) || rowId.startsWith(WINDOW_REFERENCE_PREFIX);
+}
+
+/**
+ * The content a tree row stands for, from its id alone. A projection row — a
+ * shortcut's mirror (`smirror:<shortcut>/…/<id>`) or a note's window
+ * reference (`wref:<host>/<id>`) — ends in the real id; any other row IS its
+ * content. For actions that only refer to content (open, copy a link,
+ * download): they go to the original wherever the row is shown.
+ */
+export function contentIdOfRowId(rowId: string): string {
+  if (!isProjectionRowId(rowId)) return rowId;
+  return rowId.slice(rowId.lastIndexOf("/") + 1);
+}
+
+/**
+ * The shortcut a mirror row is shown through: the head of its path, which is
+ * the shortcut's own row in the user's tree. Null for any other row.
+ */
+export function shortcutIdOfMirrorRowId(rowId: string): string | null {
+  if (!rowId.startsWith(SHORTCUT_MIRROR_PREFIX)) return null;
+  const head = rowId.slice(SHORTCUT_MIRROR_PREFIX.length).split("/")[0];
+  return head || null;
+}
+
+/**
+ * What deleting these rows removes.
+ *
+ * A row seen through a shortcut removes THAT SHORTCUT — never the original it
+ * mirrors (owner rule, 2026-10-05: "deleting … of a shortcut, NOT the deleting
+ * of the original content itself"). The original lives somewhere the user is
+ * not looking; trashing it from a projection is the surprise this prevents.
+ * A window-reference row removes nothing: it is derived from a Note Window in
+ * its host note, and taking that out is an edit of the note. Every other row
+ * removes itself. Order kept, duplicates dropped.
+ */
+export function deleteTargetsOfRowIds(rowIds: readonly string[]): string[] {
+  const targets: string[] = [];
+  for (const rowId of rowIds) {
+    if (rowId.startsWith(WINDOW_REFERENCE_PREFIX)) continue;
+    const target = rowId.startsWith(SHORTCUT_MIRROR_PREFIX)
+      ? shortcutIdOfMirrorRowId(rowId)
+      : rowId;
+    if (target && !targets.includes(target)) targets.push(target);
+  }
+  return targets;
 }
 
 /**

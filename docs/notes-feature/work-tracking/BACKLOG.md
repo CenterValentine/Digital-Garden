@@ -89,6 +89,10 @@ The order audit fixed the causes that moved rows between refreshes (anchored dro
 - [ ] **People mounts keep their own order space** (`/api/people/mounts`, still index-based); a content row and a mount row can't be anchored to each other — anchors skip mount rows.
 - [ ] **The inline-create placeholder can be wiped** by a refresh that starts while the name is being typed (the stale-response guard brackets moves and deletes only; a create would need an end that runs on submit, cancel AND unmount — a missed end drops every later refresh).
 
+## File-tree shortcuts — open decision (2026-10-05, from `fix/smooth-delete`)
+
+- [ ] **Opening through a shortcut in a view can raise the out-of-view warning** (owner's call, not built). A shortcut opens its target's own id through the open guard, and the server's view-scope check (`resolveOpenIntent`) raises a conflict unless the target is assigned to the workspace or covered by one of its recursive claims. Workspaces that already claim their targets never see it. Proposal: a shortcut inside the view puts its target in scope for that check only — no claim written, nothing else relaxed.
+
 ## E-reader — proposed (2026-09-29, plan `EREADER-PLAN.md`)
 
 + → Reader → [Scriptures, Books]. One reader shell (foliate-js for EPUB/PDF, a corpus renderer for scriptures), one annotation store keyed by Readium Locators, and a library of book-source adapters (OPDS, Gutendex, Open Library, upload). Books are file nodes in a user-chosen library folder. Blocked on owner answers to the plan's §10.

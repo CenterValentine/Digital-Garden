@@ -29,9 +29,13 @@ import {
   buildTreeIndex,
   shortcutMirrorId,
   resolveDropForwardTarget,
+  contentIdOfRowId,
+  shortcutIdOfMirrorRowId,
+  deleteTargetsOfRowIds,
   SHORTCUT_MIRROR_PREFIX,
   MAX_MIRROR_DEPTH,
 } from "@/lib/features/content/shortcut-mirror";
+import { windowReferenceRowId } from "@/lib/features/content/window-reference";
 import type { TreeNode } from "@/lib/domain/content/types";
 import { outOfScopeShortcutTargets, type ScopedNodeLite } from "@/lib/domain/content/shortcut-targets";
 
@@ -449,11 +453,43 @@ function findRow(nodes: TreeNode[], id: string): TreeNode | null {
   );
 }
 
+// ── What a row inside a shortcut acts on ────────────────────────────────────
+// Owner rule (2026-10-05): actions that only refer to content reach the
+// ORIGINAL; deleting removes the SHORTCUT, never the original. Ids built by
+// the real producers, so a format change on either side fails here.
+{
+  const top = shortcutMirrorId("sc", "folder-1");
+  const deep = shortcutMirrorId(top, "note-1");
+  const windowRow = windowReferenceRowId("host-note", "target-1");
+
+  check("a mirror row refers to its original", contentIdOfRowId(top) === "folder-1", contentIdOfRowId(top));
+  check("a nested mirror row refers to its own original", contentIdOfRowId(deep) === "note-1", contentIdOfRowId(deep));
+  check("a window row refers to the windowed note", contentIdOfRowId(windowRow) === "target-1", contentIdOfRowId(windowRow));
+  check("a real row refers to itself", contentIdOfRowId("plain-id") === "plain-id");
+
+  check("a mirror row is seen through its shortcut", shortcutIdOfMirrorRowId(deep) === "sc", String(shortcutIdOfMirrorRowId(deep)));
+  check("a real row is seen through no shortcut", shortcutIdOfMirrorRowId("plain-id") === null);
+  check("a window row is seen through no shortcut", shortcutIdOfMirrorRowId(windowRow) === null);
+
+  const targets = deleteTargetsOfRowIds(["plain-id", top, deep, windowRow]);
+  check(
+    "delete: a row inside a shortcut removes the shortcut; a window row removes nothing",
+    targets.join() === "plain-id,sc",
+    targets.join(),
+  );
+  check(
+    "delete never reaches an original through its mirror",
+    !targets.includes("folder-1") && !targets.includes("note-1") && !targets.includes("target-1"),
+  );
+  check("delete: the shortcut and its own mirror rows go once", deleteTargetsOfRowIds(["sc", top]).join() === "sc");
+  check("delete: only window rows → nothing to delete", deleteTargetsOfRowIds([windowRow]).length === 0);
+}
+
 if (failures > 0) {
   console.error(`\nshortcut-mirror:check — ${failures} check(s) failed.\n`);
   process.exit(1);
 }
 
 console.log(
-  "shortcut-mirror:check — OK (identity, mirroring, broken targets, laziness, cycles, drop forwarding, nested-shortcut hiding, out-of-view targets)",
+  "shortcut-mirror:check — OK (identity, mirroring, broken targets, laziness, cycles, drop forwarding, nested-shortcut hiding, out-of-view targets, row actions)",
 );

@@ -578,4 +578,54 @@ console.log("\nshortcut rows are draggable (source pins)");
   });
 }
 
+console.log("\nrows inside a shortcut: references reach the original, delete removes the shortcut (source pins)");
+{
+  const read = (rel: string) => readFileSync(join(__dirname, "..", rel), "utf8");
+  const menu = read("components/content/context-menu/file-tree-actions.tsx");
+  const fileNode = read("components/content/FileNode.tsx");
+  const fileTree = read("components/content/FileTree.tsx");
+  const handleDelete = sliceBetween("const handleDelete = async", "const handleDeleteConfirmed = async");
+
+  check("handleDelete maps row ids to delete targets before reading anything (⌥D and the menu both land here)", () => {
+    const mapped = handleDelete.indexOf("const ids = deleteTargetsOfRowIds(rowIds)");
+    assert.ok(mapped > 0, "handleDelete must map rows through deleteTargetsOfRowIds");
+    assert.ok(mapped < handleDelete.indexOf("nodesToDelete"));
+    assert.equal(/handleDeleteConfirmed\(rowIds|ids: rowIds/.test(handleDelete), false);
+  });
+  check("a removal from inside a shortcut says which shortcut went and offers it back", () => {
+    assert.ok(/if \(viaShortcut && removed\.length > 0\) announceShortcutRemoval\(/.test(handleDelete));
+    const announce = sliceBetween("const announceShortcutRemoval = ", "const handleDelete = async");
+    assert.ok(announce.includes('"/api/trash/restore"') && announce.includes('kind: "content"'));
+  });
+  check("the menu labels Delete by the same rule and still hands over row ids", () => {
+    assert.ok(menu.includes("const deleteTargets = deleteTargetsOfRowIds(selectedIds);"));
+    assert.ok(/if \(deleteTargets\.length > 0\) \{/.test(menu));
+    assert.ok(menu.includes("Remove Shortcut “${enclosingTitle}”"));
+    assert.ok(menu.includes("onClick: async () => await onDelete?.(selectedIds)"));
+  });
+  check("Open and Open In Pane go to the original, never the projection id", () => {
+    assert.equal(/setSelectedContentId\(clickedId|openContentInPane\(clickedId/.test(menu), false);
+    assert.equal((menu.match(/setSelectedContentId\(contentId,/g) ?? []).length, 2);
+    assert.ok(menu.includes("openContentInPane(contentId, target,"));
+  });
+  check("Download and Star act on the originals", () => {
+    assert.ok(menu.includes("onDownload?.(contentIds)"));
+    assert.ok(menu.includes("onToggleStar?.(contentIds)"));
+  });
+  check("edits stay off a mirror row: add, import, charter, view, move, transcribe", () => {
+    assert.equal((menu.match(/\(isSingleSelection \|\| !clickedId\) && !isMirrorRow/g) ?? []).length, 2);
+    assert.ok(/clickedNode &&\s*!isMirrorRow &&\s*\(clickedNode\.contentType === "note"/.test(menu));
+    assert.ok(menu.includes("isFolder && onSetFolderView && !isMirrorRow"));
+    assert.ok(menu.includes("!isPeopleMount && !isMirrorRow"));
+    assert.ok(/clickedId &&\s*!isMirrorRow &&\s*clickedNode\?\.contentType === "file"/.test(menu));
+  });
+  check("Copy puts the original on the clipboard (link and paste)", () => {
+    assert.ok(fileNode.includes("const contentId = contentIdOfRowId(id);"));
+    assert.ok(/id: contentId,\s*title:/.test(fileNode));
+  });
+  check("⌥R does nothing on a projection row (the menu greys Rename out)", () => {
+    assert.ok(fileTree.includes("if (node.data.isShortcutMirror) return;"));
+  });
+}
+
 console.log(`\ntree-smooth: ${checks} checks passed`);

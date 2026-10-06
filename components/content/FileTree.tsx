@@ -551,6 +551,11 @@ export function FileTree({
         if (tree?.selectedNodes?.length === 1) {
           const node = tree.selectedNodes[0];
 
+          // A row inside a shortcut (or a window row) is a projection: its
+          // name belongs to the original's own row. The menu greys Rename out
+          // here; the key does nothing.
+          if (node.data.isShortcutMirror) return;
+
           // Check if this is an external link
           if (node.data.contentType === "external") {
             // Dispatch edit event for external links instead of inline rename

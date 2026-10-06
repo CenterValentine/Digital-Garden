@@ -45,7 +45,11 @@ import {
   resolveCreateParent,
   toServerParent,
 } from "@/lib/domain/content/create-target";
-import { resolveDropForwardTarget } from "@/lib/features/content/shortcut-mirror";
+import {
+  deleteTargetsOfRowIds,
+  resolveDropForwardTarget,
+  shortcutIdOfMirrorRowId,
+} from "@/lib/features/content/shortcut-mirror";
 import { ContentTreePicker } from "@/components/content/pickers/ContentTreePicker";
 
 /**
@@ -2520,12 +2524,69 @@ export function LeftSidebarContent({
     }
   };
 
+  // A shortcut removed from inside its own mirror. The row the user acted on
+  // stood for content elsewhere, so the toast names the shortcut that went,
+  // says the original stayed, and offers it back: removal is a soft delete,
+  // and restoring keeps its parent and order.
+  const announceShortcutRemoval = (removedIds: string[], nodes: TreeNode[]) => {
+    const titles = nodes
+      .filter((node) => removedIds.includes(node.id))
+      .map((node) => node.title);
+    toast.success(
+      titles.length === 1
+        ? `Removed the shortcut “${titles[0]}”`
+        : `Removed ${removedIds.length} shortcuts`,
+      {
+        description: "The original is untouched.",
+        action: {
+          label: "Undo",
+          onClick: () => {
+            void (async () => {
+              const restored = await Promise.all(
+                removedIds.map((id) =>
+                  fetch("/api/trash/restore", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    credentials: "include",
+                    body: JSON.stringify({ kind: "content", id }),
+                  })
+                    .then((response) => response.ok)
+                    .catch(() => false)
+                )
+              );
+              if (restored.some((ok) => !ok)) {
+                toast.error("Couldn't put the shortcut back", {
+                  description: "It's in the trash — restore it from there.",
+                });
+              }
+              await fetchTree();
+            })();
+          },
+        },
+      }
+    );
+  };
+
   // Handler: Delete content nodes (soft delete) - supports batch delete
   const handleDelete = async (idsToDelete: string | string[]) => {
     // Normalize to array
-    const ids = Array.isArray(idsToDelete) ? idsToDelete : [idsToDelete];
+    const rowIds = Array.isArray(idsToDelete) ? idsToDelete : [idsToDelete];
 
-    if (ids.length === 0) return;
+    // Row ids → what actually goes. Here rather than in the menu because ⌥D
+    // arrives here too: a row seen through a shortcut removes the SHORTCUT,
+    // never the original it mirrors, and a window row removes nothing.
+    const ids = deleteTargetsOfRowIds(rowIds);
+    const viaShortcut = rowIds.some((id) => shortcutIdOfMirrorRowId(id) !== null);
+
+    if (ids.length === 0) {
+      if (rowIds.length > 0) {
+        toast("Nothing to delete here", {
+          description:
+            "This row shows a note's window. Remove the window in that note to remove the row.",
+        });
+      }
+      return;
+    }
 
     // Find all nodes to show titles in confirmation dialog
     const findNode = (nodes: TreeNode[], targetId: string): TreeNode | null => {
@@ -2668,7 +2729,10 @@ ${workbenchWarning}`
       nodesToDelete.length > 0 &&
       nodesToDelete.every((node) => node.contentType === "shortcut")
     ) {
-      await handleDeleteConfirmed(ids);
+      const removed = await handleDeleteConfirmed(ids);
+      // From inside a shortcut, the row clicked is not the row that goes —
+      // say which did, that the original stayed, and offer it back.
+      if (viaShortcut && removed.length > 0) announceShortcutRemoval(removed, nodesToDelete);
       return;
     }
 
@@ -2741,10 +2805,11 @@ ${workbenchWarning}`
   // confirmed before the probe answered, nothing leaves Drive, whatever the
   // saved preference says: deleting someone's Google data needs the choice to
   // have been on screen.
+  // Resolves to the ids the server actually deleted.
   const handleDeleteConfirmed = async (
     ids: string[],
     googleDriveFiles: Array<{ contentId: string; fileId: string }> = []
-  ) => {
+  ): Promise<string[]> => {
     const treeBefore = treeData;
     const requested = new Set(ids);
     setTreeData((current) =>
@@ -2900,6 +2965,7 @@ ${workbenchWarning}`
           );
         }
       }
+      return successes.map((item) => item.id);
     } catch (err) {
       clientLogger.error({
         layer: "ui",
@@ -2913,6 +2979,7 @@ ${workbenchWarning}`
       });
       // Nothing is known to have been deleted: show the tree as it was.
       if (treeBefore) setTreeData(treeBefore);
+      return [];
     } finally {
       // Settle against the server without the skeleton — the tree stays
       // mounted, so scroll position and expansion are untouched.

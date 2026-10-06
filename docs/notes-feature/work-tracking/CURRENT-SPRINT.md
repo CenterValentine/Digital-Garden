@@ -9,10 +9,10 @@ last_updated: 2026-05-13
 
 # Current Sprint Addendum
 
-## October 5, 2026 — The file tree stops flashing; deleting is instant; rows keep their order; view shortcuts show their folder
+## October 5, 2026 — The file tree stops flashing; deleting is instant; rows keep their order; view shortcuts show their folder and act on it safely
 
 **Tree**: worktree `.claude/worktrees/smooth-delete`, branch `fix/smooth-delete` (off `origin/main` at `49b94490`)
-**Status**: typecheck / lint 151 (0 errors, none new) / `tree:smooth:check` 79 (new, in the quality workflow) / `shortcut-mirror:check` (out-of-view cases) / tree + workspace gates green; no schema, TipTap or extension change → no Hocuspocus redeploy. Owner browser smoke pending.
+**Status**: typecheck / lint 151 (0 errors, none new) / `tree:smooth:check` 87 (new, in the quality workflow) / `shortcut-mirror:check` (out-of-view cases, row actions) / tree + workspace gates green; no schema, TipTap or extension change → no Hocuspocus redeploy. Owner browser smoke pending.
 
 ### Shipped
 - **Skeleton = a scope's first load only** (`tree-refresh.ts`): every refresh of a tree already on screen is quiet — covers create, duplicate, links, uploads, folder view, the header refresh and all `dg:tree-refresh` dispatchers. Stale-scope responses are dropped.
@@ -21,6 +21,7 @@ last_updated: 2026-05-13
 - **Rows keep the order the user set** (`sibling-order.ts`): drops are anchors placed by one function on server and client; the move route is owner-scoped; one total comparator (id tiebreak) everywhere; refreshes that predate a local edit are dropped; new rows are shown where the server puts them (inline create asks for the top).
 - **Shortcuts in a view show their folder**: the tree API returns out-of-view shortcut targets beside the tree (`shortcut-targets.ts`); the mirror indexes them; a drop onto such a shortcut appears in its contents at once.
 - **A shortcut's rows are draggable**: dragging one moves the real item it stands for — reorder a shortcut's contents, drag them out, or drop new ones in among them. Window-reference rows stay undraggable.
+- **Inside a shortcut, Delete removes the shortcut; reference actions reach the original** (owner rule): open, open in pane, copy, download, AI context and table→deck act on the original (`contentIdOfRowId`); Delete — menu or ⌥D — removes the shortcut the row is seen through, never the original (`deleteTargetsOfRowIds`, applied in `handleDelete`), labelled `Remove Shortcut “<name>”` and announced with Undo; a window row deletes nothing. Other edits stay off projection rows (⌥R included).
 
 ### Smoke checklist (owner)
 1. Scroll the tree well down, delete a file (⌥D → confirm) → it vanishes instantly, no flash, scroll stays.
@@ -36,6 +37,10 @@ last_updated: 2026-05-13
 11. Inside that expanded shortcut, drag its last item to the top → it moves there at once and is still there after a reload; open Career Pathways → the same order there.
 12. Drag one of the shortcut's items out into a folder of the view → it leaves the shortcut and appears in that folder at once.
 13. Try to drag a window-reference row (a note's windowed item in its drawer) → refused, as before.
+14. Right-click a row inside the expanded shortcut → Open, Open In Pane, Copy and Download work on the real item (Copy, then paste into a note → a link to the original); Rename, Add, Move and Set View are not offered or greyed.
+15. Same menu → the delete entry reads `Remove Shortcut “Career Development & Resources”` → click it → the shortcut disappears, a toast says the original is untouched → open Career Pathways → its ten items are all still there.
+16. Click Undo on that toast → the shortcut is back where it was.
+17. Select a row inside the shortcut and press ⌥D → the shortcut is removed (same toast), never the item; press ⌥R on such a row → nothing happens.
 
 ## October 4, 2026 — Coming back lands you where you were (workspace cold-load restore)
 
