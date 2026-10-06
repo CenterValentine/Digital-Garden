@@ -16,6 +16,7 @@ import type { MoveContentRequest } from "@/lib/domain/content/api-types";
 import {
   compareSiblings,
   placeAmongSiblings,
+  renumbering,
   type SiblingPlacement,
 } from "@/lib/domain/content/sibling-order";
 import { logger, spanPayload, withRouteTrace, withSpan } from "@/lib/core/logger";
@@ -537,69 +538,75 @@ async function moveContentToPosition(
   placement: SiblingPlacement,
   ownerId: string,
 ) {
-  // ownerId: without it, a move at the ROOT treated every user's root items as
-  // siblings — renumbering their displayOrder in this transaction and offsetting
-  // the index by however many of them there were.
-  const siblings = await prisma.contentNode.findMany({
-    where: {
-      parentId,
-      ownerId,
-      deletedAt: null,
-    },
-    select: {
-      id: true,
-      title: true,
-      displayOrder: true,
-      contentType: true,
-    },
-  });
-
-  // The same order the tree shows (sibling-order.ts) — renumbering from any
-  // other order would reshuffle rows the user never touched.
-  siblings.sort(compareSiblings);
-
-  let movedItem = siblings.find((s) => s.id === contentId);
-
-  if (!movedItem) {
-    movedItem = await prisma.contentNode.findUnique({
+  // ONE transaction, holding the order lock of every list it changes. The
+  // sibling read used to sit outside the write: two moves into one folder
+  // made close together (two quick drags, a drag while a paste ran, another
+  // tab) each read the same list, and the later write renumbered every row
+  // from its stale read — undoing the earlier move. That is the "the drag
+  // didn't stick" a refresh revealed.
+  return prisma.$transaction(async (tx) => {
+    const current = await tx.contentNode.findUnique({
       where: { id: contentId },
-      select: {
-        id: true,
-        title: true,
-        displayOrder: true,
-        contentType: true,
-      },
+      select: { parentId: true },
     });
-    if (!movedItem) {
-      throw new Error('Content not found');
-    }
-  }
+    if (!current) throw new Error("Content not found");
 
-  // The same placement the client's optimistic update uses, so the row lands
-  // where it was shown.
-  const ordered = placeAmongSiblings(siblings, movedItem, placement);
-
-  const updates = ordered.map((sibling, index) => {
-    const updateData: { displayOrder: number; parentId?: string | null } = { displayOrder: index };
-
-    if (sibling.id === contentId) {
-      updateData.parentId = parentId;
+    // The destination's list, and the list the row leaves (a move within
+    // that list renumbers the row too). Sorted, so two moves that need the
+    // same pair of locks always take them in the same order.
+    const lockKeys = [...new Set([parentId, current.parentId])]
+      .map((id) => siblingOrderLockKey(ownerId, id))
+      .sort();
+    for (const key of lockKeys) {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0))`;
     }
 
-    return prisma.contentNode.update({
-      where: { id: sibling.id },
-      data: updateData,
+    // ownerId: without it, a move at the ROOT treated every user's root items
+    // as siblings — renumbering their displayOrder and offsetting the index by
+    // however many of them there were.
+    const siblings = await tx.contentNode.findMany({
+      where: { parentId, ownerId, deletedAt: null },
+      select: { id: true, title: true, displayOrder: true, contentType: true },
+    });
+    // The same order the tree shows (sibling-order.ts) — renumbering from any
+    // other order would reshuffle rows the user never touched.
+    siblings.sort(compareSiblings);
+
+    const movedItem =
+      siblings.find((s) => s.id === contentId) ??
+      (await tx.contentNode.findUnique({
+        where: { id: contentId },
+        select: { id: true, title: true, displayOrder: true, contentType: true },
+      }));
+    if (!movedItem) throw new Error("Content not found");
+
+    // The same placement the client's optimistic update uses, so the row
+    // lands where it was shown.
+    const ordered = placeAmongSiblings(siblings, movedItem, placement);
+
+    // Only rows whose number changes, in one statement, and without
+    // `updatedAt`: reordering is not editing (see `renumbering`).
+    const changes = renumbering(ordered, contentId);
+    if (changes.length > 0) {
+      await tx.$executeRaw`
+        UPDATE "ContentNode" AS node
+        SET "displayOrder" = renumbered.position
+        FROM unnest(
+          ${changes.map((change) => change.id)}::uuid[],
+          ${changes.map((change) => change.displayOrder)}::int[]
+        ) AS renumbered(id, position)
+        WHERE node.id = renumbered.id`;
+    }
+
+    return tx.contentNode.update({
+      where: { id: contentId },
+      data: { parentId, displayOrder: ordered.findIndex((row) => row.id === contentId) },
+      select: { id: true, parentId: true, displayOrder: true },
     });
   });
+}
 
-  await prisma.$transaction(updates);
-
-  return await prisma.contentNode.findUnique({
-    where: { id: contentId },
-    select: {
-      id: true,
-      parentId: true,
-      displayOrder: true,
-    },
-  });
+/** The advisory-lock key for one owner's list of siblings under `parentId`. */
+function siblingOrderLockKey(ownerId: string, parentId: string | null): string {
+  return `sibling-order:${ownerId}:${parentId ?? "root"}`;
 }

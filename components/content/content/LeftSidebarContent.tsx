@@ -1268,6 +1268,9 @@ export function LeftSidebarContent({
   };
 
   // Handle node move (drag-and-drop)
+  // The tail of every move request sent so far (see handleMove).
+  const moveRequestChainRef = useRef<Promise<unknown>>(Promise.resolve());
+
   const handleMove = async (args: {
     dragIds: string[];
     parentId: string | null;
@@ -1472,71 +1475,80 @@ export function LeftSidebarContent({
         setTreeData(optimisticTree);
       }
 
-      // Fire the moves sequentially. Parallel POSTs against the move
-      // endpoint would race each other on displayOrder slot assignment
-      // (the server computes the final slot from current children).
-      // Sequential keeps the contract simple and yields stable order.
+      // Fire the moves sequentially — and after every earlier drag's moves.
+      // Each POST re-reads the destination's siblings and renumbers them all,
+      // so two drags made in quick succession used to overlap: the second
+      // read the list before the first had written, and its renumbering
+      // undid the first drag ("the drag didn't stick" after the refresh).
+      // The server now also locks a folder's order while it places a row;
+      // this chain additionally keeps the moves in the order they were made,
+      // which the optimistic tree already assumes.
       const failures: Array<{ id: string; message: string }> = [];
       // A detached reference that's still embedded in a note will re-nest
       // under it on the next tree fetch (embed-graph ownership). Capture the
       // server's flag so the snap-back happens visibly after a beat, with an
       // explanation — not silently on some later refresh.
       let snapBackTo: { id: string; title: string } | null = null;
-      for (let i = 0; i < dragged.length; i++) {
-        const { id, node } = dragged[i];
-        const pos = positions.get(id);
-        const isSameParent = pos?.currentParentId === parentId;
-        const insertionIndex = index + i;
-        // react-arborist gives the insertion point; the server expects
-        // the final visual position. When moving DOWN within the same
-        // parent, subtract 1 to account for the item's own removal
-        // shifting everything left.
-        const apiIndex =
-          isSameParent && pos && pos.currentIndex < insertionIndex
-            ? insertionIndex - 1
-            : insertionIndex;
+      const sendMoves = async () => {
+        for (let i = 0; i < dragged.length; i++) {
+          const { id, node } = dragged[i];
+          const pos = positions.get(id);
+          const isSameParent = pos?.currentParentId === parentId;
+          const insertionIndex = index + i;
+          // react-arborist gives the insertion point; the server expects
+          // the final visual position. When moving DOWN within the same
+          // parent, subtract 1 to account for the item's own removal
+          // shifting everything left.
+          const apiIndex =
+            isSameParent && pos && pos.currentIndex < insertionIndex
+              ? insertionIndex - 1
+              : insertionIndex;
 
-        const response = isPeopleTreeNode(node)
-          ? await fetch("/api/people/mounts", {
-              method: "POST",
-              credentials: "include",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                target: toPeopleMountTarget(node),
-                contentParentId: parentId ?? scopedRootParentId,
-                displayOrder: apiIndex,
-                allowRemount: true,
-              }),
-            })
-          : await fetch("/api/content/content/move", {
-              method: "POST",
-              credentials: "include",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                contentId: id,
-                targetParentId: parentId ?? scopedRootParentId,
-                newDisplayOrder: apiIndex,
-                // The placement that actually decides it (see sibling-order.ts);
-                // newDisplayOrder stays as the server's fallback.
-                afterId: anchorFor(i),
-              }),
+          const response = isPeopleTreeNode(node)
+            ? await fetch("/api/people/mounts", {
+                method: "POST",
+                credentials: "include",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  target: toPeopleMountTarget(node),
+                  contentParentId: parentId ?? scopedRootParentId,
+                  displayOrder: apiIndex,
+                  allowRemount: true,
+                }),
+              })
+            : await fetch("/api/content/content/move", {
+                method: "POST",
+                credentials: "include",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  contentId: id,
+                  targetParentId: parentId ?? scopedRootParentId,
+                  newDisplayOrder: apiIndex,
+                  // The placement that actually decides it (see sibling-order.ts);
+                  // newDisplayOrder stays as the server's fallback.
+                  afterId: anchorFor(i),
+                }),
+              });
+
+          const result = await response.json().catch(() => ({}) as { error?: { message?: string; code?: string }; success?: boolean });
+          if (!response.ok || !result.success) {
+            failures.push({
+              id,
+              message: result.error?.message ?? `HTTP ${response.status}`,
             });
-
-        const result = await response.json().catch(() => ({}) as { error?: { message?: string; code?: string }; success?: boolean });
-        if (!response.ok || !result.success) {
-          failures.push({
-            id,
-            message: result.error?.message ?? `HTTP ${response.status}`,
-          });
-        } else {
-          const moved = (
-            result as {
-              data?: { stillReferencedBy?: { id: string; title: string } | null };
-            }
-          ).data;
-          if (moved?.stillReferencedBy) snapBackTo = moved.stillReferencedBy;
+          } else {
+            const moved = (
+              result as {
+                data?: { stillReferencedBy?: { id: string; title: string } | null };
+              }
+            ).data;
+            if (moved?.stillReferencedBy) snapBackTo = moved.stillReferencedBy;
+          }
         }
-      }
+      };
+      const queued = moveRequestChainRef.current.then(sendMoves);
+      moveRequestChainRef.current = queued.catch(() => undefined);
+      await queued;
 
       if (failures.length > 0) {
         clientLogger.error({

@@ -86,6 +86,27 @@ export function placeAmongSiblings<T extends { id: string }>(
   return [...rest.slice(0, at), moved, ...rest.slice(at)];
 }
 
+/**
+ * The new numbers after a placement: every row of `ordered` other than
+ * `movedId` whose displayOrder differs from its position. The moved row is
+ * written on its own (it also changes parent). Rows already at their position
+ * are left alone — renumbering used to rewrite EVERY sibling, which stamped
+ * each one's `updatedAt`: one drag made a whole folder "just modified" in
+ * search (sorted by it, top 100), the mobile recents and every row tooltip.
+ */
+export function renumbering(
+  ordered: readonly { id: string; displayOrder: number }[],
+  movedId: string,
+): { id: string; displayOrder: number }[] {
+  const changes: { id: string; displayOrder: number }[] = [];
+  ordered.forEach((row, position) => {
+    if (row.id !== movedId && row.displayOrder !== position) {
+      changes.push({ id: row.id, displayOrder: position });
+    }
+  });
+  return changes;
+}
+
 function clampIndex(index: number, length: number): number {
   if (!Number.isFinite(index)) return length;
   return Math.max(0, Math.min(Math.trunc(index), length));

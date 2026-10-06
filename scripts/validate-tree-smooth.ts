@@ -47,11 +47,20 @@ import {
   moveAcrossForests,
   moveTouchesCarried,
   placeAmongSiblings,
+  renumbering,
   resolveDropAnchor,
   sortedInsertIndex,
   type DropRow,
   type OrderedSibling,
 } from "../lib/domain/content/sibling-order";
+import {
+  acceptsDropInto,
+  besideRowIndex,
+  dropEdgeAt,
+  dropRefused,
+  isUndraggableRow,
+  type DropRuleRow,
+} from "../lib/features/content/drop-rules";
 
 interface Node {
   id: string;
@@ -561,9 +570,8 @@ console.log("\nshortcut rows are draggable (source pins)");
 {
   const read = (rel: string) => readFileSync(join(__dirname, "..", rel), "utf8");
   const fileTree = read("components/content/FileTree.tsx");
-  check("canDrop refuses only window-reference rows, not every mirror row", () => {
-    assert.ok(fileTree.includes("dragNode.data.isShortcutMirror && dragNode.data.windowRef"));
-    assert.equal(/dragNodes\.some\(\(dragNode\) => dragNode\.data\.isShortcutMirror\)\)/.test(fileTree), false);
+  check("only window rows (and pending rows) can't be picked up — through disableDrag, which react-arborist reads", () => {
+    assert.ok(fileTree.includes("disableDrag={onMove ? (row: TreeNode) => isUndraggableRow(row) : true}"));
   });
   check("FileTree moves the real item a shortcut row stands for (mirrorOf)", () => {
     assert.ok(fileTree.includes("node.data.isShortcutMirror && node.data.mirrorOf ? node.data.mirrorOf : node.id"));
@@ -625,6 +633,178 @@ console.log("\nrows inside a shortcut: references reach the original, delete rem
   });
   check("⌥R does nothing on a projection row (the menu greys Rename out)", () => {
     assert.ok(fileTree.includes("if (node.data.isShortcutMirror) return;"));
+  });
+}
+
+console.log("\nwhat a row takes inside it, and drops beside it (drop-rules.ts)");
+{
+  const row = (id: string, contentType: string, extra: Partial<DropRuleRow> = {}): DropRuleRow =>
+    ({ id, contentType, ...extra }) as DropRuleRow;
+  const U = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
+  const folder = row(U(1), "folder");
+  const note = row(U(2), "note");
+  const file = row(U(3), "file");
+  const table = row(U(4), "data");
+  const brokenShortcut = row(U(5), "shortcut", { shortcut: { targetId: null, targetDeleted: false, targetContentType: null } as DropRuleRow["shortcut"] });
+  const folderShortcut = row(U(6), "shortcut", { shortcut: { targetId: U(60), targetDeleted: false, targetContentType: "folder" } as DropRuleRow["shortcut"] });
+  const mirrorNote = row(`smirror:${U(6)}/${U(61)}`, "note", { isShortcutMirror: true, mirrorOf: U(61) });
+  const mirrorFolder = row(`smirror:${U(6)}/${U(62)}`, "folder", { isShortcutMirror: true, mirrorOf: U(62) });
+  const windowRow = row(`wref:${U(2)}/${U(7)}`, "note", { isShortcutMirror: true, mirrorOf: U(7), windowRef: { targetId: U(7) } });
+  const pending = row("temp-123", "note");
+  const person = row("person:abc", "folder", { treeNodeKind: "person" });
+  const primaryNote = row(U(8), "note");
+  const reference = row(U(9), "file", { role: "referenced" });
+  const shortcutDrag = row(U(10), "shortcut");
+  const promotedRow = row(U(11), "note", { promotedFromTableId: U(4) });
+
+  check("a note or file takes no primary content inside it (the middle-of-row bounce)", () => {
+    assert.equal(acceptsDropInto(note, [primaryNote]), false);
+    assert.equal(acceptsDropInto(file, [primaryNote]), false);
+  });
+  check("a folder takes anything", () => assert.equal(acceptsDropInto(folder, [primaryNote, reference]), true));
+  check("a note takes attachments; a table its own rows and other tables; any content a shortcut", () => {
+    assert.equal(acceptsDropInto(note, [reference]), true);
+    assert.equal(acceptsDropInto(table, [promotedRow]), true);
+    assert.equal(acceptsDropInto(table, [row(U(12), "data")]), true);
+    assert.equal(acceptsDropInto(table, [primaryNote]), false);
+    assert.equal(acceptsDropInto(file, [shortcutDrag]), true);
+  });
+  check("a folder-shortcut and a folder seen inside one forward; other projections take nothing", () => {
+    assert.equal(acceptsDropInto(folderShortcut, [primaryNote]), true);
+    assert.equal(acceptsDropInto(mirrorFolder, [primaryNote]), true);
+    assert.equal(acceptsDropInto(mirrorNote, [reference]), false);
+    assert.equal(acceptsDropInto(windowRow, [reference]), false);
+    assert.equal(acceptsDropInto(brokenShortcut, [primaryNote]), false);
+    assert.equal(acceptsDropInto(brokenShortcut, [shortcutDrag]), false);
+  });
+  check("pending and virtual rows take nothing", () => {
+    assert.equal(acceptsDropInto(pending, [reference]), false);
+    assert.equal(acceptsDropInto(person, [shortcutDrag]), false);
+  });
+  check("window rows and pending rows can't be dragged; everything else can", () => {
+    assert.equal(isUndraggableRow(windowRow), true);
+    assert.equal(isUndraggableRow(pending), true);
+    assert.equal(isUndraggableRow(mirrorNote), false);
+    assert.equal(isUndraggableRow(primaryNote), false);
+    assert.equal(acceptsDropInto(folder, [windowRow]), false);
+  });
+  check("a drop between the rows of a list that can't take it is refused", () => {
+    assert.equal(dropRefused({ target: note, holder: folder, drags: [primaryNote], insideRow: false, holderWithinDrags: false }), true);
+  });
+  check("over the middle of a row that can't take it: allowed beside it, if the row's list can", () => {
+    assert.equal(dropRefused({ target: note, holder: folder, drags: [primaryNote], insideRow: true, holderWithinDrags: false }), false);
+    assert.equal(dropRefused({ target: note, holder: null, drags: [primaryNote], insideRow: true, holderWithinDrags: false }), false);
+    assert.equal(dropRefused({ target: reference, holder: note, drags: [primaryNote], insideRow: true, holderWithinDrags: false }), true);
+    assert.equal(dropRefused({ target: note, holder: folder, drags: [primaryNote], insideRow: true, holderWithinDrags: true }), true);
+  });
+  check("a row that takes the drag inside it, and the top level, always allow it", () => {
+    assert.equal(dropRefused({ target: folder, holder: null, drags: [primaryNote], insideRow: true, holderWithinDrags: false }), false);
+    assert.equal(dropRefused({ target: null, holder: null, drags: [primaryNote], insideRow: false, holderWithinDrags: false }), false);
+  });
+  check("an undraggable row is refused everywhere", () => {
+    assert.equal(dropRefused({ target: null, holder: null, drags: [windowRow], insideRow: false, holderWithinDrags: false }), true);
+  });
+  check("the pointer's half of a row decides above/below", () => {
+    assert.equal(dropEdgeAt(109, 100, 32), "above");
+    assert.equal(dropEdgeAt(117, 100, 32), "below");
+  });
+  check("beside a row lands at its position (above) or just after it (below)", () => {
+    const rows = ["a", "b", "c"].map((id) => ({ id, anchorId: id, kind: "primary" as const }));
+    assert.equal(resolveDropAnchor(rows, besideRowIndex(1, "above"), new Set(), "primary"), "a");
+    assert.equal(resolveDropAnchor(rows, besideRowIndex(1, "below"), new Set(), "primary"), "b");
+    assert.equal(resolveDropAnchor(rows, besideRowIndex(0, "above"), new Set(), "primary"), null);
+    // Dropping a row beside its own neighbour skips itself.
+    assert.equal(resolveDropAnchor(rows, besideRowIndex(2, "above"), new Set(["b"]), "primary"), "a");
+  });
+}
+
+console.log("\nrenumbering touches only what changed (renumbering)");
+{
+  check("only rows whose number differs from their position, never the moved row", () => {
+    const ordered = [
+      { id: "a", displayOrder: 0 },
+      { id: "m", displayOrder: 7 },
+      { id: "b", displayOrder: 1 },
+      { id: "c", displayOrder: 3 },
+    ];
+    // a stays 0; m is written on its own; b moves 1 → 2; c is already 3.
+    assert.deepEqual(renumbering(ordered, "m"), [{ id: "b", displayOrder: 2 }]);
+    assert.deepEqual(renumbering([{ id: "a", displayOrder: 0 }, { id: "b", displayOrder: 1 }], "a"), []);
+  });
+  check("a list already numbered 0..n changes nothing", () => {
+    const ordered = [0, 1, 2, 3].map((n) => ({ id: `r${n}`, displayOrder: n }));
+    assert.deepEqual(renumbering(ordered, "r0"), []);
+  });
+}
+
+console.log("\ndrags that stick (source pins)");
+{
+  const read = (rel: string) => readFileSync(join(__dirname, "..", rel), "utf8");
+  const fileTree = read("components/content/FileTree.tsx");
+  const fileNode = read("components/content/FileNode.tsx");
+  const route = read("app/api/content/content/move/route.ts");
+  const paste = read("lib/features/content/tree-clipboard.ts");
+  const moveToFolder = read("lib/features/content/move.ts");
+
+  check("the drop rules reach react-arborist through disableDrop; no dead canDrop prop", () => {
+    assert.ok(fileTree.includes("disableDrop={onMove ? disableDrop : true}"));
+    assert.equal(/canDrop\s*\}\s*as any|\{\.\.\.\(\{\s*canDrop/.test(fileTree), false);
+    assert.equal(/const canDrop = /.test(fileTree), false);
+  });
+  check("disableDrop asks dropRefused with the row, its list, and whether the pointer is mid-row", () => {
+    const fn = fileTree.slice(fileTree.indexOf("const disableDrop = ("), fileTree.indexOf("// Keyboard shortcuts (scoped to file tree)"));
+    assert.ok(fn.includes("return dropRefused({"));
+    assert.ok(fn.includes("target: parentNode.isRoot ? null : parentNode.data,"));
+    assert.ok(fn.includes("insideRow: treeRef.current?.state.dnd.index === null,"));
+    assert.ok(fn.includes("holderWithinDrags: holder !== null && dragNodes.some((dragNode) => isWithin(holder, dragNode)),"));
+  });
+  check("handleMove places that drop beside the row, on the half the pointer was in", () => {
+    assert.ok(/!acceptsDropInto\(parentNode\.data, drags\)\)\s*\{/.test(fileTree));
+    assert.ok(fileTree.includes("index = besideRowIndex(rowIndex, dropEdgeFor(row.id));"));
+    assert.ok(/onMove\(\{\s*dragIds: realDragIds,\s*parentId,\s*index,\s*afterId,/.test(fileTree));
+  });
+  check("the row records the same half it draws its line on, and highlights only when it takes the drop", () => {
+    assert.ok(fileNode.includes("const edge = dropEdgeAt(event.clientY, rect.top, rect.height);"));
+    assert.ok(fileNode.includes("noteDropEdge(data.id, edge);"));
+    assert.ok(fileNode.includes("if (takesDropInside) {"));
+  });
+  check("a row inside a shortcut prefetches and drags out as the original", () => {
+    assert.ok(fileNode.includes("prefetchContent(contentIdOfRowId(node.id));"));
+    assert.ok(fileNode.includes("id: contentIdOfRowId(node.id),"));
+  });
+  check("the move route reads and writes the order in ONE transaction, under the folder's lock", () => {
+    const fn = route.slice(route.indexOf("async function moveContentToPosition("));
+    const lock = fn.indexOf("pg_advisory_xact_lock(");
+    const read = fn.indexOf("tx.contentNode.findMany(");
+    assert.ok(fn.includes("prisma.$transaction(async (tx) =>"));
+    assert.ok(lock > 0 && read > lock, "the sibling read must come after the lock, inside the transaction");
+    assert.equal(/prisma\.contentNode\.findMany\(/.test(fn.slice(0, fn.indexOf("function siblingOrderLockKey"))), false);
+  });
+  check("renumbering writes only changed rows, in one statement, without updatedAt", () => {
+    assert.ok(route.includes("const changes = renumbering(ordered, contentId);"));
+    assert.ok(/UPDATE "ContentNode" AS node\s+SET "displayOrder" = renumbered\.position/.test(route));
+    assert.equal(/ordered\.map\(\(sibling, index\) =>/.test(route), false);
+  });
+  check("a quick second drag's moves wait for the first's", () => {
+    const move = sliceBetween("const handleMove = async", "const handleRename");
+    assert.ok(move.includes("const queued = moveRequestChainRef.current.then(sendMoves);"));
+    assert.ok(move.includes("await queued;"));
+  });
+  check("paste places by anchor after the clicked row, keeping its order", () => {
+    assert.equal(paste.includes("newDisplayOrder"), false);
+    assert.ok(paste.includes("let afterId = target.id;") && paste.includes("afterId = ids[i];"));
+  });
+  check("Move to folder keeps the group's order (top, then each after the last)", () => {
+    assert.ok(moveToFolder.includes("let afterId: string | null = null;"));
+    assert.ok(moveToFolder.includes("body: JSON.stringify({ contentId: id, targetParentId, afterId }),"));
+    assert.ok(moveToFolder.includes("afterId = id;"));
+  });
+  check("the folder views sort manual order exactly like the tree", () => {
+    for (const view of ["ListView", "GalleryView"]) {
+      const text = read(`components/content/folder-views/${view}.tsx`);
+      assert.ok(text.includes("items = items.sort(compareSiblings);"), view);
+      assert.equal(text.includes("a.displayOrder - b.displayOrder"), false, view);
+    }
   });
 }
 

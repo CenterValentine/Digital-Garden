@@ -12,7 +12,7 @@ last_updated: 2026-05-13
 ## October 5, 2026 — The file tree stops flashing; deleting is instant; rows keep their order; view shortcuts show their folder and act on it safely
 
 **Tree**: worktree `.claude/worktrees/smooth-delete`, branch `fix/smooth-delete` (off `origin/main` at `49b94490`)
-**Status**: typecheck / lint 151 (0 errors, none new) / `tree:smooth:check` 87 (new, in the quality workflow) / `shortcut-mirror:check` (out-of-view cases, row actions, view reach) / tree + workspace gates / `pnpm build` green; no schema, TipTap or browser-extension change → no Hocuspocus redeploy. Owner browser smoke pending.
+**Status**: typecheck / lint 151 (0 errors, none new) / `tree:smooth:check` 112 (new, in the quality workflow) / `shortcut-mirror:check` (out-of-view cases, row actions, view reach) / tree + workspace gates / `pnpm build` green; no schema, TipTap or browser-extension change → no Hocuspocus redeploy. Owner browser smoke pending.
 
 ### Shipped
 - **Skeleton = a scope's first load only** (`tree-refresh.ts`): every refresh of a tree already on screen is quiet — covers create, duplicate, links, uploads, folder view, the header refresh and all `dg:tree-refresh` dispatchers. Stale-scope responses are dropped.
@@ -23,6 +23,7 @@ last_updated: 2026-05-13
 - **A shortcut's rows are draggable**: dragging one moves the real item it stands for — reorder a shortcut's contents, drag them out, or drop new ones in among them. Window-reference rows stay undraggable.
 - **Inside a shortcut, Delete removes the shortcut; reference actions reach the original** (owner rule): open, open in pane, copy, download, AI context and table→deck act on the original (`contentIdOfRowId`); Delete — menu or ⌥D — removes the shortcut the row is seen through, never the original (`deleteTargetsOfRowIds`, applied in `handleDelete`), labelled `Remove Shortcut “<name>”` and announced with Undo; a window row deletes nothing. Other edits stay off projection rows (⌥R included).
 - **What a view's shortcuts show is in the view** (owner rule): the open guard's view-scope check counts the view root's subtree AND whatever shortcuts inside the view reach — their targets' subtrees, along chains of shortcuts (`viewReachRoots`). Locked-workspace overlap checks are unchanged.
+- **Drags stick** (owner report: "sometimes dragging doesn't stick"): the drop rules finally run (`disableDrop`/`disableDrag` — react-arborist never read the old `canDrop`); a drop over the middle of a note or file lands beside it, above/below by the pointer's half, with a line preview; placement is one locked transaction and drags are sent in order, so quick successive moves can't undo each other; renumbering touches only changed rows and never `updatedAt`; paste and Move to folder place by anchor; folder views use the tree's order; window rows can't be dragged.
 
 ### Smoke checklist (owner)
 1. Scroll the tree well down, delete a file (⌥D → confirm) → it vanishes instantly, no flash, scroll stays.
@@ -44,6 +45,14 @@ last_updated: 2026-05-13
 17. Select a row inside the shortcut and press ⌥D → the shortcut is removed (same toast), never the item; press ⌥R on such a row → nothing happens.
 18. In a view workspace that holds NO claim on a shortcut's target (e.g. a new view rooted at a folder with a shortcut to a folder outside it), open an item inside that shortcut → it opens; no "outside this view" dialog.
 19. In that view, open an item from a folder that no shortcut in the view points to → the "outside this view" dialog still appears.
+20. In a folder of notes, drag a note over the MIDDLE of another note → a line appears on that note's top or bottom edge (following the pointer); release → the dragged note lands there. No bounce, no "Cannot move content into a non-folder item".
+21. Drag a note over the middle of a folder → the folder highlights; release → the note goes inside it.
+22. Drag an attached image out of a note's reference block over the middle of another note → that note highlights; release → it becomes that note's attachment.
+23. In one folder, make two drags within a second of each other → reload → both stayed where you put them.
+24. Copy a note, right-click another note → Paste → it lands directly below the clicked note (try it in a folder where you've deleted or uploaded things).
+25. Select three items, Move → pick a folder → they land at the top of that folder in the order they were in.
+26. Hover a file to see its "modified" time, drag a different file within the same folder, hover the first again → its modified time hasn't changed.
+27. Try to drag a note's window row (in its reference drawer) → it doesn't lift.
 
 ## October 4, 2026 — Coming back lands you where you were (workspace cold-load restore)
 

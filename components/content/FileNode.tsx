@@ -14,7 +14,7 @@
 
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { type NodeRendererProps, type NodeApi } from "react-arborist";
 import * as LucideIcons from "lucide-react";
 import {
@@ -73,6 +73,12 @@ import {
   contentIdOfRowId,
   shortcutIdOfMirrorRowId,
 } from "@/lib/features/content/shortcut-mirror";
+import {
+  acceptsDropInto,
+  dropEdgeAt,
+  type DropEdge,
+} from "@/lib/features/content/drop-rules";
+import { noteDropEdge } from "@/lib/features/content/drop-edge";
 
 /**
  * Row hover tooltip: modified + created, Obsidian-style. Answers "which of
@@ -267,6 +273,15 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
   );
   const isSelected = node.isSelected;
   const tree = node.tree;
+  // Drop feedback. react-arborist reports the middle of ANY row as "drop
+  // inside it"; a row that takes the drag there (drop-rules.ts) highlights,
+  // one that can't shows a line on the half the pointer is in — where
+  // FileTree will place the drop, beside this row.
+  const [dropEdge, setDropEdge] = useState<DropEdge>("below");
+  const willReceiveDrop = node.state.willReceiveDrop;
+  const takesDropInside =
+    willReceiveDrop && acceptsDropInto(data, tree.dragNodes.map((dragNode) => dragNode.data));
+  const dropBesideEdge: DropEdge | null = willReceiveDrop && !takesDropInside ? dropEdge : null;
   const isMultiSelected = isSelected && tree.selectedNodes && tree.selectedNodes.length > 1;
 
   // Get display extension for orthodox files
@@ -855,7 +870,6 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
             id: data.id,
             parentId: data.parentId ?? null,
             isFolder,
-            displayOrder: (data as { displayOrder?: number }).displayOrder,
           });
         } : undefined,
         hasClipboard: hasTreeClipboard(),
@@ -1023,7 +1037,7 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
 
   // Three-state visual styling
   const getBackgroundStyle = () => {
-    if (node.state.willReceiveDrop && isFolder) {
+    if (takesDropInside) {
       return "bg-primary/30 ring-1 ring-primary/50"; // Drop target
     }
     if (isExternalDropTarget) {
@@ -1063,7 +1077,7 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
       // (playbook, upload-failed, draft) and win when hovered directly.
       title={formatNodeTimestamps(data)}
       className={`
-        touch-callout-none
+        touch-callout-none relative
         flex items-center gap-2 px-2 py-1 cursor-pointer
         transition-colors duration-150
         ${referenceBlockClasses()}
@@ -1080,8 +1094,10 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
         // composer, the workspace tab strips) can read them. People nodes are
         // synthetic and have no content id, so skip them.
         if (isPeopleNode) return;
+        // A row inside a shortcut hands over the ORIGINAL (a tab strip or
+        // the chat can't open a projection id).
         const primary = {
-          id: node.id,
+          id: contentIdOfRowId(node.id),
           title: data.title,
           contentType: data.contentType,
         };
@@ -1097,7 +1113,7 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
                     selected.data.treeNodeKind !== "person"
                 )
                 .map((selected: NodeApi<TreeNode>) => ({
-                  id: selected.id,
+                  id: contentIdOfRowId(selected.id),
                   title: selected.data.title,
                   contentType: selected.data.contentType,
                 }))
@@ -1105,6 +1121,14 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
         useTreeDragStore.getState().setDraggingNode(primary, draggedNodes);
       }}
       onDragEnd={() => useTreeDragStore.getState().setDraggingNode(null)}
+      onDragOver={(event) => {
+        // Which half of this row the pointer is in — where a drop beside it
+        // lands (FileTree reads the same value through noteDropEdge).
+        const rect = event.currentTarget.getBoundingClientRect();
+        const edge = dropEdgeAt(event.clientY, rect.top, rect.height);
+        noteDropEdge(data.id, edge);
+        if (edge !== dropEdge) setDropEdge(edge);
+      }}
       onPointerEnter={() => {
         // Best-effort prefetch — warms the server-side content cache so
         // the click that follows reads in <1ms. Skipped for synthetic
@@ -1113,9 +1137,17 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
         // soft-deleted rows where a fresh GET should hit the DB.
         if (isPeopleNode) return;
         if (data.deletedAt) return;
-        prefetchContent(node.id);
+        prefetchContent(contentIdOfRowId(node.id));
       }}
     >
+      {dropBesideEdge && (
+        <span
+          aria-hidden
+          className={`pointer-events-none absolute inset-x-1 h-0.5 rounded-full bg-primary ${
+            dropBesideEdge === "above" ? "top-0" : "bottom-0"
+          }`}
+        />
+      )}
       <div className="flex items-center gap-1">
         {/* Rail + half-step indent for reference-block rows. A half step (8px
             against the tree's 15px) separates the block without implying a
