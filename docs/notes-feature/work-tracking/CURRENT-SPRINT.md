@@ -9,6 +9,22 @@ last_updated: 2026-05-13
 
 # Current Sprint Addendum
 
+## October 5, 2026 — The file tree stops flashing; deleting is instant
+
+**Tree**: worktree `.claude/worktrees/smooth-delete`, branch `fix/smooth-delete` (off `origin/main` at `49b94490`)
+**Status**: typecheck / lint 151 (0 errors, none new) / `tree:smooth:check` 27 (new, in the quality workflow) / tree + workspace gates green; no schema, TipTap or extension change → no Hocuspocus redeploy. Owner browser smoke pending.
+
+### Shipped
+- **Skeleton = a scope's first load only** (`tree-refresh.ts`): every refresh of a tree already on screen is quiet — covers create, duplicate, links, uploads, folder view, the header refresh and all `dg:tree-refresh` dispatchers. Stale-scope responses are dropped.
+- **Optimistic delete** (`tree-remove.ts`): rows go at once, tabs close, selection pruned, quiet reconcile; failures restored in place.
+- **Delete dialog opens at once**: the Google Drive check runs behind it, file rows only; a Drive copy is deleted only if the dialog showed the choice.
+
+### Smoke checklist (owner)
+1. Scroll the tree well down, delete a file (⌥D → confirm) → it vanishes instantly, no flash, scroll stays.
+2. Duplicate a file, create a note, add an external link → no flash; the tree stays where it was.
+3. Switch workspace → the skeleton shows once while that workspace's tree loads (expected — it's a different tree); then duplicate something there → no flash.
+4. With Google connected, ⌥D a Drive-linked file → the dialog opens immediately; the Drive checkbox appears a moment later.
+
 ## October 4, 2026 — Coming back lands you where you were (workspace cold-load restore)
 
 **Tree**: worktree `.claude/worktrees/workspace-restore`, branch `fix/workspace-cold-load-restore` (off `origin/main` at `80502511`)

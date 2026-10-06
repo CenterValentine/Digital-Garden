@@ -1,20 +1,23 @@
 /**
- * Optimistic-delete gate. Runs with `pnpm tree:remove:check` (tsx, no
+ * Smooth file-tree gate. Runs with `pnpm tree:smooth:check` (tsx, no
  * database, no network, no React).
  *
- * The regression it exists for (2026-10-05): deleting from the file tree
- * waited for the server, then refetched with the skeleton up. The skeleton
- * unmounted react-arborist, so every delete flashed the whole tree and dropped
- * the user back at the top. The delete now removes rows at once and reconciles
- * quietly. Two things are pinned here:
+ * The regression it exists for (2026-10-05): the tree refreshed with its
+ * skeleton up after every mutation — delete, create, duplicate, link, upload,
+ * folder view, and every `dg:tree-refresh`. The skeleton unmounted
+ * react-arborist, so each one flashed the whole tree and dropped the user back
+ * at the top. Pinned here:
  *
- *  1. The pure edits (lib/domain/content/tree-remove.ts) — including that an
- *     untouched branch keeps its identity, which is what stops the rest of the
- *     tree re-rendering, and that a partial failure restores rows in place.
- *  2. The handler itself (LeftSidebarContent.handleDeleteConfirmed) — that it
- *     removes optimistically and reconciles with `loadTree(true)`, and never
- *     calls `fetchTree()`, the skeleton path. A source pin, because the
- *     failure is a one-word revert nobody would notice in review.
+ *  1. The skeleton is a scope's FIRST load only (lib/domain/content/tree-refresh.ts),
+ *     and the sidebar's one refresh entry point follows that rule.
+ *  2. Delete is optimistic (lib/domain/content/tree-remove.ts): rows go at
+ *     once — untouched branches keep their identity, a partial failure
+ *     restores rows in place — and the handler reconciles quietly.
+ *  3. The delete dialog opens without waiting on the Google Drive check, and
+ *     a Drive copy is only deleted if the dialog showed the choice.
+ *
+ * (2) and (3) are partly source pins on LeftSidebarContent.tsx: each failure
+ * is a one-line revert nobody would notice in review.
  */
 
 import assert from "node:assert/strict";
@@ -25,6 +28,11 @@ import {
   removeNodesFromTree,
   withoutIds,
 } from "../lib/domain/content/tree-remove";
+import {
+  refreshIsQuiet,
+  responseStillApplies,
+  treeScopeKey,
+} from "../lib/domain/content/tree-refresh";
 
 interface Node {
   id: string;
@@ -60,6 +68,28 @@ function fixture(): Node[] {
   ];
 }
 const ids = (list: Node[]) => list.map((x) => x.id);
+
+console.log("\nwhen a refresh may keep the tree on screen (tree-refresh.ts)");
+{
+  const main = treeScopeKey("ws-main", null);
+  check("the first load of a scope shows the skeleton", () => {
+    assert.equal(refreshIsQuiet(null, main), false);
+  });
+  check("a refresh of the scope already on screen is quiet", () => {
+    assert.equal(refreshIsQuiet(main, treeScopeKey("ws-main", null)), true);
+  });
+  check("another workspace is a new scope (skeleton — the old tree is the wrong files)", () => {
+    assert.equal(refreshIsQuiet(main, treeScopeKey("ws-other", null)), false);
+  });
+  check("another view root in the same workspace is a new scope too", () => {
+    assert.equal(refreshIsQuiet(treeScopeKey("ws-main", "folder-a"), treeScopeKey("ws-main", "folder-b")), false);
+    assert.equal(refreshIsQuiet(treeScopeKey("ws-main", "folder-a"), main), false);
+  });
+  check("a response for a scope the user has left is dropped", () => {
+    assert.equal(responseStillApplies(main, treeScopeKey("ws-other", null)), false);
+    assert.equal(responseStillApplies(main, main), true);
+  });
+}
 
 console.log("\nremoveNodesFromTree");
 {
@@ -133,12 +163,60 @@ console.log("\nwithoutIds");
   });
 }
 
+const source = readFileSync(
+  join(__dirname, "../components/content/content/LeftSidebarContent.tsx"),
+  "utf8",
+);
+/** The text of a `const name = …` declaration, up to the next marker. */
+function sliceBetween(startMarker: string, endMarker: string): string {
+  const start = source.indexOf(startMarker);
+  const end = source.indexOf(endMarker, start);
+  assert.ok(start > 0 && end > start, `markers moved (${startMarker} → ${endMarker}) — update this gate`);
+  return source.slice(start, end);
+}
+
+console.log("\nthe sidebar's refresh entry point (source pin)");
+{
+  check("fetchTree asks refreshIsQuiet — no refresh path forces the skeleton", () => {
+    const fetchTree = sliceBetween("const fetchTree = useCallback(", "// Initial load and refresh");
+    assert.ok(fetchTree.includes("refreshIsQuiet(loadedScopeRef.current, treeScope)"));
+  });
+  check("nothing calls loadTree(false) directly", () => {
+    assert.equal(source.includes("loadTree(false)"), false);
+  });
+  check("a load marks its scope as on-screen only after the stale-scope check", () => {
+    const loadTree = sliceBetween("const loadTree = useCallback(", "const fetchTree = useCallback(");
+    const guard = loadTree.indexOf("responseStillApplies(requestScope");
+    const mark = loadTree.indexOf("loadedScopeRef.current = requestScope");
+    assert.ok(guard > 0 && mark > guard);
+  });
+}
+
+console.log("\nthe delete dialog (source pin)");
+{
+  const handleDelete = sliceBetween("const handleDelete = async", "const handleDeleteConfirmed = async");
+  check("the dialog opens before any Google Drive request", () => {
+    const open = handleDelete.indexOf("setDeleteConfirm({");
+    const firstFetch = handleDelete.indexOf("fetch(");
+    assert.ok(open > 0 && firstFetch > open);
+  });
+  check("only file rows are probed (Drive copies live in a FilePayload)", () => {
+    assert.ok(handleDelete.includes(".filter((node) => node.file)"));
+  });
+  check("a late probe answer lands only in the dialog it was started for", () => {
+    assert.ok(handleDelete.includes("current.driveProbeToken === driveProbeToken"));
+  });
+  check("confirming never re-fetches Drive metadata", () => {
+    const confirmed = sliceBetween("const handleDeleteConfirmed = async", "const handleDownload = async");
+    assert.equal(confirmed.includes("storageMetadata"), false);
+  });
+  check("Drive copies are passed only when the box is ticked", () => {
+    assert.ok(source.includes("hasGoogleAuth && deleteFromGoogleDrive ? deleteConfirm.googleDriveFiles : []"));
+  });
+}
+
 console.log("\nthe delete handler (source pin)");
 {
-  const source = readFileSync(
-    join(__dirname, "../components/content/content/LeftSidebarContent.tsx"),
-    "utf8",
-  );
   const start = source.indexOf("const handleDeleteConfirmed = async");
   const end = source.indexOf("const handleDownload = async", start);
   assert.ok(start > 0 && end > start, "handleDeleteConfirmed / handleDownload markers moved — update this gate");
@@ -161,4 +239,4 @@ console.log("\nthe delete handler (source pin)");
   });
 }
 
-console.log(`\ntree-remove: ${checks} checks passed`);
+console.log(`\ntree-smooth: ${checks} checks passed`);

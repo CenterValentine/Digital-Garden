@@ -78,10 +78,10 @@ jobs:
       - name: Picker tree checks
         run: pnpm picker:tree:check
 
-      # Deleting from the tree is optimistic and reconciles quietly — a
-      # skeleton refetch unmounted react-arborist and lost the user's place.
-      - name: Tree delete checks
-        run: pnpm tree:remove:check
+      # The tree never flashes its skeleton after a mutation (it unmounted
+      # react-arborist and lost the user's place); delete is optimistic.
+      - name: Smooth tree checks
+        run: pnpm tree:smooth:check
 
   markdown-safety:
     name: Markdown block-safety

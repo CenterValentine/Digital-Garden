@@ -80,13 +80,6 @@ path and probably belongs to the same control.
 
 ---
 
-## File tree refreshes without the skeleton — follow-up (2026-10-05, from `fix/smooth-delete`)
-
-Delete is optimistic and reconciles quietly now; nothing else is. Every other post-mutation refresh still goes through `fetchTree()` = `loadTree(false)`, whose skeleton unmounts react-arborist — the same flash and lost scroll position the owner reported for delete. Sites in `LeftSidebarContent.tsx`: `handleMove` (failure path), `handleShortcutCreate`, `handleExternalLinkCreate` (×2), `handleCreateSubmit` (×2), `handleDuplicate`, `handleSetFolderView`, `handleCreateVisualizationDiagramsNet` (×3); plus every `dg:tree-refresh` dispatcher (30 of them, across components and extensions), which bumps `refreshTrigger` and refetches through the skeleton.
-
-- [ ] **The systemic fix:** make the skeleton a FIRST-LOAD state only — refetch quietly whenever a tree is already on screen (e.g. the `refreshTrigger` effect and `fetchTree` pick `quiet = treeData !== null`, with a workspace / view-root change still allowed to show it). One change covers all of the above; the per-site optimistic edits are only worth it where a row should appear or vanish before the round trip (create already has `tree-optimistic.ts`).
-- [ ] Extend the `tree:remove:check` source pin (or a sibling) to whichever paths are converted, so a revert to `fetchTree()` fails CI.
-
 ## E-reader — proposed (2026-09-29, plan `EREADER-PLAN.md`)
 
 + → Reader → [Scriptures, Books]. One reader shell (foliate-js for EPUB/PDF, a corpus renderer for scriptures), one annotation store keyed by Readium Locators, and a library of book-source adapters (OPDS, Gutendex, Open Library, upload). Books are file nodes in a user-chosen library folder. Blocked on owner answers to the plan's §10.

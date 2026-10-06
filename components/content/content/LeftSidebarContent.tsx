@@ -88,6 +88,11 @@ import {
   removeNodesFromTree,
   withoutIds,
 } from "@/lib/domain/content/tree-remove";
+import {
+  refreshIsQuiet,
+  responseStillApplies,
+  treeScopeKey,
+} from "@/lib/domain/content/tree-refresh";
 
 interface TreeApiResponse {
   success: boolean;
@@ -324,8 +329,12 @@ export function LeftSidebarContent({
     title: string;
     message: string;
     hasChildren: boolean;
-    hasGoogleDriveFiles: boolean;
+    /** Drive copies found by the probe that runs while the dialog is open. */
+    googleDriveFiles: Array<{ contentId: string; fileId: string }>;
+    /** Which probe this dialog belongs to — a slow answer from an earlier one is dropped. */
+    driveProbeToken: number;
   } | null>(null);
+  const driveProbeTokenRef = useRef(0);
   const [externalLinkDialog, setExternalLinkDialog] = useState<{
     open: boolean;
     mode: "create" | "edit";
@@ -565,9 +574,22 @@ export function LeftSidebarContent({
     setScopeOverride(key === "parentView" || key === "root" ? key : null);
   };
 
+  // What the tree is showing (workspace + view root), the scope whose tree is
+  // actually on screen, and the scope a finishing request must still match.
+  // See lib/domain/content/tree-refresh.ts for the rule they implement.
+  const treeScope = treeScopeKey(activeWorkspaceId, effectiveViewRootContentId);
+  const loadedScopeRef = useRef<string | null>(null);
+  const currentScopeRef = useRef(treeScope);
+  // Declared before the fetch effect below, so the scope is current by the
+  // time a scope change's own fetch is issued (effects run in order).
+  useEffect(() => {
+    currentScopeRef.current = treeScope;
+  }, [treeScope]);
+
   // Fetch tree data. `quiet` keeps the current tree on screen (no skeleton)
-  // while the refetch runs — used to reconcile after an optimistic row.
+  // while the refetch runs.
   const loadTree = useCallback(async (quiet: boolean) => {
+    const requestScope = treeScope;
     try {
       if (!quiet) setIsLoading(true);
       setError(null);
@@ -599,7 +621,11 @@ export function LeftSidebarContent({
         throw new Error(result.error?.message || "Failed to fetch tree");
       }
 
+      // Left this scope while the request was out: drop it, don't paint the
+      // previous workspace's files over the new one.
+      if (!responseStillApplies(requestScope, currentScopeRef.current)) return;
       setTreeData(result.data.tree);
+      loadedScopeRef.current = requestScope;
       // Feed the charter-id cache so metadata-less surfaces (workspace
       // tabs) can render the ScrollText identity consistently.
       useCharterIdsStore.getState().setFromTree(result.data.tree);
@@ -612,12 +638,26 @@ export function LeftSidebarContent({
         error: err,
       });
       // A quiet reconcile that fails keeps the tree it already shows.
-      if (!quiet) setError(err instanceof Error ? err.message : "Failed to load file tree");
+      if (!quiet && responseStillApplies(requestScope, currentScopeRef.current)) {
+        setError(err instanceof Error ? err.message : "Failed to load file tree");
+      }
     } finally {
-      if (!quiet) setIsLoading(false);
+      // A superseded scope's request must not drop the skeleton the CURRENT
+      // scope's first load is still showing.
+      if (!quiet && responseStillApplies(requestScope, currentScopeRef.current)) {
+        setIsLoading(false);
+      }
     }
-  }, [activeWorkspaceId, effectiveViewRootContentId]);
-  const fetchTree = useCallback(() => loadTree(false), [loadTree]);
+  }, [activeWorkspaceId, effectiveViewRootContentId, treeScope]);
+  // Every refresh goes through here — post-mutation calls, the header's
+  // refresh button, `dg:tree-refresh` (via refreshTrigger). The skeleton is
+  // shown only for a scope's FIRST load; once its tree is on screen a refresh
+  // swaps the data in place, so react-arborist stays mounted and the user
+  // keeps their place.
+  const fetchTree = useCallback(
+    () => loadTree(refreshIsQuiet(loadedScopeRef.current, treeScope)),
+    [loadTree, treeScope]
+  );
 
   // Initial load and refresh when trigger or active workspace changes.
   // Gated on `workspaceStoreReady` so we don't double-fetch (once for
@@ -2445,41 +2485,6 @@ ${workbenchWarning}`
       node.children && node.children.length > 0
     );
 
-    // Check if any files have Google Drive metadata (async check)
-    let hasGoogleDriveFiles = false;
-    if (hasGoogleAuth) {
-      try {
-        // Check metadata for all items in parallel
-        const metadataChecks = ids.map(async (id) => {
-          try {
-            const response = await fetch(`/api/content/content/${id}`, {
-              credentials: "include",
-            });
-            if (response.ok) {
-              const data = await response.json();
-              const metadata = data.data?.file?.storageMetadata;
-              const googleDriveFileId = metadata?.externalProviders?.googleDrive?.fileId;
-              return !!googleDriveFileId;
-            }
-          } catch {
-            return false;
-          }
-          return false;
-        });
-
-        const results = await Promise.all(metadataChecks);
-        hasGoogleDriveFiles = results.some(hasGoogleDrive => hasGoogleDrive);
-      } catch (err) {
-        clientLogger.error({
-          layer: "ui",
-          event: "delete_gdrive_probe:caught",
-          summary: "google drive metadata probe failed (pre-confirm)",
-          error: err,
-        });
-        hasGoogleDriveFiles = false;
-      }
-    }
-
     // Removing a shortcut destroys nothing: it is a pointer, its target is
     // untouched, and neither delete cascade in the API can reach anything from
     // it (both walk ownedByNoteId / ContentLink, which a shortcut never has).
@@ -2496,14 +2501,59 @@ ${workbenchWarning}`
       return;
     }
 
-    // Show confirmation dialog with appropriate message
+    // Show the dialog NOW. The Google Drive check used to run first — one full
+    // content GET per selected item, awaited — so with Google connected, ⌥D sat
+    // there until every request came back. It runs behind the open dialog
+    // instead, only for file rows (Drive copies live in a FilePayload's
+    // storage metadata; notes and folders never have one), and the "Also
+    // delete from Google Drive" box appears when it finds something.
+    const driveProbeToken = ++driveProbeTokenRef.current;
     setDeleteConfirm({
       ids,
       title: confirmTitle,
       message: confirmMessage,
       hasChildren,
-      hasGoogleDriveFiles,
+      googleDriveFiles: [],
+      driveProbeToken,
     });
+
+    const fileIds = nodesToDelete.filter((node) => node.file).map((node) => node.id);
+    if (!hasGoogleAuth || fileIds.length === 0) return;
+    const found = await Promise.all(
+      fileIds.map(async (id) => {
+        try {
+          const response = await fetch(`/api/content/content/${id}`, {
+            credentials: "include",
+          });
+          if (!response.ok) return null;
+          const data = await response.json();
+          const fileId: unknown =
+            data.data?.file?.storageMetadata?.externalProviders?.googleDrive?.fileId;
+          return typeof fileId === "string" && fileId
+            ? { contentId: id, fileId }
+            : null;
+        } catch (err) {
+          clientLogger.error({
+            layer: "ui",
+            event: "delete_gdrive_probe:caught",
+            summary: "google drive metadata probe failed (dialog open)",
+            attrs: { content_id: id },
+            error: err,
+          });
+          return null;
+        }
+      })
+    );
+    const googleDriveFiles = found.filter(
+      (entry): entry is { contentId: string; fileId: string } => entry !== null
+    );
+    if (googleDriveFiles.length === 0) return;
+    // Only into the dialog it was started for — not a later one, not a closed one.
+    setDeleteConfirm((current) =>
+      current && current.driveProbeToken === driveProbeToken
+        ? { ...current, googleDriveFiles }
+        : current
+    );
   };
 
   // Handler: Perform actual delete after confirmation (supports batch delete)
@@ -2514,7 +2564,16 @@ ${workbenchWarning}`
   // react-arborist: each delete flashed the whole tree and dropped the user
   // back at the top. A failure puts the failed rows back where they were,
   // rebuilt from the pre-delete snapshot.
-  const handleDeleteConfirmed = async (ids: string[]) => {
+  //
+  // `googleDriveFiles`: the Drive copies to delete as well — only ever what the
+  // dialog SHOWED the user (its probe's findings, with the box ticked). If they
+  // confirmed before the probe answered, nothing leaves Drive, whatever the
+  // saved preference says: deleting someone's Google data needs the choice to
+  // have been on screen.
+  const handleDeleteConfirmed = async (
+    ids: string[],
+    googleDriveFiles: Array<{ contentId: string; fileId: string }> = []
+  ) => {
     const treeBefore = treeData;
     const requested = new Set(ids);
     setTreeData((current) =>
@@ -2540,7 +2599,7 @@ ${workbenchWarning}`
     closeContentTabs(ids);
 
     try {
-      // Get node titles and Google Drive metadata before deleting
+      // Node titles, for the error message if anything fails
       const findNode = (nodes: TreeNode[], targetId: string): TreeNode | null => {
         for (const node of nodes) {
           if (node.id === targetId) return node;
@@ -2553,43 +2612,11 @@ ${workbenchWarning}`
       };
 
       const nodeMap = new Map<string, string>();
-      const googleDriveFiles: Array<{ contentId: string; fileId: string }> = [];
-
-      if (treeData) {
-        // First, fetch metadata for all items to check for Google Drive files
-        const metadataPromises = ids.map(async (id) => {
-          const node = findNode(treeData, id);
-          if (node) {
-            nodeMap.set(id, node.title);
-
-            // Only check for Google Drive metadata if user wants to delete from Drive
-            if (hasGoogleAuth && deleteFromGoogleDrive) {
-              try {
-                const response = await fetch(`/api/content/content/${id}`, {
-                  credentials: "include",
-                });
-                if (response.ok) {
-                  const data = await response.json();
-                  const metadata = data.data?.file?.storageMetadata;
-                  const googleDriveFileId = metadata?.externalProviders?.googleDrive?.fileId;
-                  if (googleDriveFileId) {
-                    googleDriveFiles.push({ contentId: id, fileId: googleDriveFileId });
-                  }
-                }
-              } catch (err) {
-                clientLogger.error({
-                  layer: "ui",
-                  event: "delete_metadata_fetch:caught",
-                  summary: "content metadata fetch failed during delete",
-                  attrs: { content_id: id },
-                  error: err,
-                });
-              }
-            }
-          }
-        });
-
-        await Promise.all(metadataPromises);
+      if (treeBefore) {
+        for (const id of ids) {
+          const node = findNode(treeBefore, id);
+          if (node) nodeMap.set(id, node.title);
+        }
       }
 
       // Delete from Google Drive first (if applicable)
@@ -3283,8 +3310,14 @@ ${workbenchWarning}`
         }
         confirmLabel="Delete"
         confirmVariant="danger"
-        onConfirm={() => deleteConfirm && handleDeleteConfirmed(deleteConfirm.ids)}
-        checkbox={hasGoogleAuth && deleteConfirm?.hasGoogleDriveFiles ? {
+        onConfirm={() =>
+          deleteConfirm &&
+          handleDeleteConfirmed(
+            deleteConfirm.ids,
+            hasGoogleAuth && deleteFromGoogleDrive ? deleteConfirm.googleDriveFiles : []
+          )
+        }
+        checkbox={hasGoogleAuth && (deleteConfirm?.googleDriveFiles.length ?? 0) > 0 ? {
           label: "Also delete from Google Drive",
           checked: deleteFromGoogleDrive,
           onChange: setDeleteFromGoogleDrive,
