@@ -1006,4 +1006,14 @@ console.log("\nthe sort menu: one level, permanent, nothing remembered (source p
   });
 }
 
+console.log("\nthe attachments chip (source pin)");
+{
+  const fileNode = readFileSync(join(__dirname, "../components/content/FileNode.tsx"), "utf8");
+  check("its placement arrow shows only while the block is on screen (flag on AND row open)", () => {
+    assert.ok(fileNode.includes("const referencesOnScreen = referencesExpanded && isOpen;"));
+    assert.ok(fileNode.includes("{referencesOnScreen && hasPrimaryChildren && ("));
+    assert.equal(fileNode.includes("{referencesExpanded && hasPrimaryChildren && ("), false);
+  });
+}
+
 console.log(`\ntree-smooth: ${checks} checks passed`);

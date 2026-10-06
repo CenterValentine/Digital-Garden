@@ -152,6 +152,10 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
   const referencesAtStart = useTreeStateStore((state) =>
     state.referencesAtStartIds.has(data.id),
   );
+  // The block is flagged open, but it is only VISIBLE while the row is open
+  // too — a row collapsed by its chevron hides it. The chip's look and its
+  // placement arrow follow what is on screen, not the flag.
+  const referencesOnScreen = referencesExpanded && isOpen;
   /**
    * Whether this row has any content of its own to order the reference block
    * against. Reads the post-transform children: when the block is open its
@@ -1252,7 +1256,7 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
             flex flex-none items-center rounded-full border
             text-[10px] leading-none tabular-nums transition-colors
             ${
-              referencesExpanded
+              referencesOnScreen
                 ? "border-gold-primary/40 bg-gold-primary/15 text-gold-primary"
                 : "border-black/10 bg-black/[0.04] text-gray-500 dark:border-white/10 dark:bg-white/[0.06] dark:text-gray-400"
             }
@@ -1266,9 +1270,9 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
             }}
             onDoubleClick={(e) => e.stopPropagation()}
             tabIndex={-1}
-            aria-expanded={referencesExpanded}
+            aria-expanded={referencesOnScreen}
             aria-label={
-              referencesExpanded
+              referencesOnScreen
                 ? `Hide ${referenceCount} referenced items`
                 : `Show ${referenceCount} referenced items`
             }
@@ -1279,11 +1283,13 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
             {referenceCount}
           </button>
 
-          {/* Placement toggle. Rendered only while the block is open AND this
-              row has primary children to order it against — on a collapsed
-              block, or a row that holds nothing but references, the control
-              offers a swap with no visible outcome. */}
-          {referencesExpanded && hasPrimaryChildren && (
+          {/* Placement toggle. Rendered only while the block is ON SCREEN —
+              its flag on AND the row open — and the row has primary children
+              to order it against. A block flagged on under a collapsed row
+              shows nothing, and the arrow used to stay there anyway (owner,
+              2026-10-06: "sorting isn't relevant when referenced content is
+              not expanded"). */}
+          {referencesOnScreen && hasPrimaryChildren && (
             <button
               type="button"
               onClick={(e) => {
