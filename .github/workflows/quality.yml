@@ -117,3 +117,9 @@ jobs:
 
       - name: Markdown round-trip smoke
         run: pnpm markdown:smoke
+
+      # OCR text → paste-ready blocks (lib/features/ocr/reflow.ts): which line
+      # ends are word-wraps and which are real breaks, and the hand-off to the
+      # markdown paste parser. Mutation-tested (13 mutants killed, 2026-10-06).
+      - name: OCR reflow gate
+        run: pnpm ocr:blocks:check

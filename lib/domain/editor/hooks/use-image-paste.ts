@@ -1,10 +1,12 @@
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import type { EditorView } from "@tiptap/pm/view";
 import type { Slice } from "@tiptap/pm/model";
 import type { Editor } from "@tiptap/core";
 import { toast } from "sonner";
 import { uploadImage } from "./use-image-upload";
 import { isImageUrl } from "../utils/image-url";
+import { pasteImageAsText } from "@/lib/features/ocr/editor-ocr";
+import { installPasteModifierTracker, isPasteAsText } from "@/lib/features/ocr/paste-modifier";
 
 // Attribute shape accepted by the EditorImage extension's setImage()
 // command. Mirrors the same local interface in MarkdownEditor.tsx —
@@ -113,6 +115,10 @@ export function useImagePasteHandler({
     [editorRef, parentId],
   );
 
+  useEffect(() => {
+    installPasteModifierTracker();
+  }, []);
+
   const handlePaste = useCallback(
     (view: EditorView, event: ClipboardEvent): boolean => {
       const files = Array.from(event.clipboardData?.files || []);
@@ -120,6 +126,18 @@ export function useImagePasteHandler({
 
       if (imageFiles.length > 0) {
         event.preventDefault();
+        // ⇧⌘V is "paste as text"; an image's text is its OCR (never uploaded).
+        const editor = editorRef.current;
+        if (editor && isPasteAsText()) {
+          void (async () => {
+            for (const file of imageFiles) {
+              await pasteImageAsText(editor, file, {
+                pasteImageInstead: () => insertImageFromFile(file),
+              });
+            }
+          })();
+          return true;
+        }
         for (const file of imageFiles) {
           insertImageFromFile(file);
         }
@@ -138,7 +156,7 @@ export function useImagePasteHandler({
 
       return false;
     },
-    [insertImageFromFile],
+    [editorRef, insertImageFromFile],
   );
 
   const handleDrop = useCallback(

@@ -51,6 +51,8 @@ import {
   usePendingDragRemovals,
 } from "@/lib/domain/editor/hooks/use-cross-editor-drag";
 import { useEditorDragStore } from "@/state/editor-drag-store";
+import { pasteImageAsText } from "@/lib/features/ocr/editor-ocr";
+import { installPasteModifierTracker, isPasteAsText } from "@/lib/features/ocr/paste-modifier";
 import { isImageUrl } from "@/lib/domain/editor/utils/image-url";
 import { useEditorInstanceStore } from "@/state/editor-instance-store";
 import { useSettingsStore } from "@/state/settings-store";
@@ -321,6 +323,8 @@ export function MarkdownEditor({
   // (useEditor doesn't re-apply editorProps on re-renders), so they'd capture a
   // stale version where editor=null. Same pattern as onSaveRef/contentIdRef.
   const insertImageFromFileRef = useRef<(file: File) => void>(() => {});
+  // Same frozen-closure reason: ⇧⌘V with an image pastes its OCR'd text.
+  const pasteImagesAsTextRef = useRef<(files: File[]) => void>(() => {});
   const shouldUseCollaboration =
     collaborationEnabled && Boolean(contentId) && Boolean(collaborationRuntime);
   const runtimeYdoc = collaborationRuntime?.ydoc ?? null;
@@ -621,6 +625,12 @@ export function MarkdownEditor({
 
         if (imageFiles.length > 0) {
           event.preventDefault();
+          // ⇧⌘V is "paste as text"; an image's text is its OCR. The image
+          // itself is never uploaded on this path.
+          if (isPasteAsText()) {
+            pasteImagesAsTextRef.current(imageFiles);
+            return true;
+          }
           for (const file of imageFiles) {
             insertImageFromFileRef.current(file);
           }
@@ -1549,6 +1559,22 @@ export function MarkdownEditor({
     [editor, parentId]
   );
   insertImageFromFileRef.current = insertImageFromFile;
+
+  // ⇧⌘V with image(s): OCR each in turn and insert only the text. A failed or
+  // empty read offers "Paste image instead", which runs the normal upload.
+  useEffect(() => {
+    installPasteModifierTracker();
+    pasteImagesAsTextRef.current = (files: File[]) => {
+      if (!editor) return;
+      void (async () => {
+        for (const file of files) {
+          await pasteImageAsText(editor, file, {
+            pasteImageInstead: () => insertImageFromFile(file),
+          });
+        }
+      })();
+    };
+  }, [editor, insertImageFromFile]);
 
   // Sprint 37: Handle file input change (image selected from file picker)
   const handleFileInputChange = useCallback(

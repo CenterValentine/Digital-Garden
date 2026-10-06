@@ -33,6 +33,7 @@ import {
 import { resolveExtensionVirtualContentType } from "@/lib/extensions/client-registry";
 import { markdownPasteToTiptap } from "@/lib/domain/content/markdown";
 import { clipboardBlockedGuidance } from "@/lib/domain/content/markdown-detect";
+import { imageNodeToText, pasteClipboardImageAsText } from "@/lib/features/ocr/editor-ocr";
 import { triggerBlobDownload } from "@/lib/core/download";
 import { toast } from "sonner";
 import {
@@ -863,16 +864,32 @@ export const editorActionProvider: ContextMenuActionProvider = (ctx) => {
   const imageSrc = imgEl?.getAttribute("src") ?? null;
   const imageContentId = imgEl?.getAttribute("data-content-id") ?? null;
 
-  if (imageSrc) {
-    sections.push({
-      actions: [
+  if (imageSrc && imgEl) {
+    const imageActions: ContextMenuAction[] = [
+      {
+        id: "download-image",
+        label: "Download Image",
+        onClick: () => { void downloadImage(imageSrc, imageContentId); },
+      },
+    ];
+    // Read the image's text locally (OCR). "Extract" adds it below and keeps
+    // the image; "Replace" swaps the image for its text in one undo step, and
+    // never removes the image when no text was found.
+    if (contextEditor?.isEditable) {
+      imageActions.push(
         {
-          id: "download-image",
-          label: "Download Image",
-          onClick: () => { void downloadImage(imageSrc, imageContentId); },
+          id: "image-extract-text",
+          label: "Extract text from image",
+          onClick: () => { void imageNodeToText(contextEditor, imgEl, "extract"); },
         },
-      ],
-    });
+        {
+          id: "image-replace-with-text",
+          label: "Replace image with its text",
+          onClick: () => { void imageNodeToText(contextEditor, imgEl, "replace"); },
+        },
+      );
+    }
+    sections.push({ actions: imageActions });
   }
 
   // Capture selection NOW, before any menu interaction
@@ -931,7 +948,9 @@ export const editorActionProvider: ContextMenuActionProvider = (ctx) => {
       label: "Cut",
       shortcut: "⌘X",
       onClick: async () => {
-        const editor = Object.values(useEditorInstanceStore.getState().editorsByContentId).find(Boolean) ?? null;
+        // The editor that was right-clicked — never "the first registered
+        // one", which in a split layout is often another pane's note.
+        const editor = contextEditor;
         if (!editor) return;
         await navigator.clipboard.writeText(capture.plainText);
         editor.chain().focus().deleteSelection().run();
@@ -944,7 +963,7 @@ export const editorActionProvider: ContextMenuActionProvider = (ctx) => {
     label: "Paste",
     shortcut: "⌘V",
     onClick: async () => {
-      const editor = Object.values(useEditorInstanceStore.getState().editorsByContentId).find(Boolean) ?? null;
+      const editor = contextEditor;
       if (!editor) return;
       try {
         const text = await navigator.clipboard.readText();
@@ -965,7 +984,7 @@ export const editorActionProvider: ContextMenuActionProvider = (ctx) => {
     id: "paste-markdown",
     label: "Paste as Markdown",
     onClick: async () => {
-      const editor = Object.values(useEditorInstanceStore.getState().editorsByContentId).find(Boolean) ?? null;
+      const editor = contextEditor;
       if (!editor) return;
       // navigator.clipboard.readText() rejects with "Document is not focused"
       // unless the document has focus — and the context-menu portal steals it.
@@ -988,6 +1007,17 @@ export const editorActionProvider: ContextMenuActionProvider = (ctx) => {
       const parsed = markdownPasteToTiptap(text).content ?? [];
       if (parsed.length === 0) return;
       editor.chain().focus().insertContent(parsed).run();
+    },
+  });
+
+  // The menu twin of ⇧⌘V for an image: read its text locally, insert only that.
+  clipboardActions.push({
+    id: "paste-text-from-image",
+    label: "Paste text from image",
+    shortcut: "⇧⌘V",
+    onClick: async () => {
+      if (!contextEditor) return;
+      await pasteClipboardImageAsText(contextEditor);
     },
   });
 
