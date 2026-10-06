@@ -473,6 +473,9 @@ export function MarkdownEditor({
     : isPlainEditorFallback
       ? "plain-fallback"
       : "plain";
+  // The document this editor instance must be bound to; a useEditor dep (see
+  // the deps comment there). Identity, not contents — one ydoc per note.
+  const collaborationDocument = collaborationState?.document ?? null;
   const shouldSkipRestAutosaveForCollaboration =
     shouldUseCollaboration &&
     (runtimeNetworkState === "offline" ||
@@ -934,13 +937,30 @@ export function MarkdownEditor({
         }, autoSaveDelay);
       }
     },
-    // Recreate the editor ONLY when the collaboration provider's presence
-    // changes (editorMode encodes it) — that transition genuinely requires a
-    // new editor instance. Everything else is handled without recreation:
-    // editability via the setEditable effect below, autosave skipping via
+    // Recreate the editor when the collaboration provider's presence changes
+    // (editorMode encodes it) — that transition genuinely requires a new
+    // editor instance — and when the Y.Doc it is bound to changes identity.
+    //
+    // The second one is load-bearing. The Collaboration extension takes the
+    // document at creation; nothing re-points it. This instance is reused
+    // across documents (contentIdRef), and a switch between two notes whose
+    // runtimes are BOTH warm — the other pane has the note open, or it was
+    // viewed in the last five minutes — hands over the new ydoc with
+    // editorMode unchanged ("collaboration" → "collaboration"). Without this
+    // dep the editor kept showing, and WRITING TO, the previous note's Y.Doc
+    // under the new note's title (owner report 2026-10-06: dragging tabs
+    // between panes put one note's body under another's name — an edit there
+    // would have gone into the wrong note). A cold runtime never hit it: the
+    // handle is null for a render, editorMode dips to "plain", and the
+    // recreate happened by accident.
+    //
+    // Everything else is handled without recreation: editability via the
+    // setEditable effect below, autosave skipping via
     // shouldSkipRestAutosaveRef. Recreating on those transient flags is what
-    // turned every connection blip into a stolen caret.
-  }, [editorMode]);
+    // turned every connection blip into a stolen caret — and a reconnect does
+    // NOT change the ydoc (Path A: one ydoc per note for the runtime's life),
+    // so this dep stays quiet through blips.
+  }, [editorMode, collaborationDocument]);
 
   useEffect(() => {
     if (!editor) return;
