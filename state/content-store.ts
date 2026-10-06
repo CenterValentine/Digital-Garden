@@ -8,12 +8,7 @@
  */
 
 import { create } from "zustand";
-import {
-  fingerprintPlacement,
-  isWorkspaceTraceEnabled,
-  traceCaller,
-  traceWorkspace,
-} from "@/lib/core/workspace-trace";
+import { fingerprintPlacement, isWorkspaceTraceEnabled, traceCaller, traceWorkspace, traceStack } from "@/lib/core/workspace-trace";
 
 const TOP_LEFT_PANE_ID = "top-left";
 const TOP_RIGHT_PANE_ID = "top-right";
@@ -1520,7 +1515,7 @@ function commitWorkspace(
       const before = fingerprintPlacement(state);
       const after = fingerprintPlacement(nextState);
       if (before !== after) {
-        traceWorkspace("commit", { before, after }, traceCaller());
+        traceWorkspace("commit", { before, after, stack: traceStack() }, traceCaller());
       }
     }
     syncBrowserState(nextState);

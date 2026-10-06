@@ -72,6 +72,26 @@ const KNOWN_ACTIONS = [
   "persistActiveWorkspace",
 ];
 
+/**
+ * The frames above a commit, for the ring buffer only (never the console):
+ * `traceCaller` names the innermost store action, which hides WHO called it
+ * — a `setSelectedContentId` fired by a tree handler, a sidebar effect or an
+ * open path all read the same. Dumped with `copy(window.__dgWorkspaceTrace)`
+ * the chain is in `data.stack`.
+ */
+export function traceStack(depth = 14): string[] {
+  const stack = new Error().stack ?? "";
+  return stack
+    .split("\n")
+    .slice(1)
+    .filter(
+      (line) =>
+        !line.includes("workspace-trace") && !line.includes("commitWorkspace"),
+    )
+    .slice(0, depth)
+    .map((line) => line.trim().replace(/^at /, "").replace(/\(?https?:\/\/[^)]*\)?/g, "").trim());
+}
+
 export function traceCaller(): string {
   const stack = new Error().stack ?? "";
   const lines = stack.split("\n").slice(1);
