@@ -1915,6 +1915,21 @@ console.log("\nmoving content between notes by drag and drop (cross-editor-move.
     assert.equal(/preventDefault|stopPropagation/.test(tabsHook), false);
     assert.ok(tabsHook.includes("if (!drag && !session) return;"), "only drags that started in an editor");
   });
+  check("a drag resting on a tab looks exactly like hovering it — every hover style has a drag twin", () => {
+    const header = read10("components/content/headers/MainPanelHeader.tsx");
+    const inactive = /: "(text-gray-600 hover:bg-black[^"]*)"/.exec(header)?.[1] ?? "";
+    const classes = inactive.split(/\s+/);
+    const hovers = classes.filter((c) => /^(dark:)?hover:/.test(c));
+    assert.ok(hovers.length >= 4, "the inactive tab's hover styles were found");
+    for (const hover of hovers) {
+      const twin = hover.replace("hover:", "data-[spring-hover=on]:");
+      assert.ok(classes.includes(twin), `missing drag twin for ${hover}: ${twin}`);
+    }
+    assert.ok(header.includes("group-hover:opacity-100 group-data-[spring-hover=on]:opacity-100"), "the close button shows too");
+    assert.ok(/waitingOn = target;\s*cue\(tab\);/.test(tabsHook), "cued while waiting");
+    assert.ok(/const stopWaiting = \(\) => \{\s*if \(timer\) clearTimeout\(timer\);\s*timer = null;\s*waitingOn = null;\s*cue\(null\);\s*\};/.test(tabsHook), "cleared when the drag moves off or ends");
+    assert.ok(/waitingOn = null;\s*cue\(null\);\s*useContentStore\.getState\(\)\.activateContentTab\(target\);/.test(tabsHook), "cleared as the tab opens");
+  });
 }
 
 console.log("\nthe referenced-items chip (source pin)");

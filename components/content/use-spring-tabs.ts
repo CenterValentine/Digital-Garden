@@ -30,11 +30,22 @@ export function useSpringTabs(): void {
     let session: SpringTabSession | null = null;
     let waitingOn: string | null = null;
     let timer: ReturnType<typeof setTimeout> | null = null;
+    // A drag doesn't trigger :hover, so the tab being waited on is given the
+    // hover look through a data attribute — the cue to hold still until it
+    // opens (owner, 2026-10-06). MainPanelHeader mirrors each hover style.
+    let cued: HTMLElement | null = null;
+    const cue = (tab: HTMLElement | null) => {
+      if (cued === tab) return;
+      if (cued) delete cued.dataset.springHover;
+      cued = tab;
+      if (tab) tab.dataset.springHover = "on";
+    };
 
     const stopWaiting = () => {
       if (timer) clearTimeout(timer);
       timer = null;
       waitingOn = null;
+      cue(null);
     };
 
     const finish = () => {
@@ -66,9 +77,11 @@ export function useSpringTabs(): void {
       stopWaiting();
       if (!target) return;
       waitingOn = target;
+      cue(tab);
       timer = setTimeout(() => {
         timer = null;
         waitingOn = null;
+        cue(null);
         useContentStore.getState().activateContentTab(target);
       }, SPRING_TAB_DELAY_MS);
     };
