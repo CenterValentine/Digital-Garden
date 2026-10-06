@@ -12,7 +12,7 @@ last_updated: 2026-05-13
 ## October 5, 2026 — The file tree stops flashing; deleting is instant; rows keep their order; view shortcuts show their folder and act on it safely
 
 **Tree**: worktree `.claude/worktrees/smooth-delete`, branch `fix/smooth-delete` (off `origin/main` at `49b94490`)
-**Status**: typecheck / lint 151 (0 errors, none new) / `tree:smooth:check` 168 (new, in the quality workflow) / `shortcut-mirror:check` (out-of-view cases, row actions, view reach) / tree + workspace gates / `pnpm build` green; no schema, TipTap or browser-extension change; **Hocuspocus redeploy required** (collaborative saves now refresh media links); run `scripts/backfill-media-links.ts --apply` once per environment. Owner browser smoke pending.
+**Status**: typecheck / lint 151 (0 errors, none new) / `tree:smooth:check` 189 (new, in the quality workflow) / `shortcut-mirror:check` (out-of-view cases, row actions, view reach) / tree + workspace gates / `pnpm build` green; no schema or TipTap change; **browser-extension change** (bookmark dedupe removed — `pnpm extension:build`, reload at chrome://extensions); **Hocuspocus redeploy required** (collaborative saves now refresh media links); run `scripts/backfill-media-links.ts --apply` once per environment. Owner browser smoke pending.
 
 ### Shipped
 - **Skeleton = a scope's first load only** (`tree-refresh.ts`): every refresh of a tree already on screen is quiet — covers create, duplicate, links, uploads, folder view, the header refresh and all `dg:tree-refresh` dispatchers. Stale-scope responses are dropped.
@@ -24,12 +24,14 @@ last_updated: 2026-05-13
 - **Inside a shortcut, Delete removes the shortcut; reference actions reach the original** (owner rule): open, open in pane, copy, download, AI context and table→deck act on the original (`contentIdOfRowId`); Delete — menu or ⌥D — removes the shortcut the row is seen through, never the original (`deleteTargetsOfRowIds`, applied in `handleDelete`), labelled `Remove Shortcut “<name>”` and announced with Undo; a window row deletes nothing. Other edits stay off projection rows (⌥R included).
 - **What a view's shortcuts show is in the view** (owner rule): the open guard's view-scope check counts the view root's subtree AND whatever shortcuts inside the view reach — their targets' subtrees, along chains of shortcuts (`viewReachRoots`). Locked-workspace overlap checks are unchanged.
 - **Drags stick** (owner report: "sometimes dragging doesn't stick"): the drop rules finally run (`disableDrop`/`disableDrag` — react-arborist never read the old `canDrop`); a drop over the middle of a note or file lands beside it, above/below by the pointer's half, with a line preview; placement is one locked transaction and drags are sent in order, so quick successive moves can't undo each other; renumbering touches only changed rows and never `updatedAt`; paste and Move to folder place by anchor; folder views use the tree's order; window rows can't be dragged.
-- **Every arriving row lands deliberately** (`slotForArrival` + `sibling-slot.ts`, under the same per-list lock): uploads at the top in the order picked, referenced content appended; the Folder assistant at the top in order, with Undo restoring the old place; deduped bookmarks re-filed get the appended slot; Studio outputs newest-first.
+- **Every arriving row lands deliberately** (`slotForArrival` + `sibling-slot.ts`, under the same per-list lock): uploads at the top in the order picked, referenced content appended; the Folder assistant at the top in order, with Undo restoring the old place; Studio outputs newest-first.
 - **Sort menu** (beside + in the tree header): **Float folders**, **Float nested**, **Name** (A–Z ↔ Z–A), **Stop sorting** — for the ONE folder the tree targets (the same one + adds to); nothing nested touched. **A folder remembers its sort and stays sorted** (arrivals and renames take their place; a drag inside it turns the sort off, with a toast); the header icon shows the kept sort's glyph in light gold. The vault's top level sorts once. Undo on every sort. Both header buttons' tooltips name the target.
 - **Referenced-items chip**: its above/below arrow shows only while the referenced items are on screen (and, as before, only on a row that also has sub-items to place them against).
 - **A shortcut can keep its own sort, view-only**: selecting a shortcut (or a row in one) makes the sort menu sort that shortcut's view — kept in user settings, never written to its folder; without one, a shortcut follows its folder's order. Rows inside a shortcut now target the shortcut for "+" and sort (they fell to the top level).
 - **Referenced content in a note's text**: shown with a ¶ badge (filed items keep the link badge), kept with its note — dropping it onto another note is refused with "still embedded in …"; filed content (chats, AI documents) still moves between notes. Collaborative saves now keep the text links current (links only, never trashing); `scripts/backfill-media-links.ts` catches up existing notes.
 - **Opened through a shortcut, the tree keeps pointing at the shortcut**: selection, reveal and the gold tones follow the row that stands for the open content — the shortcut (or row inside one) you opened it from, else its own row, else a shortcut leading to it (`tree-stand-in.ts`).
+- **An image pasted into a note joins its referenced content at once** (`in-text-media.ts`): the note editor reports what its text gains and loses (paste, drop, /image, AI images, delete, cut, undo) and the tree shows it immediately, by the tree API's own placement rules; each edit holds until the tree's data agrees, so nothing flashes back; a fresh upload's row is fetched at once and the tree reconciles after the save window. Media filed with a note (`filedWithNote`) is never moved by text.
+- **Bookmark dedupe removed**: no Dedupe control in the capture popup or options, no rule action; every saved bookmark is its own new row. Quick-save still updates an existing Chrome bookmark for the same page.
 - **Moves wait out a slow database** (locked transactions get 15 s to start, 30 s to run, not Prisma's 5 s), and **a shortcut can't trick a folder into itself**: drops are checked by real ids, so dragging a folder a shortcut shows into its own sub-folder is refused before release.
 
 ### Smoke checklist (owner)
@@ -61,9 +63,9 @@ last_updated: 2026-05-13
 26. Hover a file to see its "modified" time, drag a different file within the same folder, hover the first again → its modified time hasn't changed.
 27. Try to drag a note's window row (in its reference drawer) → it doesn't lift.
 28. Drop three files onto a folder (or upload them with + → File) → they appear at the top of the folder in the order you picked them.
-29. Paste an image into a note → it appears at the END of the note's referenced items.
+29. Paste an image into a note → it appears at the END of the note's referenced items as soon as the upload finishes — no reload.
 30. File two items with the Folder assistant → they land at the top of the target folder in order; click Undo → each goes back to its old folder AND its old position there.
-31. With bookmark dedupe on, save a bookmark you already have into a different folder → it appears at the bottom of that folder.
+31. Open the browser extension's capture popup and options (after `pnpm extension:build` + reload) → no Dedupe control; save a page you already bookmarked into a different folder → a NEW bookmark appears at the bottom of that folder and the old one stays where it was.
 32. Run a Studio tool (infographic or slide deck) → the new output is first in "Studio outputs".
 33. Select a folder, hover the sort icon and the + → their tooltips name that folder; select a file → they name its folder; select nothing → the top level (or the view's name).
 34. Open the sort menu → "Sort “…”" with Float folders, Float nested, Name (A–Z); hover each → a tooltip says what it does and that only this level changes.
@@ -88,6 +90,11 @@ last_updated: 2026-05-13
 53. Click a row inside an expanded shortcut → it opens; that row stays selected and gold.
 54. In a view where the original lives outside: open the content from a tab or search → the shortcut that leads to it is selected and gold (expanding the shortcut if the content sits inside its folder).
 55. Open the same content from its OWN row → the original's row takes the selection and gold again.
+56. Expand a note's referenced content and paste an image into the note → as the upload finishes, the image appears there with the ¶ badge and the chip count goes up — no refresh; wait 15 s → nothing flickers or moves.
+57. Add an image with /image → same as 56.
+58. Delete that image from the note (its toolbar's Delete, or Backspace) → it leaves the note's referenced content at once; ⌘Z → it's back at once.
+59. Cut an image from one note and paste it into another (both visible in the tree) → it moves to the second note's referenced content at once.
+60. Delete an image from a live note and wait 15 s → it shows in its folder's referenced content (kept, not trashed); nothing reappears under the note.
 
 ## October 4, 2026 — Coming back lands you where you were (workspace cold-load restore)
 
