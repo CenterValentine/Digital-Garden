@@ -88,6 +88,15 @@ import {
   settleInTextEdits,
   showInTextEdits,
 } from "../lib/features/content/in-text-media";
+import {
+  SPRING_IDLE,
+  SPRING_OPEN_DELAY_MS,
+  inMiddleBand,
+  springStep,
+  type SpringEffects,
+  type SpringEvent,
+  type SpringState,
+} from "../lib/features/content/spring-open";
 import type { TreeNode } from "../lib/domain/content/types";
 
 interface Node {
@@ -1489,6 +1498,110 @@ console.log("\nthe tree points at the row that stands for the open content (sour
   check("the gold tones follow the stand-in row", () => {
     assert.ok(fileNode.includes("const isActive = (activeRowId ?? selectedContentId) === data.id;"));
     assert.ok(fileNode.includes("(state.standIns[contentId] ?? contentId) === data.id"));
+  });
+}
+
+console.log("\nrows open as you drag over them (spring-open.ts)");
+{
+  //   A          (collapsed until sprung)
+  //   ├─ B
+  //   │  └─ C
+  //   └─ D
+  //   E
+  const parentOf: Record<string, string | null> = { A: null, B: "A", C: "B", D: "A", E: null };
+  const within = (rowId: string, ancestorId: string) => {
+    for (let id: string | null = rowId; id; id = parentOf[id] ?? null) if (id === ancestorId) return true;
+    return false;
+  };
+  const drive = (events: SpringEvent[], from: SpringState = SPRING_IDLE) => {
+    let state = from;
+    const log: SpringEffects[] = [];
+    for (const event of events) {
+      const next = springStep(state, event, within);
+      state = next.state;
+      log.push(next.effects);
+    }
+    return { state, log, last: log[log.length - 1] };
+  };
+  const over = (rowId: string | null, opensHere = false): SpringEvent => ({ kind: "over", rowId, opensHere });
+  const elapsed = (rowId: string): SpringEvent => ({ kind: "elapsed", rowId });
+
+  check("the middle band is react-arborist's 'into this row' zone — a quarter in from each edge", () => {
+    assert.equal(inMiddleBand(108, 100, 32), false, "exactly a quarter down: still the top edge");
+    assert.equal(inMiddleBand(109, 100, 32), true);
+    assert.equal(inMiddleBand(123, 100, 32), true);
+    assert.equal(inMiddleBand(124, 100, 32), false, "the bottom quarter means 'beside'");
+    assert.ok(SPRING_OPEN_DELAY_MS >= 300 && SPRING_OPEN_DELAY_MS <= 1000, "a short rest, not an instant flicker or a long wait");
+  });
+  check("resting on a collapsed row opens it after the wait — resting on, not re-arming", () => {
+    const armed = drive([over("A", true)]);
+    assert.equal(armed.last.wait, "A");
+    assert.equal(drive([over("A", true)], armed.state).last.wait, undefined, "dragover repeats while resting: the wait isn't restarted");
+    const sprung = drive([elapsed("A")], armed.state);
+    assert.equal(sprung.last.open, "A");
+    assert.deepEqual(sprung.state.opened, ["A"]);
+  });
+  check("nested: A, then B inside it; moving within A's bounds keeps it open", () => {
+    const { state, log } = drive([over("A", true), elapsed("A"), over("B", true), elapsed("B"), over("C"), over("B")]);
+    assert.deepEqual(state.opened, ["A", "B"]);
+    assert.deepEqual(log.flatMap((e) => e.close), [], "nothing closed while the pointer stayed inside");
+  });
+  check("leaving a row's displayed bounds closes it — and only it", () => {
+    const sprung = drive([over("A", true), elapsed("A"), over("B", true), elapsed("B")]).state;
+    const toD = drive([over("D")], sprung);
+    assert.deepEqual(toD.last.close, ["B"], "D is inside A but not B");
+    assert.deepEqual(toD.state.opened, ["A"]);
+    const toE = drive([over("E")], toD.state);
+    assert.deepEqual(toE.last.close, ["A"]);
+  });
+  check("leaving the tree closes everything this drag opened, deepest first", () => {
+    const sprung = drive([over("A", true), elapsed("A"), over("B", true), elapsed("B")]).state;
+    const out = drive([over(null)], sprung);
+    assert.deepEqual(out.last.close, ["B", "A"]);
+    assert.deepEqual(out.state, SPRING_IDLE);
+  });
+  check("the edge bands, another row, or a row that doesn't open stop the wait; a stale wait opens nothing", () => {
+    const toEdge = drive([over("A", true), over("A", false), elapsed("A")]);
+    assert.equal(toEdge.log[1].wait, null);
+    assert.equal(toEdge.last.open, null);
+    const toOther = drive([over("A", true), over("E", true), elapsed("A")]);
+    assert.equal(toOther.log[1].wait, "E");
+    assert.equal(toOther.last.open, null, "A's wait was replaced");
+    assert.deepEqual(drive([over("C")]).last, { close: [], open: null }, "over a row that doesn't open, with nothing waiting: no effects");
+  });
+  check("dropping in the tree keeps what is open; a drag ending anywhere else closes it", () => {
+    const sprung = drive([over("A", true), elapsed("A"), over("B", true), elapsed("B")]).state;
+    const dropped = drive([{ kind: "drop", inTree: true }, { kind: "end" }], sprung);
+    assert.deepEqual(dropped.log.flatMap((e) => e.close), [], "the drop's own dragend closes nothing");
+    assert.deepEqual(drive([{ kind: "end" }], sprung).last.close, ["B", "A"], "cancelled");
+    assert.deepEqual(drive([{ kind: "drop", inTree: false }], sprung).last.close, ["B", "A"], "dropped on another surface");
+  });
+  check("rows open before the drag are never closed by it", () => {
+    assert.deepEqual(drive([over("A"), over("E"), over(null), { kind: "end" }]).log.flatMap((e) => e.close), []);
+  });
+
+  const read8 = (rel: string) => readFileSync(join(__dirname, "..", rel), "utf8");
+  const hook = read8("components/content/use-spring-open.ts");
+  const fileTree = read8("components/content/FileTree.tsx");
+  const fileNode = read8("components/content/FileNode.tsx");
+  check("the tree runs it; it hears every drag (document, capture) and opens like a chevron click", () => {
+    assert.ok(fileTree.includes("useSpringOpen(treeRef, containerRef, setExpanded);"));
+    for (const name of ["dragover", "dragleave", "drop", "dragend"]) {
+      assert.ok(hook.includes(`document.addEventListener("${name}", `) && new RegExp(`document\\.addEventListener\\("${name}", \\w+, true\\)`).test(hook), `${name} on the document, capture phase`);
+    }
+    assert.ok(/node\.open\(\);\s*setExpanded\(open, true\);/.test(hook), "opening persists the expansion (a shortcut's contents are built from it)");
+    assert.ok(/\?\.close\(\);\s*setExpanded\(id, false\);/.test(hook));
+    assert.equal(/preventDefault|stopPropagation/.test(hook), false, "it never interferes with a drag");
+  });
+  check("only rows that show they open, in their middle band, never a dragged row", () => {
+    assert.ok(hook.includes('row.getAttribute("aria-expanded") === "false"'));
+    assert.ok(hook.includes("opensHere = !dragged && inMiddleBand(event.clientY, box.top, box.height);"));
+    assert.ok(fileNode.includes("aria-expanded={usesRowToggle ? isOpen : undefined}"), "FileNode marks rows that open");
+    assert.ok(fileNode.includes("data-tree-node-id={data.id}"));
+  });
+  check("displayed bounds are walked up the shown tree; a drop counts as in the tree only inside it", () => {
+    assert.ok(hook.includes("for (let node = treeRef.current?.get(rowId) ?? null; node; node = node.parent) {"));
+    assert.ok(hook.includes('run({ kind: "drop", inTree: target instanceof Node && container.contains(target) });'));
   });
 }
 

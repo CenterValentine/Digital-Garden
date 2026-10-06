@@ -19,6 +19,7 @@ import { Tree, type NodeApi, type TreeApi, type NodeRendererProps } from "react-
 import type { useDragDropManager } from "react-dnd";
 import { dropRowFor, resolveDropAnchor } from "@/lib/domain/content/sibling-order";
 import { FileNode } from "./FileNode";
+import { useSpringOpen } from "./use-spring-open";
 import { useTreeStateStore } from "@/state/tree-state-store";
 import { useTreeRevealStore, type TreeRevealRequest } from "@/state/tree-reveal-store";
 import { clientLogger } from "@/lib/core/logger/client";
@@ -714,6 +715,10 @@ export function FileTree({
     // for the same node.
     onExpandComplete?.();
   }, [expandNodeId, onExpandComplete, setExpanded]);
+
+  // During a drag, a collapsed row held under the pointer opens, and closes
+  // again when the pointer leaves it (spring-open.ts).
+  useSpringOpen(treeRef, containerRef, setExpanded);
 
   // Reveal request (toolbar "show in file tree", breadcrumb, or the tree
   // following the active content): mirror a real selection of the node.
