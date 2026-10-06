@@ -74,6 +74,7 @@ import {
   type DropRuleRow,
 } from "../lib/features/content/drop-rules";
 import { clearKeptSort, orderKeptLevel, showKeptSorts } from "../lib/features/content/kept-sort-display";
+import { patchTreeNodeTitle } from "../lib/domain/content/tree-patch";
 import {
   IN_TEXT_EDIT_MAX_AGE_MS,
   IN_TEXT_FETCH_MS,
@@ -1646,6 +1647,56 @@ console.log("\nrows open as you drag over them (spring-open.ts)");
     assert.ok(hook.includes('return (row.rowIndex ?? 0) < (opened.rowIndex ?? 0) ? "above" : "below";'));
     assert.ok(hook.includes("if (closeAfterDrop.length > 0) setTimeout(() => closeRows(closeAfterDrop), 0);"));
     assert.ok(hook.includes('run({ kind: "drop", inTree, rowId: row?.dataset.treeNodeId ?? null });'));
+  });
+}
+
+console.log("\ncreates and renames outside the tree reach it at once (main-panel +, Note Windows)");
+{
+  const at0 = new Date(0);
+  const row = (id: string, title: string, over: Partial<TreeNode> = {}): TreeNode => ({
+    id, title, slug: id, parentId: null, displayOrder: 0, customIcon: null, iconColor: null,
+    isPublished: false, contentType: "note", children: [], createdAt: at0, updatedAt: at0, deletedAt: null, ...over,
+  });
+  const tree = () => [
+    row("F", "Folder", { contentType: "folder", children: [row("a", "A")], references: [row("r", "Ref")] }),
+    row("G", "Other", { contentType: "folder", children: [row("b", "B")] }),
+  ];
+  check("a rename patches the row where it sits — children or a reference block — and nothing else", () => {
+    const before = tree();
+    const renamed = patchTreeNodeTitle(before, "a", "A2");
+    assert.equal(renamed[0].children[0].title, "A2");
+    assert.equal(renamed[1], before[1], "an untouched branch keeps its identity");
+    assert.equal(renamed[0].references, before[0].references, "an untouched reference block keeps its identity");
+    assert.equal(patchTreeNodeTitle(before, "r", "Ref2")[0].references?.[0].title, "Ref2");
+    assert.equal(patchTreeNodeTitle(before, "missing", "x"), before, "nothing to rename: the same array");
+    assert.equal(patchTreeNodeTitle(before, "a", "A"), before, "same title: the same array");
+  });
+
+  const read9 = (rel: string) => readFileSync(join(__dirname, "..", rel), "utf8");
+  const picker = read9("components/content/pickers/ContentTreePicker.tsx");
+  const windowView = read9("components/content/editor/NoteWindowNodeView.tsx");
+  const createFn = picker.slice(picker.indexOf("async function createContent("), picker.indexOf("export function ContentTreePicker({"));
+  check("a picker create (main-panel +, Note Window) shows its row at once, where it lands", () => {
+    assert.ok(createFn.includes("return withOptimisticTreeRow("));
+    assert.ok(createFn.includes("{ title, contentType: kind, parentId, place },"));
+    assert.equal(createFn.includes("dg:tree-refresh"), false, "no full refetch: the placeholder resolves, then the tree reconciles quietly");
+    assert.ok(picker.includes('runCreate(parentContentId ?? scopeRootParentId, 0, "top"),'));
+    assert.ok(picker.includes("runCreate(row.parentId, row.siblingIndex + 1, { afterId: row.id }),"));
+    assert.ok(picker.includes('(row: FlatRow) => runCreate(row.parentId, 0, "top"),'));
+    assert.ok(picker.includes('runCreate(destination.id, 0, "top"),'));
+  });
+  check("the tree places such a row exactly: top, or right after its anchor", () => {
+    assert.ok(source.includes('place === "top" ? 0 : anchor !== -1 ? anchor + 1 : sortedInsertIndex(list, node);'));
+    assert.ok(source.includes('place && place !== "top" ? list.findIndex((row) => row.id === place.afterId) : -1;'));
+  });
+  check("a window rename tells the tree first, and takes it back if the save fails", () => {
+    const commit = windowView.slice(windowView.indexOf("const commitRename = useCallback("), windowView.indexOf("const cancelRename = useCallback("));
+    assert.ok(commit.indexOf("broadcast(newTitle);") > 0 && commit.indexOf("broadcast(newTitle);") < commit.indexOf("await fetch("), "before the save");
+    assert.ok(/catch \{\s*setOptimisticTitle\(previous\);\s*broadcast\(shownBefore\);/.test(commit), "reverted on failure");
+  });
+  check("renames reach rows shown through a shortcut; a refresh dropped by a stuck edit is logged", () => {
+    assert.ok(source.includes("setShortcutTargetTrees((current) => patchTreeNodeTitle(current, contentId, updates.title!));"));
+    assert.ok(source.includes('event: "tree_fetch:dropped_pending_edit",'));
   });
 }
 

@@ -97,6 +97,7 @@ import {
   settleInTextEdits,
 } from "@/lib/features/content/in-text-media";
 import { useInTextMediaStore } from "@/state/in-text-media-store";
+import { patchTreeNodeTitle } from "@/lib/domain/content/tree-patch";
 import {
   collectRemovedIds,
   removeNodesFromTree,
@@ -244,33 +245,6 @@ function optimisticTreeNode(tempId: string, row: OptimisticTreeRow, treeParentId
   };
 }
 
-function patchTreeNodeTitle(
-  nodes: TreeNode[],
-  contentId: string,
-  newTitle: string,
-): TreeNode[] {
-  return nodes.map((node) => {
-    if (node.id === contentId) {
-      return { ...node, title: newTitle };
-    }
-
-    // Both arrays — a rename of content sitting in a parent's reference block
-    // has to patch there too, or the optimistic title never updates for it.
-    if (!node.children?.length && !node.references?.length) {
-      return node;
-    }
-
-    return {
-      ...node,
-      children: node.children?.length
-        ? patchTreeNodeTitle(node.children, contentId, newTitle)
-        : (node.children ?? []),
-      references: node.references?.length
-        ? patchTreeNodeTitle(node.references, contentId, newTitle)
-        : node.references,
-    };
-  });
-}
 
 /**
  * Tree-space parent for a "+" create (null = top of the current tree). The one
@@ -748,6 +722,20 @@ export function LeftSidebarContent({
           pendingEdits: pendingTreeEditsRef.current,
         })
       ) {
+        // Evidence for "the tree stopped updating": an edit that never ended
+        // would drop every quiet refresh after it (owner report, 2026-10-06
+        // — creates and renames from the main panel didn't reach the tree).
+        if (pendingTreeEditsRef.current > 0) {
+          clientLogger.warn({
+            layer: "ui",
+            event: "tree_fetch:dropped_pending_edit",
+            summary: "tree refresh dropped: a local tree edit is still pending",
+            attrs: {
+              pending_edits: pendingTreeEditsRef.current,
+              edit_gen: treeEditGenRef.current,
+            },
+          });
+        }
         return;
       }
       setTreeData(result.data.tree);
@@ -1031,6 +1019,8 @@ export function LeftSidebarContent({
       setTreeData((current) =>
         current ? patchTreeNodeTitle(current, contentId, updates.title!) : current,
       );
+      // Rows shown through a shortcut whose folder lives outside the view.
+      setShortcutTargetTrees((current) => patchTreeNodeTitle(current, contentId, updates.title!));
     };
 
     window.addEventListener(
@@ -1123,12 +1113,18 @@ export function LeftSidebarContent({
           // A parent outside the visible tree: nothing to show until it's opened.
           if (treeParentId && !treeContainsId(current, treeParentId)) return current;
           const node = optimisticTreeNode(detail.tempId, detail.row, treeParentId);
-          // Where the server will sort it, not on top: these creates store the
-          // default displayOrder (0), so the real row lands by title among the
-          // other zeros — a placeholder pinned to the top jumped there on
-          // resolve. sortedInsertIndex is the tree API's own comparator.
+          // Where the create puts it, when the caller says (the picker: top,
+          // or right after a sibling). Otherwise where the server will sort
+          // it, not on top: those creates store the default displayOrder (0),
+          // so the real row lands by title among the other zeros — a
+          // placeholder pinned to the top jumped there on resolve.
+          // sortedInsertIndex is the tree API's own comparator.
+          const place = detail.row.place;
           const insertSorted = (list: TreeNode[]): TreeNode[] => {
-            const at = sortedInsertIndex(list, node);
+            const anchor =
+              place && place !== "top" ? list.findIndex((row) => row.id === place.afterId) : -1;
+            const at =
+              place === "top" ? 0 : anchor !== -1 ? anchor + 1 : sortedInsertIndex(list, node);
             return [...list.slice(0, at), node, ...list.slice(at)];
           };
           if (!treeParentId) return insertSorted(current);

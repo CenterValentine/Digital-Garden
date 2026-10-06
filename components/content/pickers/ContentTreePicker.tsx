@@ -91,6 +91,7 @@ import {
 import { useTreeStateStore } from "@/state/tree-state-store";
 import { useContentStore } from "@/state/content-store";
 import { collectPaneAttachedTabs } from "@/state/workspace-tab-filter-store";
+import { withOptimisticTreeRow } from "@/lib/features/content/tree-optimistic";
 import {
   recordCreateDestination,
   useCreateDestinationStore,
@@ -276,40 +277,51 @@ async function createContent(
   title: string,
   parentId: string | null,
   newDisplayOrder: number,
+  place: "top" | { afterId: string },
 ): Promise<PickerTarget | null> {
-  // Notes seed an empty doc; databases send contentType and let the server
-  // seed the Name column + default view (the same POST the databases rail
-  // used before its quick-add moved here).
-  const res = await fetch("/api/content/content", {
-    method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(
-      kind === "data"
-        ? { title, parentId, contentType: "data" }
-        : { title, parentId, tiptapJson: EMPTY_DOC },
-    ),
-  });
-  const body = (await res.json().catch(() => null)) as {
-    success?: boolean;
-    data?: { id?: string };
-  } | null;
-  if (!res.ok || !body?.success || !body.data?.id) return null;
-  const newId = body.data.id;
-  // Exact placement: the move route renumbers siblings in one
-  // transaction. Non-fatal on failure — the note exists either way.
-  await fetch("/api/content/content/move", {
-    method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contentId: newId,
-      targetParentId: parentId,
-      newDisplayOrder,
-    }),
-  }).catch(() => {});
-  window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
-  return { id: newId, title, contentType: kind };
+  // Shown in the file tree at once, where it lands (owner, 2026-10-06: a
+  // create from the main panel's "+" or a Note Window didn't reach the tree
+  // until a full refetch — seconds on a large tree, or never if that refetch
+  // was dropped). The placeholder becomes the real row, then the tree
+  // reconciles quietly — the path the reader's creates take.
+  return withOptimisticTreeRow(
+    { title, contentType: kind, parentId, place },
+    async () => {
+      // Notes seed an empty doc; databases send contentType and let the
+      // server seed the Name column + default view (the same POST the
+      // databases rail used before its quick-add moved here).
+      const res = await fetch("/api/content/content", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          kind === "data"
+            ? { title, parentId, contentType: "data" }
+            : { title, parentId, tiptapJson: EMPTY_DOC },
+        ),
+      });
+      const body = (await res.json().catch(() => null)) as {
+        success?: boolean;
+        data?: { id?: string };
+      } | null;
+      if (!res.ok || !body?.success || !body.data?.id) return null;
+      const newId = body.data.id;
+      // Exact placement: the move route renumbers siblings in one
+      // transaction. Non-fatal on failure — the note exists either way.
+      await fetch("/api/content/content/move", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contentId: newId,
+          targetParentId: parentId,
+          newDisplayOrder,
+        }),
+      }).catch(() => {});
+      return { id: newId, title, contentType: kind } satisfies PickerTarget;
+    },
+    (created) => created?.id ?? null,
+  );
 }
 
 export function ContentTreePicker({
@@ -755,7 +767,11 @@ export function ContentTreePicker({
   // parent is SERVER space (the view root's real id, never tree-space
   // null) — exactly what the destination store expects.
   const runCreate = useCallback(
-    async (parentId: string | null, newDisplayOrder: number) => {
+    async (
+      parentId: string | null,
+      newDisplayOrder: number,
+      place: "top" | { afterId: string },
+    ) => {
       if (!quickCreate) return;
       setCreateError(null);
       const created = await createContent(
@@ -763,6 +779,7 @@ export function ContentTreePicker({
         quickCreate.defaultTitle,
         parentId,
         newDisplayOrder,
+        place,
       );
       if (!created) {
         setCreateError(`Couldn't create the ${createNoun.toLowerCase()}.`);
@@ -777,13 +794,13 @@ export function ContentTreePicker({
   // "Inside" — top of a container (by id), or top of the current scope (null).
   const quickCreateInside = useCallback(
     (parentContentId: string | null) =>
-      runCreate(parentContentId ?? scopeRootParentId, 0),
+      runCreate(parentContentId ?? scopeRootParentId, 0, "top"),
     [runCreate, scopeRootParentId],
   );
 
   // "Between" — the insertion gap under a row: sibling slot right after it.
   const quickCreateAfter = useCallback(
-    (row: FlatRow) => runCreate(row.parentId, row.siblingIndex + 1),
+    (row: FlatRow) => runCreate(row.parentId, row.siblingIndex + 1, { afterId: row.id }),
     [runCreate],
   );
 
@@ -791,7 +808,7 @@ export function ContentTreePicker({
   // the very top slot of that group (top of an expanded folder, or top
   // of root / the scoped view).
   const quickCreateAtStart = useCallback(
-    (row: FlatRow) => runCreate(row.parentId, 0),
+    (row: FlatRow) => runCreate(row.parentId, 0, "top"),
     [runCreate],
   );
 
@@ -799,7 +816,7 @@ export function ContentTreePicker({
   // space, so no scope remap: it creates in that folder even when the
   // picker is scoped to a view that can't see it.
   const quickCreateAtDestination = useCallback(
-    (destination: CreateDestination) => runCreate(destination.id, 0),
+    (destination: CreateDestination) => runCreate(destination.id, 0, "top"),
     [runCreate],
   );
 
