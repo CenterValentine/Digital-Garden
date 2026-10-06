@@ -799,6 +799,9 @@ export function MainPanelHeader({
                     : "text-gray-600 hover:bg-black/[0.035] hover:text-gray-900 dark:text-gray-300 dark:hover:bg-white/[0.05] dark:hover:text-white"
                 } ${isDragging ? "cursor-grabbing opacity-60" : "cursor-grab"}`}
                 data-pane-id={paneId}
+                // Hit-tested by spring-loaded tabs (use-spring-tabs.ts): a
+                // drag resting here opens this tab.
+                data-tab-id={tab.id}
                 // Tabs truncate at 22rem — hover reveals the full title. Same
                 // native-title convention as the sidebar chat tabs.
                 title={

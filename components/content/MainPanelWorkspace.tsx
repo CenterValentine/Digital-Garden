@@ -26,6 +26,7 @@ import { MainPanelNavigation } from "./MainPanelNavigation";
 import { PanelOverlayCornerTargets } from "./PanelOverlayCornerTargets";
 import { MainPanelHeader } from "./headers/MainPanelHeader";
 import { MainPanelContent } from "./content/MainPanelContent";
+import { useSpringTabs } from "./use-spring-tabs";
 import { useExtensionShellControllers } from "@/lib/extensions/client-registry";
 import type { ContentDetailResponse } from "@/lib/domain/content/api-types";
 
@@ -241,6 +242,9 @@ export function MainPanelWorkspace({
   const isPanelEmbedSurfacePath = pathname?.startsWith("/embed/panel") ?? false;
   const [draggedTabId, setDraggedTabId] = useState<string | null>(null);
   const [draggedFromPaneId, setDraggedFromPaneId] = useState<WorkspacePaneId | null>(null);
+  // Content dragged out of a note opens a tab it rests on; releasing switches
+  // the pane it came from back (spring-tabs.ts).
+  useSpringTabs();
   const [hoveredSinglePaneTargetId, setHoveredSinglePaneTargetId] = useState<string | null>(null);
 
   const handleTabDragStart = (tabId: string, paneId: WorkspacePaneId) => {

@@ -75,6 +75,23 @@ import {
 } from "../lib/features/content/drop-rules";
 import { clearKeptSort, orderKeptLevel, showKeptSorts } from "../lib/features/content/kept-sort-display";
 import { patchTreeNodeTitle } from "../lib/domain/content/tree-patch";
+import { getSchema } from "@tiptap/core";
+import StarterKit from "@tiptap/starter-kit";
+import { EditorState } from "@tiptap/pm/state";
+import { EditorImage } from "../lib/domain/editor/extensions/image";
+import {
+  checkDraggedRange,
+  insertDropped,
+  removeDragged,
+  sliceFromJSON,
+} from "../lib/domain/editor/cross-editor-move";
+import {
+  SPRING_TAB_DELAY_MS,
+  paneShowing,
+  restoreAfterSpring,
+  springsTab,
+  startSpringTabSession,
+} from "../lib/features/content/spring-tabs";
 import {
   IN_TEXT_EDIT_MAX_AGE_MS,
   IN_TEXT_FETCH_MS,
@@ -1798,6 +1815,105 @@ console.log("\ndrops onto rows inside a shortcut reach the real folder (source p
   check("the sidebar takes it (mirror rows aren't in its data) and never sends an id that names no content", () => {
     assert.ok(source.includes("const forwardTo = args.forwardTo ?? (dropRow ? resolveDropForwardTarget(dropRow) : null);"));
     assert.ok(/if \(parentId && !isUuid\(parentId\)\) \{\s*toast\.error\("Can't move there"/.test(source));
+  });
+}
+
+console.log("\nmoving content between notes by drag and drop (cross-editor-move.ts, spring-tabs.ts)");
+{
+  const makeSchema = () => getSchema([StarterKit, EditorImage.configure({ inline: false, allowBase64: true })]);
+  const schemaA = makeSchema();
+  const docJSON = {
+    type: "doc",
+    content: [
+      { type: "paragraph", content: [{ type: "text", text: "above" }] },
+      { type: "image", attrs: { src: "/api/content/content/img-1/download?stream=true", contentId: "img-1" } },
+      { type: "paragraph", content: [{ type: "text", text: "below" }] },
+    ],
+  };
+  const doc = schemaA.nodeFromJSON(docJSON);
+  // "above" paragraph is 7 wide; the image (an atom) sits at 7–8.
+  const imageSlice = doc.slice(7, 8);
+  check("the dragged content is removed only while it is still exactly where it was", () => {
+    assert.equal(checkDraggedRange(doc, 7, 8, imageSlice), "ok");
+    assert.equal(checkDraggedRange(doc, 0, 7, imageSlice), "changed", "something else there now");
+    assert.equal(checkDraggedRange(schemaA.nodeFromJSON({ type: "doc", content: [{ type: "paragraph" }] }), 7, 8, imageSlice), "not-loaded", "the note's content hasn't arrived yet: try again");
+    assert.equal(checkDraggedRange(doc, 8, 8, imageSlice), "changed");
+    const removeTr = EditorState.create({ doc }).tr;
+    assert.equal(removeDragged(doc, removeTr, { from: 7, to: 8, slice: imageSlice }), "ok");
+    assert.equal(removeTr.doc.childCount, 2, "the image is gone");
+    const keepTr = EditorState.create({ doc }).tr;
+    assert.equal(removeDragged(doc, keepTr, { from: 0, to: 7, slice: imageSlice }), "changed");
+    assert.equal(keepTr.steps.length, 0, "changed content stays (the drop was a copy)");
+  });
+  check("the trap: a slice rebuilt in ANOTHER editor's schema never matches — compare in the source's own", () => {
+    const schemaB = makeSchema();
+    const json = imageSlice.toJSON();
+    assert.equal(checkDraggedRange(doc, 7, 8, sliceFromJSON(schemaB, json)!), "changed", "ProseMirror compares node types by identity");
+    assert.equal(checkDraggedRange(doc, 7, 8, sliceFromJSON(schemaA, json)!), "ok");
+  });
+  check("the dropped content lands at the drop point, whole", () => {
+    const target = schemaA.nodeFromJSON({ type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "one" }] }, { type: "paragraph", content: [{ type: "text", text: "two" }] }] });
+    const tr = EditorState.create({ doc: target }).tr;
+    assert.equal(insertDropped(target, tr, 5, sliceFromJSON(schemaA, imageSlice.toJSON())!), true);
+    assert.deepEqual(tr.doc.content.content.map((n) => n.type.name), ["paragraph", "image", "paragraph"]);
+    assert.equal(tr.doc.child(1).attrs.contentId, "img-1", "the image keeps its content id");
+  });
+
+  const panes = (active: string | null, a: string | null, b: string | null) => ({
+    activePaneId: active,
+    panes: { left: { activeTabId: a }, right: { activeTabId: b } },
+    tabs: { tA: { contentId: "noteA" }, tB: { contentId: "noteB" }, tC: { contentId: "noteC" } },
+  });
+  check("tabs: the pane a drag started in is the one showing its note (the focused pane first)", () => {
+    assert.equal(paneShowing(panes("left", "tA", "tA"), "noteA"), "left");
+    assert.equal(paneShowing(panes("right", "tB", "tA"), "noteA"), "right");
+    assert.equal(paneShowing(panes("left", "tB", "tA"), "noteA"), "right", "not the focused pane: the one that shows it");
+    assert.equal(paneShowing(panes("left", "tB", "tC"), "noteA"), null);
+    assert.equal(paneShowing(panes("right", "tA", "tA"), "noteA"), "right", "open in both: the focused one");
+  });
+  check("tabs: resting on a tab opens it — unless it's already showing", () => {
+    assert.equal(springsTab(panes("left", "tA", "tB"), "tC", "left"), true);
+    assert.equal(springsTab(panes("left", "tA", "tB"), "tA", "left"), false);
+    assert.equal(springsTab(panes("left", "tA", "tB"), null, "left"), false);
+    assert.ok(SPRING_TAB_DELAY_MS >= 300 && SPRING_TAB_DELAY_MS <= 1000);
+  });
+  check("tabs: releasing switches the SOURCE pane back (and focus), only if a hover changed it", () => {
+    const session = startSpringTabSession(panes("left", "tA", "tB"), "noteA");
+    assert.deepEqual(session, { sourcePaneId: "left", sourceTabId: "tA", focusedPaneId: "left" });
+    assert.deepEqual(restoreAfterSpring(session, panes("right", "tC", "tB")), { tabId: "tA", focusPaneId: "left" });
+    assert.equal(restoreAfterSpring(session, panes("right", "tA", "tC")), null, "the source pane wasn't changed: a tab opened in another pane stays");
+    assert.equal(restoreAfterSpring(null, panes("left", "tC", "tB")), null);
+  });
+
+  const read10 = (rel: string) => readFileSync(join(__dirname, "..", rel), "utf8");
+  const editorSrc = read10("components/content/editor/MarkdownEditor.tsx");
+  const hook = read10("lib/domain/editor/hooks/use-cross-editor-drag.ts");
+  const tabsHook = read10("components/content/use-spring-tabs.ts");
+  check("the editor records drags, takes another editor's, and keeps ProseMirror from inserting it twice", () => {
+    assert.ok(editorSrc.includes("if (editor) recordEditorDrag(editor, contentId ?? null);"));
+    assert.ok(editorSrc.includes("drop: (view) => isForeignEditorDropOn(view),"));
+    const drop = editorSrc.indexOf("dropForeignEditorDrag(editor, contentId ?? null, { left: e.clientX, top: e.clientY })");
+    assert.ok(drop > 0 && drop < editorSrc.indexOf("const pmDragging = (editor.view"), "before the same-editor branch");
+    assert.ok(/usePendingDragRemovals\(\s*editor,\s*contentId,\s*!shouldUseCollaboration \|\|\s*editorMode === "collaboration" \|\|\s*editorMode === "collaboration-local",\s*\);/.test(editorSrc), "only once bound to the note's collaborative document");
+  });
+  check("moves use the document's own content, never the copy-transformed drag slice (public image links)", () => {
+    assert.ok(hook.includes("slice: editor.state.doc.slice(range.from, range.to).toJSON(),"));
+    assert.ok(/const slice = draggingNode\s*\? editor\.state\.doc\.slice\(draggingNode\.from, draggingNode\.to\)\s*: editor\.state\.selection\.content\(\);/.test(editorSrc), "within one note too");
+  });
+  check("the source is changed only through an editor on the page, in its own schema; otherwise queued", () => {
+    assert.ok(hook.includes("return Boolean(editor && !editor.isDestroyed && editor.view.dom.isConnected);"));
+    assert.ok(hook.includes("const slice = sliceFromJSON(live.schema, drag.slice);"));
+    assert.ok(hook.includes("useEditorDragStore.getState().queueRemoval({"));
+    assert.ok(hook.includes("useEditorDragStore.getState().take();"), "taken once: a nested editor can't insert it again");
+  });
+  check("tabs are hit-tested by id; the controller is mounted once and never interferes with a drag", () => {
+    assert.ok(read10("components/content/headers/MainPanelHeader.tsx").includes("data-tab-id={tab.id}"));
+    assert.ok(read10("components/content/MainPanelWorkspace.tsx").includes("useSpringTabs();"));
+    for (const name of ["dragover", "drop", "dragend", "pointermove", "pointerdown"]) {
+      assert.ok(new RegExp(`document\\.addEventListener\\("${name}", \\w+, true\\)`).test(tabsHook), name);
+    }
+    assert.equal(/preventDefault|stopPropagation/.test(tabsHook), false);
+    assert.ok(tabsHook.includes("if (!drag && !session) return;"), "only drags that started in an editor");
   });
 }
 
