@@ -47,9 +47,12 @@ import {
   moveAcrossForests,
   moveTouchesCarried,
   placeAmongSiblings,
+  applyKeptSort,
   compareNames,
   isFolderLike,
+  nextKeptSort,
   nextNameDirection,
+  parseKeptSort,
   renumbering,
   resolveDropAnchor,
   slotForArrival,
@@ -67,6 +70,8 @@ import {
   isUndraggableRow,
   type DropRuleRow,
 } from "../lib/features/content/drop-rules";
+import { clearKeptSort, orderKeptLevel, showKeptSorts } from "../lib/features/content/kept-sort-display";
+import type { TreeNode } from "../lib/domain/content/types";
 
 interface Node {
   id: string;
@@ -517,7 +522,7 @@ console.log("\none order, one placement (source pins)");
     }
   });
   check("the move route places with placeAmongSiblings and reads afterId", () => {
-    assert.ok(moveRoute.includes("placeAmongSiblings(siblings, movedItem, placement)"));
+    assert.ok(moveRoute.includes("placeAmongSiblings(base, movedItem, placement)"));
     assert.ok(moveRoute.includes("body.afterId"));
   });
   check("the move route's siblings are the OWNER's (root moves renumbered every user's roots)", () => {
@@ -562,7 +567,8 @@ console.log("\nout-of-view shortcut targets are wired end to end (source pins)")
     assert.ok(source.includes("shortcutTargets={shortcutTargetTrees}"));
   });
   check("FileTree indexes them for the mirror", () => {
-    assert.ok(fileTree.includes("buildTreeIndex(withReferences, shortcutTargets)"));
+    assert.ok(fileTree.includes("buildTreeIndex(withReferences, shownTargets)"));
+    assert.ok(fileTree.includes("showKeptSorts(shortcutTargets, null)"));
   });
   check("a drop onto an out-of-view shortcut shows in its mirror at once, and rolls back with the tree", () => {
     const move = sliceBetween("const handleMove = async", "const handleRename");
@@ -956,10 +962,80 @@ console.log("\nsorting one level (sortLevel — the header's sort menu)");
   });
 }
 
-console.log("\nthe sort menu: one level, permanent, nothing remembered (source pins)");
+console.log("\nwhat a folder remembers (KeptSort)");
+{
+  const row = (id: string, title: string, extra: Partial<LevelSortRow> = {}): LevelSortRow => ({
+    id, title, displayOrder: 0, folderLike: false, nested: false, ...extra,
+  });
+  const ids = (rows: { id: string }[]) => rows.map((r) => r.id).join(",");
+  const level = [
+    row("1", "zeta"),
+    row("2", "Beta", { folderLike: true, nested: true }),
+    row("3", "note 10", { nested: true }),
+    row("4", "alpha", { folderLike: true }),
+    row("5", "note 2"),
+  ];
+  check("a float toggles, the other float replaces it, Name cycles A–Z / Z–A, stop forgets", () => {
+    assert.deepEqual(nextKeptSort(null, "float-folders"), { float: "folders" });
+    assert.equal(nextKeptSort({ float: "folders" }, "float-folders"), null);
+    assert.deepEqual(nextKeptSort({ float: "folders" }, "float-nested"), { float: "nested" });
+    assert.deepEqual(nextKeptSort({ float: "folders" }, "name"), { float: "folders", name: "asc" });
+    assert.deepEqual(nextKeptSort({ name: "asc" }, "name"), { name: "desc" });
+    assert.deepEqual(nextKeptSort({ name: "desc" }, "name"), { name: "asc" });
+    assert.equal(nextKeptSort({ float: "nested", name: "asc" }, "stop"), null);
+  });
+  check("stored memory is read defensively", () => {
+    assert.equal(parseKeptSort(undefined), null);
+    assert.equal(parseKeptSort({ float: "sideways", name: 3 }), null);
+    assert.deepEqual(parseKeptSort({ float: "nested", name: "desc", extra: 1 }), { float: "nested", name: "desc" });
+  });
+  check("a kept sort orders the level: float on top, then by name within each part", () => {
+    assert.equal(ids(applyKeptSort(level, { float: "folders" })), "2,4,1,3,5");
+    assert.equal(ids(applyKeptSort(level, { float: "nested" })), "2,3,1,4,5");
+    assert.equal(ids(applyKeptSort(level, { name: "asc" })), "4,2,5,3,1");
+    assert.equal(ids(applyKeptSort(level, { float: "folders", name: "asc" })), "4,2,5,3,1");
+    assert.equal(ids(applyKeptSort(level, { float: "folders", name: "desc" })), "2,4,1,3,5");
+  });
+}
+
+console.log("\nkept sorts on the client (kept-sort-display.ts)");
+{
+  type N = Pick<TreeNode, "id" | "title" | "displayOrder" | "contentType" | "folder"> & { children?: N[] };
+  const n = (id: string, title: string, contentType: TreeNode["contentType"] = "note", extra: Partial<N> = {}): N =>
+    ({ id, title, displayOrder: 0, contentType, ...extra });
+  const folderWith = (kept: TreeNode["folder"] extends infer F ? F : never) => kept;
+  const ids = (rows: { id: string }[]) => rows.map((r) => r.id).join(",");
+  const sortedFolder = n("f", "f", "folder", {
+    folder: folderWith({ viewMode: "list", sortMode: null, includeReferencedContent: false, treeSort: { name: "asc" } }),
+    children: [n("b", "b"), n("a", "a")],
+  });
+  const manualFolder = n("m", "m", "folder", { children: [n("y", "y"), n("x", "x")] });
+  check("a folder that keeps a sort shows its children in it; a manual folder keeps its order", () => {
+    const shown = showKeptSorts([sortedFolder, manualFolder], null);
+    assert.equal(ids(shown[0].children ?? []), "a,b");
+    assert.equal(shown[1], manualFolder);
+  });
+  check("the top level follows the view root's sort", () => {
+    assert.equal(ids(showKeptSorts([n("z", "z"), n("k", "k")], { name: "asc" })), "k,z");
+  });
+  check("same input, same output object (no needless re-renders)", () => {
+    const tree = [sortedFolder, manualFolder];
+    assert.equal(showKeptSorts(tree, null), showKeptSorts(tree, null));
+  });
+  check("clearing a folder's sort fixes its rows in the shown order, then forgets the sort", () => {
+    const cleared = clearKeptSort([sortedFolder], "f");
+    assert.equal(ids(cleared[0].children ?? []), "a,b");
+    assert.equal(cleared[0].folder?.treeSort, null);
+    assert.equal(ids(orderKeptLevel([n("z", "z"), n("k", "k")], { name: "asc" })), "k,z");
+  });
+}
+
+console.log("\nthe sort menu: one level, a folder keeps it (source pins)");
 {
   const read3 = (rel: string) => readFileSync(join(__dirname, "..", rel), "utf8");
   const route = read3("app/api/content/content/reorder/route.ts");
+  const move = read3("app/api/content/content/move/route.ts");
+  const treeRoute = read3("app/api/content/content/tree/route.ts");
   const menu = read3("components/content/headers/FileTreeSortMenu.tsx");
   const header = read3("components/content/headers/LeftSidebarHeader.tsx");
   const add = read3("components/content/headers/LeftSidebarHeaderActions.tsx");
@@ -967,42 +1043,66 @@ console.log("\nthe sort menu: one level, permanent, nothing remembered (source p
   const fileTree = read3("components/content/FileTree.tsx");
   const validation = read3("lib/features/settings/validation.ts");
 
-  check("the reorder route sorts ONE level under its lock and writes only changed rows", () => {
+  check("the reorder route sorts ONE level under its lock, writes changed rows, and remembers on folders", () => {
     const sort = route.slice(route.indexOf("// ── Sort ──"));
     const lock = sort.indexOf("await lockSiblingOrder(tx, ownerId, [parentId]);");
-    assert.ok(lock > 0 && sort.indexOf("tx.contentNode.findMany(") > lock);
-    assert.ok(sort.includes("where: { parentId, ownerId, deletedAt: null },"));
-    assert.ok(sort.includes("const { ordered, direction } = sortLevel(rows, mode);"));
-    assert.ok(sort.includes("await applyRenumbering(tx, changes);"));
+    assert.ok(lock > 0 && sort.indexOf("await loadLevelRows(tx, ownerId, parentId)") > lock);
+    assert.ok(sort.includes("const kept = nextKeptSort(previousKept, mode);"));
+    assert.ok(sort.includes("const shown = previousKept ? applyKeptSort(rows, previousKept) : rows;"));
+    assert.ok(sort.includes("await writeKeptSort(tx, parentId, kept);"));
+    assert.ok(/if \(parentId === null\) \{\s*const \{ ordered, direction \} = sortLevel\(rows,/.test(sort), "the top level sorts once");
   });
-  check("Undo restores only live items directly inside that level", () => {
+  check("Undo restores only live items directly inside that level, and the folder's previous sort", () => {
     const undo = route.slice(route.indexOf("// ── Undo"), route.indexOf("// ── Sort ──"));
     assert.ok(undo.includes("where: { id: { in: restore.map((entry) => entry.id) }, parentId, ownerId, deletedAt: null },"));
     assert.ok(undo.includes("const changes = restore.filter((entry) => allowed.has(entry.id));"));
+    assert.ok(undo.includes("await writeKeptSort(tx, parentId, parseKeptSort(body.kept));"));
   });
-  check("nothing about sorting is remembered: no setting, no display transform, no checkmarks", () => {
+  check("a drag within a sorted folder starts from its shown order and turns the sort off", () => {
+    assert.ok(move.includes("current.parentId === parentId ? await readKeptSort(tx, ownerId, parentId) : null;"));
+    assert.ok(move.includes("? applyKeptSort(await loadLevelRows(tx, ownerId, parentId), kept)"));
+    assert.ok(move.includes("if (kept && parentId) await writeKeptSort(tx, parentId, null);"));
+    assert.ok(move.includes("sortCleared: updated.sortCleared,"));
+    assert.ok(sidebar.includes("optimisticTree = clearKeptSort(optimisticTree, parentId);"));
+    assert.ok(sidebar.includes("if (moved?.sortCleared) sortCleared = true;"));
+  });
+  check("the tree shows a sorted folder in its sort (server and client), the top level by the view root's", () => {
+    assert.ok(treeRoute.includes("sortChildren(node.children, node.folder?.treeSort ?? null);"));
+    assert.ok(treeRoute.includes("sortChildren(rootNodes, rootTreeSort);"));
+    assert.ok(treeRoute.includes("viewPrefs: true,"));
+    assert.ok(fileTree.includes("const shownData = useMemo(() => showKeptSorts(data, rootTreeSort ?? null), [data, rootTreeSort]);"));
+    assert.ok(/expandReferences\(\s*shownData,/.test(fileTree));
+  });
+  check("memory lives on folders only — never in user settings; no checkmarks, no focus ring", () => {
     assert.equal(validation.includes("fileTreeSort"), false);
-    assert.equal(/sortTreeForDisplay|treeSort/.test(fileTree), false);
     assert.equal(/useSettingsStore|DropdownMenuCheckboxItem/.test(menu), false);
     assert.ok(menu.includes("onCloseAutoFocus={(event) => event.preventDefault()}"));
+    assert.ok(sidebar.includes("remembers: !virtual && serverParentId !== null,"));
+  });
+  check("a kept sort shows as its glyph in light gold in the header; Stop sorting forgets it", () => {
+    assert.ok(menu.includes("<SortGlyph kept={kept} className=\"h-4 w-4\" />"));
+    assert.ok(menu.includes("if (kept?.name === \"asc\") return <ArrowDownAZ className={className} />;"));
+    assert.ok(menu.includes("className={`rounded p-0.5 transition-colors ${kept ? KEPT_TONE : className}`}"));
+    assert.ok(menu.includes('onSelect={() => void run("stop")}'));
     assert.ok(header.includes("<FileTreeSortMenu className={subInactive} />"));
   });
   check("three sorts, each with an icon, a short name and a tooltip naming the target", () => {
     for (const name of ["Float folders", "Float nested", "Name"]) assert.ok(menu.includes(`          ${name}\n`), name);
-    assert.equal((menu.match(/<DropdownMenuItem\n/g) ?? []).length, 3);
-    assert.equal((menu.match(/title=\{`[^`]*\$\{label\}/g) ?? []).length, 3);
     assert.ok(menu.includes('onSelect={() => void run("float-folders")}'));
     assert.ok(menu.includes('onSelect={() => void run("float-nested")}'));
     assert.ok(menu.includes('onSelect={() => void run("name")}'));
+    assert.ok((menu.match(/\$\{label\}/g) ?? []).length >= 6);
   });
-  check("both header buttons name their target, read live on hover (the same target)", () => {
-    assert.ok(menu.includes("onPointerEnter={() => setTooltip(buttonTooltip(describeTreeTarget()))}"));
-    assert.ok(add.includes("setAddTooltip(target ? `Add a file or folder to ${target.label}` : \"Add a file or folder\");"));
+  check("both header buttons name their target, published by the tree as the selection changes", () => {
+    assert.ok(menu.includes("const target = useTreeTargetStore((state) => state.target);"));
+    assert.ok(add.includes("? `Add a file or folder to ${addTarget.label}`"));
     assert.ok(sidebar.includes("const treeParentId = resolveTreeParent(null, treeData, scopedRootParentId);"));
-    assert.ok(sidebar.includes("registerTreeTargetDescriber(() => {"));
+    assert.ok(sidebar.includes("useTreeTargetStore.getState().setTarget({"));
+    assert.ok(sidebar.includes("}, [treeData, treeSelectedIds, scopedRootParentId, scopedRootTitle, rootTreeSort]);"));
   });
-  check("a sort offers Undo, which posts the previous numbers back", () => {
-    assert.ok(menu.includes("void postReorder({ parentId: serverParentId, restore: previous })"));
+  check("a sort offers Undo, which posts the previous numbers (and sort) back", () => {
+    assert.ok(menu.includes("restore: previous,"));
+    assert.ok(menu.includes("{ kept: result.previousKept ?? null }"));
   });
 }
 

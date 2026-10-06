@@ -12,7 +12,7 @@ last_updated: 2026-05-13
 ## October 5, 2026 — The file tree stops flashing; deleting is instant; rows keep their order; view shortcuts show their folder and act on it safely
 
 **Tree**: worktree `.claude/worktrees/smooth-delete`, branch `fix/smooth-delete` (off `origin/main` at `49b94490`)
-**Status**: typecheck / lint 151 (0 errors, none new) / `tree:smooth:check` 135 (new, in the quality workflow) / `shortcut-mirror:check` (out-of-view cases, row actions, view reach) / tree + workspace gates / `pnpm build` green; no schema, TipTap or browser-extension change → no Hocuspocus redeploy. Owner browser smoke pending.
+**Status**: typecheck / lint 151 (0 errors, none new) / `tree:smooth:check` 146 (new, in the quality workflow) / `shortcut-mirror:check` (out-of-view cases, row actions, view reach) / tree + workspace gates / `pnpm build` green; no schema, TipTap or browser-extension change → no Hocuspocus redeploy. Owner browser smoke pending.
 
 ### Shipped
 - **Skeleton = a scope's first load only** (`tree-refresh.ts`): every refresh of a tree already on screen is quiet — covers create, duplicate, links, uploads, folder view, the header refresh and all `dg:tree-refresh` dispatchers. Stale-scope responses are dropped.
@@ -25,7 +25,8 @@ last_updated: 2026-05-13
 - **What a view's shortcuts show is in the view** (owner rule): the open guard's view-scope check counts the view root's subtree AND whatever shortcuts inside the view reach — their targets' subtrees, along chains of shortcuts (`viewReachRoots`). Locked-workspace overlap checks are unchanged.
 - **Drags stick** (owner report: "sometimes dragging doesn't stick"): the drop rules finally run (`disableDrop`/`disableDrag` — react-arborist never read the old `canDrop`); a drop over the middle of a note or file lands beside it, above/below by the pointer's half, with a line preview; placement is one locked transaction and drags are sent in order, so quick successive moves can't undo each other; renumbering touches only changed rows and never `updatedAt`; paste and Move to folder place by anchor; folder views use the tree's order; window rows can't be dragged.
 - **Every arriving row lands deliberately** (`slotForArrival` + `sibling-slot.ts`, under the same per-list lock): uploads at the top in the order picked, attachments appended; the Folder assistant at the top in order, with Undo restoring the old place; deduped bookmarks re-filed get the appended slot; Studio outputs newest-first.
-- **Sort menu** (⇅ beside + in the tree header): **Float folders**, **Float nested**, **Name** (A–Z, or Z–A when already A–Z) — each a one-time, permanent reorder of the ONE folder the tree targets (the same one + adds to), with Undo; nothing remembered, nothing nested touched. Both header buttons' tooltips name the target.
+- **Sort menu** (beside + in the tree header): **Float folders**, **Float nested**, **Name** (A–Z ↔ Z–A), **Stop sorting** — for the ONE folder the tree targets (the same one + adds to); nothing nested touched. **A folder remembers its sort and stays sorted** (arrivals and renames take their place; a drag inside it turns the sort off, with a toast); the header icon shows the kept sort's glyph in light gold. The vault's top level sorts once. Undo on every sort. Both header buttons' tooltips name the target.
+- **Attachments chip**: its above/below arrow shows only while the block is on screen.
 
 ### Smoke checklist (owner)
 1. Scroll the tree well down, delete a file (⌥D → confirm) → it vanishes instantly, no flash, scroll stays.
@@ -60,12 +61,16 @@ last_updated: 2026-05-13
 30. File two items with the Folder assistant → they land at the top of the target folder in order; click Undo → each goes back to its old folder AND its old position there.
 31. With bookmark dedupe on, save a bookmark you already have into a different folder → it appears at the bottom of that folder.
 32. Run a Studio tool (infographic or slide deck) → the new output is first in "Studio outputs".
-33. Select a folder, hover the sort icon (⇅) and the + → their tooltips name that folder ("Sort “…” — reorders only the items directly inside it", "Add a file or folder to “…”"); select a file instead → they name the file's folder; select nothing → "the top level" (or the view's name).
-34. Open the sort menu → "Sort “…”" with Float folders, Float nested and Name A–Z, each with an icon; hover each → a tooltip says what it does and that only this level changes. No checkmarks.
-35. Choose Float folders → that folder's folders move to the top, everything keeping its relative order; subfolders' contents unchanged; reload → it stuck. The icon shows no lit state or focus ring afterwards.
-36. Choose Name → A–Z with folders still on top; open the menu again → Name now reads Z–A; choose it → Z–A.
-37. Choose Float nested → folders with contents and notes with sub-pages move up. Click Undo on the toast → the previous order is back exactly.
-38. Check the sort menu and its tooltips in light and dark mode → readable, matching the app's other menus.
+33. Select a folder, hover the sort icon and the + → their tooltips name that folder; select a file → they name its folder; select nothing → the top level (or the view's name).
+34. Open the sort menu → "Sort “…”" with Float folders, Float nested, Name (A–Z); hover each → a tooltip says what it does and that only this level changes.
+35. Choose Float folders → the folder's folders move to the top; the header icon becomes a light-gold folder glyph while that folder is selected; select another folder → the plain icon returns; no ring is left on the button.
+36. With Float folders on, choose Name → folders on top, each part A–Z, the glyph shows A→Z; choose Name again → Z–A. Reload → still sorted.
+37. Upload a file into that folder (and rename an item) → it lands in its sorted place, not at the top.
+38. Drag an item to a new spot inside that sorted folder → it stays where you dropped it, a toast says sorting is off for that folder, the header icon is plain again, nothing else moved.
+39. Sort it again, choose Stop sorting → nothing moves; the glyph goes away. Sort once more and click Undo on the toast → the previous order and sort come back.
+40. Select nothing (vault top level), sort by Name → it sorts once (toast says so); no glyph appears; Name again → Z–A.
+41. Collapse a note whose attachment block was open → its chip turns grey and the ⇅ arrow disappears; open the note → the gold chip and arrow return.
+42. Check the sort menu, glyph and tooltips in light and dark mode → readable, matching the app's other menus.
 
 ## October 4, 2026 — Coming back lands you where you were (workspace cold-load restore)
 

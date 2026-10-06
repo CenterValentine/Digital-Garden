@@ -7,7 +7,13 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { compareSiblings } from "@/lib/domain/content/sibling-order";
+import {
+  applyKeptSort,
+  compareSiblings,
+  isFolderLike,
+  parseKeptSort,
+  type KeptSort,
+} from "@/lib/domain/content/sibling-order";
 import { outOfScopeShortcutTargets } from "@/lib/domain/content/shortcut-targets";
 import { prisma } from "@/lib/database/client";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
@@ -106,6 +112,7 @@ type ContentTreeNode = {
     viewMode: string;
     sortMode: string | null;
     includeReferencedContent: boolean;
+    treeSort?: KeptSort | null;
   };
   file?: {
     fileName: string;
@@ -267,6 +274,7 @@ export async function GET(request: NextRequest) {
                   viewMode: true,
                   sortMode: true,
                   includeReferencedContent: true,
+                  viewPrefs: true,
                 },
               },
               externalPayload: {
@@ -379,6 +387,7 @@ export async function GET(request: NextRequest) {
       // Per-row debug logs of displayOrder removed — too noisy for the trace.
       const nodeMap = new Map<string, ContentTreeNode>();
       const rootNodes: ContentTreeNode[] = [];
+      let rootTreeSort: KeptSort | null = null;
 
       // References display as CHILDREN of their owning note (2026-07-16
       // model change; previously siblings). Display-only re-homing: storage
@@ -461,6 +470,9 @@ export async function GET(request: NextRequest) {
             viewMode: item.folderPayload.viewMode,
             sortMode: item.folderPayload.sortMode,
             includeReferencedContent: item.folderPayload.includeReferencedContent,
+            treeSort: parseKeptSort(
+              (item.folderPayload.viewPrefs as { treeSort?: unknown } | null)?.treeSort,
+            ),
           };
         }
         if (item.filePayload) {
@@ -717,6 +729,7 @@ export async function GET(request: NextRequest) {
         // root as parent. Reference-role children land at the top level too,
         // where `partitionReferences` deliberately leaves parentless
         // references inline as ordinary rows rather than hiding them.
+        rootTreeSort = nodeMap.get(viewRootContentId)?.folder?.treeSort ?? null;
         nodeMap.delete(viewRootContentId);
       }
 
@@ -736,7 +749,7 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      function sortChildren(nodes: ContentTreeNode[]) {
+      function sortChildren(nodes: ContentTreeNode[], kept: KeptSort | null) {
         // The shared, TOTAL order (sibling-order.ts). Without the id tiebreak,
         // siblings with equal displayOrder and title kept Postgres's row
         // order — unspecified here (no orderBy), and it shifts on update.
@@ -744,12 +757,31 @@ export async function GET(request: NextRequest) {
 
         for (const node of nodes) {
           if (node.children.length > 0) {
-            sortChildren(node.children);
+            sortChildren(node.children, node.folder?.treeSort ?? null);
           }
+        }
+
+        // A folder that keeps a sort is SHOWN in that order, whatever its
+        // stored numbers say: rows that arrived since (an upload, an AI note,
+        // a rename) take their sorted place without every writer having to
+        // know about sorts. Children first, so "holds other items" is known.
+        if (kept) {
+          const ordered = applyKeptSort(
+            nodes.map((node) => ({
+              id: node.id,
+              title: node.title,
+              displayOrder: node.displayOrder,
+              folderLike: isFolderLike(node),
+              nested: node.children.some((child) => child.role !== "referenced"),
+              node,
+            })),
+            kept,
+          ).map((row) => row.node);
+          nodes.splice(0, nodes.length, ...ordered);
         }
       }
 
-      sortChildren(rootNodes);
+      sortChildren(rootNodes, rootTreeSort);
 
       // Sort first, partition second — references keep the parent's sort order
       // among themselves instead of needing their own comparator.
@@ -766,7 +798,7 @@ export async function GET(request: NextRequest) {
       const shortcutTargets = carriedTargetIds
         .map((id) => carriedNodes.get(id))
         .filter((node): node is ContentTreeNode => node !== undefined);
-      for (const target of shortcutTargets) sortChildren(target.children);
+      for (const target of shortcutTargets) sortChildren(target.children, target.folder?.treeSort ?? null);
       partitionReferences(shortcutTargets);
 
       // Window reference rows: a note containing Note Window blocks surfaces
@@ -835,6 +867,8 @@ export async function GET(request: NextRequest) {
         success: true,
         data: {
           tree: rootNodes,
+          // The view root's own sort (its row isn't in the tree).
+          rootTreeSort,
           stats,
           // What out-of-view shortcuts mirror. Never rows of the tree.
           shortcutTargets,

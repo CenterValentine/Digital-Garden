@@ -1,19 +1,23 @@
 /**
  * Sort ONE level of the tree — POST /api/content/content/reorder
  *
- *   body: { parentId: string | null, mode: "float-folders" | "float-nested" | "name" }
- *     → reorders the items directly inside `parentId` (null = the top level)
- *       and stores it as their order. Nothing inside them is touched, and
- *       nothing about the sort is remembered (owner, 2026-10-06): it is a
- *       one-time rearrangement, like dragging every row into place.
- *       `name` goes A→Z, or Z→A when the level is already A→Z (the toggle).
- *     ← { changed, direction?, previous: [{ id, displayOrder }] }
+ *   body: { parentId: string | null, mode: "float-folders" | "float-nested" | "name" | "stop" }
+ *     → sorts the items directly inside `parentId` and stores the result as
+ *       their order; nothing inside them is touched.
+ *       A FOLDER remembers its sort and stays sorted (owner, 2026-10-06 —
+ *       FolderPayload.viewPrefs.treeSort): choosing a float toggles it, Name
+ *       cycles A–Z / Z–A, "stop" forgets it. The order stored is the one the
+ *       folder shows, so starting or stopping never makes rows jump.
+ *       The TOP of the vault (parentId null) has no folder to remember on:
+ *       there a sort happens once, and Name goes A–Z, or Z–A when the level
+ *       is already A–Z.
+ *     ← { changed, direction?, kept?, previous: [{ id, displayOrder }], previousKept? }
  *
- *   body: { parentId, restore: [{ id, displayOrder }] }
- *     → puts those numbers back (the toast's Undo). Only live items directly
- *       inside `parentId` are accepted.
+ *   body: { parentId, restore: [{ id, displayOrder }], kept?: KeptSort | null }
+ *     → puts those numbers (and the folder's previous sort) back — the
+ *       toast's Undo. Only live items directly inside `parentId` are accepted.
  *
- * Both run under the level's order lock (sibling-slot.ts), like a drag.
+ * All of it under the level's order lock (sibling-slot.ts), like a drag.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -22,17 +26,23 @@ import { requireAuth } from "@/lib/infrastructure/auth";
 import { logger, withRouteTrace, withSpan } from "@/lib/core/logger";
 import { isUuid } from "@/lib/domain/content/uuid";
 import {
-  compareSiblings,
-  isFolderLike,
+  applyKeptSort,
+  nextKeptSort,
+  parseKeptSort,
   renumbering,
   sortLevel,
   type LevelSortMode,
-  type LevelSortRow,
 } from "@/lib/domain/content/sibling-order";
-import { applyRenumbering, lockSiblingOrder } from "@/lib/domain/content/sibling-slot";
+import {
+  applyRenumbering,
+  loadLevelRows,
+  lockSiblingOrder,
+  readKeptSort,
+  writeKeptSort,
+} from "@/lib/domain/content/sibling-slot";
 
 const ROUTE_PATH = "/api/content/content/reorder";
-const MODES: readonly LevelSortMode[] = ["float-folders", "float-nested", "name"];
+const MODES: ReadonlyArray<LevelSortMode | "stop"> = ["float-folders", "float-nested", "name", "stop"];
 
 function badRequest(message: string) {
   return NextResponse.json({ success: false, error: message }, { status: 400 });
@@ -51,6 +61,7 @@ export async function POST(request: NextRequest) {
         parentId?: unknown;
         mode?: unknown;
         restore?: unknown;
+        kept?: unknown;
       };
 
       // Required, so a request that forgot it can't sort the top level.
@@ -91,61 +102,53 @@ export async function POST(request: NextRequest) {
           const allowed = new Set(live.map((row) => row.id));
           const changes = restore.filter((entry) => allowed.has(entry.id));
           await applyRenumbering(tx, changes);
+          // The folder's sort as it was, too (absent = leave it alone).
+          if (parentId && body.kept !== undefined) {
+            await writeKeptSort(tx, parentId, parseKeptSort(body.kept));
+          }
           return changes.length;
         });
         return NextResponse.json({ success: true, data: { restored } });
       }
 
       // ── Sort ─────────────────────────────────────────────────────────────
-      if (typeof body.mode !== "string" || !MODES.includes(body.mode as LevelSortMode)) {
-        return badRequest("`mode` must be float-folders, float-nested or name");
+      if (typeof body.mode !== "string" || !MODES.includes(body.mode as LevelSortMode | "stop")) {
+        return badRequest("`mode` must be float-folders, float-nested, name or stop");
       }
-      const mode = body.mode as LevelSortMode;
+      const mode = body.mode as LevelSortMode | "stop";
+      if (parentId === null && mode === "stop") {
+        return badRequest("The top level has no remembered sort to stop");
+      }
 
       const result = await prisma.$transaction(async (tx) => {
         await lockSiblingOrder(tx, ownerId, [parentId]);
-        const siblings = await tx.contentNode.findMany({
-          where: { parentId, ownerId, deletedAt: null },
-          select: {
-            id: true,
-            title: true,
-            displayOrder: true,
-            contentType: true,
-            shortcutPayload: {
-              select: {
-                targetContentId: true,
-                target: { select: { contentType: true, deletedAt: true } },
-              },
-            },
-            _count: { select: { children: { where: { deletedAt: null, role: "primary" } } } },
-          },
-        });
-        siblings.sort(compareSiblings);
-        const rows: LevelSortRow[] = siblings.map((sibling) => ({
-          id: sibling.id,
-          title: sibling.title,
-          displayOrder: sibling.displayOrder,
-          folderLike: isFolderLike({
-            contentType: sibling.contentType,
-            shortcut: sibling.shortcutPayload
-              ? {
-                  targetId: sibling.shortcutPayload.targetContentId,
-                  targetDeleted: Boolean(sibling.shortcutPayload.target?.deletedAt),
-                  targetContentType: sibling.shortcutPayload.target?.contentType ?? null,
-                }
-              : null,
-          }),
-          nested: sibling._count.children > 0,
-        }));
-        const { ordered, direction } = sortLevel(rows, mode);
-        // Rows already at their new position are left alone, and no row's
-        // `updatedAt` moves: sorting is not editing.
+        const rows = await loadLevelRows(tx, ownerId, parentId);
+        const previous = rows.map((row) => ({ id: row.id, displayOrder: row.displayOrder }));
+
+        // The top of the vault: sorted once, nothing remembered.
+        if (parentId === null) {
+          const { ordered, direction } = sortLevel(rows, mode as LevelSortMode);
+          const changes = renumbering(ordered, "");
+          await applyRenumbering(tx, changes);
+          return { changed: changes.length, direction, previous };
+        }
+
+        // A folder: start from the order it SHOWS (its current sort, if any),
+        // update its memory, and store the order the new sort gives — rows
+        // already in place are left alone, and no row's `updatedAt` moves.
+        const previousKept = await readKeptSort(tx, ownerId, parentId);
+        const kept = nextKeptSort(previousKept, mode);
+        const shown = previousKept ? applyKeptSort(rows, previousKept) : rows;
+        const ordered = kept ? applyKeptSort(shown, kept) : shown;
         const changes = renumbering(ordered, "");
         await applyRenumbering(tx, changes);
+        await writeKeptSort(tx, parentId, kept);
         return {
           changed: changes.length,
-          direction,
-          previous: siblings.map((sibling) => ({ id: sibling.id, displayOrder: sibling.displayOrder })),
+          direction: kept?.name,
+          kept,
+          previous,
+          previousKept,
         };
       });
 

@@ -6,6 +6,7 @@
  */
 
 import type { Prisma } from "@/lib/database/generated/prisma";
+import type { KeptSort } from "./sibling-order";
 
 // ============================================================
 // CONTENT TYPES (Explicit discriminant enum)
@@ -113,6 +114,8 @@ export interface TreeNode {
     viewMode: string;
     sortMode: string | null;
     includeReferencedContent: boolean;
+    /** The sort this folder keeps (sibling-order.ts `KeptSort`); absent = manual. */
+    treeSort?: KeptSort | null;
   };
   file?: {
     fileName: string;

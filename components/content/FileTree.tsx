@@ -35,6 +35,8 @@ import {
   isUndraggableRow,
 } from "@/lib/features/content/drop-rules";
 import { dropEdgeFor } from "@/lib/features/content/drop-edge";
+import { showKeptSorts } from "@/lib/features/content/kept-sort-display";
+import type { KeptSort } from "@/lib/domain/content/sibling-order";
 
 interface FileTreeProps {
   data: TreeNode[];
@@ -43,6 +45,11 @@ interface FileTreeProps {
    * out (tree API `shortcutTargets`). Only the shortcut mirror reads them.
    */
   shortcutTargets?: TreeNode[];
+  /**
+   * The sort the top level keeps — the view root's (tree API `rootTreeSort`).
+   * Folders below carry their own (`folder.treeSort`).
+   */
+  rootTreeSort?: KeptSort | null;
   onMove?: (args: {
     dragIds: string[];
     parentId: string | null;
@@ -91,6 +98,7 @@ interface FileTreeProps {
 export function FileTree({
   data,
   shortcutTargets,
+  rootTreeSort,
   onMove,
   onSelect,
   onRename,
@@ -311,19 +319,28 @@ export function FileTree({
   // row then never has to reason about reference blocks. Both transforms
   // preserve object identity when nothing changed — see their identity
   // contracts — so this pair still re-renders no more rows than it must.
+  //
+  // Folders that keep a sort are shown in it FIRST (kept-sort-display.ts), so
+  // an optimistic change takes its sorted place at once and a shortcut's
+  // contents follow the folder's own sort.
+  const shownData = useMemo(() => showKeptSorts(data, rootTreeSort ?? null), [data, rootTreeSort]);
+  const shownTargets = useMemo(
+    () => (shortcutTargets ? showKeptSorts(shortcutTargets, null) : shortcutTargets),
+    [shortcutTargets],
+  );
   const treeData = useMemo(() => {
     const withReferences = expandReferences(
-      data,
+      shownData,
       expandedIds,
       referencesAtStartIds,
     );
     return expandShortcutMirrors(
       withReferences,
       expandedIds,
-      buildTreeIndex(withReferences, shortcutTargets),
+      buildTreeIndex(withReferences, shownTargets),
       hiddenNestedShortcutIds,
     );
-  }, [data, shortcutTargets, expandedIds, referencesAtStartIds, hiddenNestedShortcutIds]);
+  }, [shownData, shownTargets, expandedIds, referencesAtStartIds, hiddenNestedShortcutIds]);
 
   // Get initial open state from persisted IDs
   const initialOpenState = useMemo(() => {

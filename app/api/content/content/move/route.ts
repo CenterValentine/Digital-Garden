@@ -14,12 +14,19 @@ import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import { updateMaterializedPath } from "@/lib/domain/content";
 import type { MoveContentRequest } from "@/lib/domain/content/api-types";
 import {
+  applyKeptSort,
   compareSiblings,
   placeAmongSiblings,
   renumbering,
   type SiblingPlacement,
 } from "@/lib/domain/content/sibling-order";
-import { applyRenumbering, lockSiblingOrder } from "@/lib/domain/content/sibling-slot";
+import {
+  applyRenumbering,
+  loadLevelRows,
+  lockSiblingOrder,
+  readKeptSort,
+  writeKeptSort,
+} from "@/lib/domain/content/sibling-slot";
 import { logger, spanPayload, withRouteTrace, withSpan } from "@/lib/core/logger";
 
 const ROUTE_PATH = "/api/content/content/move";
@@ -451,6 +458,9 @@ export async function POST(request: NextRequest) {
           parentId: updated.parentId,
           displayOrder: updated.displayOrder,
           stillReferencedBy,
+          // The folder kept a sort and this drag reordered it: the sort is
+          // off now, and the client says so.
+          sortCleared: updated.sortCleared,
           message: "Content moved successfully",
         },
       });
@@ -567,8 +577,20 @@ async function moveContentToPosition(
     // other order would reshuffle rows the user never touched.
     siblings.sort(compareSiblings);
 
+    // A drag WITHIN a folder that keeps a sort (owner, 2026-10-06): your
+    // order wins. Start from the order the folder SHOWS — its sort, which the
+    // stored numbers may not yet reflect for rows that arrived since — place
+    // the row there, and forget the folder's sort, so nothing else moves.
+    // A row arriving from elsewhere leaves the sort on: it takes its sorted
+    // place wherever it was dropped.
+    const kept =
+      current.parentId === parentId ? await readKeptSort(tx, ownerId, parentId) : null;
+    const base: Array<{ id: string; title: string; displayOrder: number }> = kept
+      ? applyKeptSort(await loadLevelRows(tx, ownerId, parentId), kept)
+      : siblings;
+
     const movedItem =
-      siblings.find((s) => s.id === contentId) ??
+      base.find((s) => s.id === contentId) ??
       (await tx.contentNode.findUnique({
         where: { id: contentId },
         select: { id: true, title: true, displayOrder: true, contentType: true },
@@ -577,16 +599,18 @@ async function moveContentToPosition(
 
     // The same placement the client's optimistic update uses, so the row
     // lands where it was shown.
-    const ordered = placeAmongSiblings(siblings, movedItem, placement);
+    const ordered = placeAmongSiblings(base, movedItem, placement);
 
     // Only rows whose number changes, in one statement, and without
     // `updatedAt`: reordering is not editing (see `renumbering`).
     await applyRenumbering(tx, renumbering(ordered, contentId));
+    if (kept && parentId) await writeKeptSort(tx, parentId, null);
 
-    return tx.contentNode.update({
+    const moved = await tx.contentNode.update({
       where: { id: contentId },
       data: { parentId, displayOrder: ordered.findIndex((row) => row.id === contentId) },
       select: { id: true, parentId: true, displayOrder: true },
     });
+    return { ...moved, sortCleared: Boolean(kept) };
   });
 }

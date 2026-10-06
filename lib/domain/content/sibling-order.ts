@@ -242,6 +242,69 @@ export function sortLevel(
   return { ordered: ranked.map((entry) => entry.row), direction };
 }
 
+// ── A folder's remembered sort ("keep it sorted") ────────────────────────────
+//
+// Owner, 2026-10-06: a folder can REMEMBER its sort and stay sorted — new
+// items, uploads, moves in and renames take their sorted place. The memory
+// lives on the folder (FolderPayload.viewPrefs.treeSort), so the top of the
+// vault, which has no folder row, sorts only once. Dragging to reorder inside
+// a sorted folder turns its memory off (your order wins) — the move route
+// materializes the sorted order first, so nothing jumps.
+
+/** One float at a time (floating both would undo one), plus a name order. */
+export interface KeptSort {
+  float?: "folders" | "nested";
+  name?: NameDirection;
+}
+
+/** A stored value (untrusted JSON) as a KeptSort, or null when it holds none. */
+export function parseKeptSort(value: unknown): KeptSort | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as { float?: unknown; name?: unknown };
+  const kept: KeptSort = {};
+  if (raw.float === "folders" || raw.float === "nested") kept.float = raw.float;
+  if (raw.name === "asc" || raw.name === "desc") kept.name = raw.name;
+  return kept.float || kept.name ? kept : null;
+}
+
+/**
+ * What choosing a sort does to a folder's memory: a float toggles (choosing
+ * the active one turns it off; the other float replaces it), Name cycles
+ * A–Z → Z–A → A–Z, and "stop" forgets everything.
+ */
+export function nextKeptSort(kept: KeptSort | null, choice: LevelSortMode | "stop"): KeptSort | null {
+  if (choice === "stop") return null;
+  const next: KeptSort = { ...(kept ?? {}) };
+  if (choice === "float-folders" || choice === "float-nested") {
+    const float = choice === "float-folders" ? "folders" : "nested";
+    if (next.float === float) delete next.float;
+    else next.float = float;
+  } else {
+    next.name = next.name === "asc" ? "desc" : "asc";
+  }
+  return parseKeptSort(next);
+}
+
+/**
+ * A level in its remembered order: the floated kind on top, then — within each
+ * part — by name when one is set, else the order the rows already had.
+ * `rows` in their current (`compareSiblings`) order.
+ */
+export function applyKeptSort<T extends LevelSortRow>(rows: readonly T[], kept: KeptSort): T[] {
+  const floats = (row: LevelSortRow): number =>
+    kept.float === "folders" ? Number(!row.folderLike) : kept.float === "nested" ? Number(!row.nested) : 0;
+  const sign = kept.name === "desc" ? -1 : 1;
+  return rows
+    .map((row, index) => ({ row, index }))
+    .sort(
+      (a, b) =>
+        floats(a.row) - floats(b.row) ||
+        (kept.name ? sign * compareNames(a.row, b.row) : 0) ||
+        (kept.name ? (a.row.id < b.row.id ? -1 : a.row.id > b.row.id ? 1 : 0) : a.index - b.index),
+    )
+    .map((entry) => entry.row);
+}
+
 function clampIndex(index: number, length: number): number {
   if (!Number.isFinite(index)) return length;
   return Math.max(0, Math.min(Math.trunc(index), length));

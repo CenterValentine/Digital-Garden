@@ -14,8 +14,12 @@ import { prisma } from "@/lib/database/client";
 import type { Prisma } from "@/lib/database/generated/prisma";
 import {
   compareSiblings,
+  isFolderLike,
+  parseKeptSort,
   slotForArrival,
   type ArrivalPlacement,
+  type KeptSort,
+  type LevelSortRow,
 } from "@/lib/domain/content/sibling-order";
 
 type Tx = Prisma.TransactionClient;
@@ -116,4 +120,76 @@ export async function placeExistingRow(args: {
     const displayOrder = await claimSiblingSlot(tx, { ownerId, parentId, placement, arrivingId: rowId });
     await applyRenumbering(tx, [{ id: rowId, displayOrder }]);
   });
+}
+
+// ── A folder's remembered sort (sibling-order.ts `KeptSort`) ────────────────
+
+/** The sort `folderId` keeps, or null (no memory; the top level never has one). */
+export async function readKeptSort(tx: Tx, ownerId: string, folderId: string | null): Promise<KeptSort | null> {
+  if (!folderId) return null;
+  const payload = await tx.folderPayload.findFirst({
+    where: { contentId: folderId, content: { ownerId, deletedAt: null } },
+    select: { viewPrefs: true },
+  });
+  const prefs = payload?.viewPrefs as { treeSort?: unknown } | null | undefined;
+  return parseKeptSort(prefs?.treeSort);
+}
+
+/** Remember `kept` on the folder (null forgets it). Other view prefs are kept. */
+export async function writeKeptSort(tx: Tx, folderId: string, kept: KeptSort | null): Promise<void> {
+  const existing = await tx.folderPayload.findUnique({
+    where: { contentId: folderId },
+    select: { viewPrefs: true },
+  });
+  const prefs = { ...((existing?.viewPrefs as Record<string, unknown> | null) ?? {}) };
+  if (kept) prefs.treeSort = kept;
+  else delete prefs.treeSort;
+  const viewPrefs = prefs as Prisma.InputJsonValue;
+  await tx.folderPayload.upsert({
+    where: { contentId: folderId },
+    update: { viewPrefs },
+    create: { contentId: folderId, viewPrefs },
+  });
+}
+
+/**
+ * The live rows directly under `parentId`, in `compareSiblings` order, with
+ * what a sort reads: folder-likeness (a folder, or a shortcut to a live one)
+ * and whether each holds other items (live primary children — a note's
+ * attachments are stored in its folder, so they don't count).
+ */
+export async function loadLevelRows(tx: Tx, ownerId: string, parentId: string | null): Promise<LevelSortRow[]> {
+  const siblings = await tx.contentNode.findMany({
+    where: { parentId, ownerId, deletedAt: null },
+    select: {
+      id: true,
+      title: true,
+      displayOrder: true,
+      contentType: true,
+      shortcutPayload: {
+        select: {
+          targetContentId: true,
+          target: { select: { contentType: true, deletedAt: true } },
+        },
+      },
+      _count: { select: { children: { where: { deletedAt: null, role: "primary" } } } },
+    },
+  });
+  siblings.sort(compareSiblings);
+  return siblings.map((sibling) => ({
+    id: sibling.id,
+    title: sibling.title,
+    displayOrder: sibling.displayOrder,
+    folderLike: isFolderLike({
+      contentType: sibling.contentType,
+      shortcut: sibling.shortcutPayload
+        ? {
+            targetId: sibling.shortcutPayload.targetContentId,
+            targetDeleted: Boolean(sibling.shortcutPayload.target?.deletedAt),
+            targetContentType: sibling.shortcutPayload.target?.contentType ?? null,
+          }
+        : null,
+    }),
+    nested: sibling._count.children > 0,
+  }));
 }

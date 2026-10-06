@@ -2,41 +2,71 @@
 
 /**
  * The file tree's one sorting affordance: a sort icon in the tree's header
- * row, opening a short menu of sorts. Each is a one-time, permanent reorder
- * of ONE level — the folder the tree targets, the same one "+" adds to — and
- * nothing about it is remembered (owner, 2026-10-06): no checkmarks, no
- * lit-up state. Nothing inside that folder is touched.
+ * row, opening a short menu of sorts for ONE level — the folder the tree
+ * targets, the same one "+" adds to. Nothing inside that folder is touched.
  *
- * Sorts (lib/domain/content/sibling-order.ts `sortLevel`; written by
- * /api/content/content/reorder):
- *  - Float folders — folders to the top, each part keeping its order.
- *  - Float nested  — items holding other items to the top, the same way.
- *  - Name          — A–Z, or Z–A when the level is already A–Z (the toggle).
+ * A folder REMEMBERS its sort and stays sorted (owner, 2026-10-06): uploads,
+ * new items, moves in and renames take their sorted place; dragging to
+ * reorder inside it turns the sort off. While the targeted folder keeps a
+ * sort, the header icon becomes that sort's glyph in light gold — the
+ * indicator, instead of a checkmark or a ring. The vault's top level has no
+ * folder to remember on: there, sorts happen once.
+ *
+ * Sorts (sibling-order.ts; written by /api/content/content/reorder):
+ *  - Float folders — folders on top, each part keeping its order.
+ *  - Float nested  — items holding other items on top, the same way.
+ *  - Name          — A–Z, choose again for Z–A.
+ *  - Stop sorting  — forget the folder's sort; the order stays as it is.
  *
  * More sorts belong in this same menu.
  */
-import { useState } from "react";
-import { ArrowDownAZ, ArrowDownZA, ArrowUpDown, FolderUp, ListTree } from "lucide-react";
+import { ArrowDownAZ, ArrowDownZA, ArrowUpDown, FolderUp, ListTree, X } from "lucide-react";
 import { toast } from "sonner";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/client/ui/dropdown-menu";
-import { describeTreeTarget, type TreeLevelTarget } from "@/lib/domain/content/create-target";
-import { nextNameDirection, type LevelSortMode } from "@/lib/domain/content/sibling-order";
+import {
+  nextNameDirection,
+  type KeptSort,
+  type LevelSortMode,
+  type NameDirection,
+} from "@/lib/domain/content/sibling-order";
+import { useTreeTargetStore } from "@/state/tree-target-store";
 
 interface FileTreeSortMenuProps {
-  /** The header row's idle button tone (the sort has no "on" state). */
+  /** The header row's idle button tone. */
   className: string;
 }
 
-function buttonTooltip(target: TreeLevelTarget | null): string {
-  if (!target) return "Sort the items in a folder";
-  if (!target.sortable) return `${target.label} can't be sorted`;
-  return `Sort ${target.label} — reorders only the items directly inside it`;
+/** The light-gold tone a kept sort shows in (the header glyph, active items). */
+const KEPT_TONE = "text-gold-primary/75 hover:text-gold-primary";
+const ACTIVE_ITEM = "text-gold-primary [&>svg]:text-gold-primary";
+
+/**
+ * The header icon: the glyph of the sort the targeted folder keeps — its name
+ * order wins, else its float — or the plain sort icon when it keeps none.
+ */
+function SortGlyph({ kept, className }: { kept: KeptSort | null; className: string }) {
+  if (kept?.name === "asc") return <ArrowDownAZ className={className} />;
+  if (kept?.name === "desc") return <ArrowDownZA className={className} />;
+  if (kept?.float === "nested") return <ListTree className={className} />;
+  if (kept?.float === "folders") return <FolderUp className={className} />;
+  return <ArrowUpDown className={className} />;
+}
+
+function describeKept(kept: KeptSort): string {
+  const parts = [
+    kept.float === "folders" && "folders on top",
+    kept.float === "nested" && "nested items on top",
+    kept.name === "asc" && "by name, A–Z",
+    kept.name === "desc" && "by name, Z–A",
+  ].filter(Boolean);
+  return parts.join(", ");
 }
 
 async function postReorder(body: Record<string, unknown>) {
@@ -51,8 +81,10 @@ async function postReorder(body: Record<string, unknown>) {
     error?: string;
     data?: {
       changed?: number;
-      direction?: "asc" | "desc";
+      direction?: NameDirection;
+      kept?: KeptSort | null;
       previous?: Array<{ id: string; displayOrder: number }>;
+      previousKept?: KeptSort | null;
     };
   } | null;
   if (!response.ok || !json?.success) throw new Error(json?.error || "Sort failed");
@@ -60,43 +92,70 @@ async function postReorder(body: Record<string, unknown>) {
 }
 
 export function FileTreeSortMenu({ className }: FileTreeSortMenuProps) {
-  // Read when hovered / opened: the target follows the tree's selection.
-  const [tooltip, setTooltip] = useState(() => buttonTooltip(null));
-  const [target, setTarget] = useState<TreeLevelTarget | null>(null);
-
-  const canSort = !!target?.sortable && target.rows.length > 1;
-  const nameDirection = target ? nextNameDirection(target.rows) : "asc";
+  const target = useTreeTargetStore((state) => state.target);
   const label = target?.label ?? "this folder";
+  const kept = target?.kept ?? null;
+  const remembers = target?.remembers ?? false;
+  const canSort = !!target?.sortable && (remembers || target.rows.length > 1);
+  const nameNext: NameDirection = remembers
+    ? kept?.name === "asc"
+      ? "desc"
+      : "asc"
+    : nextNameDirection(target?.rows ?? []);
 
-  const run = async (mode: LevelSortMode) => {
+  const tooltip = !target
+    ? "Sort the items in a folder"
+    : !target.sortable
+      ? `${label} can't be sorted`
+      : kept
+        ? `${label} is kept sorted: ${describeKept(kept)} — new items take their place. Click to change.`
+        : remembers
+          ? `Sort ${label} — only the items directly inside it`
+          : `Sort ${label} once — the top level can't keep a sort`;
+
+  const run = async (mode: LevelSortMode | "stop") => {
     if (!target || !canSort) return;
     const { serverParentId, label: where } = target;
     try {
       const result = await postReorder({ parentId: serverParentId, mode });
-      if (!result.changed) {
-        toast(`${where} is already in that order`);
+      window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
+      const previous = result.previous ?? [];
+      const undo = {
+        label: "Undo",
+        onClick: () => {
+          void postReorder({
+            parentId: serverParentId,
+            restore: previous,
+            // A folder gets its previous sort back too (null = none).
+            ...(serverParentId !== null ? { kept: result.previousKept ?? null } : {}),
+          })
+            .then(() => window.dispatchEvent(new CustomEvent("dg:tree-refresh")))
+            .catch(() => toast.error("Couldn't undo the sort"));
+        },
+      };
+      if (serverParentId === null) {
+        if (!result.changed) {
+          toast(`${where} is already in that order`);
+          return;
+        }
+        const what =
+          mode === "float-folders"
+            ? "folders on top"
+            : mode === "float-nested"
+              ? "nested items on top"
+              : result.direction === "desc"
+                ? "by name, Z–A"
+                : "by name, A–Z";
+        toast.success(`Sorted ${where}: ${what}`, { action: undo });
         return;
       }
-      window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
-      const what =
-        mode === "float-folders"
-          ? "folders on top"
-          : mode === "float-nested"
-            ? "nested items on top"
-            : result.direction === "desc"
-              ? "by name, Z–A"
-              : "by name, A–Z";
-      const previous = result.previous ?? [];
-      toast.success(`Sorted ${where}: ${what}`, {
-        action: {
-          label: "Undo",
-          onClick: () => {
-            void postReorder({ parentId: serverParentId, restore: previous })
-              .then(() => window.dispatchEvent(new CustomEvent("dg:tree-refresh")))
-              .catch(() => toast.error("Couldn't undo the sort"));
-          },
+      toast.success(
+        result.kept ? `${where} is kept sorted: ${describeKept(result.kept)}` : `Sorting turned off for ${where}`,
+        {
+          description: result.kept ? "New items, uploads and renames take their place." : "Its order stays as it is.",
+          action: undo,
         },
-      });
+      );
     } catch (error) {
       toast.error("Couldn't sort", {
         description: error instanceof Error ? error.message : undefined,
@@ -104,53 +163,78 @@ export function FileTreeSortMenu({ className }: FileTreeSortMenuProps) {
     }
   };
 
-  const onlyHere = "Only this level is reordered; what's inside its folders isn't touched.";
+  const scope = "Only this level is sorted; what's inside its folders isn't touched.";
+  const keeps = remembers ? "It stays sorted as items arrive." : "The top level sorts once.";
 
   return (
-    <DropdownMenu onOpenChange={(open) => open && setTarget(describeTreeTarget())}>
+    <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          className={`rounded p-0.5 transition-colors ${className}`}
+          className={`rounded p-0.5 transition-colors ${kept ? KEPT_TONE : className}`}
           title={tooltip}
           aria-label={tooltip}
-          onPointerEnter={() => setTooltip(buttonTooltip(describeTreeTarget()))}
         >
-          <ArrowUpDown className="h-4 w-4" />
+          <SortGlyph kept={kept} className="h-4 w-4" />
         </button>
       </DropdownMenuTrigger>
-      {/* No focus ring left on the icon afterwards: a sort is an action, not a state. */}
+      {/* No focus ring left on the icon afterwards. */}
       <DropdownMenuContent align="end" className="min-w-[12rem]" onCloseAutoFocus={(event) => event.preventDefault()}>
         <DropdownMenuLabel className="max-w-[16rem] truncate text-xs font-medium text-muted-foreground">
           Sort {label}
         </DropdownMenuLabel>
         <DropdownMenuItem
           disabled={!canSort}
+          className={kept?.float === "folders" ? ACTIVE_ITEM : undefined}
           onSelect={() => void run("float-folders")}
-          title={`Moves the folders in ${label} to the top, each part keeping its order. ${onlyHere}`}
+          title={
+            kept?.float === "folders"
+              ? `On — the folders in ${label} stay on top. Choose it again to turn it off.`
+              : `Moves the folders in ${label} to the top, each part keeping its order. ${keeps} ${scope}`
+          }
         >
           <FolderUp />
           Float folders
+          {kept?.float === "folders" && <span className="ml-auto pl-4 text-xs">On</span>}
         </DropdownMenuItem>
         <DropdownMenuItem
           disabled={!canSort}
+          className={kept?.float === "nested" ? ACTIVE_ITEM : undefined}
           onSelect={() => void run("float-nested")}
-          title={`Moves the items in ${label} that hold other items — folders with contents, notes with sub-pages — to the top, each part keeping its order. ${onlyHere}`}
+          title={
+            kept?.float === "nested"
+              ? `On — items in ${label} that hold other items stay on top. Choose it again to turn it off.`
+              : `Moves the items in ${label} that hold other items — folders with contents, notes with sub-pages — to the top, each part keeping its order. ${keeps} ${scope}`
+          }
         >
           <ListTree />
           Float nested
+          {kept?.float === "nested" && <span className="ml-auto pl-4 text-xs">On</span>}
         </DropdownMenuItem>
         <DropdownMenuItem
           disabled={!canSort}
+          className={kept?.name ? ACTIVE_ITEM : undefined}
           onSelect={() => void run("name")}
-          title={`Sorts ${label} ${nameDirection === "asc" ? "A–Z (0–9 first, numbers by value)" : "Z–A — it's already A–Z"}. Choose it again to flip. Floated folders or nested items stay on top, each part sorted. ${onlyHere}`}
+          title={`Sorts ${label} ${nameNext === "asc" ? "A–Z (0–9 first, numbers by value)" : "Z–A"}; choose it again to flip. Floated items stay on top, each part sorted. ${keeps} ${scope}`}
         >
-          {nameDirection === "asc" ? <ArrowDownAZ /> : <ArrowDownZA />}
+          {nameNext === "asc" ? <ArrowDownAZ /> : <ArrowDownZA />}
           Name
-          <span className="ml-auto pl-4 text-xs text-muted-foreground">
-            {nameDirection === "asc" ? "A–Z" : "Z–A"}
+          <span className={`ml-auto pl-4 text-xs ${kept?.name ? "" : "text-muted-foreground"}`}>
+            {nameNext === "asc" ? "A–Z" : "Z–A"}
           </span>
         </DropdownMenuItem>
+        {kept && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onSelect={() => void run("stop")}
+              title={`Forget ${label}'s sort. Its items stay where they are now; new ones land at the top again.`}
+            >
+              <X />
+              Stop sorting
+            </DropdownMenuItem>
+          </>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );

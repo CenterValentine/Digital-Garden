@@ -42,7 +42,6 @@ import { recordCreateDestination } from "@/state/create-destination-store";
 import { useTreeRevealStore } from "@/state/tree-reveal-store";
 import {
   registerCreateTargetResolver,
-  registerTreeTargetDescriber,
   resolveCreateParent,
   toServerParent,
 } from "@/lib/domain/content/create-target";
@@ -100,12 +99,15 @@ import {
   treeScopeKey,
 } from "@/lib/domain/content/tree-refresh";
 import {
+  type KeptSort,
   isFolderLike,
   moveAcrossForests,
   moveTouchesCarried,
   placeAmongSiblings,
   sortedInsertIndex,
 } from "@/lib/domain/content/sibling-order";
+import { clearKeptSort, orderKeptLevel } from "@/lib/features/content/kept-sort-display";
+import { useTreeTargetStore } from "@/state/tree-target-store";
 
 interface TreeApiResponse {
   success: boolean;
@@ -113,6 +115,8 @@ interface TreeApiResponse {
     tree: TreeNode[];
     /** Out-of-view folders that shortcuts in this view point at (shortcut-targets.ts). */
     shortcutTargets?: TreeNode[];
+    /** The view root's kept sort (its own row isn't in the tree). */
+    rootTreeSort?: KeptSort | null;
     stats: {
       totalNodes: number;
       rootNodes: number;
@@ -327,6 +331,9 @@ export function LeftSidebarContent({
   // outside the view (tree API `shortcutTargets`). Applied with the tree, by
   // the same guarded load, so the two can never disagree about freshness.
   const [shortcutTargetTrees, setShortcutTargetTrees] = useState<TreeNode[]>([]);
+  // The sort the top of a view keeps — the view root's own (a folder can
+  // remember its sort; the vault's top level can't). Loaded with the tree.
+  const [rootTreeSort, setRootTreeSort] = useState<KeptSort | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedCount, setSelectedCount] = useState(0);
@@ -553,39 +560,42 @@ export function LeftSidebarContent({
     );
     return () => registerCreateTargetResolver(null);
   }, [treeData, scopedRootParentId]);
-  // …and the header's "+" and sort menu describe the same target in their
-  // tooltips ("Add to “X”", "Sort “X”"), read when hovered or opened.
+  // …and publishes it for the header's "+" and sort menu, which name it in
+  // their tooltips and show the sort it keeps (state/tree-target-store.ts).
+  const treeSelectedIds = useTreeStateStore((state) => state.selectedIds);
   useEffect(() => {
-    registerTreeTargetDescriber(() => {
-      const treeParentId = resolveTreeParent(null, treeData, scopedRootParentId);
-      const virtual =
-        !!treeParentId &&
-        (treeParentId.startsWith("peopleGroup:") ||
-          treeParentId.startsWith("person:") ||
-          treeParentId.startsWith("temp-"));
-      const holder = treeParentId && treeData ? findTreeNodeById(treeData, treeParentId) : null;
-      const level = (treeParentId ? holder?.children : treeData) ?? [];
-      return {
-        serverParentId: toServerParent(treeParentId, scopedRootParentId),
-        label: holder
-          ? `“${holder.title}”`
-          : !treeParentId && scopedRootTitle
-            ? `“${scopedRootTitle}”`
-            : "the top level",
-        sortable: !virtual,
-        rows: level
-          .filter((row) => !isPeopleTreeNode(row))
-          .map((row) => ({
-            id: row.id,
-            title: row.title,
-            displayOrder: row.displayOrder ?? 0,
-            folderLike: isFolderLike(row),
-            nested: (row.children?.length ?? 0) > 0,
-          })),
-      };
+    const treeParentId = resolveTreeParent(null, treeData, scopedRootParentId);
+    const virtual =
+      !!treeParentId &&
+      (treeParentId.startsWith("peopleGroup:") ||
+        treeParentId.startsWith("person:") ||
+        treeParentId.startsWith("temp-"));
+    const holder = treeParentId && treeData ? findTreeNodeById(treeData, treeParentId) : null;
+    const level = (treeParentId ? holder?.children : treeData) ?? [];
+    const serverParentId = toServerParent(treeParentId, scopedRootParentId);
+    useTreeTargetStore.getState().setTarget({
+      serverParentId,
+      label: holder
+        ? `“${holder.title}”`
+        : !treeParentId && scopedRootTitle
+          ? `“${scopedRootTitle}”`
+          : "the top level",
+      sortable: !virtual,
+      // A folder can remember a sort; the vault's top level has no folder.
+      remembers: !virtual && serverParentId !== null,
+      kept: holder ? (holder.folder?.treeSort ?? null) : treeParentId ? null : rootTreeSort,
+      rows: level
+        .filter((row) => !isPeopleTreeNode(row))
+        .map((row) => ({
+          id: row.id,
+          title: row.title,
+          displayOrder: row.displayOrder ?? 0,
+          folderLike: isFolderLike(row),
+          nested: (row.children?.length ?? 0) > 0,
+        })),
     });
-    return () => registerTreeTargetDescriber(null);
-  }, [treeData, scopedRootParentId, scopedRootTitle]);
+  }, [treeData, treeSelectedIds, scopedRootParentId, scopedRootTitle, rootTreeSort]);
+  useEffect(() => () => useTreeTargetStore.getState().setTarget(null), []);
 
   const rootDropTarget = useMemo(
     () =>
@@ -700,6 +710,7 @@ export function LeftSidebarContent({
       }
       setTreeData(result.data.tree);
       setShortcutTargetTrees(result.data.shortcutTargets ?? []);
+      setRootTreeSort(result.data.rootTreeSort ?? null);
       loadedScopeRef.current = requestScope;
       // Feed the charter-id cache so metadata-less surfaces (workspace
       // tabs) can render the ScrollText identity consistently.
@@ -1319,6 +1330,7 @@ export function LeftSidebarContent({
     // Store original tree state for rollback if any move fails
     const originalTree = treeData;
     const targetTreesBefore = shortcutTargetTrees;
+    const rootTreeSortBefore = rootTreeSort;
 
     if (!originalTree || dragIds.length === 0) return;
 
@@ -1497,7 +1509,25 @@ export function LeftSidebarContent({
         setTreeData(moved.main);
         setShortcutTargetTrees(moved.carried);
       } else {
+        // Reordering inside a folder that keeps a sort turns its sort off —
+        // your order wins (the move route does the same). Fix its rows in the
+        // order the sort showed first, so the drop lands among them as seen.
+        const destinationKept =
+          parentId === null
+            ? rootTreeSort
+            : (findTreeNodeById(originalTree, parentId)?.folder?.treeSort ?? null);
+        const reordersSortedFolder =
+          !!destinationKept &&
+          dragged.every(({ id }) => positions.get(id)?.currentParentId === parentId);
         let optimisticTree = originalTree;
+        if (reordersSortedFolder) {
+          if (parentId === null) {
+            optimisticTree = orderKeptLevel(optimisticTree, destinationKept);
+            setRootTreeSort(null);
+          } else {
+            optimisticTree = clearKeptSort(optimisticTree, parentId);
+          }
+        }
         for (let i = 0; i < dragged.length; i++) {
           optimisticTree = applyMoveToTree(
             optimisticTree,
@@ -1524,6 +1554,8 @@ export function LeftSidebarContent({
       // server's flag so the snap-back happens visibly after a beat, with an
       // explanation — not silently on some later refresh.
       let snapBackTo: { id: string; title: string } | null = null;
+      // The server turned a folder's sort off because this drag reordered it.
+      let sortCleared = false;
       const sendMoves = async () => {
         for (let i = 0; i < dragged.length; i++) {
           const { id, node } = dragged[i];
@@ -1574,10 +1606,14 @@ export function LeftSidebarContent({
           } else {
             const moved = (
               result as {
-                data?: { stillReferencedBy?: { id: string; title: string } | null };
+                data?: {
+                  stillReferencedBy?: { id: string; title: string } | null;
+                  sortCleared?: boolean;
+                };
               }
             ).data;
             if (moved?.stillReferencedBy) snapBackTo = moved.stillReferencedBy;
+            if (moved?.sortCleared) sortCleared = true;
           }
         }
       };
@@ -1600,6 +1636,7 @@ export function LeftSidebarContent({
         // Rollback to original tree state so the UI matches truth.
         setTreeData(originalTree);
         setShortcutTargetTrees(targetTreesBefore);
+        setRootTreeSort(rootTreeSortBefore);
         const desc =
           failures.length === dragged.length
             ? failures[0].message
@@ -1621,6 +1658,16 @@ export function LeftSidebarContent({
       if (peopleDragged.length > 0) {
         window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
         window.dispatchEvent(new CustomEvent("dg:people-refresh"));
+      }
+
+      if (sortCleared) {
+        const folderTitle =
+          parentId === null
+            ? (scopedRootTitle ?? "this level")
+            : (findTreeNodeById(originalTree, parentId)?.title ?? "this folder");
+        toast(`Sorting turned off for “${folderTitle}”`, {
+          description: "You reordered it by hand, so your order is kept. Sort it again from the ⇅ menu.",
+        });
       }
 
       if (snapBackTo) {
@@ -1651,6 +1698,7 @@ export function LeftSidebarContent({
       // Rollback to original tree state on any error
       setTreeData(originalTree);
       setShortcutTargetTrees(targetTreesBefore);
+      setRootTreeSort(rootTreeSortBefore);
 
       // Show user-friendly error notification
       const errorMessage = err instanceof Error ? err.message : "An unexpected error occurred";
@@ -3545,6 +3593,7 @@ ${workbenchWarning}`
           <FileTreeWithDropZone
             data={treeData}
             shortcutTargets={shortcutTargetTrees}
+            rootTreeSort={rootTreeSort}
             rootDropTarget={rootDropTarget}
             onMove={handleMove}
             onSelect={handleSelect}

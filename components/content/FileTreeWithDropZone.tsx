@@ -15,11 +15,14 @@ import {
   type UploadDropTarget,
 } from "@/lib/domain/content/tree-drop-target";
 import type { TreeNode } from "@/lib/domain/content/types";
+import type { KeptSort } from "@/lib/domain/content/sibling-order";
 
 interface FileTreeWithDropZoneProps {
   data: TreeNode[];
   /** Passed through to FileTree — see its prop of the same name. */
   shortcutTargets?: TreeNode[];
+  /** Passed through to FileTree — see its prop of the same name. */
+  rootTreeSort?: KeptSort | null;
   onMove?: (args: {
     dragIds: string[];
     parentId: string | null;

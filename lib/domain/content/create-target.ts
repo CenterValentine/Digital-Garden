@@ -1,3 +1,5 @@
+import type { KeptSort } from "./sibling-order";
+
 /**
  * Where does a "+" create land? One rule for every create path.
  *
@@ -89,12 +91,14 @@ export function resolveServerCreateParent(explicitParentId: string | null): stri
   return activeResolver ? activeResolver(explicitParentId) : explicitParentId;
 }
 
-// ── What the header's "+" and sort act on, described for their tooltips ────
+// ── What the header's "+" and sort act on ──────────────────────────────────
 
 /**
  * The tree's current target: the folder a "+" adds to and the sort menu
  * reorders — `resolveCreateParent` with no explicit parent (a selected
- * folder, else the selected item's folder, else the top of the tree).
+ * folder, else the selected item's folder, else the top of the tree). The
+ * tree publishes it (state/tree-target-store.ts) whenever the selection or
+ * the tree changes, so the header can name it and show its sort.
  */
 export interface TreeLevelTarget {
   /** Server-space parent id (null = the vault's top level). */
@@ -103,7 +107,11 @@ export interface TreeLevelTarget {
   label: string;
   /** Whether it can be sorted (people groups and pending rows can't). */
   sortable: boolean;
-  /** The level's rows as they stand, for previewing a sort (Name's direction). */
+  /** Whether it can REMEMBER a sort — a folder can; the vault's top level can't. */
+  remembers: boolean;
+  /** The sort it keeps, if any. */
+  kept: KeptSort | null;
+  /** The level's rows as they stand, for previewing a one-time Name sort. */
   rows: Array<{
     id: string;
     title: string;
@@ -111,16 +119,4 @@ export interface TreeLevelTarget {
     folderLike: boolean;
     nested: boolean;
   }>;
-}
-
-let activeTargetDescriber: (() => TreeLevelTarget | null) | null = null;
-
-/** The file tree registers how to describe its live target. */
-export function registerTreeTargetDescriber(describer: (() => TreeLevelTarget | null) | null): void {
-  activeTargetDescriber = describer;
-}
-
-/** The current target, read at the moment it is needed (a hover, a menu opening). */
-export function describeTreeTarget(): TreeLevelTarget | null {
-  return activeTargetDescriber ? activeTargetDescriber() : null;
 }
