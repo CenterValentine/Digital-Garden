@@ -63,11 +63,13 @@ permission prompts, and Ctrl+Alt is AltGr on several Windows layouts.
 Cmd+Option+Shift+V is macOS "Paste and Match Style". Cmd+Shift+V rides the
 native paste event and needs no permission.
 
-**Shift detection.** Add `keydown`/`keyup` to the editor's existing
-`handleDOMEvents` that write `event.shiftKey` into a ref owned by
-MarkdownEditor; `handlePaste` reads the ref. Do not read `view.input.shiftKey`
-(internal; the typing can change under a prosemirror-view bump). Clear the ref
-on `blur`.
+**Shift detection (as built).** One window-level tracker
+(`lib/features/ocr/paste-modifier.ts`): capture-phase `keydown`/`keyup` record
+`event.shiftKey`, window `blur` clears it. A ClipboardEvent carries no
+modifier state, so the last key event decides. Chosen over per-editor
+`handleDOMEvents` because the flashcards editor's shared hook has no DOM-event
+seam, and one tracker serves both. Not `view.input.shiftKey` — internal to
+prosemirror-view, not public API.
 
 **Safari caveat.** Whether Safari dispatches a `paste` event for Cmd+Shift+V is
 unverified. Smoke it. If it does not, the keydown path from the context-menu
@@ -182,10 +184,12 @@ ever tightened, `'wasm-unsafe-eval'` is the narrow replacement.
 ### D5 — Co-browse: `read_screen` reads the bound tab off its pixels
 
 > **POSTPONED (owner, 2026-10-06).** The AI co-browsing / scraping slice waits
-> on another feature the owner named as its prerequisite. Rule: if that
-> feature is built by the time PRs 1 and 2 are written, PR 3 is built in this
-> run; otherwise PR 3 moves to the backlog unchanged. The design below stays
-> as the record of what PR 3 will be.
+> on another feature. Rule: if that feature is built by the time the rest is
+> written, this is built in the same run; otherwise it moves to the backlog
+> unchanged. **Outcome: backlogged** — the prerequisite was not built in this
+> run. The owner then clarified that the AI reading *images* is wanted now and
+> is separable from co-browsing; that became D8, built. The design below stays
+> as the record of what this slice will be.
 
 A new `co_browse_act` action for pages whose DOM / accessibility tree is thin
 (canvas, image-rendered text, anti-scrape markup):
@@ -229,25 +233,36 @@ Rules carried over from the agentic-browsing plan:
 ### D6 — OCR text → editor blocks
 
 Tesseract returns one line per visual line, so a wrapped paragraph arrives as
-many short lines. `lib/features/ocr/text-to-blocks.ts` applies one rule set:
+many short lines. `lib/features/ocr/reflow.ts` (`reflowOcrText`) decides, per
+line end, wrap or real break. **As built:**
 
 - A blank line is a paragraph break.
-- Inside a paragraph, a single newline **reflows to a space**, unless the next
-  line starts with a list marker (`-`, `*`, `•`, `1.`, `a)`), is indented by
-  two or more spaces, or the previous line ends a sentence and the next starts
-  with a capital **and** the previous line is short (< 40 chars). Those keep
-  their line break.
-- Collapse runs of three or more newlines to two (the speed-reader already does
-  this).
-- The resulting text goes through the existing paste path: if
-  `isLikelyMarkdown()` is true, `markdownPasteToTiptap()`; otherwise plain
-  paragraphs. Lists and headings in a screenshot format themselves for free.
+- A new list item always starts its own line. Bullet glyphs (`•`, `▪`, `–` …)
+  become `- `; `1)` becomes `1.` — the paste detector only knows markdown forms.
+- A wrapped list item's continuation lines join the item (they carry no
+  marker, so the rule looks at the item being built, not the raw line).
+- **A line that stops well short of the block's column** (< 60% of its longest
+  line, in blocks ≥ 40 chars wide) is a real break: headings, address lines,
+  sign-offs. This replaced the planned "indented by two spaces" rule —
+  Tesseract's plain-text output does not keep indentation.
+- In narrow blocks, a short line ending a sentence before a capitalised line
+  is a real break.
+- `infor-` + `mation` rejoins without the hyphen.
+- Consecutive markdown list items stay on adjacent lines (one list); every
+  other kept break becomes a paragraph break, because a single newline in
+  markdown renders as a space.
+- The result goes through the existing paste path (`buildOcrContent`): if
+  `isLikelyMarkdown()` is true, the editor's own `markdownPasteToTiptap()`;
+  otherwise plain paragraphs. The parser is a parameter so the gate can bind a
+  tsx-safe twin.
 
-This rule set is the one piece of product judgement in the feature and is the
-natural place for the owner to adjust by hand. Pin it with a fixture-based
-check (`pnpm ocr:blocks:check`, `scripts/validate-ocr-blocks.ts`, ~10 cases:
-wrapped paragraph, bullet list, numbered list, two paragraphs, code-ish
-indent) and **mutation-test the gate** before trusting a first-run PASS.
+This rule set is the one piece of product judgement in the feature and the
+natural place to tune by hand. Pinned by `pnpm ocr:blocks:check`
+(`scripts/validate-ocr-blocks.ts`, 17 fixtures, each naming the rule it pins),
+in `quality.yml`'s Markdown job. **Mutation-tested: 13 mutants, all killed** —
+the first run let two survive (the short-sentence rule masked a broken
+paragraph split; the parser-fallback hard breaks had no fixture), and both got
+fixtures.
 
 ### D7 — UX while recognising
 
@@ -267,6 +282,52 @@ indent) and **mutation-test the gate** before trusting a first-run PASS.
   attempt respawns.
 - A second OCR request while one is running just queues; no "busy" state in
   the UI beyond the toast.
+- Inside a code block, paste inserts the raw recognised lines (a code
+  screenshot's line breaks are the content), never reflowed prose.
+
+### D8 — The AI reads the text in images (built; owner, 2026-10-06)
+
+The owner separated this from co-browsing: the assistant should be able to
+read images now. Two pieces, because the first finding was that **the AI
+could not see images at all** — `extractSearchTextFromTipTap` drops image
+nodes, so `read_content` on a note holding a screenshot returned the
+surrounding text and nothing to say an image was there.
+
+1. **`read_content` names a note's images** — name and content id, after the
+   note text (`lib/domain/content/note-images.ts`). Private content is
+   stripped first; the file is a registered `private:content:check` seam with
+   a behavioural check (an image in a private block is never listed). An
+   image *file* with no extracted text now points at the tool instead of
+   "attach it".
+2. **`read_image_text({ contentId })`**, a CLIENT-executed tool (no server
+   `execute`). The engine's `onToolCall` downloads the image through the
+   authenticated download route (the embed layout's fetch bridge covers the
+   side panel) and reads it with the shared local engine
+   (`lib/features/ocr/read-for-model.ts`). Text comes back as
+   `untrustedImageText` (prompt-injection labelling, like
+   `untrustedWebContent`), with the mean confidence and a note when it is low,
+   empty, truncated, or failed. It never throws.
+
+Gating and discovery:
+
+- Registered only when the request body says `localOcrAvailable` (a browser
+  with Worker + WebAssembly), sent on both the resolver body and every
+  per-call body. A headless caller is never offered a tool nothing would run.
+- **User-configurable** (Settings → AI tools → Core), unlike the browser
+  tools, which are harness-internal because the extension's own trust settings
+  are their off-switch. This one has no other off-switch.
+- `read_content` mentions the tool only when it is registered **and enabled**
+  this turn (`ToolExecuteContext.imageTextReadable`, set after tool filtering).
+- In the `reading` family of the tool menu, summonable — not core. Its schema
+  costs nothing on turns that never touch an image.
+- Resume predicate (`lastMessageHasResolvedBrowserRead`), the run inspector's
+  client-executed set, the drift gate's client-tool enumeration, the dev
+  tool-prefix route and the chat chip all know it. Drift-gate and
+  private-content extensions mutation-tested (5 mutants, all killed).
+
+Why local OCR and not a vision model: it works with text-only models, costs no
+tokens to recognise, and the image never leaves the device for this. The
+vision-model engine stays the planned second `OcrEngine` member (§4).
 
 ---
 
