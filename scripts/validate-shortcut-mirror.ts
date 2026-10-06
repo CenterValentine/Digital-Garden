@@ -37,6 +37,7 @@ import {
   MAX_MIRROR_DEPTH,
 } from "@/lib/features/content/shortcut-mirror";
 import { windowReferenceRowId } from "@/lib/features/content/window-reference";
+import { expansionsFor, resolveTreeRow } from "@/lib/features/content/tree-stand-in";
 import type { TreeNode } from "@/lib/domain/content/types";
 import {
   outOfScopeShortcutTargets,
@@ -592,11 +593,41 @@ function findRow(nodes: TreeNode[], id: string): TreeNode | null {
   check("any other selection stands for itself", targetRowOfSelection("plain") === "plain");
 }
 
+// ── Which row stands for open content (tree-stand-in.ts) ─────────────────────
+// Owner, 2026-10-06: opened through a shortcut, the tree keeps pointing at the
+// shortcut (or the row inside it), not the original's row elsewhere.
+{
+  const docs = node("docs", { contentType: "folder", children: [node("note-a"), node("sub", { contentType: "folder", children: [node("deep")] })] });
+  const sc = shortcutTo("sc", "docs");
+  const scToNote = shortcutTo("sc-note", "note-a", { targetContentType: "note" });
+  const tree = [docs, node("projects", { contentType: "folder", children: [sc, scToNote] })];
+
+  const fromShortcut = resolveTreeRow("note-a", tree, [], "sc-note");
+  check("opened through a shortcut: that shortcut stands in, though the original is on screen", fromShortcut?.rowId === "sc-note", JSON.stringify(fromShortcut));
+  const mirrorRow = shortcutMirrorId("sc", "note-a");
+  const fromMirror = resolveTreeRow("note-a", tree, [], mirrorRow);
+  check("opened from a row inside a shortcut: that row stands in, with its shortcut expanded", fromMirror?.rowId === mirrorRow && fromMirror.expand.join() === "sc", JSON.stringify(fromMirror));
+  check("a remembered row that no longer leads there is ignored", resolveTreeRow("note-a", tree, [], "sc")?.rowId === "note-a");
+  check("otherwise its own row", resolveTreeRow("note-a", tree, [], null)?.rowId === "note-a");
+
+  // A view without the original: only the shortcuts are on screen; docs is carried.
+  const view = [node("projects", { contentType: "folder", children: [sc, scToNote] })];
+  check("not in the tree: a shortcut straight to it", resolveTreeRow("note-a", view, [docs], null)?.rowId === "sc-note");
+  const deep = resolveTreeRow("deep", view, [docs], null);
+  check(
+    "not in the tree, no direct shortcut: the row inside a shortcut's folder, folders on the way expanded",
+    deep?.rowId === shortcutMirrorId(shortcutMirrorId("sc", "sub"), "deep") && deep.expand.join() === `sc,${shortcutMirrorId("sc", "sub")}`,
+    JSON.stringify(deep),
+  );
+  check("nothing leads to it: null", resolveTreeRow("elsewhere", view, [docs], null) === null);
+  check("expansions for a row three deep", expansionsFor("smirror:S/a/b/X").join() === "S,smirror:S/a,smirror:S/a/b");
+}
+
 if (failures > 0) {
   console.error(`\nshortcut-mirror:check — ${failures} check(s) failed.\n`);
   process.exit(1);
 }
 
 console.log(
-  "shortcut-mirror:check — OK (identity, mirroring, broken targets, laziness, cycles, drop forwarding, nested-shortcut hiding, out-of-view targets, row actions, view reach, shortcut sorts)",
+  "shortcut-mirror:check — OK (identity, mirroring, broken targets, laziness, cycles, drop forwarding, nested-shortcut hiding, out-of-view targets, row actions, view reach, shortcut sorts, stand-in rows)",
 );

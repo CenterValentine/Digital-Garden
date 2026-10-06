@@ -1246,6 +1246,34 @@ console.log("\nthe in-text signal: kept fresh, sent to the tree, shown, enforced
   });
 }
 
+console.log("\nthe tree points at the row that stands for the open content (source pins)");
+{
+  const read6 = (rel: string) => readFileSync(join(__dirname, "..", rel), "utf8");
+  const fileNode = read6("components/content/FileNode.tsx");
+  check("a tree open remembers the row clicked (a shortcut or a row inside one)", () => {
+    assert.ok(source.includes("if (viaRowId !== id) standIns.remember(id, viaRowId);"));
+    assert.ok(source.includes("else standIns.forget(id);"));
+    assert.ok(source.includes("standIns.setActiveRow(viaRowId);"));
+    assert.equal((source.match(/\n\s*firstNode\.id,\n\s*\);/g) ?? []).length, 2, "the mirror-row and shortcut opens pass the row clicked");
+  });
+  check("the follow effect points at the stand-in, revealing only what the tree didn't open itself", () => {
+    assert.ok(source.includes("pointTreeAt(selectedContentId, !openedHere);"));
+    assert.ok(source.includes("setSelectedIds([rowId]);"));
+    assert.ok(source.includes("for (const id of standIn?.expand ?? []) useTreeStateStore.getState().setExpanded(id, true);"));
+  });
+  check("a retry when the tree arrives never moves a selection it can't place", () => {
+    assert.ok(source.includes("pointTreeAt(selectedContentId, true, true);"));
+    assert.ok(source.includes("if (!standIn && onlyIfFound) return;"));
+  });
+  check("a reveal of a row inside a shortcut is held when its shortcut is", () => {
+    assert.ok(source.includes("const heldId = shortcutIdOfMirrorRowId(revealRequest.id) ?? revealRequest.id;"));
+  });
+  check("the gold tones follow the stand-in row", () => {
+    assert.ok(fileNode.includes("const isActive = (activeRowId ?? selectedContentId) === data.id;"));
+    assert.ok(fileNode.includes("(state.standIns[contentId] ?? contentId) === data.id"));
+  });
+}
+
 console.log("\nthe referenced-items chip (source pin)");
 {
   const fileNode = readFileSync(join(__dirname, "../components/content/FileNode.tsx"), "utf8");

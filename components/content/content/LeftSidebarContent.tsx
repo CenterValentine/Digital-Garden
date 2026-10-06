@@ -111,6 +111,8 @@ import {
 import { clearKeptSort, orderKeptLevel } from "@/lib/features/content/kept-sort-display";
 import { useTreeTargetStore } from "@/state/tree-target-store";
 import { inTextElsewhere } from "@/lib/features/content/drop-rules";
+import { resolveTreeRow } from "@/lib/features/content/tree-stand-in";
+import { useTreeStandInStore } from "@/state/tree-stand-in-store";
 
 interface TreeApiResponse {
   success: boolean;
@@ -911,15 +913,61 @@ export function LeftSidebarContent({
   // external selection only to VISIBLE rows, so an item inside a folder the
   // tree had collapsed stayed hidden while the picker showed it unfolded
   // (owner report, 2026-10-02). A row the tree itself just opened is skipped.
+  //
+  // It points at the row that STANDS FOR the content (tree-stand-in.ts): the
+  // shortcut — or row inside one — you opened it from, else its own row, else
+  // a shortcut leading to it. Opening through a shortcut used to move the
+  // selection to the original's row (and ⌥D then acted on the original).
+  // Tree data is read through refs: this follows the CONTENT, not refreshes
+  // (a refresh must not drag the selection back from wherever you moved it).
+  const treeDataRef = useRef(treeData);
+  const shortcutTargetTreesRef = useRef(shortcutTargetTrees);
   useEffect(() => {
-    if (!selectedContentId || selectedContentId.startsWith("temp-")) return;
-    setSelectedIds([selectedContentId]);
-    if (treeOpenedIdRef.current === selectedContentId) {
-      treeOpenedIdRef.current = null;
+    treeDataRef.current = treeData;
+    shortcutTargetTreesRef.current = shortcutTargetTrees;
+  }, [treeData, shortcutTargetTrees]);
+  const pointTreeAt = useCallback(
+    (contentId: string, reveal: boolean, onlyIfFound = false): void => {
+      const standIns = useTreeStandInStore.getState();
+      const standIn = treeDataRef.current
+        ? resolveTreeRow(
+            contentId,
+            treeDataRef.current,
+            shortcutTargetTreesRef.current,
+            standIns.standIns[contentId] ?? null,
+          )
+        : null;
+      // A retry that finds nothing leaves the selection alone — the user may
+      // have selected something else since.
+      if (!standIn && onlyIfFound) return;
+      const rowId = standIn?.rowId ?? contentId;
+      standIns.setActiveRow(standIn ? rowId : null);
+      // A row inside a shortcut exists only while the shortcut (and each
+      // folder on the way) is open.
+      for (const id of standIn?.expand ?? []) useTreeStateStore.getState().setExpanded(id, true);
+      setSelectedIds([rowId]);
+      if (reveal) requestReveal(rowId, { align: "auto", flash: false, explicit: false });
+    },
+    [setSelectedIds, requestReveal],
+  );
+  useEffect(() => {
+    if (!selectedContentId) {
+      useTreeStandInStore.getState().setActiveRow(null);
       return;
     }
-    requestReveal(selectedContentId, { align: "auto", flash: false, explicit: false });
-  }, [selectedContentId, setSelectedIds, requestReveal]);
+    if (selectedContentId.startsWith("temp-")) return;
+    const openedHere = treeOpenedIdRef.current === selectedContentId;
+    if (openedHere) treeOpenedIdRef.current = null;
+    pointTreeAt(selectedContentId, !openedHere);
+  }, [selectedContentId, pointTreeAt]);
+  // The tree arrived (or changed scope) while the open content had no row to
+  // point at: try again. Only then — never re-pointing a row the user has
+  // since moved away from.
+  useEffect(() => {
+    if (!treeData || !selectedContentId || selectedContentId.startsWith("temp-")) return;
+    if (useTreeStandInStore.getState().activeRowId !== null) return;
+    pointTreeAt(selectedContentId, true, true);
+  }, [treeData, selectedContentId, pointTreeAt]);
 
   // A reveal is handed to the tree only once the tree HOLDS the item: a
   // request for a row the fetched tree lacks would make react-arborist's
@@ -927,7 +975,10 @@ export function LeftSidebarContent({
   // that has it (the picker-created note arrives with the next refetch).
   const activeReveal = useMemo(() => {
     if (!revealRequest || !treeData) return null;
-    return findTreeNodeById(treeData, revealRequest.id) ? revealRequest : null;
+    // A row inside a shortcut isn't in the tree's data (it is built while the
+    // shortcut is open): it is held when its shortcut is.
+    const heldId = shortcutIdOfMirrorRowId(revealRequest.id) ?? revealRequest.id;
+    return findTreeNodeById(treeData, heldId) ? revealRequest : null;
   }, [revealRequest, treeData]);
   const handleRevealComplete = useCallback(() => {
     const current = useTreeRevealStore.getState().request;
@@ -1846,8 +1897,17 @@ export function LeftSidebarContent({
     const openFromTree = (
       id: string,
       meta: Parameters<typeof setSelectedContentId>[1],
+      /** The row clicked — a shortcut or a row inside one opens another id. */
+      viaRowId: string = id,
     ) => {
       treeOpenedIdRef.current = id;
+      // Opened through a shortcut: that row stands in for the content while
+      // you work through it (tree-stand-in.ts); opened from its own row: the
+      // stand-in is forgotten. The tree keeps pointing where you clicked.
+      const standIns = useTreeStandInStore.getState();
+      if (viaRowId !== id) standIns.remember(id, viaRowId);
+      else standIns.forget(id);
+      standIns.setActiveRow(viaRowId);
       setSelectedContentId(id, meta);
     };
 
@@ -1916,11 +1976,15 @@ export function LeftSidebarContent({
     // is synthetic and path-scoped, so opening it means opening the REAL id —
     // otherwise the tab would hold an id no fetch can resolve.
     if (firstNode.isShortcutMirror && firstNode.mirrorOf) {
-      openFromTree(firstNode.mirrorOf, {
-        title: firstNode.title,
-        contentType: firstNode.contentType,
-        ...sideBySide,
-      });
+      openFromTree(
+        firstNode.mirrorOf,
+        {
+          title: firstNode.title,
+          contentType: firstNode.contentType,
+          ...sideBySide,
+        },
+        firstNode.id,
+      );
       return;
     }
 
@@ -1931,11 +1995,15 @@ export function LeftSidebarContent({
     if (firstNode.contentType === "shortcut") {
       const target = firstNode.shortcut;
       if (target?.targetId && !target.targetDeleted) {
-        openFromTree(target.targetId, {
-          title: target.targetTitle ?? firstNode.title,
-          contentType: target.targetContentType ?? undefined,
-          ...sideBySide,
-        });
+        openFromTree(
+          target.targetId,
+          {
+            title: target.targetTitle ?? firstNode.title,
+            contentType: target.targetContentType ?? undefined,
+            ...sideBySide,
+          },
+          firstNode.id,
+        );
       } else {
         openFromTree(firstNode.id, {
           title: firstNode.title,

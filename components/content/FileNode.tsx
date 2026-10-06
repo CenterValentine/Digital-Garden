@@ -79,6 +79,7 @@ import {
   type DropEdge,
 } from "@/lib/features/content/drop-rules";
 import { noteDropEdge } from "@/lib/features/content/drop-edge";
+import { useTreeStandInStore } from "@/state/tree-stand-in-store";
 
 /**
  * Row hover tooltip: modified + created, Obsidian-style. Answers "which of
@@ -263,8 +264,14 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
   // 1. Active: This file is open in the editor (brightest)
   // 2. Selected: This file is selected in tree (medium)
   // 3. Multi-selected: Part of multi-selection (subtle)
-  const isActive = data.id === selectedContentId;
-  const isOpenInTab = openContentIds.includes(data.id);
+  // The gold tones follow the row that STANDS FOR the content (tree-stand-in.ts):
+  // opened through a shortcut, the shortcut row is lit — not the original's
+  // row elsewhere — so the tree never shows you in two places at once.
+  const activeRowId = useTreeStandInStore((state) => state.activeRowId);
+  const isActive = (activeRowId ?? selectedContentId) === data.id;
+  const isOpenInTab = useTreeStandInStore((state) =>
+    openContentIds.some((contentId) => (state.standIns[contentId] ?? contentId) === data.id),
+  );
   // External (OS file) drag destination — selector returns a boolean so only
   // the rows whose target status flips re-render as the pointer moves.
   const isExternalDropTarget = useTreeDragStore(

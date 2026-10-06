@@ -12,7 +12,7 @@ last_updated: 2026-05-13
 ## October 5, 2026 — The file tree stops flashing; deleting is instant; rows keep their order; view shortcuts show their folder and act on it safely
 
 **Tree**: worktree `.claude/worktrees/smooth-delete`, branch `fix/smooth-delete` (off `origin/main` at `49b94490`)
-**Status**: typecheck / lint 151 (0 errors, none new) / `tree:smooth:check` 163 (new, in the quality workflow) / `shortcut-mirror:check` (out-of-view cases, row actions, view reach) / tree + workspace gates / `pnpm build` green; no schema, TipTap or browser-extension change; **Hocuspocus redeploy required** (collaborative saves now refresh media links); run `scripts/backfill-media-links.ts --apply` once per environment. Owner browser smoke pending.
+**Status**: typecheck / lint 151 (0 errors, none new) / `tree:smooth:check` 168 (new, in the quality workflow) / `shortcut-mirror:check` (out-of-view cases, row actions, view reach) / tree + workspace gates / `pnpm build` green; no schema, TipTap or browser-extension change; **Hocuspocus redeploy required** (collaborative saves now refresh media links); run `scripts/backfill-media-links.ts --apply` once per environment. Owner browser smoke pending.
 
 ### Shipped
 - **Skeleton = a scope's first load only** (`tree-refresh.ts`): every refresh of a tree already on screen is quiet — covers create, duplicate, links, uploads, folder view, the header refresh and all `dg:tree-refresh` dispatchers. Stale-scope responses are dropped.
@@ -29,6 +29,7 @@ last_updated: 2026-05-13
 - **Referenced-items chip**: its above/below arrow shows only while the referenced items are on screen (and, as before, only on a row that also has sub-items to place them against).
 - **A shortcut can keep its own sort, view-only**: selecting a shortcut (or a row in one) makes the sort menu sort that shortcut's view — kept in user settings, never written to its folder; without one, a shortcut follows its folder's order. Rows inside a shortcut now target the shortcut for "+" and sort (they fell to the top level).
 - **Referenced content in a note's text**: shown with a ¶ badge (filed items keep the link badge), kept with its note — dropping it onto another note is refused with "still embedded in …"; filed content (chats, AI documents) still moves between notes. Collaborative saves now keep the text links current (links only, never trashing); `scripts/backfill-media-links.ts` catches up existing notes.
+- **Opened through a shortcut, the tree keeps pointing at the shortcut**: selection, reveal and the gold tones follow the row that stands for the open content — the shortcut (or row inside one) you opened it from, else its own row, else a shortcut leading to it (`tree-stand-in.ts`).
 - **Moves wait out a slow database** (locked transactions get 15 s to start, 30 s to run, not Prisma's 5 s), and **a shortcut can't trick a folder into itself**: drops are checked by real ids, so dragging a folder a shortcut shows into its own sub-folder is refused before release.
 
 ### Smoke checklist (owner)
@@ -83,6 +84,10 @@ last_updated: 2026-05-13
 49. Expand a note with an image in its text → that image's badge is ¶, tooltip "In this note's text — it stays with this note"; a chat under the same note has the link badge ("Filed under this note …").
 50. Drag that ¶ image onto a different note → nothing moves; a warning says it's still embedded in the first note.
 51. In a live-edited note, delete an image from the text, wait a few seconds, reload → its row shows the link badge (no longer in the text) and it is NOT in the trash; paste a new image → after a few seconds and a reload it shows ¶.
+52. With the original visible in the tree, click a shortcut to it → the content opens; the SHORTCUT row stays selected and gold; the original's row doesn't light up. Press ⌥D → the shortcut is removed, not the original.
+53. Click a row inside an expanded shortcut → it opens; that row stays selected and gold.
+54. In a view where the original lives outside: open the content from a tab or search → the shortcut that leads to it is selected and gold (expanding the shortcut if the content sits inside its folder).
+55. Open the same content from its OWN row → the original's row takes the selection and gold again.
 
 ## October 4, 2026 — Coming back lands you where you were (workspace cold-load restore)
 
