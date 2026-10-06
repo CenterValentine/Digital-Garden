@@ -472,8 +472,19 @@ console.log("\nthe sidebar's refresh entry point (source pin)");
     const fetchTree = sliceBetween("const fetchTree = useCallback(", "// Initial load and refresh");
     assert.ok(fetchTree.includes("refreshIsQuiet(loadedScopeRef.current, treeScope)"));
   });
-  check("nothing calls loadTree(false) directly", () => {
-    assert.equal(source.includes("loadTree(false)"), false);
+  check("only the press-and-hold hard reload calls loadTree(false) — every other refresh is quiet", () => {
+    assert.equal((source.match(/loadTree\(false\)/g) ?? []).length, 1);
+    const hard = sliceBetween("const hardReloadTree = useCallback(", "// Bracket every optimistic tree edit");
+    assert.ok(hard.includes("void loadTree(false);"));
+    assert.ok(hard.includes("useInTextMediaStore.getState().settle(NO_IN_TEXT_EDITS);"), "a hard reload shows the server's tree, no overlay");
+    assert.equal((source.match(/onHardRefresh=\{hardReloadTree\}/g) ?? []).length, 2, "both header mounts");
+  });
+  check("the refresh button: a click is quiet, a hold (any pointer) is the hard reload, never both", () => {
+    const header = readFileSync(join(__dirname, "../components/content/file-tree/RootNodeHeader.tsx"), "utf8");
+    assert.ok(header.includes('const HOLD_POINTERS = ["mouse", "touch", "pen"] as const;'));
+    assert.ok(/heldRef\.current = true;\s*onHardRefresh\(\);/.test(header));
+    assert.ok(/if \(heldRef\.current\) \{\s*heldRef\.current = false;\s*return;\s*\}\s*onRefresh\(\);/.test(header), "the click ending a hold doesn't also refresh");
+    assert.ok(/onPointerDown=\{\(e\) => \{\s*heldRef\.current = false;\s*hold\.onPointerDown\(e\);/.test(header));
   });
   check("a load applies (and marks its scope on-screen) only after treeResponseApplies", () => {
     const loadTree = sliceBetween("const loadTree = useCallback(", "const fetchTree = useCallback(");

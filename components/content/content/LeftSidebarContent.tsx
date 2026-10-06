@@ -92,6 +92,7 @@ import {
 import {
   IN_TEXT_FETCH_MS,
   IN_TEXT_RECONCILE_MS,
+  NO_IN_TEXT_EDITS,
   missingInTextMedia,
   settleInTextEdits,
 } from "@/lib/features/content/in-text-media";
@@ -788,6 +789,17 @@ export function LeftSidebarContent({
   );
   useEffect(() => {
     loadTreeRef.current = loadTree;
+  }, [loadTree]);
+
+  // Press-and-hold on the refresh button: reload from scratch, skeleton and
+  // all (owner, 2026-10-06 — "a hard refresh that flashes"). The only
+  // deliberate skeleton load of a tree already on screen: react-arborist
+  // remounts (open state and scroll come back from the persisted store), and
+  // the in-text overlay is dropped, so what shows is exactly what the server
+  // has. A click stays the quiet refresh.
+  const hardReloadTree = useCallback(() => {
+    useInTextMediaStore.getState().settle(NO_IN_TEXT_EDITS);
+    void loadTree(false);
   }, [loadTree]);
 
   // Bracket every optimistic tree edit: begin before the tree is touched, end
@@ -3731,6 +3743,7 @@ ${workbenchWarning}`
             onRefresh={() => {
               void fetchTree();
             }}
+            onHardRefresh={hardReloadTree}
             onClick={() => {
               setSelectedContentId(null);
               setSelectedIds([]);
@@ -3773,6 +3786,7 @@ ${workbenchWarning}`
             onRefresh={() => {
               void fetchTree();
             }}
+            onHardRefresh={hardReloadTree}
             onClick={() => {
               setSelectedContentId(null);
               setSelectedIds([]);
