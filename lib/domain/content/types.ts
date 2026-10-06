@@ -51,6 +51,16 @@ export interface TreeNode {
    */
   role?: "primary" | "referenced";
   /**
+   * For referenced rows: how the row belongs to its note (tree API).
+   *  - "text"  — it is IN a note's text (an image or audio embedded there),
+   *    linked from that note; it stays with that note.
+   *  - "filed" — it is filed under the note (a chat replying to it, an AI
+   *    document made from it, something dragged onto it) but not in its
+   *    text; it can be moved to another note.
+   * `inTextOf` names the note whose text holds it (the oldest live one).
+   */
+  reference?: { via: "text" | "filed"; inTextOf: { id: string; title: string } | null };
+  /**
    * Referenced children, held apart from `children`. The tree splices these
    * back in (flagged via `isNestedReference`) when the parent's chip is
    * expanded — see `expandReferences` in FileTree.

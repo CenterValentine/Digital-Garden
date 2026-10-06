@@ -1198,11 +1198,25 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
         ) : data.role === "referenced" ? (
           <span data-file-icon className="relative inline-flex">
             {getIcon()}
+            {/* Why it sits under its note (tree API `reference`): IN the
+                note's text (¶ — it stays with that note) or filed under it
+                (link — it can move to another note). */}
             <span
               aria-hidden
+              title={
+                data.reference?.via === "text" && data.reference.inTextOf
+                  ? data.reference.inTextOf.id === data.parentId
+                    ? "In this note's text — it stays with this note"
+                    : `In “${data.reference.inTextOf.title}”'s text — it stays with that note`
+                  : "Filed under this note, not in its text — it can be moved to another note"
+              }
               className="absolute -bottom-0.5 -right-1 flex h-3 w-3 items-center justify-center rounded-full bg-white text-gray-500 shadow-sm ring-1 ring-black/10 dark:bg-gray-800 dark:text-gray-400 dark:ring-white/15"
             >
-              <LucideIcons.Link className="h-2 w-2" />
+              {data.reference?.via === "text" ? (
+                <LucideIcons.Pilcrow className="h-2 w-2" />
+              ) : (
+                <LucideIcons.Link className="h-2 w-2" />
+              )}
             </span>
           </span>
         ) : (

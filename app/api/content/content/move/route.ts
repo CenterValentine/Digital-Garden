@@ -327,6 +327,37 @@ export async function POST(request: NextRequest) {
         }
       }
 
+      // Referenced content IN a note's text stays with that note (owner,
+      // 2026-10-06). Filing it under a DIFFERENT note used to succeed: the
+      // tree showed it there while the first note still displayed it, and
+      // deleting the new owner (which trashes what it owns) would trash an
+      // image another note still shows. A drop into a folder already snaps
+      // back for the same reason (`stillReferencedBy` below).
+      if (typeof ownerNoteUpdate === "string" && content.role === "referenced") {
+        const embeddedElsewhere = await prisma.contentLink.findFirst({
+          where: {
+            targetId: contentId,
+            linkType: { in: ["image-ref", "audio-ref"] },
+            sourceId: { not: ownerNoteUpdate },
+            source: { deletedAt: null },
+          },
+          orderBy: { createdAt: "asc" },
+          select: { source: { select: { title: true } } },
+        });
+        if (embeddedElsewhere) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: {
+                code: "STILL_EMBEDDED",
+                message: `This content is still embedded in “${embeddedElsewhere.source.title}”. Remove it from that note's text to move it.`,
+              },
+            },
+            { status: 400 }
+          );
+        }
+      }
+
       // Determine the final parent (storage home — a reference dropped onto
       // a note stores under the note's folder, displays under the note)
       const finalParentId =

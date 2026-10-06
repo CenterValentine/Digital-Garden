@@ -67,6 +67,7 @@ import {
   besideRowIndex,
   dropEdgeAt,
   dropRefused,
+  inTextElsewhere,
   isUndraggableRow,
   realIdOfRow,
   wouldNestInItself,
@@ -1189,6 +1190,59 @@ console.log("\nthe real-id check and the lock timeouts are wired (source pins)")
       assert.equal(withTimeout, transactions, `${file}: ${withTimeout}/${transactions} transactions carry ORDER_TRANSACTION`);
     }
     assert.ok(read4("lib/domain/content/sibling-slot.ts").includes("export const ORDER_TRANSACTION = { maxWait: 15_000, timeout: 30_000 } as const;"));
+  });
+}
+
+console.log("\nreferenced content in a note's text stays with that note");
+{
+  const inA = { reference: { via: "text" as const, inTextOf: { id: "A", title: "Note A" } } };
+  const filed = { reference: { via: "filed" as const, inTextOf: null } };
+  check("an item in note A's text can't be filed under note B; under A itself it can", () => {
+    assert.deepEqual(inTextElsewhere(inA, "B"), { id: "A", title: "Note A" });
+    assert.equal(inTextElsewhere(inA, "A"), null);
+  });
+  check("an item merely filed under a note (a chat, an AI document) can move to another note", () => {
+    assert.equal(inTextElsewhere(filed, "B"), null);
+    assert.equal(inTextElsewhere({}, "B"), null);
+  });
+}
+
+console.log("\nthe in-text signal: kept fresh, sent to the tree, shown, enforced (source pins)");
+{
+  const read5 = (rel: string) => readFileSync(join(__dirname, "..", rel), "utf8");
+  const imageRefs = read5("lib/domain/content/image-refs.ts");
+  const collab = read5("lib/domain/collaboration/documents.ts");
+  const treeRoute = read5("app/api/content/content/tree/route.ts");
+  const fileNode = read5("components/content/FileNode.tsx");
+  const move = read5("app/api/content/content/move/route.ts");
+  const sidebar = read5("components/content/content/LeftSidebarContent.tsx");
+  const backfill = read5("scripts/backfill-media-links.ts");
+  check("live collaborative saves refresh media links — links only, never trashing", () => {
+    assert.ok(collab.includes("await syncImageReferences(contentId, snapshot, ownerId, { trashOrphans: false });"));
+    assert.ok(collab.indexOf("await syncImageReferences(") > collab.indexOf("await syncWindowReferences(prisma, contentId, snapshot);"));
+    assert.ok(/if \(trashOrphans\) \{\s*for \(const targetId of orphanedLinks/.test(imageRefs), "trashing must sit behind the flag");
+    assert.ok(imageRefs.includes("const trashOrphans = options.trashOrphans ?? true;"), "the REST path keeps cleaning up");
+  });
+  check("the tree tells each referenced row why it is there (from live notes' text links)", () => {
+    assert.ok(/\.filter\(\(item\) => item\.role === "referenced"\)\s*\.map\(\(item\) => item\.id\);/.test(treeRoute), "every referenced row, owned or not");
+    assert.ok(treeRoute.includes("source: { deletedAt: null },"));
+    assert.ok(treeRoute.includes('? { via: "text" as const, inTextOf: { id: embedder, title } }'));
+  });
+  check("the badge says which: ¶ in the note's text, link when filed", () => {
+    assert.ok(/\{data\.reference\?\.via === "text" \? \(\s*<LucideIcons\.Pilcrow className="h-2 w-2" \/>/.test(fileNode), "the ¶ mark shows for in-text items only");
+    assert.ok(fileNode.includes('"In this note\'s text — it stays with this note"'));
+    assert.ok(fileNode.includes('"Filed under this note, not in its text — it can be moved to another note"'));
+  });
+  check("filing in-text content under another note is refused — before the move, and by the route", () => {
+    assert.ok(sidebar.includes("const holder = inTextElsewhere(node, parentId);"));
+    assert.ok(sidebar.includes('toast.warning("Unable to move referenced content", {'));
+    assert.ok(move.includes('code: "STILL_EMBEDDED",'));
+    assert.ok(move.includes("sourceId: { not: ownerNoteUpdate },"));
+  });
+  check("the backfill reports by default and never trashes", () => {
+    assert.ok(backfill.includes('const APPLY = process.argv.includes("--apply");'));
+    assert.ok(backfill.includes("await syncImageReferences(note.id, json, note.ownerId, { trashOrphans: false });"));
+    assert.ok(/if \(APPLY\) \{\s*await syncImageReferences/.test(backfill));
   });
 }
 

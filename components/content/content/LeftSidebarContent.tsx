@@ -110,6 +110,7 @@ import {
 } from "@/lib/domain/content/sibling-order";
 import { clearKeptSort, orderKeptLevel } from "@/lib/features/content/kept-sort-display";
 import { useTreeTargetStore } from "@/state/tree-target-store";
+import { inTextElsewhere } from "@/lib/features/content/drop-rules";
 
 interface TreeApiResponse {
   success: boolean;
@@ -1461,6 +1462,22 @@ export function LeftSidebarContent({
           "Contacts and groups can only be placed at the root or inside real folders. Use the People view to change group membership.",
       });
       return;
+    }
+
+    // Referenced content IN another note's text stays with that note (owner,
+    // 2026-10-06): dropping it onto a different note is refused with the
+    // reason, before anything moves — the same message a drop into a folder
+    // gives when it snaps back. The move route refuses it too.
+    if (parentId && findTreeNodeById(originalTree, parentId)?.contentType === "note") {
+      for (const { node } of dragged) {
+        const holder = inTextElsewhere(node, parentId);
+        if (holder) {
+          toast.warning("Unable to move referenced content", {
+            description: `This content is still embedded in “${holder.title}”. Remove it from that note's text to move it.`,
+          });
+          return;
+        }
+      }
     }
 
     // Skip no-op drops: every dragged item is already at its target

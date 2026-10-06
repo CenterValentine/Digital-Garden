@@ -146,6 +146,27 @@ export function wouldNestInItself(
   return false;
 }
 
+/**
+ * The note whose TEXT holds `row` (an image or audio embedded there), when
+ * that note isn't `destinationNoteId` — i.e. dropping the row onto that
+ * destination would pull it away from the text that shows it. Null when the
+ * row isn't in a note's text, or is in the destination's own text.
+ *
+ * Owner, 2026-10-06: referenced content in a note's text stays with that
+ * note. Filing it under another note used to succeed silently: the tree then
+ * showed it under the new note while the old note still displayed it — and
+ * deleting the new note (which trashes what it owns) would have trashed the
+ * image the old note still shows. Dropping it into a FOLDER was already
+ * refused the same way (it snaps back, "still embedded in …").
+ */
+export function inTextElsewhere(
+  row: Pick<TreeNode, "reference">,
+  destinationNoteId: string,
+): { id: string; title: string } | null {
+  const inTextOf = row.reference?.via === "text" ? row.reference.inTextOf : null;
+  return inTextOf && inTextOf.id !== destinationNoteId ? inTextOf : null;
+}
+
 /** Which half of a row the pointer is over during a drag. */
 export type DropEdge = "above" | "below";
 

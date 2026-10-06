@@ -89,6 +89,7 @@ type ContentTreeNode = {
   contentType: string;
   treeNodeKind: "content" | "peopleGroup" | "person";
   role: string;
+  reference?: { via: "text" | "filed"; inTextOf: { id: string; title: string } | null };
   /** The database this node is a promoted row of, if any (plan Phase 5). */
   promotedFromTableId?: string | null;
   children: ContentTreeNode[];
@@ -406,25 +407,39 @@ export async function GET(request: NextRequest) {
       // reference dragged out to a folder re-nests while its embed persists
       // — it IS still embedded there; full detach applies to non-embedded
       // references only.
+      //
+      // The same edges also say WHY each referenced row sits under its note
+      // (`node.reference`): in a note's text (an embed edge from a live note)
+      // or filed under it (ownedByNoteId, no embed). Read for every
+      // referenced row — an owned row can be in a note's text too.
       const referencedIds = allContent
-        .filter((item) => item.role === "referenced" && !item.ownedByNoteId)
+        .filter((item) => item.role === "referenced")
         .map((item) => item.id);
       const linkOwnerByTarget = new Map<string, string>();
+      const inTextOfByTarget = new Map<string, string>();
       if (referencedIds.length > 0) {
         const embedLinks = await prisma.contentLink.findMany({
           where: {
             targetId: { in: referencedIds },
             linkType: { in: ["image-ref", "audio-ref"] },
+            source: { deletedAt: null },
           },
           select: { targetId: true, sourceId: true },
           orderBy: { createdAt: "asc" },
         });
         for (const link of embedLinks) {
-          if (!linkOwnerByTarget.has(link.targetId)) {
-            linkOwnerByTarget.set(link.targetId, link.sourceId);
+          if (!inTextOfByTarget.has(link.targetId)) {
+            inTextOfByTarget.set(link.targetId, link.sourceId);
+          }
+        }
+        for (const item of allContent) {
+          const embedder = inTextOfByTarget.get(item.id);
+          if (embedder && item.role === "referenced" && !item.ownedByNoteId) {
+            linkOwnerByTarget.set(item.id, embedder);
           }
         }
       }
+      const titleById = new Map(allContent.map((item) => [item.id, item.title]));
 
       // First pass: Create all nodes
       for (const item of allContent) {
@@ -454,6 +469,17 @@ export async function GET(request: NextRequest) {
           contentType: item.contentType,
           treeNodeKind: "content",
           role: item.role,
+          ...(item.role === "referenced"
+            ? {
+                reference: (() => {
+                  const embedder = inTextOfByTarget.get(item.id);
+                  const title = embedder ? titleById.get(embedder) : undefined;
+                  return embedder && title !== undefined
+                    ? { via: "text" as const, inTextOf: { id: embedder, title } }
+                    : { via: "filed" as const, inTextOf: null };
+                })(),
+              }
+            : {}),
           promotedFromTableId: item.promotedFromRow?.tableId ?? null,
           children: [],
           references: [],
