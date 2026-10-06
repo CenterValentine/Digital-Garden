@@ -95,6 +95,7 @@ import {
   NO_IN_TEXT_EDITS,
   missingInTextMedia,
   settleInTextEdits,
+  settleWindowEdits,
 } from "@/lib/features/content/in-text-media";
 import { useInTextMediaStore } from "@/state/in-text-media-store";
 import { patchTreeNodeTitle } from "@/lib/domain/content/tree-patch";
@@ -1173,12 +1174,18 @@ export function LeftSidebarContent({
   // an old one expire, so the tree never falls back on its own to data from
   // before the edit.
   const inTextEdits = useInTextMediaStore((state) => state.edits);
+  const windowEdits = useInTextMediaStore((state) => state.windowEdits);
   const inTextRecordedAt = useInTextMediaStore((state) => state.recordedAt);
   useEffect(() => {
     if (!treeData) return;
     const settled = settleInTextEdits([treeData, shortcutTargetTrees], inTextEdits, Date.now());
     if (settled !== inTextEdits) useInTextMediaStore.getState().settle(settled);
   }, [treeData, shortcutTargetTrees, inTextEdits]);
+  useEffect(() => {
+    if (!treeData) return;
+    const settled = settleWindowEdits([treeData, shortcutTargetTrees], windowEdits, Date.now());
+    if (settled !== windowEdits) useInTextMediaStore.getState().settleWindows(settled);
+  }, [treeData, shortcutTargetTrees, windowEdits]);
   // On each new edit: fetch at once a row the tree hasn't loaded (a fresh
   // upload — the edit can't show it until it is here), and reconcile once
   // the save has had time to land (Hocuspocus stores 2–10 s after an edit),

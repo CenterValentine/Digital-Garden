@@ -40,7 +40,7 @@ import {
 } from "@/lib/features/content/drop-rules";
 import { dropEdgeFor } from "@/lib/features/content/drop-edge";
 import { showKeptSorts } from "@/lib/features/content/kept-sort-display";
-import { showInTextEdits } from "@/lib/features/content/in-text-media";
+import { showInTextEdits, showWindowEdits } from "@/lib/features/content/in-text-media";
 import { useSettingsStore } from "@/state/settings-store";
 import { useInTextMediaStore } from "@/state/in-text-media-store";
 import type { KeptSort } from "@/lib/domain/content/sibling-order";
@@ -348,10 +348,13 @@ export function FileTree({
   // note now, not after the save (in-text-media.ts). Across both forests, so
   // an image can move between the tree and a carried shortcut target.
   const inTextEdits = useInTextMediaStore((state) => state.edits);
+  // …and the window rows a note's Note Windows gain or lose.
+  const windowEdits = useInTextMediaStore((state) => state.windowEdits);
   const [editedData, editedTargets] = useMemo(() => {
-    const [tree, targets] = showInTextEdits([data, shortcutTargets ?? NO_CARRIED_TARGETS], inTextEdits);
+    const withMedia = showInTextEdits([data, shortcutTargets ?? NO_CARRIED_TARGETS], inTextEdits);
+    const [tree, targets] = showWindowEdits(withMedia, windowEdits);
     return [tree, shortcutTargets ? targets : shortcutTargets] as const;
-  }, [data, shortcutTargets, inTextEdits]);
+  }, [data, shortcutTargets, inTextEdits, windowEdits]);
   const shownData = useMemo(
     () => showKeptSorts(editedData, rootTreeSort ?? null),
     [editedData, rootTreeSort],

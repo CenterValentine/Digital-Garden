@@ -88,6 +88,9 @@ import {
   recordInTextEdits,
   settleInTextEdits,
   showInTextEdits,
+  showWindowEdits,
+  settleWindowEdits,
+  windowTargetsInDoc,
 } from "../lib/features/content/in-text-media";
 import {
   SPRING_IDLE,
@@ -1468,6 +1471,82 @@ console.log("\nmedia a note's text gains or loses shows at once (in-text-media.t
   });
 }
 
+console.log("\na Note Window shows in its note's referenced content at once (in-text-media.ts)");
+{
+  const at0 = new Date(0);
+  const row = (id: string, over: Partial<TreeNode> = {}): TreeNode => ({
+    id, title: id, slug: id, parentId: null, displayOrder: 0, customIcon: null, iconColor: null,
+    isPublished: false, contentType: "note", children: [], createdAt: at0, updatedAt: at0, deletedAt: null, ...over,
+  });
+  // F: H (host note, one image filed under it), T (target note), K (a note filed under H)
+  const fixture = () => [
+    row("F", { contentType: "folder", children: [
+      row("H", { parentId: "F", references: [row("img", { parentId: "H", role: "referenced" })], children: [row("K", { parentId: "H" })] }),
+      row("T", { parentId: "F" }),
+    ] }),
+  ];
+  const find = (nodes: TreeNode[], id: string): TreeNode | undefined => {
+    for (const node of nodes) {
+      if (node.id === id) return node;
+      const hit = find(node.children ?? [], id) ?? find(node.references ?? [], id);
+      if (hit) return hit;
+    }
+    return undefined;
+  };
+  const refIds = (nodes: TreeNode[], id: string) => (find(nodes, id)?.references ?? []).map((r) => r.id);
+  const on = (at = 1) => ({ inText: true, at });
+  const off = (at = 1) => ({ inText: false, at });
+
+  check("the window targets in a document: Note Windows aimed at another note (never the host, never unaimed)", () => {
+    const nodes = [
+      { type: { name: "noteWindow" }, attrs: { targetContentId: "T" } },
+      { type: { name: "noteWindow" }, attrs: { targetContentId: null } },
+      { type: { name: "noteWindow" }, attrs: { targetContentId: "H" } },
+      { type: { name: "paragraph" }, attrs: {} },
+    ];
+    const ids = windowTargetsInDoc({ descendants: (visit) => nodes.forEach((node) => visit(node)) }, "H");
+    assert.deepEqual([...ids], ["T"]);
+  });
+  check("aimed at a note: its window row joins the host's referenced content at once, after the rest", () => {
+    const tree = fixture();
+    const [shown] = showWindowEdits([tree, []], { H: { T: on() } });
+    assert.deepEqual(refIds(shown, "H"), ["img", "wref:H/T"]);
+    const w = find(shown, "wref:H/T")!;
+    assert.equal(w.mirrorOf, "T");
+    assert.deepEqual(w.windowRef, { targetId: "T" });
+    assert.equal(find(shown, "T"), find(tree, "T"), "the target's own row is untouched");
+  });
+  check("removed or retargeted away: the row leaves at once", () => {
+    const withRow = showWindowEdits([fixture(), []], { H: { T: on() } });
+    const [shown] = showWindowEdits(withRow, { H: { T: off() } });
+    assert.deepEqual(refIds(shown, "H"), ["img"]);
+  });
+  check("the tree route's rule: no row for a target filed under the host, or one the tree doesn't hold", () => {
+    const forests = [fixture(), []];
+    assert.deepEqual(showWindowEdits(forests, { H: { K: on(), GONE: on() } }), forests);
+    assert.deepEqual(showWindowEdits(forests, { NOHOST: { T: on() } }), forests);
+  });
+  check("window edits settle when the data shows them — or can never show them — and expire", () => {
+    const tree = fixture();
+    const edits = { H: { T: on(1000) } };
+    assert.equal(settleWindowEdits([tree, []], edits, 2000), edits, "not saved yet: kept");
+    const saved = showWindowEdits([tree, []], edits);
+    assert.deepEqual(settleWindowEdits(saved, edits, 2000), {}, "the data shows it: dropped");
+    assert.deepEqual(settleWindowEdits([tree, []], { H: { K: on() } }, 2000), {}, "filed under the host: never shown");
+    assert.deepEqual(settleWindowEdits([tree, []], { H: { T: off() } }, 2000), {}, "nothing to remove");
+    assert.deepEqual(settleWindowEdits(saved, { H: { T: off(1000) } }, 2000 + IN_TEXT_EDIT_MAX_AGE_MS), {}, "expired");
+  });
+  check("the tracker reports windows; the tree shows them after media; the sidebar settles them", () => {
+    const tracker = readFileSync(join(__dirname, "../lib/domain/editor/hooks/use-in-text-media-tracker.ts"), "utf8");
+    const fileTree = readFileSync(join(__dirname, "../components/content/FileTree.tsx"), "utf8");
+    assert.ok(tracker.includes("const windows = trackMediaStep(knownWindows, windowTargetsInDoc(transaction.doc, noteId), arriving);"));
+    assert.ok(tracker.includes("useInTextMediaStore.getState().recordWindows(noteId, windows.added, windows.removed);"));
+    assert.ok(tracker.includes("knownWindows = windows.known;"));
+    assert.ok(fileTree.includes("const [tree, targets] = showWindowEdits(withMedia, windowEdits);"));
+    assert.ok(source.includes("const settled = settleWindowEdits([treeData, shortcutTargetTrees], windowEdits, Date.now());"));
+  });
+}
+
 console.log("\nthe in-text edits are recorded, shown and reconciled (source pins)");
 {
   const read7 = (rel: string) => readFileSync(join(__dirname, "..", rel), "utf8");
@@ -1478,7 +1557,8 @@ console.log("\nthe in-text edits are recorded, shown and reconciled (source pins
     assert.ok(editor.includes("useInTextMediaTracker(editor, contentId);"));
   });
   check("the tracker steps every document change through trackMediaStep and keeps its baseline", () => {
-    assert.ok(tracker.includes('isArrivingChange(transaction.getMeta("y-sync$")),'));
+    assert.ok(tracker.includes('const arriving = isArrivingChange(transaction.getMeta("y-sync$"));'));
+    assert.ok(tracker.includes("const step = trackMediaStep(known, mediaInDoc(transaction.doc), arriving);"));
     assert.ok(tracker.includes("useInTextMediaStore.getState().record(noteId, step.added, step.removed);"));
     assert.ok(tracker.includes("known = step.known;"));
   });

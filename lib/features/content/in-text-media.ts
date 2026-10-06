@@ -29,7 +29,7 @@
  */
 import type { TreeNode } from "@/lib/domain/content/types";
 import { sortedInsertIndex } from "@/lib/domain/content/sibling-order";
-import { isWindowReferenceRowId } from "./window-reference";
+import { isWindowReferenceRowId, toWindowReferenceRow, windowReferenceRowId } from "./window-reference";
 
 /** TipTap node types whose `contentId` puts media in a note's text (image-refs.ts). */
 export const IN_TEXT_MEDIA_NODE_TYPES: ReadonlySet<string> = new Set(["image", "audioEmbed"]);
@@ -349,4 +349,121 @@ export function missingInTextMedia(
     }
   }
   return [...missing];
+}
+
+// ── Note Windows ─────────────────────────────────────────────────────────
+//
+// The same lag, for windows: a note's Note Window blocks show their targets
+// as window rows in its referenced content (tree route, from "window-ref"
+// links written on save — window-refs.ts). Owner report, 2026-10-06: a window
+// aimed at a note only showed in the tree after a refresh. The tracker reports
+// the targets a note's text gains and loses, and the tree shows the row at
+// once — by the tree route's own rule, so what shows early is what the server
+// will show.
+
+interface WindowNodeLike {
+  type: { name: string };
+  attrs: Readonly<Record<string, unknown>>;
+}
+
+interface WindowDocLike {
+  descendants(visit: (node: WindowNodeLike) => boolean | void): void;
+}
+
+/** The notes a document's Note Windows are aimed at (never the host itself) — window-refs.ts. */
+export function windowTargetsInDoc(doc: WindowDocLike, hostId: string): Set<string> {
+  const ids = new Set<string>();
+  doc.descendants((node) => {
+    if (node.type.name !== "noteWindow") return;
+    const id = node.attrs.targetContentId;
+    if (typeof id === "string" && id && id !== hostId) ids.add(id);
+  });
+  return ids;
+}
+
+/** Whether the tree route would show a window row for `targetId` under `host`. */
+function windowRowShown(index: Map<string, Located>, hostId: string, targetId: string): boolean {
+  const host = index.get(hostId)?.node;
+  const rowId = windowReferenceRowId(hostId, targetId);
+  return Boolean(host?.references?.some((ref) => ref.id === rowId));
+}
+
+/**
+ * The forests with window edits shown: a host note gains or loses the window
+ * row for a target at once. The tree route's rule: both notes are in the
+ * tree, the target is live, and it isn't filed directly under the host (that
+ * row would only repeat it); window rows follow the rest, newest last.
+ * Identity-preserving, as showInTextEdits.
+ */
+export function showWindowEdits(forests: readonly TreeNode[][], edits: InTextEdits): TreeNode[][] {
+  if (Object.keys(edits).length === 0) return forests as TreeNode[][];
+  const index = indexForests(forests);
+  const nextRefs = new Map<string, TreeNode[]>(); // host id → its references with the edits
+  for (const [hostId, forHost] of Object.entries(edits)) {
+    const host = index.get(hostId)?.node;
+    if (!host) continue;
+    let refs = host.references ?? [];
+    const ordered = Object.entries(forHost).sort(([, a], [, b]) => a.at - b.at);
+    for (const [targetId, edit] of ordered) {
+      const rowId = windowReferenceRowId(hostId, targetId);
+      const present = refs.some((ref) => ref.id === rowId);
+      if (edit.inText && !present) {
+        const target = index.get(targetId)?.node;
+        if (!target || target.deletedAt !== null || target.parentId === hostId) continue;
+        refs = [...refs, toWindowReferenceRow(target, hostId)];
+      } else if (!edit.inText && present) {
+        refs = refs.filter((ref) => ref.id !== rowId);
+      }
+    }
+    if (refs !== (host.references ?? [])) nextRefs.set(hostId, refs);
+  }
+  if (nextRefs.size === 0) return forests as TreeNode[][];
+
+  const rebuild = (nodes: TreeNode[]): TreeNode[] => {
+    let changed = false;
+    const out = nodes.map((node) => {
+      const children = node.children?.length ? rebuild(node.children) : node.children;
+      const references = nextRefs.get(node.id) ?? (node.references?.length ? rebuild(node.references) : node.references);
+      if (children === node.children && references === node.references) return node;
+      changed = true;
+      return { ...node, children, references };
+    });
+    return changed ? out : nodes;
+  };
+  return forests.map((forest) => rebuild(forest));
+}
+
+/** The window edits the tree's data doesn't show yet (expiry as settleInTextEdits). */
+export function settleWindowEdits(
+  forests: readonly (readonly TreeNode[])[],
+  edits: InTextEdits,
+  now: number,
+  maxAgeMs: number = IN_TEXT_EDIT_MAX_AGE_MS,
+): InTextEdits {
+  const hostIds = Object.keys(edits);
+  if (hostIds.length === 0) return edits;
+  const index = indexForests(forests);
+  let changed = false;
+  const next: Record<string, Record<string, InTextEdit>> = {};
+  for (const hostId of hostIds) {
+    const kept: Record<string, InTextEdit> = {};
+    let keptAny = false;
+    for (const [targetId, edit] of Object.entries(edits[hostId])) {
+      const shown = windowRowShown(index, hostId, targetId);
+      const target = index.get(targetId)?.node;
+      // Nothing the server would ever show: the host or the target isn't in
+      // this tree, the target is trashed, or it is filed under the host.
+      const neverShown =
+        !index.has(hostId) || !target || target.deletedAt !== null || target.parentId === hostId;
+      const settled = edit.inText ? shown || neverShown : !shown;
+      if (now - edit.at > maxAgeMs || settled) {
+        changed = true;
+        continue;
+      }
+      kept[targetId] = edit;
+      keptAny = true;
+    }
+    if (keptAny) next[hostId] = kept;
+  }
+  return changed ? next : edits;
 }
