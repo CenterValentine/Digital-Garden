@@ -37,7 +37,13 @@ import {
 } from "@/lib/features/content/shortcut-mirror";
 import { windowReferenceRowId } from "@/lib/features/content/window-reference";
 import type { TreeNode } from "@/lib/domain/content/types";
-import { outOfScopeShortcutTargets, type ScopedNodeLite } from "@/lib/domain/content/shortcut-targets";
+import {
+  outOfScopeShortcutTargets,
+  viewReachRoots,
+  type ScopedNodeLite,
+} from "@/lib/domain/content/shortcut-targets";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 let failures = 0;
 
@@ -485,11 +491,83 @@ function findRow(nodes: TreeNode[], id: string): TreeNode | null {
   check("delete: only window rows → nothing to delete", deleteTargetsOfRowIds([windowRow]).length === 0);
 }
 
+// ── What a view reaches through its shortcuts (the open guard's scope) ──────
+// Owner rule (2026-10-05): "count view from a shortcut as in scope for any
+// check related to the view targeting". Shaped on the owner's case: a
+// shortcut in the Career Hunt view to a folder under Career Pathways.
+{
+  const parentOf = new Map<string, string | null>([
+    ["top", null],
+    ["hunt", "top"], // the view root
+    ["hunt-sub", "hunt"],
+    ["sc-in-view", "hunt-sub"], // shortcut inside the view → "resources"
+    ["pathways", "top"],
+    ["resources", "pathways"],
+    ["resources-note", "resources"],
+    ["sc-chain", "resources"], // a shortcut inside the reached folder → "far"
+    ["far", "top"],
+    ["far-note", "far"],
+    ["sc-outside", "pathways"], // a shortcut OUTSIDE the view → "elsewhere"
+    ["elsewhere", "top"],
+    ["sc-to-note", "hunt"], // a shortcut to a single note
+    ["lone-note", "pathways"],
+    ["sc-cycle", "far"], // points back at the view root: must just stop
+    ["sc-dead", "hunt"], // its target is trashed (not in the live map)
+  ]);
+  // The chain's second link is listed FIRST, so reach must keep going until
+  // nothing new is added — a single pass would miss it.
+  const shortcuts = [
+    { id: "sc-chain", targetId: "far" },
+    { id: "sc-in-view", targetId: "resources" },
+    { id: "sc-outside", targetId: "elsewhere" },
+    { id: "sc-to-note", targetId: "lone-note" },
+    { id: "sc-cycle", targetId: "hunt" },
+    { id: "sc-dead", targetId: "trashed-folder" },
+    { id: "sc-trashed", targetId: "pathways" }, // the shortcut itself is trashed
+  ];
+  const roots = viewReachRoots("hunt", parentOf, shortcuts);
+  const reached = (lineage: string[]) => lineage.some((id) => roots.has(id));
+
+  check("a shortcut in the view brings its folder into scope", roots.has("resources"));
+  check("…and everything under it", reached(["resources-note", "resources", "pathways", "top"]));
+  check("a chain of shortcuts is followed", roots.has("far") && reached(["far-note", "far", "top"]));
+  check("a shortcut to a note brings that note into scope", roots.has("lone-note"));
+  check("a shortcut outside the view reaches nothing", !roots.has("elsewhere"));
+  check("the target's own parent stays out of scope", !roots.has("pathways"));
+  check("a trashed target reaches nothing", !roots.has("trashed-folder"));
+  check("a trashed shortcut reaches nothing", [...roots].sort().join() === "far,hunt,lone-note,resources", [...roots].sort().join());
+
+  const viewOnly = viewReachRoots("hunt", parentOf, []);
+  check("with no shortcuts, only the view root is reached", [...viewOnly].join() === "hunt");
+
+  const service = readFileSync(
+    join(__dirname, "../extensions/workplaces/server/service.ts"),
+    "utf8",
+  );
+  const scopeCheck = service.slice(
+    service.indexOf("if (workspace.viewRootContentId) {\n    const isInScope ="),
+    service.indexOf('conflictType: "viewScope"'),
+  );
+  check(
+    "the open guard counts what the view reaches through shortcuts as in scope",
+    scopeCheck.length > 0 && scopeCheck.includes("await reachedThroughViewShortcuts("),
+  );
+  check(
+    "the guard reads reach through viewReachRoots on the content's lineage",
+    /viewReachRoots\(\s*viewRootContentId,/.test(service) &&
+      service.includes("return lineage.some((id) => roots.has(id));"),
+  );
+  check(
+    "the cheap pre-check bails out only when no shortcut points into the lineage",
+    /if \(!shortcuts\.some\(\(shortcut\) => lineage\.includes\(shortcut\.targetContentId \?\? ""\)\)\) \{\s*return false;/.test(service),
+  );
+}
+
 if (failures > 0) {
   console.error(`\nshortcut-mirror:check — ${failures} check(s) failed.\n`);
   process.exit(1);
 }
 
 console.log(
-  "shortcut-mirror:check — OK (identity, mirroring, broken targets, laziness, cycles, drop forwarding, nested-shortcut hiding, out-of-view targets, row actions)",
+  "shortcut-mirror:check — OK (identity, mirroring, broken targets, laziness, cycles, drop forwarding, nested-shortcut hiding, out-of-view targets, row actions, view reach)",
 );

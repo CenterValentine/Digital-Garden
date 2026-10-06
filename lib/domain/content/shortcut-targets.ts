@@ -1,6 +1,8 @@
 /**
- * Which folders a view-scoped tree must carry so its shortcuts can show what
- * they point at.
+ * A view and its shortcuts: which folders a view-scoped tree must carry so
+ * its shortcuts can show what they point at (`outOfScopeShortcutTargets`),
+ * and what the view reaches through them for its scope checks
+ * (`viewReachRoots`).
  *
  * A view (a workspace rooted at a folder) loads only that folder's subtree.
  * A shortcut inside the view whose target folder lives elsewhere then mirrored
@@ -69,4 +71,50 @@ export function outOfScopeShortcutTargets(
     }
   }
   return { targetIds, carriedIds };
+}
+
+/**
+ * The roots a view reaches through its shortcuts: their subtrees count as IN
+ * the view for its scope checks (owner rule, 2026-10-05: "count view from a
+ * shortcut as in scope for any check related to the view targeting").
+ *
+ * Starts from the view root. A live shortcut anywhere inside a reached root
+ * adds its target — a folder brings its subtree, a note is reached itself —
+ * and a shortcut inside THAT target reaches further, until nothing new is
+ * added. A chain of shortcuts is followed as far as it goes; a cycle stops
+ * at the first repeat.
+ *
+ * `parentOf` holds the owner's LIVE nodes only: a trashed shortcut, or one
+ * whose target is trashed, reaches nothing. Pure so `shortcut-mirror:check`
+ * can pin it; the open guard (`resolveOpenIntent`) loads the inputs.
+ */
+export function viewReachRoots(
+  viewRootId: string,
+  parentOf: ReadonlyMap<string, string | null>,
+  shortcuts: ReadonlyArray<{ id: string; targetId: string | null }>,
+): Set<string> {
+  const roots = new Set([viewRootId]);
+  const insideReach = (id: string): boolean => {
+    const seen = new Set<string>();
+    let at = parentOf.get(id) ?? null;
+    while (at !== null && !seen.has(at)) {
+      if (roots.has(at)) return true;
+      seen.add(at);
+      at = parentOf.get(at) ?? null;
+    }
+    return false;
+  };
+
+  let grew = true;
+  while (grew) {
+    grew = false;
+    for (const shortcut of shortcuts) {
+      const targetId = shortcut.targetId;
+      if (!targetId || roots.has(targetId) || !parentOf.has(targetId)) continue;
+      if (!parentOf.has(shortcut.id) || !insideReach(shortcut.id)) continue;
+      roots.add(targetId);
+      grew = true;
+    }
+  }
+  return roots;
 }
