@@ -42,6 +42,7 @@ import { recordCreateDestination } from "@/state/create-destination-store";
 import { useTreeRevealStore } from "@/state/tree-reveal-store";
 import {
   registerCreateTargetResolver,
+  registerTreeTargetDescriber,
   resolveCreateParent,
   toServerParent,
 } from "@/lib/domain/content/create-target";
@@ -99,6 +100,7 @@ import {
   treeScopeKey,
 } from "@/lib/domain/content/tree-refresh";
 import {
+  isFolderLike,
   moveAcrossForests,
   moveTouchesCarried,
   placeAmongSiblings,
@@ -551,6 +553,39 @@ export function LeftSidebarContent({
     );
     return () => registerCreateTargetResolver(null);
   }, [treeData, scopedRootParentId]);
+  // …and the header's "+" and sort menu describe the same target in their
+  // tooltips ("Add to “X”", "Sort “X”"), read when hovered or opened.
+  useEffect(() => {
+    registerTreeTargetDescriber(() => {
+      const treeParentId = resolveTreeParent(null, treeData, scopedRootParentId);
+      const virtual =
+        !!treeParentId &&
+        (treeParentId.startsWith("peopleGroup:") ||
+          treeParentId.startsWith("person:") ||
+          treeParentId.startsWith("temp-"));
+      const holder = treeParentId && treeData ? findTreeNodeById(treeData, treeParentId) : null;
+      const level = (treeParentId ? holder?.children : treeData) ?? [];
+      return {
+        serverParentId: toServerParent(treeParentId, scopedRootParentId),
+        label: holder
+          ? `“${holder.title}”`
+          : !treeParentId && scopedRootTitle
+            ? `“${scopedRootTitle}”`
+            : "the top level",
+        sortable: !virtual,
+        rows: level
+          .filter((row) => !isPeopleTreeNode(row))
+          .map((row) => ({
+            id: row.id,
+            title: row.title,
+            displayOrder: row.displayOrder ?? 0,
+            folderLike: isFolderLike(row),
+            nested: (row.children?.length ?? 0) > 0,
+          })),
+      };
+    });
+    return () => registerTreeTargetDescriber(null);
+  }, [treeData, scopedRootParentId, scopedRootTitle]);
 
   const rootDropTarget = useMemo(
     () =>

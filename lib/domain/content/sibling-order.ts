@@ -107,6 +107,141 @@ export function renumbering(
   return changes;
 }
 
+/**
+ * Where a row ARRIVING in a list goes — a new upload, an AI output, an item
+ * filed into a folder by something other than a drag.
+ *
+ * - `"top"`: before every sibling (what you put somewhere lands where you
+ *   look: inline create, Move to folder, uploads).
+ * - `"bottom"`: after every sibling (appended: attachments, bookmarks).
+ * - `{ afterId }`: right after that sibling — how a batch keeps its order at
+ *   the top (each item goes after the one before it). An `afterId` that isn't
+ *   a sibling falls back to the top.
+ *
+ * These callers used to store `displayOrder: 0` or keep the number the row
+ * had in its OLD folder, so it tied with the first row (then sorted by title)
+ * or landed at an arbitrary spot. `sorted` is the destination's siblings in
+ * `compareSiblings` order, not including the arriving row.
+ */
+export type ArrivalPlacement = "top" | "bottom" | { afterId: string | null };
+
+export function slotForArrival(
+  sorted: readonly OrderedSibling[],
+  placement: ArrivalPlacement,
+  arrivingId: string,
+): { displayOrder: number; changes: { id: string; displayOrder: number }[] } {
+  if (placement === "bottom") {
+    const last = sorted[sorted.length - 1];
+    return { displayOrder: last ? last.displayOrder + 1 : 0, changes: [] };
+  }
+  const afterId = placement === "top" ? null : placement.afterId;
+  if (afterId === null || !sorted.some((sibling) => sibling.id === afterId)) {
+    return { displayOrder: displayOrderForTop(sorted[0]?.displayOrder ?? null), changes: [] };
+  }
+  const arriving: OrderedSibling = { id: arrivingId, title: "", displayOrder: Number.NaN };
+  const ordered = placeAmongSiblings(sorted, arriving, { afterId, index: 0 });
+  return {
+    displayOrder: ordered.indexOf(arriving),
+    changes: renumbering(ordered, arrivingId),
+  };
+}
+
+// ── Sorting one level (the tree header's sort menu) ─────────────────────────
+//
+// A sort is a one-time, permanent reorder of ONE list — the folder the tree
+// targets — written as its displayOrder; nothing inside it is touched and
+// nothing about the sort is remembered (owner, 2026-10-06).
+
+/** What a sort reads about each row of the level. */
+export interface LevelSortRow extends OrderedSibling {
+  /** A folder, or a shortcut to a live folder (it reads as one). */
+  folderLike: boolean;
+  /** Holds other items: a folder with contents, a note with sub-pages. */
+  nested: boolean;
+}
+
+export type LevelSortMode = "float-folders" | "float-nested" | "name";
+export type NameDirection = "asc" | "desc";
+
+/** A folder, or a shortcut to a live folder. */
+export function isFolderLike(row: {
+  contentType: string;
+  shortcut?: { targetId: string | null; targetDeleted: boolean; targetContentType: string | null } | null;
+}): boolean {
+  if (row.contentType === "folder") return true;
+  const shortcut = row.shortcut;
+  return (
+    row.contentType === "shortcut" &&
+    !!shortcut?.targetId &&
+    !shortcut.targetDeleted &&
+    shortcut.targetContentType === "folder"
+  );
+}
+
+const nameCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+
+/** 0–9, A–Z: case-insensitive, numbers compared by value ("Note 2" < "Note 10"). */
+export function compareNames(a: { title: string }, b: { title: string }): number {
+  return nameCollator.compare(a.title ?? "", b.title ?? "");
+}
+
+/**
+ * The block a level currently keeps on top, as a group rank per row: folders
+ * when every folder already sits above every other row, otherwise nested
+ * items the same way, otherwise one group. A name sort orders WITHIN these
+ * groups, so floating folders and then sorting by name keeps the folders on
+ * top, each part in name order — the combination the owner asked for.
+ */
+function floatedGroups(rows: readonly LevelSortRow[]): (row: LevelSortRow) => number {
+  const floated = (flag: (row: LevelSortRow) => boolean): boolean => {
+    const first = rows.findIndex((row) => !flag(row));
+    return first > 0 && rows.slice(first).every((row) => !flag(row));
+  };
+  if (floated((row) => row.folderLike)) return (row) => (row.folderLike ? 0 : 1);
+  if (floated((row) => row.nested)) return (row) => (row.nested ? 0 : 1);
+  return () => 0;
+}
+
+/**
+ * Which way a name sort goes next: A→Z, unless the level is already in A→Z
+ * order (within its floated groups) — then Z→A. That is the toggle, with
+ * nothing remembered: the list itself says which way it was sorted.
+ */
+export function nextNameDirection(rows: readonly LevelSortRow[]): NameDirection {
+  const group = floatedGroups(rows);
+  const ascending = rows.every(
+    (row, i) => i === 0 || group(rows[i - 1]) !== group(row) || compareNames(rows[i - 1], row) <= 0,
+  );
+  const allSameName = rows.every((row) => compareNames(rows[0], row) === 0);
+  return ascending && rows.length > 1 && !allSameName ? "desc" : "asc";
+}
+
+/**
+ * The level's new order. `rows` is the level as it stands (`compareSiblings`
+ * order). Floats are stable — each part keeps the order it had.
+ */
+export function sortLevel(
+  rows: readonly LevelSortRow[],
+  mode: LevelSortMode,
+): { ordered: LevelSortRow[]; direction?: NameDirection } {
+  const ranked = rows.map((row, index) => ({ row, index }));
+  if (mode === "float-folders" || mode === "float-nested") {
+    const floats = (row: LevelSortRow) => (mode === "float-folders" ? row.folderLike : row.nested);
+    ranked.sort((a, b) => Number(floats(b.row)) - Number(floats(a.row)) || a.index - b.index);
+    return { ordered: ranked.map((entry) => entry.row) };
+  }
+  const group = floatedGroups(rows);
+  const direction = nextNameDirection(rows);
+  const sign = direction === "asc" ? 1 : -1;
+  ranked.sort(
+    (a, b) =>
+      group(a.row) - group(b.row) ||
+      sign * compareNames(a.row, b.row) ||
+      (a.row.id < b.row.id ? -1 : a.row.id > b.row.id ? 1 : 0),
+  );
+  return { ordered: ranked.map((entry) => entry.row), direction };
+}
+
 function clampIndex(index: number, length: number): number {
   if (!Number.isFinite(index)) return length;
   return Math.max(0, Math.min(Math.trunc(index), length));

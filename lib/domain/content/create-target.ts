@@ -88,3 +88,39 @@ export function registerCreateTargetResolver(resolver: ServerParentResolver | nu
 export function resolveServerCreateParent(explicitParentId: string | null): string | null {
   return activeResolver ? activeResolver(explicitParentId) : explicitParentId;
 }
+
+// ── What the header's "+" and sort act on, described for their tooltips ────
+
+/**
+ * The tree's current target: the folder a "+" adds to and the sort menu
+ * reorders — `resolveCreateParent` with no explicit parent (a selected
+ * folder, else the selected item's folder, else the top of the tree).
+ */
+export interface TreeLevelTarget {
+  /** Server-space parent id (null = the vault's top level). */
+  serverParentId: string | null;
+  /** How to name it to the user: `“Career Pathways”`, or "the top level". */
+  label: string;
+  /** Whether it can be sorted (people groups and pending rows can't). */
+  sortable: boolean;
+  /** The level's rows as they stand, for previewing a sort (Name's direction). */
+  rows: Array<{
+    id: string;
+    title: string;
+    displayOrder: number;
+    folderLike: boolean;
+    nested: boolean;
+  }>;
+}
+
+let activeTargetDescriber: (() => TreeLevelTarget | null) | null = null;
+
+/** The file tree registers how to describe its live target. */
+export function registerTreeTargetDescriber(describer: (() => TreeLevelTarget | null) | null): void {
+  activeTargetDescriber = describer;
+}
+
+/** The current target, read at the moment it is needed (a hover, a menu opening). */
+export function describeTreeTarget(): TreeLevelTarget | null {
+  return activeTargetDescriber ? activeTargetDescriber() : null;
+}

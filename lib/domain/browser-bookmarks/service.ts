@@ -1664,6 +1664,11 @@ export async function applyBrowserSyncMutations(
               title,
               slug: await generateUniqueSlug(title, userId, contentId),
               parentId,
+              // Re-saved into ANOTHER folder: take the slot a new bookmark
+              // would (appended), not the number it had in its old folder,
+              // which put it at an arbitrary spot. Re-saved where it already
+              // is: it keeps its place.
+              ...(dedupeTarget.parentId !== parentId ? { displayOrder } : {}),
             },
           });
           await prisma.externalPayload.update({

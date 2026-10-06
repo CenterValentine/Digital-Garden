@@ -47,9 +47,15 @@ import {
   moveAcrossForests,
   moveTouchesCarried,
   placeAmongSiblings,
+  compareNames,
+  isFolderLike,
+  nextNameDirection,
   renumbering,
   resolveDropAnchor,
+  slotForArrival,
   sortedInsertIndex,
+  sortLevel,
+  type LevelSortRow,
   type DropRow,
   type OrderedSibling,
 } from "../lib/domain/content/sibling-order";
@@ -772,18 +778,24 @@ console.log("\ndrags that stick (source pins)");
     assert.ok(fileNode.includes("prefetchContent(contentIdOfRowId(node.id));"));
     assert.ok(fileNode.includes("id: contentIdOfRowId(node.id),"));
   });
-  check("the move route reads and writes the order in ONE transaction, under the folder's lock", () => {
+  check("the move route reads and writes the order in ONE transaction, under both lists' locks", () => {
     const fn = route.slice(route.indexOf("async function moveContentToPosition("));
-    const lock = fn.indexOf("pg_advisory_xact_lock(");
+    const lock = fn.indexOf("await lockSiblingOrder(tx, ownerId, [parentId, current.parentId]);");
     const read = fn.indexOf("tx.contentNode.findMany(");
     assert.ok(fn.includes("prisma.$transaction(async (tx) =>"));
     assert.ok(lock > 0 && read > lock, "the sibling read must come after the lock, inside the transaction");
-    assert.equal(/prisma\.contentNode\.findMany\(/.test(fn.slice(0, fn.indexOf("function siblingOrderLockKey"))), false);
+    assert.equal(/prisma\.contentNode\.findMany\(/.test(fn), false);
   });
   check("renumbering writes only changed rows, in one statement, without updatedAt", () => {
-    assert.ok(route.includes("const changes = renumbering(ordered, contentId);"));
-    assert.ok(/UPDATE "ContentNode" AS node\s+SET "displayOrder" = renumbered\.position/.test(route));
+    const slot = read("lib/domain/content/sibling-slot.ts");
+    assert.ok(route.includes("await applyRenumbering(tx, renumbering(ordered, contentId));"));
+    assert.ok(/UPDATE "ContentNode" AS node\s+SET "displayOrder" = renumbered\.position/.test(slot));
     assert.equal(/ordered\.map\(\(sibling, index\) =>/.test(route), false);
+  });
+  check("the lock is one advisory lock per list, taken in sorted order", () => {
+    const slot = read("lib/domain/content/sibling-slot.ts");
+    assert.ok(/\.map\(\(id\) => siblingOrderLockKey\(ownerId, id\)\)\.sort\(\)/.test(slot));
+    assert.ok(slot.includes("pg_advisory_xact_lock(hashtextextended(${key}, 0))"));
   });
   check("a quick second drag's moves wait for the first's", () => {
     const move = sliceBetween("const handleMove = async", "const handleRename");
@@ -805,6 +817,192 @@ console.log("\ndrags that stick (source pins)");
       assert.ok(text.includes("items = items.sort(compareSiblings);"), view);
       assert.equal(text.includes("a.displayOrder - b.displayOrder"), false, view);
     }
+  });
+}
+
+console.log("\nwhere an arriving row goes (slotForArrival)");
+{
+  const sorted = [
+    { id: "a", title: "a", displayOrder: -1 },
+    { id: "b", title: "b", displayOrder: 0 },
+    { id: "c", title: "c", displayOrder: 4 },
+  ];
+  check("top: one before the first — no tie with it, nothing renumbered", () => {
+    assert.deepEqual(slotForArrival(sorted, "top", "new"), { displayOrder: -2, changes: [] });
+    assert.deepEqual(slotForArrival([], "top", "new"), { displayOrder: 0, changes: [] });
+  });
+  check("bottom: one after the last", () => {
+    assert.deepEqual(slotForArrival(sorted, "bottom", "new"), { displayOrder: 5, changes: [] });
+    assert.deepEqual(slotForArrival([], "bottom", "new"), { displayOrder: 0, changes: [] });
+  });
+  check("after a sibling: takes its position and shifts the rest (a batch keeps its order)", () => {
+    const slot = slotForArrival(sorted, { afterId: "a" }, "new");
+    assert.equal(slot.displayOrder, 1);
+    assert.deepEqual(slot.changes, [
+      { id: "a", displayOrder: 0 },
+      { id: "b", displayOrder: 2 },
+      { id: "c", displayOrder: 3 },
+    ]);
+  });
+  check("an afterId that isn't a sibling (or null) falls back to the top", () => {
+    assert.deepEqual(slotForArrival(sorted, { afterId: "gone" }, "new"), { displayOrder: -2, changes: [] });
+    assert.deepEqual(slotForArrival(sorted, { afterId: null }, "new"), { displayOrder: -2, changes: [] });
+  });
+}
+
+console.log("\nrows arriving by other routes land deliberately (source pins)");
+{
+  const read2 = (rel: string) => readFileSync(join(__dirname, "..", rel), "utf8");
+  const upload = read2("app/api/content/content/upload/simple/route.ts");
+  const initiate = read2("app/api/content/content/upload/initiate/route.ts");
+  const dialog = read2("components/content/dialogs/FileUploadDialog.tsx");
+  const assist = read2("lib/domain/ai/folder-assist/service.ts");
+  const bookmarks = read2("lib/domain/browser-bookmarks/service.ts");
+  const studio = read2("extensions/studio/server/runs.ts");
+  const slot = read2("lib/domain/content/sibling-slot.ts");
+
+  check("claiming a slot locks the list before reading it", () => {
+    const fn = slot.slice(slot.indexOf("export async function claimSiblingSlot("));
+    const lock = fn.indexOf("await lockSiblingOrder(tx, ownerId, [parentId]);");
+    assert.ok(lock > 0 && fn.indexOf("tx.contentNode.findMany(") > lock);
+  });
+  check("uploads: top of the folder, a batch in order, attachments appended — slot and row in one transaction", () => {
+    assert.ok(/role === "referenced"\s*\?\s*"bottom"\s*:\s*typeof afterUploadId === "string" && afterUploadId\s*\?\s*\{ afterId: afterUploadId \}\s*:\s*"top"/.test(upload));
+    assert.ok(/created = await prisma\.\$transaction\(async \(tx\) => \{\s*const displayOrder = await claimSiblingSlot\(tx,/.test(upload));
+    assert.ok(/return tx\.contentNode\.create\(\{\s*data: \{[\s\S]*?\n\s*displayOrder,\n\s*\},\s*\}\);\s*\}\);/.test(upload), "the claimed slot must be what the upload stores");
+    assert.ok(/return tx\.contentNode\.create\(\{\s*data: \{[\s\S]*?\n\s*displayOrder,\n/.test(initiate), "the claimed slot must be what the presigned upload stores");
+    assert.equal(upload.includes("displayOrder: 0,"), false);
+    assert.ok(/placement: role === "referenced" \? "bottom" : "top",/.test(initiate));
+    assert.ok(dialog.includes("uploadSingleFile(files[i], i, customName, previousUploadId)"));
+    assert.ok(dialog.includes("if (uploaded.contentId) previousUploadId = uploaded.contentId;"));
+    assert.ok(dialog.includes('if (afterId) formData.append("afterId", afterId);'));
+  });
+  check("Folder assistant: top of the folder in order, Undo restores the old place", () => {
+    assert.ok(assist.includes('const placement: ArrivalPlacement = afterId ? { afterId } : "top";'));
+    assert.ok(assist.includes("data: { parentId: targetFolderId, displayOrder },"));
+    assert.ok(assist.includes("prevOrders[id] = node.displayOrder;"));
+    assert.ok(assist.includes("? { displayOrder: Math.trunc(prevOrder) }"));
+    assert.equal((assist.match(/undo: \{ prevParents, prevOrders,/g) ?? []).length, 3);
+  });
+  check("bookmark dedupe: a re-filed bookmark takes the appended slot; one staying put keeps its place", () => {
+    assert.ok(bookmarks.includes("...(dedupeTarget.parentId !== parentId ? { displayOrder } : {}),"));
+  });
+  check("Studio outputs land newest-first at the top of the outputs folder", () => {
+    assert.equal((studio.match(/await placeExistingRow\(\{ ownerId: ctx\.userId, rowId: (node\.id|speech\.contentId), parentId: outputsFolderId, placement: "top" \}\);/g) ?? []).length, 3);
+  });
+}
+
+console.log("\nsorting one level (sortLevel — the header's sort menu)");
+{
+  const row = (id: string, title: string, extra: Partial<LevelSortRow> = {}): LevelSortRow => ({
+    id,
+    title,
+    displayOrder: 0,
+    folderLike: false,
+    nested: false,
+    ...extra,
+  });
+  const ids = (rows: LevelSortRow[]) => rows.map((r) => r.id).join(",");
+  const level = [
+    row("1", "zeta"),
+    row("2", "Beta", { folderLike: true, nested: true }),
+    row("3", "note 10", { nested: true }),
+    row("4", "alpha", { folderLike: true }),
+    row("5", "note 2"),
+  ];
+
+  check("Float folders: folders to the top, each part keeping its order", () => {
+    assert.equal(ids(sortLevel(level, "float-folders").ordered), "2,4,1,3,5");
+  });
+  check("Float nested: items holding others to the top, each part keeping its order", () => {
+    assert.equal(ids(sortLevel(level, "float-nested").ordered), "2,3,1,4,5");
+  });
+  check("Name: 0–9, A–Z, case-insensitive, numbers by value", () => {
+    const sorted = sortLevel(level, "name");
+    assert.equal(sorted.direction, "asc");
+    assert.equal(ids(sorted.ordered), "4,2,5,3,1");
+    assert.ok(compareNames({ title: "note 2" }, { title: "note 10" }) < 0);
+    assert.ok(compareNames({ title: "2024 plan" }, { title: "apple" }) < 0);
+  });
+  check("Name toggles: a level already A–Z goes Z–A, and back", () => {
+    const ascending = sortLevel(level, "name").ordered;
+    assert.equal(nextNameDirection(ascending), "desc");
+    const descending = sortLevel(ascending, "name");
+    assert.equal(descending.direction, "desc");
+    // A–Z happened to put both folders (alpha, Beta) above everything else,
+    // so they read as a floated block and stay on top: Z–A within each part.
+    assert.equal(ids(descending.ordered), "2,4,1,3,5");
+    // With no block on top, Z–A is the whole list reversed by name.
+    const flat = [row("a", "b"), row("b", "c"), row("c", "a")];
+    const flatAscending = sortLevel(flat, "name").ordered;
+    assert.equal(ids(sortLevel(flatAscending, "name").ordered), "b,a,c");
+    assert.equal(sortLevel(descending.ordered, "name").direction, "asc");
+  });
+  check("Name keeps floated folders on top, sorting each part (the combination)", () => {
+    const floated = sortLevel(level, "float-folders").ordered;
+    assert.equal(ids(sortLevel(floated, "name").ordered), "4,2,5,3,1");
+    const floatedNested = sortLevel(level, "float-nested").ordered;
+    assert.equal(ids(sortLevel(floatedNested, "name").ordered), "2,3,4,5,1");
+  });
+  check("identical names never read as already sorted (Name sorts A–Z first)", () => {
+    assert.equal(nextNameDirection([row("a", "x"), row("b", "x")]), "asc");
+    assert.equal(nextNameDirection([row("a", "x")]), "asc");
+  });
+  check("a shortcut to a live folder counts as a folder; to a note, or a trashed folder, not", () => {
+    assert.equal(isFolderLike({ contentType: "folder" }), true);
+    assert.equal(isFolderLike({ contentType: "shortcut", shortcut: { targetId: "t", targetDeleted: false, targetContentType: "folder" } }), true);
+    assert.equal(isFolderLike({ contentType: "shortcut", shortcut: { targetId: "t", targetDeleted: false, targetContentType: "note" } }), false);
+    assert.equal(isFolderLike({ contentType: "shortcut", shortcut: { targetId: "t", targetDeleted: true, targetContentType: "folder" } }), false);
+  });
+}
+
+console.log("\nthe sort menu: one level, permanent, nothing remembered (source pins)");
+{
+  const read3 = (rel: string) => readFileSync(join(__dirname, "..", rel), "utf8");
+  const route = read3("app/api/content/content/reorder/route.ts");
+  const menu = read3("components/content/headers/FileTreeSortMenu.tsx");
+  const header = read3("components/content/headers/LeftSidebarHeader.tsx");
+  const add = read3("components/content/headers/LeftSidebarHeaderActions.tsx");
+  const sidebar = read3("components/content/content/LeftSidebarContent.tsx");
+  const fileTree = read3("components/content/FileTree.tsx");
+  const validation = read3("lib/features/settings/validation.ts");
+
+  check("the reorder route sorts ONE level under its lock and writes only changed rows", () => {
+    const sort = route.slice(route.indexOf("// ── Sort ──"));
+    const lock = sort.indexOf("await lockSiblingOrder(tx, ownerId, [parentId]);");
+    assert.ok(lock > 0 && sort.indexOf("tx.contentNode.findMany(") > lock);
+    assert.ok(sort.includes("where: { parentId, ownerId, deletedAt: null },"));
+    assert.ok(sort.includes("const { ordered, direction } = sortLevel(rows, mode);"));
+    assert.ok(sort.includes("await applyRenumbering(tx, changes);"));
+  });
+  check("Undo restores only live items directly inside that level", () => {
+    const undo = route.slice(route.indexOf("// ── Undo"), route.indexOf("// ── Sort ──"));
+    assert.ok(undo.includes("where: { id: { in: restore.map((entry) => entry.id) }, parentId, ownerId, deletedAt: null },"));
+    assert.ok(undo.includes("const changes = restore.filter((entry) => allowed.has(entry.id));"));
+  });
+  check("nothing about sorting is remembered: no setting, no display transform, no checkmarks", () => {
+    assert.equal(validation.includes("fileTreeSort"), false);
+    assert.equal(/sortTreeForDisplay|treeSort/.test(fileTree), false);
+    assert.equal(/useSettingsStore|DropdownMenuCheckboxItem/.test(menu), false);
+    assert.ok(menu.includes("onCloseAutoFocus={(event) => event.preventDefault()}"));
+    assert.ok(header.includes("<FileTreeSortMenu className={subInactive} />"));
+  });
+  check("three sorts, each with an icon, a short name and a tooltip naming the target", () => {
+    for (const name of ["Float folders", "Float nested", "Name"]) assert.ok(menu.includes(`          ${name}\n`), name);
+    assert.equal((menu.match(/<DropdownMenuItem\n/g) ?? []).length, 3);
+    assert.equal((menu.match(/title=\{`[^`]*\$\{label\}/g) ?? []).length, 3);
+    assert.ok(menu.includes('onSelect={() => void run("float-folders")}'));
+    assert.ok(menu.includes('onSelect={() => void run("float-nested")}'));
+    assert.ok(menu.includes('onSelect={() => void run("name")}'));
+  });
+  check("both header buttons name their target, read live on hover (the same target)", () => {
+    assert.ok(menu.includes("onPointerEnter={() => setTooltip(buttonTooltip(describeTreeTarget()))}"));
+    assert.ok(add.includes("setAddTooltip(target ? `Add a file or folder to ${target.label}` : \"Add a file or folder\");"));
+    assert.ok(sidebar.includes("const treeParentId = resolveTreeParent(null, treeData, scopedRootParentId);"));
+    assert.ok(sidebar.includes("registerTreeTargetDescriber(() => {"));
+  });
+  check("a sort offers Undo, which posts the previous numbers back", () => {
+    assert.ok(menu.includes("void postReorder({ parentId: serverParentId, restore: previous })"));
   });
 }
 

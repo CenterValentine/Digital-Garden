@@ -21,6 +21,8 @@ import { resolvePrimaryRoute } from "@/lib/domain/ai/features/router";
 import { getUserSettings, updateUserSettings } from "@/lib/features/settings";
 import { updateMaterializedPath, generateUniqueSlug } from "@/lib/domain/content";
 import { logger } from "@/lib/core/logger";
+import type { ArrivalPlacement } from "@/lib/domain/content/sibling-order";
+import { claimSiblingSlot, lockSiblingOrder } from "@/lib/domain/content/sibling-slot";
 import type {
   FolderAssistResult,
   FolderCandidate,
@@ -157,26 +159,48 @@ async function formatMovedLabel(
 }
 
 /** Move files into a folder, capturing previous parents for undo. */
+/**
+ * File `fileIds` into `targetFolderId` at its top, in the order given — the
+ * same placement as Move to folder in the tree. It used to change only the
+ * parent, so each file kept the number it had in its OLD folder and landed at
+ * an arbitrary spot. Each file's previous parent AND position are returned
+ * for Undo.
+ */
 async function executeMove(
   userId: string,
   fileIds: string[],
   targetFolderId: string,
-): Promise<Record<string, string | null>> {
+): Promise<{ prevParents: Record<string, string | null>; prevOrders: Record<string, number> }> {
   const prevParents: Record<string, string | null> = {};
+  const prevOrders: Record<string, number> = {};
+  let afterId: string | null = null;
   for (const id of fileIds) {
     const node = await prisma.contentNode.findFirst({
       where: { id, ownerId: userId, deletedAt: null },
-      select: { id: true, parentId: true, contentType: true },
+      select: { id: true, parentId: true, contentType: true, displayOrder: true },
     });
     if (!node) continue;
     prevParents[id] = node.parentId;
-    await prisma.contentNode.update({
-      where: { id },
-      data: { parentId: targetFolderId },
+    prevOrders[id] = node.displayOrder;
+    const placement: ArrivalPlacement = afterId ? { afterId } : "top";
+    await prisma.$transaction(async (tx) => {
+      // The list it leaves and the one it joins (same locks as a tree drag).
+      await lockSiblingOrder(tx, userId, [node.parentId, targetFolderId]);
+      const displayOrder = await claimSiblingSlot(tx, {
+        ownerId: userId,
+        parentId: targetFolderId,
+        placement,
+        arrivingId: id,
+      });
+      await tx.contentNode.update({
+        where: { id },
+        data: { parentId: targetFolderId, displayOrder },
+      });
     });
+    afterId = id;
     await repath(id, node.contentType === "folder");
   }
-  return prevParents;
+  return { prevParents, prevOrders };
 }
 
 async function createFolder(
@@ -422,7 +446,7 @@ export async function runFolderAssist(args: {
       const underPath = under ? index.pathOfFolder(under) : "Root";
       if (feelingLucky) {
         const created = await createFolder(userId, decision.newFolderName, under);
-        const prevParents = await executeMove(userId, fileIds, created.id);
+        const { prevParents, prevOrders } = await executeMove(userId, fileIds, created.id);
         const targetPath = index.pathOfFolder(under ? under : "")
           ? `${underPath} / ${created.name}`
           : created.name;
@@ -439,7 +463,7 @@ export async function runFolderAssist(args: {
           movedCount: Object.keys(prevParents).length,
           movedLabel: await formatMovedLabel(userId, Object.keys(prevParents)),
           createdFolder: created,
-          undo: { prevParents, createdFolderId: created.id, prompt, targetFolderId: created.id },
+          undo: { prevParents, prevOrders, createdFolderId: created.id, prompt, targetFolderId: created.id },
           reason: decision.reason,
         };
       }
@@ -485,7 +509,7 @@ async function moveAndRespond(
   prompt: string,
 ): Promise<FolderAssistResult> {
   const targetPath = index.pathOfFolder(targetFolderId);
-  const prevParents = await executeMove(userId, fileIds, targetFolderId);
+  const { prevParents, prevOrders } = await executeMove(userId, fileIds, targetFolderId);
   await recordMemory(userId, {
     prompt,
     status: "success",
@@ -498,7 +522,7 @@ async function moveAndRespond(
     targetPath,
     movedCount: Object.keys(prevParents).length,
     movedLabel: await formatMovedLabel(userId, Object.keys(prevParents)),
-    undo: { prevParents, prompt, targetFolderId },
+    undo: { prevParents, prevOrders, prompt, targetFolderId },
     reason: "",
   };
 }
@@ -520,7 +544,7 @@ export async function confirmPlacement(args: {
       return { status: "abstain", reason: "Parent folder no longer exists." };
     }
     const created = await createFolder(userId, args.createFolder.name, under);
-    const prevParents = await executeMove(userId, fileIds, created.id);
+    const { prevParents, prevOrders } = await executeMove(userId, fileIds, created.id);
     const targetPath = under
       ? `${index.pathOfFolder(under)} / ${created.name}`
       : created.name;
@@ -537,7 +561,7 @@ export async function confirmPlacement(args: {
       movedCount: Object.keys(prevParents).length,
       movedLabel: await formatMovedLabel(userId, Object.keys(prevParents)),
       createdFolder: created,
-      undo: { prevParents, createdFolderId: created.id, prompt, targetFolderId: created.id },
+      undo: { prevParents, prevOrders, createdFolderId: created.id, prompt, targetFolderId: created.id },
       reason: "",
     };
   }
@@ -566,9 +590,17 @@ export async function undoPlacement(args: {
       select: { id: true, contentType: true },
     });
     if (!node) continue;
+    // Back to its old folder AND its old place there (payloads from before
+    // prevOrders existed never changed the number, so it is still right).
+    const prevOrder = undo.prevOrders?.[fileId];
     await prisma.contentNode.update({
       where: { id: fileId },
-      data: { parentId: prevParentId },
+      data: {
+        parentId: prevParentId,
+        ...(typeof prevOrder === "number" && Number.isFinite(prevOrder)
+          ? { displayOrder: Math.trunc(prevOrder) }
+          : {}),
+      },
     });
     await repath(fileId, node.contentType === "folder");
   }

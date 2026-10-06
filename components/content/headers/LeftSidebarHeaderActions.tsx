@@ -21,6 +21,7 @@ import {
 import { getExtensionCreateMenuItems } from "@/lib/extensions/client-registry";
 import { usePageTemplateStore } from "@/state/page-template-store";
 import { useContentStore } from "@/state/content-store";
+import { describeTreeTarget } from "@/lib/domain/content/create-target";
 
 const SUBMENU_HOVER_BRIDGE_PX = 12;
 /** Grace before a submenu closes once the pointer leaves it. */
@@ -333,6 +334,7 @@ export function LeftSidebarHeaderActions({
   ...callbacks
 }: LeftSidebarHeaderActionsProps) {
   const [showMenu, setShowMenu] = useState(false);
+  const [addTooltip, setAddTooltip] = useState("Add a file or folder");
   const buttonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const submenuRef = useRef<HTMLDivElement>(null);
@@ -559,7 +561,13 @@ export function LeftSidebarHeaderActions({
         onClick={() => !disabled && setShowMenu(!showMenu)}
         disabled={disabled}
         className="rounded p-1 transition-colors hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
-        title={disabled ? "Cannot add when multiple items are selected" : "Add file or folder"}
+        title={disabled ? "Cannot add when multiple items are selected" : addTooltip}
+        // Names where a new item will land — the tree's target, read on hover
+        // because it follows the selection (create-target.ts).
+        onPointerEnter={() => {
+          const target = describeTreeTarget();
+          setAddTooltip(target ? `Add a file or folder to ${target.label}` : "Add a file or folder");
+        }}
       >
         <Plus className="h-4 w-4" />
       </button>

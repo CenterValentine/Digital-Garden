@@ -19,6 +19,7 @@ import {
   renumbering,
   type SiblingPlacement,
 } from "@/lib/domain/content/sibling-order";
+import { applyRenumbering, lockSiblingOrder } from "@/lib/domain/content/sibling-slot";
 import { logger, spanPayload, withRouteTrace, withSpan } from "@/lib/core/logger";
 
 const ROUTE_PATH = "/api/content/content/move";
@@ -552,14 +553,8 @@ async function moveContentToPosition(
     if (!current) throw new Error("Content not found");
 
     // The destination's list, and the list the row leaves (a move within
-    // that list renumbers the row too). Sorted, so two moves that need the
-    // same pair of locks always take them in the same order.
-    const lockKeys = [...new Set([parentId, current.parentId])]
-      .map((id) => siblingOrderLockKey(ownerId, id))
-      .sort();
-    for (const key of lockKeys) {
-      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0))`;
-    }
+    // that list renumbers the row too).
+    await lockSiblingOrder(tx, ownerId, [parentId, current.parentId]);
 
     // ownerId: without it, a move at the ROOT treated every user's root items
     // as siblings — renumbering their displayOrder and offsetting the index by
@@ -586,17 +581,7 @@ async function moveContentToPosition(
 
     // Only rows whose number changes, in one statement, and without
     // `updatedAt`: reordering is not editing (see `renumbering`).
-    const changes = renumbering(ordered, contentId);
-    if (changes.length > 0) {
-      await tx.$executeRaw`
-        UPDATE "ContentNode" AS node
-        SET "displayOrder" = renumbered.position
-        FROM unnest(
-          ${changes.map((change) => change.id)}::uuid[],
-          ${changes.map((change) => change.displayOrder)}::int[]
-        ) AS renumbered(id, position)
-        WHERE node.id = renumbered.id`;
-    }
+    await applyRenumbering(tx, renumbering(ordered, contentId));
 
     return tx.contentNode.update({
       where: { id: contentId },
@@ -604,9 +589,4 @@ async function moveContentToPosition(
       select: { id: true, parentId: true, displayOrder: true },
     });
   });
-}
-
-/** The advisory-lock key for one owner's list of siblings under `parentId`. */
-function siblingOrderLockKey(ownerId: string, parentId: string | null): string {
-  return `sibling-order:${ownerId}:${parentId ?? "root"}`;
 }
