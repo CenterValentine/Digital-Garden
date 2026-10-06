@@ -29,6 +29,7 @@ import {
   resolveOppositePane,
   resolveOpenDestinationPane,
   resolveLayoutModeForPane,
+  __resetPaneRecentTabsForTests,
   getStalePaneMemoryTabIds,
   type WorkspacePaneId,
   type WorkspaceLayoutMode,
@@ -609,6 +610,81 @@ console.log("\nempty panes collapse the layout (owner scenarios, 2026-10-02)");
   check("closing the focused pane's last tab moves focus onto content",
     [useContentStore.getState().layoutMode, useContentStore.getState().selectedContentId],
     ["dual-vertical", "P1"]);
+}
+
+console.log("\nonly the pane emptied BY THIS removal may fold the layout (owner rule, 2026-10-06)");
+{
+  // A split whose right pane the user left empty on purpose. Before: ANY tab
+  // removal in the left — a close, or a drop back onto the same strip (a
+  // sloppy click) — read the already-empty right pane as "just emptied" and
+  // collapsed to single. Owner: "no external factors should cause it to
+  // collapse".
+  const splitWithEmptyRight = () => {
+    seedSplit();
+    useContentStore.getState().restoreWorkspace({
+      activeContentId: "A",
+      activePaneId: "top-left",
+      layoutMode: "dual-vertical",
+      paneTabContentIds: { "top-left": ["A", "B", "C"], "top-right": [] },
+    });
+    clearPendingWorkspaceIntents();
+  };
+  splitWithEmptyRight();
+  useContentStore.getState().moveContentTabToPane("tab:C", "top-left", { beforeTabId: "tab:A" });
+  check(
+    "reordering within the left strip keeps the split",
+    [useContentStore.getState().layoutMode, paneContents("top-left")],
+    ["dual-vertical", ["C", "A", "B"]],
+  );
+  useContentStore.getState().closeContentTab("tab:B");
+  check("closing one of several left tabs keeps the split", useContentStore.getState().layoutMode, "dual-vertical");
+  useContentStore.getState().closeContentTab("tab:C");
+  check("…and another", useContentStore.getState().layoutMode, "dual-vertical");
+  useContentStore.getState().closeContentTab("tab:A");
+  check("closing the LAST tab in the left — the pane this close emptied — folds to single", useContentStore.getState().layoutMode, "single");
+
+  splitWithEmptyRight();
+  useContentStore.getState().moveContentTabToPane("tab:B", "top-right", {});
+  check("moving a tab into the empty pane keeps the split (nothing emptied)", useContentStore.getState().layoutMode, "dual-vertical");
+}
+
+console.log("\nwhen the active tab leaves a pane, the pane shows what it showed BEFORE it (owner, 2026-10-06)");
+{
+  // [A, B, C]: the user viewed A, then C, then dragged C to the other pane.
+  // The old rule took the index neighbour (B) — "a chat that was never
+  // selected". The pane remembers A.
+  seedSplit();
+  __resetPaneRecentTabsForTests();
+  useContentStore.getState().restoreWorkspace({
+    activeContentId: "A",
+    activePaneId: "top-left",
+    layoutMode: "dual-vertical",
+    paneTabContentIds: { "top-left": ["A", "B", "C"], "top-right": ["D"] },
+  });
+  clearPendingWorkspaceIntents();
+  useContentStore.getState().activateContentTab("tab:A");
+  useContentStore.getState().activateContentTab("tab:C");
+  useContentStore.getState().moveContentTabToPane("tab:C", "top-right", {});
+  check("dragging the active C away → the left shows A again, not its neighbour B", paneActive("top-left"), "A");
+  check("…and C is active where it landed", paneActive("top-right"), "C");
+
+  useContentStore.getState().activateContentTab("tab:B");
+  useContentStore.getState().activateContentTab("tab:A");
+  useContentStore.getState().closeContentTab("tab:A");
+  check("closing the active A → B (viewed before it), not the index neighbour", paneActive("top-left"), "B");
+
+  // Memory only names tabs still in the pane; with none remembered the old
+  // neighbour rule applies, so a pane never ends up showing nothing.
+  __resetPaneRecentTabsForTests();
+  useContentStore.getState().restoreWorkspace({
+    activeContentId: "A",
+    activePaneId: "top-left",
+    layoutMode: "dual-vertical",
+    paneTabContentIds: { "top-left": ["A", "B", "C"], "top-right": [] },
+  });
+  clearPendingWorkspaceIntents();
+  useContentStore.getState().closeContentTab("tab:A");
+  check("with no memory, closing A → its right neighbour B", paneActive("top-left"), "B");
 }
 
 console.log("\na restore never collapses — only a user's removal does (owner rule, 2026-10-03)");
