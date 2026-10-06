@@ -14,6 +14,7 @@ import { generateUniqueSlug } from "@/lib/domain/content";
 import type { InitiateUploadRequest } from "@/lib/domain/content/api-types";
 import crypto from "crypto";
 import { logger, withRouteTrace, withSpan } from "@/lib/core/logger";
+import { ORDER_TRANSACTION, claimSiblingSlot } from "@/lib/domain/content/sibling-slot";
 
 const ROUTE_PATH = "/api/content/content/upload/initiate";
 
@@ -137,31 +138,43 @@ export async function POST(request: NextRequest) {
         { layer: "content", name: "create" },
         { attrs: { kind: "file", ext: fileExtension, bytes: fileSize } },
         async (span) => {
-          const created = await prisma.contentNode.create({
-            data: {
+          // Same placement as the tree's uploads (upload/simple): a file
+          // lands at the top of its folder, referenced content (an image dropped
+          // into a note, a recording) is appended after the others. Claimed
+          // and written under the folder's order lock.
+          const created = await prisma.$transaction(async (tx) => {
+            const displayOrder = await claimSiblingSlot(tx, {
               ownerId: session.user.id,
-              title: contentTitle,
-              slug,
-              contentType: "file",
               parentId: parentId || null,
-              role: role || "primary",
-              customIcon: customIcon || null,
-              iconColor: iconColor || null,
-              filePayload: {
-                create: {
-                  fileName,
-                  fileExtension,
-                  mimeType,
-                  fileSize: BigInt(fileSize),
-                  checksum: checksum || "",
-                  storageProvider: storageConfig.provider,
-                  storageKey,
-                  uploadStatus: "uploading",
+              placement: role === "referenced" ? "bottom" : "top",
+            });
+            return tx.contentNode.create({
+              data: {
+                ownerId: session.user.id,
+                title: contentTitle,
+                slug,
+                contentType: "file",
+                parentId: parentId || null,
+                role: role || "primary",
+                displayOrder,
+                customIcon: customIcon || null,
+                iconColor: iconColor || null,
+                filePayload: {
+                  create: {
+                    fileName,
+                    fileExtension,
+                    mimeType,
+                    fileSize: BigInt(fileSize),
+                    checksum: checksum || "",
+                    storageProvider: storageConfig.provider,
+                    storageKey,
+                    uploadStatus: "uploading",
+                  },
                 },
               },
-            },
-            include: { filePayload: true },
-          });
+              include: { filePayload: true },
+            });
+          }, ORDER_TRANSACTION);
           span.attr("content_id", created.id);
           return created;
         },

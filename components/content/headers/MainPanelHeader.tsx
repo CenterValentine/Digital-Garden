@@ -796,9 +796,15 @@ export function MainPanelHeader({
                 className={`group relative flex min-w-[6rem] max-w-[22rem] shrink items-center gap-1.5 overflow-hidden border-r border-r-black/[0.08] px-2 py-1.5 text-[13px] transition-colors dark:border-r-white/10 ${
                   isActive
                     ? "border-b-2 border-gold-primary bg-black/[0.04] text-gold-primary shadow-[0_1px_2px_rgba(15,23,42,0.04)] dark:bg-white/[0.04]"
-                    : "text-gray-600 hover:bg-black/[0.035] hover:text-gray-900 dark:text-gray-300 dark:hover:bg-white/[0.05] dark:hover:text-white"
+                    : "text-gray-600 hover:bg-black/[0.035] hover:text-gray-900 dark:text-gray-300 dark:hover:bg-white/[0.05] dark:hover:text-white data-[spring-hover=on]:bg-black/[0.035] data-[spring-hover=on]:text-gray-900 dark:data-[spring-hover=on]:bg-white/[0.05] dark:data-[spring-hover=on]:text-white"
                 } ${isDragging ? "cursor-grabbing opacity-60" : "cursor-grab"}`}
+                // A drag doesn't trigger :hover, so a drag resting here gets
+                // the hover look through `data-spring-hover` (set by
+                // use-spring-tabs.ts) — the cue to hold until the tab opens.
                 data-pane-id={paneId}
+                // Hit-tested by spring-loaded tabs (use-spring-tabs.ts): a
+                // drag resting here opens this tab.
+                data-tab-id={tab.id}
                 // Tabs truncate at 22rem — hover reveals the full title. Same
                 // native-title convention as the sidebar chat tabs.
                 title={
@@ -890,7 +896,7 @@ export function MainPanelHeader({
                     <span className="truncate">{tab.title}</span>
                   </button>
                 )}
-                <span className="absolute inset-y-0 right-0 flex items-center px-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+                <span className="absolute inset-y-0 right-0 flex items-center px-1 opacity-0 group-hover:opacity-100 group-data-[spring-hover=on]:opacity-100 transition-opacity duration-150">
                   <button
                     type="button"
                     className={`rounded p-0.5 transition-colors ${

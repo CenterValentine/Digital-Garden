@@ -172,7 +172,6 @@ export interface BrowserSyncMutation {
   resourceRelationship?: string | null;
   userIntent?: string | null;
   tags?: string[];
-  dedupeEnabled?: boolean;
   domainIntelligenceEnabled?: boolean;
   noteText?: string | null;
   preserveHtml?: boolean;
@@ -217,7 +216,6 @@ export interface BrowserBookmarksRulesExport {
   exportedAt: string;
   nativeSaveBehavior: "silent-defaults" | "auto-open-follow-up";
   defaults: Record<string, unknown>;
-  dedupeDefaults: Record<string, unknown>;
   routingRules: Array<Record<string, unknown>>;
   connections: Array<{
     name: string;

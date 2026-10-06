@@ -717,39 +717,6 @@ async function softDeleteContentNode(contentId: string, userId: string) {
   ]);
 }
 
-async function findExistingExternalForDedupe(
-  userId: string,
-  url: string | null,
-  canonicalUrl: string | null
-) {
-  const candidates = [canonicalUrl, url].filter((value): value is string => Boolean(value));
-  if (candidates.length === 0) return null;
-
-  return prisma.contentNode.findFirst({
-    where: {
-      ownerId: userId,
-      deletedAt: null,
-      contentType: "external",
-      externalPayload: {
-        is: {
-          OR: [
-            { normalizedUrl: { in: candidates } },
-            { canonicalUrl: { in: candidates } },
-            { url: { in: candidates } },
-          ],
-        },
-      },
-    },
-    include: {
-      externalPayload: true,
-      notePayload: true,
-      bookmarkSyncLinks: true,
-      children: { select: { id: true } },
-      folderPayload: true,
-    },
-  });
-}
-
 async function applyExternalBookmarkUpdate(params: {
   connection: ConnectionWithRoot;
   userId: string;
@@ -1619,77 +1586,35 @@ export async function applyBrowserSyncMutations(
           0,
           255
         );
-        const dedupeTarget =
-          mutation.dedupeEnabled && normalized.normalizedUrl
-            ? await findExistingExternalForDedupe(
-                userId,
-                normalized.normalizedUrl,
-                normalized.canonicalUrl
-              )
-            : null;
-
-        const contentId = dedupeTarget?.id
-          ? dedupeTarget.id
-          : (
-              await prisma.contentNode.create({
-                data: {
-                  ownerId: userId,
-                  title,
-                  slug: await generateUniqueSlug(title, userId),
-                  contentType: "external",
-                  parentId,
-                  displayOrder,
-                  externalPayload: {
-                    create: {
-                      url: mutation.url?.trim() || "https://example.com",
-                      subtype: mutation.preserveHtml ? "preserved-html" : "website",
-                      description: normalizeOptionalBookmarkText(mutation.description),
-                      resourceType: normalizeOptionalBookmarkTagValue(mutation.resourceType),
-                      resourceRelationship: normalizeOptionalBookmarkTagValue(
-                        mutation.resourceRelationship
-                      ),
-                      userIntent: normalizeOptionalBookmarkTagValue(mutation.userIntent),
-                      preview: buildExternalPreviewFromMutation(mutation, normalized),
-                      ...normalized,
-                    },
-                  },
-                },
-              })
-            ).id;
-
-        if (dedupeTarget) {
-          await prisma.contentNode.update({
-            where: { id: contentId },
-            data: {
-              title,
-              slug: await generateUniqueSlug(title, userId, contentId),
-              parentId,
+        const { id: contentId } = await prisma.contentNode.create({
+          data: {
+            ownerId: userId,
+            title,
+            slug: await generateUniqueSlug(title, userId),
+            contentType: "external",
+            parentId,
+            displayOrder,
+            externalPayload: {
+              create: {
+                url: mutation.url?.trim() || "https://example.com",
+                subtype: mutation.preserveHtml ? "preserved-html" : "website",
+                description: normalizeOptionalBookmarkText(mutation.description),
+                resourceType: normalizeOptionalBookmarkTagValue(mutation.resourceType),
+                resourceRelationship: normalizeOptionalBookmarkTagValue(
+                  mutation.resourceRelationship
+                ),
+                userIntent: normalizeOptionalBookmarkTagValue(mutation.userIntent),
+                preview: buildExternalPreviewFromMutation(mutation, normalized),
+                ...normalized,
+              },
             },
-          });
-          await prisma.externalPayload.update({
-            where: { contentId },
-            data: {
-              url: mutation.url?.trim() || dedupeTarget.externalPayload?.url || "https://example.com",
-              subtype: mutation.preserveHtml ? "preserved-html" : "website",
-              description: normalizeOptionalBookmarkText(mutation.description),
-              resourceType: normalizeOptionalBookmarkTagValue(mutation.resourceType),
-              resourceRelationship: normalizeOptionalBookmarkTagValue(
-                mutation.resourceRelationship
-              ),
-              userIntent: normalizeOptionalBookmarkTagValue(mutation.userIntent),
-              ...normalized,
-              preview: buildExternalPreviewFromMutation(
-                mutation,
-                normalized,
-                dedupeTarget.externalPayload?.preview ?? null
-              ),
-            },
-          });
-        }
+          },
+          select: { id: true },
+        });
 
         await ensureWebResourceForExternalContent(userId, {
           contentId,
-          url: mutation.url?.trim() || dedupeTarget?.externalPayload?.url || "https://example.com",
+          url: mutation.url?.trim() || "https://example.com",
           canonicalUrl: normalized.canonicalUrl,
           title,
           faviconUrl: normalized.faviconUrl,

@@ -15,6 +15,8 @@ import { getUserStorageProvider } from "@/lib/infrastructure/storage";
 import crypto from "crypto";
 import { logger, spanPayload, withRouteTrace, withSpan } from "@/lib/core/logger";
 import { effectiveMimeType } from "@/lib/infrastructure/media/file-validation";
+import type { ArrivalPlacement } from "@/lib/domain/content/sibling-order";
+import { ORDER_TRANSACTION, claimSiblingSlot } from "@/lib/domain/content/sibling-slot";
 
 const ROUTE_PATH = "/api/content/content/upload/simple";
 
@@ -38,6 +40,19 @@ export async function POST(request: NextRequest) {
       const provider = formData.get("provider") as "r2" | "s3" | "vercel" | null;
       const enableOCR = formData.get("enableOCR") === "true";
       const role = formData.get("role") as "primary" | "referenced" | null;
+      // Where the new file goes (sibling-order.ts `slotForArrival`): at the
+      // top of its folder — or right after the previous file of the same
+      // batch, so a multi-file upload keeps its order there. Referenced content
+      // (an image pasted into a note) is appended instead, in the order added.
+      // Every upload used to store 0: it tied with the folder's first row
+      // and was then ordered by title.
+      const afterUploadId = formData.get("afterId");
+      const uploadPlacement: ArrivalPlacement =
+        role === "referenced"
+          ? "bottom"
+          : typeof afterUploadId === "string" && afterUploadId
+            ? { afterId: afterUploadId }
+            : "top";
 
       if (!file) {
         return NextResponse.json(
@@ -355,35 +370,46 @@ export async function POST(request: NextRequest) {
             attempt++;
 
             try {
-              created = await prisma.contentNode.create({
-                data: {
+              // The slot is claimed and the row written under the folder's
+              // order lock, so two uploads can't take the same slot.
+              created = await prisma.$transaction(async (tx) => {
+                const displayOrder = await claimSiblingSlot(tx, {
                   ownerId: session.user.id,
-                  title: finalFileName,
-                  slug,
-                  contentType: "file",
                   parentId: parentId || null,
+                  placement: uploadPlacement,
                   peopleGroupId: resolvedPeopleGroupId,
                   personId: resolvedPersonId,
-                  role: role || "primary",
-                  displayOrder: 0,
-                  filePayload: {
-                    create: {
-                      fileName: finalFileName,
-                      fileExtension,
-                      mimeType,
-                      fileSize: BigInt(file.size),
-                      checksum,
-                      storageProvider: usedProvider,
-                      storageKey,
-                      searchText,
-                      uploadStatus: "ready",
-                      uploadedAt: new Date(),
-                      isProcessed: false,
-                      processingStatus: "none",
+                });
+                return tx.contentNode.create({
+                  data: {
+                    ownerId: session.user.id,
+                    title: finalFileName,
+                    slug,
+                    contentType: "file",
+                    parentId: parentId || null,
+                    peopleGroupId: resolvedPeopleGroupId,
+                    personId: resolvedPersonId,
+                    role: role || "primary",
+                    filePayload: {
+                      create: {
+                        fileName: finalFileName,
+                        fileExtension,
+                        mimeType,
+                        fileSize: BigInt(file.size),
+                        checksum,
+                        storageProvider: usedProvider,
+                        storageKey,
+                        searchText,
+                        uploadStatus: "ready",
+                        uploadedAt: new Date(),
+                        isProcessed: false,
+                        processingStatus: "none",
+                      },
                     },
+                    displayOrder,
                   },
-                },
-              });
+                });
+              }, ORDER_TRANSACTION);
               span.attr("attempts", attempt).attr("content_id", created.id);
               await spanPayload(span, "uploaded_content", created);
               return { content: created, attempts: attempt };

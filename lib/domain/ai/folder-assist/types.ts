@@ -30,6 +30,8 @@ export interface CreateSuggestion {
 export interface UndoPayload {
   /** fileId → previous parentId (null = was at root). */
   prevParents: Record<string, string | null>;
+  /** fileId → previous displayOrder, so Undo puts it back where it was. */
+  prevOrders?: Record<string, number>;
   /** Set when the assistant created a folder for this placement. */
   createdFolderId?: string;
   /** The originating prompt — recorded as a failure in memory on undo. */

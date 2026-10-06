@@ -3,6 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Check, ChevronDown, Eye, Hammer, Home, RefreshCw } from "lucide-react";
+import { useLongPress } from "@/components/common/useLongPress";
+
+/** Every pointer: a press-and-hold on the refresh button means something on a mouse too. */
+const HOLD_POINTERS = ["mouse", "touch", "pen"] as const;
 
 interface RootNodeHeaderProps {
   workspaceName?: string;
@@ -17,6 +21,11 @@ interface RootNodeHeaderProps {
    * the resting state, refresh is hidden behind it.
    */
   onRefresh?: () => void;
+  /**
+   * Press-and-hold on the refresh button: reload the tree from scratch —
+   * skeleton and all (owner, 2026-10-06). A click stays the quiet refresh.
+   */
+  onHardRefresh?: () => void;
   /**
    * Scope choices for the filter dropdown, most-specific first. On a plain
    * view-workspace this is [view, root]; on a workbench it is
@@ -45,11 +54,23 @@ export function RootNodeHeader({
   isView = false,
   viewRootTitle,
   onRefresh,
+  onHardRefresh,
   scopeOptions,
   activeScopeKey,
   onSelectScope,
 }: RootNodeHeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
+  // A hold fires the hard reload on its own; the click that ends it must not
+  // also run the quiet refresh.
+  const heldRef = useRef(false);
+  const hold = useLongPress(
+    () => {
+      if (!onHardRefresh) return;
+      heldRef.current = true;
+      onHardRefresh();
+    },
+    { delayMs: 600, pointerTypes: HOLD_POINTERS },
+  );
   const [menuPos, setMenuPos] = useState<{ left: number; top: number } | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -167,11 +188,24 @@ export function RootNodeHeader({
         (onRefresh ? (
           <button
             type="button"
+            {...hold}
+            onPointerDown={(e) => {
+              heldRef.current = false;
+              hold.onPointerDown(e);
+            }}
             onClick={(e) => {
               e.stopPropagation();
+              if (heldRef.current) {
+                heldRef.current = false;
+                return;
+              }
               onRefresh();
             }}
-            title="Refresh file tree"
+            title={
+              onHardRefresh
+                ? "Refresh file tree — press and hold to reload it from scratch"
+                : "Refresh file tree"
+            }
             aria-label="Refresh file tree"
             className="group/refresh relative ml-2 shrink-0 cursor-pointer rounded-full bg-black/[0.04] dark:bg-white/5 px-2 py-0.5 text-xs text-gray-500 dark:text-gray-400 hover:bg-black/[0.07] dark:hover:bg-white/10 transition-colors"
           >

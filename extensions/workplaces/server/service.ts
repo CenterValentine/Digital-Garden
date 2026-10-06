@@ -15,6 +15,7 @@ import { generateSlug } from "@/lib/domain/content";
 import { logger } from "@/lib/core/logger";
 import { reconcileMembershipFromSnapshot } from "./membership";
 import { onlyUuids } from "@/lib/domain/content/uuid";
+import { viewReachRoots } from "@/lib/domain/content/shortcut-targets";
 import { LAYOUT_RECORD_MAX_AGE_DAYS } from "./layout-records";
 import type {
   ContentWorkspaceResponse,
@@ -1466,6 +1467,40 @@ async function getAncestorIds(ownerId: string, contentId: string) {
   return ancestors;
 }
 
+/**
+ * Whether content outside a view's root is reached through a shortcut inside
+ * the view — directly, or along a chain of shortcuts (`viewReachRoots`).
+ * `lineage` is the content id followed by its ancestors.
+ *
+ * Asked only after the plain subtree check has failed. Every root other than
+ * the view's own is a shortcut target, so unless some live shortcut points
+ * into `lineage` the answer is no without reading anything else; otherwise
+ * it reads the owner's live parent map once.
+ */
+async function reachedThroughViewShortcuts(
+  ownerId: string,
+  viewRootContentId: string,
+  lineage: string[],
+): Promise<boolean> {
+  const shortcuts = await prisma.shortcutPayload.findMany({
+    where: { targetContentId: { not: null }, content: { ownerId, deletedAt: null } },
+    select: { contentId: true, targetContentId: true },
+  });
+  if (!shortcuts.some((shortcut) => lineage.includes(shortcut.targetContentId ?? ""))) {
+    return false;
+  }
+  const nodes = await prisma.contentNode.findMany({
+    where: { ownerId, deletedAt: null },
+    select: { id: true, parentId: true },
+  });
+  const roots = viewReachRoots(
+    viewRootContentId,
+    new Map(nodes.map((node) => [node.id, node.parentId])),
+    shortcuts.map((shortcut) => ({ id: shortcut.contentId, targetId: shortcut.targetContentId })),
+  );
+  return lineage.some((id) => roots.has(id));
+}
+
 async function findOverlappingPrimaryRecursiveClaims(
   ownerId: string,
   workspaceId: string,
@@ -1598,11 +1633,19 @@ export async function resolveOpenIntent(
     return { allowed: true, alreadyCovered: true, conflict: null };
   }
 
-  // View scope enforcement: if active workspace is a view, content must be inside the view root subtree
+  // View scope enforcement: if active workspace is a view, content must be
+  // inside the view root subtree — or reached from the view through one of
+  // its shortcuts (owner rule, 2026-10-05): a shortcut in the view shows its
+  // target there, so opening what it shows is not leaving the view.
   if (workspace.viewRootContentId) {
     const isInScope =
       contentId === workspace.viewRootContentId ||
-      ancestorIds.includes(workspace.viewRootContentId);
+      ancestorIds.includes(workspace.viewRootContentId) ||
+      (await reachedThroughViewShortcuts(
+        ownerId,
+        workspace.viewRootContentId,
+        [contentId, ...ancestorIds],
+      ));
 
     if (!isInScope) {
       const folderScopeCandidate =

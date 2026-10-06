@@ -78,6 +78,11 @@ jobs:
       - name: Picker tree checks
         run: pnpm picker:tree:check
 
+      # The tree never flashes its skeleton after a mutation (it unmounted
+      # react-arborist and lost the user's place); delete is optimistic.
+      - name: Smooth tree checks
+        run: pnpm tree:smooth:check
+
   markdown-safety:
     name: Markdown block-safety
     runs-on: ubuntu-latest

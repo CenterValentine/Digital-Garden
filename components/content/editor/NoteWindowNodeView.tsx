@@ -870,7 +870,18 @@ export function NoteWindowNodeView({
     const newTitle = raw.trim();
     if (!newTitle || newTitle === displayTitle || !targetContentId) return;
     const previous = optimisticTitle;
+    const shownBefore = displayTitle;
     setOptimisticTitle(newTitle);
+    const broadcast = (title: string) =>
+      window.dispatchEvent(
+        new CustomEvent("content-updated", {
+          detail: { contentId: targetContentId, updates: { title } },
+        }),
+      );
+    // The file tree, tabs and breadcrumbs take the new name at once (owner,
+    // 2026-10-06) — not after the save, which on a slow database left them
+    // stale for seconds. A failed save puts the old name back everywhere.
+    broadcast(newTitle);
     try {
       const res = await fetch(
         `/api/content/content/${encodeURIComponent(targetContentId)}`,
@@ -887,13 +898,9 @@ export function NoteWindowNodeView({
       // The API can return 200 with success:false — check both.
       if (!res.ok || !result?.success) throw new Error("rename failed");
       if (hostEditable) updateAttrs({ targetTitle: newTitle });
-      window.dispatchEvent(
-        new CustomEvent("content-updated", {
-          detail: { contentId: targetContentId, updates: { title: newTitle } },
-        }),
-      );
     } catch {
       setOptimisticTitle(previous);
+      broadcast(shownBefore);
       toast.error("Failed to rename");
     }
   }, [titleDraft, displayTitle, targetContentId, optimisticTitle, hostEditable, updateAttrs]);
