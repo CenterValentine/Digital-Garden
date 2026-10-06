@@ -1052,6 +1052,16 @@ console.log("\nkept sorts on the client (kept-sort-display.ts)");
     const tree = [sortedFolder, manualFolder];
     assert.equal(showKeptSorts(tree, null), showKeptSorts(tree, null));
   });
+  check("a sorted folder's referenced content follows its sort; a note's keeps its own order", () => {
+    type R = N & { references?: R[] };
+    const folder: R = { ...sortedFolder, references: [n("r2", "zeta"), n("r1", "alpha")] };
+    const note: R = { ...n("t", "t"), references: [n("q2", "zeta"), n("q1", "alpha")] };
+    const [shownFolder, shownNote] = showKeptSorts([folder, note], null) as R[];
+    assert.equal(ids(shownFolder.references ?? []), "r1,r2");
+    assert.equal(shownNote, note, "notes keep no sort: same object");
+    const cleared = clearKeptSort([folder], "f") as R[];
+    assert.equal(ids(cleared[0].references ?? []), "r1,r2", "turning the sort off fixes the referenced block in the order it showed");
+  });
   check("clearing a folder's sort fixes its rows in the shown order, then forgets the sort", () => {
     const cleared = clearKeptSort([sortedFolder], "f");
     assert.equal(ids(cleared[0].children ?? []), "a,b");
@@ -1631,6 +1641,10 @@ console.log("\nrows open as you drag over them (spring-open.ts)");
 console.log("\nthe referenced-items chip (source pin)");
 {
   const fileNode = readFileSync(join(__dirname, "../components/content/FileNode.tsx"), "utf8");
+  check("its placement control reads as placement, not sorting: a list with its start or end marked", () => {
+    assert.ok(/referencesAtStart \? \(\s*<LucideIcons\.ListStart className="h-2\.5 w-2\.5" \/>\s*\) : \(\s*<LucideIcons\.ListEnd className="h-2\.5 w-2\.5" \/>/.test(fileNode));
+    assert.equal(fileNode.includes("LucideIcons.ArrowUpDown"), false);
+  });
   check("its placement arrow shows only while the block is on screen (flag on AND row open)", () => {
     assert.ok(fileNode.includes("const referencesOnScreen = referencesExpanded && isOpen;"));
     assert.ok(fileNode.includes("{referencesOnScreen && hasPrimaryChildren && ("));

@@ -1331,7 +1331,14 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
               }
               className="flex items-center rounded-full border-l border-gold-primary/30 px-1 py-px transition-opacity hover:opacity-100 opacity-70"
             >
-              <LucideIcons.ArrowUpDown className="h-2.5 w-2.5" />
+              {/* Where the block sits, not a sort (owner, 2026-10-06: the
+                  up-down arrow read as sorting): a list with its start or
+                  its end marked. */}
+              {referencesAtStart ? (
+                <LucideIcons.ListStart className="h-2.5 w-2.5" />
+              ) : (
+                <LucideIcons.ListEnd className="h-2.5 w-2.5" />
+              )}
             </button>
           )}
         </span>
