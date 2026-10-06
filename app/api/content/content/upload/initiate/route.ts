@@ -14,7 +14,7 @@ import { generateUniqueSlug } from "@/lib/domain/content";
 import type { InitiateUploadRequest } from "@/lib/domain/content/api-types";
 import crypto from "crypto";
 import { logger, withRouteTrace, withSpan } from "@/lib/core/logger";
-import { claimSiblingSlot } from "@/lib/domain/content/sibling-slot";
+import { ORDER_TRANSACTION, claimSiblingSlot } from "@/lib/domain/content/sibling-slot";
 
 const ROUTE_PATH = "/api/content/content/upload/initiate";
 
@@ -174,7 +174,7 @@ export async function POST(request: NextRequest) {
               },
               include: { filePayload: true },
             });
-          });
+          }, ORDER_TRANSACTION);
           span.attr("content_id", created.id);
           return created;
         },

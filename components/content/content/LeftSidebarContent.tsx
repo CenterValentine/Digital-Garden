@@ -117,6 +117,8 @@ interface TreeApiResponse {
     shortcutTargets?: TreeNode[];
     /** The view root's kept sort (its own row isn't in the tree). */
     rootTreeSort?: KeptSort | null;
+    /** The view root, then its ancestors (empty when unscoped). */
+    rootAncestry?: string[];
     stats: {
       totalNodes: number;
       rootNodes: number;
@@ -334,6 +336,9 @@ export function LeftSidebarContent({
   // The sort the top of a view keeps — the view root's own (a folder can
   // remember its sort; the vault's top level can't). Loaded with the tree.
   const [rootTreeSort, setRootTreeSort] = useState<KeptSort | null>(null);
+  // The view root and its ancestors — for refusing a drop that would put a
+  // folder inside itself when a shortcut shows a folder that contains the view.
+  const [rootAncestry, setRootAncestry] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedCount, setSelectedCount] = useState(0);
@@ -711,6 +716,7 @@ export function LeftSidebarContent({
       setTreeData(result.data.tree);
       setShortcutTargetTrees(result.data.shortcutTargets ?? []);
       setRootTreeSort(result.data.rootTreeSort ?? null);
+      setRootAncestry(result.data.rootAncestry ?? []);
       loadedScopeRef.current = requestScope;
       // Feed the charter-id cache so metadata-less surfaces (workspace
       // tabs) can render the ScrollText identity consistently.
@@ -3594,6 +3600,7 @@ ${workbenchWarning}`
             data={treeData}
             shortcutTargets={shortcutTargetTrees}
             rootTreeSort={rootTreeSort}
+            rootAncestry={rootAncestry}
             rootDropTarget={rootDropTarget}
             onMove={handleMove}
             onSelect={handleSelect}

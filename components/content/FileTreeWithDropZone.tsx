@@ -23,6 +23,8 @@ interface FileTreeWithDropZoneProps {
   shortcutTargets?: TreeNode[];
   /** Passed through to FileTree — see its prop of the same name. */
   rootTreeSort?: KeptSort | null;
+  /** Passed through to FileTree — see its prop of the same name. */
+  rootAncestry?: string[];
   onMove?: (args: {
     dragIds: string[];
     parentId: string | null;

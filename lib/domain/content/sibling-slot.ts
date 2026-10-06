@@ -24,6 +24,16 @@ import {
 
 type Tx = Prisma.TransactionClient;
 
+/**
+ * Options for every transaction that takes the order lock. Prisma's default
+ * interactive-transaction timeout is 5 s; a slow moment in the database (a
+ * cold start, a busy local Docker VM) once ran a drag 5.27 s and failed it
+ * with "expired transaction" — a move that was only slow became an error.
+ * The work inside is a few small queries; these limits only matter when the
+ * database itself is slow, and then waiting beats failing.
+ */
+export const ORDER_TRANSACTION = { maxWait: 15_000, timeout: 30_000 } as const;
+
 /** The advisory-lock key for one owner's list of siblings under `parentId`. */
 function siblingOrderLockKey(ownerId: string, parentId: string | null): string {
   return `sibling-order:${ownerId}:${parentId ?? "root"}`;
@@ -119,7 +129,7 @@ export async function placeExistingRow(args: {
   await prisma.$transaction(async (tx) => {
     const displayOrder = await claimSiblingSlot(tx, { ownerId, parentId, placement, arrivingId: rowId });
     await applyRenumbering(tx, [{ id: rowId, displayOrder }]);
-  });
+  }, ORDER_TRANSACTION);
 }
 
 // ── A folder's remembered sort (sibling-order.ts `KeptSort`) ────────────────

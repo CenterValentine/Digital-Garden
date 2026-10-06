@@ -68,6 +68,8 @@ import {
   dropEdgeAt,
   dropRefused,
   isUndraggableRow,
+  realIdOfRow,
+  wouldNestInItself,
   type DropRuleRow,
 } from "../lib/features/content/drop-rules";
 import { clearKeptSort, orderKeptLevel, showKeptSorts } from "../lib/features/content/kept-sort-display";
@@ -765,7 +767,7 @@ console.log("\ndrags that stick (source pins)");
   });
   check("disableDrop asks dropRefused with the row, its list, and whether the pointer is mid-row", () => {
     const fn = fileTree.slice(fileTree.indexOf("const disableDrop = ("), fileTree.indexOf("// Keyboard shortcuts (scoped to file tree)"));
-    assert.ok(fn.includes("return dropRefused({"));
+    assert.ok(fn.includes("const refused = dropRefused({") && fn.includes("if (refused) return true;"));
     assert.ok(fn.includes("target: parentNode.isRoot ? null : parentNode.data,"));
     assert.ok(fn.includes("insideRow: treeRef.current?.state.dnd.index === null,"));
     assert.ok(fn.includes("holderWithinDrags: holder !== null && dragNodes.some((dragNode) => isWithin(holder, dragNode)),"));
@@ -875,7 +877,7 @@ console.log("\nrows arriving by other routes land deliberately (source pins)");
   check("uploads: top of the folder, a batch in order, attachments appended — slot and row in one transaction", () => {
     assert.ok(/role === "referenced"\s*\?\s*"bottom"\s*:\s*typeof afterUploadId === "string" && afterUploadId\s*\?\s*\{ afterId: afterUploadId \}\s*:\s*"top"/.test(upload));
     assert.ok(/created = await prisma\.\$transaction\(async \(tx\) => \{\s*const displayOrder = await claimSiblingSlot\(tx,/.test(upload));
-    assert.ok(/return tx\.contentNode\.create\(\{\s*data: \{[\s\S]*?\n\s*displayOrder,\n\s*\},\s*\}\);\s*\}\);/.test(upload), "the claimed slot must be what the upload stores");
+    assert.ok(/return tx\.contentNode\.create\(\{\s*data: \{[\s\S]*?\n\s*displayOrder,\n\s*\},\s*\}\);\s*\}(?:, ORDER_TRANSACTION)?\);/.test(upload), "the claimed slot must be what the upload stores");
     assert.ok(/return tx\.contentNode\.create\(\{\s*data: \{[\s\S]*?\n\s*displayOrder,\n/.test(initiate), "the claimed slot must be what the presigned upload stores");
     assert.equal(upload.includes("displayOrder: 0,"), false);
     assert.ok(/placement: role === "referenced" \? "bottom" : "top",/.test(initiate));
@@ -1103,6 +1105,69 @@ console.log("\nthe sort menu: one level, a folder keeps it (source pins)");
   check("a sort offers Undo, which posts the previous numbers (and sort) back", () => {
     assert.ok(menu.includes("restore: previous,"));
     assert.ok(menu.includes("{ kept: result.previousKept ?? null }"));
+  });
+}
+
+console.log("\nno folder inside itself, judged by real ids (wouldNestInItself)");
+{
+  // A/B/C, with a shortcut in C pointing at A: its contents show B again.
+  const parents = new Map<string, string | null>([
+    ["A", null],
+    ["B", "A"],
+    ["C", "B"],
+    ["S", "C"], // the shortcut row itself
+    ["D", "A"],
+  ]);
+  const parentOf = (id: string) => parents.get(id);
+  check("dragging the mirrored B onto C is refused — C is inside B", () => {
+    const mirroredB = { id: "smirror:S/B", isShortcutMirror: true, mirrorOf: "B" };
+    assert.equal(realIdOfRow(mirroredB), "B");
+    assert.equal(wouldNestInItself("C", [realIdOfRow(mirroredB)], parentOf), true);
+  });
+  check("dragging B into itself is refused; into a sibling or the top level isn't", () => {
+    assert.equal(wouldNestInItself("B", ["B"], parentOf), true);
+    assert.equal(wouldNestInItself("D", ["B"], parentOf), false);
+    assert.equal(wouldNestInItself(null, ["B"], parentOf), false);
+  });
+  check("a shortcut pointing ABOVE the view: the view root's ancestry is walked too", () => {
+    // View rooted at C; a shortcut in it shows A. Dragging A into the view's top level = into C.
+    const viewParents = new Map<string, string | null>([["S", "C"], ["C", "B"], ["B", "A"], ["A", null]]);
+    assert.equal(wouldNestInItself("C", ["A"], (id) => viewParents.get(id)), true);
+  });
+  check("a corrupt parent loop can't hang the check", () => {
+    const loop = new Map<string, string | null>([["x", "y"], ["y", "x"]]);
+    assert.equal(wouldNestInItself("x", ["z"], (id) => loop.get(id)), false);
+  });
+}
+
+console.log("\nthe real-id check and the lock timeouts are wired (source pins)");
+{
+  const read4 = (rel: string) => readFileSync(join(__dirname, "..", rel), "utf8");
+  const fileTree = read4("components/content/FileTree.tsx");
+  const treeRoute = read4("app/api/content/content/tree/route.ts");
+  check("FileTree refuses a drop that would nest a dragged item inside itself", () => {
+    assert.ok(fileTree.includes("return wouldNestInItself(destinationRealId, drags.map(realIdOfRow), (id) => realParentOf.get(id));"));
+    assert.ok(fileTree.includes("if (!node.isShortcutMirror) parents.set(node.id, node.parentId ?? null);"));
+    assert.ok(fileTree.includes(": (rootAncestry?.[0] ?? null);"));
+    assert.ok(treeRoute.includes("rootAncestry.push(at);"));
+  });
+  check("every transaction holding the order lock gets the generous timeout", () => {
+    const files = [
+      "app/api/content/content/move/route.ts",
+      "app/api/content/content/reorder/route.ts",
+      "app/api/content/content/upload/simple/route.ts",
+      "app/api/content/content/upload/initiate/route.ts",
+      "lib/domain/ai/folder-assist/service.ts",
+      "lib/domain/content/sibling-slot.ts",
+    ];
+    for (const file of files) {
+      const text = read4(file);
+      // Code only: a doc comment quoting the call (in backticks) isn't one.
+      const transactions = (text.match(/(?<!`)prisma\.\$transaction\(async \(tx\)/g) ?? []).length;
+      const withTimeout = (text.match(/\}, ORDER_TRANSACTION\);/g) ?? []).length;
+      assert.equal(withTimeout, transactions, `${file}: ${withTimeout}/${transactions} transactions carry ORDER_TRANSACTION`);
+    }
+    assert.ok(read4("lib/domain/content/sibling-slot.ts").includes("export const ORDER_TRANSACTION = { maxWait: 15_000, timeout: 30_000 } as const;"));
   });
 }
 

@@ -21,6 +21,7 @@ import {
   type SiblingPlacement,
 } from "@/lib/domain/content/sibling-order";
 import {
+  ORDER_TRANSACTION,
   applyRenumbering,
   loadLevelRows,
   lockSiblingOrder,
@@ -612,5 +613,5 @@ async function moveContentToPosition(
       select: { id: true, parentId: true, displayOrder: true },
     });
     return { ...moved, sortCleared: Boolean(kept) };
-  });
+  }, ORDER_TRANSACTION);
 }

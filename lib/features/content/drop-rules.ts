@@ -109,6 +109,43 @@ export function dropRefused(args: {
   return !acceptsDropInto(holder, drags);
 }
 
+/** The content a row stands for: a shortcut's mirror row stands for its original. */
+export function realIdOfRow(row: Pick<DropRuleRow, "id" | "isShortcutMirror" | "mirrorOf">): string {
+  return row.isShortcutMirror && row.mirrorOf ? row.mirrorOf : row.id;
+}
+
+/**
+ * Whether the drop would put a dragged item inside itself — judged by REAL
+ * ids, the way the move route judges it (`checkIsDescendant`).
+ *
+ * react-arborist refuses a drop into the dragged row or anything under it,
+ * but only by the rows on screen. A shortcut shows a real folder a second
+ * time, under other row ids, so the same folder can appear "beside" its own
+ * contents: a shortcut in A/B/C pointing at A shows B, and dragging that B
+ * onto the real C looks legal — but C is inside B. The server always refused
+ * it (nothing could be corrupted), yet the row vanished, then came back with
+ * an error. This refuses it before release instead.
+ *
+ * `destinationRealId`: the real folder the drop lands in (null = the vault's
+ * top level, inside nothing). `parentOf`: real parent ids for every loaded
+ * row, plus the view root's ancestors — a shortcut in a view can point ABOVE
+ * the view, so the view itself can be inside a dragged folder.
+ */
+export function wouldNestInItself(
+  destinationRealId: string | null,
+  dragRealIds: readonly string[],
+  parentOf: (id: string) => string | null | undefined,
+): boolean {
+  if (!destinationRealId) return false;
+  const dragged = new Set(dragRealIds);
+  const seen = new Set<string>();
+  for (let at: string | null | undefined = destinationRealId; at && !seen.has(at); at = parentOf(at)) {
+    if (dragged.has(at)) return true;
+    seen.add(at);
+  }
+  return false;
+}
+
 /** Which half of a row the pointer is over during a drag. */
 export type DropEdge = "above" | "below";
 

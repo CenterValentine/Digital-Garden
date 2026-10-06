@@ -27,12 +27,15 @@ import { expandReferences } from "@/lib/features/content/reference-group";
 import {
   expandShortcutMirrors,
   buildTreeIndex,
+  resolveDropForwardTarget,
 } from "@/lib/features/content/shortcut-mirror";
 import {
   acceptsDropInto,
   besideRowIndex,
   dropRefused,
   isUndraggableRow,
+  realIdOfRow,
+  wouldNestInItself,
 } from "@/lib/features/content/drop-rules";
 import { dropEdgeFor } from "@/lib/features/content/drop-edge";
 import { showKeptSorts } from "@/lib/features/content/kept-sort-display";
@@ -50,6 +53,8 @@ interface FileTreeProps {
    * Folders below carry their own (`folder.treeSort`).
    */
   rootTreeSort?: KeptSort | null;
+  /** The view root, then its ancestors (tree API `rootAncestry`; empty when unscoped). */
+  rootAncestry?: string[];
   onMove?: (args: {
     dragIds: string[];
     parentId: string | null;
@@ -99,6 +104,7 @@ export function FileTree({
   data,
   shortcutTargets,
   rootTreeSort,
+  rootAncestry,
   onMove,
   onSelect,
   onRename,
@@ -324,6 +330,24 @@ export function FileTree({
   // an optimistic change takes its sorted place at once and a shortcut's
   // contents follow the folder's own sort.
   const shownData = useMemo(() => showKeptSorts(data, rootTreeSort ?? null), [data, rootTreeSort]);
+  // Real parent of every loaded row (mirror rows excluded — they are views),
+  // plus the view root's ancestors: what `wouldNestInItself` walks.
+  const realParentOf = useMemo(() => {
+    const parents = new Map<string, string | null>();
+    const index = (nodes: TreeNode[]) => {
+      for (const node of nodes) {
+        if (!node.isShortcutMirror) parents.set(node.id, node.parentId ?? null);
+        if (node.children?.length) index(node.children);
+        if (node.references?.length) index(node.references);
+      }
+    };
+    index(data);
+    if (shortcutTargets) index(shortcutTargets);
+    (rootAncestry ?? []).forEach((id, i) => {
+      if (!parents.has(id)) parents.set(id, rootAncestry?.[i + 1] ?? null);
+    });
+    return parents;
+  }, [data, shortcutTargets, rootAncestry]);
   const shownTargets = useMemo(
     () => (shortcutTargets ? showKeptSorts(shortcutTargets, null) : shortcutTargets),
     [shortcutTargets],
@@ -483,15 +507,30 @@ export function FileTree({
     const holder = parentNode.isRoot || !parentNode.parent || parentNode.parent.isRoot
       ? null
       : parentNode.parent;
-    return dropRefused({
+    const drags = dragNodes.map((dragNode) => dragNode.data);
+    const refused = dropRefused({
       target: parentNode.isRoot ? null : parentNode.data,
       holder: holder?.data ?? null,
-      drags: dragNodes.map((dragNode) => dragNode.data),
+      drags,
       // The pointer is over the MIDDLE of the row: react-arborist reports
       // that as "inside it" with no index.
       insideRow: treeRef.current?.state.dnd.index === null,
       holderWithinDrags: holder !== null && dragNodes.some((dragNode) => isWithin(holder, dragNode)),
     });
+    if (refused) return true;
+    // Never a folder inside itself, judged by REAL ids: through a shortcut
+    // the same folder shows twice, so the on-screen check above can't see it
+    // (drop-rules.ts `wouldNestInItself`). The drop lands inside the row when
+    // the row takes it, otherwise beside it — in the row's own list.
+    const destination = parentNode.isRoot
+      ? null
+      : acceptsDropInto(parentNode.data, drags)
+        ? parentNode
+        : holder;
+    const destinationRealId = destination
+      ? (resolveDropForwardTarget(destination.data) ?? realIdOfRow(destination.data))
+      : (rootAncestry?.[0] ?? null);
+    return wouldNestInItself(destinationRealId, drags.map(realIdOfRow), (id) => realParentOf.get(id));
   };
 
   // Keyboard shortcuts (scoped to file tree)

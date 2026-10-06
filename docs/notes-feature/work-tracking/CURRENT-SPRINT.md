@@ -12,7 +12,7 @@ last_updated: 2026-05-13
 ## October 5, 2026 — The file tree stops flashing; deleting is instant; rows keep their order; view shortcuts show their folder and act on it safely
 
 **Tree**: worktree `.claude/worktrees/smooth-delete`, branch `fix/smooth-delete` (off `origin/main` at `49b94490`)
-**Status**: typecheck / lint 151 (0 errors, none new) / `tree:smooth:check` 146 (new, in the quality workflow) / `shortcut-mirror:check` (out-of-view cases, row actions, view reach) / tree + workspace gates / `pnpm build` green; no schema, TipTap or browser-extension change → no Hocuspocus redeploy. Owner browser smoke pending.
+**Status**: typecheck / lint 151 (0 errors, none new) / `tree:smooth:check` 152 (new, in the quality workflow) / `shortcut-mirror:check` (out-of-view cases, row actions, view reach) / tree + workspace gates / `pnpm build` green; no schema, TipTap or browser-extension change → no Hocuspocus redeploy. Owner browser smoke pending.
 
 ### Shipped
 - **Skeleton = a scope's first load only** (`tree-refresh.ts`): every refresh of a tree already on screen is quiet — covers create, duplicate, links, uploads, folder view, the header refresh and all `dg:tree-refresh` dispatchers. Stale-scope responses are dropped.
@@ -27,6 +27,7 @@ last_updated: 2026-05-13
 - **Every arriving row lands deliberately** (`slotForArrival` + `sibling-slot.ts`, under the same per-list lock): uploads at the top in the order picked, attachments appended; the Folder assistant at the top in order, with Undo restoring the old place; deduped bookmarks re-filed get the appended slot; Studio outputs newest-first.
 - **Sort menu** (beside + in the tree header): **Float folders**, **Float nested**, **Name** (A–Z ↔ Z–A), **Stop sorting** — for the ONE folder the tree targets (the same one + adds to); nothing nested touched. **A folder remembers its sort and stays sorted** (arrivals and renames take their place; a drag inside it turns the sort off, with a toast); the header icon shows the kept sort's glyph in light gold. The vault's top level sorts once. Undo on every sort. Both header buttons' tooltips name the target.
 - **Attachments chip**: its above/below arrow shows only while the block is on screen.
+- **Moves wait out a slow database** (locked transactions get 15 s to start, 30 s to run, not Prisma's 5 s), and **a shortcut can't trick a folder into itself**: drops are checked by real ids, so dragging a folder a shortcut shows into its own sub-folder is refused before release.
 
 ### Smoke checklist (owner)
 1. Scroll the tree well down, delete a file (⌥D → confirm) → it vanishes instantly, no flash, scroll stays.
@@ -71,6 +72,8 @@ last_updated: 2026-05-13
 40. Select nothing (vault top level), sort by Name → it sorts once (toast says so); no glyph appears; Name again → Z–A.
 41. Collapse a note whose attachment block was open → its chip turns grey and the ⇅ arrow disappears; open the note → the gold chip and arrow return.
 42. Check the sort menu, glyph and tooltips in light and dark mode → readable, matching the app's other menus.
+43. Drag an item OUT of an expanded shortcut into a folder of your tree → it moves there (and is gone from the shortcut's folder).
+44. Put a shortcut inside one of the sub-folders of the folder it points at (A/B/C with a shortcut in C → A); expand it, drag the mirrored B onto the real C → no drop line, nothing is sent (C is inside B).
 
 ## October 4, 2026 — Coming back lands you where you were (workspace cold-load restore)
 

@@ -22,7 +22,7 @@ import { getUserSettings, updateUserSettings } from "@/lib/features/settings";
 import { updateMaterializedPath, generateUniqueSlug } from "@/lib/domain/content";
 import { logger } from "@/lib/core/logger";
 import type { ArrivalPlacement } from "@/lib/domain/content/sibling-order";
-import { claimSiblingSlot, lockSiblingOrder } from "@/lib/domain/content/sibling-slot";
+import { ORDER_TRANSACTION, claimSiblingSlot, lockSiblingOrder } from "@/lib/domain/content/sibling-slot";
 import type {
   FolderAssistResult,
   FolderCandidate,
@@ -196,7 +196,7 @@ async function executeMove(
         where: { id },
         data: { parentId: targetFolderId, displayOrder },
       });
-    });
+    }, ORDER_TRANSACTION);
     afterId = id;
     await repath(id, node.contentType === "folder");
   }

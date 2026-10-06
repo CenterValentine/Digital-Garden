@@ -388,6 +388,7 @@ export async function GET(request: NextRequest) {
       const nodeMap = new Map<string, ContentTreeNode>();
       const rootNodes: ContentTreeNode[] = [];
       let rootTreeSort: KeptSort | null = null;
+      const rootAncestry: string[] = [];
 
       // References display as CHILDREN of their owning note (2026-07-16
       // model change; previously siblings). Display-only re-homing: storage
@@ -716,6 +717,14 @@ export async function GET(request: NextRequest) {
           const node = nodeMap.get(id);
           if (node) carriedNodes.set(id, node);
         }
+        // The view root and its ancestors (outside the view), so the client
+        // can see that a folder a shortcut shows may CONTAIN the view — and
+        // refuse a drop that would put a folder inside itself before it is
+        // sent (drop-rules.ts `wouldNestInItself`).
+        for (let at: string | null = viewRootContentId, hops = 0; at && hops < 64; hops++) {
+          rootAncestry.push(at);
+          at = nodeMap.get(at)?.parentId ?? null;
+        }
         for (const id of [...nodeMap.keys()]) {
           if (!included.has(id)) nodeMap.delete(id);
         }
@@ -869,6 +878,8 @@ export async function GET(request: NextRequest) {
           tree: rootNodes,
           // The view root's own sort (its row isn't in the tree).
           rootTreeSort,
+          // The view root, then its ancestors up to the top (empty when unscoped).
+          rootAncestry,
           stats,
           // What out-of-view shortcuts mirror. Never rows of the tree.
           shortcutTargets,

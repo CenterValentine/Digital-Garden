@@ -34,6 +34,7 @@ import {
   type LevelSortMode,
 } from "@/lib/domain/content/sibling-order";
 import {
+  ORDER_TRANSACTION,
   applyRenumbering,
   loadLevelRows,
   lockSiblingOrder,
@@ -107,7 +108,7 @@ export async function POST(request: NextRequest) {
             await writeKeptSort(tx, parentId, parseKeptSort(body.kept));
           }
           return changes.length;
-        });
+        }, ORDER_TRANSACTION);
         return NextResponse.json({ success: true, data: { restored } });
       }
 
@@ -150,7 +151,7 @@ export async function POST(request: NextRequest) {
           previous,
           previousKept,
         };
-      });
+      }, ORDER_TRANSACTION);
 
       return NextResponse.json({ success: true, data: result });
     } catch (error) {

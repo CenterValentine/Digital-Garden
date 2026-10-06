@@ -16,7 +16,7 @@ import crypto from "crypto";
 import { logger, spanPayload, withRouteTrace, withSpan } from "@/lib/core/logger";
 import { effectiveMimeType } from "@/lib/infrastructure/media/file-validation";
 import type { ArrivalPlacement } from "@/lib/domain/content/sibling-order";
-import { claimSiblingSlot } from "@/lib/domain/content/sibling-slot";
+import { ORDER_TRANSACTION, claimSiblingSlot } from "@/lib/domain/content/sibling-slot";
 
 const ROUTE_PATH = "/api/content/content/upload/simple";
 
@@ -409,7 +409,7 @@ export async function POST(request: NextRequest) {
                     displayOrder,
                   },
                 });
-              });
+              }, ORDER_TRANSACTION);
               span.attr("attempts", attempt).attr("content_id", created.id);
               await spanPayload(span, "uploaded_content", created);
               return { content: created, attempts: attempt };
