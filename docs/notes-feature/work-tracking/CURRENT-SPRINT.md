@@ -12,7 +12,7 @@ last_updated: 2026-05-13
 ## October 5, 2026 — The file tree stops flashing; deleting is instant; rows keep their order; view shortcuts show their folder and act on it safely
 
 **Tree**: worktree `.claude/worktrees/smooth-delete`, branch `fix/smooth-delete` (off `origin/main` at `49b94490`)
-**Status**: typecheck / lint 151 (0 errors, none new) / `tree:smooth:check` 205 (new, in the quality workflow) / `shortcut-mirror:check` (out-of-view cases, row actions, view reach) / tree + workspace gates / `pnpm build` green; no schema or TipTap change; **browser-extension change** (bookmark dedupe removed — `pnpm extension:build`, reload at chrome://extensions); **Hocuspocus redeploy required** (collaborative saves now refresh media links); run `scripts/backfill-media-links.ts --apply` once per environment. Owner browser smoke pending.
+**Status**: typecheck / lint 151 (0 errors, none new) / `tree:smooth:check` 206 (new, in the quality workflow) / `shortcut-mirror:check` (out-of-view cases, row actions, view reach) / tree + workspace gates / `pnpm build` green; no schema or TipTap change; **browser-extension change** (bookmark dedupe removed — `pnpm extension:build`, reload at chrome://extensions); **Hocuspocus redeploy required** (collaborative saves now refresh media links); run `scripts/backfill-media-links.ts --apply` once per environment. Owner browser smoke pending.
 
 ### Shipped
 - **Skeleton = a scope's first load only** (`tree-refresh.ts`): every refresh of a tree already on screen is quiet — covers create, duplicate, links, uploads, folder view, the header refresh and all `dg:tree-refresh` dispatchers. Stale-scope responses are dropped.
@@ -33,6 +33,7 @@ last_updated: 2026-05-13
 - **An image pasted into a note joins its referenced content at once** (`in-text-media.ts`): the note editor reports what its text gains and loses (paste, drop, /image, AI images, delete, cut, undo) and the tree shows it immediately, by the tree API's own placement rules; each edit holds until the tree's data agrees, so nothing flashes back; a fresh upload's row is fetched at once and the tree reconciles after the save window. Media filed with a note (`filedWithNote`) is never moved by text.
 - **Folders spring open as you drag over them** (`spring-open.ts`): rest a drag on a collapsed row's middle for half a second and it opens; nested rows open in turn and stay open while you drag inside them. A row the drag opened closes when the pointer moves above it, leaves the tree, or the drag ends — not when the pointer passes below it, which would pull the rows under the pointer up. A drop in the tree keeps open what holds it (the rest close after the drop); a cancelled drag closes them all. Works for tree rows, other surfaces' drags and OS files.
 - **The referenced-content chip's placement control** is now a list with its start or end marked, not an up-down arrow (it reads as placement, not sorting); **a folder's sort covers its referenced content** on the client too.
+- **Press and hold refresh for a hard reload**: a click on the tree's refresh button stays quiet; holding it (600 ms, any pointer) reloads the tree from scratch — the skeleton flashes, the tree remounts, the in-text overlay is dropped.
 - **Bookmark dedupe removed**: no Dedupe control in the capture popup or options, no rule action; every saved bookmark is its own new row. Quick-save still updates an existing Chrome bookmark for the same page.
 - **Moves wait out a slow database** (locked transactions get 15 s to start, 30 s to run, not Prisma's 5 s), and **a shortcut can't trick a folder into itself**: drops are checked by real ids, so dragging a folder a shortcut shows into its own sub-folder is refused before release.
 
@@ -106,6 +107,7 @@ last_updated: 2026-05-13
 67. Spring a folder open, drag on below it and drop there → the item lands where you dropped it, then the folder closes.
 68. Open a folder's referenced content on a row that also has sub-items → the placement control shows a list with its start or end marked (not an up-down arrow); click it → the block moves and the icon swaps.
 69. Give a folder with referenced items a kept sort (Name) → its referenced items show in that order too; rename one → it moves to its sorted place at once.
+70. Click the tree's refresh button (hover the file count) → it refreshes quietly, no flash. Press and hold it for about half a second → the tree flashes its skeleton and reloads; on release nothing else happens. Open folders and the scroll position come back.
 
 ## October 4, 2026 — Coming back lands you where you were (workspace cold-load restore)
 
