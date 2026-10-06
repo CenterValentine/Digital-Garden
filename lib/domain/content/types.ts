@@ -58,8 +58,15 @@ export interface TreeNode {
    *    document made from it, something dragged onto it) but not in its
    *    text; it can be moved to another note.
    * `inTextOf` names the note whose text holds it (the oldest live one).
+   * `filedWithNote`: it is filed with a note (ownedByNoteId), which places
+   * it — a note's text taking it or letting it go never moves it
+   * (in-text-media.ts).
    */
-  reference?: { via: "text" | "filed"; inTextOf: { id: string; title: string } | null };
+  reference?: {
+    via: "text" | "filed";
+    inTextOf: { id: string; title: string } | null;
+    filedWithNote?: boolean;
+  };
   /**
    * Referenced children, held apart from `children`. The tree splices these
    * back in (flagged via `isNestedReference`) when the parent's chip is

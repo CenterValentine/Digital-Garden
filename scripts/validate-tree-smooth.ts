@@ -74,6 +74,20 @@ import {
   type DropRuleRow,
 } from "../lib/features/content/drop-rules";
 import { clearKeptSort, orderKeptLevel, showKeptSorts } from "../lib/features/content/kept-sort-display";
+import {
+  IN_TEXT_EDIT_MAX_AGE_MS,
+  IN_TEXT_FETCH_MS,
+  IN_TEXT_RECONCILE_MS,
+  NO_IN_TEXT_EDITS,
+  isArrivingChange,
+  trackMediaStep,
+  mediaChanges,
+  mediaInDoc,
+  missingInTextMedia,
+  recordInTextEdits,
+  settleInTextEdits,
+  showInTextEdits,
+} from "../lib/features/content/in-text-media";
 import type { TreeNode } from "../lib/domain/content/types";
 
 interface Node {
@@ -571,7 +585,9 @@ console.log("\nout-of-view shortcut targets are wired end to end (source pins)")
   });
   check("FileTree indexes them for the mirror", () => {
     assert.ok(fileTree.includes("buildTreeIndex(withReferences, shownTargets)"));
-    assert.ok(fileTree.includes("showKeptSorts(shortcutTargets, null)"));
+    // shortcutTargets → in-text edits (editedTargets) → kept sorts (shownTargets)
+    assert.ok(fileTree.includes("showInTextEdits([data, shortcutTargets ?? NO_CARRIED_TARGETS], inTextEdits)"));
+    assert.ok(fileTree.includes("showKeptSorts(editedTargets, null)"));
   });
   check("a drop onto an out-of-view shortcut shows in its mirror at once, and rolls back with the tree", () => {
     const move = sliceBetween("const handleMove = async", "const handleRename");
@@ -1074,7 +1090,8 @@ console.log("\nthe sort menu: one level, a folder keeps it (source pins)");
     assert.ok(treeRoute.includes("sortChildren(node.children, node.folder?.treeSort ?? null);"));
     assert.ok(treeRoute.includes("sortChildren(rootNodes, rootTreeSort);"));
     assert.ok(treeRoute.includes("viewPrefs: true,"));
-    assert.ok(fileTree.includes("const shownData = useMemo(() => showKeptSorts(data, rootTreeSort ?? null), [data, rootTreeSort]);"));
+    // data → in-text edits (editedData) → kept sorts (shownData)
+    assert.ok(/const shownData = useMemo\(\s*\(\) => showKeptSorts\(editedData, rootTreeSort \?\? null\),\s*\[editedData, rootTreeSort\],\s*\);/.test(fileTree));
     assert.ok(/expandReferences\(\s*shownData,/.test(fileTree));
   });
   check("a folder's sort lives on the folder (never in user settings); no checkmarks, no focus ring", () => {
@@ -1227,7 +1244,8 @@ console.log("\nthe in-text signal: kept fresh, sent to the tree, shown, enforced
   check("the tree tells each referenced row why it is there (from live notes' text links)", () => {
     assert.ok(/\.filter\(\(item\) => item\.role === "referenced"\)\s*\.map\(\(item\) => item\.id\);/.test(treeRoute), "every referenced row, owned or not");
     assert.ok(treeRoute.includes("source: { deletedAt: null },"));
-    assert.ok(treeRoute.includes('? { via: "text" as const, inTextOf: { id: embedder, title } }'));
+    assert.ok(treeRoute.includes('? { via: "text" as const, inTextOf: { id: embedder, title }, filedWithNote }'));
+    assert.ok(treeRoute.includes("const filedWithNote = !!item.ownedByNoteId;"), "filed = ownedByNoteId, which places it whether or not its note is loaded");
   });
   check("the badge says which: ¶ in the note's text, link when filed", () => {
     assert.ok(/\{data\.reference\?\.via === "text" \? \(\s*<LucideIcons\.Pilcrow className="h-2 w-2" \/>/.test(fileNode), "the ¶ mark shows for in-text items only");
@@ -1244,6 +1262,205 @@ console.log("\nthe in-text signal: kept fresh, sent to the tree, shown, enforced
     assert.ok(backfill.includes('const APPLY = process.argv.includes("--apply");'));
     assert.ok(backfill.includes("await syncImageReferences(note.id, json, note.ownerId, { trashOrphans: false });"));
     assert.ok(/if \(APPLY\) \{\s*await syncImageReferences/.test(backfill));
+  });
+}
+
+console.log("\nmedia a note's text gains or loses shows at once (in-text-media.ts)");
+{
+  const at0 = new Date(0);
+  const row = (id: string, over: Partial<TreeNode> = {}): TreeNode => ({
+    id,
+    title: id,
+    slug: id,
+    parentId: null,
+    displayOrder: 0,
+    customIcon: null,
+    iconColor: null,
+    isPublished: false,
+    contentType: "file",
+    children: [],
+    createdAt: at0,
+    updatedAt: at0,
+    deletedAt: null,
+    ...over,
+  });
+  const orphan = (id: string, parentId: string, displayOrder = 0) =>
+    row(id, { parentId, role: "referenced", displayOrder, reference: { via: "filed", inTextOf: null, filedWithNote: false } });
+  const inTextOf = (id: string, noteId: string, over: Partial<TreeNode> = {}) =>
+    row(id, { parentId: noteId, role: "referenced", reference: { via: "text", inTextOf: { id: noteId, title: noteId }, filedWithNote: false }, ...over });
+  const note = (id: string, references: TreeNode[] = [], parentId = "F") =>
+    row(id, { contentType: "note", parentId, references });
+  const edit = (inText: boolean, at = 1000) => ({ inText, at });
+  const refIds = (node: TreeNode | undefined) => (node?.references ?? []).map((r) => r.id);
+  const find = (nodes: TreeNode[], id: string): TreeNode | undefined => {
+    for (const node of nodes) {
+      if (node.id === id) return node;
+      const hit = find(node.children ?? [], id) ?? find(node.references ?? [], id);
+      if (hit) return hit;
+    }
+    return undefined;
+  };
+  // F (folder): children W (note), N (note: S in its text); references X (an orphan image)
+  const fixture = () => {
+    const W = note("W");
+    const N = note("N", [inTextOf("S", "N")]);
+    const X = orphan("X", "F");
+    return [row("F", { contentType: "folder", children: [W, N], references: [X] }), row("G", { contentType: "folder" })];
+  };
+
+  check("the media in a document: images and audio clips that carry a content id (placeholders don't count)", () => {
+    const nodes = [
+      { type: { name: "paragraph" }, attrs: {} },
+      { type: { name: "image" }, attrs: { contentId: "i1", src: "/x" } },
+      { type: { name: "image" }, attrs: { contentId: null, src: "blob:…" } },
+      { type: { name: "audioEmbed" }, attrs: { contentId: "a1" } },
+      { type: { name: "image" }, attrs: { contentId: "i1" } },
+    ];
+    const ids = mediaInDoc({ descendants: (visit) => nodes.forEach((node) => visit(node)) });
+    assert.deepEqual([...ids].sort(), ["a1", "i1"]);
+    assert.deepEqual(mediaChanges(new Set(["a", "b"]), new Set(["b", "c"])), { added: ["c"], removed: ["a"] });
+  });
+  check("only changes made here count: an arriving change (another session, the document loading) doesn't; an undo does", () => {
+    assert.equal(isArrivingChange(undefined), false);
+    assert.equal(isArrivingChange({ isChangeOrigin: true }), true);
+    assert.equal(isArrivingChange({ isChangeOrigin: true, binding: {} }), true);
+    assert.equal(isArrivingChange({ isChangeOrigin: true, isUndoRedoOperation: true }), false);
+    assert.equal(isArrivingChange({ isChangeOrigin: false, isUndoRedoOperation: false }), false);
+  });
+  check("an arriving change moves the baseline unrecorded, so a later local change reports only itself", () => {
+    const loaded = trackMediaStep(new Set(), new Set(["a"]), true);
+    assert.deepEqual([loaded.added, loaded.removed], [[], []], "the document loading isn't an edit");
+    const pasted = trackMediaStep(loaded.known, new Set(["a", "b"]), false);
+    assert.deepEqual([pasted.added, pasted.removed], [["b"], []], "only the paste — not the image that arrived");
+    const deleted = trackMediaStep(pasted.known, new Set(["b"]), false);
+    assert.deepEqual([deleted.added, deleted.removed], [[], ["a"]]);
+  });
+  check("recording keeps the latest edit per note and media", () => {
+    const one = recordInTextEdits(NO_IN_TEXT_EDITS, "W", ["X"], [], 1);
+    const two = recordInTextEdits(one, "W", [], ["X"], 2);
+    assert.deepEqual(two, { W: { X: { inText: false, at: 2 } } });
+    assert.equal(recordInTextEdits(two, "W", [], [], 3), two, "nothing gained or lost: the same edits");
+  });
+  check("no edits: the very same arrays (react-arborist keys rows off identity)", () => {
+    const forests = [fixture(), []];
+    assert.equal(showInTextEdits(forests, NO_IN_TEXT_EDITS), forests);
+  });
+  check("an image pasted into a note joins that note's referenced content at once, out of its folder's", () => {
+    const tree = fixture();
+    const carried = [row("T", { contentType: "folder", children: [row("t1")] })];
+    const [shown, shownCarried] = showInTextEdits([tree, carried], { W: { X: edit(true) } });
+    assert.deepEqual(refIds(find(shown, "W")), ["X"]);
+    assert.equal(shownCarried, carried, "an untouched forest is the same array");
+    assert.deepEqual(refIds(find(shown, "F")), [], "it leaves the folder's referenced content");
+    const x = find(shown, "W")!.references![0];
+    assert.equal(x.parentId, "W");
+    assert.deepEqual(x.reference, { via: "text", inTextOf: { id: "W", title: "W" } });
+    assert.equal(find(shown, "N"), find(tree, "N"), "untouched rows keep their identity");
+    assert.equal(shown[1], tree[1], "an untouched branch keeps its identity");
+  });
+  check("an upload the tree hasn't loaded: nothing to show yet, and it is fetched", () => {
+    const tree = fixture();
+    const edits = { W: { NEW: edit(true) } };
+    const forests = [tree, []];
+    assert.deepEqual(showInTextEdits(forests, edits), forests);
+    assert.deepEqual(missingInTextMedia(forests, edits), ["NEW"]);
+    assert.deepEqual(missingInTextMedia(forests, { W: { X: edit(true), GONE: edit(false) } }), [], "only rows still to come");
+    assert.equal(settleInTextEdits(forests, edits, 2000), edits, "kept until its row arrives");
+  });
+  check("an image deleted from a note's text leaves its referenced content at once", () => {
+    const [shown] = showInTextEdits([fixture(), []], { N: { S: edit(false) } });
+    assert.deepEqual(refIds(find(shown, "N")), []);
+    assert.equal(find(shown, "S"), undefined, "the server re-homes it on save; until then it isn't shown twice");
+  });
+  check("media filed with a note is placed by that, never by text: it stays, only its label changes", () => {
+    const filedIn = inTextOf("S", "N", { reference: { via: "text", inTextOf: { id: "N", title: "N" }, filedWithNote: true } });
+    const tree = [row("F", { contentType: "folder", children: [note("W"), note("N", [filedIn])] })];
+    const [out] = showInTextEdits([tree, []], { N: { S: edit(false) } });
+    assert.deepEqual(refIds(find(out, "N")), ["S"]);
+    assert.deepEqual(find(out, "S")!.reference, { via: "filed", inTextOf: null, filedWithNote: true });
+    const filedOnly = row("P", { parentId: "N", role: "referenced", reference: { via: "filed", inTextOf: null, filedWithNote: true } });
+    const tree2 = [row("F", { contentType: "folder", children: [note("W"), note("N", [filedOnly])] })];
+    const [into] = showInTextEdits([tree2, []], { W: { P: edit(true) } });
+    assert.deepEqual(refIds(find(into, "N")), ["P"], "it stays with the note it is filed with");
+    assert.deepEqual(find(into, "P")!.reference, { via: "text", inTextOf: { id: "W", title: "W" }, filedWithNote: true });
+  });
+  check("cut from one note and pasted into another: it moves between them", () => {
+    const [shown] = showInTextEdits([fixture(), []], { N: { S: edit(false, 1000) }, W: { S: edit(true, 1001) } });
+    assert.deepEqual(refIds(find(shown, "N")), []);
+    assert.deepEqual(refIds(find(shown, "W")), ["S"]);
+    assert.equal(find(shown, "S")!.reference?.inTextOf?.id, "W");
+  });
+  check("already in an older note's text: it stays there (the oldest note holds it)", () => {
+    const forests = [fixture(), []];
+    assert.deepEqual(showInTextEdits(forests, { W: { S: edit(true) } }), forests);
+  });
+  check("pasted into two notes: the first keeps it", () => {
+    const [shown] = showInTextEdits([fixture(), []], { N: { X: edit(true, 5) }, W: { X: edit(true, 4) } });
+    assert.deepEqual(refIds(find(shown, "W")), ["X"]);
+    assert.deepEqual(refIds(find(shown, "N")), ["S"]);
+  });
+  check("it takes its sorted place among the note's referenced content; window rows stay last", () => {
+    const W = note("W", [inTextOf("A", "W", { displayOrder: 1 }), inTextOf("C", "W", { displayOrder: 3 }), row("wref:W/T", { role: "referenced", displayOrder: -9 })]);
+    const tree = [row("F", { contentType: "folder", children: [W], references: [orphan("B", "F", 2), orphan("E", "F", 5)] })];
+    const [shown] = showInTextEdits([tree, []], { W: { B: edit(true), E: edit(true) } });
+    assert.deepEqual(refIds(find(shown, "W")), ["A", "B", "C", "E", "wref:W/T"]);
+  });
+  check("only a note takes media into its text; primary content is never moved", () => {
+    const forests = [fixture(), []];
+    assert.deepEqual(showInTextEdits(forests, { G: { X: edit(true) } }), forests, "G is a folder");
+    const primary = [row("F", { contentType: "folder", children: [note("W"), row("IMG", { parentId: "F", role: "primary" })] })];
+    assert.deepEqual(showInTextEdits([primary, []], { W: { IMG: edit(true) } }), [primary, []]);
+  });
+  check("between the tree and a carried shortcut target", () => {
+    const tree = [row("F", { contentType: "folder", children: [note("W")] })];
+    const carried = [row("T", { contentType: "folder", references: [orphan("X", "T")] })];
+    const [shown, shownCarried] = showInTextEdits([tree, carried], { W: { X: edit(true) } });
+    assert.deepEqual(refIds(find(shown, "W")), ["X"]);
+    assert.deepEqual(refIds(find(shownCarried, "T")), []);
+  });
+  check("an edit is dropped once the data shows it — kept while it doesn't, and expired only when the data changes", () => {
+    const tree = fixture();
+    const edits = { W: { X: edit(true, 1000) }, N: { S: edit(false, 1000) } };
+    assert.equal(settleInTextEdits([tree, []], edits, 2000), edits, "the save hasn't landed: both kept, same object");
+    const saved = [row("F", { contentType: "folder", children: [note("W", [inTextOf("X", "W")]), note("N")] })];
+    assert.deepEqual(settleInTextEdits([saved, []], edits, 2000), {}, "both landed: both dropped");
+    assert.deepEqual(settleInTextEdits([tree, []], edits, 1000 + IN_TEXT_EDIT_MAX_AGE_MS + 1), {}, "never confirmed: expired");
+    const primary = [row("F", { contentType: "folder", children: [note("W"), row("IMG", { role: "primary" })] })];
+    assert.deepEqual(settleInTextEdits([primary, []], { W: { IMG: edit(true) } }, 2000), {}, "primary content: nothing will ever show");
+  });
+  check("the reconcile waits out Hocuspocus's store window", () => {
+    const server = readFileSync(join(__dirname, "../server/hocuspocus/server.ts"), "utf8");
+    const max = Number(/HOCUSPOCUS_STORE_MAX_DEBOUNCE_MS \|\| (\d+)\)/.exec(server)?.[1]);
+    assert.ok(max > 0 && IN_TEXT_RECONCILE_MS > max, `reconcile (${IN_TEXT_RECONCILE_MS} ms) must come after the store's max debounce (${max} ms)`);
+    assert.ok(IN_TEXT_FETCH_MS < 1000);
+  });
+}
+
+console.log("\nthe in-text edits are recorded, shown and reconciled (source pins)");
+{
+  const read7 = (rel: string) => readFileSync(join(__dirname, "..", rel), "utf8");
+  const editor = read7("components/content/editor/MarkdownEditor.tsx");
+  const tracker = read7("lib/domain/editor/hooks/use-in-text-media-tracker.ts");
+  const fileTree = read7("components/content/FileTree.tsx");
+  check("every note editor reports its text's media", () => {
+    assert.ok(editor.includes("useInTextMediaTracker(editor, contentId);"));
+  });
+  check("the tracker steps every document change through trackMediaStep and keeps its baseline", () => {
+    assert.ok(tracker.includes('isArrivingChange(transaction.getMeta("y-sync$")),'));
+    assert.ok(tracker.includes("useInTextMediaStore.getState().record(noteId, step.added, step.removed);"));
+    assert.ok(tracker.includes("known = step.known;"));
+  });
+  check("the tree shows the edits before its kept sorts, across both forests", () => {
+    assert.ok(fileTree.includes("showInTextEdits([data, shortcutTargets ?? NO_CARRIED_TARGETS], inTextEdits)"));
+    assert.ok(fileTree.includes("() => showKeptSorts(editedData, rootTreeSort ?? null),"));
+    assert.ok(fileTree.includes("() => (editedTargets ? showKeptSorts(editedTargets, null) : editedTargets),"));
+  });
+  check("the sidebar drops edits the data shows, fetches missing rows, and reconciles after the save", () => {
+    assert.ok(source.includes("const settled = settleInTextEdits([treeData, shortcutTargetTrees], inTextEdits, Date.now());"));
+    assert.ok(source.includes("}, [treeData, shortcutTargetTrees, inTextEdits]);"));
+    assert.ok(/if \(missing\.length > 0\) \{\s*timers\.push\(setTimeout\(\(\) => void loadTreeRef\.current\?\.\(true\), IN_TEXT_FETCH_MS\)\);/.test(source));
+    assert.ok(source.includes("timers.push(setTimeout(() => void loadTreeRef.current?.(true), IN_TEXT_RECONCILE_MS));"));
+    assert.ok(source.includes("}, [inTextRecordedAt]);"));
   });
 }
 

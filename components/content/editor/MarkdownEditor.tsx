@@ -42,6 +42,7 @@ import {
 import { MarkdownPasteToast } from "./MarkdownPasteToast";
 import { clientLogger } from "@/lib/core/logger/client";
 import { uploadImage } from "@/lib/domain/editor/hooks/use-image-upload";
+import { useInTextMediaTracker } from "@/lib/domain/editor/hooks/use-in-text-media-tracker";
 import { isImageUrl } from "@/lib/domain/editor/utils/image-url";
 import { useEditorInstanceStore } from "@/state/editor-instance-store";
 import { useSettingsStore } from "@/state/settings-store";
@@ -1097,6 +1098,10 @@ export function MarkdownEditor({
       }
     };
   }, [contentId, editor]);
+
+  // Images and audio entering or leaving this note's text show in the file
+  // tree at once, not after the save (lib/features/content/in-text-media.ts).
+  useInTextMediaTracker(editor, contentId);
 
   // Handle Cmd+K / Ctrl+K keyboard shortcut for link dialog
   useEffect(() => {

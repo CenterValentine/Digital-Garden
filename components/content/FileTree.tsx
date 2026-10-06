@@ -39,11 +39,14 @@ import {
 } from "@/lib/features/content/drop-rules";
 import { dropEdgeFor } from "@/lib/features/content/drop-edge";
 import { showKeptSorts } from "@/lib/features/content/kept-sort-display";
+import { showInTextEdits } from "@/lib/features/content/in-text-media";
 import { useSettingsStore } from "@/state/settings-store";
+import { useInTextMediaStore } from "@/state/in-text-media-store";
 import type { KeptSort } from "@/lib/domain/content/sibling-order";
 
 /** A stable empty map, so the mirror memo doesn't rebuild for "no sorts". */
 const NO_SHORTCUT_SORTS: Readonly<Record<string, KeptSort>> = {};
+const NO_CARRIED_TARGETS: TreeNode[] = [];
 
 interface FileTreeProps {
   data: TreeNode[];
@@ -333,7 +336,19 @@ export function FileTree({
   // Folders that keep a sort are shown in it FIRST (kept-sort-display.ts), so
   // an optimistic change takes its sorted place at once and a shortcut's
   // contents follow the folder's own sort.
-  const shownData = useMemo(() => showKeptSorts(data, rootTreeSort ?? null), [data, rootTreeSort]);
+  //
+  // Before that: media a note's text just gained or lost is shown with that
+  // note now, not after the save (in-text-media.ts). Across both forests, so
+  // an image can move between the tree and a carried shortcut target.
+  const inTextEdits = useInTextMediaStore((state) => state.edits);
+  const [editedData, editedTargets] = useMemo(() => {
+    const [tree, targets] = showInTextEdits([data, shortcutTargets ?? NO_CARRIED_TARGETS], inTextEdits);
+    return [tree, shortcutTargets ? targets : shortcutTargets] as const;
+  }, [data, shortcutTargets, inTextEdits]);
+  const shownData = useMemo(
+    () => showKeptSorts(editedData, rootTreeSort ?? null),
+    [editedData, rootTreeSort],
+  );
   // Shortcuts' own sorts (view-only — they never change the folder).
   const shortcutSorts = useSettingsStore((state) => state.ui?.shortcutSorts ?? NO_SHORTCUT_SORTS);
   // Real parent of every loaded row (mirror rows excluded — they are views),
@@ -355,8 +370,8 @@ export function FileTree({
     return parents;
   }, [data, shortcutTargets, rootAncestry]);
   const shownTargets = useMemo(
-    () => (shortcutTargets ? showKeptSorts(shortcutTargets, null) : shortcutTargets),
-    [shortcutTargets],
+    () => (editedTargets ? showKeptSorts(editedTargets, null) : editedTargets),
+    [editedTargets],
   );
   const treeData = useMemo(() => {
     const withReferences = expandReferences(

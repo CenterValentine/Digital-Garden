@@ -89,7 +89,11 @@ type ContentTreeNode = {
   contentType: string;
   treeNodeKind: "content" | "peopleGroup" | "person";
   role: string;
-  reference?: { via: "text" | "filed"; inTextOf: { id: string; title: string } | null };
+  reference?: {
+    via: "text" | "filed";
+    inTextOf: { id: string; title: string } | null;
+    filedWithNote?: boolean;
+  };
   /** The database this node is a promoted row of, if any (plan Phase 5). */
   promotedFromTableId?: string | null;
   children: ContentTreeNode[];
@@ -474,9 +478,14 @@ export async function GET(request: NextRequest) {
                 reference: (() => {
                   const embedder = inTextOfByTarget.get(item.id);
                   const title = embedder ? titleById.get(embedder) : undefined;
+                  // Filed with a note (ownedByNoteId): placed by that, never by
+                  // text — it stays where it is when a note's text takes it or
+                  // lets it go (the client shows that ahead of the save:
+                  // lib/features/content/in-text-media.ts).
+                  const filedWithNote = !!item.ownedByNoteId;
                   return embedder && title !== undefined
-                    ? { via: "text" as const, inTextOf: { id: embedder, title } }
-                    : { via: "filed" as const, inTextOf: null };
+                    ? { via: "text" as const, inTextOf: { id: embedder, title }, filedWithNote }
+                    : { via: "filed" as const, inTextOf: null, filedWithNote };
                 })(),
               }
             : {}),

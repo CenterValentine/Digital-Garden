@@ -90,6 +90,13 @@ import {
   type TreeOptimisticDetail,
 } from "@/lib/features/content/tree-optimistic";
 import {
+  IN_TEXT_FETCH_MS,
+  IN_TEXT_RECONCILE_MS,
+  missingInTextMedia,
+  settleInTextEdits,
+} from "@/lib/features/content/in-text-media";
+import { useInTextMediaStore } from "@/state/in-text-media-store";
+import {
   collectRemovedIds,
   removeNodesFromTree,
   withoutIds,
@@ -1150,6 +1157,36 @@ export function LeftSidebarContent({
       window.removeEventListener(TREE_SYNC_EVENT, handleSync);
     };
   }, [scopedRootParentId, loadTree]);
+
+  // Media a note's text just gained or lost is shown with that note at once
+  // (FileTree, in-text-media.ts); these keep that honest. An edit the data
+  // already shows is dropped whenever the data changes — and only then does
+  // an old one expire, so the tree never falls back on its own to data from
+  // before the edit.
+  const inTextEdits = useInTextMediaStore((state) => state.edits);
+  const inTextRecordedAt = useInTextMediaStore((state) => state.recordedAt);
+  useEffect(() => {
+    if (!treeData) return;
+    const settled = settleInTextEdits([treeData, shortcutTargetTrees], inTextEdits, Date.now());
+    if (settled !== inTextEdits) useInTextMediaStore.getState().settle(settled);
+  }, [treeData, shortcutTargetTrees, inTextEdits]);
+  // On each new edit: fetch at once a row the tree hasn't loaded (a fresh
+  // upload — the edit can't show it until it is here), and reconcile once
+  // the save has had time to land (Hocuspocus stores 2–10 s after an edit),
+  // so the edits settle and media a note let go of shows where it is kept.
+  useEffect(() => {
+    if (inTextRecordedAt === 0) return;
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    const missing = missingInTextMedia(
+      [treeDataRef.current ?? [], shortcutTargetTreesRef.current],
+      useInTextMediaStore.getState().edits,
+    );
+    if (missing.length > 0) {
+      timers.push(setTimeout(() => void loadTreeRef.current?.(true), IN_TEXT_FETCH_MS));
+    }
+    timers.push(setTimeout(() => void loadTreeRef.current?.(true), IN_TEXT_RECONCILE_MS));
+    return () => timers.forEach(clearTimeout);
+  }, [inTextRecordedAt]);
 
   // Imperative reveal request from outside the tree (main-panel path
   // breadcrumb): open the node's ancestors, scroll to it, and select it —
