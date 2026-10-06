@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/database/client";
+import { compareSiblings } from "@/lib/domain/content/sibling-order";
 import type { Prisma } from "@/lib/database/generated/prisma";
 import { generateUniqueSlug } from "@/lib/domain/content";
 import { normalizeUrl } from "@/lib/domain/content/external-validation";
@@ -521,12 +522,7 @@ export async function getExtensionContentPickerTree(
 
   const build = (parentId: string | null): TreeNode[] =>
     (byParent.get(parentId) ?? [])
-      .sort((a, b) => {
-        if (a.displayOrder !== b.displayOrder) {
-          return a.displayOrder - b.displayOrder;
-        }
-        return a.title.localeCompare(b.title);
-      })
+      .sort(compareSiblings) // the app tree's order, ties included
       .map((node) => ({
         id: node.id,
         title: getContentPickerTitle(node),

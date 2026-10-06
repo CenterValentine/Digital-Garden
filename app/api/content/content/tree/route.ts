@@ -7,6 +7,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { compareSiblings } from "@/lib/domain/content/sibling-order";
 import { prisma } from "@/lib/database/client";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import { logger, spanPayload, withRouteTrace, withSpan } from "@/lib/core/logger";
@@ -713,12 +714,10 @@ export async function GET(request: NextRequest) {
       }
 
       function sortChildren(nodes: ContentTreeNode[]) {
-        nodes.sort((a, b) => {
-          if (a.displayOrder !== b.displayOrder) {
-            return a.displayOrder - b.displayOrder;
-          }
-          return a.title.localeCompare(b.title);
-        });
+        // The shared, TOTAL order (sibling-order.ts). Without the id tiebreak,
+        // siblings with equal displayOrder and title kept Postgres's row
+        // order — unspecified here (no orderBy), and it shifts on update.
+        nodes.sort(compareSiblings);
 
         for (const node of nodes) {
           if (node.children.length > 0) {

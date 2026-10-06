@@ -39,3 +39,29 @@ export function refreshIsQuiet(loadedScope: string | null, scope: string): boole
 export function responseStillApplies(requestScope: string, currentScope: string): boolean {
   return requestScope === currentScope;
 }
+
+/**
+ * Whether a finished tree request may replace the tree on screen.
+ *
+ * Beyond the scope check: a refresh that STARTED before a local optimistic
+ * edit (a move, a delete) — or finishes while one is still being written —
+ * carries the server's order from before that edit. Applying it put a dragged
+ * row back where it came from until some later refresh moved it again: rows
+ * visibly changing order on their own. Such a response is dropped; every edit
+ * ends with its own quiet refresh, started after its writes, which applies.
+ *
+ * A scope's first load always applies (if still current) — there is no tree
+ * of that scope on screen for an edit to have changed.
+ */
+export function treeResponseApplies(r: {
+  requestScope: string;
+  currentScope: string;
+  firstLoad: boolean;
+  startedEditGen: number;
+  currentEditGen: number;
+  pendingEdits: number;
+}): boolean {
+  if (r.requestScope !== r.currentScope) return false;
+  if (r.firstLoad) return true;
+  return r.startedEditGen === r.currentEditGen && r.pendingEdits === 0;
+}

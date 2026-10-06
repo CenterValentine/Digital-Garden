@@ -80,6 +80,15 @@ path and probably belongs to the same control.
 
 ---
 
+## File-tree order — remaining ties (2026-10-05, from `fix/smooth-delete`)
+
+The order audit fixed the causes that moved rows between refreshes (anchored drops, owner-scoped moves, one total comparator, stale refreshes dropped, new rows shown where they land). What's left can't reorder rows on its own any more — `compareSiblings` makes every order deterministic — but a few writes still pick a position that may not be the one the user expects:
+
+- [ ] **Duplicate lands tied with its original** (`duplicate/route.ts` copies `displayOrder`), so the copy sits above or below the original by title, then id. Placing it directly after the original needs a renumber, like the move route does.
+- [ ] **Restore from trash keeps the old `displayOrder`**; siblings renumbered since then can put it beside different neighbours. Restore could re-anchor after its old previous sibling if that still exists.
+- [ ] **People mounts keep their own order space** (`/api/people/mounts`, still index-based); a content row and a mount row can't be anchored to each other — anchors skip mount rows.
+- [ ] **The inline-create placeholder can be wiped** by a refresh that starts while the name is being typed (the stale-response guard brackets moves and deletes only; a create would need an end that runs on submit, cancel AND unmount — a missed end drops every later refresh).
+
 ## E-reader — proposed (2026-09-29, plan `EREADER-PLAN.md`)
 
 + → Reader → [Scriptures, Books]. One reader shell (foliate-js for EPUB/PDF, a corpus renderer for scriptures), one annotation store keyed by Readium Locators, and a library of book-source adapters (OPDS, Gutendex, Open Library, upload). Books are file nodes in a user-chosen library folder. Blocked on owner answers to the plan's §10.

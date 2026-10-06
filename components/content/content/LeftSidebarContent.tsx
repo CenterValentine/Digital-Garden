@@ -91,8 +91,10 @@ import {
 import {
   refreshIsQuiet,
   responseStillApplies,
+  treeResponseApplies,
   treeScopeKey,
 } from "@/lib/domain/content/tree-refresh";
+import { placeAmongSiblings, sortedInsertIndex } from "@/lib/domain/content/sibling-order";
 
 interface TreeApiResponse {
   success: boolean;
@@ -175,7 +177,11 @@ function renameTreeNodeId(nodes: TreeNode[], fromId: string, toId: string): Tree
   );
 }
 
-/** Placeholder row for a create made outside the tree (tree-optimistic.ts). */
+/**
+ * Placeholder row for a create made outside the tree (tree-optimistic.ts).
+ * `displayOrder: 0` is the server's default, which those creates store — it
+ * is what places the row correctly (see the sorted insert in the handler).
+ */
 function optimisticTreeNode(tempId: string, row: OptimisticTreeRow, treeParentId: string | null): TreeNode {
   const now = new Date();
   return {
@@ -580,6 +586,11 @@ export function LeftSidebarContent({
   const treeScope = treeScopeKey(activeWorkspaceId, effectiveViewRootContentId);
   const loadedScopeRef = useRef<string | null>(null);
   const currentScopeRef = useRef(treeScope);
+  // Local optimistic edits (move, delete): a counter bumped when one starts
+  // and the number still writing. See treeResponseApplies.
+  const treeEditGenRef = useRef(0);
+  const pendingTreeEditsRef = useRef(0);
+  const loadTreeRef = useRef<((quiet: boolean) => Promise<void>) | null>(null);
   // Declared before the fetch effect below, so the scope is current by the
   // time a scope change's own fetch is issued (effects run in order).
   useEffect(() => {
@@ -590,6 +601,7 @@ export function LeftSidebarContent({
   // while the refetch runs.
   const loadTree = useCallback(async (quiet: boolean) => {
     const requestScope = treeScope;
+    const startedEditGen = treeEditGenRef.current;
     try {
       if (!quiet) setIsLoading(true);
       setError(null);
@@ -621,9 +633,21 @@ export function LeftSidebarContent({
         throw new Error(result.error?.message || "Failed to fetch tree");
       }
 
-      // Left this scope while the request was out: drop it, don't paint the
-      // previous workspace's files over the new one.
-      if (!responseStillApplies(requestScope, currentScopeRef.current)) return;
+      // Left this scope while the request was out, or a local edit started /
+      // is still writing: this response predates it — drop it rather than
+      // paint the old order (or the previous workspace's files) over it.
+      if (
+        !treeResponseApplies({
+          requestScope,
+          currentScope: currentScopeRef.current,
+          firstLoad: !quiet,
+          startedEditGen,
+          currentEditGen: treeEditGenRef.current,
+          pendingEdits: pendingTreeEditsRef.current,
+        })
+      ) {
+        return;
+      }
       setTreeData(result.data.tree);
       loadedScopeRef.current = requestScope;
       // Feed the charter-id cache so metadata-less surfaces (workspace
@@ -658,6 +682,22 @@ export function LeftSidebarContent({
     () => loadTree(refreshIsQuiet(loadedScopeRef.current, treeScope)),
     [loadTree, treeScope]
   );
+  useEffect(() => {
+    loadTreeRef.current = loadTree;
+  }, [loadTree]);
+
+  // Bracket every optimistic tree edit: begin before the tree is touched, end
+  // in a `finally` — a missed end would drop every refresh after it. The end
+  // of the last pending edit reconciles quietly with the CURRENT scope's
+  // loader (not a stale closure from before a workspace switch).
+  const beginTreeEdit = () => {
+    treeEditGenRef.current += 1;
+    pendingTreeEditsRef.current += 1;
+  };
+  const endTreeEdit = () => {
+    pendingTreeEditsRef.current = Math.max(0, pendingTreeEditsRef.current - 1);
+    if (pendingTreeEditsRef.current === 0) void loadTreeRef.current?.(true);
+  };
 
   // Initial load and refresh when trigger or active workspace changes.
   // Gated on `workspaceStoreReady` so we don't double-fetch (once for
@@ -918,11 +958,19 @@ export function LeftSidebarContent({
           // A parent outside the visible tree: nothing to show until it's opened.
           if (treeParentId && !treeContainsId(current, treeParentId)) return current;
           const node = optimisticTreeNode(detail.tempId, detail.row, treeParentId);
-          if (!treeParentId) return [node, ...current];
+          // Where the server will sort it, not on top: these creates store the
+          // default displayOrder (0), so the real row lands by title among the
+          // other zeros — a placeholder pinned to the top jumped there on
+          // resolve. sortedInsertIndex is the tree API's own comparator.
+          const insertSorted = (list: TreeNode[]): TreeNode[] => {
+            const at = sortedInsertIndex(list, node);
+            return [...list.slice(0, at), node, ...list.slice(at)];
+          };
+          if (!treeParentId) return insertSorted(current);
           const insertUnder = (nodes: TreeNode[]): TreeNode[] =>
             nodes.map((candidate) =>
               candidate.id === treeParentId
-                ? { ...candidate, children: [node, ...(candidate.children ?? [])] }
+                ? { ...candidate, children: insertSorted(candidate.children ?? []) }
                 : candidate.children?.length
                   ? { ...candidate, children: insertUnder(candidate.children) }
                   : candidate
@@ -1059,7 +1107,12 @@ export function LeftSidebarContent({
     tree: TreeNode[],
     nodeId: string,
     newParentId: string | null,
-    newIndex: number
+    newIndex: number,
+    // The anchor from the drop (see sibling-order.ts). When present, the row
+    // is placed by placeAmongSiblings — the same function the move route
+    // uses — so the optimistic tree and the server agree. `undefined` keeps
+    // the index path for callers without one.
+    afterId?: string | null
   ): TreeNode[] => {
     // Find and remove the node from its current location
     let movedNode: TreeNode | null = null;
@@ -1128,6 +1181,9 @@ export function LeftSidebarContent({
     const insertNode = (nodes: TreeNode[]): TreeNode[] => {
       // If this is the target parent (or root if newParentId is null)
       if (newParentId === null) {
+        if (afterId !== undefined) {
+          return placeAmongSiblings(nodes, relocated, { afterId, index: adjustedIndex });
+        }
         // Insert at root level
         const newNodes = [...nodes];
         newNodes.splice(adjustedIndex, 0, relocated);
@@ -1137,6 +1193,15 @@ export function LeftSidebarContent({
       return nodes.map((node) => {
         if (node.id === newParentId) {
           const landing = { ...relocated, parentId: newParentId };
+          if (landsInReferences && afterId !== undefined) {
+            return {
+              ...node,
+              references: placeAmongSiblings(node.references ?? [], landing, {
+                afterId,
+                index: adjustedIndex,
+              }),
+            };
+          }
           if (landsInReferences) {
             const newReferences = [...(node.references ?? [])];
             // react-arborist's index counts rendered rows (primary children
@@ -1149,6 +1214,15 @@ export function LeftSidebarContent({
               landing,
             );
             return { ...node, references: newReferences };
+          }
+          if (afterId !== undefined) {
+            return {
+              ...node,
+              children: placeAmongSiblings(node.children ?? [], landing, {
+                afterId,
+                index: adjustedIndex,
+              }),
+            };
           }
           // Found the target parent, insert into its children
           const newChildren = [...(node.children || [])];
@@ -1182,8 +1256,10 @@ export function LeftSidebarContent({
     dragIds: string[];
     parentId: string | null;
     index: number;
+    /** From FileTree: the row the drop landed after, read off the screen. */
+    afterId?: string | null;
   }) => {
-    const { dragIds, index } = args;
+    const { dragIds, index, afterId } = args;
     let { parentId } = args;
 
     // Store original tree state for rollback if any move fails
@@ -1283,16 +1359,53 @@ export function LeftSidebarContent({
     // position (same parent, adjacent index). React-arborist sometimes
     // fires `onMove` even when the user just released without changing
     // anything.
-    const everyDragIsNoop = dragged.every(({ id }) => {
+    // Each dragged row's anchor: the first goes after the drop's anchor, each
+    // next one after the row before it, so the group keeps its drag order.
+    const anchorFor = (i: number): string | null | undefined =>
+      afterId === undefined ? undefined : i === 0 ? afterId : dragged[i - 1].id;
+
+    // With an anchor, "no-op" means the placement leaves the list exactly as
+    // it is. The index comparison below can't be trusted then: `index` counts
+    // the rows on screen (an open reference block included) and
+    // `currentIndex` the data array, so with a block open at the start a real
+    // move to the top read as a no-op and was silently dropped.
+    const listHolding = (id: string): TreeNode[] | null => {
       const pos = positions.get(id);
-      if (!pos) return false;
-      const isSameParent = pos.currentParentId === parentId;
-      return (
-        isSameParent &&
-        (pos.currentIndex === index || pos.currentIndex === index - 1)
-      );
-    });
+      if (!pos) return null;
+      if (pos.currentParentId === null) return originalTree;
+      const holder = findTreeNodeById(originalTree, pos.currentParentId);
+      if (!holder) return null;
+      if (holder.children?.some((c) => c.id === id)) return holder.children;
+      if (holder.references?.some((c) => c.id === id)) return holder.references ?? null;
+      return null;
+    };
+    const everyDragIsNoop =
+      afterId !== undefined
+        ? (() => {
+            const list = listHolding(dragged[0].id);
+            if (!list) return false;
+            const allHere = dragged.every(
+              ({ id }) => positions.get(id)?.currentParentId === parentId && listHolding(id) === list
+            );
+            if (!allHere) return false;
+            let order: TreeNode[] = list;
+            dragged.forEach(({ node }, i) => {
+              order = placeAmongSiblings(order, node, { afterId: anchorFor(i), index: index + i });
+            });
+            return order.map((n) => n.id).join("\n") === list.map((n) => n.id).join("\n");
+          })()
+        : dragged.every(({ id }) => {
+            const pos = positions.get(id);
+            if (!pos) return false;
+            const isSameParent = pos.currentParentId === parentId;
+            return (
+              isSameParent &&
+              (pos.currentIndex === index || pos.currentIndex === index - 1)
+            );
+          });
     if (everyDragIsNoop) return;
+
+    beginTreeEdit();
 
     try {
       // OPTIMISTIC UPDATE: walk every dragged id and apply each move to
@@ -1305,6 +1418,7 @@ export function LeftSidebarContent({
           dragged[i].id,
           parentId,
           index + i,
+          anchorFor(i),
         );
       }
       setTreeData(optimisticTree);
@@ -1353,6 +1467,9 @@ export function LeftSidebarContent({
                 contentId: id,
                 targetParentId: parentId ?? scopedRootParentId,
                 newDisplayOrder: apiIndex,
+                // The placement that actually decides it (see sibling-order.ts);
+                // newDisplayOrder stays as the server's fallback.
+                afterId: anchorFor(i),
               }),
             });
 
@@ -1447,6 +1564,10 @@ export function LeftSidebarContent({
       }
 
       throw err;
+    } finally {
+      // Reconcile once the writes are in — a refresh that started during the
+      // drag was dropped (treeResponseApplies), so this is the one that lands.
+      endTreeEdit();
     }
   };
 
@@ -1949,6 +2070,9 @@ export function LeftSidebarContent({
       const requestBody: Record<string, unknown> = {
         title: config.title,
         parentId: requestParentId,
+        // Where the placeholder row already is (insertTempNode puts it first),
+        // so the real row doesn't jump to its alphabetical spot on reconcile.
+        position: "top",
       };
       if (createTarget.peopleGroupId) {
         requestBody.peopleGroupId = createTarget.peopleGroupId;
@@ -2598,6 +2722,9 @@ ${workbenchWarning}`
     // the node itself, and its descendants stay readable (restored with it).
     closeContentTabs(ids);
 
+    // Immediately before the try whose `finally` ends it (no await between,
+    // so a refresh already in flight still sees the bump before it lands).
+    beginTreeEdit();
     try {
       // Node titles, for the error message if anything fails
       const findNode = (nodes: TreeNode[], targetId: string): TreeNode | null => {
@@ -2742,7 +2869,7 @@ ${workbenchWarning}`
     } finally {
       // Settle against the server without the skeleton — the tree stays
       // mounted, so scroll position and expansion are untouched.
-      void loadTree(true);
+      endTreeEdit();
     }
   };
 

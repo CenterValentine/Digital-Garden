@@ -16,6 +16,7 @@
 
 import { useRef, useEffect, useMemo } from "react";
 import { Tree, type NodeApi, type TreeApi, type NodeRendererProps } from "react-arborist";
+import { dropRowFor, resolveDropAnchor } from "@/lib/domain/content/sibling-order";
 import { FileNode } from "./FileNode";
 import { useTreeStateStore } from "@/state/tree-state-store";
 import { useTreeRevealStore, type TreeRevealRequest } from "@/state/tree-reveal-store";
@@ -34,6 +35,13 @@ interface FileTreeProps {
     dragIds: string[];
     parentId: string | null;
     index: number;
+    /**
+     * The row the drop landed after (null = first of its kind), read from the
+     * rows ON SCREEN. `index` counts those rows too — including a spliced-in
+     * reference block — so it is only meaningful in this list; the anchor
+     * means the same thing to the server. Absent when it can't be resolved.
+     */
+    afterId?: string | null;
   }) => Promise<void>;
   onSelect?: (
     nodes: TreeNode[],
@@ -316,10 +324,35 @@ export function FileTree({
     dragIds: string[];
     parentId: string | null;
     index: number;
+    parentNode?: NodeApi<TreeNode> | null;
+    dragNodes?: NodeApi<TreeNode>[];
   }) => {
     if (onMove) {
       try {
-        await onMove(args);
+        // The rows the drop index counts: the new parent's rendered children
+        // (reference block and mirrors included), or the top level.
+        const visible: NodeApi<TreeNode>[] =
+          (args.parentNode
+            ? args.parentNode.children
+            : treeRef.current?.root?.children) ?? [];
+        const first = args.dragNodes?.[0]?.data;
+        // A referenced row dropped under a parent joins its reference block
+        // and is ordered among references; everything else among primaries.
+        // The top level has no block, so everything there is primary.
+        const kind =
+          args.parentId !== null && first?.role === "referenced" ? "reference" : "primary";
+        const afterId = resolveDropAnchor(
+          visible.map((row) => dropRowFor(row.data)),
+          args.index,
+          new Set(args.dragIds),
+          kind,
+        );
+        await onMove({
+          dragIds: args.dragIds,
+          parentId: args.parentId,
+          index: args.index,
+          afterId,
+        });
       } catch (error) {
         clientLogger.error({
           layer: "ui",

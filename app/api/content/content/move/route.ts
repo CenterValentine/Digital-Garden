@@ -13,6 +13,11 @@ import { prisma } from "@/lib/database/client";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import { updateMaterializedPath } from "@/lib/domain/content";
 import type { MoveContentRequest } from "@/lib/domain/content/api-types";
+import {
+  compareSiblings,
+  placeAmongSiblings,
+  type SiblingPlacement,
+} from "@/lib/domain/content/sibling-order";
 import { logger, spanPayload, withRouteTrace, withSpan } from "@/lib/core/logger";
 
 const ROUTE_PATH = "/api/content/content/move";
@@ -28,6 +33,15 @@ export async function POST(request: NextRequest) {
       const body = (await request.json()) as MoveContentRequest;
 
       const { contentId, targetParentId, newDisplayOrder } = body;
+      // The row the item was dropped after (null = first). Preferred over
+      // newDisplayOrder, which indexes the client's VISIBLE rows — a different
+      // list from the sibling list below whenever a parent has referenced
+      // media, hidden rows or an expanded reference block. Shape-checked only;
+      // a name that isn't a sibling falls back to the index.
+      const afterId =
+        body.afterId === null || typeof body.afterId === "string"
+          ? body.afterId
+          : undefined;
 
       if (!contentId) {
         return NextResponse.json(
@@ -322,7 +336,12 @@ export async function POST(request: NextRequest) {
         },
         async (span) => {
           // Per-row debug log of sibling order removed — too noisy.
-          const result = await moveContentToPosition(contentId, finalParentId, newDisplayOrder ?? 0);
+          const result = await moveContentToPosition(
+            contentId,
+            finalParentId,
+            { afterId, index: newDisplayOrder ?? 0 },
+            session.user.id,
+          );
           if (!result) {
             throw new Error('Failed to update content position');
           }
@@ -515,11 +534,16 @@ async function updateChildrenPaths(parentId: string) {
 async function moveContentToPosition(
   contentId: string,
   parentId: string | null,
-  visualIndex: number
+  placement: SiblingPlacement,
+  ownerId: string,
 ) {
+  // ownerId: without it, a move at the ROOT treated every user's root items as
+  // siblings — renumbering their displayOrder in this transaction and offsetting
+  // the index by however many of them there were.
   const siblings = await prisma.contentNode.findMany({
     where: {
       parentId,
+      ownerId,
       deletedAt: null,
     },
     select: {
@@ -530,20 +554,11 @@ async function moveContentToPosition(
     },
   });
 
-  siblings.sort((a, b) => {
-    if (a.displayOrder !== b.displayOrder) {
-      return a.displayOrder - b.displayOrder;
-    }
-    return a.title.localeCompare(b.title);
-  });
+  // The same order the tree shows (sibling-order.ts) — renumbering from any
+  // other order would reshuffle rows the user never touched.
+  siblings.sort(compareSiblings);
 
-  const movedItemIndex = siblings.findIndex(s => s.id === contentId);
-  let movedItem;
-  if (movedItemIndex >= 0) {
-    [movedItem] = siblings.splice(movedItemIndex, 1);
-  }
-
-  const targetIndex = Math.max(0, Math.min(visualIndex, siblings.length));
+  let movedItem = siblings.find((s) => s.id === contentId);
 
   if (!movedItem) {
     movedItem = await prisma.contentNode.findUnique({
@@ -560,9 +575,11 @@ async function moveContentToPosition(
     }
   }
 
-  siblings.splice(targetIndex, 0, movedItem);
+  // The same placement the client's optimistic update uses, so the row lands
+  // where it was shown.
+  const ordered = placeAmongSiblings(siblings, movedItem, placement);
 
-  const updates = siblings.map((sibling, index) => {
+  const updates = ordered.map((sibling, index) => {
     const updateData: { displayOrder: number; parentId?: string | null } = { displayOrder: index };
 
     if (sibling.id === contentId) {
