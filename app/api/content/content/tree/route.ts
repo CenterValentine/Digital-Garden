@@ -8,6 +8,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { compareSiblings } from "@/lib/domain/content/sibling-order";
+import { outOfScopeShortcutTargets } from "@/lib/domain/content/shortcut-targets";
 import { prisma } from "@/lib/database/client";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import { logger, spanPayload, withRouteTrace, withSpan } from "@/lib/core/logger";
@@ -678,9 +679,31 @@ export async function GET(request: NextRequest) {
         }
       }
 
+      // Folders that shortcuts inside a view point at, kept out of the view's
+      // rows but returned beside them (see shortcut-targets.ts).
+      const carriedNodes = new Map<string, ContentTreeNode>();
+      let carriedTargetIds: string[] = [];
+
       // View filtering
       if (viewRootContentId && nodeMap.has(viewRootContentId)) {
         const included = collectSubtreeIds(nodeMap, viewRootContentId);
+        const lite = new Map(
+          [...nodeMap.values()].map((node) => [
+            node.id,
+            {
+              id: node.id,
+              parentId: node.parentId,
+              contentType: node.contentType,
+              shortcutTargetId: node.shortcut?.targetDeleted ? null : (node.shortcut?.targetId ?? null),
+            },
+          ]),
+        );
+        const carried = outOfScopeShortcutTargets(lite, included);
+        carriedTargetIds = carried.targetIds;
+        for (const id of carried.carriedIds) {
+          const node = nodeMap.get(id);
+          if (node) carriedNodes.set(id, node);
+        }
         for (const id of [...nodeMap.keys()]) {
           if (!included.has(id)) nodeMap.delete(id);
         }
@@ -731,6 +754,20 @@ export async function GET(request: NextRequest) {
       // Sort first, partition second — references keep the parent's sort order
       // among themselves instead of needing their own comparator.
       partitionReferences(rootNodes);
+
+      // Shortcut targets outside the view: same hierarchy, sort and partition as
+      // the tree, built from the carried nodes only (none of them is in
+      // nodeMap, so neither pass can attach them to view rows).
+      for (const node of carriedNodes.values()) {
+        if (carriedTargetIds.includes(node.id)) continue;
+        const parent = node.parentId ? carriedNodes.get(node.parentId) : undefined;
+        if (parent) parent.children.push(node);
+      }
+      const shortcutTargets = carriedTargetIds
+        .map((id) => carriedNodes.get(id))
+        .filter((node): node is ContentTreeNode => node !== undefined);
+      for (const target of shortcutTargets) sortChildren(target.children);
+      partitionReferences(shortcutTargets);
 
       // Window reference rows: a note containing Note Window blocks surfaces
       // each windowed target in its Reference Drawer. Rows are DERIVED per
@@ -799,6 +836,8 @@ export async function GET(request: NextRequest) {
         data: {
           tree: rootNodes,
           stats,
+          // What out-of-view shortcuts mirror. Never rows of the tree.
+          shortcutTargets,
         },
       });
     } catch (error) {

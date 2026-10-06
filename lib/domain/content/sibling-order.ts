@@ -159,3 +159,43 @@ export function dropRowFor(row: DropRowSource): DropRow {
 export function displayOrderForTop(firstSiblingOrder: number | null): number {
   return firstSiblingOrder === null ? 0 : firstSiblingOrder - 1;
 }
+
+/** A tree row as far as placing a moved row under a parent goes. */
+export interface PlaceableTreeNode<T> {
+  id: string;
+  parentId?: string | null;
+  role?: string | null;
+  children?: T[];
+  references?: T[];
+}
+
+/**
+ * `nodes` with `moved` placed under the row `parentId` — into `references`
+ * for a referenced row, `children` otherwise — by `placeAmongSiblings`.
+ * Branches that don't contain the parent keep their identity. Used for the
+ * carried shortcut targets of a view-scoped tree: a row dropped onto an
+ * out-of-view shortcut has no parent in the visible tree to land under.
+ */
+export function insertUnderParent<T extends PlaceableTreeNode<T>>(
+  nodes: T[],
+  parentId: string,
+  moved: T,
+  placement: SiblingPlacement,
+): T[] {
+  let changed = false;
+  const next = nodes.map((candidate) => {
+    if (candidate.id === parentId) {
+      changed = true;
+      const landing = { ...moved, parentId } as T;
+      return moved.role === "referenced"
+        ? { ...candidate, references: placeAmongSiblings(candidate.references ?? [], landing, placement) }
+        : { ...candidate, children: placeAmongSiblings(candidate.children ?? [], landing, placement) };
+    }
+    if (!candidate.children?.length) return candidate;
+    const children = insertUnderParent(candidate.children, parentId, moved, placement);
+    if (children === candidate.children) return candidate;
+    changed = true;
+    return { ...candidate, children };
+  });
+  return changed ? next : nodes;
+}

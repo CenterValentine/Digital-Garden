@@ -18,10 +18,13 @@ import type { TreeNode } from "@/lib/domain/content/types";
 
 interface FileTreeWithDropZoneProps {
   data: TreeNode[];
+  /** Passed through to FileTree — see its prop of the same name. */
+  shortcutTargets?: TreeNode[];
   onMove?: (args: {
     dragIds: string[];
     parentId: string | null;
     index: number;
+    afterId?: string | null;
   }) => Promise<void>;
   onSelect?: (nodes: TreeNode[]) => void;
   onRename?: (id: string, name: string) => Promise<void>;

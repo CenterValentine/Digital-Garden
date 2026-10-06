@@ -9,16 +9,17 @@ last_updated: 2026-05-13
 
 # Current Sprint Addendum
 
-## October 5, 2026 — The file tree stops flashing; deleting is instant; rows keep their order
+## October 5, 2026 — The file tree stops flashing; deleting is instant; rows keep their order; view shortcuts show their folder
 
 **Tree**: worktree `.claude/worktrees/smooth-delete`, branch `fix/smooth-delete` (off `origin/main` at `49b94490`)
-**Status**: typecheck / lint 151 (0 errors, none new) / `tree:smooth:check` 61 (new, in the quality workflow) / tree + workspace gates green; no schema, TipTap or extension change → no Hocuspocus redeploy. Owner browser smoke pending.
+**Status**: typecheck / lint 151 (0 errors, none new) / `tree:smooth:check` 69 (new, in the quality workflow) / `shortcut-mirror:check` (out-of-view cases) / tree + workspace gates green; no schema, TipTap or extension change → no Hocuspocus redeploy. Owner browser smoke pending.
 
 ### Shipped
 - **Skeleton = a scope's first load only** (`tree-refresh.ts`): every refresh of a tree already on screen is quiet — covers create, duplicate, links, uploads, folder view, the header refresh and all `dg:tree-refresh` dispatchers. Stale-scope responses are dropped.
 - **Optimistic delete** (`tree-remove.ts`): rows go at once, tabs close, selection pruned, quiet reconcile; failures restored in place.
 - **Delete dialog opens at once**: the Google Drive check runs behind it, file rows only; a Drive copy is deleted only if the dialog showed the choice.
 - **Rows keep the order the user set** (`sibling-order.ts`): drops are anchors placed by one function on server and client; the move route is owner-scoped; one total comparator (id tiebreak) everywhere; refreshes that predate a local edit are dropped; new rows are shown where the server puts them (inline create asks for the top).
+- **Shortcuts in a view show their folder**: the tree API returns out-of-view shortcut targets beside the tree (`shortcut-targets.ts`); the mirror indexes them; a drop onto such a shortcut appears in its contents at once.
 
 ### Smoke checklist (owner)
 1. Scroll the tree well down, delete a file (⌥D → confirm) → it vanishes instantly, no flash, scroll stays.
@@ -29,6 +30,8 @@ last_updated: 2026-05-13
 6. Open a reference block that's set to show at the start, then drag a sub-note to the very top → it moves (before, this was silently ignored).
 7. Create a new note inline in a folder of alphabetically-named notes → after naming it, it stays at the top instead of jumping to its alphabetical spot.
 8. Drag a row, then immediately delete another → neither the dragged row nor the rest of the folder reshuffles when the tree settles.
+9. In the Career Hunt view, expand "Career Development & Resources" → its ten items appear (they live under Career Pathways, outside the view).
+10. Drag a note from the view onto that shortcut (or between two of its mirrored items) → it appears inside the shortcut at once, at the spot you dropped it, and stays there after a reload; it no longer vanishes.
 
 ## October 4, 2026 — Coming back lands you where you were (workspace cold-load restore)
 

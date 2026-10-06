@@ -74,9 +74,25 @@ function indexTree(nodes: TreeNode[], into: Map<string, TreeNode>): void {
   }
 }
 
-export function buildTreeIndex(nodes: TreeNode[]): Map<string, TreeNode> {
+export function buildTreeIndex(
+  nodes: TreeNode[],
+  /**
+   * Folders a shortcut points at that are NOT in `nodes` — a view-scoped tree
+   * leaves out everything outside its root, so the tree API returns those
+   * targets beside it (`shortcutTargets`, see shortcut-targets.ts). Indexed
+   * only where the visible tree has no row of that id: what's on screen wins.
+   */
+  extra: TreeNode[] = [],
+): Map<string, TreeNode> {
   const index = new Map<string, TreeNode>();
   indexTree(nodes, index);
+  if (extra.length > 0) {
+    const carried = new Map<string, TreeNode>();
+    indexTree(extra, carried);
+    for (const [id, node] of carried) {
+      if (!index.has(id)) index.set(id, node);
+    }
+  }
   return index;
 }
 

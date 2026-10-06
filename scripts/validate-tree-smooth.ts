@@ -43,6 +43,7 @@ import {
   compareSiblings,
   displayOrderForTop,
   dropRowFor,
+  insertUnderParent,
   placeAmongSiblings,
   resolveDropAnchor,
   sortedInsertIndex,
@@ -201,6 +202,34 @@ console.log("\nplacing a dropped row (placeAmongSiblings — server AND optimist
     assert.deepEqual(primary(oldWay), ["A", "B", "C"], "the old way silently undoes the drop");
     // The anchor means the same thing in both lists.
     assert.deepEqual(primary(placeAmongSiblings(server, r("A"), { afterId: "B", index: 1 })), ["B", "A", "C"]);
+  });
+}
+
+console.log("\nplacing a row under a parent (insertUnderParent — the carried shortcut targets)");
+{
+  type N = { id: string; parentId?: string | null; role?: string | null; children?: N[]; references?: N[] };
+  const tree = (): N[] => [
+    { id: "out", children: [{ id: "a" }, { id: "b" }], references: [{ id: "img" }] },
+    { id: "other", children: [{ id: "x" }] },
+  ];
+  check("lands under the parent, after its anchor", () => {
+    const next = insertUnderParent(tree(), "out", { id: "new" }, { afterId: "a", index: 0 });
+    assert.deepEqual(next[0].children!.map((c) => c.id), ["a", "new", "b"]);
+    assert.equal(next[0].children![1].parentId, "out");
+  });
+  check("a referenced row lands in the parent's references", () => {
+    const next = insertUnderParent(tree(), "out", { id: "r", role: "referenced" }, { afterId: null, index: 0 });
+    assert.deepEqual(next[0].references!.map((c) => c.id), ["r", "img"]);
+  });
+  check("deeper parents are found, and other branches keep their identity", () => {
+    const t = tree();
+    const next = insertUnderParent(t, "x", { id: "deep" }, { afterId: null, index: 0 });
+    assert.equal(next[0], t[0]);
+    assert.deepEqual(next[1].children![0].children!.map((c) => c.id), ["deep"]);
+  });
+  check("no such parent → the same array back", () => {
+    const t = tree();
+    assert.equal(insertUnderParent(t, "missing", { id: "n" }, { afterId: null, index: 0 }), t);
   });
 }
 
@@ -440,6 +469,33 @@ console.log("\none order, one placement (source pins)");
   check("optimistic rows from outside the tree are inserted sorted, not on top", () => {
     assert.ok(source.includes("sortedInsertIndex(list, node)"));
     assert.equal(source.includes("if (!treeParentId) return [node, ...current];"), false);
+  });
+}
+
+console.log("\nout-of-view shortcut targets are wired end to end (source pins)");
+{
+  const read = (rel: string) => readFileSync(join(__dirname, "..", rel), "utf8");
+  const treeRoute = read("app/api/content/content/tree/route.ts");
+  const fileTree = read("components/content/FileTree.tsx");
+  check("the tree route carries them and returns them beside the tree", () => {
+    assert.ok(treeRoute.includes("outOfScopeShortcutTargets(lite, included)"));
+    assert.ok(/data: \{[\s\S]*shortcutTargets,[\s\S]*\}/.test(treeRoute));
+  });
+  check("the sidebar applies them in the SAME guarded load as the tree", () => {
+    const loadTree = sliceBetween("const loadTree = useCallback(", "const fetchTree = useCallback(");
+    const apply = loadTree.indexOf("setTreeData(result.data.tree);");
+    const targets = loadTree.indexOf("setShortcutTargetTrees(result.data.shortcutTargets ?? []);");
+    assert.ok(apply > 0 && targets > apply && loadTree.indexOf("treeResponseApplies(") < apply);
+    assert.ok(source.includes("shortcutTargets={shortcutTargetTrees}"));
+  });
+  check("FileTree indexes them for the mirror", () => {
+    assert.ok(fileTree.includes("buildTreeIndex(withReferences, shortcutTargets)"));
+  });
+  check("a drop onto an out-of-view shortcut shows in its mirror at once, and rolls back with the tree", () => {
+    const move = sliceBetween("const handleMove = async", "const handleRename");
+    assert.ok(move.includes("insertUnderParent("));
+    assert.ok(move.includes("setShortcutTargetTrees(nextTargets);"), "the insert's result must be applied");
+    assert.equal((move.match(/setShortcutTargetTrees\(targetTreesBefore\)/g) ?? []).length, 2);
   });
 }
 

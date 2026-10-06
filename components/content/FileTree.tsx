@@ -31,6 +31,11 @@ import {
 
 interface FileTreeProps {
   data: TreeNode[];
+  /**
+   * Folders that shortcuts in a view-scoped tree point at but the view leaves
+   * out (tree API `shortcutTargets`). Only the shortcut mirror reads them.
+   */
+  shortcutTargets?: TreeNode[];
   onMove?: (args: {
     dragIds: string[];
     parentId: string | null;
@@ -77,6 +82,7 @@ interface FileTreeProps {
 
 export function FileTree({
   data,
+  shortcutTargets,
   onMove,
   onSelect,
   onRename,
@@ -306,10 +312,10 @@ export function FileTree({
     return expandShortcutMirrors(
       withReferences,
       expandedIds,
-      buildTreeIndex(withReferences),
+      buildTreeIndex(withReferences, shortcutTargets),
       hiddenNestedShortcutIds,
     );
-  }, [data, expandedIds, referencesAtStartIds, hiddenNestedShortcutIds]);
+  }, [data, shortcutTargets, expandedIds, referencesAtStartIds, hiddenNestedShortcutIds]);
 
   // Get initial open state from persisted IDs
   const initialOpenState = useMemo(() => {

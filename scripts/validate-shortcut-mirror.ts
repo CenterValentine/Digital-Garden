@@ -33,6 +33,7 @@ import {
   MAX_MIRROR_DEPTH,
 } from "@/lib/features/content/shortcut-mirror";
 import type { TreeNode } from "@/lib/domain/content/types";
+import { outOfScopeShortcutTargets, type ScopedNodeLite } from "@/lib/domain/content/shortcut-targets";
 
 let failures = 0;
 
@@ -362,11 +363,97 @@ function findRow(nodes: TreeNode[], id: string): TreeNode | null {
   );
 }
 
+// --- Out-of-view targets (view-scoped trees) ----------------------------
+// Owner report 2026-10-05: a shortcut in the Career Hunt VIEW to a folder
+// under Career Pathways (outside the view) expanded to nothing. The client
+// looks a shortcut's target up in the tree it has; the view filter had left
+// the target out. The tree API now returns such targets beside the tree.
+{
+  // What a view-scoped tree delivers: the shortcut row, but not its target.
+  const view = [shortcutTo("sc", "pathways-dev")];
+  const carried = [
+    node("pathways-dev", {
+      contentType: "folder",
+      children: [node("resume-tips"), node("interview-prep")],
+    }),
+  ];
+  const before = expandShortcutMirrors(view, new Set(["sc"]), buildTreeIndex(view), new Set());
+  check(
+    "THE BUG: without the carried target, an out-of-view shortcut mirrors nothing",
+    (findRow(before, "sc")?.children.length ?? -1) === 0,
+  );
+  const after = expandShortcutMirrors(view, new Set(["sc"]), buildTreeIndex(view, carried), new Set());
+  check(
+    "with the carried target, it mirrors the folder's contents",
+    (findRow(after, "sc")?.children ?? []).map((c) => c.mirrorOf).join() === "resume-tips,interview-prep",
+    (findRow(after, "sc")?.children ?? []).map((c) => c.mirrorOf).join(),
+  );
+  check(
+    "carried targets never become rows of the tree",
+    !allIds(after).includes("pathways-dev"),
+  );
+
+  // On-screen rows win an id collision with a carried copy.
+  const onScreen = [node("dup", { title: "on screen" })];
+  const index = buildTreeIndex(onScreen, [node("dup", { title: "carried" })]);
+  check("an id on screen beats a carried copy", index.get("dup")?.title === "on screen");
+
+  // Which targets the route carries.
+  const lite = (id: string, parentId: string | null, contentType: string, shortcutTargetId?: string | null): ScopedNodeLite =>
+    ({ id, parentId, contentType, shortcutTargetId });
+  const all = new Map(
+    [
+      lite("view", null, "folder"),
+      lite("sc-out", "view", "shortcut", "out"),
+      lite("sc-in", "view", "shortcut", "inner"),
+      lite("sc-note", "view", "shortcut", "a-note"),
+      lite("sc-broken", "view", "shortcut", null),
+      lite("sc-out-again", "view", "shortcut", "out"),
+      lite("inner", "view", "folder"),
+      lite("out-parent", null, "folder"),
+      lite("out", "out-parent", "folder"),
+      lite("out-child", "out", "note"),
+      lite("out-sub", "out", "folder"),
+      lite("out-grandchild", "out-sub", "note"),
+      lite("a-note", null, "note"),
+      lite("unrelated", null, "folder"),
+    ].map((n) => [n.id, n]),
+  );
+  const included = new Set(["view", "sc-out", "sc-in", "sc-note", "sc-broken", "sc-out-again", "inner"]);
+  const picked = outOfScopeShortcutTargets(all, included);
+  check("carries a folder target outside the view", picked.targetIds.join() === "out", picked.targetIds.join());
+  check(
+    "…with its whole subtree, and nothing else",
+    [...picked.carriedIds].sort().join() === "out,out-child,out-grandchild,out-sub",
+    [...picked.carriedIds].sort().join(),
+  );
+  check("a target already in the view isn't carried", !picked.carriedIds.has("inner"));
+  check("a non-folder target isn't carried (nothing to mirror)", !picked.carriedIds.has("a-note"));
+  check("two shortcuts to one folder carry it once", picked.targetIds.filter((t) => t === "out").length === 1);
+  check("the target's own parent isn't carried", !picked.carriedIds.has("out-parent"));
+
+  // A shortcut to an ANCESTOR of the view root must not re-ship the view.
+  const ancestorCase = new Map(
+    [
+      lite("top", null, "folder"),
+      lite("view", "top", "folder"),
+      lite("sc-up", "view", "shortcut", "top"),
+      lite("sibling", "top", "note"),
+    ].map((n) => [n.id, n]),
+  );
+  const up = outOfScopeShortcutTargets(ancestorCase, new Set(["view", "sc-up"]));
+  check(
+    "a shortcut to the view root's ancestor carries it minus the view itself",
+    [...up.carriedIds].sort().join() === "sibling,top",
+    [...up.carriedIds].sort().join(),
+  );
+}
+
 if (failures > 0) {
   console.error(`\nshortcut-mirror:check — ${failures} check(s) failed.\n`);
   process.exit(1);
 }
 
 console.log(
-  "shortcut-mirror:check — OK (identity, mirroring, broken targets, laziness, cycles, drop forwarding, nested-shortcut hiding)",
+  "shortcut-mirror:check — OK (identity, mirroring, broken targets, laziness, cycles, drop forwarding, nested-shortcut hiding, out-of-view targets)",
 );

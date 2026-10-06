@@ -94,12 +94,18 @@ import {
   treeResponseApplies,
   treeScopeKey,
 } from "@/lib/domain/content/tree-refresh";
-import { placeAmongSiblings, sortedInsertIndex } from "@/lib/domain/content/sibling-order";
+import {
+  insertUnderParent,
+  placeAmongSiblings,
+  sortedInsertIndex,
+} from "@/lib/domain/content/sibling-order";
 
 interface TreeApiResponse {
   success: boolean;
   data: {
     tree: TreeNode[];
+    /** Out-of-view folders that shortcuts in this view point at (shortcut-targets.ts). */
+    shortcutTargets?: TreeNode[];
     stats: {
       totalNodes: number;
       rootNodes: number;
@@ -310,6 +316,10 @@ export function LeftSidebarContent({
   onCreateAiImage,
 }: LeftSidebarContentProps) {
   const [treeData, setTreeData] = useState<TreeNode[] | null>(null);
+  // What shortcuts in a view-scoped tree mirror when their target folder is
+  // outside the view (tree API `shortcutTargets`). Applied with the tree, by
+  // the same guarded load, so the two can never disagree about freshness.
+  const [shortcutTargetTrees, setShortcutTargetTrees] = useState<TreeNode[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedCount, setSelectedCount] = useState(0);
@@ -649,6 +659,7 @@ export function LeftSidebarContent({
         return;
       }
       setTreeData(result.data.tree);
+      setShortcutTargetTrees(result.data.shortcutTargets ?? []);
       loadedScopeRef.current = requestScope;
       // Feed the charter-id cache so metadata-less surfaces (workspace
       // tabs) can render the ScrollText identity consistently.
@@ -1264,6 +1275,7 @@ export function LeftSidebarContent({
 
     // Store original tree state for rollback if any move fails
     const originalTree = treeData;
+    const targetTreesBefore = shortcutTargetTrees;
 
     if (!originalTree || dragIds.length === 0) return;
 
@@ -1422,6 +1434,24 @@ export function LeftSidebarContent({
         );
       }
       setTreeData(optimisticTree);
+      // Dropped onto a shortcut whose folder is outside this view: the main
+      // tree has no row to put it under, so it just left the view. Put it in
+      // the carried target too, so the shortcut's mirror shows it now rather
+      // than after the reconcile.
+      if (
+        parentId &&
+        !findTreeNodeById(originalTree, parentId) &&
+        findTreeNodeById(targetTreesBefore, parentId)
+      ) {
+        let nextTargets = targetTreesBefore;
+        dragged.forEach(({ node }, i) => {
+          nextTargets = insertUnderParent(nextTargets, parentId!, node, {
+            afterId: anchorFor(i),
+            index: index + i,
+          });
+        });
+        setShortcutTargetTrees(nextTargets);
+      }
 
       // Fire the moves sequentially. Parallel POSTs against the move
       // endpoint would race each other on displayOrder slot assignment
@@ -1503,6 +1533,7 @@ export function LeftSidebarContent({
         });
         // Rollback to original tree state so the UI matches truth.
         setTreeData(originalTree);
+        setShortcutTargetTrees(targetTreesBefore);
         const desc =
           failures.length === dragged.length
             ? failures[0].message
@@ -1553,6 +1584,7 @@ export function LeftSidebarContent({
       });
       // Rollback to original tree state on any error
       setTreeData(originalTree);
+      setShortcutTargetTrees(targetTreesBefore);
 
       // Show user-friendly error notification
       const errorMessage = err instanceof Error ? err.message : "An unexpected error occurred";
@@ -3383,6 +3415,7 @@ ${workbenchWarning}`
           />
           <FileTreeWithDropZone
             data={treeData}
+            shortcutTargets={shortcutTargetTrees}
             rootDropTarget={rootDropTarget}
             onMove={handleMove}
             onSelect={handleSelect}
