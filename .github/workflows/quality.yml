@@ -73,6 +73,11 @@ jobs:
       - name: Output-target checks
         run: pnpm output-targets:check
 
+      # The picker's row walk: eligibility decides what can be PICKED, folders
+      # are always browsed (a notes-only picker once listed only top-level notes).
+      - name: Picker tree checks
+        run: pnpm picker:tree:check
+
   markdown-safety:
     name: Markdown block-safety
     runs-on: ubuntu-latest
