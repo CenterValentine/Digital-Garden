@@ -23,6 +23,7 @@
  */
 
 import { isUuid } from "@/lib/domain/content/uuid";
+import { removeNodesFromTree } from "@/lib/domain/content/tree-remove";
 
 export interface OrderedSibling {
   id: string;
@@ -191,11 +192,75 @@ export function insertUnderParent<T extends PlaceableTreeNode<T>>(
         ? { ...candidate, references: placeAmongSiblings(candidate.references ?? [], landing, placement) }
         : { ...candidate, children: placeAmongSiblings(candidate.children ?? [], landing, placement) };
     }
-    if (!candidate.children?.length) return candidate;
-    const children = insertUnderParent(candidate.children, parentId, moved, placement);
-    if (children === candidate.children) return candidate;
+    const children = candidate.children?.length
+      ? insertUnderParent(candidate.children, parentId, moved, placement)
+      : candidate.children;
+    const references = candidate.references?.length
+      ? insertUnderParent(candidate.references, parentId, moved, placement)
+      : candidate.references;
+    if (children === candidate.children && references === candidate.references) return candidate;
     changed = true;
-    return { ...candidate, children };
+    return { ...candidate, children, references };
   });
   return changed ? next : nodes;
+}
+
+function forestHas<T extends PlaceableTreeNode<T>>(nodes: readonly T[], id: string): boolean {
+  return nodes.some(
+    (node) =>
+      node.id === id ||
+      forestHas(node.children ?? [], id) ||
+      forestHas(node.references ?? [], id),
+  );
+}
+
+/**
+ * Whether a move involves the carried out-of-view shortcut targets: a dragged
+ * item that isn't in the visible tree (a shortcut's row moves its real item,
+ * which in a view lives only in `carried`), or a destination that's only
+ * there. Such a move goes through `moveAcrossForests`; anything else stays on
+ * the visible tree's own path.
+ */
+export function moveTouchesCarried<T extends PlaceableTreeNode<T>>(
+  forests: { main: readonly T[]; carried: readonly T[] },
+  dragIds: readonly string[],
+  parentId: string | null,
+): boolean {
+  if (dragIds.some((id) => !forestHas(forests.main, id) && forestHas(forests.carried, id))) {
+    return true;
+  }
+  return (
+    parentId !== null &&
+    !forestHas(forests.main, parentId) &&
+    forestHas(forests.carried, parentId)
+  );
+}
+
+/**
+ * The optimistic side of a move whose source or destination is in the
+ * CARRIED shortcut targets (a view-scoped tree's out-of-view folders) rather
+ * than the visible tree. Dragging a shortcut's row moves the real item it
+ * stands for, which in a view may live only in `carried` — and may land in
+ * the view, in another out-of-view folder, or back among its siblings. Rows
+ * leave whichever collection holds them and land under `parentId` wherever
+ * that is (null = the visible top level), each at its own placement.
+ */
+export function moveAcrossForests<T extends PlaceableTreeNode<T>>(
+  forests: { main: T[]; carried: T[] },
+  moves: ReadonlyArray<{ node: T; placement: SiblingPlacement }>,
+  parentId: string | null,
+): { main: T[]; carried: T[] } {
+  const ids = new Set(moves.map((move) => move.node.id));
+  let main = removeNodesFromTree(forests.main, ids);
+  let carried = removeNodesFromTree(forests.carried, ids);
+  for (const { node, placement } of moves) {
+    if (parentId === null) {
+      main = placeAmongSiblings(main, node, placement);
+    } else if (forestHas(main, parentId)) {
+      main = insertUnderParent(main, parentId, node, placement);
+    } else if (forestHas(carried, parentId)) {
+      carried = insertUnderParent(carried, parentId, node, placement);
+    }
+  }
+  return { main, carried };
 }

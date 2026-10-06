@@ -166,9 +166,12 @@ export interface TreeNode {
    */
   mirrorOf?: string;
   /**
-   * Marks that same synthesized row as VIEW-ONLY. It cannot be a drag source,
-   * nothing may be stored under it, and a drop onto it forwards to the real
-   * folder — the projection never becomes a second home for content.
+   * Marks that same synthesized row as a PROJECTION. Nothing may be stored
+   * under it — a drop onto it forwards to the real folder — so it never
+   * becomes a second home for content. Dragging a shortcut's row moves the
+   * real item it stands for (`mirrorOf`), not the row (owner call 2026-10-05:
+   * rearranging through a shortcut without going to the source folder).
+   * Window-reference rows (`windowRef`) stay undraggable: they're derived links.
    */
   isShortcutMirror?: boolean;
   /**

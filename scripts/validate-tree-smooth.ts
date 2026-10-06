@@ -44,6 +44,8 @@ import {
   displayOrderForTop,
   dropRowFor,
   insertUnderParent,
+  moveAcrossForests,
+  moveTouchesCarried,
   placeAmongSiblings,
   resolveDropAnchor,
   sortedInsertIndex,
@@ -230,6 +232,62 @@ console.log("\nplacing a row under a parent (insertUnderParent — the carried s
   check("no such parent → the same array back", () => {
     const t = tree();
     assert.equal(insertUnderParent(t, "missing", { id: "n" }, { afterId: null, index: 0 }), t);
+  });
+  check("a parent held in references is found too", () => {
+    const t: N[] = [{ id: "host", children: [], references: [{ id: "ref-note", children: [] }] }];
+    const next = insertUnderParent(t, "ref-note", { id: "n" }, { afterId: null, index: 0 });
+    assert.deepEqual(next[0].references![0].children!.map((c) => c.id), ["n"]);
+  });
+}
+
+console.log("\ndragging a shortcut's rows (moveAcrossForests — view tree + carried targets)");
+{
+  type N = { id: string; parentId?: string | null; role?: string | null; children?: N[]; references?: N[] };
+  // The view shows `inbox`; the shortcut's folder `out` (outside the view)
+  // travels beside it, holding a, b, c.
+  const forests = () => ({
+    main: [{ id: "inbox", children: [{ id: "v1" }] }] as N[],
+    carried: [{ id: "out", children: [{ id: "a" }, { id: "b" }, { id: "c" }] }] as N[],
+  });
+  const ids = (list?: N[]) => (list ?? []).map((n) => n.id);
+  check("reorder inside the shortcut: c dragged above a", () => {
+    const f = forests();
+    const out = moveAcrossForests(f, [{ node: { id: "c" }, placement: { afterId: null, index: 0 } }], "out");
+    assert.deepEqual(ids(out.carried[0].children), ["c", "a", "b"]);
+    assert.equal(out.main, f.main, "the view's tree is untouched");
+  });
+  check("drag out of the shortcut into a view folder", () => {
+    const out = moveAcrossForests(forests(), [{ node: { id: "b" }, placement: { afterId: "v1", index: 1 } }], "inbox");
+    assert.deepEqual(ids(out.carried[0].children), ["a", "c"]);
+    assert.deepEqual(ids(out.main[0].children), ["v1", "b"]);
+  });
+  check("drag from the view into the shortcut, at an anchor", () => {
+    const out = moveAcrossForests(forests(), [{ node: { id: "v1" }, placement: { afterId: "a", index: 1 } }], "out");
+    assert.deepEqual(ids(out.main[0].children), []);
+    assert.deepEqual(ids(out.carried[0].children), ["a", "v1", "b", "c"]);
+  });
+  check("drag out of the shortcut to the view's top level", () => {
+    const out = moveAcrossForests(forests(), [{ node: { id: "a" }, placement: { afterId: null, index: 0 } }], null);
+    assert.deepEqual(ids(out.main), ["a", "inbox"]);
+    assert.deepEqual(ids(out.carried[0].children), ["b", "c"]);
+  });
+  check("moveTouchesCarried: a shortcut row's item, or a destination only in carried", () => {
+    const f = forests();
+    assert.equal(moveTouchesCarried(f, ["a"], "inbox"), true, "dragging an item that lives only in carried");
+    assert.equal(moveTouchesCarried(f, ["v1"], "out"), true, "dropping onto an out-of-view shortcut's folder");
+    assert.equal(moveTouchesCarried(f, ["v1"], "inbox"), false, "a move within the view");
+    assert.equal(moveTouchesCarried(f, ["v1"], null), false, "to the view's top level");
+  });
+  check("several rows keep their drag order", () => {
+    const out = moveAcrossForests(
+      forests(),
+      [
+        { node: { id: "a" }, placement: { afterId: "c", index: 3 } },
+        { node: { id: "b" }, placement: { afterId: "a", index: 4 } },
+      ],
+      "out",
+    );
+    assert.deepEqual(ids(out.carried[0].children), ["c", "a", "b"]);
   });
 }
 
@@ -459,7 +517,7 @@ console.log("\none order, one placement (source pins)");
   check("the sidebar sends the anchor and places optimistically with it", () => {
     const move = sliceBetween("const handleMove = async", "const handleRename");
     assert.ok(move.includes("afterId: anchorFor(i)"));
-    assert.ok(move.includes("anchorFor(i),\n        );"), "applyMoveToTree must receive the anchor");
+    assert.ok(/index \+ i,\s*anchorFor\(i\),\s*\);/.test(move), "applyMoveToTree must receive the anchor");
     assert.ok(/finally \{[\s\S]*endTreeEdit\(\)/.test(move), "the move must end its edit in a finally");
   });
   check("the inline create asks for the top — where its placeholder already is", () => {
@@ -493,9 +551,30 @@ console.log("\nout-of-view shortcut targets are wired end to end (source pins)")
   });
   check("a drop onto an out-of-view shortcut shows in its mirror at once, and rolls back with the tree", () => {
     const move = sliceBetween("const handleMove = async", "const handleRename");
-    assert.ok(move.includes("insertUnderParent("));
-    assert.ok(move.includes("setShortcutTargetTrees(nextTargets);"), "the insert's result must be applied");
+    assert.ok(move.includes("moveAcrossForests("));
+    assert.ok(move.includes("setShortcutTargetTrees(moved.carried);"), "the cross-collection result must be applied");
     assert.equal((move.match(/setShortcutTargetTrees\(targetTreesBefore\)/g) ?? []).length, 2);
+  });
+}
+
+console.log("\nshortcut rows are draggable (source pins)");
+{
+  const read = (rel: string) => readFileSync(join(__dirname, "..", rel), "utf8");
+  const fileTree = read("components/content/FileTree.tsx");
+  check("canDrop refuses only window-reference rows, not every mirror row", () => {
+    assert.ok(fileTree.includes("dragNode.data.isShortcutMirror && dragNode.data.windowRef"));
+    assert.equal(/dragNodes\.some\(\(dragNode\) => dragNode\.data\.isShortcutMirror\)\)/.test(fileTree), false);
+  });
+  check("FileTree moves the real item a shortcut row stands for (mirrorOf)", () => {
+    assert.ok(fileTree.includes("node.data.isShortcutMirror && node.data.mirrorOf ? node.data.mirrorOf : node.id"));
+    assert.ok(/onMove\(\{\s*dragIds: realDragIds,/.test(fileTree));
+  });
+  check("the sidebar finds dragged items in the carried targets and moves across both", () => {
+    const move = sliceBetween("const handleMove = async", "const handleRename");
+    assert.ok(move.includes("findTreeNodeById(targetTreesBefore, id)"));
+    assert.ok(move.includes("findPositions(targetTreesBefore)"));
+    assert.ok(move.includes("moveAcrossForests("));
+    assert.ok(/if \(\s*moveTouchesCarried\(/.test(move), "the move must branch on moveTouchesCarried itself");
   });
 }
 

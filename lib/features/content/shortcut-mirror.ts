@@ -19,9 +19,11 @@
  *     ids could otherwise be replayed into an enormous tree on the next load,
  *     with no click to pace it. The cap bounds that first render.
  *
- * Mirror rows are presentation only: nothing here changes storage, and a
- * shortcut never becomes a real parent. Dropping onto one forwards to the real
- * folder (see the move route).
+ * Mirror rows are projections: nothing here changes storage, and a shortcut
+ * never becomes a real parent. Dropping onto one forwards to the real folder
+ * (see the move route); dragging one moves the real item it stands for
+ * (FileTree passes `mirrorOf` up), so content can be rearranged from inside a
+ * shortcut without visiting the source folder.
  *
  * Pure and dependency-free by design so it can be exercised without standing
  * up react-arborist or a browser. Mirrors the structure of `expandReferences`

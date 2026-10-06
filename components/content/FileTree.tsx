@@ -353,8 +353,19 @@ export function FileTree({
           new Set(args.dragIds),
           kind,
         );
+        // A shortcut's row stands for real content: move THAT. (The anchor
+        // above still skips the dragged rows by their on-screen ids.)
+        const realDragIds = args.dragNodes?.length
+          ? [
+              ...new Set(
+                args.dragNodes.map((node) =>
+                  node.data.isShortcutMirror && node.data.mirrorOf ? node.data.mirrorOf : node.id,
+                ),
+              ),
+            ]
+          : args.dragIds;
         await onMove({
-          dragIds: args.dragIds,
+          dragIds: realDragIds,
           parentId: args.parentId,
           index: args.index,
           afterId,
@@ -402,9 +413,14 @@ export function FileTree({
   const canDrop = (args: { dragNodes: NodeApi<TreeNode>[]; parentNode: NodeApi<TreeNode> | null }) => {
     const { dragNodes, parentNode } = args;
 
-    // A mirror row is a projection, not a place. Dragging one would offer to
-    // move content that does not live where it appears to.
-    if (dragNodes.some((dragNode) => dragNode.data.isShortcutMirror)) {
+    // Dragging a shortcut's row moves the REAL item it stands for (handleMove
+    // receives `mirrorOf`, not the row id) — owner call 2026-10-05: someone
+    // working through a shortcut needs to rearrange what's in it, or they're
+    // stuck going to the source folder to do it. The shortcut is still never
+    // a parent: drops onto it forward to the real folder. A window-reference
+    // row is the exception — it's a derived link (a note windows another),
+    // not content held in a folder, so there is nothing to rearrange.
+    if (dragNodes.some((dragNode) => dragNode.data.isShortcutMirror && dragNode.data.windowRef)) {
       return false;
     }
 

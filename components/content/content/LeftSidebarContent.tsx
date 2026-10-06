@@ -95,7 +95,8 @@ import {
   treeScopeKey,
 } from "@/lib/domain/content/tree-refresh";
 import {
-  insertUnderParent,
+  moveAcrossForests,
+  moveTouchesCarried,
   placeAmongSiblings,
   sortedInsertIndex,
 } from "@/lib/domain/content/sibling-order";
@@ -1318,6 +1319,9 @@ export function LeftSidebarContent({
       }
     };
     findPositions(originalTree);
+    // A shortcut's row moves its real item, which in a view may live only in
+    // the carried out-of-view targets (shortcutTargetTrees).
+    findPositions(targetTreesBefore);
 
     // Resolve every dragged node, dropping any id that no longer names a live
     // row rather than aborting the whole drag.
@@ -1335,7 +1339,10 @@ export function LeftSidebarContent({
     // created item was unmovable until the tree was refetched (which cleared the
     // stale id as a side effect). Only bail when nothing at all resolves.
     const dragged = dragIds
-      .map((id) => ({ id, node: findTreeNodeById(originalTree, id) }))
+      .map((id) => ({
+        id,
+        node: findTreeNodeById(originalTree, id) ?? findTreeNodeById(targetTreesBefore, id),
+      }))
       .filter((x): x is { id: string; node: TreeNode } => x.node !== null);
     if (dragged.length === 0) {
       toast.error("Failed to move item", {
@@ -1385,7 +1392,9 @@ export function LeftSidebarContent({
       const pos = positions.get(id);
       if (!pos) return null;
       if (pos.currentParentId === null) return originalTree;
-      const holder = findTreeNodeById(originalTree, pos.currentParentId);
+      const holder =
+        findTreeNodeById(originalTree, pos.currentParentId) ??
+        findTreeNodeById(targetTreesBefore, pos.currentParentId);
       if (!holder) return null;
       if (holder.children?.some((c) => c.id === id)) return holder.children;
       if (holder.references?.some((c) => c.id === id)) return holder.references ?? null;
@@ -1423,34 +1432,40 @@ export function LeftSidebarContent({
       // OPTIMISTIC UPDATE: walk every dragged id and apply each move to
       // the working tree, offsetting the index by i so items keep their
       // drag-order in the destination.
-      let optimisticTree = originalTree;
-      for (let i = 0; i < dragged.length; i++) {
-        optimisticTree = applyMoveToTree(
-          optimisticTree,
-          dragged[i].id,
-          parentId,
-          index + i,
-          anchorFor(i),
-        );
-      }
-      setTreeData(optimisticTree);
-      // Dropped onto a shortcut whose folder is outside this view: the main
-      // tree has no row to put it under, so it just left the view. Put it in
-      // the carried target too, so the shortcut's mirror shows it now rather
-      // than after the reconcile.
+      // A move that touches the carried out-of-view shortcut targets — a
+      // shortcut's row dragged (its real item lives there), or a drop onto an
+      // out-of-view shortcut — moves rows ACROSS the two collections, so the
+      // shortcut's contents and the view both show the result now rather
+      // than after the reconcile. Everything else keeps the visible-tree path.
       if (
-        parentId &&
-        !findTreeNodeById(originalTree, parentId) &&
-        findTreeNodeById(targetTreesBefore, parentId)
+        moveTouchesCarried(
+          { main: originalTree, carried: targetTreesBefore },
+          dragged.map(({ id }) => id),
+          parentId,
+        )
       ) {
-        let nextTargets = targetTreesBefore;
-        dragged.forEach(({ node }, i) => {
-          nextTargets = insertUnderParent(nextTargets, parentId!, node, {
-            afterId: anchorFor(i),
-            index: index + i,
-          });
-        });
-        setShortcutTargetTrees(nextTargets);
+        const moved = moveAcrossForests(
+          { main: originalTree, carried: targetTreesBefore },
+          dragged.map(({ node }, i) => ({
+            node,
+            placement: { afterId: anchorFor(i), index: index + i },
+          })),
+          parentId,
+        );
+        setTreeData(moved.main);
+        setShortcutTargetTrees(moved.carried);
+      } else {
+        let optimisticTree = originalTree;
+        for (let i = 0; i < dragged.length; i++) {
+          optimisticTree = applyMoveToTree(
+            optimisticTree,
+            dragged[i].id,
+            parentId,
+            index + i,
+            anchorFor(i),
+          );
+        }
+        setTreeData(optimisticTree);
       }
 
       // Fire the moves sequentially. Parallel POSTs against the move
