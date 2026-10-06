@@ -18,10 +18,19 @@
  *    qualify, and never a row being dragged.
  *  - A row this drag opened stays open while the pointer is anywhere in its
  *    displayed bounds — its own row or any row shown inside it — so opening
- *    nests: A, then B inside A, then C inside B. Leaving a row's bounds closes
- *    it (and whatever this drag opened inside it); leaving the tree closes all.
- *  - Dropping in the tree keeps what is open (you can see where it landed). A
- *    drag that ends anywhere else — cancelled, or dropped on another surface —
+ *    nests: A, then B inside A, then C inside B.
+ *  - It closes when the pointer moves ABOVE it, when the drag leaves the tree,
+ *    or when the drag ends. Not when the pointer passes BELOW it: closing it
+ *    then pulls every row under the pointer up, so the pointer lands on a
+ *    different row than the one it was aiming at (owner report, 2026-10-06 —
+ *    leaving a nested folder downward closed it, the rows jumped, and the
+ *    pointer landed outside the outer folder, closing that too). Closing a row
+ *    above the pointer moves nothing above it.
+ *  - Over the tree but not over a row (its padding, the space below the last
+ *    row) says nothing about where the pointer is aiming: nothing closes.
+ *  - Dropping in the tree keeps open what holds the drop, so you see where it
+ *    landed; anything else it opened closes once the drop is done. A drag
+ *    that ends anywhere else — cancelled, or dropped on another surface —
  *    closes everything it opened. Rows that were open before the drag are
  *    never closed.
  *
@@ -54,72 +63,93 @@ export const SPRING_IDLE: SpringState = Object.freeze({ opened: [], pendingId: n
 
 export type SpringEvent =
   /**
-   * The pointer moved (or rested) during a drag. `rowId`: the row under it,
-   * null when it isn't over a row of the tree. `opensHere`: that row would
-   * open and the pointer is in its middle band.
+   * The pointer moved (or rested) during a drag. `inTree`: it is over the
+   * tree. `rowId`: the row under it, null when it isn't over a row.
+   * `opensHere`: that row would open and the pointer is in its middle band.
    */
-  | { kind: "over"; rowId: string | null; opensHere: boolean }
+  | { kind: "over"; inTree: boolean; rowId: string | null; opensHere: boolean }
   /** The wait for `rowId` ran out. */
   | { kind: "elapsed"; rowId: string }
-  /** The drag dropped — in the tree or elsewhere. */
-  | { kind: "drop"; inTree: boolean }
+  /** The drag dropped — in the tree (on `rowId`, if over a row) or elsewhere. */
+  | { kind: "drop"; inTree: boolean; rowId: string | null }
   /** The drag ended without a drop in the tree (cancelled, or dropped elsewhere). */
   | { kind: "end" };
 
 export interface SpringEffects {
-  /** Rows to close, deepest first. */
+  /** Rows to close now, deepest first. */
   close: string[];
+  /** Rows to close once the drop has been handled (so nothing moves under it), deepest first. */
+  closeAfterDrop: string[];
   /** A row to open now. */
   open: string | null;
   /** Start waiting on this row (replacing any wait); null = stop waiting; undefined = unchanged. */
   wait?: string | null;
 }
 
-const NONE: SpringEffects = Object.freeze({ close: [], open: null }) as SpringEffects;
+const NONE: SpringEffects = Object.freeze({ close: [], closeAfterDrop: [], open: null }) as SpringEffects;
 
-/** `within(rowId, ancestorId)`: the row is that row, or is shown inside it. */
-export type ShownWithin = (rowId: string, ancestorId: string) => boolean;
+/**
+ * Where a hovered row is relative to a row the drag opened: inside its
+ * displayed bounds (that row, or shown inside it), or above or below them.
+ */
+export type RowPlace = "inside" | "above" | "below";
+export type PlaceOf = (rowId: string, openedId: string) => RowPlace;
 
-/** The rows this drag opened that the pointer has left, deepest first. */
-export function springRowsLeft(
+/** The rows this drag opened that the pointer is now above — safe to close (deepest first). */
+export function springRowsToClose(
   opened: readonly string[],
-  rowId: string | null,
-  within: ShownWithin,
+  rowId: string,
+  placeOf: PlaceOf,
 ): string[] {
-  return opened.filter((id) => rowId === null || !within(rowId, id)).reverse();
+  return opened.filter((id) => placeOf(rowId, id) === "above").reverse();
 }
+
+const all = (state: SpringState) => [...state.opened].reverse();
 
 export function springStep(
   state: SpringState,
   event: SpringEvent,
-  within: ShownWithin,
+  placeOf: PlaceOf,
 ): { state: SpringState; effects: SpringEffects } {
   switch (event.kind) {
     case "over": {
-      const close = springRowsLeft(state.opened, event.rowId, within);
+      const close = !event.inTree
+        ? all(state)
+        : event.rowId === null
+          ? []
+          : springRowsToClose(state.opened, event.rowId, placeOf);
       const opened = close.length > 0 ? state.opened.filter((id) => !close.includes(id)) : state.opened;
-      const target = event.opensHere ? event.rowId : null;
+      const target = event.inTree && event.opensHere ? event.rowId : null;
       if (target === state.pendingId) {
         return close.length > 0
-          ? { state: { ...state, opened }, effects: { close, open: null } }
+          ? { state: { ...state, opened }, effects: { close, closeAfterDrop: [], open: null } }
           : { state, effects: NONE };
       }
-      return { state: { opened, pendingId: target }, effects: { close, open: null, wait: target } };
+      return {
+        state: { opened, pendingId: target },
+        effects: { close, closeAfterDrop: [], open: null, wait: target },
+      };
     }
     case "elapsed": {
       // A wait that was replaced or cancelled since it started.
       if (event.rowId !== state.pendingId) return { state, effects: NONE };
       return {
         state: { opened: [...state.opened, event.rowId], pendingId: null },
-        effects: { close: [], open: event.rowId, wait: null },
+        effects: { close: [], closeAfterDrop: [], open: event.rowId, wait: null },
       };
     }
-    case "drop":
-      return {
-        state: SPRING_IDLE,
-        effects: { close: event.inTree ? [] : [...state.opened].reverse(), open: null, wait: null },
-      };
+    case "drop": {
+      if (!event.inTree) {
+        return { state: SPRING_IDLE, effects: { close: all(state), closeAfterDrop: [], open: null, wait: null } };
+      }
+      // Keep what holds the drop; the rest closes once the drop is handled.
+      const dropRow = event.rowId;
+      const closeAfterDrop = state.opened
+        .filter((id) => dropRow === null || placeOf(dropRow, id) !== "inside")
+        .reverse();
+      return { state: SPRING_IDLE, effects: { close: [], closeAfterDrop, open: null, wait: null } };
+    }
     case "end":
-      return { state: SPRING_IDLE, effects: { close: [...state.opened].reverse(), open: null, wait: null } };
+      return { state: SPRING_IDLE, effects: { close: all(state), closeAfterDrop: [], open: null, wait: null } };
   }
 }
