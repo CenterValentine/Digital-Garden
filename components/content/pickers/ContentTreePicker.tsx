@@ -83,6 +83,11 @@ import {
 import { cn } from "@/lib/core/utils";
 import { calculateMenuPosition } from "@/lib/core/menu-positioning";
 import { useWorkspaceStore } from "@/state/workspace-store";
+import {
+  flattenEligible,
+  type FlatRow,
+  type TreeNodeLite,
+} from "@/lib/domain/content/picker-tree";
 import { useTreeStateStore } from "@/state/tree-state-store";
 import { useContentStore } from "@/state/content-store";
 import { collectPaneAttachedTabs } from "@/state/workspace-tab-filter-store";
@@ -105,27 +110,7 @@ export const DEFAULT_ELIGIBLE_TYPES = new Set([
   "html",
   "code",
 ]);
-/** Types we recurse into when flattening (containers of more content). */
-const RECURSE_TYPES = new Set(["folder", "note"]);
-
 const EMPTY_DOC = { type: "doc", content: [{ type: "paragraph" }] };
-
-interface TreeNodeLite {
-  id: string;
-  title: string;
-  contentType: string;
-  treeNodeKind?: string;
-  note?: unknown;
-  /** ISO string over the wire — read to derive "where you last created". */
-  createdAt?: string | Date;
-  children?: TreeNodeLite[];
-  /**
-   * Referenced children, partitioned out of `children` by the tree API. They
-   * have to be walked separately or attachments are invisible to browse —
-   * which is what kept referenced content reachable by search only.
-   */
-  references?: TreeNodeLite[];
-}
 
 export interface PickerTarget {
   id: string;
@@ -169,83 +154,6 @@ export function useWorkspaceViewOptions(): {
 /** A folder holding open content, with how many open items it holds. */
 interface OpenDestination extends CreateDestination {
   count: number;
-}
-
-interface FlatRow {
-  id: string;
-  title: string;
-  contentType: string;
-  depth: number;
-  hasNote: boolean;
-  /** Real parent id — for scoped trees, top-level rows' parent is the view root. */
-  parentId: string | null;
-  /** Index among content-kind siblings in tree order — the move route's splice index space. */
-  siblingIndex: number;
-  /** True when this row has renderable nested content (expand affordance). */
-  hasChildren: boolean;
-  /**
-   * Row came from a parent's `references` array — an attachment or generated
-   * deliverable rather than authored content. Marked so it can carry the same
-   * link badge the file tree uses, and so the "insert after" gap is
-   * suppressed: references occupy a separate index space from primary
-   * children, so `siblingIndex + 1` would not mean what it means elsewhere.
-   */
-  isReference: boolean;
-}
-
-function flattenEligible(
-  nodes: TreeNodeLite[],
-  eligibleTypes: ReadonlySet<string>,
-  parentId: string | null,
-  depth = 0,
-  out: FlatRow[] = [],
-  asReference = false,
-): FlatRow[] {
-  let siblingIndex = 0;
-  for (const node of nodes) {
-    // Synthetic people rows (peopleGroup:/person:) are not real content —
-    // offering them would present un-createable / un-windowable parents.
-    // They also don't occupy displayOrder slots, so they don't advance
-    // the sibling index.
-    if (node.treeNodeKind && node.treeNodeKind !== "content") continue;
-    const eligible = eligibleTypes.has(node.contentType);
-    if (eligible) {
-      const row: FlatRow = {
-        id: node.id,
-        title: node.title,
-        contentType: node.contentType,
-        depth,
-        hasNote: Boolean(node.note),
-        parentId,
-        siblingIndex,
-        hasChildren: false,
-        isReference: asReference,
-      };
-      out.push(row);
-      if (RECURSE_TYPES.has(node.contentType)) {
-        const before = out.length;
-        if (node.children?.length) {
-          flattenEligible(node.children, eligibleTypes, node.id, depth + 1, out);
-        }
-        // Second pass for the parent's reference block. Listed after primary
-        // children, matching the file tree's default placement, and flagged so
-        // the rows read as attachments rather than authored content.
-        if (node.references?.length) {
-          flattenEligible(
-            node.references,
-            eligibleTypes,
-            node.id,
-            depth + 1,
-            out,
-            true,
-          );
-        }
-        row.hasChildren = out.length > before;
-      }
-    }
-    siblingIndex += 1;
-  }
-  return out;
 }
 
 /**
@@ -1048,6 +956,7 @@ export function ContentTreePicker({
                   ...item,
                   depth: 0,
                   hasNote: item.contentType === "note",
+                  pickable: true,
                   parentId: null,
                   siblingIndex: 0,
                   hasChildren: false,
@@ -1082,6 +991,7 @@ export function ContentTreePicker({
                       contentType: "note",
                       depth: 0,
                       hasNote: true,
+                      pickable: true,
                       parentId: null,
                       siblingIndex: 0,
                       hasChildren: false,
@@ -1581,8 +1491,12 @@ function PickRow({
   onQuickCreateInside?: (row: FlatRow) => void;
 }) {
   const expandable = Boolean(row.hasChildren && onToggle);
-  const pick = () =>
+  // A folder shown only so its contents can be reached (the picker doesn't
+  // accept folders) browses and offers "+ New", but never commits as a pick.
+  const pick = () => {
+    if (!row.pickable) return;
     onPick({ id: row.id, title: row.title, contentType: row.contentType });
+  };
 
   /**
    * Press and hold to pick a container, matching the file tree's gesture.
@@ -1601,7 +1515,7 @@ function PickRow({
   const suppressNextToggleRef = useRef(false);
   const longPress = useLongPress(
     () => {
-      if (disabled || !expandable) return;
+      if (disabled || !expandable || !row.pickable) return;
       suppressNextToggleRef.current = true;
       pick();
     },
@@ -1610,9 +1524,13 @@ function PickRow({
 
   const tooltip = disabled
     ? (disabledReason ?? "Not selectable here")
-    : expandable
-      ? `Click to expand · Double-click or hold to ${commitLabel}`
-      : `Click to ${commitLabel}`;
+    : !row.pickable
+      ? expandable
+        ? "Click to expand"
+        : "Not selectable here"
+      : expandable
+        ? `Click to expand · Double-click or hold to ${commitLabel}`
+        : `Click to ${commitLabel}`;
 
   return (
     <div
@@ -1654,7 +1572,7 @@ function PickRow({
           // the list shifts under the cursor at the moment of commit.
           if (expandable) {
             onToggle?.(row.id);
-            pick();
+            pick(); // no-op for a browse-only folder: the toggle is the whole gesture
           }
         }}
         className={cn(
@@ -1719,14 +1637,18 @@ function PickRow({
         {disabled && disabledReason ? (
           <span className="text-[10px] text-gray-500">({disabledReason})</span>
         ) : null}
-        <span
-          className={cn(
-            "ml-auto h-1.5 w-1.5 shrink-0 rounded-full",
-            row.hasNote
-              ? "bg-emerald-500/80"
-              : "border border-gray-400 dark:border-gray-500",
-          )}
-        />
+        {/* The has-content dot belongs to things you can pick; a browse-only
+            folder has nothing to report. */}
+        {row.pickable ? (
+          <span
+            className={cn(
+              "ml-auto h-1.5 w-1.5 shrink-0 rounded-full",
+              row.hasNote
+                ? "bg-emerald-500/80"
+                : "border border-gray-400 dark:border-gray-500",
+            )}
+          />
+        ) : null}
       </button>
       {onQuickCreateInside && !disabled ? (
         <span title={`+ New ${createNoun} (inside this folder)`}>
