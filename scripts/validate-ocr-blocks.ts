@@ -54,6 +54,17 @@ check(
   "First paragraph is here.\n\nSecond paragraph is here.",
 );
 
+// Long lines and a lowercase start, so no other rule could produce the break —
+// only the blank line itself. (A mutation run showed the short-sentence rule
+// masking a broken paragraph split in the fixture above.)
+check(
+  "blank line breaks even when nothing else would",
+  reflowOcrText(
+    "This first paragraph has one long line that keeps going well past forty\n\nand this second one starts lowercase and is also a fairly long line",
+  ),
+  "This first paragraph has one long line that keeps going well past forty\n\nand this second one starts lowercase and is also a fairly long line",
+);
+
 check(
   "hyphenated wrap rejoins the word",
   reflowOcrText(
@@ -136,6 +147,21 @@ check(
   [
     { type: "paragraph", content: [{ type: "text", text: "Price is *about* 5 dollars." }] },
     { type: "paragraph", content: [{ type: "text", text: "See you soon." }] },
+  ],
+);
+
+check(
+  "a list the parser cannot read falls back to lines with hard breaks",
+  buildOcrContent("• Apples\n• Bananas", () => ({ type: "doc", content: [] })),
+  [
+    {
+      type: "paragraph",
+      content: [
+        { type: "text", text: "- Apples" },
+        { type: "hardBreak" },
+        { type: "text", text: "- Bananas" },
+      ],
+    },
   ],
 );
 
