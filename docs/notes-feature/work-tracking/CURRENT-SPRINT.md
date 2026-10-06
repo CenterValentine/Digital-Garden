@@ -12,7 +12,7 @@ last_updated: 2026-05-13
 ## October 5, 2026 — The file tree stops flashing; deleting is instant; rows keep their order; view shortcuts show their folder and act on it safely
 
 **Tree**: worktree `.claude/worktrees/smooth-delete`, branch `fix/smooth-delete` (off `origin/main` at `49b94490`)
-**Status**: typecheck / lint 151 (0 errors, none new) / `tree:smooth:check` 213 (new, in the quality workflow) / `shortcut-mirror:check` (out-of-view cases, row actions, view reach) / tree + workspace gates / `pnpm build` green; no schema or TipTap change; **browser-extension change** (bookmark dedupe removed — `pnpm extension:build`, reload at chrome://extensions); **Hocuspocus redeploy required** (collaborative saves now refresh media links); run `scripts/backfill-media-links.ts --apply` once per environment. Owner browser smoke pending.
+**Status**: typecheck / lint 151 (0 errors, none new) / `tree:smooth:check` 230 (new, in the quality workflow) / `shortcut-mirror:check` (out-of-view cases, row actions, view reach) / tree + workspace gates / `pnpm build` green; no schema or TipTap change; **browser-extension change** (bookmark dedupe removed — `pnpm extension:build`, reload at chrome://extensions); **Hocuspocus redeploy required** (collaborative saves now refresh media links); run `scripts/backfill-media-links.ts --apply` once per environment. Owner browser smoke pending.
 
 ### Shipped
 - **Skeleton = a scope's first load only** (`tree-refresh.ts`): every refresh of a tree already on screen is quiet — covers create, duplicate, links, uploads, folder view, the header refresh and all `dg:tree-refresh` dispatchers. Stale-scope responses are dropped.
@@ -35,6 +35,8 @@ last_updated: 2026-05-13
 - **The referenced-content chip's placement control** is now a list with its start or end marked, not an up-down arrow (it reads as placement, not sorting); **a folder's sort covers its referenced content** on the client too.
 - **Creates and renames from the main panel and Note Windows reach the tree at once**: the "+" picker's creates show a placeholder row exactly where they land, resolved to the real row (no full refetch); a window rename updates the tree before the save and reverts if it fails; renames reach rows shown through shortcuts.
 - **Drops into folders and shortcuts seen inside a shortcut land in the real folder**: a folder inside a shortcut used to take the drop and then fail (the mirror id was sent); a shortcut inside a shortcut refused drops and opened onto nothing. Both now forward to the real folder, and a nested shortcut opens onto its folder's contents.
+- **Note Windows show in the tree at once** (window rows follow the editor, like images), and **renaming a windowed note renames its window row**.
+- **Drag content between notes in different panes, and into a tab by hovering it**: an image (or text, or a block) dragged from one note lands in the other and leaves the source; Option/Alt copies. Resting a drag on a tab opens it; releasing switches the source pane back. Moves no longer swap an image's `src` for its public link.
 - **Press and hold refresh for a hard reload**: a click on the tree's refresh button stays quiet; holding it (600 ms, any pointer) reloads the tree from scratch — the skeleton flashes, the tree remounts, the in-text overlay is dropped.
 - **Bookmark dedupe removed**: no Dedupe control in the capture popup or options, no rule action; every saved bookmark is its own new row. Quick-save still updates an existing Chrome bookmark for the same page.
 - **Moves wait out a slow database** (locked transactions get 15 s to start, 30 s to run, not Prisma's 5 s), and **a shortcut can't trick a folder into itself**: drops are checked by real ids, so dragging a folder a shortcut shows into its own sub-folder is refused before release.
@@ -115,6 +117,11 @@ last_updated: 2026-05-13
 73. Rename the windowed note from the window's header → the tree shows the new name at once; rename a note shown inside an expanded shortcut → its row there updates too.
 74. Expand a shortcut whose folder holds a sub-folder; drag a note onto that sub-folder (inside the shortcut) → it highlights, lands there, no error; open the real folder → the note is in the sub-folder.
 75. Expand a shortcut whose folder holds ANOTHER shortcut to a folder; click the nested shortcut → it opens onto its folder's items; drag a note onto it → it lands in that folder and shows inside the nested shortcut at once.
+76. Add a Note Window to a note and aim it at another note → the window row appears in the note's referenced content at once (no refresh); remove the window → the row leaves at once.
+77. Rename the windowed note from the window's header → its window row in the tree shows the new name at once.
+78. Vertical Split with a note in each pane: drag an image from the left note into the right note's text → it lands where dropped and leaves the left note; the tree shows it under the right note. Hold Option/Alt while dragging → it is copied instead.
+79. Single pane with two note tabs: drag an image from the open note and rest it on the other tab → after half a second that tab opens; drop into its text → the pane switches back to the note you started in, and the image is gone from it.
+80. Drag a line of text from one note onto another note's tab, rest, drop into its text → same: it moves, and the view returns.
 
 ## October 4, 2026 — Coming back lands you where you were (workspace cold-load restore)
 
