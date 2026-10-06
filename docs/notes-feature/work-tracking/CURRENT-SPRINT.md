@@ -12,7 +12,7 @@ last_updated: 2026-05-13
 ## October 5, 2026 — The file tree stops flashing; deleting is instant; rows keep their order; view shortcuts show their folder and act on it safely
 
 **Tree**: worktree `.claude/worktrees/smooth-delete`, branch `fix/smooth-delete` (off `origin/main` at `49b94490`)
-**Status**: typecheck / lint 151 (0 errors, none new) / `tree:smooth:check` 230 (new, in the quality workflow) / `shortcut-mirror:check` (out-of-view cases, row actions, view reach) / tree + workspace gates / `pnpm build` green; no schema or TipTap change; **browser-extension change** (bookmark dedupe removed — `pnpm extension:build`, reload at chrome://extensions); **Hocuspocus redeploy required** (collaborative saves now refresh media links); run `scripts/backfill-media-links.ts --apply` once per environment. Owner browser smoke pending.
+**Status**: typecheck / lint 151 (0 errors, none new) / `tree:smooth:check` 231 (new, in the quality workflow) / `shortcut-mirror:check` (out-of-view cases, row actions, view reach) / tree + workspace gates / `pnpm build` green; no schema or TipTap change; **browser-extension change** (bookmark dedupe removed — `pnpm extension:build`, reload at chrome://extensions); **Hocuspocus redeploy required** (collaborative saves now refresh media links); run `scripts/backfill-media-links.ts --apply` once per environment. Owner browser smoke pending.
 
 ### Shipped
 - **Skeleton = a scope's first load only** (`tree-refresh.ts`): every refresh of a tree already on screen is quiet — covers create, duplicate, links, uploads, folder view, the header refresh and all `dg:tree-refresh` dispatchers. Stale-scope responses are dropped.
@@ -36,7 +36,7 @@ last_updated: 2026-05-13
 - **Creates and renames from the main panel and Note Windows reach the tree at once**: the "+" picker's creates show a placeholder row exactly where they land, resolved to the real row (no full refetch); a window rename updates the tree before the save and reverts if it fails; renames reach rows shown through shortcuts.
 - **Drops into folders and shortcuts seen inside a shortcut land in the real folder**: a folder inside a shortcut used to take the drop and then fail (the mirror id was sent); a shortcut inside a shortcut refused drops and opened onto nothing. Both now forward to the real folder, and a nested shortcut opens onto its folder's contents.
 - **Note Windows show in the tree at once** (window rows follow the editor, like images), and **renaming a windowed note renames its window row**.
-- **Drag content between notes in different panes, and into a tab by hovering it**: an image (or text, or a block) dragged from one note lands in the other and leaves the source; Option/Alt copies. Resting a drag on a tab opens it; releasing switches the source pane back. Moves no longer swap an image's `src` for its public link.
+- **Drag content between notes in different panes, and into a tab by hovering it**: an image (or text, or a block) dragged from one note lands in the other and leaves the source; Option/Alt copies. Resting a drag on a tab shows the tab's hover look, then opens it; releasing switches the source pane back. Moves no longer swap an image's `src` for its public link.
 - **Press and hold refresh for a hard reload**: a click on the tree's refresh button stays quiet; holding it (600 ms, any pointer) reloads the tree from scratch — the skeleton flashes, the tree remounts, the in-text overlay is dropped.
 - **Bookmark dedupe removed**: no Dedupe control in the capture popup or options, no rule action; every saved bookmark is its own new row. Quick-save still updates an existing Chrome bookmark for the same page.
 - **Moves wait out a slow database** (locked transactions get 15 s to start, 30 s to run, not Prisma's 5 s), and **a shortcut can't trick a folder into itself**: drops are checked by real ids, so dragging a folder a shortcut shows into its own sub-folder is refused before release.
@@ -122,6 +122,7 @@ last_updated: 2026-05-13
 78. Vertical Split with a note in each pane: drag an image from the left note into the right note's text → it lands where dropped and leaves the left note; the tree shows it under the right note. Hold Option/Alt while dragging → it is copied instead.
 79. Single pane with two note tabs: drag an image from the open note and rest it on the other tab → after half a second that tab opens; drop into its text → the pane switches back to the note you started in, and the image is gone from it.
 80. Drag a line of text from one note onto another note's tab, rest, drop into its text → same: it moves, and the view returns.
+81. While dragging, hold over another tab → it takes the hover look at once (tint, darker title, close button) until it opens; drag off it before it opens → the look clears.
 
 ## October 4, 2026 — Coming back lands you where you were (workspace cold-load restore)
 
