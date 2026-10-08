@@ -62,7 +62,7 @@ function workspace(id: string, name: string, isMain: boolean, panes: Panes, layo
       ),
     },
     settings: {}, createdAt: "", updatedAt: "2026-10-04T10:00:00.000Z",
-    items: [] as unknown[], contentMeta: {}, membershipContentIds: Object.values(panes).flat(),
+    contentMeta: {}, membershipContentIds: Object.values(panes).flat(),
   };
 }
 const MAIN = workspace("main-id", "main", true, { "top-left": ["m1", "m2"] });
@@ -77,12 +77,6 @@ globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
   calls.push(`${init?.method ?? "GET"} ${url}`);
   if (url.endsWith("/api/content/workspaces")) {
     return new Response(JSON.stringify({ success: true, data: ALL }), { status: 200 });
-  }
-  if (url.endsWith("/open-intent")) {
-    return new Response(
-      JSON.stringify({ success: true, data: { allowed: true, alreadyCovered: true, conflict: null } }),
-      { status: 200 },
-    );
   }
   return new Response(JSON.stringify({ success: true, data: {} }), { status: 200 });
 }) as typeof fetch;
@@ -231,8 +225,12 @@ function urlRestore(panes: Panes, activeContentId: string, layoutMode: "single" 
       [active(), placement()],
       ["b-id", { "top-left": ["b1", "b2", "x9"] }],
     );
-    check("…through the workspace-aware open (the claim check ran)", calls.some((c) => c.endsWith("/open-intent")), true);
-    check("…and it was agreed, not left provisional behind a conflict dialog", useWorkspaceStore.getState().conflict, null);
+    check(
+      "…through the workspace-aware open, which writes it into B at once",
+      calls.some((c) => c.startsWith("PATCH ") && c.endsWith("/workspaces/b-id/state")),
+      true,
+    );
+    check("…without asking the server for permission", calls.filter((c) => c.includes("/open-intent")), []);
   }
 
   console.log("\na persist re-run never writes another workspace's tabs (self-inflicted by the write coalescing)");
