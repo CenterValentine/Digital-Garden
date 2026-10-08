@@ -11,7 +11,9 @@
 
 import assert from "node:assert/strict";
 import {
+  filesForDestination,
   flattenEligible,
+  latestViewTimes,
   type FlatRow,
   type TreeNodeLite,
 } from "../lib/domain/content/picker-tree";
@@ -154,6 +156,55 @@ check("a scoped tree's top level carries the view root as its real parent", () =
   const rows = flattenEligible(TREE, new Set(["note"]), "view-root");
   assert.equal(byId(rows, "salesforce").parentId, "view-root");
   assert.equal(byId(rows, "Career").parentId, "view-root");
+});
+
+// ── A destination names its files (owner ask 2026-10-08) ─────────────────
+// "Recent" / "Open" listed folders only; people recognize the FILE they were
+// in. The row now leads with the folder's files, newest-viewed first.
+const DEST_TREE: TreeNodeLite[] = [
+  node("Work", "folder", [
+    node("old", "note", undefined, { createdAt: "2026-01-01" }),
+    node("plan", "note", undefined, { createdAt: "2026-03-01" }),
+    node("deck", "file", undefined, { createdAt: "2026-02-01" }),
+    node("tabbed", "note", undefined, { createdAt: "2025-01-01" }),
+    node("Sub", "folder", [node("deep", "note")]),
+  ]),
+  node("loose", "note", undefined, { createdAt: "2026-04-01" }),
+];
+const destRows = flattenEligible(DEST_TREE, new Set(["note", "file"]), null);
+
+check("viewed files lead, newest view first", () => {
+  const viewed = new Map([["old", 300], ["deck", 500]]);
+  assert.deepEqual(ids(filesForDestination(destRows, "Work", viewed) as FlatRow[]).slice(0, 2), ["deck", "old"]);
+});
+
+check("then open tabs not yet viewed, then the folder's newest creations", () => {
+  const viewed = new Map([["old", 300]]);
+  const files = filesForDestination(destRows, "Work", viewed, { alsoFirst: new Set(["tabbed"]) });
+  assert.deepEqual(files.map((f) => f.id), ["old", "tabbed", "plan", "deck"]);
+});
+
+check("direct children only — no subfolders, nothing nested, nothing elsewhere", () => {
+  const files = filesForDestination(destRows, "Work", new Map([["deep", 900], ["loose", 900]]));
+  assert.ok(!files.some((f) => ["Sub", "deep", "loose"].includes(f.id)));
+});
+
+check("the root destination names top-level files", () => {
+  assert.deepEqual(filesForDestination(destRows, null, new Map()).map((f) => f.id), ["loose"]);
+});
+
+check("capped", () => {
+  assert.equal(filesForDestination(destRows, "Work", new Map(), { limit: 2 }).length, 2);
+});
+
+check("view times take each item's latest view across every pane", () => {
+  const times = latestViewTimes([
+    { history: [{ contentId: "a", timestamp: 1 }, { contentId: null, timestamp: 9 }] },
+    { history: [{ contentId: "a", timestamp: 5 }, { contentId: "b", timestamp: 2 }] },
+  ]);
+  assert.equal(times.get("a"), 5);
+  assert.equal(times.get("b"), 2);
+  assert.equal(times.size, 2);
 });
 
 console.log(`\npicker tree: ${checks} checks passed`);
