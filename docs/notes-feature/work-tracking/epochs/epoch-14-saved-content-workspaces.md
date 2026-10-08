@@ -10,6 +10,8 @@ last_updated: 2026-05-17
 # Epoch 14: Saved Content Workspaces
 
 > **Status: shipped 2026-04-30.** The work landed across the April merge series listed in the frontmatter above (last fixup `e7c0beb` — "Fix workspace persistence and tree rename drafts"). The actual implementation ships under `extensions/workplaces/` (built-in extension), with `ContentWorkspace` + `ContentWorkspaceItem` Prisma models and `app/api/content/workspaces/{route,[id],open-intent,reset}.ts` route handlers. The original Sprint-65 planning text below is preserved as the epoch's historical record but the worktree path it references was cleaned up after merge.
+>
+> **2026-10-08 — claims, borrowing, sharing and the open-intent gate were removed** by owner decision: views and shortcuts govern what a workplace shows, and nothing gates what it opens. `ContentWorkspaceItem`, the `open-intent` / `assignments` routes and the conflict dialog are gone; saved layouts, views and expiration remain. This document is kept as the historical record. See [WORKPLACE-RESTRICTIONS-REMOVAL-PLAN.md](../WORKPLACE-RESTRICTIONS-REMOVAL-PLAN.md).
 
 ## Objective
 Add DB-backed named workspaces on top of the existing pane/tab workspace engine so users can preserve task-specific tab and pane arrangements, lock claimed content, borrow or share overlapping content intentionally, and expire workspaces when the work is done.
