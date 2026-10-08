@@ -451,8 +451,10 @@ async function main() {
       align > 0 && runtime.indexOf("entry.hocuspocusProvider = new HocuspocusProvider(", align) > align,
     );
     check(
-      "…and a copy filled from the canonical state is marked as already sharing the lineage",
-      /Y\.applyUpdate\(entry\.ydoc, canonicalState\.update\);\s*\n(\s*\/\/[^\n]*\n)*\s*entry\.lineageChecked = true;/.test(runtime),
+      "…every copy, one filled from the canonical state included (the server's can be replaced while a solo session waits)",
+      (runtime.match(/entry\.lineageChecked = true;/g) ?? []).length === 1 &&
+        runtime.indexOf("entry.lineageChecked = true;") < align &&
+        runtime.indexOf("entry.lineageChecked = true;") > align - 200,
     );
     for (const caller of ["components/content/content/MainPanelContent.tsx", "components/content/editor/NoteWindowNodeView.tsx"]) {
       check(`${caller.split("/").pop()} builds its save body with noteSaveBody`, /body: noteSaveBody\(/.test(src(caller)));

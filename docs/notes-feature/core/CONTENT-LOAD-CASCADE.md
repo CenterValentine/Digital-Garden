@@ -375,8 +375,10 @@ persisted. Charter marks, run ledgers and quests bump the payload's
   payload ran ahead, the catch-up wrote the server's own items for the
   editor's text, and the editor brought its items for the same text. A copy of
   another lineage is refused (merging would double the note);
-- a browser holding a rival copy (IndexedDB from a pre-fix rebuild, or the
-  local seed fallback) compares lineages before its first connect
+- a browser holding a rival copy (IndexedDB from a pre-fix rebuild, the
+  local seed fallback, or a server copy replaced while a solo session waited —
+  so EVERY copy is compared, one filled from the canonical state too)
+  compares lineages before its first connect
   (`alignLineageBeforeFirstConnect` in `runtime.ts`) and moves onto the
   server's when content-wise nothing is lost (`planAlignment`); when both
   sides hold blocks the other lacks it connects as before and logs

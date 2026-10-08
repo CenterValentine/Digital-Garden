@@ -306,10 +306,12 @@ interface DocumentRuntimeEntry {
   hasSeededInitialContent: boolean;
   isBootstrappingInitialContent: boolean;
   /**
-   * True once this copy is known to share the server's lineage — it was
-   * filled from the canonical state, or compared before the first connect.
-   * A copy from IndexedDB or from the local seed fallback is unknown until
-   * then (see `alignLineageBeforeFirstConnect`).
+   * True once this copy was compared with the server's before its first
+   * connect (`alignLineageBeforeFirstConnect`). Every copy is compared — one
+   * filled from the canonical state too: a solo session can stay local for
+   * hours, and the server's copy can be replaced meanwhile (a Hocuspocus not
+   * yet redeployed with the lineage fix, the manual reseed). Verified in a
+   * two-browser smoke: skipping such a copy doubled the note.
    */
   lineageChecked: boolean;
   promotionPromise: Promise<void> | null;
@@ -1014,8 +1016,6 @@ class CollaborationRuntimeManager {
           return;
         }
         Y.applyUpdate(entry.ydoc, canonicalState.update);
-        // Filled from the server's own copy: nothing to compare later.
-        entry.lineageChecked = true;
       } else if (pendingContentIsMeaningful) {
         this.markBootstrapFailed(
           entry,
@@ -1225,8 +1225,9 @@ class CollaborationRuntimeManager {
    * item with the server's, and Y.js's union then shows everything twice —
    * and persists it (owner report 2026-10-08: a collaborator joining
    * duplicated the note). Such copies sit in IndexedDB from server rebuilds
-   * before the lineage fix, and from the local seed fallback when the
-   * canonical fetch failed.
+   * before the lineage fix, come from the local seed fallback when the
+   * canonical fetch failed, or turn rival while a solo session waits (the
+   * server's copy replaced by a Hocuspocus without the fix, or a reseed).
    *
    * Moves onto the server's lineage only when content-wise nothing is lost
    * (`planAlignment`); when both sides hold blocks the other lacks there is
