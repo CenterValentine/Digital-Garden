@@ -50,7 +50,7 @@ const storage = { delete: (k: string) => memoryStorage.removeItem(k), set: (k: s
 type Panes = Record<string, string[]>;
 function workspace(id: string, name: string, isMain: boolean, panes: Panes, layoutMode = "single") {
   return {
-    id, name, slug: name, isMain, isLocked: false, isView: false,
+    id, name, slug: name, isMain, isView: false,
     viewRootContentId: null, viewRoot: null, parentWorkspaceId: null,
     status: "active", expiresAt: null, archivedAt: null,
     layoutMode, activePaneId: "top-left",
