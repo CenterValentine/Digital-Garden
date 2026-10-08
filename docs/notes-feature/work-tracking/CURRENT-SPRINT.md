@@ -28,6 +28,12 @@ last_updated: 2026-05-13
 - [ ] **Already-doubled notes stay doubled:** the fix prevents new duplication; a note that was doubled before needs its extra copy deleted by hand (once).
 - [ ] **Nested shortcut in a workbench:** in a workbench rooted at folder V, a shortcut to out-of-view folder A whose contents include a shortcut to out-of-view folder B → expand the outer shortcut, then the nested one → B's items show.
 - [ ] **Nested back to a parent:** a shortcut to B, and inside B a shortcut to B's parent A → expanding either shows its folder's items, none missing or repeated.
+- [ ] **Tab menu, closed:** right-click a tab → the tab's title with a copy icon (tooltip "Copy link"), then "Move tab to ›" and "Duplicate tab to ›" — no list of workplaces until asked.
+- [ ] **Half-second rest:** rest on "Move tab to" → nothing for a moment, then the workplace picker opens beside the menu (flipped left near the right edge); a click opens it at once; resting on another row closes it.
+- [ ] **Folding:** a workplace with workbenches folds out on click; the current workplace shows "current" and only its workbenches can be picked.
+- [ ] **Move:** pick another workplace → the tab leaves this one; switching there shows it.
+- [ ] **Duplicate:** "Duplicate tab to" → another workplace → the tab stays here and also appears there.
+- [ ] **Picker Recent / Open:** open the pane "+" → Recent, then Open → each row shows files on the first line (most recently viewed first, long names capped, extras running off the edge) and the folder on the second; clicking a file reveals it in the tree; the "+" still creates in the folder.
 - [ ] **After merge:** redeploy Hocuspocus from a tree matching `origin/main`; `/readyz` five times with `uptimeMs` climbing.
 
 ## October 5, 2026 — The file tree stops flashing; deleting is instant; rows keep their order; view shortcuts show their folder and act on it safely (PR #284, merged `c48218d3`)
