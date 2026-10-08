@@ -61,6 +61,11 @@ interface MermaidViewerProps {
 
 const DEFAULT_SOURCE = "graph TD\n    A[Start] --> B[End]";
 
+// A run of keystrokes leaves the diagram transiently invalid; parsing each one
+// produced an error surface per character (#70). One parse per pause is enough,
+// and the last good SVG stays on screen for the gap.
+const RENDER_DEBOUNCE_MS = 500;
+
 export function MermaidViewer({
   contentId,
   title,
@@ -93,6 +98,9 @@ export function MermaidViewer({
   const [mermaidReady, setMermaidReady] = useState(false);
 
   const previewRef = useRef<HTMLDivElement>(null);
+  // Source of the last render attempt — lets the effect tell a keystroke (debounce)
+  // apart from a theme/mode change or the first paint (render immediately).
+  const lastRenderedSourceRef = useRef<string | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- TODO(any-epic-phase-4): mermaid is lazy-imported and its default export isn't easily typed; narrow once initializeMermaid returns a typed handle
   const mermaidRef = useRef<any>(null);
   const resolvedTheme = useResolvedTheme();
@@ -227,6 +235,7 @@ export function MermaidViewer({
     }
 
     const renderDiagram = async () => {
+      lastRenderedSourceRef.current = source;
       try {
         // Pre-validate syntax before rendering
         await mermaidRef.current.parse(source);
@@ -246,28 +255,25 @@ export function MermaidViewer({
           error,
         });
         const errorMessage = (error instanceof Error ? error.message : null) || "Syntax error";
+        // The banner below is the only error surface: the previously rendered
+        // SVG is left untouched (and dimmed while renderError is set) so a
+        // half-typed edit no longer wipes the diagram.
         setRenderError(errorMessage);
-
-        // Show toast with detailed error
-        toast.error("Mermaid Syntax Error", {
-          description: errorMessage,
-          duration: 5000,
-        });
-
-        // Show inline error without the mermaid error icon
-        previewRef.current!.innerHTML = `
-          <div class="flex items-center justify-center h-full">
-            <div class="max-w-2xl p-6 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-              <h3 class="text-lg font-semibold text-red-900 dark:text-red-200 mb-2">Syntax Error</h3>
-              <p class="text-sm text-red-700 dark:text-red-300 whitespace-pre-wrap">${errorMessage}</p>
-              <p class="text-xs text-red-600 dark:text-red-400 mt-3">Check your Mermaid syntax and try again.</p>
-            </div>
-          </div>
-        `;
       }
     };
 
-    renderDiagram();
+    // Only an edit to the source waits out the grace period. The first render,
+    // a theme flip and an edit-mode toggle all re-render the same source right
+    // away — debouncing those would just make correct state feel slow.
+    const isSourceEdit =
+      lastRenderedSourceRef.current !== null && lastRenderedSourceRef.current !== source;
+    if (!isSourceEdit) {
+      renderDiagram();
+      return;
+    }
+
+    const timeoutId = setTimeout(renderDiagram, RENDER_DEBOUNCE_MS);
+    return () => clearTimeout(timeoutId);
   }, [source, mermaidReady, isEditMode, resolvedTheme]); // Re-render when toggling edit mode or theme
 
   // Export handler
@@ -433,6 +439,21 @@ export function MermaidViewer({
     setIsEditMode((v) => !v);
   }, []);
 
+  // One error surface for both modes. View-only mode used to get its error from
+  // an innerHTML card that replaced the diagram; the banner replaces it so the
+  // last good render can stay on screen.
+  const errorBanner = renderError ? (
+    <div className="border-t border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-900/20 p-2 text-xs text-red-700 dark:text-red-400">
+      <strong>Syntax Error:</strong> {renderError}
+    </div>
+  ) : null;
+
+  // While the source is invalid the previous diagram is held, dimmed, rather
+  // than wiped — the grace period asked for in #70.
+  const stalePreviewClass = renderError
+    ? "opacity-40 blur-[1px] transition-[opacity,filter] duration-200"
+    : "transition-[opacity,filter] duration-200";
+
   return (
     <div className="h-full flex flex-col">
       {/* Header (hidden in full-screen mode or when embedded in a block) */}
@@ -539,11 +560,7 @@ export function MermaidViewer({
                 placeholder="Enter Mermaid syntax..."
                 spellCheck={false}
               />
-              {renderError && (
-                <div className="bg-red-900/20 border-t border-red-500/30 p-2 text-xs text-red-400">
-                  <strong>Syntax Error:</strong> {renderError}
-                </div>
-              )}
+              {errorBanner}
             </div>
 
             {/* Live preview */}
@@ -553,22 +570,31 @@ export function MermaidViewer({
                   <Loader2 className="h-8 w-8 animate-spin text-blue-400" />
                 </div>
               ) : (
-                <div ref={previewRef} className="mermaid-preview flex justify-center" />
+                <div
+                  ref={previewRef}
+                  className={`mermaid-preview flex justify-center ${stalePreviewClass}`}
+                />
               )}
             </div>
           </div>
         ) : (
           // View-only mode: centered preview with max width
-          <div className="h-full w-full p-8 overflow-auto bg-gray-50 dark:bg-gray-800">
-            {!mermaidReady ? (
-              <div className="flex items-center justify-center h-full">
-                <Loader2 className="h-8 w-8 animate-spin text-blue-400" />
-              </div>
-            ) : (
-              <div className="flex items-center justify-center w-full h-full">
-                <div ref={previewRef} className="mermaid-preview max-w-full" />
-              </div>
-            )}
+          <div className="h-full w-full flex flex-col bg-gray-50 dark:bg-gray-800">
+            <div className="flex-1 w-full p-8 overflow-auto">
+              {!mermaidReady ? (
+                <div className="flex items-center justify-center h-full">
+                  <Loader2 className="h-8 w-8 animate-spin text-blue-400" />
+                </div>
+              ) : (
+                <div className="flex items-center justify-center w-full h-full">
+                  <div
+                    ref={previewRef}
+                    className={`mermaid-preview max-w-full ${stalePreviewClass}`}
+                  />
+                </div>
+              )}
+            </div>
+            {errorBanner}
           </div>
         )}
       </div>
