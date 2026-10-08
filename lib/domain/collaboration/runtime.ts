@@ -13,6 +13,11 @@ import {
   ydocUpdateHasMeaningfulDefaultContent,
 } from "@/lib/domain/collaboration/content-safety";
 import { getCollaborationServerExtensions } from "@/lib/domain/collaboration/extensions";
+import {
+  alignOntoServerCopy,
+  planAlignment,
+  sharesLineage,
+} from "@/lib/domain/collaboration/lineage";
 import { sanitizeTipTapJsonWithExtensions } from "@/lib/domain/editor/unsupported-content";
 import { onNativeMessage } from "@/lib/mobile-bridge/client";
 import { clientLogger } from "@/lib/core/logger/client";
@@ -300,6 +305,13 @@ interface DocumentRuntimeEntry {
   pendingInitialContent: JSONContent | null;
   hasSeededInitialContent: boolean;
   isBootstrappingInitialContent: boolean;
+  /**
+   * True once this copy is known to share the server's lineage — it was
+   * filled from the canonical state, or compared before the first connect.
+   * A copy from IndexedDB or from the local seed fallback is unknown until
+   * then (see `alignLineageBeforeFirstConnect`).
+   */
+  lineageChecked: boolean;
   promotionPromise: Promise<void> | null;
   authVerificationPromise: Promise<void> | null;
   ydocUpdateHandler:
@@ -740,6 +752,7 @@ class CollaborationRuntimeManager {
       pendingInitialContent: null,
       hasSeededInitialContent: false,
       isBootstrappingInitialContent: false,
+      lineageChecked: false,
       promotionPromise: null,
       authVerificationPromise: null,
       ydocUpdateHandler: null,
@@ -1001,6 +1014,8 @@ class CollaborationRuntimeManager {
           return;
         }
         Y.applyUpdate(entry.ydoc, canonicalState.update);
+        // Filled from the server's own copy: nothing to compare later.
+        entry.lineageChecked = true;
       } else if (pendingContentIsMeaningful) {
         this.markBootstrapFailed(
           entry,
@@ -1202,6 +1217,53 @@ class CollaborationRuntimeManager {
       return;
     }
     this.emit(entry);
+  }
+
+  /**
+   * Before this copy first meets the server, make sure the meeting cannot
+   * double the note. A copy seeded independently from the same JSON shares no
+   * item with the server's, and Y.js's union then shows everything twice —
+   * and persists it (owner report 2026-10-08: a collaborator joining
+   * duplicated the note). Such copies sit in IndexedDB from server rebuilds
+   * before the lineage fix, and from the local seed fallback when the
+   * canonical fetch failed.
+   *
+   * Moves onto the server's lineage only when content-wise nothing is lost
+   * (`planAlignment`); when both sides hold blocks the other lacks there is
+   * no safe choice, so it connects as before and says so in the log.
+   */
+  private async alignLineageBeforeFirstConnect(entry: DocumentRuntimeEntry) {
+    if (!ydocHasMeaningfulDefaultContent(entry.ydoc)) return;
+    let serverUpdate: Uint8Array | null;
+    try {
+      serverUpdate = (await this.fetchCanonicalYDocState(entry.contentId)).update;
+    } catch {
+      return; // can't tell — connect as before
+    }
+    if (!serverUpdate || this.entries.get(entry.contentId) !== entry) return;
+    if (sharesLineage(Y.encodeStateVector(entry.ydoc), Y.encodeStateVectorFromUpdate(serverUpdate))) {
+      return;
+    }
+
+    const local = TiptapTransformer.fromYdoc(entry.ydoc, "default") as JSONContent;
+    const serverDoc = new Y.Doc();
+    Y.applyUpdate(serverDoc, serverUpdate);
+    const server = TiptapTransformer.fromYdoc(serverDoc, "default") as JSONContent;
+    serverDoc.destroy();
+    const plan = planAlignment(local, server);
+    clientLogger.warn({
+      layer: "editor",
+      event: "collab:lineage_rival",
+      summary: `this browser's copy shares no history with the server's — ${plan}`,
+      attrs: { content_id: entry.contentId, plan },
+    });
+    if (plan === "diverged") return;
+    alignOntoServerCopy(
+      entry.ydoc,
+      serverUpdate,
+      plan === "adopt-and-reapply" ? local : null,
+      "lineage-align"
+    );
   }
 
   private async fetchCanonicalYDocState(contentId: string, signal?: AbortSignal) {
@@ -1824,6 +1886,13 @@ class CollaborationRuntimeManager {
     if (entry.hocuspocusProvider) {
       entry.hocuspocusProvider.connect();
       return;
+    }
+
+    if (!entry.lineageChecked) {
+      entry.lineageChecked = true;
+      await this.alignLineageBeforeFirstConnect(entry);
+      // Released while we compared — nothing left to connect.
+      if (this.entries.get(entry.contentId) !== entry || entry.hocuspocusProvider) return;
     }
 
     entry.hocuspocusProvider = new HocuspocusProvider({

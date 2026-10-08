@@ -75,6 +75,7 @@ import {
   useContentPresence,
   isActiveTransport,
 } from "@/lib/domain/collaboration/presence-poll";
+import { noteSaveBody, type SaveMeta } from "@/lib/domain/content/save-meta";
 
 /** Depth at and beyond which nested windows render as inert chips. */
 const NESTED_CHIP_DEPTH = 3;
@@ -711,10 +712,7 @@ export function NoteWindowNodeView({
   // runs. On 409 the window NEVER overwrites: banner + refresh is the
   // v1 resolution (no conflict-store port).
   const handlePlainSave = useCallback(
-    async (
-      json: JSONContent,
-      meta?: { userInitiated?: boolean; secondsSinceInput?: number },
-    ) => {
+    async (json: JSONContent, meta?: SaveMeta) => {
       if (!targetContentId) return;
       try {
         const res = await fetch(
@@ -728,13 +726,7 @@ export function NoteWindowNodeView({
                 ? { "X-Body-Hash": bodyHashRef.current }
                 : {}),
             },
-            body: JSON.stringify({
-              tiptapJson: json,
-              ...(meta?.userInitiated === true && { userInitiated: true }),
-              ...(typeof meta?.secondsSinceInput === "number" && {
-                secondsSinceInput: meta.secondsSinceInput,
-              }),
-            }),
+            body: noteSaveBody(json, meta),
           },
         );
         if (res.status === 409) {

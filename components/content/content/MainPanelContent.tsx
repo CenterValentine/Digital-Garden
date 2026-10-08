@@ -13,7 +13,7 @@ import {
   sameProjectedText,
   sameCanonicalJson,
 } from "@/lib/domain/content/conflict-diff";
-import type { SaveMeta } from "@/lib/domain/content/save-meta";
+import { noteSaveBody, type SaveMeta } from "@/lib/domain/content/save-meta";
 import { usePathname } from "next/navigation";
 import { AlertTriangle } from "lucide-react";
 import { ToolSurfaceProvider } from "@/lib/domain/tools";
@@ -1349,20 +1349,19 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
               ? { "X-Body-Hash": bodyHashRef.current }
               : {}),
           },
-          body: JSON.stringify({
-            tiptapJson: content,
-            // Forward user-intent metadata from the editor. The content
-            // PATCH route uses `userInitiated` to bypass the shrink-refusal
-            // guard when there's been a recent user gesture, allowing
-            // legitimate "select all + delete" flows while still refusing
-            // bug-class auto-saves (editor mount race with no input).
-            // `secondsSinceInput` is telemetry only — surfaces in trace
-            // span attrs so we can tune the recency window with real data.
-            ...(meta?.userInitiated === true && { userInitiated: true }),
-            ...(typeof meta?.secondsSinceInput === "number" && {
-              secondsSinceInput: meta.secondsSinceInput,
-            }),
-          }),
+          // Forward user-intent metadata from the editor. The content
+          // PATCH route uses `userInitiated` to bypass the shrink-refusal
+          // guard when there's been a recent user gesture, allowing
+          // legitimate "select all + delete" flows while still refusing
+          // bug-class auto-saves (editor mount race with no input).
+          // `secondsSinceInput` is telemetry only — surfaces in trace
+          // span attrs so we can tune the recency window with real data.
+          // A solo editor's Y state rides along (SaveMeta.collaborationUpdate);
+          // templates have no collaborative copy.
+          body: noteSaveBody(
+            content,
+            isPageTemplateTab && meta ? { ...meta, collaborationUpdate: undefined } : meta,
+          ),
           // keepalive lets the request outlive a page that is unloading; an
           // abort signal would be moot there, so it is omitted for that case.
           ...(meta?.keepalive ? { keepalive: true } : { signal: abortController.signal }),

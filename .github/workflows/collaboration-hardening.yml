@@ -8,6 +8,10 @@ on:
       - "lib/domain/collaboration/**"
       - "server/hocuspocus/**"
       - "scripts/validate-collaboration-schema.ts"
+      - "scripts/validate-collab-lineage.ts"
+      - "lib/domain/content/save-meta.ts"
+      - "app/api/content/content/*/route.ts"
+      - "components/content/content/MainPanelContent.tsx"
       - "package.json"
       - "pnpm-lock.yaml"
   push:
@@ -48,3 +52,9 @@ jobs:
 
       - name: Validate collaboration schema
         run: pnpm collab:schema:check
+
+      # A collaborator joining must never double a note: the load catches up
+      # on the stored lineage, solo saves carry their Y copy, rival copies
+      # align before connecting. Drives the real documents.ts, no database.
+      - name: Validate collaboration lineage
+        run: pnpm collab:lineage:check
