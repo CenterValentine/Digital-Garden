@@ -833,9 +833,11 @@ export async function GET(request: NextRequest) {
 
       // Shortcut targets outside the view: same hierarchy, sort and partition as
       // the tree, built from the carried nodes only (none of them is in
-      // nodeMap, so neither pass can attach them to view rows).
+      // nodeMap, so neither pass can attach them to view rows). Every carried
+      // node goes under its carried parent — including a nested shortcut's
+      // target that sits inside another carried folder; `carriedTargetIds`
+      // holds only the forest roots, so nothing is shipped twice.
       for (const node of carriedNodes.values()) {
-        if (carriedTargetIds.includes(node.id)) continue;
         const parent = node.parentId ? carriedNodes.get(node.parentId) : undefined;
         if (parent) parent.children.push(node);
       }

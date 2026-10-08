@@ -27,7 +27,11 @@ export interface ScopedNodeLite {
 }
 
 export interface CarriedShortcutTargets {
-  /** Target folders to return beside the tree, in the order first seen. */
+  /**
+   * The roots of the carried forests, in the order first seen: carried
+   * folders whose parent is not carried. A target that sits inside another
+   * carried subtree travels inside it instead, so no node ships twice.
+   */
   targetIds: string[];
   /** Every node to carry: those folders and their descendants. */
   carriedIds: Set<string>;
@@ -38,6 +42,13 @@ export interface CarriedShortcutTargets {
  * OUTSIDE it: that folder and its whole subtree. Nodes already in the view are
  * never carried — they are on screen already, and a shortcut to an ancestor of
  * the view root would otherwise re-ship the entire view.
+ *
+ * Transitive: a shortcut inside a carried folder is followed too, the same
+ * way `viewReachRoots` follows a chain. Owner report (2026-10-08): a shortcut
+ * nested in a shortcut showed nothing in a workbench, because only shortcuts
+ * IN the view were looked at — the inner one's target was neither in the view
+ * nor carried, so its mirror had nothing to show. A cycle stops at the first
+ * repeat: a target already in the view or already carried adds nothing.
  */
 export function outOfScopeShortcutTargets(
   nodes: ReadonlyMap<string, ScopedNodeLite>,
@@ -53,8 +64,10 @@ export function outOfScopeShortcutTargets(
 
   const targetIds: string[] = [];
   const carriedIds = new Set<string>();
-  for (const id of included) {
-    const node = nodes.get(id);
+  // Shortcuts to look at: those in the view, then each one carried along.
+  const pending = [...included];
+  for (let i = 0; i < pending.length; i++) {
+    const node = nodes.get(pending[i]);
     if (!node || node.contentType !== "shortcut") continue;
     const targetId = node.shortcutTargetId;
     if (!targetId || included.has(targetId) || carriedIds.has(targetId)) continue;
@@ -67,10 +80,18 @@ export function outOfScopeShortcutTargets(
       const next = queue.shift()!;
       if (carriedIds.has(next) || included.has(next)) continue;
       carriedIds.add(next);
+      pending.push(next);
       for (const child of childrenByParent.get(next) ?? []) queue.push(child);
     }
   }
-  return { targetIds, carriedIds };
+  // A target carried first can turn out to sit inside one carried later (a
+  // shortcut to B, then one inside B to B's parent A). It then travels inside
+  // A's subtree; shipping it as a root too would put one node in two places.
+  const roots = targetIds.filter((id) => {
+    const parentId = nodes.get(id)?.parentId ?? null;
+    return parentId === null || !carriedIds.has(parentId);
+  });
+  return { targetIds: roots, carriedIds };
 }
 
 /**
