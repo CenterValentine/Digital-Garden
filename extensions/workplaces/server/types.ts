@@ -1,8 +1,3 @@
-import type {
-  ContentWorkspaceItemAssignmentType,
-  ContentWorkspaceItemScope,
-} from "@/lib/database/generated/prisma";
-
 export type WorkspaceLayoutMode =
   | "single"
   | "dual-vertical"
@@ -52,23 +47,6 @@ export interface WorkspaceStateSavePayload extends WorkspaceStatePayload {
    * Defaults to true: an omitted flag means an authoritative full-shell client.
    */
   layoutAuthority?: boolean;
-}
-
-export interface WorkspaceContentSummary {
-  id: string;
-  title: string;
-  contentType: string;
-  parentId: string | null;
-}
-
-export interface WorkspaceItemResponse {
-  id: string;
-  workspaceId: string;
-  contentId: string;
-  assignmentType: ContentWorkspaceItemAssignmentType;
-  scope: ContentWorkspaceItemScope;
-  expiresAt: string | null;
-  content: WorkspaceContentSummary;
 }
 
 export interface WorkspaceViewRoot {
@@ -228,7 +206,6 @@ export interface ContentWorkspaceResponse {
   name: string;
   slug: string;
   isMain: boolean;
-  isLocked: boolean;
   isView: boolean;
   viewRootContentId: string | null;
   viewRoot: WorkspaceViewRoot | null;
@@ -249,13 +226,11 @@ export interface ContentWorkspaceResponse {
   settings: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
-  items: WorkspaceItemResponse[];
   /**
-   * Title + type for every content id referenced by the saved pane layout
-   * (open tabs), keyed by contentId. This is a *superset* of `items` — open
-   * tabs are not always formal workspace assignments — so tabs paint named on
-   * the first frame regardless of assignment status (spec §3.8). Populated on
-   * read paths (list/get); may be empty on mutation responses.
+   * Title + type for every open content id — the saved pane layout plus R1
+   * membership — keyed by contentId, so tabs paint named on the first frame
+   * (spec §3.8). Populated on read paths (list/get); may be empty on mutation
+   * responses.
    */
   contentMeta: Record<string, { title: string; contentType: string }>;
   /**
@@ -282,31 +257,4 @@ export interface WorkspaceLayoutRecordSummary {
   paneOrder: Array<{ paneOrdinal: number; tabOrder: string[] }>;
   lastActive: { paneOrdinal: number; contentId: string } | null;
   updatedAt: string;
-}
-
-export interface WorkspaceOpenConflict {
-  conflictType: "overlap" | "viewScope";
-  workspaceId: string;
-  workspaceName: string;
-  contentId: string;
-  contentTitle: string;
-  claimContentId: string;
-  claimContentTitle: string;
-  scope: ContentWorkspaceItemScope;
-  folderScopeContentId: string | null;
-  folderScopeContentTitle: string | null;
-}
-
-export interface WorkspaceOpenIntentResponse {
-  allowed: boolean;
-  /**
-   * True when the workspace already holds a claim covering this content —
-   * either a direct item assignment or a recursive claim on the content or
-   * one of its ancestors (any assignment type). The client must NOT create
-   * a new assignment for covered opens: doing so would upsert over the
-   * existing claim (e.g. converting a borrowed/shared item to primary) or
-   * pin descendants of a borrowed folder past the borrow window.
-   */
-  alreadyCovered?: boolean;
-  conflict: WorkspaceOpenConflict | null;
 }

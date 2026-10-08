@@ -20,16 +20,9 @@ import { useWorkspaceTabFilterStore } from "@/state/workspace-tab-filter-store";
 import type {
   ContentWorkspaceResponse,
   WorkspaceLayoutRecordSummary,
-  WorkspaceOpenConflict,
-  WorkspaceOpenIntentResponse,
   WorkspaceStatePayload,
   WorkspaceStateSavePayload,
 } from "@/extensions/workplaces/server";
-import type {
-  ContentWorkspaceItemAssignmentType,
-  ContentWorkspaceItemScope,
-} from "@/lib/database/generated/prisma";
-import { warmContentSummaryCache } from "@/lib/domain/content/content-summary-cache";
 import {
   detectWorkspaceSurfaceFamily,
   getDeviceId,
@@ -40,11 +33,6 @@ type ApiResponse<T> = {
   data?: T;
   error?: { code: string; message: string };
 };
-
-interface PendingOpenIntent {
-  contentId: string;
-  options: ContentSelectionOptions;
-}
 
 interface WorkspaceState {
   workspaces: ContentWorkspaceResponse[];
@@ -59,8 +47,6 @@ interface WorkspaceState {
    * rest of the session.
    */
   hasLoadedOnce: boolean;
-  conflict: WorkspaceOpenConflict | null;
-  pendingOpenIntent: PendingOpenIntent | null;
   loadWorkspaces: (initialWorkspaceId?: string | null) => Promise<void>;
   activateWorkspace: (workspaceId: string) => Promise<void>;
   createWorkspace: (name: string) => Promise<ContentWorkspaceResponse>;
@@ -102,8 +88,8 @@ interface WorkspaceState {
   /**
    * Open content as tabs in `targetWorkspaceId` (a workplace or bench)
    * without leaving the active one — a file dragged onto the workplaces
-   * affordance. Targeting the ACTIVE workplace is an ordinary open through
-   * the workplace guard. `openTarget` switches there afterwards.
+   * affordance. Targeting the ACTIVE workplace is an ordinary open.
+   * `openTarget` switches there afterwards.
    */
   sendContentToWorkspace: (
     targetWorkspaceId: string,
@@ -114,7 +100,6 @@ interface WorkspaceState {
     workspaceId: string,
     updates: {
       name?: string;
-      isLocked?: boolean;
       expiresAt?: string | null;
       settings?: Record<string, unknown>;
       viewRootContentId?: string | null;
@@ -126,29 +111,6 @@ interface WorkspaceState {
   requestOpenContent: (
     contentId: string,
     options?: ContentSelectionOptions,
-  ) => Promise<void>;
-  borrowPendingContent: (
-    expiresAt: string,
-    options?: { useFolderScope?: boolean },
-  ) => Promise<void>;
-  sharePendingContent: (options?: {
-    useFolderScope?: boolean;
-  }) => Promise<void>;
-  switchToConflictWorkspace: () => Promise<void>;
-  cancelOpenConflict: () => void;
-  assignContentToWorkspace: (
-    workspaceId: string,
-    contentId: string,
-    options: {
-      assignmentType: ContentWorkspaceItemAssignmentType;
-      scope?: ContentWorkspaceItemScope;
-      expiresAt?: string | null;
-      moveFromWorkspaceId?: string | null;
-    },
-  ) => Promise<void>;
-  unassignContentFromWorkspace: (
-    workspaceId: string,
-    contentId: string,
   ) => Promise<void>;
   resetWorkspaces: () => Promise<void>;
   receiveRefreshedWorkspaces: (workspaces: ContentWorkspaceResponse[]) => void;
@@ -163,22 +125,6 @@ function affinityForPane(paneId: WorkspacePaneId) {
     h: paneId.endsWith("left") ? "left" : "right",
     v: paneId.startsWith("top") ? "top" : "bottom",
   };
-}
-
-/**
- * Which ownership claim, if any, should follow a tab out of `source`.
- *
- * Policy: only a claim the source ALREADY holds on this exact content moves;
- * a folder-scoped (recursive) claim that merely covers the content stays put,
- * because moving it would drag every sibling's ownership along with one tab.
- */
-function claimToCarry(
-  source: ContentWorkspaceResponse | null,
-  contentId: string,
-) {
-  return (
-    source?.items.find((item) => item.contentId === contentId) ?? null
-  );
 }
 
 let isBypassingWorkspaceGuard = false;
@@ -232,60 +178,6 @@ export function __resetContentStoreOwnerForTests(): void {
 const persistInFlight = new Map<string, Promise<void>>();
 const persistDirty = new Set<string>();
 
-/**
- * Opens shown BEFORE the server has agreed to them.
- *
- * In a non-Main workspace an open used to wait on the open-intent POST (five
- * sequential queries on Neon) and often an assignment POST after it, and only
- * then create the tab — so a tree click or a wiki-link showed nothing for
- * hundreds of milliseconds, and the user was left guessing whether anything
- * was coming (owner, prod, 2026-10-03: "the biggest lag observed"). The tab now
- * appears at once and the content starts loading; the intent check runs
- * alongside. If the server refuses, the conflict dialog opens over the tab
- * exactly as it did, and cancelling closes it.
- *
- * While an open is provisional the workspace row is NOT persisted: the state
- * PATCH folds the pane lists into membership, and writing it would mint the
- * very claim the intent check exists to gate. The persist is deferred, not
- * dropped — it runs the moment the last provisional open settles.
- */
-const provisionalOpens = new Map<string, { layoutModeBefore: WorkspaceLayoutMode }>();
-let persistDeferredByProvisional = false;
-
-function settleProvisionalOpen(contentId: string) {
-  provisionalOpens.delete(contentId);
-  if (provisionalOpens.size === 0 && persistDeferredByProvisional) {
-    persistDeferredByProvisional = false;
-    void useWorkspaceStore
-      .getState()
-      .persistActiveWorkspace()
-      .catch((error) => {
-        console.error(
-          "[Workspace Store] Failed to persist after a provisional open settled:",
-          error,
-        );
-      });
-  }
-}
-
-/**
- * The server said no (or never answered): take the provisional tab back —
- * and the layout with it. An open can grow the layout (a side-by-side open
- * into the empty pane, an aimed open into a quad) and closing the only tab in
- * a pane folds it (the removal rule); either way the user never had this tab,
- * so the arrangement must be exactly what it was before they asked.
- */
-function rollbackProvisionalOpen(contentId: string) {
-  const provisional = provisionalOpens.get(contentId);
-  if (!provisional) return;
-  traceWorkspace("open:provisional:rollback", { contentId });
-  const cs = useContentStore.getState();
-  cs.closeContentTabs([contentId]);
-  if (useContentStore.getState().layoutMode !== provisional.layoutModeBefore) {
-    useContentStore.getState().setLayoutMode(provisional.layoutModeBefore);
-  }
-  settleProvisionalOpen(contentId);
-}
 let onMutationBroadcast: (() => void) | null = null;
 const WORKSPACE_MUTATION_TIMEOUT_MS = 12_000;
 /** How long a move/send toast offers Undo — matches the clear-tabs control. */
@@ -663,17 +555,17 @@ export function restoreContentWorkspace(
 
   // Cold-load race: the workspace API can resolve before
   // MainPanelWorkspace's URL parser runs. If the URL specifies a
-  // content id that belongs to this workspace, it must win as the
-  // active tab — otherwise the user deep-links to a tab but watches
-  // it load LAST while the persisted active tab loads first. Gating
-  // on workspace membership avoids regressing the manual workspace
-  // switch path, where `syncWorkspaceUrl` leaves a stale `content=`
-  // in the URL from the previous workspace.
+  // content id that is one of this workspace's open tabs, it must win
+  // as the active tab — otherwise the user deep-links to a tab but
+  // watches it load LAST while the persisted active tab loads first.
+  // Gating on the open-tab set (blob ∪ membership, above) avoids
+  // regressing the manual workspace switch path, where
+  // `syncWorkspaceUrl` leaves a stale `content=` in the URL from the
+  // previous workspace, and can never elect an id that sits in no pane.
+  const openTabIds = Object.values(paneTabContentIds).flat();
   const contentIdFromUrl = allowUrlActiveFallback ? readContentIdFromUrl() : null;
   const urlContentBelongsToWorkspace =
-    contentIdFromUrl !== null &&
-    workspace.items.some((item) => item.contentId === contentIdFromUrl);
-  const openTabIds = Object.values(paneTabContentIds).flat();
+    contentIdFromUrl !== null && openTabIds.includes(contentIdFromUrl);
   const preferStillOpen =
     preferActiveContentId != null &&
     openTabIds.includes(preferActiveContentId);
@@ -699,7 +591,7 @@ export function restoreContentWorkspace(
 
   // Per-content title + type from the snapshot so tabs paint named on the
   // first frame (spec §3.8) — no "Loading…" tab label, no post-mount fetch.
-  // contentMeta covers the full open-tab set (superset of items), so tabs that
+  // contentMeta covers the full open-tab set (blob ∪ membership), so tabs that
   // aren't formal workspace assignments are still named.
   const tabMeta = workspace.contentMeta ?? {};
 
@@ -838,56 +730,6 @@ function directOpenContent(
     }
   } finally {
     isBypassingWorkspaceGuard = false;
-  }
-}
-
-function isContentAlreadyInWorkspace(
-  workspace: ContentWorkspaceResponse | null,
-  contentId: string,
-) {
-  return Boolean(workspace?.items.some((item) => item.contentId === contentId));
-}
-
-function closeReleasedBorrowedTabs(
-  previousWorkspaces: ContentWorkspaceResponse[],
-  nextWorkspaces: ContentWorkspaceResponse[],
-  activeWorkspaceId: string | null,
-) {
-  const previous = getWorkspace(previousWorkspaces, activeWorkspaceId);
-  const next = getWorkspace(nextWorkspaces, activeWorkspaceId);
-  if (!previous || !next) return;
-
-  const nextItemIds = new Set(next.items.map((item) => item.contentId));
-  const releasedBorrowedContentIds = previous.items
-    .filter(
-      (item) =>
-        item.assignmentType === "borrowed" && !nextItemIds.has(item.contentId),
-    )
-    .map((item) => item.contentId);
-
-  if (releasedBorrowedContentIds.length > 0) {
-    useContentStore.getState().closeContentTabs(releasedBorrowedContentIds);
-  }
-
-  const expiredBorrowedItems = previous.items.filter(
-    (item) =>
-      item.assignmentType === "borrowed" &&
-      item.expiresAt &&
-      new Date(item.expiresAt).getTime() <= Date.now() &&
-      !nextItemIds.has(item.contentId),
-  );
-
-  if (expiredBorrowedItems.length > 0) {
-    const firstTitle =
-      expiredBorrowedItems[0]?.content.title ?? "A borrowed tab";
-    const suffix =
-      expiredBorrowedItems.length > 1
-        ? ` and ${expiredBorrowedItems.length - 1} more`
-        : "";
-    notifyExpirationWarning(
-      "Borrowed tab expired",
-      `${firstTitle}${suffix} was released because its borrow window ended.`,
-    );
   }
 }
 
@@ -1092,8 +934,6 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   activeWorkspaceId: null,
   isLoading: false,
   hasLoadedOnce: false,
-  conflict: null,
-  pendingOpenIntent: null,
 
   loadWorkspaces: async (initialWorkspaceId) => {
     set({ isLoading: true });
@@ -1118,12 +958,6 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       const activeWorkspace =
         requestedWorkspace ?? getMainWorkspace(workspaces);
 
-      closeReleasedBorrowedTabs(
-        previousWorkspaces,
-        workspaces,
-        activeWorkspace?.id ?? null,
-      );
-
       set({
         workspaces,
         activeWorkspaceId: activeWorkspace?.id ?? null,
@@ -1131,10 +965,6 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         hasLoadedOnce: true,
       });
       writePersistedActiveWorkspaceId(activeWorkspace?.id ?? null);
-
-      warmContentSummaryCache(
-        workspaces.flatMap((ws) => ws.items.map((item) => item.content)),
-      );
 
       if (activeWorkspace) {
         lastAppliedUpdatedAt[activeWorkspace.id] = activeWorkspace.updatedAt;
@@ -1227,11 +1057,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       throw new Error("Workspace not found");
     }
 
-    set({
-      activeWorkspaceId: workspace.id,
-      conflict: null,
-      pendingOpenIntent: null,
-    });
+    set({ activeWorkspaceId: workspace.id });
     writePersistedActiveWorkspaceId(workspace.id);
     lastAppliedUpdatedAt[workspace.id] = workspace.updatedAt;
     syncWorkspaceUrl(workspace.id);
@@ -1386,31 +1212,6 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       ),
     }));
 
-    // Ownership travels with the tab only when the source already held it.
-    // A move never MINTS a claim: that is what "Share permanently" and the
-    // settings dialog are for, and silently claiming on the user's behalf is
-    // how conflicts appear in workplaces they never assigned anything to.
-    const claim = claimToCarry(
-      getWorkspace(get().workspaces, sourceWorkspaceId),
-      tab.contentId,
-    );
-    let claimCarried = false;
-    if (claim) {
-      try {
-        await get().assignContentToWorkspace(targetWorkspaceId, tab.contentId, {
-          assignmentType: claim.assignmentType,
-          scope: claim.scope,
-          expiresAt: claim.expiresAt,
-          moveFromWorkspaceId: sourceWorkspaceId,
-        });
-        claimCarried = true;
-      } catch (error) {
-        toast.warning("Tab moved, but its workplace claim stayed behind", {
-          description: error instanceof Error ? error.message : undefined,
-        });
-      }
-    }
-
     notifyMutation();
     const switched = Boolean(options.openTarget);
     if (switched) {
@@ -1420,7 +1221,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
 
     const title = tab.title || "Untitled";
     // Undo reverses every half of the move: membership back to the source,
-    // the carried claim back, and the switch if there was one.
+    // and the switch if there was one.
     const undo = async () => {
       try {
         const back = await fetchWorkspaceMutation(
@@ -1453,14 +1254,6 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
                 : candidate,
           ),
         }));
-        if (claimCarried && claim) {
-          await get().assignContentToWorkspace(sourceWorkspaceId, tab.contentId, {
-            assignmentType: claim.assignmentType,
-            scope: claim.scope,
-            expiresAt: claim.expiresAt,
-            moveFromWorkspaceId: targetWorkspaceId,
-          });
-        }
         if (get().activeWorkspaceId === sourceWorkspaceId) {
           // The source is on screen. The move back bumped its revision;
           // adopt it as this window's base (as a 409-adopt would) so the
@@ -1520,9 +1313,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const ids = items.map((item) => item.id);
     const previousActiveId = get().activeWorkspaceId;
 
-    // Already here: open normally, through the workplace guard (claims,
-    // conflicts, borrow prompts all apply). Membership follows via persist,
-    // and so does the undo — a plain local close.
+    // Already here: open normally. Membership follows via persist, and so
+    // does the undo — a plain local close.
     if (targetWorkspaceId === previousActiveId) {
       for (const item of items) {
         await get().requestOpenContent(item.id);
@@ -1704,7 +1496,6 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       const optimisticWorkspace: ContentWorkspaceResponse = {
         ...existingWorkspace,
         name: updates.name ?? existingWorkspace.name,
-        isLocked: updates.isLocked ?? existingWorkspace.isLocked,
         expiresAt:
           "expiresAt" in updates
             ? (updates.expiresAt ?? null)
@@ -1897,12 +1688,6 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
 
     async function persistNow() {
       if (!hasWorkspace(get().workspaces, activeWorkspaceId)) return;
-      // An open the server has not agreed to yet must not reach the row (see
-      // provisionalOpens). Deferred: settleProvisionalOpen re-runs this.
-      if (provisionalOpens.size > 0) {
-        persistDeferredByProvisional = true;
-        return;
-      }
       saveTreeSnapshotForWorkspace(activeWorkspaceId);
 
       if (typeof navigator !== "undefined" && !navigator.onLine) {
@@ -2012,245 +1797,25 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       return;
     }
 
-    // The Main Workspace is the unrestricted catchall: opens are never gated
-    // by other workspaces' claims and mint no claims, so skip the open-intent
-    // round trip entirely. The server enforces the same rule for stale-cache
-    // callers that POST anyway.
-    if (activeWorkspace.isMain) {
-      directOpenContent(contentId, options);
-      void get()
-        .persistActiveWorkspace()
-        .catch((error) => {
-          console.error(
-            "[Workspace Store] Failed to persist active workspace after open:",
-            error,
-          );
-        });
-      return;
-    }
-
-    if (
-      isContentAlreadyInWorkspace(activeWorkspace, contentId) ||
-      useContentStore.getState().openContentIds.includes(contentId) ||
-      contentId.startsWith("temp-")
-    ) {
-      directOpenContent(contentId, options);
-      return;
-    }
-
-    // Show it NOW; ask alongside (see provisionalOpens). The content fetch
-    // and the intent check overlap instead of queueing.
-    provisionalOpens.set(contentId, {
-      layoutModeBefore: useContentStore.getState().layoutMode,
-    });
-    traceWorkspace("open:provisional", { contentId, workspaceId: activeWorkspace.id });
+    // Every open goes straight through: views and shortcuts decide what a
+    // workplace shows, nothing decides what it may open. The immediate persist
+    // lands the tab in this workplace's row without waiting for the debounced
+    // snapshot write.
     directOpenContent(contentId, options);
-
-    let result: WorkspaceOpenIntentResponse;
-    try {
-      const response = await fetch("/api/content/workspaces/open-intent", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          workspaceId: activeWorkspace.id,
-          contentId,
-        }),
+    void get()
+      .persistActiveWorkspace()
+      .catch((error) => {
+        console.error(
+          "[Workspace Store] Failed to persist active workspace after open:",
+          error,
+        );
       });
-      result = await parseResponse<WorkspaceOpenIntentResponse>(
-        response,
-        "Failed to resolve workspace conflict",
-      );
-    } catch (error) {
-      // No answer is not a yes: the tab goes back.
-      rollbackProvisionalOpen(contentId);
-      throw error;
-    }
-
-    // The user may have closed the tab (or switched workspace) while the
-    // server was thinking. Nothing to confirm; nothing to persist for it.
-    if (!provisionalOpens.has(contentId)) return;
-
-    if (result.allowed) {
-      // Agreed — the tab is no longer provisional, so the deferred persist may
-      // run. The assignment below is what the row's membership would mint
-      // anyway; ordering it first keeps the claim's TYPE right.
-      //
-      // A covered open (direct assignment or a recursive folder claim held by
-      // this workspace) must not create a new item: the upsert would overwrite
-      // the existing claim's type (borrowed/shared → primary) or permanently
-      // pin a descendant of a folder that was only borrowed.
-      if (!result.alreadyCovered) {
-        await get().assignContentToWorkspace(activeWorkspace.id, contentId, {
-          assignmentType: "primary",
-          scope: "item",
-        });
-      }
-      settleProvisionalOpen(contentId);
-      void get()
-        .persistActiveWorkspace()
-        .catch((error) => {
-          console.error(
-            "[Workspace Store] Failed to persist active workspace after open:",
-            error,
-          );
-        });
-      return;
-    }
-
-    // Refused: the tab stays on screen under the dialog (the user sees what
-    // they asked for and decides); it stays provisional until they do.
-    set({
-      conflict: result.conflict,
-      pendingOpenIntent: { contentId, options },
-    });
-  },
-
-  borrowPendingContent: async (expiresAt, options) => {
-    const state = get();
-    const activeWorkspaceId = state.activeWorkspaceId;
-    const pending = state.pendingOpenIntent;
-    const conflict = state.conflict;
-    if (!activeWorkspaceId || !pending) return;
-
-    const targetContentId =
-      options?.useFolderScope && conflict?.folderScopeContentId
-        ? conflict.folderScopeContentId
-        : pending.contentId;
-    const targetScope =
-      options?.useFolderScope && conflict?.folderScopeContentId
-        ? "recursive"
-        : undefined;
-
-    await get().assignContentToWorkspace(activeWorkspaceId, targetContentId, {
-      assignmentType: "borrowed",
-      scope: targetScope,
-      expiresAt,
-    });
-    directOpenContent(pending.contentId, pending.options);
-    set({ conflict: null, pendingOpenIntent: null });
-    settleProvisionalOpen(pending.contentId);
-  },
-
-  sharePendingContent: async (options) => {
-    const state = get();
-    const activeWorkspaceId = state.activeWorkspaceId;
-    const pending = state.pendingOpenIntent;
-    const conflict = state.conflict;
-    if (!activeWorkspaceId || !pending) return;
-
-    const targetContentId =
-      options?.useFolderScope && conflict?.folderScopeContentId
-        ? conflict.folderScopeContentId
-        : pending.contentId;
-    const targetScope =
-      options?.useFolderScope && conflict?.folderScopeContentId
-        ? "recursive"
-        : undefined;
-
-    await get().assignContentToWorkspace(activeWorkspaceId, targetContentId, {
-      assignmentType: "shared",
-      scope: targetScope,
-    });
-    directOpenContent(pending.contentId, pending.options);
-    set({ conflict: null, pendingOpenIntent: null });
-    settleProvisionalOpen(pending.contentId);
-  },
-
-  switchToConflictWorkspace: async () => {
-    const conflict = get().conflict;
-    if (!conflict) return;
-    const pending = get().pendingOpenIntent;
-    // The provisional tab belongs to the workspace we are LEAVING; take it
-    // back before the switch-away write can fold it into that row.
-    if (pending) rollbackProvisionalOpen(pending.contentId);
-    await get().activateWorkspace(conflict.workspaceId);
-    if (pending) {
-      directOpenContent(pending.contentId, pending.options);
-    }
-    set({ conflict: null, pendingOpenIntent: null });
-  },
-
-  cancelOpenConflict: () => {
-    const pending = get().pendingOpenIntent;
-    set({ conflict: null, pendingOpenIntent: null });
-    if (pending) rollbackProvisionalOpen(pending.contentId);
-  },
-
-  assignContentToWorkspace: async (workspaceId, contentId, options) => {
-    const response = await fetch(
-      `/api/content/workspaces/${workspaceId}/assignments`,
-      {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contentId,
-          assignmentType: options.assignmentType,
-          scope: options.scope,
-          expiresAt: options.expiresAt,
-          moveFromWorkspaceId: options.moveFromWorkspaceId,
-        }),
-      },
-    );
-    const workspace = await parseResponse<ContentWorkspaceResponse>(
-      response,
-      "Failed to assign content to workspace",
-    );
-    if (
-      options.moveFromWorkspaceId &&
-      options.moveFromWorkspaceId !== workspaceId
-    ) {
-      const workspaces = await fetchWorkspaces();
-      set({ workspaces });
-    } else {
-      set((state) => ({
-        workspaces: state.workspaces.map((candidate) =>
-          candidate.id === workspace.id ? workspace : candidate,
-        ),
-      }));
-    }
-
-    if (
-      options.moveFromWorkspaceId &&
-      options.moveFromWorkspaceId === get().activeWorkspaceId &&
-      options.moveFromWorkspaceId !== workspaceId
-    ) {
-      useContentStore.getState().closeContentTabs([contentId]);
-    }
-    notifyMutation();
-  },
-
-  unassignContentFromWorkspace: async (workspaceId, contentId) => {
-    const response = await fetch(
-      `/api/content/workspaces/${workspaceId}/assignments/${contentId}`,
-      {
-        method: "DELETE",
-        credentials: "include",
-      },
-    );
-    const workspace = await parseResponse<ContentWorkspaceResponse>(
-      response,
-      "Failed to remove workspace claim",
-    );
-    if (!workspace) return;
-    set((state) => ({
-      workspaces: state.workspaces.map((candidate) =>
-        candidate.id === workspace.id ? workspace : candidate,
-      ),
-    }));
-    notifyMutation();
   },
 
   receiveRefreshedWorkspaces: (incoming) => {
     const state = get();
     const ordered = applyWorkspaceOrder(incoming);
     notifyExpiredWorkspaceRemoval(state.workspaces, ordered);
-    closeReleasedBorrowedTabs(
-      state.workspaces,
-      ordered,
-      state.activeWorkspaceId,
-    );
 
     // INVARIANT — cross-session isolation is scoped to the SAME workspace.
     // This background reconcile only re-applies the local session's *active*
@@ -2301,8 +1866,6 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     set({
       workspaces,
       activeWorkspaceId: nextWorkspace?.id ?? null,
-      conflict: null,
-      pendingOpenIntent: null,
     });
     if (nextWorkspace) {
       syncWorkspaceUrl(nextWorkspace.id);

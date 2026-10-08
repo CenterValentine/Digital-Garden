@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect } from "react";
-import { WorkspaceConflictDialog } from "@/extensions/workplaces/components/WorkspaceConflictDialog";
 import {
   installWorkspaceOpenGuard,
   useWorkspaceStore,
@@ -44,5 +43,5 @@ export function WorkplacesShellController() {
     return () => window.clearTimeout(timeoutId);
   }, [activeWorkspaceId, workspaceSnapshotKey, persistActiveWorkspace]);
 
-  return <WorkspaceConflictDialog />;
+  return null;
 }
