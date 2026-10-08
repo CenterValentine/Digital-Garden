@@ -233,6 +233,29 @@ function urlRestore(panes: Panes, activeContentId: string, layoutMode: "single" 
     check("…without asking the server for permission", calls.filter((c) => c.includes("/open-intent")), []);
   }
 
+  console.log("\na ?content= that is one of the workspace's open tabs wins the cold load");
+  {
+    // The tiebreaker gates on the OPEN-TAB set (blob ∪ membership). It used to
+    // gate on claim rows, so in Main (which never held claims) it never fired,
+    // and elsewhere a stale claim could elect content that sat in no pane.
+    const selected = () => useContentStore.getState().selectedContentId;
+    freshPage("http://localhost/content?workspace=b-id&content=b2", "b-id");
+    await useWorkspaceStore.getState().loadWorkspaces("b-id");
+    check("…b2 is selected over B's stored active tab", [active(), selected()], ["b-id", "b2"]);
+
+    freshPage("http://localhost/content?workspace=main-id&content=m2", "main-id");
+    await useWorkspaceStore.getState().loadWorkspaces("main-id");
+    check("…and it works in Main too", [active(), selected()], ["main-id", "m2"]);
+
+    freshPage("http://localhost/content?workspace=b-id&content=zz", "b-id");
+    await useWorkspaceStore.getState().loadWorkspaces("b-id");
+    check(
+      "a ?content= that is not an open tab is never elected (no tab that sits in no pane)",
+      [selected(), placement()],
+      ["b1", { "top-left": ["b1", "b2"] }],
+    );
+  }
+
   console.log("\na persist re-run never writes another workspace's tabs (self-inflicted by the write coalescing)");
   {
     freshPage("http://localhost/content?workspace=main-id", "main-id");
