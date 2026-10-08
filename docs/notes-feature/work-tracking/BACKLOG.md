@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-10-03
+last_updated: 2026-10-08
 ---
 
 # Sprint Backlog
@@ -7,6 +7,31 @@ last_updated: 2026-10-03
 **Prioritized work items for upcoming sprints, organized by epoch.**
 
 **Sprint Execution Protocol**: Before commencing any sprint, always ask the user for input before planning and executing — there may be additions or modifications.
+
+---
+
+## Collaboration lineage — follow-ups (2026-10-08, from `fix/join-dup-nested-shortcuts`)
+
+The join duplication is fixed at its three sources (`lib/domain/collaboration/lineage.ts`,
+`CONTENT-LOAD-CASCADE.md §9.4`). What is deliberately left:
+
+- **Diverged rival copies still union.** When a browser's rival copy and the
+  server's each hold blocks the other lacks, `planAlignment` returns
+  `"diverged"` and the browser connects as before (the note doubles, nothing is
+  lost), logging `collab:lineage_rival`. The cure is a resolution step — offer
+  the browser's version through the save-conflict banner ("Keep mine / Take
+  theirs") instead of letting the union stand. Watch the log event first: if it
+  never fires, this stays parked.
+- **Notes already doubled in production** are not repaired by the fix. A
+  one-off script could find candidates (snapshotJson whose block list is two
+  identical halves) for the owner to review; never auto-dedupe.
+- **Solo saves send the whole Y state.** Cheap for ordinary notes; for very
+  large ones a diff since the last acknowledged state vector would do (the
+  route merges either). Only if save latency or body size shows up.
+- **Keepalive flushes over 64 KiB carry no Y copy** (the browser refuses the
+  request). The last edits before closing the tab then reach the stored copy
+  only through the payload catch-up — the editor's own items for them can meet
+  the server's later (a few words doubled). Same diff-since-last-ack idea fixes it.
 
 ---
 

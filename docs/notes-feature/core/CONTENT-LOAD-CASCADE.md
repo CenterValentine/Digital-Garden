@@ -346,11 +346,43 @@ the payload win bootstrap when ALL of:
    (top-level block count) — a smaller-but-newer payload is far more likely a
    partial/failed write than a legitimate edit, so the Y.Doc is kept and the
    divergence banner still surfaces it.
-When it fires, the fall-through path builds a fresh Y.Doc from the payload —
-the same code first-open uses — so nothing new is invented. **Why the stamp,
+When it fires, the payload is applied **onto the stored copy as a diff**
+(`catchUpStoredCopy`, `lib/domain/collaboration/lineage.ts`) — never by
+building a fresh Y.Doc. **Why the stamp,
 not `updatedAt` vs `updatedAt`:** the store hook writes the payload a hair
 *after* the Y.Doc, so a naive comparison would reseed on every ordinary open.
 The stamp is semantically exact ("when did the Y.Doc last mirror into me?").
+
+**Layer 2 must keep the lineage (2026-10-08, owner report: "when a
+collaborator joins, the content in a note gets duplicated").** Layer 2 used to
+rebuild the stored Y.Doc from the payload — a fresh seed, i.e. exactly the
+rival-copy hazard Layer 1 bans — and never wrote the stamp, so the NEXT load
+rebuilt again. A collaborator's first open runs two loads (the canonical-state
+fetch, then Hocuspocus), got two rivals, and merged them: the note twice,
+persisted. Charter marks, run ledgers and quests bump the payload's
+`updatedAt` with no content change and set it off too. The rules now:
+- the catch-up is a diff on the stored lineage, so every holder of the stored
+  copy merges with it cleanly;
+- it runs under a per-document advisory lock (`collab-doc:<documentName>`)
+  and re-decides inside it, so two simultaneous loads take turns;
+- it writes the stamp **as of the payload's `updatedAt`** and holds
+  `updatedAt` there — opening a note is not editing it (activity signals read
+  `updatedAt`);
+- a **solo** editor (collaboration-local: Y.Doc bound, no provider) sends its
+  Y state with each REST save (`SaveMeta.collaborationUpdate`); the PATCH route
+  merges it into the stored copy (`mergeSoloCollaborationCopy`) BEFORE writing
+  the payload, and stamps the payload only when it merged. Otherwise the
+  payload ran ahead, the catch-up wrote the server's own items for the
+  editor's text, and the editor brought its items for the same text. A copy of
+  another lineage is refused (merging would double the note);
+- a browser holding a rival copy (IndexedDB from a pre-fix rebuild, or the
+  local seed fallback) compares lineages before its first connect
+  (`alignLineageBeforeFirstConnect` in `runtime.ts`) and moves onto the
+  server's when content-wise nothing is lost (`planAlignment`); when both
+  sides hold blocks the other lacks it connects as before and logs
+  `collab:lineage_rival`.
+Pinned by `pnpm collab:lineage:check` (real `documents.ts`, in-memory Prisma
+with the lock emulated).
 
 **Layer 3 — don't stay detached (PR #168).** A `localOnly` session used to
 re-promote on typing only when *another* session was present; a solo editor

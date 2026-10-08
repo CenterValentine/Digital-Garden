@@ -9,7 +9,28 @@ last_updated: 2026-05-13
 
 # Current Sprint Addendum
 
-## October 5, 2026 — The file tree stops flashing; deleting is instant; rows keep their order; view shortcuts show their folder and act on it safely
+## October 8, 2026 — A collaborator joining no longer duplicates a note; nested shortcuts show in workbenches
+
+**Tree**: worktree `.claude/worktrees/join-dup`, branch `fix/join-dup-nested-shortcuts` (off `origin/main` at `3f966a0c`)
+**Status**: typecheck / lint 151 (0 errors, none new) / `collab:lineage:check` (new; in `build`, preflight and the collaboration-hardening workflow; mutation-tested 15 ways) / `shortcut-mirror:check` (nested-in-a-view cases; mutation-tested 3 ways) / `pnpm build` green; no schema, TipTap or extension change; **Hocuspocus redeploy required after merge** (`documents.ts` load path).
+
+### Shipped
+- **Loads catch up on the stored lineage** (`lineage.ts` `catchUpStoredCopy`): a payload newer than the mirror stamp is applied onto the stored Y.Doc as a diff — never a fresh seed — under a per-document advisory lock, and the stamp is written as of the payload's `updatedAt` (left unchanged: opening is not editing). Two loads a moment apart (canonical fetch + Hocuspocus) used to mint two rival copies.
+- **Solo saves carry their Y copy** (`SaveMeta.collaborationUpdate`, `noteSaveBody`): merged into the stored copy before the payload is written (`mergeSoloCollaborationCopy`), payload stamped only when merged; a rival copy is refused; over-size copies are left out (never fail the save).
+- **Rival copies in a browser align before the first connect** (`alignLineageBeforeFirstConnect`): adopt when the server's copy already shows everything, adopt-and-re-apply when the browser's only adds, otherwise connect as before and log `collab:lineage_rival`.
+- **Nested shortcuts in a workbench**: `outOfScopeShortcutTargets` follows shortcuts inside carried folders (cycle-safe); carried targets inside other carried folders travel inside them.
+
+### Smoke checklist (owner)
+- [ ] **Join after solo editing:** account A opens a note alone and types two new lines, waits ~3 s; account B (or a second browser profile) opens the same note → both see the note once, the two new lines once.
+- [ ] **Join, then edit live:** with A and B both on the note, each types a line → each line appears once on both sides; reload both → still once.
+- [ ] **Metadata bump:** mark a note as a charter (or run an AI quest on it), then open it in a second browser → content once.
+- [ ] **Window editing:** edit a note through a Note Window alone, then open the target note in a second browser → content once.
+- [ ] **Already-doubled notes stay doubled:** the fix prevents new duplication; a note that was doubled before needs its extra copy deleted by hand (once).
+- [ ] **Nested shortcut in a workbench:** in a workbench rooted at folder V, a shortcut to out-of-view folder A whose contents include a shortcut to out-of-view folder B → expand the outer shortcut, then the nested one → B's items show.
+- [ ] **Nested back to a parent:** a shortcut to B, and inside B a shortcut to B's parent A → expanding either shows its folder's items, none missing or repeated.
+- [ ] **After merge:** redeploy Hocuspocus from a tree matching `origin/main`; `/readyz` five times with `uptimeMs` climbing.
+
+## October 5, 2026 — The file tree stops flashing; deleting is instant; rows keep their order; view shortcuts show their folder and act on it safely (PR #284, merged `c48218d3`)
 
 **Tree**: worktree `.claude/worktrees/smooth-delete`, branch `fix/smooth-delete` (off `origin/main` at `49b94490`)
 **Status**: typecheck / lint 151 (0 errors, none new) / `tree:smooth:check` 231 (new, in the quality workflow) / `shortcut-mirror:check` (out-of-view cases, row actions, view reach) / tree + workspace gates / `pnpm build` green; no schema or TipTap change; **browser-extension change** (bookmark dedupe removed — `pnpm extension:build`, reload at chrome://extensions); **Hocuspocus redeploy required** (collaborative saves now refresh media links); run `scripts/backfill-media-links.ts --apply` once per environment. Owner browser smoke pending.
