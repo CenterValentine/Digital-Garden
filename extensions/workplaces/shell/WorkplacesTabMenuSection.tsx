@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
-import { FolderOpen, Loader2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ChevronRight, Copy } from "lucide-react";
 import { toast } from "sonner";
 import type { ExtensionShellTabMenuSectionProps } from "@/lib/extensions/types";
 import { useWorkspaceStore } from "@/extensions/workplaces/state/workspace-store";
@@ -9,12 +9,22 @@ import {
   copyTreeItems,
   ensureAltTracker,
 } from "@/lib/features/content/tree-clipboard";
-import { useTabMoveTargets, type BenchTarget } from "./use-tab-move-targets";
+import { useTabMoveTargets } from "./use-tab-move-targets";
+import { WorkplaceTargetFlyout, type WorkplaceTarget } from "./WorkplaceTargetFlyout";
 
 const HEADING_CLASS =
   "px-2 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-gray-500";
 const ROW_CLASS =
   "flex w-full items-center gap-2 rounded px-2 py-1.5 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/10";
+
+/**
+ * How long the pointer rests on "Move tab to" / "Duplicate tab to" before its
+ * destinations open beside the menu (owner ask, 2026-10-08: the menu itself
+ * should not open as a wall of workplaces). A click opens it at once.
+ */
+export const TAB_MENU_FLYOUT_DELAY_MS = 500;
+
+type FlyoutKind = "move" | "duplicate";
 
 export function WorkplacesTabMenuSection({
   tab,
@@ -27,6 +37,9 @@ export function WorkplacesTabMenuSection({
   const moveTabToWorkspace = useWorkspaceStore(
     (state) => state.moveTabToWorkspace
   );
+  const sendContentToWorkspace = useWorkspaceStore(
+    (state) => state.sendContentToWorkspace
+  );
   const ensureWorkbench = useWorkspaceStore((state) => state.ensureWorkbench);
 
   // Alt at Copy-click = strictly the URL — the tracker must be live while
@@ -37,30 +50,58 @@ export function WorkplacesTabMenuSection({
 
   // The menu section only mounts while the menu is open, so fetching is
   // always on.
-  const { groups, hasAnyTarget, topLevelWorkspaces } = useTabMoveTargets(true);
+  const { groups, topLevelWorkspaces } = useTabMoveTargets(true);
 
-  const movePayload = {
-    id: tab.id,
-    contentId: tab.contentId,
-    title: tab.title,
+  const [flyout, setFlyout] = useState<{ kind: FlyoutKind; anchor: HTMLElement } | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clearTimer = () => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = null;
+  };
+  useEffect(() => clearTimer, []);
+
+  const armFlyout = (kind: FlyoutKind, anchor: HTMLElement) => {
+    clearTimer();
+    if (flyout?.kind === kind) return;
+    timerRef.current = setTimeout(() => setFlyout({ kind, anchor }), TAB_MENU_FLYOUT_DELAY_MS);
+  };
+  // Resting on any other row closes an open flyout, as menus do.
+  const leaveFlyoutRows = () => {
+    clearTimer();
+    setFlyout(null);
   };
 
-  const moveTo = async (targetWorkspaceId: string) => {
-    try {
-      await moveTabToWorkspace(targetWorkspaceId, movePayload);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to move tab");
-    }
-  };
+  const resolveTarget = async (target: WorkplaceTarget) =>
+    target.kind === "workspace"
+      ? target.workspaceId
+      : (target.bench.workbenchId ??
+        (await ensureWorkbench(target.parentWorkspaceId, target.bench.folderId)).id);
 
-  const moveToBench = async (parentWorkspaceId: string, bench: BenchTarget) => {
+  const pick = async (kind: FlyoutKind, target: WorkplaceTarget) => {
+    closeMenu();
     try {
-      const target =
-        bench.workbenchId ??
-        (await ensureWorkbench(parentWorkspaceId, bench.folderId)).id;
-      await moveTabToWorkspace(target, movePayload);
+      const workspaceId = await resolveTarget(target);
+      if (kind === "move") {
+        // A transfer: the tab leaves this workplace.
+        await moveTabToWorkspace(workspaceId, {
+          id: tab.id,
+          contentId: tab.contentId,
+          title: tab.title,
+        });
+      } else {
+        // A copy: the target gains the tab, this workplace keeps it.
+        await sendContentToWorkspace(workspaceId, [
+          { id: tab.contentId, title: tab.title || "Untitled", contentType: tab.contentType ?? null },
+        ]);
+      }
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to move tab");
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : kind === "move"
+            ? "Failed to move tab"
+            : "Failed to duplicate tab"
+      );
     }
   };
 
@@ -68,114 +109,95 @@ export function WorkplacesTabMenuSection({
     (workspace) => workspace.id !== activeWorkspaceId
   );
 
+  const flyoutRow = (kind: FlyoutKind, label: string) => (
+    <button
+      type="button"
+      className={`${ROW_CLASS} ${flyout?.kind === kind ? "bg-black/5 dark:bg-white/10" : ""}`}
+      aria-haspopup="menu"
+      aria-expanded={flyout?.kind === kind}
+      onPointerEnter={(event) => armFlyout(kind, event.currentTarget)}
+      onPointerLeave={clearTimer}
+      onClick={(event) => {
+        clearTimer();
+        setFlyout({ kind, anchor: event.currentTarget });
+      }}
+    >
+      <span className="flex-1 truncate">{label}</span>
+      <ChevronRight className="h-3.5 w-3.5 shrink-0 text-gray-400" aria-hidden="true" />
+    </button>
+  );
+
   return (
     <>
-      <div className={HEADING_CLASS}>Clipboard</div>
-      <button
-        type="button"
-        className={ROW_CLASS}
-        onClick={() => {
-          closeMenu();
-          // Same dual-flavor payload as the file tree (owner spec
-          // 2026-08-10): URL as text, wiki-link html for note paste,
-          // @-mention on chat paste — and tree paste rides along for free.
-          void copyTreeItems(
-            [
-              {
-                id: tab.contentId,
-                title: tab.title || "Untitled",
-                contentType: tab.contentType ?? "note",
-              },
-            ],
-            "copy",
-          );
-        }}
-      >
-        Copy link
-      </button>
+      <div className="flex items-center gap-2 px-2 py-1" onPointerEnter={leaveFlyoutRows}>
+        <span className="min-w-0 flex-1 truncate text-xs text-gray-500">
+          {tab.title || "Untitled"}
+        </span>
+        <button
+          type="button"
+          title="Copy link"
+          aria-label="Copy link"
+          className="shrink-0 rounded p-1 text-gray-500 transition-colors hover:bg-black/5 hover:text-gray-800 dark:hover:bg-white/10 dark:hover:text-gray-100"
+          onClick={() => {
+            closeMenu();
+            // Same dual-flavor payload as the file tree (owner spec
+            // 2026-08-10): URL as text, wiki-link html for note paste,
+            // @-mention on chat paste — and tree paste rides along for free.
+            void copyTreeItems(
+              [
+                {
+                  id: tab.contentId,
+                  title: tab.title || "Untitled",
+                  contentType: tab.contentType ?? "note",
+                },
+              ],
+              "copy",
+            );
+          }}
+        >
+          <Copy className="h-3.5 w-3.5" aria-hidden="true" />
+        </button>
+      </div>
       <div className="my-1 h-px bg-black/10 dark:bg-white/10" />
-      <div className={HEADING_CLASS}>Move tab to</div>
-      {!hasAnyTarget ? (
-        <div className="px-2 py-1.5 text-xs text-gray-500">
-          Create another workplace first.
-        </div>
-      ) : (
-        groups.map((group) => {
-          if (group.isCurrent && group.benches.length === 0 && !group.isLoadingBenches) {
-            return null;
-          }
-          return (
-            <div key={`move-${group.workspace.id}`}>
-              {group.isCurrent ? (
-                <div className="flex items-center gap-2 px-2 py-1.5 text-gray-400 dark:text-gray-500">
-                  <span className="truncate">{group.workspace.name}</span>
-                  <span className="shrink-0 text-[10px] uppercase tracking-wide">
-                    current
-                  </span>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  className={ROW_CLASS}
-                  onClick={() => {
-                    closeMenu();
-                    void moveTo(group.workspace.id);
-                  }}
-                >
-                  <span className="truncate">{group.workspace.name}</span>
-                </button>
-              )}
-              {group.benches.map((bench) => (
-                <button
-                  key={`move-bench-${group.workspace.id}-${bench.folderId}`}
-                  type="button"
-                  className={`${ROW_CLASS} pl-6`}
-                  onClick={() => {
-                    closeMenu();
-                    void moveToBench(group.workspace.id, bench);
-                  }}
-                >
-                  <FolderOpen
-                    className="h-3.5 w-3.5 shrink-0 text-gray-400"
-                    aria-hidden="true"
-                  />
-                  <span className="truncate">{bench.title}</span>
-                </button>
-              ))}
-              {group.isLoadingBenches && group.benches.length === 0 ? (
-                <div className="flex items-center gap-2 py-1 pl-6 pr-2 text-xs text-gray-500">
-                  <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
-                  Loading workbenches…
-                </div>
-              ) : null}
-            </div>
-          );
-        })
-      )}
+      {flyoutRow("move", "Move tab to")}
+      {flyoutRow("duplicate", "Duplicate tab to")}
+      {flyout ? (
+        <WorkplaceTargetFlyout
+          key={flyout.kind}
+          anchor={flyout.anchor}
+          label={flyout.kind === "move" ? "Move tab to" : "Duplicate tab to"}
+          groups={groups}
+          activeWorkspaceId={activeWorkspaceId}
+          onPointerEnter={clearTimer}
+          onPick={(target) => void pick(flyout.kind, target)}
+        />
+      ) : null}
       <div className="my-1 h-px bg-black/10 dark:bg-white/10" />
-      <div className={HEADING_CLASS}>Share permanently</div>
-      {shareTargets.length === 0 ? (
-        <div className="px-2 py-1.5 text-xs text-gray-500">
-          Create another workplace first.
-        </div>
-      ) : (
-        shareTargets.map((workspace) => (
-          <button
-            key={`share-${workspace.id}`}
-            type="button"
-            className={ROW_CLASS}
-            onClick={() => {
-              closeMenu();
-              void assignContentToWorkspace(workspace.id, tab.contentId, {
-                assignmentType: "shared",
-                scope: tab.contentType === "folder" ? "recursive" : "item",
-              });
-            }}
-          >
-            <span className="truncate">{workspace.name}</span>
-          </button>
-        ))
-      )}
+      <div onPointerEnter={leaveFlyoutRows}>
+        <div className={HEADING_CLASS}>Share permanently</div>
+        {shareTargets.length === 0 ? (
+          <div className="px-2 py-1.5 text-xs text-gray-500">
+            Create another workplace first.
+          </div>
+        ) : (
+          shareTargets.map((workspace) => (
+            <button
+              key={`share-${workspace.id}`}
+              type="button"
+              className={ROW_CLASS}
+              onClick={() => {
+                closeMenu();
+                void assignContentToWorkspace(workspace.id, tab.contentId, {
+                  assignmentType: "shared",
+                  scope: tab.contentType === "folder" ? "recursive" : "item",
+                });
+              }}
+            >
+              <span className="truncate">{workspace.name}</span>
+            </button>
+          ))
+        )}
+      </div>
     </>
   );
 }

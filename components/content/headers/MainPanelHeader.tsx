@@ -944,6 +944,7 @@ export function MainPanelHeader({
         ? createPortal(
             <div
               ref={tabMenuRef}
+              data-tab-menu=""
               className="fixed z-[120] min-w-56 overflow-y-auto rounded-md border border-white/10 bg-white/95 p-1 text-sm text-gray-900 shadow-lg backdrop-blur-sm dark:bg-gray-900/95 dark:text-gray-100"
               style={
                 tabMenuPosition

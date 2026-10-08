@@ -1538,8 +1538,15 @@ function JumpTo({
   );
 }
 
-function PickRow({
+/**
+ * One picker row — exported so other pickers built on this design (the tab
+ * menu's workplace picker) render rows exactly like this one instead of
+ * re-drawing them.
+ */
+export function PickRow({
   row,
+  icon,
+  showPickDot = true,
   disabled,
   disabledReason,
   isExpanded = false,
@@ -1552,6 +1559,10 @@ function PickRow({
   onQuickCreateInside,
 }: {
   row: FlatRow;
+  /** Replaces the content-type icon (a row that isn't content, e.g. a workplace). */
+  icon?: React.ReactNode;
+  /** The has-note dot; meaningless for rows that aren't notes. */
+  showPickDot?: boolean;
   disabled?: boolean;
   disabledReason?: string;
   isExpanded?: boolean;
@@ -1679,7 +1690,9 @@ function PickRow({
         <span
           className={cn("relative inline-flex shrink-0", row.isReference && "mr-0.5")}
         >
-          {row.contentType === "folder" ? (
+          {icon ? (
+            icon
+          ) : row.contentType === "folder" ? (
             isExpanded ? (
               <FolderOpen className="h-3.5 w-3.5 shrink-0 text-yellow-500/80" />
             ) : (
@@ -1719,7 +1732,7 @@ function PickRow({
         ) : null}
         {/* The has-content dot belongs to things you can pick; a browse-only
             folder has nothing to report. */}
-        {row.pickable ? (
+        {row.pickable && showPickDot ? (
           <span
             className={cn(
               "ml-auto h-1.5 w-1.5 shrink-0 rounded-full",
