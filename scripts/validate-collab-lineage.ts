@@ -305,6 +305,11 @@ async function main() {
     check("a solo editor's copy merges into the stored one", outcome === "merged", outcome);
     const fetched = await loadCollaborationYDocState(prisma, DOCUMENT);
     const loaded = await loadCollaborationYDocState(prisma, DOCUMENT);
+    check(
+      "the collaborator sees the solo edit before the editor even connects",
+      show(textsOf(docFrom(fetched!, loaded!))) === "one | two | three",
+      show(textsOf(docFrom(fetched!, loaded!))),
+    );
     const all = docFrom(fetched!, loaded!, Y.encodeStateAsUpdate(editor));
     check(
       "the collaborator, the server and the solo editor meet as one note",
