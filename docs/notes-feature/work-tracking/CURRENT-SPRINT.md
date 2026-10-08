@@ -13,7 +13,7 @@ last_updated: 2026-05-13
 
 Branch `refactor/remove-workplace-claims` · plan [WORKPLACE-RESTRICTIONS-REMOVAL-PLAN.md](WORKPLACE-RESTRICTIONS-REMOVAL-PLAN.md) (§R = regression guards). Owner decision: views and shortcuts govern what a workplace shows; nothing gates what it opens, and the user is never asked to borrow or share.
 
-**Owner smoke (plan §2):**
+**Owner smoke (plan §2) — passed 2026-10-08:**
 1. In a non-Main workplace, click any file in the tree → the tab appears at once, no dialog.
 2. In a view workplace, open a wiki-link / search hit / daily-summary row pointing OUTSIDE the view root → it opens as a tab; the tree still shows only the view root.
 3. Workspace settings → View tab → no "View Exceptions"; "Enable as View" describes tree scoping only.
