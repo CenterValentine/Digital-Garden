@@ -31,8 +31,14 @@ import { getSchema } from "@tiptap/core";
 import type { JSONContent } from "@tiptap/core";
 import { Node as PMNode } from "@tiptap/pm/model";
 import { getCollaborationServerExtensions } from "@/lib/domain/collaboration/extensions";
+import { EditorState } from "@tiptap/pm/state";
 import { buildOutline, resolveHandle } from "@/lib/domain/editor/ai/block-handles";
 import { findTextInDoc } from "@/lib/domain/editor/ai/text-search";
+import {
+  mapRange,
+  rangeMatchesText,
+  type AnchoredRange,
+} from "@/lib/domain/editor/ai/position-anchor";
 
 const schema = getSchema(getCollaborationServerExtensions());
 
@@ -203,6 +209,115 @@ console.log("\n6. unrelated edits do NOT invalidate a handle");
   elsewhere.content![3] = para("Completely rewritten closing paragraph.");
   const r = resolveHandle(PMNode.fromJSON(schema, elsewhere), outline[2].handle);
   check("editing a different block leaves the target valid", r.ok === true, JSON.stringify(r));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Position anchors — the AI edit animation spans ~1.2s with the editor still
+// EDITABLE (lockEditor is Phase 3), so a keystroke or a remote y-prosemirror
+// update can shift the resolved range before it is used. These cases prove the
+// shift is real, that mapping absorbs it, and that the assertion catches what
+// mapping cannot.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const SENTENCE = "Replace this exact sentence.";
+const anchorDocJson: JSONContent = {
+  type: "doc",
+  content: [para("First paragraph, above the target."), para(SENTENCE), para("Below.")],
+};
+const anchorDoc = PMNode.fromJSON(schema, anchorDocJson);
+const baseState = EditorState.create({ schema, doc: anchorDoc });
+
+const located = findTextInDoc(anchorDoc, SENTENCE);
+const target: AnchoredRange =
+  located && !("count" in located) ? located : { from: -1, to: -1 };
+
+console.log("\n7. the bug is real (unmapped positions go stale)");
+check("the target resolves", target.from > 0, JSON.stringify(located));
+{
+  // A collaborator (or the user) types 30 characters ABOVE the target.
+  const tr = baseState.tr.insertText("x".repeat(30), 2);
+  const after = tr.doc;
+
+  check(
+    "an UNMAPPED range no longer spans the target — this is the defect",
+    rangeMatchesText(after, target, SENTENCE) === false,
+    JSON.stringify(after.textBetween(target.from, target.to)),
+  );
+  check(
+    "a MAPPED range still spans the target",
+    rangeMatchesText(after, mapRange(tr.mapping, target), SENTENCE) === true,
+    JSON.stringify(mapRange(tr.mapping, target)),
+  );
+  check(
+    "the mapped range shifted by exactly the inserted length",
+    mapRange(tr.mapping, target).from === target.from + 30,
+  );
+}
+
+console.log("\n8. edits that cannot shift it are left alone");
+{
+  // Below the target: nothing before it moved, so nothing should change.
+  const tr = baseState.tr.insertText("tail", anchorDoc.content.size - 2);
+  const mapped = mapRange(tr.mapping, target);
+  check(
+    "an insert BELOW the target does not move it",
+    mapped.from === target.from && mapped.to === target.to,
+    JSON.stringify(mapped),
+  );
+  check("…and it still matches", rangeMatchesText(tr.doc, mapped, SENTENCE) === true);
+}
+{
+  // Exactly at the boundaries — the exclusive bias must keep the range on the
+  // target so a keystroke at its edge does not force a pointless refusal.
+  const atStart = baseState.tr.insertText("New. ", target.from);
+  check(
+    "an insert exactly AT `from` stays outside the range",
+    rangeMatchesText(atStart.doc, mapRange(atStart.mapping, target), SENTENCE) === true,
+    JSON.stringify(atStart.doc.textBetween(
+      mapRange(atStart.mapping, target).from,
+      mapRange(atStart.mapping, target).to,
+    )),
+  );
+  const atEnd = baseState.tr.insertText(" More.", target.to);
+  check(
+    "an insert exactly AT `to` stays outside the range",
+    rangeMatchesText(atEnd.doc, mapRange(atEnd.mapping, target), SENTENCE) === true,
+    JSON.stringify(atEnd.doc.textBetween(
+      mapRange(atEnd.mapping, target).from,
+      mapRange(atEnd.mapping, target).to,
+    )),
+  );
+}
+
+console.log("\n9. the assertion catches what mapping cannot");
+{
+  // Edited INSIDE the target: mapping widens the range, so the text no longer
+  // matches and the edit must refuse rather than delete the changed span.
+  const tr = baseState.tr.insertText("NOT ", target.from + 8);
+  check(
+    "a keystroke INSIDE the target → refused",
+    rangeMatchesText(tr.doc, mapRange(tr.mapping, target), SENTENCE) === false,
+  );
+}
+{
+  // The target itself deleted — the range collapses.
+  const tr = baseState.tr.delete(target.from, target.to);
+  const mapped = mapRange(tr.mapping, target);
+  check("a deleted target → collapsed range", mapped.to <= mapped.from, JSON.stringify(mapped));
+  check("…and refused", rangeMatchesText(tr.doc, mapped, SENTENCE) === false);
+}
+{
+  // The document shrank past `to`. This is the case that threw a RangeError out
+  // of TextSelection.create and surfaced as "Unknown error during edit".
+  const tiny = PMNode.fromJSON(schema, { type: "doc", content: [para("tiny")] });
+  let threw = false;
+  let result = true;
+  try {
+    result = rangeMatchesText(tiny, target, SENTENCE);
+  } catch {
+    threw = true;
+  }
+  check("an out-of-bounds range returns false rather than throwing", !threw && result === false);
 }
 
 if (fails > 0) {
