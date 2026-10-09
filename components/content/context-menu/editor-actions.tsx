@@ -33,7 +33,7 @@ import {
 import { resolveExtensionVirtualContentType } from "@/lib/extensions/client-registry";
 import { markdownPasteToTiptap } from "@/lib/domain/content/markdown";
 import { clipboardBlockedGuidance } from "@/lib/domain/content/markdown-detect";
-import { imageNodeToText, pasteClipboardImageAsText } from "@/lib/features/ocr/editor-ocr";
+import { imageNodeToText } from "@/lib/features/ocr/editor-ocr";
 import { triggerBlobDownload } from "@/lib/core/download";
 import { toast } from "sonner";
 import {
@@ -885,7 +885,7 @@ export const editorActionProvider: ContextMenuActionProvider = (ctx) => {
         },
         {
           id: "image-replace-with-text",
-          label: "Replace image with its text",
+          label: "Replace image with text",
           onClick: () => { void imageNodeToText(contextEditor, imgEl, "replace"); },
         },
       );
@@ -1011,27 +1011,11 @@ export const editorActionProvider: ContextMenuActionProvider = (ctx) => {
     },
   });
 
-  // The menu twin of ⇧⌘V for an image: read its text locally, insert only that.
-  clipboardActions.push({
-    id: "paste-text-from-image",
-    label: "Paste text from image",
-    shortcut: "⇧⌘V",
-    onClick: async () => {
-      if (!contextEditor) return;
-      await pasteClipboardImageAsText(contextEditor);
-    },
-  });
-  // …and of ⌥⌘V: the user's AI model reads it (tables, icons, handwriting).
-  clipboardActions.push({
-    id: "paste-text-from-image-ai",
-    label: "Paste text from image with AI",
-    shortcut: "⌥⌘V",
-    tooltip: "Sends the image to the AI model chosen in Settings → AI → Feature Routing.",
-    onClick: async () => {
-      if (!contextEditor) return;
-      await pasteClipboardImageAsText(contextEditor, "ai");
-    },
-  });
+  // No "Paste text from image" items: the menu cannot tell whether the
+  // clipboard holds an image without reading it (a permission prompt, or a
+  // Safari/Firefox paste bubble on every right-click), and an item that
+  // usually does nothing is noise. ⇧⌘V and ⌥⌘V (Ctrl+Alt+V) carry both
+  // actions; the image items above act on an image already in the note.
 
   clipboardActions.push({
     id: "select-all",

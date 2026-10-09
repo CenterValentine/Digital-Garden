@@ -21,6 +21,7 @@ import {
   grayscaleForOcr,
   needsSparsePass,
   pickBetterRead,
+  readsAsNoText,
   shouldInvert,
   upscaleFactor,
 } from "@/lib/features/ocr/preprocess";
@@ -189,6 +190,9 @@ check("a zero width is left alone", upscaleFactor(0), 1);
 check("a list read at 72 gets a sparse pass", needsSparsePass(72), true);
 check("prose read at 93 stays on one pass", needsSparsePass(93), false);
 check("the sparse threshold is 85", [needsSparsePass(84.9), needsSparsePass(85)], [true, false]);
+check("an icons-only read (31) is no text", readsAsNoText(31), true);
+check("the noisiest real screenshot (76) is text", readsAsNoText(76), false);
+check("the no-text threshold is 50", [readsAsNoText(49.9), readsAsNoText(50)], [true, false]);
 check(
   "the more confident read wins",
   pickBetterRead({ confidence: 72, layout: "auto" }, { confidence: 80, layout: "sparse" }).layout,

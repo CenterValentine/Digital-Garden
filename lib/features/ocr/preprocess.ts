@@ -28,6 +28,19 @@ export const MAX_SCALE = 3;
 /** First-pass mean confidence (0–100) below this earns a sparse-mode pass. */
 export const SPARSE_PASS_BELOW = 85;
 
+/**
+ * The best read's mean confidence below this = the image has no real text.
+ * Owner smoke 2026-10-09: four toolbar icons read as "Igy] OF" at 31; every
+ * real screenshot measured 76 or higher (noisiest: an address bar with icons).
+ * Below the line the read is reported as no text, so the user gets "No text
+ * found" (with "Paste image instead") instead of junk.
+ */
+export const NO_TEXT_BELOW = 50;
+
+export function readsAsNoText(confidence: number): boolean {
+  return confidence < NO_TEXT_BELOW;
+}
+
 /** Tesseract page-segmentation modes used here. */
 export const LAYOUT_PSM = { auto: "3", sparse: "11" } as const;
 export type OcrLayout = keyof typeof LAYOUT_PSM;

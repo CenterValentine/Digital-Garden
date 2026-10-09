@@ -1,10 +1,9 @@
 /**
  * Editor-facing OCR actions. OCR-PASTE-PLAN.md D1, D2, D7.
  *
- *   pasteImageAsText      — Cmd/Ctrl+Shift+V with an image on the clipboard
- *   pasteClipboardImageAsText — context menu "Paste text from image"
- *   imageNodeToText       — context menu on an image: "Extract text" (keeps
- *                           the image) / "Replace image with its text"
+ *   pasteImageAsText — ⇧⌘V (local) or ⌥⌘V (AI) with an image on the clipboard
+ *   imageNodeToText  — context menu on an image: "Extract text from image"
+ *                      (keeps the image) / "Replace image with text"
  *
  * Text lands at the editor's selection AT COMPLETION, not where it was when
  * the job started — the user may have moved on while recognition ran. The
@@ -117,38 +116,6 @@ export async function pasteImageAsText(
   if (!insertRecognised(editor, out)) {
     toast("No text found in that image", { action: instead });
   }
-}
-
-/**
- * Context menu "Paste text from image". The clipboard read happens FIRST,
- * before anything is awaited, so it stays inside the user gesture (Safari
- * voids a gesture that awaits other work first).
- */
-export async function pasteClipboardImageAsText(editor: Editor, engine: OcrEngineId = "local"): Promise<void> {
-  // The context-menu portal holds focus; readText/read reject with "Document
-  // is not focused" unless the editor is focused first.
-  editor.commands.focus();
-  let image: Blob | null = null;
-  try {
-    const items = await navigator.clipboard.read();
-    for (const item of items) {
-      const type = item.types.find((t) => t.startsWith("image/"));
-      if (type) {
-        image = await item.getType(type);
-        break;
-      }
-    }
-  } catch {
-    toast.error("The browser blocked reading the clipboard from a menu. Paste with ⇧⌘V (Ctrl+Shift+V) instead.", {
-      duration: 8000,
-    });
-    return;
-  }
-  if (!image) {
-    toast("There's no image on the clipboard");
-    return;
-  }
-  await pasteImageAsText(editor, image, { engine });
 }
 
 // ── Image node → text ───────────────────────────────────────────────────────

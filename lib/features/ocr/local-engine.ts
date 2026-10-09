@@ -28,6 +28,7 @@ import {
   needsSparsePass,
   pickBetterRead,
   preprocessForOcr,
+  readsAsNoText,
   type OcrLayout,
 } from "./preprocess";
 import type { OcrEngine, OcrProgress, OcrResult } from "./types";
@@ -186,7 +187,9 @@ async function recognize(
       // and the more confident of the two wins.
       const first = await read("auto");
       const best = needsSparsePass(first.confidence) ? pickBetterRead(first, await read("sparse")) : first;
-      return { text: best.text, confidence: best.confidence, layout: best.layout, engine: "local" as const };
+      // Icons and decoration read as junk at low confidence: report no text.
+      const text = readsAsNoText(best.confidence) ? "" : best.text;
+      return { text, confidence: best.confidence, layout: best.layout, engine: "local" as const };
     });
   } catch (error) {
     // A worker that threw mid-job may be wedged; respawn on the next call.
