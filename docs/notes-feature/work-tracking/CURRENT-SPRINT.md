@@ -40,6 +40,7 @@ last_updated: 2026-05-13
 - [ ] **Workbenches instant:** on production, load the app, wait a few seconds, open the workspace menu and rest on a view workspace → its workbench folders appear at once, no loading state.
 - [ ] **Pill balance:** inside a workbench, the pill shows the workspace shortened first and more of the workbench name.
 - [ ] **Toolbar spacing:** in a narrow (split) pane the toolbar shows no scrollbar under its icons and still scrolls sideways; the title sits close under the toolbar (note, JSON and file views alike).
+- [ ] **Quad titles:** switch to Quad Split → each note's title is smaller with less padding; back to Vertical Split → full size again; renaming a title in quad keeps the small size.
 - [ ] **After merge:** redeploy Hocuspocus from a tree matching `origin/main`; `/readyz` five times with `uptimeMs` climbing.
 
 ## October 8, 2026 — Open anything from any workplace (claims, borrow/share, view exceptions removed)
