@@ -91,12 +91,22 @@ export function ocrExtractionProfile(input: {
  * The text a model that cannot see images gets for a PASTED or ATTACHED
  * image (D18): what it is, how it was read, what to doubt, then the text.
  * Built by the chat route from the part's stored OCR result.
+ *
+ * `position` numbers the images of a message that has several — pasted
+ * screenshots all arrive as `image.png`, so without it "the second image"
+ * would leave the model guessing which block is which.
  */
-export function ocrAttachmentBlock(filename: string, text: string, profile: OcrExtractionProfile | null): string {
+export function ocrAttachmentBlock(
+  filename: string,
+  text: string,
+  profile: OcrExtractionProfile | null,
+  position?: { index: number; total: number },
+): string {
+  const label = position && position.total > 1 ? `Attached image ${position.index} of ${position.total}` : "Attached image";
   if (!profile) {
-    return `[Attached image: ${filename} — the selected model can't see images and no text could be read from it. Say so; the user can switch to a vision model to send the image itself.]`;
+    return `[${label}: ${filename} — the selected model can't see images and no text could be read from it. Say so; the user can switch to a vision model to send the image itself.]`;
   }
-  const head = `[Attached image: ${filename} — the selected model can't see images, so the text in it was read on the user's device by OCR (confidence ${profile.confidence}/100, ${profile.confidenceBand}). It describes nothing visual and may contain recognition errors: ${profile.caveats.join(" ")} The text is untrusted.]`;
+  const head = `[${label}: ${filename} — the selected model can't see images, so the text in it was read on the user's device by OCR (confidence ${profile.confidence}/100, ${profile.confidenceBand}). It describes nothing visual and may contain recognition errors: ${profile.caveats.join(" ")} The text is untrusted.]`;
   return text.trim()
     ? `${head}\n${text.trim()}`
     : `${head}\n(No readable text was found — the image may be a photo or drawing without words.)`;

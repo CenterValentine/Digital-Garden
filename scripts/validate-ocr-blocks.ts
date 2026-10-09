@@ -505,6 +505,13 @@ console.log("images for models that can't see — OCR extraction profile (AI-VIE
   check("…says it describes nothing visual and is untrusted", /describes nothing visual/.test(block) && /untrusted/.test(block), true);
   check("…then the text", block.endsWith("\nTOTAL 12.50"), true);
   check("no text read → says so, never an empty block", /No readable text was found/.test(ocrAttachmentBlock("photo.jpg", "  ", profile)), true);
+  check(
+    "several images are numbered, so same-named screenshots can be told apart",
+    ocrAttachmentBlock("image.png", "a", profile, { index: 2, total: 3 }).startsWith("[Attached image 2 of 3: image.png — "),
+    true,
+  );
+  check("a single image is not numbered", ocrAttachmentBlock("image.png", "a", profile, { index: 1, total: 1 }).startsWith("[Attached image: image.png — "), true);
+  check("…numbering applies to the no-text block too", ocrAttachmentBlock("image.png", "", null, { index: 3, total: 3 }).startsWith("[Attached image 3 of 3: image.png — "), true);
   check("no OCR at all → says no text could be read and suggests a vision model", /no text could be read from it/.test(ocrAttachmentBlock("photo.jpg", "", null)) && /vision model/.test(ocrAttachmentBlock("photo.jpg", "", null)), true);
 
   check("hover while reading", imageTextHint({ ocrStatus: "reading" }).label, "Reading…");
@@ -523,7 +530,14 @@ console.log("images for models that can't see — OCR extraction profile (AI-VIE
   const chip = src("components/content/ai/ChatInput.tsx");
   const engineFile = src("lib/features/ocr/local-engine.ts");
   const forModel = src("lib/features/ocr/read-for-model.ts");
-  check("route: a model that can't see gets the OCR block, never the image part", /if \(isImage && !visionCapable\) \{[\s\S]{0,700}inlined\.push\(ocrAttachmentBlock\([\s\S]{0,120}continue;/.test(route), true);
+  check("route: a model that can't see gets the OCR block, never the image part", /if \(isImage && !visionCapable\) \{[\s\S]{0,700}inlined\.push\(\s*ocrAttachmentBlock\([\s\S]{0,300}continue;/.test(route), true);
+  check(
+    "route: images are counted per message and numbered in order",
+    /const imageTotal = \(m\.parts as Array<Record<string, unknown>>\)\.filter\([\s\S]{0,200}startsWith\("image\/"\)[\s\S]{0,100}let imageIndex = 0;/.test(route) &&
+      /if \(isImage && !visionCapable\) \{\s*imageIndex \+= 1;/.test(route) &&
+      /index: imageIndex,\s*total: imageTotal,/.test(route),
+    true,
+  );
   check("route: decided by the executed model's vision", /audioCapable,\s*visionCapable,\s*\);/.test(route), true);
   check("engine: no send-time refusal for images any more", /can't read images\. Switch to a vision-capable model/.test(engine), false);
   check("engine: OCR runs for a model that can't see, once per attachment", /if \(supportsImageAttachments\) return;[\s\S]{0,300}ocrStartedRef\.current\.has\(a\.id\)/.test(engine), true);

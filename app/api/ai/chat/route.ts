@@ -3985,6 +3985,12 @@ function resolveAttachmentsForModel(
 
     const kept: unknown[] = [];
     const inlined: string[] = [];
+    // D18: number a message's images for a model that can't see them, in
+    // attachment order — pasted screenshots all share the name image.png.
+    const imageTotal = (m.parts as Array<Record<string, unknown>>).filter(
+      (x) => x?.type === "file" && typeof x.mediaType === "string" && x.mediaType.startsWith("image/"),
+    ).length;
+    let imageIndex = 0;
 
     for (const p of m.parts as Array<Record<string, unknown>>) {
       if (p?.type !== "file") {
@@ -4007,6 +4013,7 @@ function resolveAttachmentsForModel(
       // doubt. Never the image part — a text-only provider rejects it or
       // drops it silently.
       if (isImage && !visionCapable) {
+        imageIndex += 1;
         const appMeta = (p.providerMetadata as Record<string, Record<string, unknown>> | undefined)?.app;
         let profile: OcrExtractionProfile | null = null;
         try {
@@ -4014,7 +4021,12 @@ function resolveAttachmentsForModel(
         } catch {
           profile = null;
         }
-        inlined.push(ocrAttachmentBlock(filename, typeof appMeta?.ocrText === "string" ? appMeta.ocrText : "", profile));
+        inlined.push(
+          ocrAttachmentBlock(filename, typeof appMeta?.ocrText === "string" ? appMeta.ocrText : "", profile, {
+            index: imageIndex,
+            total: imageTotal,
+          }),
+        );
         continue;
       }
 
