@@ -90,6 +90,7 @@ import {
 } from "@/lib/domain/ai/tools/metadata";
 import { PROVIDER_CATALOG } from "@/lib/domain/ai/providers/catalog";
 import { effectiveCapabilities } from "@/lib/domain/ai/features/capabilities";
+import { describeChatError, parseChatError } from "@/lib/domain/ai/chat-errors";
 import {
   useModelSelection,
 } from "@/components/content/ai/ModelPicker";
@@ -2842,7 +2843,9 @@ export function useConversationEngine({
       }
       // Don't stomp an in-flight reconnect's own toast with a duplicate.
       if (!reconnectingRef.current) {
-        toast.error(err.message || "Chat request failed");
+        // Same words as the in-chat banner (ChatErrorBanner): a recognised
+        // provider error reads as a sentence, anything else as before.
+        toast.error(err.message ? describeChatError(parseChatError(err.message)) : "Chat request failed");
       }
     },
     onFinish: (event) => {

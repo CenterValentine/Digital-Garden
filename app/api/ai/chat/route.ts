@@ -209,7 +209,11 @@ import {
   ensureConversationContentNode,
 } from "@/lib/features/conversations";
 import { publishEvent } from "@/lib/domain/notifications";
-import { resolveNativeWebSearchTool } from "@/lib/domain/ai/acquisition";
+import {
+  noteNativeSearchRejection,
+  resolveNativeWebSearchTool,
+  supportsNativeWebSearch,
+} from "@/lib/domain/ai/acquisition";
 import { userHasSearchConnection } from "@/lib/domain/ai/acquisition/search/resolve";
 import { createAppWebSearchTool } from "@/lib/domain/ai/acquisition/search/tool";
 import { repairDanglingToolCalls } from "@/lib/domain/ai/repair-dangling-tools";
@@ -1730,8 +1734,13 @@ export async function POST(request: Request) {
       const executedProviderId = NATIVE_TOOL_VENDORS.has(executedVendorId)
         ? executedVendorId
         : null;
+      // A model that rejects its vendor's hosted search (catalog
+      // `nativeWebSearch: false`, or learned from a rejection) falls through
+      // to the app-executed search below, like a vendor with none.
       const nativeSearch =
-        executedProviderId && NATIVE_TOOL_VENDORS.has(executedProviderId)
+        executedProviderId &&
+        NATIVE_TOOL_VENDORS.has(executedProviderId) &&
+        supportsNativeWebSearch(executedProviderId, executedBareModelId)
           ? resolveNativeWebSearchTool(executedProviderId)
           : null;
       const searchEnabled = toolConfig["search_web"]?.enabled !== false;
@@ -3602,6 +3611,20 @@ export async function POST(request: Request) {
         },
         onError: ({ error }) => {
           streamSpan.fail(error);
+          // "Tool 'web_search_preview' is not supported with gpt-4." — leave
+          // the hosted search off for that model from the next request on.
+          const rejectedModel = noteNativeSearchRejection(
+            executedVendorId,
+            error instanceof Error ? error.message : String(error),
+          );
+          if (rejectedModel) {
+            logger.warn({
+              layer: "ai",
+              event: "ai:native_search_rejected",
+              summary: `${executedVendorId} rejected hosted web search for ${rejectedModel} — off for this model from now on`,
+              attrs: { vendor: executedVendorId, model: rejectedModel },
+            });
+          }
         },
       });
 

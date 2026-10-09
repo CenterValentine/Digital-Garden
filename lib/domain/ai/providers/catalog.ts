@@ -96,6 +96,8 @@ export const PROVIDER_CATALOG: ProviderMeta[] = [
         maxOutput: 8_192,
         capabilities: ["text", "tools", "streaming"],
         costTier: "high",
+        // OpenAI rejects its hosted web search for gpt-4 (verified 2026-10-09).
+        nativeWebSearch: false,
       },
       {
         // OpenAI o-series reasoning model — auto-emits reasoning parts
