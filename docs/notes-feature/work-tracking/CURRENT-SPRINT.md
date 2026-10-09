@@ -34,6 +34,7 @@ last_updated: 2026-05-13
 - [ ] **Move:** pick another workplace → the tab leaves this one; switching there shows it.
 - [ ] **Duplicate:** "Duplicate tab to" → another workplace → the tab stays here and also appears there.
 - [ ] **Picker Recent / Open:** open the pane "+" → Recent, then Open → each row shows files on the first line (most recently viewed first, long names capped, extras running off the edge) and the folder on the second; clicking a file reveals it in the tree; the "+" still creates in the folder.
+- [ ] **Close without activating:** split panes, focus the right one, then press the x on an inactive tab in the LEFT pane → the tab closes, the right pane stays focused and the right sidebar doesn't change.
 - [ ] **After merge:** redeploy Hocuspocus from a tree matching `origin/main`; `/readyz` five times with `uptimeMs` climbing.
 
 ## October 5, 2026 — The file tree stops flashing; deleting is instant; rows keep their order; view shortcuts show their folder and act on it safely (PR #284, merged `c48218d3`)
