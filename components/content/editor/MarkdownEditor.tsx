@@ -52,7 +52,13 @@ import {
 } from "@/lib/domain/editor/hooks/use-cross-editor-drag";
 import { useEditorDragStore } from "@/state/editor-drag-store";
 import { pasteImageAsText } from "@/lib/features/ocr/editor-ocr";
-import { installPasteModifierTracker, isPasteAsText } from "@/lib/features/ocr/paste-modifier";
+import {
+  handlePasteAsTextChord,
+  installPasteModifierTracker,
+  isPasteAsText,
+  isPasteAsTextChord,
+  notePasteEvent,
+} from "@/lib/features/ocr/paste-modifier";
 import { isImageUrl } from "@/lib/domain/editor/utils/image-url";
 import { useEditorInstanceStore } from "@/state/editor-instance-store";
 import { useSettingsStore } from "@/state/settings-store";
@@ -617,9 +623,27 @@ export function MarkdownEditor({
         // here so ProseMirror's built-in drop doesn't insert it a second time.
         drop: (view) => isForeignEditorDropOn(view),
       },
+      // ⇧⌘V with only an image on the clipboard: Chromium fires NO paste event
+      // ("paste and match style" is text-only), so watch the chord itself and
+      // read the clipboard when no paste follows. See paste-modifier.ts.
+      handleKeyDown: (view, event) => {
+        if (isPasteAsTextChord(event)) {
+          handlePasteAsTextChord({
+            onImage: (image) => {
+              const file = new File([image], "pasted-image.png", { type: image.type });
+              pasteImagesAsTextRef.current([file]);
+            },
+            // ProseMirror's own plain-text paste pipeline (paste handlers run).
+            onText: (text) => view.pasteText(text),
+          });
+        }
+        return false;
+      },
       // Sprint 37: Image paste handler
       // Uses insertImageFromFileRef to avoid stale closure (see ref declaration)
       handlePaste: (view, event) => {
+        // Tells the ⇧⌘V chord watcher the browser delivered a real paste.
+        notePasteEvent(event);
         const files = Array.from(event.clipboardData?.files || []);
         const imageFiles = files.filter((f) => f.type.startsWith("image/"));
 

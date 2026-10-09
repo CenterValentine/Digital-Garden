@@ -6,7 +6,13 @@ import { toast } from "sonner";
 import { uploadImage } from "./use-image-upload";
 import { isImageUrl } from "../utils/image-url";
 import { pasteImageAsText } from "@/lib/features/ocr/editor-ocr";
-import { installPasteModifierTracker, isPasteAsText } from "@/lib/features/ocr/paste-modifier";
+import {
+  handlePasteAsTextChord,
+  installPasteModifierTracker,
+  isPasteAsText,
+  isPasteAsTextChord,
+  notePasteEvent,
+} from "@/lib/features/ocr/paste-modifier";
 
 // Attribute shape accepted by the EditorImage extension's setImage()
 // command. Mirrors the same local interface in MarkdownEditor.tsx —
@@ -48,6 +54,8 @@ export interface UseImagePasteOptions {
 export interface UseImagePasteResult {
   handlePaste: (view: EditorView, event: ClipboardEvent) => boolean;
   handleDrop: (view: EditorView, event: DragEvent, slice: Slice, moved: boolean) => boolean;
+  // ⇧⌘V with only an image on the clipboard (Chromium fires no paste event).
+  handleKeyDown: (view: EditorView, event: KeyboardEvent) => boolean;
   // Direct invocation for toolbar "Insert image" buttons.
   insertImageFromFile: (file: File) => void;
 }
@@ -121,6 +129,7 @@ export function useImagePasteHandler({
 
   const handlePaste = useCallback(
     (view: EditorView, event: ClipboardEvent): boolean => {
+      notePasteEvent(event);
       const files = Array.from(event.clipboardData?.files || []);
       const imageFiles = files.filter((f) => f.type.startsWith("image/"));
 
@@ -179,5 +188,23 @@ export function useImagePasteHandler({
     [insertImageFromFile],
   );
 
-  return { handlePaste, handleDrop, insertImageFromFile };
+  const handleKeyDown = useCallback(
+    (view: EditorView, event: KeyboardEvent): boolean => {
+      if (isPasteAsTextChord(event)) {
+        handlePasteAsTextChord({
+          onImage: (image) => {
+            const editor = editorRef.current;
+            if (!editor) return;
+            const file = new File([image], "pasted-image.png", { type: image.type });
+            void pasteImageAsText(editor, file, { pasteImageInstead: () => insertImageFromFile(file) });
+          },
+          onText: (text) => view.pasteText(text),
+        });
+      }
+      return false;
+    },
+    [editorRef, insertImageFromFile],
+  );
+
+  return { handlePaste, handleDrop, handleKeyDown, insertImageFromFile };
 }

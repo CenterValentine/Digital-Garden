@@ -71,10 +71,25 @@ modifier state, so the last key event decides. Chosen over per-editor
 seam, and one tracker serves both. Not `view.input.shiftKey` — internal to
 prosemirror-view, not public API.
 
-**Safari caveat.** Whether Safari dispatches a `paste` event for Cmd+Shift+V is
-unverified. Smoke it. If it does not, the keydown path from the context-menu
-item (D2) is the fallback and the gesture degrades to "use the menu" on
-Safari; do not add a second chord to compensate.
+**Correction (owner smoke, 2026-10-08): the chord cannot rely on a paste
+event.** In Chrome on macOS, ⇧⌘V with a screenshot did nothing — the paste
+handler never saw the image (no event, or one without the file). The
+assumption that Chrome delivers the image on a Shift paste was never tested
+and was wrong. Fix (`paste-modifier.ts`): the editor's `handleKeyDown` watches
+the chord. After an 80 ms grace it checks whether a paste event **with
+content** arrived (`notePasteEvent(event)` in each paste handler; an empty
+event does not count). If one did, the paste handler owns it. If not, the
+editor does "paste as text" itself: `navigator.clipboard.read()`, an image
+goes to OCR, otherwise `text/plain` goes through `view.pasteText`. The
+clipboard is read only when no paste arrived, so Chrome's one-time clipboard
+permission prompt appears on the first image ⇧⌘V and never interrupts a
+paste the browser handled. Headless Chromium cannot reproduce the real chord
+(Playwright maps only ⌘V to a paste on macOS), so the logic was verified in
+Chromium by simulating each outcome: image with no event, text with no event,
+event with text, empty event with an image, and plain ⌘V (5/5).
+
+**Safari** behaviour for the chord is still unverified; whichever of the two
+outcomes it produces, one of the paths above handles it.
 
 ### D2 — Fallback surfaces: two image actions and one clipboard action
 

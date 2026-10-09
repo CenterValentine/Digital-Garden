@@ -1,16 +1,37 @@
 /**
- * Was Shift held for this paste? OCR-PASTE-PLAN.md D1.
+ * ⇧⌘V (Ctrl+Shift+V) — "paste as text", extended to images. OCR-PASTE-PLAN.md D1.
  *
- * Cmd/Ctrl+Shift+V is "paste as text" everywhere; for an image, the text is
- * its OCR. A ClipboardEvent carries no modifier state, so the last keyboard
- * event decides. One window-level tracker serves every editor (the main
- * editor and the flashcards editor), installed once by whichever mounts
- * first. ProseMirror tracks the same thing internally (`view.input.shiftKey`),
- * but that field is not public API.
+ * Two paths, because browsers disagree about what ⇧⌘V delivers:
+ *
+ * 1. **A paste event with the image** (browsers that pass files on a Shift
+ *    paste). A ClipboardEvent carries no modifier state, so `isPasteAsText()`
+ *    reports the last key event's Shift; the editor's paste handler OCRs the
+ *    image instead of uploading it.
+ *
+ * 2. **No usable paste event** — Chrome on macOS (owner report 2026-10-08:
+ *    ⇧⌘V with a screenshot did nothing, so the paste handler never saw the
+ *    image — either no event fired or it arrived without the file). So the
+ *    editor watches the chord itself (`handlePasteAsTextChord` from its
+ *    keydown): it waits a moment for a paste event that carried content; if
+ *    one arrived, the paste handler owns it; if none did, the editor does the
+ *    "paste as text" itself — an image goes to OCR, plain text is inserted as
+ *    plain text. (Headless Chromium cannot reproduce the real chord: Playwright
+ *    maps only ⌘V to a paste on macOS, so this path is tested by simulating
+ *    both outcomes, not by pressing the keys.)
+ *
+ * Reading only when no paste arrived matters: Chrome asks for clipboard
+ * permission on the first read, and that prompt must never interrupt an
+ * ordinary plain-text paste.
  */
+import { toast } from "sonner";
 
 let shiftHeld = false;
 let installed = false;
+/** performance.now() of the last paste event any editor saw. */
+let lastPasteEventAt = Number.NEGATIVE_INFINITY;
+
+/** How long to wait for the browser's own paste event before reading the clipboard. */
+const PASTE_EVENT_GRACE_MS = 80;
 
 export function installPasteModifierTracker(): void {
   if (installed || typeof window === "undefined") return;
@@ -29,4 +50,70 @@ export function installPasteModifierTracker(): void {
 
 export function isPasteAsText(): boolean {
   return shiftHeld;
+}
+
+/**
+ * Editors call this first thing in their paste handler. Only a paste that
+ * carried something counts — an empty one (a browser that stripped the image)
+ * must not stop the chord watcher from reading the clipboard.
+ */
+export function notePasteEvent(event: ClipboardEvent): void {
+  const data = event.clipboardData;
+  if (data && (data.types.length > 0 || data.files.length > 0)) {
+    lastPasteEventAt = performance.now();
+  }
+}
+
+/** ⇧⌘V / Ctrl+Shift+V (no Alt — ⌥⇧⌘V is macOS "Paste and Match Style"). */
+export function isPasteAsTextChord(event: KeyboardEvent): boolean {
+  return (
+    (event.metaKey || event.ctrlKey) &&
+    event.shiftKey &&
+    !event.altKey &&
+    event.key.toLowerCase() === "v"
+  );
+}
+
+/**
+ * Call from the editor's keydown when `isPasteAsTextChord(event)`. Never
+ * prevents the default. Only when no paste with content follows is the
+ * clipboard read: an image goes to `onImage` (OCR), otherwise plain text goes
+ * to `onText`. Image wins when both are present — ⇧⌘V on an image is a request
+ * for its words.
+ */
+export function handlePasteAsTextChord(handlers: {
+  onImage: (image: Blob) => void;
+  onText: (text: string) => void;
+}): void {
+  const pressedAt = performance.now();
+  setTimeout(() => {
+    if (lastPasteEventAt >= pressedAt) return; // the browser delivered a paste — its handler owns it
+    if (!navigator.clipboard?.read) return;
+    void (async () => {
+      let items: ClipboardItems;
+      try {
+        items = await navigator.clipboard.read();
+      } catch {
+        toast.error(
+          "The browser blocked reading the clipboard. Allow clipboard access for this site (the icon at the left of the address bar), then press ⇧⌘V again.",
+          { duration: 8000 },
+        );
+        return;
+      }
+      for (const item of items) {
+        const type = item.types.find((t) => t.startsWith("image/"));
+        if (type) {
+          handlers.onImage(await item.getType(type));
+          return;
+        }
+      }
+      for (const item of items) {
+        if (item.types.includes("text/plain")) {
+          const text = await (await item.getType("text/plain")).text();
+          if (text) handlers.onText(text);
+          return;
+        }
+      }
+    })();
+  }, PASTE_EVENT_GRACE_MS);
 }
