@@ -78,7 +78,7 @@ Branch `refactor/remove-workplace-claims` · plan [WORKPLACE-RESTRICTIONS-REMOVA
 
 ### Shipped
 - **Shared OCR engine** (`lib/features/ocr/`): lazy, one worker per page, 120 s idle termination, self-hosted worker + core (`public/ocr/`), pinned language pack. The speed reader uses it.
-- **Editor**: ⇧⌘V pastes an image's text only; image context menu *Extract text from image* / *Replace image with its text*; clipboard *Paste text from image*. Same ⇧⌘V branch in the flashcards editor.
+- **Editor**: ⇧⌘V pastes an image's text only; image context menu *Extract text from image* / *Replace image with text*. Same ⇧⌘V branch in the flashcards editor.
 - **AI**: `read_content` lists a note's images (it dropped them before); new client-executed `read_image_text` reads one on the device.
 - **Fix — wrong-pane inserts**: editor context-menu Cut / Paste / Paste as Markdown / Insert Template / Insert Snippet act on the right-clicked editor (they used the first registered one); `/template` and `/snippet` open only the invoking editor's picker and insert there (they opened in every pane).
 - **Postponed (owner)**: co-browse `read_screen` → backlog.

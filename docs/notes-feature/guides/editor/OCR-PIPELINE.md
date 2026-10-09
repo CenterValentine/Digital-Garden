@@ -5,8 +5,9 @@ last_updated: 2026-10-08
 # OCR pipeline — how an image becomes text, and how to tune it
 
 Text recognition runs on the user's device (Tesseract.js in a Web Worker) for
-four surfaces: ⇧⌘V on an image, the image right-click actions, the clipboard
-menu's *Paste text from image*, and the assistant's `read_image_text` tool.
+three surfaces: ⇧⌘V on an image, the image right-click actions (*Extract
+text from image*, *Replace image with text*), and the assistant's
+`read_image_text` tool. ⌥⌘V (Ctrl+Alt+V) is the AI path (below).
 This guide is for **refining** it: what each stage does, every threshold with
 the evidence behind it, and how to measure a change before shipping it.
 
@@ -38,7 +39,7 @@ and replaces 2–7 with one model call:
 
 | Stage | Where | What it does |
 |---|---|---|
-| Gesture | `paste-modifier.ts` `isAiPasteChord` | Physical V key with ⌥⌘ / Ctrl+Alt, not Shift, not AltGr; reads the clipboard at once. Also: editor context menu → *Paste text from image with AI*. |
+| Gesture | `paste-modifier.ts` `isAiPasteChord` | Physical V key with ⌥⌘ / Ctrl+Alt, not Shift, not AltGr; reads the clipboard at once. Keyboard only — no context-menu item (see "Context menu" below). |
 | Model | `lib/domain/ai/features/registry.ts` → `image-text` | Settings → AI → Feature Routing → *Read Text in Images (AI)*; requires vision. Unrouted: registry default, then the first vision-capable model connected. |
 | Upload | `ai-engine.ts` | Images over 3.5 MB shrink to ≤ 2400 px JPEG (Vercel caps bodies at 4.5 MB; the route accepts ≤ 4 MB). |
 | Read | `app/api/ai/image-text/route.ts` | One `generateText` call; the instructions ask for markdown — tables as tables, code/terminal in fences, icons ignored, nothing translated. **Tune the AI's behaviour here.** |
@@ -47,6 +48,15 @@ and replaces 2–7 with one model call:
 The image leaves the device on this path. The first AI read in a browser
 names the provider and model that read it (`editor-ocr.ts`,
 `dg:ocr-ai-notice-shown`).
+
+### Context menu
+
+Only the image actions are in the editor's context menu, and only when an
+image is right-clicked. There is deliberately no "Paste text from image": the
+menu cannot know whether the clipboard holds an image without reading it — a
+permission prompt in Chrome, a paste bubble in Safari and Firefox on every
+right-click — and an item that usually does nothing is noise (owner,
+2026-10-09). ⇧⌘V and ⌥⌘V are the paste gestures.
 
 ---
 
@@ -66,6 +76,7 @@ names the provider and model that read it (`editor-ocr.ts`,
 | `TALL_WORD` | `layout.ts` | 1.5× median | Three stacked ✓ read as one tall "NNN" had merged three rows | — |
 | `PARAGRAPH_GAP_ROWS` | `layout.ts` | 1.6 rows | — (geometry convention) | — |
 | `SHORT_LINE_RATIO`, `MIN_WRAP_WIDTH` | `reflow.ts` | 0.6, 40 chars | A line stopping well short of the column is a real break (heading, sign-off) | See the 17 reflow fixtures before changing. |
+| `NO_TEXT_BELOW` | `preprocess.ts` | 50 | Four toolbar icons read as "Igy] OF" at 31; every real screenshot ≥ 76 | Higher may blank a blurry photo of real text; lower lets icon junk through. |
 | `PASTE_EVENT_GRACE_MS` | `paste-modifier.ts` | 80 ms | Paste events fire synchronously after keydown | Longer only delays the fallback. |
 | `OCR_IDLE_MS` | `local-engine.ts` | 120 s | Owner: "bursty start, idle termination" | Shorter re-downloads nothing (HTTP cache + IndexedDB) but re-compiles WASM (~1 s). |
 

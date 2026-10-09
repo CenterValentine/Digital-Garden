@@ -124,7 +124,7 @@ export const FEATURE_REGISTRY: FeatureSpec[] = [
     },
   },
   {
-    // "Paste text from image with AI" (⌥⌘V / Ctrl+Alt+V) — OCR-PASTE-PLAN D13.
+    // Paste an image's text with AI (⌥⌘V / Ctrl+Alt+V) — OCR-PASTE-PLAN D13.
     // The on-device engine stays the default (⇧⌘V); this is the opt-in path
     // for what it cannot do: wrapped table cells, icons vs text, handwriting,
     // stylised fonts. Unrouted = registry default, else the first

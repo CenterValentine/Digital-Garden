@@ -99,7 +99,7 @@ Right-click on an image node in the editor:
 
 1. **Extract text from image** — runs OCR on the image, inserts the text as
    blocks *after* the image node, keeps the image.
-2. **Replace image with its text** — the extract-and-destroy variant: same
+2. **Replace image with text** (renamed from "…with its text", owner 2026-10-09) — the extract-and-destroy variant: same
    OCR, then one transaction replaces the image node with the text blocks. If
    OCR returns nothing, do nothing destructive: toast "No text found", image
    stays.
@@ -111,7 +111,7 @@ work in every browser and are the robust path.
 
 Clipboard section, beside "Paste as Markdown":
 
-3. **Paste text from image** — `navigator.clipboard.read()`, take the first
+3. ~~**Paste text from image**~~ — **removed 2026-10-09 (owner):** the menu cannot tell whether the clipboard holds an image without reading it, so the item usually did nothing; ⇧⌘V / ⌥⌘V carry the action. As built until then: `navigator.clipboard.read()`, take the first
    `image/*` item, OCR, insert at the context editor's selection. Read the
    clipboard **before** awaiting the engine import: the read must happen inside
    the user gesture or Safari voids it. A refused read gets its own message
@@ -462,6 +462,16 @@ no AI variants of the image right-click actions; no fallback chain across
 routed models (`resolvePrimaryRoute` only). Verified by typecheck, gates and
 the chord/content checks — **not yet exercised against a live model**.
 
+### D14 — No text is no text; the menu keeps only image actions (owner, 2026-10-09)
+
+An image of four toolbar icons pasted as "Igy] OF". Measured: 31 confidence;
+every real screenshot 76 or higher. A best read below **50** (`NO_TEXT_BELOW`)
+is now reported as no text — the editor shows "No text found" with "Paste
+image instead"; `read_image_text` answers "no readable text". Gate: 3 mutants
+killed. Also: "Replace image with its text" → "Replace image with text", and
+the two clipboard items ("Paste text from image", "…with AI") left the
+context menu (see D2 item 3).
+
 ### Not built — rotation detection
 
 Tesseract's own orientation detector (PSM 0/1/12, `worker.detect()`) needs
@@ -493,8 +503,8 @@ scripts/validate-ocr-blocks.ts  # pnpm ocr:blocks:check — 17 fixtures, quality
 components/content/editor/MarkdownEditor.tsx    # ⇧ + image paste → OCR (ref, frozen-closure safe)
 lib/domain/editor/hooks/use-image-paste.ts      # same branch for the flashcards editor
 components/content/context-menu/editor-actions.tsx
-  image section:     Extract text from image · Replace image with its text
-  clipboard section: Paste text from image (⇧⌘V) · Cut/Paste/Paste as Markdown → contextEditor
+  image section:     Extract text from image · Replace image with text
+  clipboard section: Cut/Paste/Paste as Markdown/Insert Template/Insert Snippet → contextEditor
 extensions/speed-reader/lib/extractors/ocr.ts   # thin adapter; no terminate (shared worker)
 
 lib/domain/ai/tools/read-image-text.ts   # client-safe contract (name, schema, description)
@@ -527,8 +537,8 @@ Co-browse `read_screen` (D5): **backlogged**, see the D5 note.
 - [ ] ⇧⌘V with a screenshot on the clipboard → its text appears; no image file is created in the tree.
 - [ ] ⌘V with the same screenshot → the image uploads as before.
 - [ ] Right-click an image → Extract text from image → text below it, image kept.
-- [ ] Right-click an image → Replace image with its text → image replaced; one ⌘Z brings it back.
-- [ ] Context menu → Paste text from image, in the **right** pane of a split → text lands in that pane's note.
+- [ ] Right-click an image → Replace image with text → image replaced; one ⌘Z brings it back.
+- [ ] ⇧⌘V in the **right** pane of a split → text lands in that pane's note.
 - [ ] Screenshot of a bulleted list → a real bullet list.
 - [ ] Network tab on first use → `/ocr/worker.min.js` and one `/ocr/tesseract-core-*.wasm.js` from this origin, `eng.traineddata.gz` from jsdelivr; nothing on later uses until ~2 min idle, then the worker is gone.
 - [ ] AI chat on a note holding a screenshot: "what does the image say?" → `read_content` lists the image, `read_image_text` returns its text, the chip reads "Read text in an image (N characters)".
