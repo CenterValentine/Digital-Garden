@@ -83,6 +83,8 @@ function WorkspacePane({
           ? "bg-black/[0.015] shadow-[inset_0_0_0_1px_rgba(201,168,108,0.25)]"
           : ""
       }`}
+      // view_screen captures the focused pane by this (AI-VIEW-SCREEN-PLAN D4).
+      data-workspace-pane={paneId}
       onPointerDownCapture={(event) => {
         if (keepsPaneFocus(event.target)) return;
         focusPane(paneId);

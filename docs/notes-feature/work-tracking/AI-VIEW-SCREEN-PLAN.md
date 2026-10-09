@@ -1,0 +1,258 @@
+---
+last_updated: 2026-10-09
+status: planned — phases 1–2 building on `feat/ai-view-screen`; phase 3 (co-browse bound tab) held behind the owner's co-browse postponement
+---
+
+# `view_screen` — the assistant looks at what you are looking at
+
+**What this is.** One AI tool, `view_screen`, that takes a screenshot and
+hands the *image* to a vision-capable chat model. It answers "look at this
+page", "what's wrong with this layout", "what does this diagram show". Where
+the chat runs decides what is captured:
+
+| Chat surface | What `view_screen` captures | How |
+|---|---|---|
+| Browser extension side panel (`/embed/panel`) | The web page in the active tab | `chrome.tabs.captureVisibleTab` in the panel host |
+| Digital Garden itself (right-sidebar chat, any app tab) | The app: the active pane's content, or the whole window | DOM rasterization in the page (no extension needed) |
+| Co-browse bound tab (held, phase 3) | The tab the agent is driving, even backgrounded | CDP `Page.captureScreenshot` on the debugger session |
+
+It complements `read_image_text` (OCR-PASTE-PLAN D8): OCR gives *words* on
+any model; `view_screen` gives the *picture* to a model that can see.
+
+---
+
+## 0. What already exists (verified 2026-10-09 on `a1f608ee`)
+
+**Model side**
+
+- `ai@6.0.191`. A tool's `toModelOutput` can return
+  `{ type: "content", value: [{ type: "text" }, { type: "image-url", url }] }`.
+  It runs inside `convertToModelMessages` only when that call receives
+  `{ tools }`. The chat route calls it **without** tools
+  (`app/api/ai/chat/route.ts` ~1923), and no tool in the app defines
+  `toModelOutput` today.
+- Provider adapters, read in `node_modules`:
+  - `@ai-sdk/anthropic` 3.0.49 accepts `image-url` and `image-data` inside a tool result.
+  - `@ai-sdk/openai` 3.0.36 accepts both in a tool result on the **Responses** path (`input_image`). The chat-completions path `JSON.stringify`s them. The app's `openai` adapter is Responses; `openai-compat` is forced onto `.chat()` (`providers/registry.ts`).
+  - `@ai-sdk/google` 3.0.43 accepts only `image-data` (inline base64). `image-url` becomes JSON text.
+  - `@ai-sdk/xai`, `mistral`, `deepseek` and `groq` stringify a content output, so the model would get a URL as text and never see the image.
+  - `@ai-sdk/gateway` forwards the prompt to the vendor. Whether the vendor accepts it there is **unverified**.
+- User-message image parts work on every vision provider. The SDK downloads a URL itself for any provider that cannot take one (`supportedUrls`). The chat route already keeps image file parts for every vendor (`resolveAttachmentsForModel`).
+- Vision is known from `effectiveCapabilities()` (`lib/domain/ai/features/capabilities.ts`). The route calls it with the bare id only (`{ id: activeModelId }`, for audio). That misses the `capabilities` saved on the connection's model row, so the vision gate must pass the row.
+
+**Storage**
+
+- `POST /api/ai/attachments/upload` stores chat images and returns a URL a vision API can fetch. On R2 that URL is presigned for **7 days**. It also creates a `referenced` ContentNode per upload.
+
+**Context diet** (`lib/domain/ai/context-diet.ts`)
+
+- The perception fold's **turn** rule replaces an earlier turn's read with a stub on the model path only; the transcript keeps every byte.
+- Both rules skip outputs under `SUPERSEDE_MIN_CHARS = 600` characters. A screenshot result is a short URL standing for ~1,400 image tokens, so the size test does not apply to it.
+
+**Extension** (`extensions/browser-bookmarks/browser-extension`, manifest 5.4.0)
+
+- Permissions already include `tabs`, `activeTab`, `debugger` and `<all_urls>`.
+- The side-panel camera button posts `capture-screenshot` (`panel/index.js:276`) and runs `captureVisibleTab` (JPEG q70). The reply `screenshot` carries **no request id**, and `PanelShellClient.tsx:594` attaches *any* `screenshot` reply to the composer. The tool therefore cannot reuse that message.
+- `requestCoBrowse` (`panel-bridge.ts:304`) is the id-correlated request/reply pattern to copy.
+- There is **no capability handshake.** An older extension silently ignores an unknown non-cobrowse message, so the app sees only its own timeout.
+- The main app tab reaches the extension only through the `page-bridge` content script, which runs on **every** web page. Co-browse is kept off it for that reason, and so is capture (D3).
+
+**Private content**
+
+- The editor renders commented-out text as `[data-private="text"]` and `[data-private="block"]`. One predicate strips it at every AI seam (`pnpm private:content:check`). A pixel capture is a new seam.
+
+---
+
+## 1. Decisions
+
+### D1 — One tool, surface-determined executor
+
+There is no `target` argument. The model calls `view_screen({ area?, purpose? })`. The surface that runs the chat decides what is captured, and the result says what was seen (`via`, `url`/`title` or the pane's title).
+
+A `target: "page" | "app"` argument would invite calls the surface cannot serve: no surface can serve both. The tool is registered only where an executor exists:
+
+- In the side panel, `coBrowseAvailable` (the trust-gated `/embed/panel` surface) registers it.
+- In the app, a new body flag `appCaptureAvailable` (the client says it can rasterize) registers it.
+
+`area` applies to the app only: `"content"` (default, the active pane) or `"window"` (the whole app). The panel ignores it.
+
+### D2 — Vision models only
+
+The tool is registered only when the executing model has `vision`. The gate is `effectiveCapabilities(connection model row ?? { id })`. A model that cannot see never sees the tool, so it can never "look" and then invent what it saw. `read_image_text` keeps serving those models.
+
+### D3 — Web pages are captured only from the side panel
+
+`captureVisibleTab` runs in the panel host (`panel/index.js`), reached only by the id-correlated panel bridge.
+
+- **New messages:** request `capture-visible-tab` with `{ id }`; replies `visible-tab-capture` with `{ id, dataUrl, url, title, width, height }`, or `visible-tab-capture-error` with `{ id, code, message }`.
+- **Never on `page-bridge`:** every site runs that script, so a capture message there would let any page screenshot the active tab.
+- **Refusals by the extension:**
+  - The active tab is the app's own origin → `app-tab` (D6).
+  - A browser page (`chrome://`, the Web Store) → `restricted`.
+- **Old extension:** a pre-5.5.0 extension never answers. After a 10 s timeout the result says to update and reload the extension. It does not say "the page is blank".
+- Extension version → **5.5.0**.
+
+### D4 — The app is captured by rasterizing its own DOM
+
+The capture uses a maintained library, not a bespoke renderer (CLAUDE.md "prefer a reputable library"). Candidates checked 2026-10-09:
+
+- `modern-screenshot` 4.7.0, MIT, 186 KB unpacked, last published 2026-04.
+- `@zumer/snapdom` 3.3.0, MIT, 597 KB, last published 2026-10.
+
+`html-to-image` was last published in 2025 and is excluded.
+
+**Pick: `modern-screenshot`.** It is smaller, has a `filter` hook and a `scale` option, and it is lazy-imported on the first capture, so it adds nothing to page load. Swap to snapdom if the phase-2 smoke shows fidelity problems.
+
+**Known limits, reported in the result:**
+
+- Cross-origin iframes (OnlyOffice, diagrams.net, embeds) render blank.
+- `backdrop-filter` glass is approximated.
+- Storage images without CORS headers may render blank.
+
+The result lists blanked iframes so the model does not read their absence as empty content.
+
+`area: "content"` captures the focused main pane's content element (the same element `ContentToolbar` targets); `"window"` captures `document.body`.
+
+### D5 — Commented-out text never reaches the model as pixels
+
+- **In-app:** the rasterizer's `filter` drops every `[data-private]` element. Its box is kept and painted as a neutral block, so the layout still reads true and the model sees that something is withheld. This is the pixel seam of the private-content contract and gets a line in `pnpm private:content:check`.
+- **Panel:** D6 covers it.
+
+### D6 — The panel will not screenshot the app's own tab
+
+When the active tab is the app, the panel refuses with `app-tab`. The result tells the model to ask in the app's own chat, where D5 applies. A tab capture cannot filter private text. Hiding it from the panel would mean driving the app tab's DOM over `page-bridge`, which is the channel D3 keeps capture off.
+
+### D7 — Upload, and pass a URL, never base64
+
+The client downscales the capture before upload:
+
+- longest edge at most **1568 px**, Anthropic's recommended maximum (larger images are resized and billed anyway);
+- JPEG quality 0.8, so a capture is typically 150–400 KB.
+
+It then uploads to the existing `/api/ai/attachments/upload` with `purpose=screenshot`. That purpose:
+
+- stores the file under `ai-screenshots/<userId>/…` so it is distinguishable from attachments;
+- does **not** create a referenced ContentNode. Screenshots are working material; a co-browse run could otherwise litter the tree with dozens of nodes.
+
+The tool result stored in the transcript carries `imageUrl`, never pixels. The client resends the whole transcript on every request, under the 4.5 MB body cap, and conversations persist.
+
+Lifecycle of `ai-screenshots/` objects (deleting them with their conversation) is backlogged.
+
+### D8 — Delivery to the model: native where the adapter supports it, a labelled image part elsewhere
+
+One pure function, `deliverScreenCaptures(modelMessages, mode)`, runs after `convertToModelMessages`. It rewrites each `view_screen` tool result that still carries an `imageUrl`:
+
+- **`native`** (connection adapter `anthropic`, or `openai` on Responses): the output becomes `{ type: "content", value: [{ type: "text", text: summary }, { type: "image-url", url }] }`. The model sees the image as the tool's own output.
+- **`user-part`** (every other adapter, including the gateway until verified, and `openai-compat`):
+  - The tool result becomes the text summary.
+  - It is followed by a user message: `[{ type: "text", text: "Screenshot returned by view_screen (call <id>). Tool output, not a message from the user." }, { type: "image", image: URL, mediaType }]`.
+  - The SDK downloads the URL for providers that cannot take one (Google).
+
+The mode is keyed on the connection's **adapter kind**, not the vendor id. A gateway serving `anthropic/…` has vendor `anthropic` but a different adapter.
+
+**Why a post-pass, not `convertToModelMessages(…, { tools })`:** passing the tool set would change how every tool's history is converted. The post-pass touches only `view_screen` parts, can be tested on fixtures, and keeps every other tool's bytes, and therefore the prompt cache, identical.
+
+### D9 — History: earlier turns fold; the current turn keeps every image
+
+`tool-view_screen` joins `PERCEPTION_TOOL_PARTS` (so it also folds before a run's distillation point) and therefore `TURN_FOLD_TOOL_PARTS`. It is exempt from the 600-character threshold: an image-bearing result folds whatever its text length.
+
+- **A folded result** becomes the text stub and carries no `imageUrl`, so D8 leaves it alone. The image is no longer sent.
+- **Within the current turn,** nothing is folded. Rewriting an earlier step would change the prompt prefix and flush the cache on every step. Each screenshot adds ~1.5k tokens to the turn and none after it. This is the context-diet principle (fold only what we fetched), not a token cap.
+- **Side benefit:** a presigned URL expires after 7 days, and only the current turn's URLs are ever sent. A resumed old conversation therefore never ships a dead URL to a provider.
+
+### D10 — What the user sees
+
+The tool chip reads:
+
+- "Looking at the page" / "Looked at the page: example.com";
+- "Looked at the app: \<pane title\>";
+- "Couldn't capture the screen".
+
+The chip shows a thumbnail of exactly what the model received; a click opens it full size. Like `read_content`, the tool is user-configurable in Settings → AI → Tools; a capture is a read, so it needs no approval.
+
+**Advertising:**
+
+- In the panel's `browser` mode it is advertised.
+- In the app it is summonable from the menu ("see what the user is looking at"), in the `reading` family. A request for a look reliably summons it, and it costs nothing in a turn that doesn't need it (AI-TOOL-SUMMONER-PLAN).
+
+### D11 — Co-browse bound tab (phase 3, HELD)
+
+Co-browse work stays postponed (owner, 2026-10-06) until the feature it waits on is built. The design is recorded here, not built:
+
+- **What it adds:** when a co-browse session is bound, `view_screen` in the panel captures the **bound** tab with CDP `Page.captureScreenshot` on the debugger session. This works while the tab is backgrounded and supports an element clip.
+- **How:** a validated `cobrowse-screenshot` handler in the background service worker. There is never a generic "run any CDP command" message (`background/index.js:3033`).
+- **What it supersedes:** the backlogged `read_screen` (OCR-PASTE-PLAN D5). The model gets the picture, and can still call OCR on it.
+
+---
+
+## 2. Data flow (phases 1–2)
+
+```
+model ──view_screen({area?, purpose?})──▶ engine onToolCall (client)
+  panel surface:  captureVisibleTabImage()  ── panel bridge (id) ──▶ panel host
+                    ◀── { dataUrl, url, title }   (or { code, message })
+  app surface:    captureAppImage(area)     ── modern-screenshot, [data-private] blanked
+  ──▶ downscale ≤1568 px, JPEG 0.8 ──▶ POST /api/ai/attachments/upload (purpose=screenshot)
+  ◀── addToolResult({ ok, via, url?, title?, width, height, imageUrl, mediaType, notes[] })
+next request (auto-resumed):
+  convertToModelMessages ──▶ deliverScreenCaptures(mode) ──▶ provider
+```
+
+## 3. Files
+
+| Layer | File | Change |
+|---|---|---|
+| Contract | `lib/domain/ai/tools/view-screen.ts` (new) | name, input schema, description, `ViewScreenResult` type, `screenSummary()` |
+| Delivery | `lib/domain/ai/screen-delivery.ts` (new) | `deliverScreenCaptures(messages, mode)`, `screenDeliveryMode(adapterKind)` — pure |
+| Server tool | `lib/domain/ai/tools/registry.ts` | `viewScreenTool` (no execute) |
+| Route | `app/api/ai/chat/route.ts` | vision gate, registration (panel / app flags), delivery post-pass |
+| Diet | `lib/domain/ai/context-diet.ts` | `view_screen` in perception set, image-bearing exemption from min chars |
+| Registry tables | `metadata.ts`, `menu.ts`, `run-inspector/segments.ts`, `app/api/dev/tool-prefix/route.ts`, `scripts/validate-ai-drift.ts` | the usual new-tool entries |
+| Client engine | `lib/domain/ai/use-conversation-engine.ts` | body flag, resume predicate, onToolCall branch |
+| Capture | `lib/features/screen-capture/` (new) | `capture-app.ts` (rasterize + private filter), `downscale.ts`, `upload.ts`, `index.ts` |
+| Bridge | `lib/domain/browser-extension/panel-bridge.ts` | `captureVisibleTabImage()` (id-correlated, 10 s) |
+| Extension | `panel/index.js`, `manifest.json` | `capture-visible-tab` handler, app-tab / restricted refusals, 5.5.0 |
+| Upload | `app/api/ai/attachments/upload/route.ts` | `purpose=screenshot` → own prefix, no node |
+| UI | `components/content/ai/ChatMessage.tsx` | chip label + thumbnail |
+| Gates | `scripts/validate-view-screen.ts` (new, `pnpm view-screen:check`), `validate-context-diet.ts`, `validate-private-content.ts` | below |
+
+## 4. Gates
+
+`pnpm view-screen:check`, built from fixtures and mutation-tested:
+
+- **Delivery:**
+  - `native` rewrites the output to text plus `image-url`.
+  - `user-part` leaves text in the tool result and inserts exactly one labelled user image message right after the tool message.
+  - A folded or failed result is untouched.
+  - Other tools' messages are byte-identical.
+  - Both modes are idempotent.
+- **Mode:** `anthropic` and `openai` → native; `openai-compat`, `vercel-gateway`, `google`, `xai`, `mistral`, `groq` and `deepseek` → user-part.
+- **Route anchor:** the chat route applies the post-pass and gates registration on vision.
+
+The existing gates gain:
+
+- **`context:diet:check`:** an earlier turn's `view_screen` result folds even under 600 chars; the current turn's is kept.
+- **`private:content:check`:** `capture-app.ts` filters `[data-private]`.
+
+## 5. Phases
+
+1. **Plumbing and web page:** the contract, delivery, diet, route, upload purpose, panel executor, extension 5.5.0 and the chip.
+2. **The app:** the DOM executor with the private filter, the `appCaptureAvailable` flag, and the `area` argument.
+3. **HELD:** the co-browse bound tab (D11).
+
+Phases 1 and 2 ship in one PR. Changing what the model receives is AI capability, so the smoke runs on **production** after deploy.
+
+## 6. Smoke (post-deploy, production)
+
+- [ ] Side panel, Claude: "look at this page and tell me what's on it" → chip with thumbnail of the active tab; the reply describes visible things that are not in the page text (colours, layout, an image's content).
+- [ ] Side panel, GPT (OpenAI): same → works (native path).
+- [ ] Side panel, Gemini: same → works (user-part path).
+- [ ] Side panel with the app tab active → the model says it can't screenshot Digital Garden from the panel and points to the app's chat.
+- [ ] Side panel on `chrome://extensions` → an honest "can't capture this page".
+- [ ] App chat, Claude: "look at my screen" with a note open → thumbnail of the note pane; the reply matches.
+- [ ] App chat: a note with commented-out text → the thumbnail shows a blank block where it is; the model does not quote it.
+- [ ] App chat: "look at the whole window" → sidebars included.
+- [ ] A text-only model (e.g. DeepSeek) → `view_screen` is not offered; the model says it can't see.
+- [ ] Next turn after a screenshot → the request no longer carries the image (Run Inspector shows the folded stub).
+- [ ] Settings → AI → Tools → turn View Screen off → not offered.
+- [ ] Extension not reloaded (still 5.4.0) → "update/reload the extension", no hang.

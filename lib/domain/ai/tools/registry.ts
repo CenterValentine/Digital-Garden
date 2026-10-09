@@ -146,6 +146,7 @@ import {
   READ_IMAGE_TEXT_DESCRIPTION,
   readImageTextInputSchema,
 } from "./read-image-text";
+import { VIEW_SCREEN_DESCRIPTION, viewScreenInputSchema } from "./view-screen";
 import { describeNoteImages, listNoteImages } from "@/lib/domain/content/note-images";
 
 /**
@@ -221,6 +222,18 @@ export const listTabsTool = tool({
 export const readImageTextTool = tool({
   description: READ_IMAGE_TEXT_DESCRIPTION,
   inputSchema: readImageTextInputSchema,
+});
+
+/**
+ * `view_screen` — CLIENT-EXECUTED (no server `execute`). AI-VIEW-SCREEN-PLAN.md.
+ * Registered only for a vision model on a surface that can capture (the side
+ * panel → the active web page; the app → itself). The engine's onToolCall
+ * captures, uploads, and returns the image URL; `deliverScreenCaptures` hands
+ * the image to the model on the next request.
+ */
+export const viewScreenTool = tool({
+  description: VIEW_SCREEN_DESCRIPTION,
+  inputSchema: viewScreenInputSchema,
 });
 
 /**

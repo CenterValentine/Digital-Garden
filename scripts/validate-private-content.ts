@@ -105,6 +105,9 @@ const SEAMS: Array<[string, RegExp]> = [
   ["lib/domain/browser-extension/service.ts", /stripPrivateContent\(/],
   // The images a note holds, as the AI's read_content lists them (OCR plan D8).
   ["lib/domain/content/note-images.ts", /stripPrivateContent\(/],
+  // The PIXEL seam (AI-VIEW-SCREEN-PLAN D5): view_screen's in-app capture
+  // leaves every [data-private] element out of the screenshot.
+  ["lib/features/screen-capture/capture-app.ts", /filter: isCapturable/],
 ];
 for (const [file, pattern] of SEAMS) {
   const source = readFileSync(resolve(process.cwd(), file), "utf8");
@@ -115,6 +118,22 @@ for (const [file, pattern] of SEAMS) {
   // note's own markdown, and the author must still see their private text.
   const serializer = readFileSync(resolve(process.cwd(), "lib/domain/content/markdown.ts"), "utf8");
   check("tiptapToMarkdown itself does not strip (source view must show private text)", !/stripPrivateContent/.test(serializer));
+}
+{
+  // The pixel seam filters by DOM attribute, so the attribute is the contract:
+  // what the editor renders and what the capture leaves out must agree.
+  const extension = readFileSync(resolve(process.cwd(), "lib/domain/editor/extensions/private-content.ts"), "utf8");
+  const capture = readFileSync(resolve(process.cwd(), "lib/features/screen-capture/capture-app.ts"), "utf8");
+  const sourceView = readFileSync(resolve(process.cwd(), "components/content/editor/MarkdownSourceView.tsx"), "utf8");
+  check(
+    "private text and blocks render with data-private (the attribute view_screen filters on)",
+    extension.includes('"data-private": "text"') && extension.includes('"data-private": "block"') && !/addNodeView/.test(extension),
+  );
+  check("view_screen's capture leaves out [data-private]", capture.includes('PRIVATE_SELECTOR = "[data-private]"') && /!node\.matches\(PRIVATE_SELECTOR\)/.test(capture));
+  check(
+    "view_screen's capture leaves out a source view holding %% text, and the source view is marked",
+    capture.includes('SOURCE_VIEW_SELECTOR = "textarea[data-markdown-source]"') && /\.value\.includes\("%%"\)/.test(capture) && sourceView.includes("data-markdown-source"),
+  );
 }
 
 if (failures > 0) {

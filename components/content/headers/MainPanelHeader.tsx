@@ -843,6 +843,8 @@ export function MainPanelHeader({
                 // the hover look through `data-spring-hover` (set by
                 // use-spring-tabs.ts) — the cue to hold until the tab opens.
                 data-pane-id={paneId}
+                // view_screen names the pane it captured by its active tab.
+                data-active-tab={isActive ? "" : undefined}
                 // Hit-tested by spring-loaded tabs (use-spring-tabs.ts): a
                 // drag resting here opens this tab.
                 data-tab-id={tab.id}

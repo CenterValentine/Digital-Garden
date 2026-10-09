@@ -65,6 +65,7 @@ import {
   READ_IMAGE_TEXT,
   READ_IMAGE_TEXT_DESCRIPTION,
 } from "../lib/domain/ai/tools/read-image-text";
+import { VIEW_SCREEN, VIEW_SCREEN_DESCRIPTION } from "../lib/domain/ai/tools/view-screen";
 import {
   OPEN_TAB_AND_READ,
   OPEN_TAB_AND_READ_DESCRIPTION,
@@ -356,6 +357,7 @@ const CLIENT_TOOLS: Array<{ name: string; description: string }> = [
   { name: READ_CURRENT_PAGE, description: READ_CURRENT_PAGE_DESCRIPTION },
   { name: LIST_TABS, description: LIST_TABS_DESCRIPTION },
   { name: READ_IMAGE_TEXT, description: READ_IMAGE_TEXT_DESCRIPTION },
+  { name: VIEW_SCREEN, description: VIEW_SCREEN_DESCRIPTION },
 ];
 
 const realToolNames = new Set<string>([
@@ -459,6 +461,7 @@ const scriptConstants = new Set([
   "READ_CURRENT_PAGE",
   "LIST_TABS",
   "READ_IMAGE_TEXT",
+  "VIEW_SCREEN",
 ]);
 for (const c of routeBracketConstants) {
   if (!scriptConstants.has(c)) {

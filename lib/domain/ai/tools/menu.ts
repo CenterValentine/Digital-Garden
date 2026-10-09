@@ -52,6 +52,7 @@ export const TOOL_MENU: Readonly<Record<string, ToolMenuEntry>> = {
   search_content: { family: "reading", selectWhen: "Find items by text when you do not have an id" },
   read_folder_context: { family: "reading", selectWhen: "Read a folder's selected sources and children" },
   read_image_text: { family: "reading", selectWhen: "Read the text in an image (screenshot, photo of a page) by its content id" },
+  view_screen: { family: "reading", selectWhen: "Take a screenshot and SEE what the user is looking at — the page or the open pane" },
   search_charters: { family: "reading", selectWhen: "Find a charter/playbook note by name when none is loaded" },
 
   // ── writing ────────────────────────────────────────────────────────────
@@ -184,7 +185,7 @@ export const MODE_TOOL_IDS: Readonly<Record<string, readonly string[]>> = {
     "ask_user",
     "finish_with_summary",
   ],
-  browser: ["co_browse_open", "co_browse_act", "read_current_page", "list_tabs"],
+  browser: ["co_browse_open", "co_browse_act", "read_current_page", "list_tabs", "view_screen"],
   runs: [
     "propose_item_iteration",
     "record_item_result",

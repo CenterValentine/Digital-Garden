@@ -163,6 +163,7 @@ import {
   type OutputTarget,
 } from "@/lib/domain/ai/output-target";
 import { inferReplyExportTitle } from "@/lib/domain/ai/reply-export";
+import { screenImageOf } from "@/lib/domain/ai/tools/view-screen";
 import { toast } from "sonner";
 
 /**
@@ -4068,6 +4069,8 @@ function ToolCallBubble({
     return "ok";
   }, [isRunning, wasStopped, hasError, hasResult, result, toolName, pinState]);
 
+  const screenImage = toolName === "view_screen" && hasResult ? screenImageOf(result) : null;
+
   // Human action phrase — describes what the tool is *doing* (present
   // tense while running, past tense when done) rather than echoing the
   // raw tool identifier.
@@ -4161,6 +4164,23 @@ function ToolCallBubble({
         if (r?.ok === false) return "Couldn't read the image";
         const chars = r?.untrustedImageText?.length ?? 0;
         return chars > 0 ? `Read text in an image (${chars.toLocaleString("en-US")} characters)` : "No text found in the image";
+      }
+      // view_screen (AI-VIEW-SCREEN-PLAN D10): say WHAT was looked at.
+      if (toolName === "view_screen") {
+        if (isRunning) return "Looking at the screen";
+        const r = result as { ok?: boolean; via?: string; url?: string; title?: string } | null;
+        if (!r || r.ok === false) return "Couldn't capture the screen";
+        if (r.via === "active-tab") {
+          let host = "";
+          try {
+            if (r.url) host = new URL(r.url).hostname.replace(/^www\./, "");
+          } catch {
+            // best-effort host label
+          }
+          return `Looked at the page${host ? `: ${host}` : ""}`;
+        }
+        if (r.via === "app-window") return "Looked at the app window";
+        return `Looked at the app${r.title ? `: ${r.title}` : ""}`;
       }
       if (toolName === "co_browse_open") {
         const host = hostFromToolArgs(args);
@@ -4292,6 +4312,24 @@ function ToolCallBubble({
           />
         )}
       </button>
+      {screenImage && (
+        // What the model saw — exactly the uploaded image (D10).
+        <a
+          href={screenImage.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block border-t border-black/[0.06] dark:border-white/[0.06] px-3 py-2"
+          title="Open the screenshot the assistant received"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element -- presigned storage URL, not a static asset */}
+          <img
+            src={screenImage.url}
+            alt="Screenshot the assistant looked at"
+            className="max-h-40 w-auto max-w-full rounded border border-black/10 dark:border-white/10"
+            loading="lazy"
+          />
+        </a>
+      )}
       {hasDetails && expanded && resultString && (
         <div className="border-t border-black/[0.06] dark:border-white/[0.06] bg-black/[0.02] dark:bg-black/20">
           <div className="flex items-center justify-between px-3 py-1 text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-500">

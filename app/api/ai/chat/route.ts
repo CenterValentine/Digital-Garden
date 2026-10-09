@@ -242,8 +242,11 @@ import {
   readCurrentPageTool,
   listTabsTool,
   readImageTextTool,
+  viewScreenTool,
 } from "@/lib/domain/ai/tools/registry";
 import { READ_IMAGE_TEXT, describeImageMention } from "@/lib/domain/ai/tools/read-image-text";
+import { VIEW_SCREEN } from "@/lib/domain/ai/tools/view-screen";
+import { deliverScreenCaptures, screenDeliveryMode } from "@/lib/domain/ai/screen-delivery";
 import { READ_PAGE_HEADLESS_OR_BROWSER } from "@/lib/domain/ai/tools/read-page-in-browser";
 import { OPEN_TAB_AND_READ } from "@/lib/domain/ai/tools/open-tab-and-read";
 import {
@@ -633,6 +636,10 @@ export async function POST(request: Request) {
       // with Worker + WebAssembly). Gates the client-executed read_image_text,
       // so a headless caller is never offered a tool nothing would execute.
       const localOcrAvailable = body.localOcrAvailable === true;
+      // AI-VIEW-SCREEN-PLAN D1: the app reports it can rasterize itself (a
+      // browser outside the side panel). With coBrowseAvailable (the panel,
+      // which captures the active web page) this gates view_screen.
+      const appCaptureAvailable = body.appCaptureAvailable === true;
       // Agentic Browsing Phase 1: derive the active research run's page budget
       // from the conversation history — the propose_research_run result always
       // rides in body.messages, whereas a client body flag can't reliably reach
@@ -1523,6 +1530,12 @@ export async function POST(request: Request) {
         // for a research turn (undefined outside a research run → default cap).
         researchPageBudget: researchPageBudget ?? undefined,
       };
+      // Can the EXECUTED model see? The connection's own model row carries
+      // capabilities the user or the fetcher saved; the bare id alone misses
+      // those (AI-VIEW-SCREEN-PLAN D2).
+      const visionCapable = effectiveCapabilities(
+        activeConnection?.models.find((m) => m.id === activeModelId) ?? { id: activeModelId },
+      ).has("vision");
       const allTools = {
         ...createBaseTools(toolCtx),
         ...createFlashcardTools(toolCtx),
@@ -1566,6 +1579,15 @@ export async function POST(request: Request) {
         ...(localOcrAvailable
           ? {
               [READ_IMAGE_TEXT]: readImageTextTool,
+            }
+          : {}),
+        // AI-VIEW-SCREEN-PLAN D1/D2: CLIENT-executed. Only where something can
+        // capture (the panel → the active page; the app → itself), and only
+        // for a model that can SEE — a text-only model offered a screenshot
+        // would "look" and invent what it saw.
+        ...((coBrowseAvailable || appCaptureAvailable) && visionCapable
+          ? {
+              [VIEW_SCREEN]: viewScreenTool,
             }
           : {}),
       };
@@ -1920,8 +1942,15 @@ export async function POST(request: Request) {
       );
 
       // Convert UIMessages to ModelMessages for streamText
-      let modelMessages = await convertToModelMessages(
-        resolvedMessages as Parameters<typeof convertToModelMessages>[0],
+      // view_screen results carry a URL; hand the image itself to the model —
+      // inside the tool result where the adapter supports it, as a labelled
+      // image part where it doesn't (AI-VIEW-SCREEN-PLAN D8). Touches only
+      // view_screen parts; folded (earlier-turn) results carry no image.
+      let modelMessages = deliverScreenCaptures(
+        await convertToModelMessages(
+          resolvedMessages as Parameters<typeof convertToModelMessages>[0],
+        ),
+        screenDeliveryMode(activeConnection?.adapterKind),
       );
 
       // Fetch mentioned content for @ mentions (max 5 to limit token usage)

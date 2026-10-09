@@ -55,6 +55,7 @@ export const BASE_TOOL_IDS = [
   "search_charters",
   "read_content",
   "read_image_text",
+  "view_screen",
   "create_note",
   "update_note",
   "rename_note",
@@ -136,6 +137,11 @@ export const BASE_TOOL_METADATA: Record<BaseToolId, BaseToolMeta> = {
     name: "Read Image Text",
     description:
       "Read the words in an image — a screenshot, a photo of a page, a receipt — on your device, so the assistant can use what an image says. Reads text only; it does not describe pictures",
+  },
+  view_screen: {
+    name: "View Screen",
+    description:
+      "Let the assistant take a screenshot and look at it: the web page in your active tab (browser side panel) or the pane you have open in Digital Garden. Vision models only; commented-out text is blanked out",
   },
   create_note: {
     name: "Create Note",
