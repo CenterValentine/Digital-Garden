@@ -318,6 +318,31 @@ When nothing could be read, the block says so instead. It is never the image par
 
 **Gate:** `ocr:blocks:check` covers the profile bands and caveats, the labelled block, the hover text and the wiring. 15 mutants, all killed.
 
+### D19 — Offline banners clear when a still-open socket comes back, and say so (owner smoke, 2026-10-09)
+
+**Symptom.** In DevTools the owner went offline, typed, then came back online. The edit synced, but "Offline editing is active…" and "Connecting collaborative editor…" never cleared.
+
+**Cause.** The browser's `offline` event does not close an open WebSocket: not DevTools' offline mode, not a captive portal, not a Wi-Fi blip.
+- The runtime marked itself `disconnectedButDirty` while the Hocuspocus provider stayed synced, and edits kept flowing.
+- On `online`, `promote()` called `provider.connect()`, which was a no-op.
+- The provider emits `synced` only on a change (`if (this.isSynced === state) return;`), so `onSynced`, the only place the degraded markers are cleared, never fired again.
+
+**Fix (no order of operations changed).**
+- `onSynced`'s body became `markSynced(entry)`, unchanged.
+- `restoreIfStillSynced` calls it after `connect()` on an existing provider (in `promote` and `promoteInternal`), and when pending changes drain to zero. It acts only when all of these hold:
+  - the provider is synced;
+  - there is nothing pending;
+  - the network is online;
+  - the runtime is *not already* synced.
+
+  So in normal operation it is a no-op, and an acknowledged keystroke never re-emits or sends a heartbeat. A real disconnect still recovers through `onSynced`.
+- Recovering from a degraded state sets `recoveredAt` for 4 s. The editor shows "Reconnected — your changes are synced."
+
+**Verified:**
+- Two-tab browser run with Playwright's `setOffline`, the same Chromium emulation as DevTools: offline shows the warning; about 2 s after online the banners are gone and the notice shows; by about 9 s it has faded; the other tab has the offline edit.
+- Control with the restore disabled: both banners still up 9 s later, the owner's screenshot exactly.
+- `collab:lineage:check` reconnect cases, 6 mutants killed.
+
 ### D11 — Co-browse bound tab (phase 3, HELD)
 
 Co-browse work stays postponed (owner, 2026-10-06) until the feature it waits on is built. The design is recorded here, not built:

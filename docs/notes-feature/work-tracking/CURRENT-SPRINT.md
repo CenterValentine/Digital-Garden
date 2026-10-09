@@ -23,6 +23,7 @@ last_updated: 2026-05-13
 - **Vision models only**, checked against the connection's own model row.
 - **A cached note copy catches up with a newer stored note on open (D17)** — the production stale-viewer report: an AI payload write to a note with no server Y copy was invisible in the viewer, and the next keystroke would have saved the old copy over it.
 - **Pasted images reach text-only models as OCR text (D18)** — read on attach, a hover badge on the chip, a labelled block with an extraction profile (confidence band, rebuilt-table and look-alike caveats); the composer's vision test now matches the server's.
+- **Offline banners clear on reconnect (D19)** — a socket that never closed (DevTools offline, captive portal) left the runtime waiting for a sync event the provider never re-sends; a brief "Reconnected" notice now confirms recovery.
 - **`view_image`** (owner smoke follow-up): a vision model sees an image FILE itself; hints point at it; a result naming a tool advertises it (the loop fix).
 
 ### Smoke checklist (owner, production after deploy — plan §6)
@@ -34,6 +35,7 @@ last_updated: 2026-05-13
 - [ ] A scrolled chat/note → the capture shows the scrolled view; "screenshot just this file" beside a chat → the file's pane; a first message with an @mention → title reads "@name".
 - [ ] **Stale note fix (D17):** reopen "New Resume Guidance" / "New Resume Layout and Format" → the AI's revision shows once; edit a line → saves cleanly, revision intact.
 - [ ] **Pasted images, text-only model (D18):** chip badge Reading… → Text with a hover explaining the model gets the extracted text; Send waits; the reply uses the text and hedges on a rebuilt table.
+- [ ] **Offline → online (D19):** DevTools offline, type, back online → the offline / connecting banners clear and "Reconnected — your changes are synced" shows briefly.
 - [ ] "Look at the bookcove image" → one `view_image` call, thumbnail chip, a description — no loop; a text-only model → `read_image_text`.
 - [ ] Commented-out text (rich view and source view) → not in the thumbnail; the model doesn't quote it.
 - [ ] Text-only model → no `view_screen`; next turn after a screenshot → folded stub, no image resent.
