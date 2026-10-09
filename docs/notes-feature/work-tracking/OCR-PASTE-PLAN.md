@@ -424,6 +424,20 @@ stays a list). Reflow passes table blocks through; the speed reader flattens
 them to comma-separated rows. Gate: 12 checks, 9 mutants killed. Not
 handled: cells that wrap onto a second line — the vision-model path.
 
+**D12 addendum — wrapped cells (owner smoke, 2026-10-09).** A table whose
+cells wrap onto two lines came back 3/12 cells right: each visual line was a
+row, and a line with text in one column ("Keep them concise and clear.")
+ended the table. Rows now span lines: a line within 1.25× of the table's
+tightest spacing continues the row above (appending to its columns, even
+one column only); a wider step starts a row that needs two columns of text.
+Continuations apply only when the table has two spacings, measured below
+multi-column lines, so a title above evenly spaced rows cannot merge them.
+A cell must sit inside its own column on both sides (a note under the table
+stays text — found by a new gate check, which failed on the first fix).
+Hyphenated wraps rejoin with the hyphen. The prose guard became "short cells
+OR a short header row". Owner's table: 12/12; harness gains a cell score and
+a synthetic wrapped table. Gate: 10 row-rule mutants + 8 earlier, all killed.
+
 ### D13 — ⌥⌘V reads with the user's AI model (owner, 2026-10-09; stub)
 
 Owner: a separate special-paste shortcut for an AI model the user designates.

@@ -24,7 +24,7 @@ D1–D11. Code: `lib/features/ocr/`.
 | 3 | **Languages** | `languages.ts` | English always; others from `editor.ocrLanguages` (Settings → Editor & Files → Text recognition). |
 | 4 | **Preprocess** | `preprocess.ts` | Grayscale; invert if the median luminance is dark; upscale narrow images. |
 | 5 | **Layout mode** | `preprocess.ts` + `local-engine.ts` | Read in normal layout (PSM 3); below 85 confidence, re-read in sparse layout (PSM 11) and keep the more confident read. |
-| 6 | **Tables** | `table.ts` | Cells split at gaps wider than 1.2 word heights; ≥ 3 consecutive rows whose cells fall in distinct columns become a markdown table (→ a real table node). |
+| 6 | **Tables** | `table.ts` | Cells split at gaps wider than 1.2 word heights; a row may span lines (a wrapped cell sits at the table's tightest line spacing; a row break adds padding); ≥ 3 rows whose cells each sit inside one column become a markdown table (→ a real table node). |
 | 6b | **Reading order** | `layout.ts` | No table: if most lines are 1–2-word fragments, rebuild rows from word boxes (Tesseract reads aligned short words as columns). |
 | 7 | **Reflow** | `reflow.ts` | Which line ends are word-wraps and which are real breaks; bullets and `1)` → markdown; hyphenated wraps rejoined. |
 | 8 | **Into the editor** | `to-content.ts`, `editor-ocr.ts` | Markdown-looking text through the editor's own paste parser, else plain paragraphs; inside a code block the raw lines. |
@@ -60,7 +60,8 @@ names the provider and model that read it (`editor-ocr.ts`,
 | `FRAGMENT_MAX_WORDS`, `FRAGMENTED_SHARE`, `FRAGMENTED_MIN_LINES` | `layout.ts` | 2, 60%, 4 | Terminal output 64% → 10% | Looser rules risk interleaving a real two-column article. |
 | `COLUMN_GAP_HEIGHTS` | `table.ts` | 1.2 word heights | Word spacing is a fraction of a letter's height; synthetic tables split cleanly | Lower splits ordinary words into cells; higher merges narrow columns. |
 | `MIN_TABLE_ROWS`, `MIN_COLUMNS` | `table.ts` | 3, 2 | A header plus two rows is the smallest table worth structuring | — |
-| `MAX_WORDS_PER_CELL` | `table.ts` | 5 (median) | A two-column article stayed text | Higher risks turning two prose columns into a "table". |
+| `CONTINUATION_PITCH` | `table.ts` | 1.25× the tightest line spacing | Owner's table: lines in a cell 27–28 px apart, header → row 40 (1.48×), rows 68 (2.5×); 3/12 → 12/12 cells | Higher merges the header into the first row; lower splits wrapped cells. Only applies when the table has two spacings. |
+| `MAX_WORDS_PER_CELL`, `HEADER_MAX_WORDS` | `table.ts` | 5 (median), 4 | A table has short cells OR a short header row; a two-column article has neither | Looser risks turning two prose columns into a "table". |
 | `ICON_COLUMN_CONFIDENCE` | `table.ts` | 50 | The sidebar list's icon column read at low confidence and is dropped, so the list stays a list | Higher may drop a real column of short codes. |
 | `TALL_WORD` | `layout.ts` | 1.5× median | Three stacked ✓ read as one tall "NNN" had merged three rows | — |
 | `PARAGRAPH_GAP_ROWS` | `layout.ts` | 1.6 rows | — (geometry convention) | — |
@@ -85,7 +86,9 @@ pnpm ocr:accuracy --dir ~/ocr-samples --show
 
 `scripts/ocr-accuracy.mjs` runs the shipped engine in headless Chromium and
 prints each image's character error rate (whitespace-normalised Levenshtein ÷
-truth length), its confidence and the layout mode that won. Built-in cases are
+truth length, markdown table syntax ignored), its confidence, the layout mode
+that won, whether a table came out, and — when the truth file is a markdown
+table — how many cells came back exactly right. Built-in cases are
 synthetic (paragraph light/dark, terminal, three-column table, Spanish with and
 without the pack). `--dir` adds every `name.png` with a `name.txt` truth file
 beside it — keep real screenshots in a local folder, never in the repo.
@@ -98,6 +101,8 @@ Baseline on 2026-10-08:
 | Terminal | 10% (✓ marks read as stray letters) |
 | Three-column table | 0%, pasted as a real table |
 | Table with an empty cell | 0%, empty cell kept |
+| Table with wrapped cells | 0%, 12/12 cells |
+| Owner's SEO table (2026-10-09, wrapped cells) | 12/12 cells (was 3/12) |
 | Two-column article | not mistaken for a table |
 | Spanish, English only / + Spanish | 8% / 0% |
 
@@ -116,7 +121,7 @@ mutation-test the gate — break the rule on purpose and confirm the check fails
 |---|---|---|
 | "DB Al" for "DB AI", `|` for `I` | Look-alike glyphs in sans-serif UI fonts | None locally; a vision model |
 | Stray letters from icons and ✓ marks | Tesseract reads any glyph as text | None locally; a vision model |
-| A table pastes as flat lines | A cell wraps onto a second line, or the table has fewer than three rows | Local detection handles clean single-line cells (`table.ts`); wrapped cells need a vision model |
+| A table pastes as flat lines or split rows | Fewer than three rows; or rows and wrapped lines evenly spaced (no padding), so a wrap cannot be told from a row | ⌥⌘V |
 | Two prose columns come back interleaved line by line | Tesseract's own reading order for side-by-side text columns | A vision model |
 | Sideways phone photos | No orientation detection | Try 90/180/270° on very low confidence (not built; see plan) |
 | Handwriting, stylised fonts | Outside Tesseract's training | A vision model |
