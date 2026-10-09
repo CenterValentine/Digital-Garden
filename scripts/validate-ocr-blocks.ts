@@ -222,13 +222,17 @@ console.log("layout — reading order (D11)");
   const shredded = [...col(70, 110, ys.map(() => "Compiled")), ...col(190, 24, ys.map(() => "in")), ...col(230, 70, ms)];
   const wanted = ms.map((m) => `Compiled in ${m}`).join("\n");
   check("terminal columns read back as rows", readingOrderText("Compiled\nCompiled\n…", shredded), wanted);
+  // Columns supplied right to left: only the left-to-right sort restores the rows.
+  const reversed = [...col(230, 70, ms), ...col(190, 24, ys.map(() => "in")), ...col(70, 110, ys.map(() => "Compiled"))];
+  check("words in a row are read left to right", readingOrderText("", reversed), wanted);
 
-  // A tall junk "word" (three ✓ glued) spanning rows 1–3 must not merge them.
-  const withJunk: OcrLine[] = [...shredded, { words: [{ text: "NNN", bbox: { x0: 30, y0: 10, x1: 60, y1: 102 } }] }];
+  // A tall junk "word" (three ✓ glued, starting above row 1) must neither
+  // merge rows nor drag its row above row 1.
+  const withJunk: OcrLine[] = [...shredded, { words: [{ text: "NNN", bbox: { x0: 30, y0: 0, x1: 60, y1: 102 } }] }];
   check(
-    "a tall glued glyph does not merge rows",
-    readingOrderText("", withJunk).split("\n").filter((l) => l.includes("Compiled")).length,
-    6,
+    "a tall glued glyph joins one row and moves nothing",
+    readingOrderText("", withJunk),
+    ["Compiled in 135ms", "NNN Compiled in 128ms", "Compiled in 133ms", "Compiled in 144ms", "Compiled in 153ms", "Compiled in 135ms"].join("\n"),
   );
 
   const prose: OcrLine[] = [0, 1, 2, 3, 4].map((i) => ({

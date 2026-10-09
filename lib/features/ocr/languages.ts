@@ -31,8 +31,6 @@ export const OCR_LANGUAGES: readonly OcrLanguage[] = [
   { code: "nld", label: "Dutch", sizeMb: 3.0 },
 ];
 
-const KNOWN = new Set(OCR_LANGUAGES.map((l) => l.code));
-
 /**
  * The stored setting → the codes to load: English first and always present,
  * unknown codes dropped, duplicates removed, catalogue order otherwise. Any
@@ -40,8 +38,9 @@ const KNOWN = new Set(OCR_LANGUAGES.map((l) => l.code));
  */
 export function normalizeOcrLanguages(stored: unknown): string[] {
   const picked = new Set(
-    Array.isArray(stored) ? stored.filter((c): c is string => typeof c === "string" && KNOWN.has(c)) : [],
+    Array.isArray(stored) ? stored.filter((c): c is string => typeof c === "string") : [],
   );
   picked.add(OCR_BASE_LANGUAGE);
+  // Reading codes off the catalogue is what drops unknown ones and fixes the order.
   return OCR_LANGUAGES.map((l) => l.code).filter((code) => picked.has(code));
 }
