@@ -348,6 +348,39 @@ Why local OCR and not a vision model: it works with text-only models, costs no
 tokens to recognise, and the image never leaves the device for this. The
 vision-model engine stays the planned second `OcrEngine` member (§4).
 
+### D9 — Reading hard screenshots: preprocess, then pick the layout mode (owner smoke, 2026-10-08)
+
+The first build read prose perfectly but missed a white-on-blue chat bubble
+entirely and read a dark UI list as icon noise. Measured on six images (the
+owner's three screenshots, the owner's address-bar screenshot, and a wrapped
+paragraph rendered light and dark), character error on whitespace-normalised
+text:
+
+| Setting | Para light | Para dark | Address bar | Console | Bubble | List | Mean |
+|---|---|---|---|---|---|---|---|
+| First build | 0% | 0% | 20% | 0% | 25% | 46% | 15.1% |
+| Invert dark backgrounds | 0% | 0% | 16% | 0% | 0% | 44% | 10.1% |
+| + upscale | 0% | 0% | 23% | 0% | 0% | 31% | 9.0% |
+| + always sparse mode (PSM 11) | 0% | 0% | 28% | 0% | 0% | 14% | 7.0% |
+| **+ sparse only below 85 confidence (shipped)** | 0% | 0% | 23% | 0% | 0% | 14% | **6.2%** |
+
+Rejected: Sauvola thresholding (`thresholding_method=2`) wrecked the bubble
+and the list (100% / 99%); a word-confidence filter dropped real words.
+
+Shipped (`lib/features/ocr/preprocess.ts`, thresholds pinned by
+`ocr:blocks:check`, 7 mutants killed): grayscale; invert when the median
+luminance is below 128; upscale narrow images toward 1600 px (≤3×); read in
+normal layout (PSM 3); if the mean confidence is below 85, re-read in sparse
+layout (PSM 11) and keep the more confident read. Whole reads are queued,
+because the second pass changes a worker-wide parameter (two concurrent reads
+verified to keep their own modes). The bundled shipped engine reproduces the
+6.2% mean exactly.
+
+Known limits (font, not settings): capital I / lowercase l / pipe look alike
+in many sans-serif UI fonts ("DB Al"); tightly spaced labels can lose a space;
+badge icons can leak a stray character. The vision-model engine (§4) is the
+route for UI screenshots that must be exact.
+
 ---
 
 ## 2. Architecture (as built)
