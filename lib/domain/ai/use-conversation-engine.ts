@@ -3641,7 +3641,6 @@ export function useConversationEngine({
     attachments,
     attachmentsUploading,
     folderGates,
-    supportsImageAttachments,
     supportsAudioAttachments,
     pendingUserPartsRef,
     sendMessage,
