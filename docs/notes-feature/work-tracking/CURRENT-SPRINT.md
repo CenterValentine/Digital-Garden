@@ -61,6 +61,16 @@ Branch `refactor/remove-workplace-claims` · plan [WORKPLACE-RESTRICTIONS-REMOVA
 
 **Post-merge (owner):** Vercel deploy live → run the drop migration (handoff script in the PR) → Hocuspocus redeploy from a tree matching `origin/main`, `/readyz` ×5.
 
+## October 8, 2026 — Right sidebar opens on your last panel; one-line titles (rides the OCR release)
+
+**Tree**: worktree `.claude/worktrees/ocr-ui`, branch `feat/ocr-paste-ui` (off `feat/ocr-paste`, `origin/main` merged in) — fast-forward `feat/ocr-paste` onto it.
+
+### Smoke checklist (owner)
+- [ ] **Last panel:** pick a sidebar tab (e.g. Context or AI Chat) on one note, then open a note you've never touched → it opens on that same tab; a note where you chose a different tab keeps its own.
+- [ ] **Not offered:** remember Outline, then open a file (no Outline tab) → it falls back to its first tab.
+- [ ] **One-line titles:** a long title ends in "…" (single, split and quad); hovering shows the full name; on a phone it still swipes.
+- [ ] **Quad breadcrumb:** in Quad Split the breadcrumb runs the full width under the title + toolbar line, names not cut to a fixed width.
+
 ## October 6, 2026 — Paste an image as its text; the assistant reads images (OCR)
 
 **Tree**: worktree `.claude/worktrees/ocr-paste`, branch `feat/ocr-paste` (off `main` at `45d697ba`), not pushed. Plan: `OCR-PASTE-PLAN.md`.
