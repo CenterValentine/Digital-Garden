@@ -24,6 +24,18 @@ function plainParagraphs(text: string): JSONContent[] {
   });
 }
 
+/**
+ * The AI engine already returns well-formed markdown (code fences, headings,
+ * tables), so it skips the reflow built for Tesseract's one-line-per-visual-
+ * line output — reflowing would mangle a code block's lines.
+ */
+export function buildAiContent(markdown: string, parseMarkdown: MarkdownParser): JSONContent[] {
+  const text = markdown.trim();
+  if (!text) return [];
+  const parsed = parseMarkdown(text).content ?? [];
+  return parsed.length > 0 ? parsed : plainParagraphs(text);
+}
+
 /** Empty array = no text was recognised. */
 export function buildOcrContent(raw: string, parseMarkdown: MarkdownParser): JSONContent[] {
   const text = reflowOcrText(raw);

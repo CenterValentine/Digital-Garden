@@ -117,3 +117,55 @@ export function handlePasteAsTextChord(handlers: {
     })();
   }, PASTE_EVENT_GRACE_MS);
 }
+
+/**
+ * ⌥⌘V (Ctrl+Alt+V) — read the clipboard image with the user's AI model
+ * (OCR-PASTE-PLAN.md D13). "Paste Special" is Ctrl+Alt+V in Office, so the
+ * meaning carries over; nothing in the app or the browsers binds it.
+ *
+ * Matched on the PHYSICAL key: on a Mac, Option changes `event.key` to "√".
+ * Skipped when the OS reports AltGr — on several European Windows layouts
+ * Ctrl+Alt *is* AltGr, and AltGr+V types a character there.
+ */
+export function isAiPasteChord(event: KeyboardEvent): boolean {
+  return (
+    (event.metaKey || event.ctrlKey) &&
+    event.altKey &&
+    !event.shiftKey &&
+    event.code === "KeyV" &&
+    !event.getModifierState?.("AltGraph")
+  );
+}
+
+/**
+ * Call from the editor's keydown when `isAiPasteChord(event)`, after
+ * `event.preventDefault()`. Reads the clipboard at once — inside the gesture,
+ * since no browser delivers a paste for this chord — and hands an image to
+ * `onImage`.
+ */
+export function handleAiPasteChord(onImage: (image: Blob) => void): void {
+  if (!navigator.clipboard?.read) {
+    toast.error("This browser cannot read images from the clipboard.");
+    return;
+  }
+  void (async () => {
+    let items: ClipboardItems;
+    try {
+      items = await navigator.clipboard.read();
+    } catch {
+      toast.error(
+        "The browser blocked reading the clipboard. Allow clipboard access for this site, then press ⌥⌘V (Ctrl+Alt+V) again.",
+        { duration: 8000 },
+      );
+      return;
+    }
+    for (const item of items) {
+      const type = item.types.find((t) => t.startsWith("image/"));
+      if (type) {
+        onImage(await item.getType(type));
+        return;
+      }
+    }
+    toast("⌥⌘V reads an image with AI — the clipboard has no image.");
+  })();
+}

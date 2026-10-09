@@ -1021,6 +1021,17 @@ export const editorActionProvider: ContextMenuActionProvider = (ctx) => {
       await pasteClipboardImageAsText(contextEditor);
     },
   });
+  // …and of ⌥⌘V: the user's AI model reads it (tables, icons, handwriting).
+  clipboardActions.push({
+    id: "paste-text-from-image-ai",
+    label: "Paste text from image with AI",
+    shortcut: "⌥⌘V",
+    tooltip: "Sends the image to the AI model chosen in Settings → AI → Feature Routing.",
+    onClick: async () => {
+      if (!contextEditor) return;
+      await pasteClipboardImageAsText(contextEditor, "ai");
+    },
+  });
 
   clipboardActions.push({
     id: "select-all",

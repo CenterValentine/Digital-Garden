@@ -10,6 +10,8 @@
  * setter — the same path every other editor preference uses — so a second
  * writer can never revert it. The engine picks a change up on its next read.
  */
+import Link from "next/link";
+
 import { Switch } from "@/components/client/ui/switch";
 import { SavedIndicator, SettingRow, SettingSection, useTransientSaved } from "@/components/settings/ui";
 import { normalizeOcrLanguages, OCR_BASE_LANGUAGE, OCR_LANGUAGES } from "@/lib/features/ocr/languages";
@@ -59,6 +61,19 @@ export function OcrLanguagesSection() {
             </SettingRow>
           );
         })}
+        <div className="border-t border-black/10 pt-4 dark:border-white/10">
+          <SettingRow
+            label="Read with AI (⌥⌘V / Ctrl+Alt+V)"
+            description="For tables with wrapped cells, icons, handwriting or stylised text. Sends the image to the AI model you choose; ⇧⌘V stays on this device."
+          >
+            <Link
+              href="/settings/ai/feature-routing"
+              className="whitespace-nowrap text-sm font-medium text-primary underline-offset-4 hover:underline"
+            >
+              Choose model
+            </Link>
+          </SettingRow>
+        </div>
       </div>
     </SettingSection>
   );

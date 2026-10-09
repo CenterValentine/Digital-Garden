@@ -53,8 +53,10 @@ import {
 import { useEditorDragStore } from "@/state/editor-drag-store";
 import { pasteImageAsText } from "@/lib/features/ocr/editor-ocr";
 import {
+  handleAiPasteChord,
   handlePasteAsTextChord,
   installPasteModifierTracker,
+  isAiPasteChord,
   isPasteAsText,
   isPasteAsTextChord,
   notePasteEvent,
@@ -330,7 +332,7 @@ export function MarkdownEditor({
   // stale version where editor=null. Same pattern as onSaveRef/contentIdRef.
   const insertImageFromFileRef = useRef<(file: File) => void>(() => {});
   // Same frozen-closure reason: ⇧⌘V with an image pastes its OCR'd text.
-  const pasteImagesAsTextRef = useRef<(files: File[]) => void>(() => {});
+  const pasteImagesAsTextRef = useRef<(files: File[], engine?: "local" | "ai") => void>(() => {});
   const shouldUseCollaboration =
     collaborationEnabled && Boolean(contentId) && Boolean(collaborationRuntime);
   const runtimeYdoc = collaborationRuntime?.ydoc ?? null;
@@ -627,6 +629,15 @@ export function MarkdownEditor({
       // ("paste and match style" is text-only), so watch the chord itself and
       // read the clipboard when no paste follows. See paste-modifier.ts.
       handleKeyDown: (view, event) => {
+        // ⌥⌘V / Ctrl+Alt+V: the user's AI model reads the clipboard image.
+        if (isAiPasteChord(event)) {
+          event.preventDefault();
+          handleAiPasteChord((image) => {
+            const file = new File([image], "pasted-image.png", { type: image.type });
+            pasteImagesAsTextRef.current([file], "ai");
+          });
+          return true;
+        }
         if (isPasteAsTextChord(event)) {
           handlePasteAsTextChord({
             onImage: (image) => {
@@ -1588,12 +1599,13 @@ export function MarkdownEditor({
   // empty read offers "Paste image instead", which runs the normal upload.
   useEffect(() => {
     installPasteModifierTracker();
-    pasteImagesAsTextRef.current = (files: File[]) => {
+    pasteImagesAsTextRef.current = (files: File[], engine: "local" | "ai" = "local") => {
       if (!editor) return;
       void (async () => {
         for (const file of files) {
           await pasteImageAsText(editor, file, {
             pasteImageInstead: () => insertImageFromFile(file),
+            engine,
           });
         }
       })();

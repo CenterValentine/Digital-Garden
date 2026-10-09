@@ -4,7 +4,7 @@
  * OCR-PASTE-PLAN.md §4 — and slots in here without touching any caller.
  */
 
-export type OcrEngineId = "local";
+export type OcrEngineId = "local" | "ai";
 
 export interface OcrProgress {
   /** "loading" = fetching/compiling the engine or language data; "recognizing" = reading the image. */
@@ -18,8 +18,10 @@ export interface OcrResult {
   text: string;
   /** Mean word confidence, 0..100. */
   confidence: number;
-  /** Which layout mode produced the text (preprocess.ts decides). */
+  /** Which layout mode produced the text (preprocess.ts decides). Local engine only. */
   layout?: "auto" | "sparse";
+  /** Who read it, for the "ai" engine: "<connection> · <model>". */
+  model?: string;
   engine: OcrEngineId;
 }
 

@@ -14,6 +14,8 @@ import { decompressMarkdown } from "@/lib/domain/content/markdown-decompress";
 import { markdownToTiptapRich, type HtmlBridge } from "@/lib/domain/content/markdown-serialize";
 import { normalizeOcrLanguages } from "@/lib/features/ocr/languages";
 import { tableMarkdown } from "@/lib/features/ocr/table";
+import { isAiPasteChord, isPasteAsTextChord } from "@/lib/features/ocr/paste-modifier";
+import { buildAiContent } from "@/lib/features/ocr/to-content";
 import { isFragmented, readingOrderText, rowsFromWords, type OcrLine } from "@/lib/features/ocr/layout";
 import {
   grayscaleForOcr,
@@ -337,6 +339,36 @@ console.log("table — detection (D12)");
     types(ocrTextToContent(tableMarkdown(grid(people, [20, 240, 460])) ?? "")),
     ["table"],
   );
+}
+
+console.log("AI paste — chord and content (D13)");
+
+{
+  const key = (mods: { meta?: boolean; ctrl?: boolean; alt?: boolean; shift?: boolean; altGraph?: boolean }, code = "KeyV", k = "v") =>
+    ({
+      metaKey: !!mods.meta,
+      ctrlKey: !!mods.ctrl,
+      altKey: !!mods.alt,
+      shiftKey: !!mods.shift,
+      code,
+      key: k,
+      getModifierState: (m: string) => m === "AltGraph" && !!mods.altGraph,
+    }) as unknown as KeyboardEvent;
+  check("⌥⌘V is the AI chord (Option makes key \"√\")", isAiPasteChord(key({ meta: true, alt: true }, "KeyV", "√")), true);
+  check("Ctrl+Alt+V is the AI chord on Windows", isAiPasteChord(key({ ctrl: true, alt: true })), true);
+  check("AltGr+V (typing a character) is not the chord", isAiPasteChord(key({ ctrl: true, alt: true, altGraph: true })), false);
+  check("⌥⇧⌘V (Paste and Match Style) is not the chord", isAiPasteChord(key({ meta: true, alt: true, shift: true })), false);
+  check("plain ⌘V is not the chord", isAiPasteChord(key({ meta: true })), false);
+  check("⇧⌘V is the local chord, not the AI one", [isPasteAsTextChord(key({ meta: true, shift: true })), isAiPasteChord(key({ meta: true, shift: true }))], [true, false]);
+  check("⌥⌘V is not the local chord", isPasteAsTextChord(key({ meta: true, alt: true }, "KeyV", "√")), false);
+
+  const parseAi = (md: string) => markdownToTiptapRich(decompressMarkdown(md), ext, bridge);
+  check(
+    "AI markdown keeps its table, list and code block",
+    types(buildAiContent("| A | B |\n| --- | --- |\n| 1 | 2 |\n\n- one\n- two\n\n```\nnpm run build\n✓ done\n```", parseAi)),
+    ["table", "bulletList", "codeBlock"],
+  );
+  check("an empty AI read is no blocks", buildAiContent("   ", parseAi), []);
 }
 
 console.log("languages — setting (D10)");

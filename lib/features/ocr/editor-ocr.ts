@@ -16,7 +16,8 @@ import type { Editor, JSONContent } from "@tiptap/core";
 import type { Node as PMNode } from "@tiptap/pm/model";
 import { toast } from "sonner";
 
-import { getOcrEngine, ocrTextToContent } from "./index";
+import { aiTextToContent, getOcrEngine, ocrTextToContent } from "./index";
+import type { OcrEngineId } from "./types";
 
 interface Recognised {
   /** Raw engine text (line per visual line) — used verbatim inside code blocks. */
@@ -25,7 +26,35 @@ interface Recognised {
   content: JSONContent[];
 }
 
-async function recognise(image: Blob): Promise<Recognised> {
+/** localStorage key: the "your image went to <provider>" notice has been shown. */
+const AI_NOTICE_KEY = "dg:ocr-ai-notice-shown";
+
+/** Once per browser: say where an AI-read image went. */
+function noticeAiProvider(model: string | undefined) {
+  try {
+    if (localStorage.getItem(AI_NOTICE_KEY)) return;
+    localStorage.setItem(AI_NOTICE_KEY, "1");
+  } catch {
+    return; // no storage: skip the notice rather than repeat it every time
+  }
+  toast.info(`Read by ${model ?? "your AI model"}`, {
+    description:
+      "⌥⌘V (Ctrl+Alt+V) sends the image to this AI provider to read it. ⇧⌘V reads on your device. Choose the model in Settings → AI → Feature Routing.",
+    duration: 10000,
+  });
+}
+
+async function recognise(image: Blob, engine: OcrEngineId = "local"): Promise<Recognised> {
+  if (engine === "ai") {
+    const id = toast.loading("Reading text with AI…");
+    try {
+      const result = await getOcrEngine("ai").recognize(image);
+      noticeAiProvider(result.model);
+      return { raw: result.text.trim(), content: aiTextToContent(result.text) };
+    } finally {
+      toast.dismiss(id);
+    }
+  }
   const id = toast.loading("Loading text recognition…");
   let shown = "";
   try {
@@ -72,14 +101,14 @@ function insertRecognised(editor: Editor, out: Recognised): boolean {
 export async function pasteImageAsText(
   editor: Editor,
   image: Blob,
-  opts: { pasteImageInstead?: () => void } = {},
+  opts: { pasteImageInstead?: () => void; engine?: OcrEngineId } = {},
 ): Promise<void> {
   const instead = opts.pasteImageInstead
     ? { label: "Paste image instead", onClick: opts.pasteImageInstead }
     : undefined;
   let out: Recognised;
   try {
-    out = await recognise(image);
+    out = await recognise(image, opts.engine);
   } catch (error) {
     toast.error("Couldn't read text from that image", { description: describe(error), action: instead });
     return;
@@ -95,7 +124,7 @@ export async function pasteImageAsText(
  * before anything is awaited, so it stays inside the user gesture (Safari
  * voids a gesture that awaits other work first).
  */
-export async function pasteClipboardImageAsText(editor: Editor): Promise<void> {
+export async function pasteClipboardImageAsText(editor: Editor, engine: OcrEngineId = "local"): Promise<void> {
   // The context-menu portal holds focus; readText/read reject with "Document
   // is not focused" unless the editor is focused first.
   editor.commands.focus();
@@ -119,7 +148,7 @@ export async function pasteClipboardImageAsText(editor: Editor): Promise<void> {
     toast("There's no image on the clipboard");
     return;
   }
-  await pasteImageAsText(editor, image);
+  await pasteImageAsText(editor, image, { engine });
 }
 
 // ── Image node → text ───────────────────────────────────────────────────────

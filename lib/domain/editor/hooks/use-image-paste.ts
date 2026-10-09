@@ -7,8 +7,10 @@ import { uploadImage } from "./use-image-upload";
 import { isImageUrl } from "../utils/image-url";
 import { pasteImageAsText } from "@/lib/features/ocr/editor-ocr";
 import {
+  handleAiPasteChord,
   handlePasteAsTextChord,
   installPasteModifierTracker,
+  isAiPasteChord,
   isPasteAsText,
   isPasteAsTextChord,
   notePasteEvent,
@@ -190,6 +192,16 @@ export function useImagePasteHandler({
 
   const handleKeyDown = useCallback(
     (view: EditorView, event: KeyboardEvent): boolean => {
+      if (isAiPasteChord(event)) {
+        event.preventDefault();
+        handleAiPasteChord((image) => {
+          const editor = editorRef.current;
+          if (!editor) return;
+          const file = new File([image], "pasted-image.png", { type: image.type });
+          void pasteImageAsText(editor, file, { pasteImageInstead: () => insertImageFromFile(file), engine: "ai" });
+        });
+        return true;
+      }
       if (isPasteAsTextChord(event)) {
         handlePasteAsTextChord({
           onImage: (image) => {

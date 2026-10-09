@@ -79,11 +79,15 @@ export function grayscaleForOcr(rgba: Uint8ClampedArray): boolean {
 
 type Canvas2D = OffscreenCanvasRenderingContext2D | CanvasRenderingContext2D;
 
-function makeCanvas(width: number, height: number): { ctx: Canvas2D; toBlob: () => Promise<Blob> } | null {
+/** A 2D canvas of the given size (Offscreen when available), with a PNG/JPEG exporter. */
+export function makeCanvas(
+  width: number,
+  height: number,
+): { ctx: Canvas2D; toBlob: (type?: string, quality?: number) => Promise<Blob> } | null {
   if (typeof OffscreenCanvas !== "undefined") {
     const canvas = new OffscreenCanvas(width, height);
     const ctx = canvas.getContext("2d");
-    if (ctx) return { ctx, toBlob: () => canvas.convertToBlob({ type: "image/png" }) };
+    if (ctx) return { ctx, toBlob: (type = "image/png", quality) => canvas.convertToBlob({ type, quality }) };
   }
   if (typeof document !== "undefined") {
     const canvas = document.createElement("canvas");
@@ -93,9 +97,9 @@ function makeCanvas(width: number, height: number): { ctx: Canvas2D; toBlob: () 
     if (ctx) {
       return {
         ctx,
-        toBlob: () =>
+        toBlob: (type = "image/png", quality) =>
           new Promise((resolve, reject) =>
-            canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("canvas export failed"))), "image/png"),
+            canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("canvas export failed"))), type, quality),
           ),
       };
     }

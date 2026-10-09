@@ -17,7 +17,8 @@ import type { JSONContent } from "@tiptap/core";
 import { markdownPasteToTiptap } from "@/lib/domain/content/markdown";
 
 import { localOcrEngine } from "./local-engine";
-import { buildOcrContent } from "./to-content";
+import { aiOcrEngine } from "./ai-engine";
+import { buildAiContent, buildOcrContent } from "./to-content";
 import type { OcrEngine } from "./types";
 
 export type { OcrEngine, OcrEngineId, OcrProgress, OcrResult } from "./types";
@@ -29,9 +30,17 @@ export function ocrTextToContent(raw: string): JSONContent[] {
   return buildOcrContent(raw, markdownPasteToTiptap);
 }
 
-/** The engine every caller uses. One member today; see types.ts. */
-export function getOcrEngine(): OcrEngine {
-  return localOcrEngine;
+/** AI-read markdown → TipTap blocks, without the Tesseract reflow. */
+export function aiTextToContent(markdown: string): JSONContent[] {
+  return buildAiContent(markdown, markdownPasteToTiptap);
+}
+
+/**
+ * The engine to use. "local" (default) reads on the device; "ai" sends the
+ * image to the user's routed vision model (⌥⌘V) — see ai-engine.ts.
+ */
+export function getOcrEngine(id: OcrEngine["id"] = "local"): OcrEngine {
+  return id === "ai" ? aiOcrEngine : localOcrEngine;
 }
 
 /**
