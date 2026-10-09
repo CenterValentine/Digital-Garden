@@ -2710,6 +2710,10 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
 
   // Render content based on type
   let contentElement: React.ReactNode;
+  // A quad pane is short on height: a note's toolbar moves into its title row
+  // (owner, 2026-10-08) instead of taking a row of its own above it. Decided
+  // in the note branch below, where that title row exists.
+  let toolbarInTitleRow = false;
   const isReadOnlyPageTemplate =
     contentType === "page-template" && Boolean(contentData?.isSystem);
   const templateWarningText =
@@ -2833,6 +2837,12 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
       />
     );
   } else if (noteContent) {
+    toolbarInTitleRow =
+      isQuadPane &&
+      !isEmbedMode &&
+      contentType !== "page-template" &&
+      Boolean(selectedContentId) &&
+      !selectedContentId?.startsWith("person:");
     // Render debug view based on selected mode
     const renderDebugView = () => {
       switch (viewMode) {
@@ -2932,6 +2942,14 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
                 toolbar (TOOL_REGISTRY "markdown-source", order 10) — it is a
                 view control like the rest of the toolbar, and the title row
                 needs its width back on phones. */}
+            {toolbarInTitleRow ? (
+              // The pane's toolbar, beside the title instead of above it — on
+              // the title's line, not centred against title + breadcrumb. It
+              // takes what the title leaves and scrolls past that.
+              <div className="ml-2 flex min-w-0 max-w-[55%] shrink items-center self-start">
+                <ContentToolbar contentId={selectedContentId} inline />
+              </div>
+            ) : null}
             <div className="flex flex-none items-center gap-1">
               {process.env.NODE_ENV === "development" && !isMultiPane && <DebugViewToggle />}
             </div>
@@ -3051,7 +3069,8 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
           !selectedContentId.startsWith("person:") &&
           !isVirtualExtensionContent &&
           contentType !== "page-template" &&
-          !isEmbedMode && <ContentToolbar contentId={selectedContentId} />}
+          !isEmbedMode &&
+          !toolbarInTitleRow && <ContentToolbar contentId={selectedContentId} />}
 
         {/* Save-conflict resolution (stale-tab / concurrent-edit overwrite).
             Mounted at the TOP LEVEL, above every layout branch, deliberately.
