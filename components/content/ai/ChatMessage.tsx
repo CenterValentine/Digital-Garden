@@ -165,6 +165,7 @@ import {
 import { inferReplyExportTitle } from "@/lib/domain/ai/reply-export";
 import { screenImageOf } from "@/lib/domain/ai/tools/view-screen";
 import { toast } from "sonner";
+import { MENTION_RE as MENTION_PATTERN } from "@/lib/domain/ai/mention-markup";
 
 /**
  * Detect tool parts in AI SDK v6 UIMessage.
@@ -659,7 +660,7 @@ export const ChatMessage = memo(function ChatMessage({
     // user sees readable text; we restore the canonical form on save.
     const map: Array<{ label: string; id: string }> = [];
     const cleaned = messageText.replace(
-      /@\[([^\]]+)\]\(([^)]+)\)/g,
+      new RegExp(MENTION_PATTERN.source, "g"),
       (_, label, id) => {
         map.push({ label, id });
         return `@${label}`;
@@ -1982,7 +1983,6 @@ function MessageActionButton({
 
 // ─── Markdown Renderer ───────────────────────────────────────
 
-const MENTION_PATTERN = /@\[([^\]]+)\]\(([^)]+)\)/g;
 
 /**
  * `[[Title]]` / `[[Title|Display]]` as the model writes it — copied from the

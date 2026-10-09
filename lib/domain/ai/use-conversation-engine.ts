@@ -122,6 +122,7 @@ import {
 import { stopPendingToolCalls } from "@/lib/domain/ai/repair-dangling-tools";
 import { normalizeItemUrl } from "@/lib/domain/ai/tools/iteration-proposal";
 import { getContentWriteRefreshTargets } from "@/lib/domain/ai/content-write-receipts";
+import { MENTION_RE } from "@/lib/domain/ai/mention-markup";
 
 export type { OutputTarget } from "@/lib/domain/ai/output-target";
 
@@ -229,9 +230,6 @@ function maybeDispatchArtifactRefresh(part: unknown, seen: Set<string>): void {
     /* unparseable tool output — skip */
   }
 }
-
-/** Mention syntax shared by composer + send pipeline: `@[Title](id)`. */
-const MENTION_RE = /@\[([^\]]+)\]\(([^)]+)\)/g;
 
 /** Default mention search hint copy keyed by tool id. */
 const COMMAND_HINTS: Record<string, string> = {

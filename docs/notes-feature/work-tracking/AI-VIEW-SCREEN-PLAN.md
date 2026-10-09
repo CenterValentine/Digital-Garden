@@ -277,7 +277,7 @@ next request (auto-resumed):
 | Upload | `app/api/ai/attachments/upload/route.ts` | `purpose=screenshot` → own prefix, no node |
 | UI | `components/content/ai/ChatMessage.tsx` | chip label + thumbnail |
 | Gates | `scripts/validate-view-screen.ts` (new, `pnpm view-screen:check`, in `build` and `ai-drift.yml`), `validate-context-diet.ts` G9, `validate-private-content.ts` pixel seam | below |
-| Markers | `MainPanelWorkspace.tsx` `data-workspace-pane`, `MainPanelHeader.tsx` `data-active-tab`, `MarkdownSourceView.tsx` `data-markdown-source` | the DOM the in-app capture finds |
+| Markers | `MainPanelWorkspace.tsx` `data-workspace-pane` + `data-capture-region`, `LeftSidebar.tsx` / `RightSidebar.tsx` `data-capture-region`, `MarkdownSourceView.tsx` `data-markdown-source`, `ImageViewer.tsx` `data-content-id` | the DOM the in-app capture finds |
 
 ## 4. Gates
 
@@ -340,7 +340,7 @@ Phases 1 and 2 ship in one PR. Changing what the model receives is AI capability
 - the pane, tab strip, title and toolbar all rendered;
 - the visible paragraph was present;
 - both secrets were absent, so the inline sentence reads "Inline  after.";
-- the pane title came from `data-active-tab`;
+- the pane title came from the pane's active tab (now read from the content store, D16);
 - the capture took about 0.4 s.
 
 Full `pnpm build` green: lint 151 (none new), every chained gate.

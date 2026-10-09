@@ -28,6 +28,7 @@
  * still unreadable is counted in `notes`, never left as a silent blank.
  */
 import type { ViewScreenArea } from "@/lib/domain/ai/tools/view-screen";
+import { mentionsToPlainText } from "@/lib/domain/ai/mention-markup";
 import { useContentStore } from "@/state/content-store";
 
 /** The largest edge sent to a model (Anthropic's recommended maximum). */
@@ -80,13 +81,37 @@ function visible(el: HTMLElement | null): HTMLElement | null {
   return rect.width > 1 && rect.height > 1 ? el : null;
 }
 
-function regionFor(area: ViewScreenArea): HTMLElement | null {
-  if (area === "window") return document.body;
+const paneElement = (paneId: string) =>
+  visible(document.querySelector<HTMLElement>(`[data-workspace-pane="${CSS.escape(paneId)}"]`));
+
+/** The pane's active tab, from the store — title and type without scraping the DOM. */
+function activeTabOf(paneId: string) {
+  const state = useContentStore.getState();
+  const tabId = state.panes[paneId as keyof typeof state.panes]?.activeTabId;
+  return tabId ? state.tabs[tabId] ?? null : null;
+}
+
+/**
+ * The visible pane whose active tab shows `contentId` (D16 — "just this
+ * file" while the user types in a chat pane). The focused pane first.
+ */
+function paneShowing(contentId: string): string | null {
+  const state = useContentStore.getState();
+  const ids = [state.activePaneId, ...Object.keys(state.panes).filter((id) => id !== state.activePaneId)];
+  return ids.find((id) => activeTabOf(id)?.contentId === contentId && paneElement(id)) ?? null;
+}
+
+function regionFor(area: ViewScreenArea, contentId?: string): { el: HTMLElement | null; paneId?: string } {
+  if (contentId) {
+    const paneId = paneShowing(contentId);
+    return { el: paneId ? paneElement(paneId) : null, paneId: paneId ?? undefined };
+  }
+  if (area === "window") return { el: document.body };
   if (area === "pane") {
     const paneId = useContentStore.getState().activePaneId;
-    return visible(document.querySelector<HTMLElement>(`[data-workspace-pane="${CSS.escape(paneId)}"]`));
+    return { el: paneElement(paneId), paneId };
   }
-  return visible(document.querySelector<HTMLElement>(REGION_SELECTOR[area]));
+  return { el: visible(document.querySelector<HTMLElement>(REGION_SELECTOR[area])) };
 }
 
 function crossOriginFrames(root: Element): number {
@@ -160,15 +185,23 @@ function significantImages(root: HTMLElement): Set<string> {
   return urls;
 }
 
-export async function captureApp(area: ViewScreenArea): Promise<AppCapture> {
-  const target = regionFor(area);
+export async function captureApp(area: ViewScreenArea, contentId?: string): Promise<AppCapture> {
+  const region = regionFor(area, contentId);
+  const target = region.el;
   if (!target) {
     // Never widen: the user may have asked for less precisely to show less.
     throw new AppCaptureRefused(
-      `${MISSING_REGION[area as Exclude<ViewScreenArea, "window">]}, so nothing was captured — ask the user to open it, or offer a different area`,
+      contentId
+        ? "that item is not open in a visible pane, so nothing was captured — ask the user to open it, or call view_image for an image file"
+        : `${MISSING_REGION[area as Exclude<ViewScreenArea, "window">]}, so nothing was captured — ask the user to open it, or offer a different area`,
     );
   }
+  const tab = region.paneId ? activeTabOf(region.paneId) : null;
   const notes: string[] = [];
+  // The focused pane is often the chat the user is typing in (D16).
+  if (!contentId && area === "pane" && tab?.contentType === "chat" && Object.values(useContentStore.getState().panes).some((p) => p.activeTabId && p.id !== region.paneId && paneElement(p.id))) {
+    notes.push('This pane is the chat itself. To see another open pane, call view_screen again with that item\'s contentId, or with area "all-panes".');
+  }
   if (target.querySelector(PRIVATE_SELECTOR)) {
     notes.push("Commented-out (private) text was left out of the image on purpose.");
   }
@@ -190,6 +223,9 @@ export async function captureApp(area: ViewScreenArea): Promise<AppCapture> {
   const { domToCanvas } = await import("modern-screenshot");
   const canvas = await domToCanvas(target, {
     scale,
+    // Off by default in modern-screenshot: without it every scrolled area
+    // (a long chat, a note read halfway) is drawn from its top (D16).
+    features: { restoreScrollPosition: true },
     filter: isCapturable,
     fetchFn: imageFetcher(target, unreadable),
     backgroundColor: background && background !== "rgba(0, 0, 0, 0)" ? background : "#ffffff",
@@ -204,6 +240,6 @@ export async function captureApp(area: ViewScreenArea): Promise<AppCapture> {
     );
   }
 
-  const title = area === "pane" ? target.querySelector("[data-active-tab]")?.textContent?.trim() || undefined : undefined;
-  return { canvas, area, title, notes };
+  const title = tab?.title ? mentionsToPlainText(tab.title) : undefined;
+  return { canvas, area: region.paneId ? "pane" : area, title, notes };
 }

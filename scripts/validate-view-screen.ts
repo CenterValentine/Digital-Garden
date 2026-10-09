@@ -31,6 +31,7 @@ import { screenSummary, VIEW_SCREEN } from "../lib/domain/ai/tools/view-screen";
 import { VIEW_IMAGE } from "../lib/domain/ai/tools/view-image";
 import { describeImageMention } from "../lib/domain/ai/tools/read-image-text";
 import { describeNoteImages } from "../lib/domain/content/note-images";
+import { mentionsToPlainText } from "../lib/domain/ai/mention-markup";
 
 const errors: string[] = [];
 function check(label: string, cond: unknown): void {
@@ -170,7 +171,7 @@ async function main() {
     "areas: pane, all-panes, left-sidebar, right-sidebar, window",
     contract.includes('VIEW_SCREEN_AREAS = ["pane", "all-panes", "left-sidebar", "right-sidebar", "window"] as const'),
   );
-  check("areas: the default is the narrowest (the focused pane)", executor.includes('captureApp(input.area ?? "pane")'));
+  check("areas: the default is the narrowest (the focused pane)", executor.includes('captureApp(input.area ?? "pane", input.contentId)'));
   for (const [area, file] of [
     ["panes", "components/content/MainPanelWorkspace.tsx"],
     ["left-sidebar", "components/content/LeftSidebar.tsx"],
@@ -246,6 +247,22 @@ async function main() {
   const viewImage = registry.slice(registry.indexOf("export function createViewImageTool"), registry.indexOf("export function createViewImageTool") + 3000);
   check("view_image: only the user's own, undeleted file", viewImage.includes("where: { id: contentId, ownerId: ctx.userId, deletedAt: null }"));
   check("view_image: refuses types and sizes a vision model cannot take", viewImage.includes("VIEW_IMAGE_MEDIA_TYPES.has(file.mimeType)") && viewImage.includes("> VIEW_IMAGE_MAX_BYTES"));
+
+  // ── 9. D16: scroll, "this file", and titles without mention markup ──────
+  check("scroll: the capture restores scroll positions (off by default in the library)", appCapture.includes("features: { restoreScrollPosition: true }"));
+  check(
+    "contentId: the schema takes it, the executor passes it, the capture finds the pane showing it",
+    contract.includes("contentId: z") && executor.includes('captureApp(input.area ?? "pane", input.contentId)') && /if \(contentId\) \{\s*const paneId = paneShowing\(contentId\);/.test(appCapture),
+  );
+  check("contentId: an item not open in a visible pane is refused, never widened", /contentId\s*\?\s*"that item is not open in a visible pane, so nothing was captured/.test(appCapture));
+  check("chat pane: capturing the chat itself tells the model how to reach the other pane", /tab\?\.contentType === "chat"[\s\S]{0,300}This pane is the chat itself/.test(appCapture));
+  check("title: from the store, mention markup rendered", appCapture.includes("mentionsToPlainText(tab.title)") && !appCapture.includes("[data-active-tab]"));
+  check("mentions: @[Title](id) renders as @Title", mentionsToPlainText("look at @[bookcove](ec196794-1472-41da-929c-4a27a24f6e8b) now") === "look at @bookcove now");
+  check("mentions: text without markup is untouched", mentionsToPlainText("a [link](x) and @someone") === "a [link](x) and @someone");
+  check("titles: the auto-title route renders mentions before titling", read("app/api/conversations/[id]/auto-title/route.ts").includes(".map((p) => mentionsToPlainText(p.text))"));
+  for (const file of ["components/content/ai/ChatInput.tsx", "lib/domain/ai/use-conversation-engine.ts", "components/content/ai/ChatMessage.tsx"]) {
+    check(`mentions: ${file} uses the one shared regex`, read(file).includes('from "@/lib/domain/ai/mention-markup"') && !read(file).includes("/@\\[([^\\]]+)\\]\\(([^)]+)\\)/g"));
+  }
 
   if (errors.length > 0) {
     console.error(`\n✖ view-screen:check failed — ${errors.length} problem(s):\n`);

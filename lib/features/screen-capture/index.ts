@@ -93,7 +93,7 @@ export async function viewScreenForModel(input: ViewScreenInput): Promise<ViewSc
     }
     let shot;
     try {
-      shot = await captureApp(input.area ?? "pane");
+      shot = await captureApp(input.area ?? "pane", input.contentId);
     } catch (err) {
       if (err instanceof AppCaptureRefused) return { ok: false, area: input.area ?? "pane", error: err.message };
       throw err;

@@ -35,6 +35,12 @@ export const viewScreenInputSchema = z.object({
     .describe(
       'Digital Garden only: "pane" (default) the open pane; "all-panes"; "left-sidebar" the file tree only; "right-sidebar"; "window" everything. Capture the least asked for.',
     ),
+  contentId: z
+    .string()
+    .uuid()
+    .optional()
+    .describe("Digital Garden only: capture the pane showing this item (e.g. a file the user calls \"this file\").")
+    ,
   purpose: z
     .string()
     .max(200)
