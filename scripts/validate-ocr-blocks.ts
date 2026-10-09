@@ -313,6 +313,19 @@ console.log("table — detection (D12)");
     "| Name | Role | Status |",
   );
   check("two rows are too few for a table", tableMarkdown(grid(people.slice(0, 2), [20, 240, 460])), null);
+  // A wide gap inside a name ("Bob     Smith") makes two cells in ONE column.
+  // That row cannot be placed, so it stays out of the table as text — no word lost.
+  const split: OcrLine = {
+    words: [
+      { text: "Bob", bbox: { x0: 20, y0: 160, x1: 47, y1: 180 }, confidence: 95 },
+      { text: "Smith", bbox: { x0: 100, y0: 160, x1: 145, y1: 180 }, confidence: 95 },
+      { text: "Intern", bbox: { x0: 240, y0: 160, x1: 294, y1: 180 }, confidence: 95 },
+      { text: "New", bbox: { x0: 460, y0: 160, x1: 487, y1: 180 }, confidence: 95 },
+    ],
+  };
+  const withSplit = tableMarkdown([...grid(people, [20, 240, 460]), split]) ?? "";
+  check("two cells in one column keep the row out of the table", withSplit.split("\n\n").pop(), "Bob Smith Intern New");
+  check("…and the table above it is intact", withSplit.split("\n").filter((l) => l.startsWith("|")).length, 5);
   check(
     "a pipe read inside a cell is escaped",
     tableMarkdown(grid([["A", "B"], ["x|y", "z"], ["p", "q"]], [20, 240]))?.split("\n")[2],
