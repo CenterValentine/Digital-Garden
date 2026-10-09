@@ -36,6 +36,7 @@ last_updated: 2026-05-13
 - [ ] **Picker Recent / Open:** open the pane "+" → Recent, then Open → each row shows files on the first line (most recently viewed first, long names capped, extras running off the edge) and the folder on the second; clicking a file reveals it in the tree; the "+" still creates in the folder.
 - [ ] **Close without activating:** split panes, focus the right one, then press the x on an inactive tab in the LEFT pane → the tab closes, the right pane stays focused and the right sidebar doesn't change.
 - [ ] **Tab full name:** rest on a truncated tab → after about a second its full name appears below it; move to the next tab → its name shows at once; move away → it closes; renaming or dragging a tab shows none.
+- [ ] **Tab presence both ways:** open one note in two windows (or a window and the side panel) → each shows the other's disc on that tab; collapse or drag a sidebar in either → the disc stays on its tab.
 - [ ] **After merge:** redeploy Hocuspocus from a tree matching `origin/main`; `/readyz` five times with `uptimeMs` climbing.
 
 ## October 8, 2026 — Open anything from any workplace (claims, borrow/share, view exceptions removed)
