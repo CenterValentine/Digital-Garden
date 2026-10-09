@@ -25,6 +25,14 @@ export interface OcrBox {
 export interface OcrWord {
   text: string;
   bbox: OcrBox;
+  /** Tesseract's word confidence, 0–100 (icons and glued glyphs score low). */
+  confidence?: number;
+}
+/** A row of words, left to right, with its vertical band. */
+export interface OcrRow {
+  y0: number;
+  y1: number;
+  words: OcrWord[];
 }
 export interface OcrLine {
   words: OcrWord[];
@@ -54,22 +62,26 @@ export function isFragmented(lines: OcrLine[]): boolean {
 
 const centerY = (b: OcrBox) => (b.y0 + b.y1) / 2;
 
+/** Median word height — the ruler for row bands and column gaps. */
+export function medianWordHeight(words: OcrWord[]): number {
+  const heights = words.map((w) => w.bbox.y1 - w.bbox.y0).sort((a, b) => a - b);
+  return heights[heights.length >> 1] || 1;
+}
+
 /**
- * Words → rows: a word joins the row whose vertical band contains its center;
- * rows read left to right, top to bottom; an unusually tall gap between rows
- * becomes a blank line (paragraph break for the reflow step).
+ * Words → rows: a word joins the row whose vertical band contains its center.
+ * Rows come back top to bottom, each row's words left to right.
  */
-export function rowsFromWords(words: OcrWord[]): string {
+export function groupRows(words: OcrWord[]): OcrRow[] {
   const usable = words.filter((w) => w.text.trim());
-  if (usable.length === 0) return "";
-  const wordHeights = usable.map((w) => w.bbox.y1 - w.bbox.y0).sort((a, b) => a - b);
-  const medianWord = wordHeights[wordHeights.length >> 1] || 1;
+  if (usable.length === 0) return [];
+  const medianWord = medianWordHeight(usable);
   const isTall = (w: OcrWord) => w.bbox.y1 - w.bbox.y0 > TALL_WORD * medianWord;
   // Normal-height words first, so rows take their bands from real text.
   const sorted = [...usable].sort(
     (a, b) => Number(isTall(a)) - Number(isTall(b)) || centerY(a.bbox) - centerY(b.bbox),
   );
-  const rows: { y0: number; y1: number; words: OcrWord[] }[] = [];
+  const rows: OcrRow[] = [];
   for (const word of sorted) {
     const c = centerY(word.bbox);
     const tall = isTall(word);
@@ -87,18 +99,29 @@ export function rowsFromWords(words: OcrWord[]): string {
     }
   }
   rows.sort((a, b) => a.y0 - b.y0);
+  for (const row of rows) row.words.sort((a, b) => a.bbox.x0 - b.bbox.x0);
+  return rows;
+}
+
+/**
+ * Rows as text: words joined by a space, rows by a newline; an unusually tall
+ * gap between rows becomes a blank line (paragraph break for the reflow step).
+ */
+export function rowsToText(rows: OcrRow[]): string {
   const heights = rows.map((r) => r.y1 - r.y0).sort((a, b) => a - b);
   const rowHeight = heights[heights.length >> 1] || 1;
   let out = "";
   rows.forEach((row, i) => {
-    const text = row.words
-      .sort((a, b) => a.bbox.x0 - b.bbox.x0)
-      .map((w) => w.text.trim())
-      .join(" ");
+    const text = row.words.map((w) => w.text.trim()).join(" ");
     if (i > 0) out += row.y0 - rows[i - 1].y1 > PARAGRAPH_GAP_ROWS * rowHeight ? "\n\n" : "\n";
     out += text;
   });
   return out;
+}
+
+/** Words → text, row by row (rows + rowsToText). */
+export function rowsFromWords(words: OcrWord[]): string {
+  return rowsToText(groupRows(words));
 }
 
 /** Tesseract's text, or the row-rebuilt text when its lines are fragments. */

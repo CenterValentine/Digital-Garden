@@ -94,11 +94,20 @@ function reflowBlock(rawLines: string[]): string {
   return text;
 }
 
+/** A block of markdown table rows (table.ts) passes through untouched. */
+function isMarkdownTable(lines: string[]): boolean {
+  const rows = lines.map((l) => l.trim()).filter(Boolean);
+  return rows.length >= 2 && rows.every((l) => l.startsWith("|") && l.endsWith("|"));
+}
+
 export function reflowOcrText(raw: string): string {
   const normalized = raw.replace(/\r\n?/g, "\n").replace(/\f/g, "\n\n");
   return normalized
     .split(/\n[ \t]*\n/)
-    .map((block) => reflowBlock(block.split("\n")))
+    .map((block) => {
+      const lines = block.split("\n");
+      return isMarkdownTable(lines) ? lines.map((l) => l.trim()).filter(Boolean).join("\n") : reflowBlock(lines);
+    })
     .filter((block) => block.length > 0)
     .join("\n\n");
 }

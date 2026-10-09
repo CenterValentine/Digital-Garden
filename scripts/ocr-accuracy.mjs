@@ -45,13 +45,23 @@ const TABLE = [
   ["Alan Turing", "Research", "Active since 2019"],
   ["Katherine Johnson", "Flight Analysis", "Contractor"],
 ];
+const TABLE_GAPS = [
+  ["Item", "Owner", "Due"],
+  ["Budget review", "Finance", "Friday"],
+  ["Hiring plan", "", "Next week"],
+  ["Launch checklist", "Product", "Monday"],
+];
+const COLUMNS_LEFT = "The committee met on Tuesday to review the proposed budget for the coming year and agreed on most items";
+const COLUMNS_RIGHT = "Several members asked for more detail on travel costs before the final vote scheduled for next month";
 const SPANISH = "El niño comió una manzana y después bebió café con azúcar. Mañana iremos a la montaña con la señora Muñoz.";
 
 const BUILT_IN = [
   { id: "paragraph (light)", synth: "para-light", truth: PARA },
   { id: "paragraph (dark)", synth: "para-dark", truth: PARA },
   { id: "terminal", synth: "terminal", truth: TERMINAL_MS.map((n) => `Compiled in ${n}ms`).join(" ") },
-  { id: "3-column table", synth: "table", truth: TABLE.map((r) => r.join(" ")).join(" ") },
+  { id: "3-column table", synth: "table", truth: TABLE.map((r) => r.join(" ")).join(" "), table: true },
+  { id: "table, an empty cell", synth: "tableGaps", truth: TABLE_GAPS.map((r) => r.join(" ")).join(" "), table: true },
+  { id: "two-column article", synth: "article", truth: null, table: false },
   { id: "spanish, English only", synth: "spanish", truth: SPANISH, langs: [] },
   { id: "spanish, + Spanish pack", synth: "spanish", truth: SPANISH, langs: ["spa"] },
 ];
@@ -92,6 +102,23 @@ const PAGE_SCRIPT = `
         g.fillStyle = "#d0d0d0"; g.fillRect(16, y + 12, 688, 1); });
       return c.convertToBlob({ type: "image/png" });
     },
+    async tableGaps() {
+      const rows = ${JSON.stringify(TABLE_GAPS)}; const [c, g] = W(640, 60 + rows.length * 40);
+      g.fillStyle = "#ffffff"; g.fillRect(0, 0, c.width, c.height); g.fillStyle = "#1a1a1a";
+      g.font = "18px -apple-system, Helvetica, Arial, sans-serif";
+      rows.forEach((r, i) => r.forEach((cell, j) => g.fillText(cell, 24 + j * 210, 40 + i * 40)));
+      return c.convertToBlob({ type: "image/png" });
+    },
+    async article() {
+      const [c, g] = W(900, 260); g.fillStyle = "#ffffff"; g.fillRect(0, 0, 900, 260); g.fillStyle = "#1a1a1a";
+      g.font = "16px Georgia, serif";
+      const col = (text, x) => { let line = "", y = 34;
+        for (const w of text.split(" ")) { const t = line ? line + " " + w : w;
+          if (g.measureText(t).width > 390) { g.fillText(line, x, y); y += 24; line = w; } else line = t; }
+        g.fillText(line, x, y); };
+      col(${JSON.stringify(COLUMNS_LEFT)}, 20); col(${JSON.stringify(COLUMNS_RIGHT)}, 470);
+      return c.convertToBlob({ type: "image/png" });
+    },
     async spanish() {
       const [c, g] = W(820, 110); g.fillStyle = "#ffffff"; g.fillRect(0, 0, 820, 110); g.fillStyle = "#111111";
       g.font = "22px -apple-system, Helvetica, Arial, sans-serif";
@@ -128,7 +155,9 @@ function levenshtein(a, b) {
   }
   return prev[b.length];
 }
-const norm = (s) => s.replace(/\s+/g, " ").trim();
+const stripTable = (s) => s.split("\n").filter((l) => !/^\|(\s*---\s*\|)+$/.test(l.trim())).map((l) => l.replace(/\\\|/g, "|").replace(/^\s*\||\|\s*$/g, "").replace(/\s\|\s/g, " ")).join("\n");
+const norm = (s) => stripTable(s).replace(/\s+/g, " ").trim();
+const isTable = (s) => /^\|.*\|$/m.test(s) && /^\|(\s*---\s*\|)+$/m.test(s);
 
 async function main() {
   if (!fs.existsSync(path.join(root, "public/ocr/worker.min.js"))) {
@@ -168,19 +197,22 @@ async function main() {
 
   const urls = new Map([...files.entries()].map(([u, f]) => [f, u]));
   let total = 0;
-  console.log(`${"case".padEnd(28)} ${"error".padStart(6)} ${"conf".padStart(5)}  layout`);
+  let scored = 0;
+  console.log(`${"case".padEnd(28)} ${"error".padStart(6)} ${"conf".padStart(5)}  layout  table`);
   for (const c of list) {
     const r = await page.evaluate((input) => window.read(input), {
       synthId: c.synth ?? null,
       url: c.file ? urls.get(c.file) : null,
       langs: c.langs ?? [],
     });
-    const error = levenshtein(norm(r.text), norm(c.truth)) / Math.max(1, norm(c.truth).length);
-    total += error;
-    console.log(`${c.id.padEnd(28)} ${((error * 100).toFixed(0) + "%").padStart(6)} ${String(r.confidence).padStart(5)}  ${r.layout}`);
+    const error = c.truth === null ? 0 : levenshtein(norm(r.text), norm(c.truth)) / Math.max(1, norm(c.truth).length);
+    if (c.truth !== null) { total += error; scored++; }
+    const table = isTable(r.text);
+    const tableNote = c.table === undefined ? (table ? "yes" : "no") : table === c.table ? (table ? "yes ✓" : "no ✓") : (table ? "YES ✗" : "NO ✗");
+    console.log(`${c.id.padEnd(28)} ${(c.truth === null ? "—" : (error * 100).toFixed(0) + "%").padStart(6)} ${String(r.confidence).padStart(5)}  ${String(r.layout).padEnd(6)}  ${tableNote}`);
     if (show) console.log("    " + JSON.stringify(r.text.trim()));
   }
-  console.log(`${"MEAN".padEnd(28)} ${((total / list.length) * 100).toFixed(1).padStart(5)}%`);
+  console.log(`${"MEAN".padEnd(28)} ${((total / Math.max(1, scored)) * 100).toFixed(1).padStart(5)}%`);
   await browser.close();
   server.close();
 }

@@ -13,6 +13,7 @@ import { getCollaborationServerExtensions } from "@/lib/domain/collaboration/ext
 import { decompressMarkdown } from "@/lib/domain/content/markdown-decompress";
 import { markdownToTiptapRich, type HtmlBridge } from "@/lib/domain/content/markdown-serialize";
 import { normalizeOcrLanguages } from "@/lib/features/ocr/languages";
+import { tableMarkdown } from "@/lib/features/ocr/table";
 import { isFragmented, readingOrderText, rowsFromWords, type OcrLine } from "@/lib/features/ocr/layout";
 import {
   grayscaleForOcr,
@@ -248,6 +249,81 @@ console.log("layout — reading order (D11)");
     { text: "More", bbox: box(0, 150, 50) },
   ]);
   check("a tall gap between rows is a paragraph break", gapped, "Title\n\nBody\nMore");
+}
+
+console.log("table — detection (D12)");
+
+{
+  // Words laid out as a table: cell texts at column x positions, one row per y.
+  const H = 20;
+  const grid = (rows: string[][], xs: number[], conf: (row: number, col: number) => number = () => 95): OcrLine[] =>
+    rows.map((cells, i) => ({
+      words: cells.flatMap((cell, j) => {
+        let x = xs[j];
+        return cell
+          .split(" ")
+          .filter(Boolean)
+          .map((t) => {
+            const w = { text: t, bbox: { x0: x, y0: i * 40, x1: x + t.length * 9, y1: i * 40 + H }, confidence: conf(i, j) };
+            x += t.length * 9 + 6; // ordinary word spacing: well under a word height
+            return w;
+          });
+      }),
+    }));
+  const people = [
+    ["Name", "Role", "Status"],
+    ["Ada Lovelace", "Lead Engineer", "Active since 2021"],
+    ["Grace Hopper", "Compiler Team", "On leave"],
+    ["Alan Turing", "Research", "Active since 2019"],
+  ];
+  check(
+    "a three-column table becomes a markdown table",
+    tableMarkdown(grid(people, [20, 240, 460])),
+    [
+      "| Name | Role | Status |",
+      "| --- | --- | --- |",
+      "| Ada Lovelace | Lead Engineer | Active since 2021 |",
+      "| Grace Hopper | Compiler Team | On leave |",
+      "| Alan Turing | Research | Active since 2019 |",
+    ].join("\n"),
+  );
+  check(
+    "a missing cell is an empty cell, not a broken table",
+    tableMarkdown(grid([["Item", "Owner", "Due"], ["Budget", "Finance", "Friday"], ["Hiring", "", "Monday"]], [20, 240, 460]))?.split("\n")[3],
+    "| Hiring |  | Monday |",
+  );
+  check(
+    "text above the table stays above it",
+    tableMarkdown([{ words: [{ text: "Team", bbox: { x0: 20, y0: -80, x1: 60, y1: -60 }, confidence: 95 }] }, ...grid(people, [20, 240, 460])])?.split("\n\n")[0],
+    "Team",
+  );
+  const article = [0, 1, 2, 3].map(() => [
+    "the committee met on tuesday to review the budget",
+    "several members asked for more detail on travel costs",
+  ]);
+  check("two columns of prose are not a table", tableMarkdown(grid(article, [20, 520])), null);
+  check(
+    "an icon column is dropped; one data column left is not a table",
+    tableMarkdown(grid([["@", "DB AI P4 VI"], ["@", "DB AI P5 II"], ["@", "DB AI P5 III"]], [10, 60], (_r, c) => (c === 0 ? 20 : 95))),
+    null,
+  );
+  check(
+    "an icon column is dropped from a real table",
+    tableMarkdown(grid(people.map((r) => ["@", ...r]), [0, 40, 260, 480], (_r, c) => (c === 0 ? 20 : 95)))?.split("\n")[0],
+    "| Name | Role | Status |",
+  );
+  check("two rows are too few for a table", tableMarkdown(grid(people.slice(0, 2), [20, 240, 460])), null);
+  check(
+    "a pipe read inside a cell is escaped",
+    tableMarkdown(grid([["A", "B"], ["x|y", "z"], ["p", "q"]], [20, 240]))?.split("\n")[2],
+    "| x\\|y | z |",
+  );
+  check("prose lines have no table", tableMarkdown(grid([["just one cell of text"], ["and another"], ["and a third"]], [20])), null);
+  check(
+    "a table survives reflow and pastes as a table node",
+    types(ocrTextToContent(tableMarkdown(grid(people, [20, 240, 460])) ?? "")),
+    ["table"],
+  );
 }
 
 console.log("languages — setting (D10)");

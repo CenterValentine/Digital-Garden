@@ -22,6 +22,7 @@ import { useSettingsStore } from "@/state/settings-store";
 
 import { normalizeOcrLanguages, OCR_BASE_LANGUAGE } from "./languages";
 import { readingOrderText, type OcrLine } from "./layout";
+import { tableMarkdown } from "./table";
 import {
   LAYOUT_PSM,
   needsSparsePass,
@@ -169,12 +170,14 @@ async function recognize(
         const lines: OcrLine[] = (data.blocks ?? []).flatMap((block) =>
           block.paragraphs.flatMap((paragraph) =>
             paragraph.lines.map((line) => ({
-              words: line.words.map((word) => ({ text: word.text, bbox: word.bbox })),
+              words: line.words.map((word) => ({ text: word.text, bbox: word.bbox, confidence: word.confidence })),
             })),
           ),
         );
         return {
-          text: readingOrderText(data.text ?? "", lines),
+          // A table becomes a markdown table (table.ts); otherwise rows are
+          // rebuilt only when Tesseract shredded the page into columns (layout.ts).
+          text: tableMarkdown(lines) ?? readingOrderText(data.text ?? "", lines),
           confidence: typeof data.confidence === "number" ? data.confidence : 0,
           layout,
         };
