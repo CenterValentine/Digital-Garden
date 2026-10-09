@@ -244,6 +244,42 @@ The description was tightened to keep the cost down: about 330 tokens before, ab
 - **Titles.** A chat was titled `Try to just look at the @[bookcove](ec196794-147`, because the auto-title route's fallback cut the raw mention markup at 48 characters. Mentions now render as `@Title` before titling, which helps both the model-written title and the fallback. One shared mention regex (`lib/domain/ai/mention-markup.ts`) replaces four copies (input, engine, two in the message renderer). Chats already titled with the markup keep their title until renamed.
 - **Pane titles** come from the content store's active tab. The `data-active-tab` marker is gone: the editor's Tabs block renders the same attribute inside notes, so it could have been read as a pane title.
 
+### D17 — A cached note copy catches up with a newer stored note (owner report, production, 2026-10-09)
+
+Not a `view_screen` change. It rides this PR at the owner's request.
+
+**Symptom.** An AI chat rewrote two notes. The download had the revision, but the viewer showed the old text.
+
+**Diagnosis (production, read-only):**
+- Both notes had **no** `CollaborationDocument` row. Presence shows their editors `localOnly` from creation on Oct 8 at 21:16 until the owner viewed them. They were filled before #287's solo saves pushed their Y state.
+- So the write router took its designed S2 path (no server Y copy → write the payload; `route: "payload"`). Hocuspocus played no part: it was healthy on `00015-qgc`, deployed before the chat. Its cold start only caused the two *refusals* on S3 notes in the same turn.
+- The browser's IndexedDB copy was never compared with the payload. `bootstrapInitialContent` trusted any meaningful cached copy (`runtime.ts`).
+- The editor's save baseline (`bodyHashRef`) came from the **fresh** payload. So the next keystroke would have passed the body-hash check and saved the stale copy **over** the revision.
+- Scale in production: 216 notes had been opened in a browser and had no server copy; 17 had a payload newer than their last view.
+
+**Fix: catch up on open.** A meaningful cached copy is compared with the server's before editing unlocks. That is one round trip, bounded at 4 s; on any failure the cached copy opens as before. `planLocalCatchUp` (`lineage.ts`) decides:
+
+| Situation | Plan |
+|---|---|
+| Same lineage, the union equals the server's copy | merge |
+| Same lineage, the union would double (REST-era independent catch-up) | keep |
+| Rival, one side only adds | #287 adopt / adopt-and-reapply |
+| Rival, diverged, clean, stored note changed after this browser's last edit, or the copy predates last-edit tracking | adopt the server's copy |
+| Offline edits left by the last session, or a local edit newer than the stored note | keep |
+
+How it fits together:
+- Asking for the canonical state mints the server copy of an S2 note, so later AI writes go through Y.js on the lineage the browser now shares.
+- The first-connect comparison from #287 still runs.
+- The state route returns `payloadUpdatedAt`.
+- The local cache manifest records `lastLocalEditAt`, and the previous session's entry is read before this session overwrites it.
+
+**Verified:**
+- `collab:lineage:check` D17 cases: the planner table, the incident end to end, the doubling union and the wiring. Mutation run: 12 of 13 killed; the survivor is equivalent (`null > n` is false in JavaScript).
+- Dev browser reproduction with a persistent profile: a cached note had its server copy removed and its payload rewritten, then was reopened. With the fix it shows the revision. The control without the fix showed OLD + NEW doubled (it connected to local Hocuspocus); production showed OLD only (it never connected).
+- Hocuspocus boot-probed on a spare port, five `/readyz` responses with climbing uptime (`lineage.ts` is in its import graph).
+
+**Existing notes.** The 17 production notes heal on their next open in a browser. Nothing needs running.
+
 ### D11 — Co-browse bound tab (phase 3, HELD)
 
 Co-browse work stays postponed (owner, 2026-10-06) until the feature it waits on is built. The design is recorded here, not built:
@@ -330,6 +366,8 @@ Phases 1 and 2 ship in one PR. Changing what the model receives is AI capability
 - [ ] A long chat scrolled to the bottom → "screenshot my screen" shows the latest messages, not the top (D16).
 - [ ] Typing in a chat pane beside a file: "screenshot just this file" → the file's pane, not the chat (D16).
 - [ ] A new chat whose first message @-mentions a file → its title reads "@name", no `@[…](…)` (D16).
+- [ ] **D17:** reopen "New Resume Guidance" and "New Resume Layout and Format" → the AI's revision shows, once (no old text, no doubling). Then edit one line → it saves without a conflict and the revision is intact.
+- [ ] **D17:** ask the AI to rewrite a note you have had open before, then reopen it → the new text shows.
 - [ ] "Look at the bookcove image" (GPT-4o, Claude, Gemini) → one `view_image` call, chip "Looked at image: bookcove" with its thumbnail, and a description of the cover — no read_content loop.
 - [ ] Same with a text-only model → `read_image_text` is offered and called (no loop), the cover's words come back.
 - [ ] A text-only model (e.g. DeepSeek) → `view_screen` is not offered; the model says it can't see.
