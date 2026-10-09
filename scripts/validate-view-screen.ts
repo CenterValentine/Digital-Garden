@@ -232,7 +232,10 @@ async function main() {
   check("note images: a vision model is pointed at view_image", describeNoteImages(noteImgs, true, true)?.includes("view_image") === true);
   check("note images: without vision, read_image_text", describeNoteImages(noteImgs, true, false)?.includes("read_image_text") === true);
   const registry = read("lib/domain/ai/tools/registry.ts");
-  check("read_content: an image file points a vision model at view_image", registry.includes("To see what it shows, call view_image with this content id."));
+  check(
+    "read_content: an image file points a vision model at view_image",
+    /isImage && ctx\.imageViewable === true\s*\?\s*"\\n\\nThis is an image\. To see what it shows, call view_image with this content id\."/.test(registry),
+  );
   const viewImage = registry.slice(registry.indexOf("export function createViewImageTool"), registry.indexOf("export function createViewImageTool") + 3000);
   check("view_image: only the user's own, undeleted file", viewImage.includes("where: { id: contentId, ownerId: ctx.userId, deletedAt: null }"));
   check("view_image: refuses types and sizes a vision model cannot take", viewImage.includes("VIEW_IMAGE_MEDIA_TYPES.has(file.mimeType)") && viewImage.includes("> VIEW_IMAGE_MAX_BYTES"));
