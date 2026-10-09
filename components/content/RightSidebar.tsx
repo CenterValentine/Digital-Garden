@@ -27,6 +27,7 @@ import {
   STUDIO_TAB_KEY,
 } from "@/extensions/studio/manifest";
 import {
+  defaultRightSidebarTab,
   resolveRightSidebarTab,
   useRightSidebarStateStore,
 } from "@/state/right-sidebar-state-store";
@@ -75,6 +76,8 @@ export function RightSidebar({
       : null
   );
   const setActiveTab = useRightSidebarStateStore((state) => state.setActiveTab);
+  const lastEngagedTab = useRightSidebarStateStore((state) => state.lastEngagedTab);
+  const recordEngagedTab = useRightSidebarStateStore((state) => state.recordEngagedTab);
 
   const studioEnabled = useIsExtensionEnabled(STUDIO_EXTENSION_ID);
   // An extension viewer (e.g. the reader) can claim the sidebar for the
@@ -129,8 +132,10 @@ export function RightSidebar({
     if (!savedTab && (claimedPanel || extensionManifest?.surfaces.includes("right-sidebar"))) {
       return resolveRightSidebarTab("extension", availableTabs);
     }
-    return resolveRightSidebarTab(savedTab, availableTabs);
-  }, [availableTabs, claimedPanel, dismissedBlockId, extensionManifest, savedTab, selectedBlockId]);
+    // Content the user hasn't picked a tab for opens on the rail they last
+    // engaged with (defaultRightSidebarTab), not on the first one.
+    return defaultRightSidebarTab(savedTab, lastEngagedTab, availableTabs);
+  }, [availableTabs, claimedPanel, dismissedBlockId, extensionManifest, lastEngagedTab, savedTab, selectedBlockId]);
 
   const handleTabChange = (tab: RightSidebarTab) => {
     // The view-driven extension tab isn't a per-content choice; a claimed
@@ -141,6 +146,7 @@ export function RightSidebar({
     // the live Properties override (until they select a different block).
     if (selectedBlockId) setDismissedBlockId(selectedBlockId);
     setActiveTab(selectedContentId, tab);
+    recordEngagedTab(tab);
   };
 
   return (

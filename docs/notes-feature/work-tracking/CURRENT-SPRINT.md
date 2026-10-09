@@ -61,6 +61,31 @@ Branch `refactor/remove-workplace-claims` · plan [WORKPLACE-RESTRICTIONS-REMOVA
 
 **Post-merge (owner):** Vercel deploy live → run the drop migration (handoff script in the PR) → Hocuspocus redeploy from a tree matching `origin/main`, `/readyz` ×5.
 
+## October 8, 2026 — Right sidebar opens on your last panel; one-line titles (rides the OCR release)
+
+**Tree**: worktree `.claude/worktrees/ocr-ui`, branch `feat/ocr-paste-ui` (off `feat/ocr-paste`, `origin/main` merged in) — fast-forward `feat/ocr-paste` onto it.
+
+### Smoke checklist (owner)
+- [ ] **Last panel:** pick a sidebar tab (e.g. Context or AI Chat) on one note, then open a note you've never touched → it opens on that same tab; a note where you chose a different tab keeps its own.
+- [ ] **Not offered:** remember Outline, then open a file (no Outline tab) → it falls back to its first tab.
+- [ ] **One-line titles:** a long title ends in "…" (single, split and quad); hovering shows the full name; on a phone it still swipes.
+- [ ] **Quad breadcrumb:** in Quad Split the breadcrumb runs the full width under the title + toolbar line, names not cut to a fixed width.
+
+## October 6, 2026 — Paste an image as its text; the assistant reads images (OCR)
+
+**Tree**: worktree `.claude/worktrees/ocr-paste`, branch `feat/ocr-paste` (off `main` at `45d697ba`), not pushed. Plan: `OCR-PASTE-PLAN.md`.
+**Status**: full `pnpm build` green — typecheck / lint 151 (0 errors, none new) / new `ocr:blocks:check` (17 fixtures, 13 mutants killed, in `quality.yml`) / `ai:drift:check` / `private:content:check` (+1 seam; extended gates 5 mutants killed). Headless-Chromium runtime smoke under the `/embed` CSP passed (control with a `blob:` worker blocked, as designed). No schema, TipTap or extension change → no Hocuspocus redeploy. Owner browser smoke pending.
+
+### Shipped
+- **Shared OCR engine** (`lib/features/ocr/`): lazy, one worker per page, 120 s idle termination, self-hosted worker + core (`public/ocr/`), pinned language pack. The speed reader uses it.
+- **Editor**: ⇧⌘V pastes an image's text only; image context menu *Extract text from image* / *Replace image with text*. Same ⇧⌘V branch in the flashcards editor.
+- **AI**: `read_content` lists a note's images (it dropped them before); new client-executed `read_image_text` reads one on the device.
+- **Fix — wrong-pane inserts**: editor context-menu Cut / Paste / Paste as Markdown / Insert Template / Insert Snippet act on the right-clicked editor (they used the first registered one); `/template` and `/snippet` open only the invoking editor's picker and insert there (they opened in every pane).
+- **Postponed (owner)**: co-browse `read_screen` → backlog.
+
+### Smoke checklist (owner)
+The ten lines in `OCR-PASTE-PLAN.md` §3 — ⇧⌘V vs ⌘V, both image actions (and one-step undo), the split-pane paste, a bulleted-list screenshot, the Network tab on first use and after 2 min idle, the AI question in the main chat and in the side panel, and Safari ⇧⌘V.
+
 ## October 5, 2026 — The file tree stops flashing; deleting is instant; rows keep their order; view shortcuts show their folder and act on it safely (PR #284, merged `c48218d3`)
 
 **Tree**: worktree `.claude/worktrees/smooth-delete`, branch `fix/smooth-delete` (off `origin/main` at `49b94490`)
@@ -270,7 +295,7 @@ Branch `refactor/remove-workplace-claims` · plan [WORKPLACE-RESTRICTIONS-REMOVA
 - [ ] AI chat bound to the note: `read_content` / "read the document" never quotes private text; `list_document_outline` shows "(no text)" for a private block.
 - [ ] Publish the note → private text and block absent from the public page.
 - [ ] Global search for a private-only word finds nothing after the note saves.
-=======
+
 ## September 21, 2026 — Move tab to workplace / workbench
 
 **Tree**: worktree `.claude/worktrees/move-tab-to-workspace`, branch `feat/move-tab-to-workspace` (PR pending)

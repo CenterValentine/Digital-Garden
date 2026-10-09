@@ -4153,6 +4153,15 @@ function ToolCallBubble({
         const suffix = host ? `: ${host}` : "";
         return `${isRunning ? "Reading" : "Read"} the page you're on${suffix}`;
       }
+      // read_image_text — local OCR. The chip says what came back, so "no text"
+      // and a failure read differently from a successful read.
+      if (toolName === "read_image_text") {
+        if (isRunning) return "Reading text in an image";
+        const r = result as { ok?: boolean; untrustedImageText?: string } | null;
+        if (r?.ok === false) return "Couldn't read the image";
+        const chars = r?.untrustedImageText?.length ?? 0;
+        return chars > 0 ? `Read text in an image (${chars.toLocaleString("en-US")} characters)` : "No text found in the image";
+      }
       if (toolName === "co_browse_open") {
         const host = hostFromToolArgs(args);
         const suffix = host ? `: ${host}` : "";

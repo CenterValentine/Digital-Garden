@@ -26,6 +26,7 @@ import {
   usePatchSettingsSection,
   useTransientSaved,
 } from "@/components/settings/ui";
+import { OcrLanguagesSection } from "@/components/settings/OcrLanguagesSection";
 import { useUploadSettingsStore } from "@/state/upload-settings-store";
 
 type FolderViewMode = "list" | "gallery" | "kanban" | "dashboard" | "canvas";
@@ -184,6 +185,8 @@ export default function FilesSettingsPage() {
           options={UPLOAD_OPTIONS}
         />
       </SettingSection>
+
+      <OcrLanguagesSection />
 
       <SettingSection
         title="Office Documents"

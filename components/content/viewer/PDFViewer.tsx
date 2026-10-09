@@ -30,6 +30,7 @@ import {
 import { Button } from "@/components/ui/glass/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
+import { isTypingTarget } from "@/lib/core/keyboard-target";
 
 interface PDFViewerProps {
   downloadUrl: string;
@@ -105,6 +106,20 @@ export function PDFViewer({ downloadUrl, fileName, title, onDownload }: PDFViewe
       // Don't interfere with search input
       if (document.activeElement?.tagName === "INPUT") return;
 
+      // Full screen takes Option (Alt on Windows) — owner, 2026-10-09. As bare
+      // letters they fired from ANY pane, since this listener is on window:
+      // typing "r" or "f" into a note beside an open image rotated it or went
+      // full screen, and preventDefault() ate the letter. Matched on e.code —
+      // under Option macOS types "®" / "ƒ" — and skipped while the user is
+      // typing, where ⌥R / ⌥F produce those characters.
+      const optionChord =
+        e.altKey && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.isComposing && !isTypingTarget(e.target);
+      if (optionChord && e.code === "KeyF") {
+        e.preventDefault();
+        toggleFullscreen();
+        return;
+      }
+
       switch (e.key) {
         case "ArrowLeft":
         case "PageUp":
@@ -136,13 +151,6 @@ export function PDFViewer({ downloadUrl, fileName, title, onDownload }: PDFViewe
         case "0":
           e.preventDefault();
           fitToWidth();
-          break;
-        case "f":
-        case "F":
-          if (!e.ctrlKey && !e.metaKey) {
-            e.preventDefault();
-            toggleFullscreen();
-          }
           break;
         case "/":
           e.preventDefault();
@@ -270,7 +278,7 @@ export function PDFViewer({ downloadUrl, fileName, title, onDownload }: PDFViewe
               onClick={toggleFullscreen}
               variant="glass"
               size="sm"
-              title="Fullscreen (F)"
+              title="Fullscreen (⌥F · Alt+F)"
             >
               {isFullscreen ? (
                 <Minimize className="h-4 w-4" />

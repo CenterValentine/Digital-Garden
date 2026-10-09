@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/glass/button";
 import { toast } from "sonner";
+import { isTypingTarget } from "@/lib/core/keyboard-target";
 
 interface ImageViewerProps {
   downloadUrl: string;
@@ -119,6 +120,25 @@ export function ImageViewer({ downloadUrl, fileName, title, onDownload }: ImageV
       // Only handle shortcuts when this viewer is visible
       if (!containerRef.current) return;
 
+      // Rotate and full screen take Option (Alt on Windows) — owner, 2026-10-09. As bare
+      // letters they fired from ANY pane, since this listener is on window:
+      // typing "r" or "f" into a note beside an open image rotated it or went
+      // full screen, and preventDefault() ate the letter. Matched on e.code —
+      // under Option macOS types "®" / "ƒ" — and skipped while the user is
+      // typing, where ⌥R / ⌥F produce those characters.
+      const optionChord =
+        e.altKey && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.isComposing && !isTypingTarget(e.target);
+      if (optionChord && e.code === "KeyR") {
+        e.preventDefault();
+        rotate();
+        return;
+      }
+      if (optionChord && e.code === "KeyF") {
+        e.preventDefault();
+        toggleFullscreen();
+        return;
+      }
+
       switch (e.key) {
         case "+":
         case "=":
@@ -136,16 +156,6 @@ export function ImageViewer({ downloadUrl, fileName, title, onDownload }: ImageV
         case "1":
           e.preventDefault();
           actualSize();
-          break;
-        case "r":
-        case "R":
-          e.preventDefault();
-          rotate();
-          break;
-        case "f":
-        case "F":
-          e.preventDefault();
-          toggleFullscreen();
           break;
       }
     };
@@ -203,7 +213,7 @@ export function ImageViewer({ downloadUrl, fileName, title, onDownload }: ImageV
           <div className="h-6 w-px bg-white/10 mx-1" />
 
           {/* Rotate */}
-          <Button onClick={rotate} variant="glass" size="sm" title="Rotate 90° (R)">
+          <Button onClick={rotate} variant="glass" size="sm" title="Rotate 90° (⌥R · Alt+R)">
             <RotateCw className="h-4 w-4" />
           </Button>
 
@@ -212,7 +222,7 @@ export function ImageViewer({ downloadUrl, fileName, title, onDownload }: ImageV
             onClick={toggleFullscreen}
             variant="glass"
             size="sm"
-            title="Fullscreen (F)"
+            title="Fullscreen (⌥F · Alt+F)"
           >
             {isFullscreen ? (
               <Minimize className="h-4 w-4" />

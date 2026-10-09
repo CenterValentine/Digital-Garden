@@ -33,6 +33,7 @@ import {
   coBrowseActTool,
   coBrowseOpenTool,
   listTabsTool,
+  readImageTextTool,
   openTabAndReadTool,
   readCurrentPageTool,
   readPageInBrowserTool,
@@ -108,6 +109,7 @@ export async function GET() {
     co_browse_act: coBrowseActTool as AnyTool,
     read_current_page: readCurrentPageTool as AnyTool,
     list_tabs: listTabsTool as AnyTool,
+    read_image_text: readImageTextTool as AnyTool,
   };
 
   const rows = Object.entries(allTools)

@@ -35,6 +35,17 @@ The join duplication is fixed at its three sources (`lib/domain/collaboration/li
 
 ---
 
+## OCR paste — follow-ups (2026-10-06, branch `feat/ocr-paste`; plan `OCR-PASTE-PLAN.md`)
+
+Built on the branch (engine + self-hosted assets, ⇧⌘V / image context actions / clipboard item, and the AI's `read_image_text` with `read_content` naming a note's images); owner smoke pending — the checklist is in the plan §3. Remaining:
+
+- [ ] **Co-browse `read_screen` (POSTPONED 2026-10-06, owner)** — waits on a prerequisite feature the owner named; not built in this run because that feature was not. Design in the plan D5: a `co_browse_act` action that screenshots the BOUND tab via `Page.captureScreenshot` on the debugger session (not `captureVisibleTab`), OCRs it app-side after the bridge returns, answers as `untrustedWebContent`. Extension 5.5.0. Smoke on a backgrounded bound tab.
+- [ ] **Safari ⇧⌘V** — record whether Safari fires a paste event for the chord (smoke item). If not, the context-menu item is the Safari path; do not add a second chord.
+- [ ] **`ai` OCR engine** behind an `editor.ocrEngine` setting — the user's vision connection as the second `OcrEngine` member (precedent: the flashcards media route); needs a vision-capability check and client-side downscale for the 4.5 MB body limit.
+- [ ] **Mentioned images seen by vision models** — when the chat model is vision-capable, attach a mentioned/bound image file to the turn as an image part (presigned URL, like the flashcards media route) so "what does it show" gets a description, not just OCR'd words. Provider-payload change: smoke on production per the AI rule. (Owner smoke 2026-10-09: GPT-4o on a book-cover PNG.)
+- [ ] **External-URL images for the AI** — `read_content` lists them, but `read_image_text` takes a content id only (a cross-origin fetch usually cannot read the pixels). A server-side fetch-and-hand-off would close it.
+- Also deferred in the plan §4: full-page co-browse strips, OCR as an automatic read-ladder rung, multimodal tool output, self-hosting the language pack.
+
 ## Split Pane Placement — behaviour as a setting (2026-10-02, from `feat/open-into-opposite-pane`)
 
 Where content opened from the file tree lands in a split workspace is a

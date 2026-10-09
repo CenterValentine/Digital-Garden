@@ -41,6 +41,12 @@ export interface ToolExecuteContext {
   autoApprovedTools?: ReadonlySet<string>;
   charterFinalPhase?: boolean;
   /**
+   * Set by the chat route AFTER tool filtering: true when the client-executed
+   * `read_image_text` is registered and enabled this turn. read_content uses it
+   * to point at images' text only when something can actually read it.
+   */
+  imageTextReadable?: boolean;
+  /**
    * The bound Conversation entity id (sidebar multi-conv / full-page chat).
    * AI v3 core S3: lets tools associate created/read content with the
    * conversation (dual association — node + target folder).

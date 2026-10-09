@@ -24,6 +24,7 @@ import {
 } from "@/lib/domain/ai/tools/co-browse-tools";
 import { READ_PAGE_HEADLESS_OR_BROWSER } from "@/lib/domain/ai/tools/read-page-in-browser";
 import { OPEN_TAB_AND_READ } from "@/lib/domain/ai/tools/open-tab-and-read";
+import { READ_IMAGE_TEXT } from "@/lib/domain/ai/tools/read-image-text";
 import type { StepDiagnostics } from "./types";
 
 /** Tools with no server `execute` — their call ends the server stream. */
@@ -34,6 +35,7 @@ export const CLIENT_EXECUTED_TOOL_NAMES: ReadonlySet<string> = new Set([
   LIST_TABS,
   READ_PAGE_HEADLESS_OR_BROWSER,
   OPEN_TAB_AND_READ,
+  READ_IMAGE_TEXT,
 ]);
 
 /** Part states that mean the stream paused for a user approval decision. */

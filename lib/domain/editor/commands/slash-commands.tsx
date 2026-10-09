@@ -1093,7 +1093,7 @@ export function getSlashCommands(): SlashCommand[] {
       icon: FileText,
       command: ({ editor, range }) => {
         editor.chain().focus().deleteRange(range).run();
-        window.dispatchEvent(new CustomEvent("open-template-picker"));
+        window.dispatchEvent(new CustomEvent("open-template-picker", { detail: { editor } }));
       },
       aliases: ["tpl", "templates"],
     },
@@ -1103,7 +1103,7 @@ export function getSlashCommands(): SlashCommand[] {
       icon: Scissors,
       command: ({ editor, range }) => {
         editor.chain().focus().deleteRange(range).run();
-        window.dispatchEvent(new CustomEvent("open-snippet-picker"));
+        window.dispatchEvent(new CustomEvent("open-snippet-picker", { detail: { editor } }));
       },
       aliases: ["snip", "snippets", "reusable"],
     },

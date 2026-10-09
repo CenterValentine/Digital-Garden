@@ -1,10 +1,20 @@
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import type { EditorView } from "@tiptap/pm/view";
 import type { Slice } from "@tiptap/pm/model";
 import type { Editor } from "@tiptap/core";
 import { toast } from "sonner";
 import { uploadImage } from "./use-image-upload";
 import { isImageUrl } from "../utils/image-url";
+import { pasteImageAsText } from "@/lib/features/ocr/editor-ocr";
+import {
+  handleAiPasteChord,
+  handlePasteAsTextChord,
+  installPasteModifierTracker,
+  isAiPasteChord,
+  isPasteAsText,
+  isPasteAsTextChord,
+  notePasteEvent,
+} from "@/lib/features/ocr/paste-modifier";
 
 // Attribute shape accepted by the EditorImage extension's setImage()
 // command. Mirrors the same local interface in MarkdownEditor.tsx —
@@ -46,6 +56,8 @@ export interface UseImagePasteOptions {
 export interface UseImagePasteResult {
   handlePaste: (view: EditorView, event: ClipboardEvent) => boolean;
   handleDrop: (view: EditorView, event: DragEvent, slice: Slice, moved: boolean) => boolean;
+  // ⇧⌘V with only an image on the clipboard (Chromium fires no paste event).
+  handleKeyDown: (view: EditorView, event: KeyboardEvent) => boolean;
   // Direct invocation for toolbar "Insert image" buttons.
   insertImageFromFile: (file: File) => void;
 }
@@ -113,13 +125,30 @@ export function useImagePasteHandler({
     [editorRef, parentId],
   );
 
+  useEffect(() => {
+    installPasteModifierTracker();
+  }, []);
+
   const handlePaste = useCallback(
     (view: EditorView, event: ClipboardEvent): boolean => {
+      notePasteEvent(event);
       const files = Array.from(event.clipboardData?.files || []);
       const imageFiles = files.filter((f) => f.type.startsWith("image/"));
 
       if (imageFiles.length > 0) {
         event.preventDefault();
+        // ⇧⌘V is "paste as text"; an image's text is its OCR (never uploaded).
+        const editor = editorRef.current;
+        if (editor && isPasteAsText()) {
+          void (async () => {
+            for (const file of imageFiles) {
+              await pasteImageAsText(editor, file, {
+                pasteImageInstead: () => insertImageFromFile(file),
+              });
+            }
+          })();
+          return true;
+        }
         for (const file of imageFiles) {
           insertImageFromFile(file);
         }
@@ -138,7 +167,7 @@ export function useImagePasteHandler({
 
       return false;
     },
-    [insertImageFromFile],
+    [editorRef, insertImageFromFile],
   );
 
   const handleDrop = useCallback(
@@ -161,5 +190,33 @@ export function useImagePasteHandler({
     [insertImageFromFile],
   );
 
-  return { handlePaste, handleDrop, insertImageFromFile };
+  const handleKeyDown = useCallback(
+    (view: EditorView, event: KeyboardEvent): boolean => {
+      if (isAiPasteChord(event)) {
+        event.preventDefault();
+        handleAiPasteChord((image) => {
+          const editor = editorRef.current;
+          if (!editor) return;
+          const file = new File([image], "pasted-image.png", { type: image.type });
+          void pasteImageAsText(editor, file, { pasteImageInstead: () => insertImageFromFile(file), engine: "ai" });
+        });
+        return true;
+      }
+      if (isPasteAsTextChord(event)) {
+        handlePasteAsTextChord({
+          onImage: (image) => {
+            const editor = editorRef.current;
+            if (!editor) return;
+            const file = new File([image], "pasted-image.png", { type: image.type });
+            void pasteImageAsText(editor, file, { pasteImageInstead: () => insertImageFromFile(file) });
+          },
+          onText: (text) => view.pasteText(text),
+        });
+      }
+      return false;
+    },
+    [editorRef, insertImageFromFile],
+  );
+
+  return { handlePaste, handleDrop, handleKeyDown, insertImageFromFile };
 }

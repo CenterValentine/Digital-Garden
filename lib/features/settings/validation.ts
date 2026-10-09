@@ -96,6 +96,10 @@ const editorSettingsSchema = z
     // newly inserted windows (range mirrors the block schema). Unset =
     // the block's built-in default.
     noteWindowDefaultHeight: z.number().int().min(160).max(1200).optional(),
+    // Text recognition (OCR) languages beyond English, as Tesseract codes
+    // ("spa", "fra", …). Shape only; lib/features/ocr/languages.ts decides
+    // what is valid (unknown codes are ignored, English is always on).
+    ocrLanguages: z.array(z.string().max(8)).max(16).optional(),
   })
   .optional();
 
