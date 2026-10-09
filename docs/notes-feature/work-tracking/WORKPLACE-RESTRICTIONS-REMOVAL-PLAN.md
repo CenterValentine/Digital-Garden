@@ -1,6 +1,6 @@
 ---
 title: Workplace Restrictions Removal — claims, borrow, share, view exceptions
-status: built, owner smoke passed 2026-10-08 — awaiting merge, then owner-run schema drop + Hocuspocus redeploy
+status: shipped — PR #289 merged 2026-10-09 (7c940cd7), Hocuspocus rev 00014-smp; schema drop in chore/drop-workspace-claims, prod migrate deploy pending
 created: 2026-10-08
 branch: refactor/remove-workplace-claims (worktree .claude/worktrees/claims-removal, from origin/main 3f966a0c)
 decisions: "D1 keep workplace expiration (owner, 2026-10-08) · D2 MINOR · D3 drop isLocked · D4 no rename"
