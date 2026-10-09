@@ -391,6 +391,11 @@ console.log("table — wrapped cells (D12, owner's SEO table)");
     "This note runs under all three columns of the table and keeps going on",
   );
   check(
+    "a line starting in a column but running into the next is not absorbed either",
+    (tableMarkdown([...seo, line(288, [[250, "An indented remark that keeps running well past the example column"]])]) ?? "").split("\n\n").pop(),
+    "An indented remark that keeps running well past the example column",
+  );
+  check(
     "long cells under a short header row are still a table",
     rowsOf(
       tableMarkdown([
