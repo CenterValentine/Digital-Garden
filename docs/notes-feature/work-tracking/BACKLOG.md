@@ -35,11 +35,19 @@ The join duplication is fixed at its three sources (`lib/domain/collaboration/li
 
 ---
 
+## AI view_screen — follow-ups (2026-10-09, branch `feat/ai-view-screen`; plan `AI-VIEW-SCREEN-PLAN.md`)
+
+- [ ] **Co-browse bound tab (HELD — co-browse postponement, owner 2026-10-06)** — plan D11: when a co-browse session is bound, the panel's `view_screen` captures THAT tab with CDP `Page.captureScreenshot` through a validated `cobrowse-screenshot` handler (never a generic CDP message); works backgrounded, supports an element clip. Supersedes the OCR plan's `read_screen` below.
+- [ ] **Gateway tool-result images** — `vercel-gateway` is on the user-part path because tool-result images through the gateway are unverified. Smoke a gateway Claude model with the native shape; promote it in `NATIVE_ADAPTERS` (screen-delivery.ts) and flip the mode table in `view-screen:check` if it holds.
+- [ ] **`ai-screenshots/` lifecycle** — screenshots are stored without a ContentNode (D7), so nothing deletes them. Delete with the conversation, or age out after the 7-day URL life.
+- [ ] **In-app images without CORS** — storage images in a captured pane may rasterize blank if the bucket sends no CORS headers for the app origin; check in the production smoke, and if so pass `fetchFn` through the app's own media route.
+- [ ] **Full-page / element captures** — v1 is the visible area only.
+
 ## OCR paste — follow-ups (2026-10-06, branch `feat/ocr-paste`; plan `OCR-PASTE-PLAN.md`)
 
-Built on the branch (engine + self-hosted assets, ⇧⌘V / image context actions / clipboard item, and the AI's `read_image_text` with `read_content` naming a note's images); owner smoke pending — the checklist is in the plan §3. Remaining:
+Merged in PR #291 (2026-10-09, `0967297d`). Remaining:
 
-- [ ] **Co-browse `read_screen` (POSTPONED 2026-10-06, owner)** — waits on a prerequisite feature the owner named; not built in this run because that feature was not. Design in the plan D5: a `co_browse_act` action that screenshots the BOUND tab via `Page.captureScreenshot` on the debugger session (not `captureVisibleTab`), OCRs it app-side after the bridge returns, answers as `untrustedWebContent`. Extension 5.5.0. Smoke on a backgrounded bound tab.
+- [ ] **Co-browse `read_screen` (POSTPONED 2026-10-06, owner; superseded in design by `view_screen` D11 above — the picture, with OCR still callable on it)** — waits on a prerequisite feature the owner named; not built in this run because that feature was not. Design in the plan D5: a `co_browse_act` action that screenshots the BOUND tab via `Page.captureScreenshot` on the debugger session (not `captureVisibleTab`), OCRs it app-side after the bridge returns, answers as `untrustedWebContent`. Extension 5.5.0. Smoke on a backgrounded bound tab.
 - [ ] **Safari ⇧⌘V** — record whether Safari fires a paste event for the chord (smoke item). If not, the context-menu item is the Safari path; do not add a second chord.
 - [ ] **`ai` OCR engine** behind an `editor.ocrEngine` setting — the user's vision connection as the second `OcrEngine` member (precedent: the flashcards media route); needs a vision-capability check and client-side downscale for the 4.5 MB body limit.
 - [ ] **Mentioned images seen by vision models** — when the chat model is vision-capable, attach a mentioned/bound image file to the turn as an image part (presigned URL, like the flashcards media route) so "what does it show" gets a description, not just OCR'd words. Provider-payload change: smoke on production per the AI rule. (Owner smoke 2026-10-09: GPT-4o on a book-cover PNG.)

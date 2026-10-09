@@ -1,6 +1,6 @@
 ---
 last_updated: 2026-10-09
-status: planned — phases 1–2 building on `feat/ai-view-screen`; phase 3 (co-browse bound tab) held behind the owner's co-browse postponement
+status: phases 1–2 built on `feat/ai-view-screen` (gates green, 22/22 mutants killed) — production smoke after deploy; phase 3 (co-browse bound tab) held behind the owner's co-browse postponement
 ---
 
 # `view_screen` — the assistant looks at what you are looking at
@@ -115,7 +115,9 @@ The result lists blanked iframes so the model does not read their absence as emp
 
 ### D5 — Commented-out text never reaches the model as pixels
 
-- **In-app:** the rasterizer's `filter` drops every `[data-private]` element. Its box is kept and painted as a neutral block, so the layout still reads true and the model sees that something is withheld. This is the pixel seam of the private-content contract and gets a line in `pnpm private:content:check`.
+- **In-app:** the rasterizer's `filter` leaves every `[data-private]` element out of the clone, children included. It is excluded rather than painted over: an excluded node certainly never renders, while repainting a cloned node depends on the library's hook order. The result's `notes` tell the model that private text was left out on purpose.
+- **Source view:** the markdown source view must show `%%…%%` to its author. Its textarea (`data-markdown-source`) is therefore left out whenever it holds `%%`, with a note.
+- **The gate:** `pnpm private:content:check` pins this pixel seam. It also checks that the attribute the editor renders and the attribute the capture filters on agree. The extension renders private text through `renderHTML` only (no node view).
 - **Panel:** D6 covers it.
 
 ### D6 — The panel will not screenshot the app's own tab
@@ -214,7 +216,8 @@ next request (auto-resumed):
 | Extension | `panel/index.js`, `manifest.json` | `capture-visible-tab` handler, app-tab / restricted refusals, 5.5.0 |
 | Upload | `app/api/ai/attachments/upload/route.ts` | `purpose=screenshot` → own prefix, no node |
 | UI | `components/content/ai/ChatMessage.tsx` | chip label + thumbnail |
-| Gates | `scripts/validate-view-screen.ts` (new, `pnpm view-screen:check`), `validate-context-diet.ts`, `validate-private-content.ts` | below |
+| Gates | `scripts/validate-view-screen.ts` (new, `pnpm view-screen:check`, in `build` and `ai-drift.yml`), `validate-context-diet.ts` G9, `validate-private-content.ts` pixel seam | below |
+| Markers | `MainPanelWorkspace.tsx` `data-workspace-pane`, `MainPanelHeader.tsx` `data-active-tab`, `MarkdownSourceView.tsx` `data-markdown-source` | the DOM the in-app capture finds |
 
 ## 4. Gates
 
@@ -250,9 +253,35 @@ Phases 1 and 2 ship in one PR. Changing what the model receives is AI capability
 - [ ] Side panel with the app tab active → the model says it can't screenshot Digital Garden from the panel and points to the app's chat.
 - [ ] Side panel on `chrome://extensions` → an honest "can't capture this page".
 - [ ] App chat, Claude: "look at my screen" with a note open → thumbnail of the note pane; the reply matches.
-- [ ] App chat: a note with commented-out text → the thumbnail shows a blank block where it is; the model does not quote it.
+- [ ] App chat: a note with commented-out text → the thumbnail leaves it out; the model does not quote it and says some text was withheld.
+- [ ] App chat: the same note in markdown source view → the textarea is blank in the thumbnail; the model is told why.
 - [ ] App chat: "look at the whole window" → sidebars included.
 - [ ] A text-only model (e.g. DeepSeek) → `view_screen` is not offered; the model says it can't see.
 - [ ] Next turn after a screenshot → the request no longer carries the image (Run Inspector shows the folded stub).
 - [ ] Settings → AI → Tools → turn View Screen off → not offered.
 - [ ] Extension not reloaded (still 5.4.0) → "update/reload the extension", no hang.
+
+## 7. Build record (2026-10-09)
+
+| Commit | What |
+|---|---|
+| `578417b8` | Contract, delivery post-pass, diet G9, route, upload purpose, panel bridge + extension 5.5.0, in-app capture, chip + thumbnail, gates |
+| `ac0a3a34`, `3c5cfbdd` | Gate tightening after the first mutation run (app-tab refusal, source-view filter); CI wiring; docs |
+
+**Mutation run:** 22 mutants, all killed. They covered the delivery mode table, rewrite order, insertion, pass-through by reference, the URL guard, summary leaks, the vision gate, the vision row, adapter vs vendor, bridge id matching, the app-tab refusal, reply ids, node creation, engine resume, the diet exemption both ways, and the private filter, selector and source view. On the first run three survived: one was a no-op mutant, and two exposed checks that were too loose. Both checks were tightened.
+
+**Headless smoke (2026-10-09, dev, smoke user):** a note with a `privateText` mark and a `privateBlock` was captured from the real app with `modern-screenshot`, the in-app filter and the `data-workspace-pane` marker:
+- the pane, tab strip, title and toolbar all rendered;
+- the visible paragraph was present;
+- both secrets were absent, so the inline sentence reads "Inline  after.";
+- the pane title came from `data-active-tab`;
+- the capture took about 0.4 s.
+
+Full `pnpm build` green: lint 151 (none new), every chained gate.
+
+**Owner action after pulling:** reload the extension at `chrome://extensions` (5.5.0). Until then the panel's `view_screen` times out with a clear message.
+
+**Follow-ups (BACKLOG):**
+- lifecycle of `ai-screenshots/` objects;
+- verify the gateway's tool-result images and promote it to native if it passes;
+- the co-browse bound tab (D11, held).
