@@ -16,8 +16,15 @@
  *
  * Client-only. Never import from a server module.
  */
-import type { LoggerMessage, Worker as TesseractWorker } from "tesseract.js";
+import type { LoggerMessage, PSM, Worker as TesseractWorker } from "tesseract.js";
 
+import {
+  LAYOUT_PSM,
+  needsSparsePass,
+  pickBetterRead,
+  preprocessForOcr,
+  type OcrLayout,
+} from "./preprocess";
 import type { OcrEngine, OcrProgress, OcrResult } from "./types";
 
 /** How long an idle worker survives before it is terminated. */
@@ -42,6 +49,17 @@ let workerPromise: Promise<TesseractWorker> | null = null;
 let activeJobs = 0;
 let idleTimer: ReturnType<typeof setTimeout> | null = null;
 let jobCounter = 0;
+/**
+ * Whole reads run one at a time. A read sets a worker-wide parameter (the
+ * layout mode) between its two passes; queuing only the worker's own jobs
+ * would let a second image be read in the first one's sparse mode.
+ */
+let readQueue: Promise<unknown> = Promise.resolve();
+function oneAtATime<T>(read: () => Promise<T>): Promise<T> {
+  const run = readQueue.then(read, read);
+  readQueue = run.catch(() => undefined);
+  return run;
+}
 const progressListeners = new Map<string, (p: OcrProgress) => void>();
 
 function routeLog(message: LoggerMessage) {
@@ -115,12 +133,26 @@ async function recognize(
   try {
     workerPromise ??= spawnWorker();
     const worker = await workerPromise;
-    const { data } = await worker.recognize(image, {}, { text: true }, jobId);
-    return {
-      text: data.text ?? "",
-      confidence: typeof data.confidence === "number" ? data.confidence : 0,
-      engine: "local",
-    };
+    return await oneAtATime(async () => {
+      // Grayscale, invert a dark background, upscale narrow images (preprocess.ts).
+      const prepared = await preprocessForOcr(image);
+      const read = async (layout: OcrLayout) => {
+        await worker.setParameters({
+          tessedit_pageseg_mode: LAYOUT_PSM[layout] as PSM,
+        });
+        const { data } = await worker.recognize(prepared, {}, { text: true }, jobId);
+        return {
+          text: data.text ?? "",
+          confidence: typeof data.confidence === "number" ? data.confidence : 0,
+          layout,
+        };
+      };
+      // Normal layout first; a low-confidence read earns a sparse-mode pass
+      // and the more confident of the two wins.
+      const first = await read("auto");
+      const best = needsSparsePass(first.confidence) ? pickBetterRead(first, await read("sparse")) : first;
+      return { text: best.text, confidence: best.confidence, layout: best.layout, engine: "local" as const };
+    });
   } catch (error) {
     // A worker that threw mid-job may be wedged; respawn on the next call.
     await terminateLocalOcr();

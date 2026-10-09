@@ -12,6 +12,13 @@ import type { JSONContent } from "@tiptap/core";
 import { getCollaborationServerExtensions } from "@/lib/domain/collaboration/extensions";
 import { decompressMarkdown } from "@/lib/domain/content/markdown-decompress";
 import { markdownToTiptapRich, type HtmlBridge } from "@/lib/domain/content/markdown-serialize";
+import {
+  grayscaleForOcr,
+  needsSparsePass,
+  pickBetterRead,
+  shouldInvert,
+  upscaleFactor,
+} from "@/lib/features/ocr/preprocess";
 import { reflowOcrText } from "@/lib/features/ocr/reflow";
 import { buildOcrContent } from "@/lib/features/ocr/to-content";
 
@@ -164,6 +171,41 @@ check(
     },
   ],
 );
+
+console.log("preprocess — mode decisions (D9)");
+
+check("a dark median inverts", shouldInvert(40), true);
+check("a light median does not invert", shouldInvert(230), false);
+check("the dark threshold is 128", [shouldInvert(127), shouldInvert(128)], [true, false]);
+check("a 680 px screenshot is doubled", upscaleFactor(680), 2);
+check("a tiny image stops at 3x", upscaleFactor(200), 3);
+check("a wide screenshot is not scaled", upscaleFactor(2400), 1);
+check("a zero width is left alone", upscaleFactor(0), 1);
+check("a list read at 72 gets a sparse pass", needsSparsePass(72), true);
+check("prose read at 93 stays on one pass", needsSparsePass(93), false);
+check("the sparse threshold is 85", [needsSparsePass(84.9), needsSparsePass(85)], [true, false]);
+check(
+  "the more confident read wins",
+  pickBetterRead({ confidence: 72, layout: "auto" }, { confidence: 80, layout: "sparse" }).layout,
+  "sparse",
+);
+check(
+  "a tie keeps the normal-layout read",
+  pickBetterRead({ confidence: 80, layout: "auto" }, { confidence: 80, layout: "sparse" }).layout,
+  "auto",
+);
+
+// Pixels: white text (255) on a mostly dark-blue background → grayscale, inverted.
+{
+  const px = (r: number, g: number, b: number) => [r, g, b, 255];
+  const rgba = new Uint8ClampedArray([...px(10, 30, 90), ...px(10, 30, 90), ...px(10, 30, 90), ...px(255, 255, 255)]);
+  const inverted = grayscaleForOcr(rgba);
+  check("a dark-background image is inverted", inverted, true);
+  check("its white text becomes black", [rgba[12], rgba[13], rgba[14]], [0, 0, 0]);
+  check("its dark background becomes light", rgba[0] > 200, true);
+  const light = new Uint8ClampedArray([...px(250, 250, 250), ...px(250, 250, 250), ...px(20, 20, 20)]);
+  check("a light-background image is only grayscaled", [grayscaleForOcr(light), light[8]], [false, 20]);
+}
 
 if (fails > 0) {
   console.log(`\nocr:blocks:check — ${fails} failure(s)`);

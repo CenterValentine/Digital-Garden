@@ -18,6 +18,8 @@ export interface OcrResult {
   text: string;
   /** Mean word confidence, 0..100. */
   confidence: number;
+  /** Which layout mode produced the text (preprocess.ts decides). */
+  layout?: "auto" | "sparse";
   engine: OcrEngineId;
 }
 
