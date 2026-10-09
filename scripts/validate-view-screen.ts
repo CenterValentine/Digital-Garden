@@ -159,6 +159,47 @@ async function main() {
   check("engine: view_screen resumes the loop like the other client tools", /part\.type === `tool-\$\{VIEW_SCREEN\}`/.test(engine));
   check("engine: both request builders send appCaptureAvailable", (engine.match(/appCaptureAvailable: isAppCaptureSupported\(\)/g) ?? []).length === 2);
 
+  // ── 7. Areas, never wider than asked (D12) and images (D13) ──────────────
+  const contract = read("lib/domain/ai/tools/view-screen.ts");
+  const appCapture = read("lib/features/screen-capture/capture-app.ts");
+  const executor = read("lib/features/screen-capture/index.ts");
+  check(
+    "areas: pane, all-panes, left-sidebar, right-sidebar, window",
+    contract.includes('VIEW_SCREEN_AREAS = ["pane", "all-panes", "left-sidebar", "right-sidebar", "window"] as const'),
+  );
+  check("areas: the default is the narrowest (the focused pane)", executor.includes('captureApp(input.area ?? "pane")'));
+  for (const [area, file] of [
+    ["panes", "components/content/MainPanelWorkspace.tsx"],
+    ["left-sidebar", "components/content/LeftSidebar.tsx"],
+    ["right-sidebar", "components/content/RightSidebar.tsx"],
+  ] as const) {
+    check(`areas: ${file} carries data-capture-region="${area}"`, read(file).includes(`data-capture-region="${area}"`));
+    check(`areas: the capture looks the ${area} region up by that marker`, appCapture.includes(`'[data-capture-region="${area}"]'`));
+  }
+  check(
+    "never wider: a missing region is refused, never swapped for the window",
+    /if \(!target\) \{[\s\S]{0,200}throw new AppCaptureRefused/.test(appCapture) && !/\?\?\s*document\.body/.test(appCapture),
+  );
+  check("never wider: a collapsed region (zero size) counts as missing", /rect\.width > 1 && rect\.height > 1 \? el : null/.test(appCapture));
+  check("never wider: a refusal reaches the model as a result, not a thrown error", /err instanceof AppCaptureRefused\) return \{ ok: false/.test(executor));
+  check(
+    "images: a cross-origin image with a content id loads through the same-origin download route",
+    appCapture.includes("fetchFn: imageFetcher(target, unreadable)") &&
+      appCapture.includes('img[data-content-id]') &&
+      appCapture.includes("/download?stream=true"),
+  );
+  check("images: an unreadable image is reported to the model", /could not be loaded into the screenshot/.test(appCapture));
+  check(
+    "images: the image viewer tags its <img> with the content id",
+    read("components/content/viewer/ImageViewer.tsx").includes("data-content-id={contentId}") &&
+      read("components/content/viewer/FileViewer.tsx").includes("contentId={contentId}"),
+  );
+  check(
+    "summary: names the area captured",
+    screenSummary({ ok: true, via: "app", area: "left-sidebar" }).includes("file tree") &&
+      screenSummary({ ok: true, via: "app", area: "all-panes" }).includes("every open"),
+  );
+
   if (errors.length > 0) {
     console.error(`\n✖ view-screen:check failed — ${errors.length} problem(s):\n`);
     for (const e of errors) console.error(`  ${e}`);

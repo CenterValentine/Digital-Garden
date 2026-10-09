@@ -4168,7 +4168,7 @@ function ToolCallBubble({
       // view_screen (AI-VIEW-SCREEN-PLAN D10): say WHAT was looked at.
       if (toolName === "view_screen") {
         if (isRunning) return "Looking at the screen";
-        const r = result as { ok?: boolean; via?: string; url?: string; title?: string } | null;
+        const r = result as { ok?: boolean; via?: string; area?: string; url?: string; title?: string } | null;
         if (!r || r.ok === false) return "Couldn't capture the screen";
         if (r.via === "active-tab") {
           let host = "";
@@ -4179,7 +4179,10 @@ function ToolCallBubble({
           }
           return `Looked at the page${host ? `: ${host}` : ""}`;
         }
-        if (r.via === "app-window") return "Looked at the app window";
+        if (r.area === "window") return "Looked at the app window";
+        if (r.area === "all-panes") return "Looked at all open panes";
+        if (r.area === "left-sidebar") return "Looked at the file tree";
+        if (r.area === "right-sidebar") return "Looked at the right sidebar";
         return `Looked at the app${r.title ? `: ${r.title}` : ""}`;
       }
       if (toolName === "co_browse_open") {

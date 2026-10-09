@@ -28,12 +28,14 @@ import { isTypingTarget } from "@/lib/core/keyboard-target";
 
 interface ImageViewerProps {
   downloadUrl: string;
+  /** Tags the <img> so view_screen can load it same-origin (AI-VIEW-SCREEN-PLAN D13). */
+  contentId?: string;
   fileName: string;
   title: string;
   onDownload: () => void;
 }
 
-export function ImageViewer({ downloadUrl, fileName, title, onDownload }: ImageViewerProps) {
+export function ImageViewer({ downloadUrl, contentId, fileName, title, onDownload }: ImageViewerProps) {
   const [scale, setScale] = useState(1);
   const [rotation, setRotation] = useState(0);
   const [position, setPosition] = useState({ x: 0, y: 0 });
@@ -258,6 +260,7 @@ export function ImageViewer({ downloadUrl, fileName, title, onDownload }: ImageV
         <img
           ref={imageRef}
           src={downloadUrl}
+          data-content-id={contentId}
           alt={title}
           className="max-w-full max-h-full object-contain select-none transition-transform duration-200"
           style={{

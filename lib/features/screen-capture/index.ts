@@ -8,12 +8,13 @@
  * is a result the model can act on.
  *
  *   side panel  → the web page in the active tab, via the extension (D3)
- *   the app     → the app itself, rasterized in the page (D4)
+ *   the app     → the app itself, rasterized in the page (D4) — the area
+ *                 asked for, never wider (D12)
  */
 import { captureVisibleTabImage, isPanelEmbedSurface } from "@/lib/domain/browser-extension/panel-bridge";
 import type { ViewScreenInput, ViewScreenResult } from "@/lib/domain/ai/tools/view-screen";
 
-import { captureApp, MAX_EDGE_PX } from "./capture-app";
+import { AppCaptureRefused, captureApp, MAX_EDGE_PX } from "./capture-app";
 
 const JPEG_QUALITY = 0.8;
 
@@ -90,12 +91,19 @@ export async function viewScreenForModel(input: ViewScreenInput): Promise<ViewSc
     if (!isAppCaptureSupported()) {
       return { ok: false, error: "nothing on this surface can take a screenshot" };
     }
-    const shot = await captureApp(input.area ?? "content");
+    let shot;
+    try {
+      shot = await captureApp(input.area ?? "pane");
+    } catch (err) {
+      if (err instanceof AppCaptureRefused) return { ok: false, area: input.area ?? "pane", error: err.message };
+      throw err;
+    }
     const encoded = await encodeForModel(shot.canvas);
     const stored = await upload(encoded.blob);
     return {
       ok: true,
-      via: shot.area === "window" ? "app-window" : "app-content",
+      via: "app",
+      area: shot.area,
       title: shot.title,
       imageUrl: stored.url,
       mediaType: stored.mediaType,

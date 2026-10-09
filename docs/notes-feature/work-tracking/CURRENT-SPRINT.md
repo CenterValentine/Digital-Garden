@@ -25,7 +25,8 @@ last_updated: 2026-05-13
 ### Smoke checklist (owner, production after deploy — plan §6)
 - [ ] Side panel, Claude / GPT / Gemini: "look at this page" → thumbnail chip; the reply describes visual things not in the page text.
 - [ ] Side panel on the app tab → refused, pointed to the app's chat. On `chrome://extensions` → honest "can't capture".
-- [ ] App chat: "look at my screen" → pane thumbnail; "the whole window" → sidebars included.
+- [ ] App chat: "look at my screen" → pane thumbnail; "all my panes" / "just the file tree" / "the whole window" → that area only; a collapsed sidebar → refused.
+- [ ] App chat, an image file open → the image is in the thumbnail and the model describes it.
 - [ ] Commented-out text (rich view and source view) → not in the thumbnail; the model doesn't quote it.
 - [ ] Text-only model → no `view_screen`; next turn after a screenshot → folded stub, no image resent.
 - [ ] Extension not reloaded → "update/reload the extension", no hang.

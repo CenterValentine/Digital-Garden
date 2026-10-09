@@ -177,6 +177,39 @@ The chip shows a thumbnail of exactly what the model received; a click opens it 
 - In the panel's `browser` mode it is advertised.
 - In the app it is summonable from the menu ("see what the user is looking at"), in the `reading` family. A request for a look reliably summons it, and it costs nothing in a turn that doesn't need it (AI-TOOL-SUMMONER-PLAN).
 
+### D12 — Areas: the least the request needs, and never wider (owner smoke, 2026-10-09)
+
+The first build captured the focused pane, or the whole window. Owner: capture all panes at once, or only the file tree or side rail, "particularly out of privacy".
+
+**`area`** is one of:
+- `pane` (default) — the focused pane;
+- `all-panes` — the main panel with every open pane;
+- `left-sidebar` — the file tree and the side rail;
+- `right-sidebar`;
+- `window`.
+
+The description tells the model to capture the least the request needs and to use `window` only when asked for everything.
+
+**Never wider.** Asking for the file tree alone is often a choice to show less. When the requested region is not on screen (a collapsed sidebar measures zero), the capture is **refused** and the model is told why. It is never swapped for the window. The first build's "no pane → whole window" fallback is gone for the same reason.
+
+Regions are found by DOM markers:
+- `data-capture-region="panes"` (MainPanelWorkspace);
+- `data-capture-region="left-sidebar"` (LeftSidebar);
+- `data-capture-region="right-sidebar"` (RightSidebar);
+- `data-workspace-pane` for the focused pane.
+
+### D13 — Images load through the app's own origin (owner smoke, 2026-10-09)
+
+A PNG book cover open in the image viewer captured as an empty viewer, and GPT-4o correctly reported that it saw only the file's metadata.
+
+**Cause:** uploads render from presigned R2 URLs on another origin, and the bucket sends no CORS headers for the app. The rasterizer's own fetch of the image therefore fails, and it draws a blank.
+
+**Fix:** a `fetchFn` for the rasterizer. A cross-origin `<img>` carrying `data-content-id` is fetched through `/api/content/content/<id>/download?stream=true`: the user's own file, same origin, no CORS. The editor's image node already set the attribute; the image viewer now does too.
+
+**Anything still unreadable:** images of 48 px or more that could not be loaded are counted in `notes`, and the model is told not to describe them as empty.
+
+**Headless check:** the same viewer captured without the fetcher shows a blank image area, reproducing the bug; with it, the image renders.
+
 ### D11 — Co-browse bound tab (phase 3, HELD)
 
 Co-browse work stays postponed (owner, 2026-10-06) until the feature it waits on is built. The design is recorded here, not built:
@@ -256,6 +289,9 @@ Phases 1 and 2 ship in one PR. Changing what the model receives is AI capability
 - [ ] App chat: a note with commented-out text → the thumbnail leaves it out; the model does not quote it and says some text was withheld.
 - [ ] App chat: the same note in markdown source view → the textarea is blank in the thumbnail; the model is told why.
 - [ ] App chat: "look at the whole window" → sidebars included.
+- [ ] App chat: "look at all my panes" → every open pane in one image.
+- [ ] App chat: "screenshot just my file tree" → the left sidebar only; with it collapsed → refused, nothing captured.
+- [ ] App chat, an image file open (e.g. a book cover PNG) → the image is IN the thumbnail and the model describes it.
 - [ ] A text-only model (e.g. DeepSeek) → `view_screen` is not offered; the model says it can't see.
 - [ ] Next turn after a screenshot → the request no longer carries the image (Run Inspector shows the folded stub).
 - [ ] Settings → AI → Tools → turn View Screen off → not offered.

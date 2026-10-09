@@ -40,7 +40,7 @@ The join duplication is fixed at its three sources (`lib/domain/collaboration/li
 - [ ] **Co-browse bound tab (HELD — co-browse postponement, owner 2026-10-06)** — plan D11: when a co-browse session is bound, the panel's `view_screen` captures THAT tab with CDP `Page.captureScreenshot` through a validated `cobrowse-screenshot` handler (never a generic CDP message); works backgrounded, supports an element clip. Supersedes the OCR plan's `read_screen` below.
 - [ ] **Gateway tool-result images** — `vercel-gateway` is on the user-part path because tool-result images through the gateway are unverified. Smoke a gateway Claude model with the native shape; promote it in `NATIVE_ADAPTERS` (screen-delivery.ts) and flip the mode table in `view-screen:check` if it holds.
 - [ ] **`ai-screenshots/` lifecycle** — screenshots are stored without a ContentNode (D7), so nothing deletes them. Delete with the conversation, or age out after the 7-day URL life.
-- [ ] **In-app images without CORS** — storage images in a captured pane may rasterize blank if the bucket sends no CORS headers for the app origin; check in the production smoke, and if so pass `fetchFn` through the app's own media route.
+- [ ] **Images without a content id** — D13 loads uploads through the download route by `data-content-id`; other cross-origin images (external URLs in notes, link-preview thumbnails) still rasterize blank and are reported in `notes`. A server-side image proxy would close it.
 - [ ] **Full-page / element captures** — v1 is the visible area only.
 
 ## OCR paste — follow-ups (2026-10-06, branch `feat/ocr-paste`; plan `OCR-PASTE-PLAN.md`)
