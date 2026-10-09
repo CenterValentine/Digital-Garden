@@ -12,8 +12,6 @@ import {
 import { useTabMoveTargets } from "./use-tab-move-targets";
 import { WorkplaceTargetFlyout, type WorkplaceTarget } from "./WorkplaceTargetFlyout";
 
-const HEADING_CLASS =
-  "px-2 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-gray-500";
 const ROW_CLASS =
   "flex w-full items-center gap-2 rounded px-2 py-1.5 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/10";
 
@@ -31,9 +29,6 @@ export function WorkplacesTabMenuSection({
   closeMenu,
 }: ExtensionShellTabMenuSectionProps) {
   const activeWorkspaceId = useWorkspaceStore((state) => state.activeWorkspaceId);
-  const assignContentToWorkspace = useWorkspaceStore(
-    (state) => state.assignContentToWorkspace
-  );
   const moveTabToWorkspace = useWorkspaceStore(
     (state) => state.moveTabToWorkspace
   );
@@ -50,7 +45,7 @@ export function WorkplacesTabMenuSection({
 
   // The menu section only mounts while the menu is open, so fetching is
   // always on.
-  const { groups, topLevelWorkspaces } = useTabMoveTargets(true);
+  const { groups } = useTabMoveTargets(true);
 
   const [flyout, setFlyout] = useState<{ kind: FlyoutKind; anchor: HTMLElement } | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -104,10 +99,6 @@ export function WorkplacesTabMenuSection({
       );
     }
   };
-
-  const shareTargets = topLevelWorkspaces.filter(
-    (workspace) => workspace.id !== activeWorkspaceId
-  );
 
   const flyoutRow = (kind: FlyoutKind, label: string) => (
     <button
@@ -172,32 +163,6 @@ export function WorkplacesTabMenuSection({
           onPick={(target) => void pick(flyout.kind, target)}
         />
       ) : null}
-      <div className="my-1 h-px bg-black/10 dark:bg-white/10" />
-      <div onPointerEnter={leaveFlyoutRows}>
-        <div className={HEADING_CLASS}>Share permanently</div>
-        {shareTargets.length === 0 ? (
-          <div className="px-2 py-1.5 text-xs text-gray-500">
-            Create another workplace first.
-          </div>
-        ) : (
-          shareTargets.map((workspace) => (
-            <button
-              key={`share-${workspace.id}`}
-              type="button"
-              className={ROW_CLASS}
-              onClick={() => {
-                closeMenu();
-                void assignContentToWorkspace(workspace.id, tab.contentId, {
-                  assignmentType: "shared",
-                  scope: tab.contentType === "folder" ? "recursive" : "item",
-                });
-              }}
-            >
-              <span className="truncate">{workspace.name}</span>
-            </button>
-          ))
-        )}
-      </div>
     </>
   );
 }

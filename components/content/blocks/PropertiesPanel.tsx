@@ -20,7 +20,6 @@ import { schemaToFields } from "@/lib/domain/blocks/properties-renderer";
 import type { PropertiesField, BlockDefinition } from "@/lib/domain/blocks/types";
 import { Settings2 } from "lucide-react";
 import { PropertyField } from "./PropertyFieldRenderer";
-import { useExtensionActivationStore } from "@/state/extension-activation-store";
 import { HabitTrackerPropertiesPanel } from "./HabitTrackerPropertiesPanel";
 import { StopwatchPropertiesPanel } from "./StopwatchPropertiesPanel";
 
@@ -28,9 +27,6 @@ export function PropertiesPanel() {
   const selectedBlockId = useBlockStore((s) => s.selectedBlockId);
   const selectedBlockType = useBlockStore((s) => s.selectedBlockType);
   const selectedBlockAttrs = useBlockStore((s) => s.selectedBlockAttrs);
-  const workplacesEnabled = useExtensionActivationStore((state) =>
-    state.isExtensionEnabled("workplaces")
-  );
 
   const [definition, setDefinition] = useState<BlockDefinition | null>(null);
   const [fields, setFields] = useState<PropertiesField[]>([]);
@@ -38,23 +34,11 @@ export function PropertiesPanel() {
 
   const filterVisibleFields = useCallback(
     (def: BlockDefinition, allFields: PropertiesField[]) => {
-      let visibleFields = def.hiddenFields
+      return def.hiddenFields
         ? allFields.filter((field) => !def.hiddenFields!.includes(field.key))
         : allFields;
-
-      if (
-        (selectedBlockType === "dailySummary" ||
-          selectedBlockType === "weeklySummary") &&
-        !workplacesEnabled
-      ) {
-        visibleFields = visibleFields.filter(
-          (field) => field.key !== "autoBorrowDurationMinutes"
-        );
-      }
-
-      return visibleFields;
     },
-    [selectedBlockType, workplacesEnabled]
+    []
   );
 
   // Look up block definition when selection changes

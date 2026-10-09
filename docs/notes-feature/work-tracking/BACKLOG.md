@@ -376,7 +376,6 @@ true async-batch substrate.
 Built and committed: workbench rows (`parentWorkspaceId` + `dormantAt`), dwell submenu nestable to 3 layers, hide/reorder per layer, lifecycle hooks (archive on delete, purge on hard delete, dormant-clearout cron), tab counts, tri-state tree scope, and the redundant view-root row fix. Remaining:
 
 - [ ] **`vercel.json` cron entry for `/api/cron/dormant-workbenches`** — the route exists and is CRON_SECRET-guarded, but nothing invokes it in production yet, so dormant benches accumulate silently. Daily is the intended cadence (matches `purge-trash`).
-- [ ] **Claims: inherit vs independent** (the plan's one open question). Workbenches currently claim content independently, like any workspace — zero special cases, but two benches under one parent can each borrow the same note and conflict with each other. Revisit only if that actually bites; the alternative (inheriting the parent's claims) makes open-intent resolution depth-aware.
 - [ ] **Server list endpoint is root-only.** `listWorkbenchFolders` serves layer 1; nested layers derive client-side from the one scoped-tree fetch. Fine while the submenu is the only consumer — if a second surface (mobile, extension panel) ever needs workbenches, it needs a depth parameter rather than a second tree walk.
 - [ ] **Dormant sweep is per-row.** `sweepDormantWorkbenches` does a hop-walk per workbench (≤3 point reads each). Correct and cheap at personal-vault scale; if a tenant ever holds hundreds of benches, batch the ancestor resolution.
 - [ ] **`membershipContentIds` union for tab counts** is computed client-side per row. If the count ever needs to appear somewhere without the full workspace payload, push it into `ContentWorkspaceResponse` as a scalar.
@@ -1123,18 +1122,17 @@ The following sprints were originally 38-42 in Epoch 9 but are deferred to Epoch
 
 ## Epoch 14: Saved Content Workspaces
 
-**Goal**: Persist named tab/pane workspaces with locked claims, temporary borrowing, permanent sharing, and expiration cleanup.
+**Goal**: Persist named tab/pane workspaces with expiration cleanup.
 **Detailed plan**: [epoch-14-saved-content-workspaces.md](epochs/epoch-14-saved-content-workspaces.md)
+**2026-10-08:** the claims / borrow / share half of this epoch was removed by owner decision — views and shortcuts govern what a workplace shows, nothing gates what it opens ([WORKPLACE-RESTRICTIONS-REMOVAL-PLAN.md](WORKPLACE-RESTRICTIONS-REMOVAL-PLAN.md)). The claim items below are withdrawn, not pending.
 
-### Sprint 65: Workspace Persistence + Claims
-- [ ] DB-backed `ContentWorkspace` and `ContentWorkspaceItem` models
+### Sprint 65: Workspace Persistence
+- [ ] DB-backed `ContentWorkspace` model
 - [ ] Main Workspace fallback for unassigned/catchall tabs
 - [ ] Workspace selector and settings popup in the main-panel navigation chrome
 - [ ] Per-workspace tab/pane layout persistence and restoration
-- [ ] Locked recursive folder/content claims with conflict reminder
-- [ ] Temporary borrowing with auto-release and permanent sharing
-- [ ] Tab context menu actions to move or share tabs across workspaces
-- [ ] Workspace expiration archive/release flow
+- [ ] Tab context menu action to move tabs across workspaces
+- [ ] Workspace expiration archive flow
 - [ ] Build + smoke gate on port `3014`
 
 ---

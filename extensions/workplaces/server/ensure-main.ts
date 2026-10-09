@@ -22,7 +22,6 @@ export const MAIN_WORKSPACE_SLUG = "main";
 /** The state Main must be in. Anything else is repaired (and that write is legitimate). */
 const REQUIRED = {
   isMain: true,
-  isLocked: false,
   status: "active" as const,
   expiresAt: null,
   archivedAt: null,
@@ -52,7 +51,6 @@ export async function ensureMainWorkspaceRow(
 
   const offState =
     existing.isMain !== REQUIRED.isMain ||
-    existing.isLocked !== REQUIRED.isLocked ||
     existing.status !== REQUIRED.status ||
     existing.expiresAt !== REQUIRED.expiresAt ||
     existing.archivedAt !== REQUIRED.archivedAt;

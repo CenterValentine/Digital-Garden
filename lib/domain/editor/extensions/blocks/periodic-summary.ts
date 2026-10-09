@@ -80,13 +80,6 @@ const summaryBaseAttrs = {
     .max(4)
     .default(0)
     .describe("Cutoff from 12 AM through 4 AM for assigning late-night work to the previous day."),
-  autoBorrowDurationMinutes: z
-    .number()
-    .int()
-    .min(1)
-    .max(1440)
-    .default(60)
-    .describe("Minutes to auto-borrow opened files when Workplaces is enabled."),
   pathOrder: z
     .enum(["Root > File", "File < Root"])
     .default("Root > File")
@@ -441,7 +434,6 @@ function renderSummaryItems(
   kind: PeriodicSummaryKind,
   window: { label: string; periodDate: string },
   items: PeriodicSummaryItem[],
-  autoBorrowDurationMinutes: number,
   pathOrder: unknown,
   showBackground: boolean
 ) {
@@ -493,7 +485,6 @@ function renderSummaryItems(
           id: item.id,
           title: item.title,
           contentType: item.contentType,
-          autoBorrowDurationMinutes,
         })
       );
     });
@@ -540,7 +531,6 @@ function renderPeriodicSummary(
   getPos?: () => number | undefined
 ) {
   const { window } = normalizeSummaryAttrs(kind, node.attrs);
-  const duration = Number(node.attrs.autoBorrowDurationMinutes) || 60;
   const pathOrder = node.attrs.pathOrder || "Root > File";
   const showBackground = node.attrs.showBackground !== false;
   const cacheKey = getSummaryCacheKey(window);
@@ -553,7 +543,6 @@ function renderPeriodicSummary(
         kind,
         window,
         cachedResult.items,
-        duration,
         pathOrder,
         showBackground
       );
@@ -565,7 +554,7 @@ function renderPeriodicSummary(
   loadPeriodicSummary(window)
     .then((result) => {
       if (contentDom.dataset.summaryRequestKey !== cacheKey) return;
-      renderSummaryItems(contentDom, kind, window, result.items, duration, pathOrder, showBackground);
+      renderSummaryItems(contentDom, kind, window, result.items, pathOrder, showBackground);
     })
     .catch((error) => {
       if (contentDom.dataset.summaryRequestKey !== cacheKey) return;
@@ -606,15 +595,6 @@ function createPeriodicSummaryNode(kind: PeriodicSummaryKind) {
             clampSummaryCutoffHour(el.getAttribute("data-workday-cutoff-hour")),
           renderHTML: (attrs) => ({
             "data-workday-cutoff-hour": clampSummaryCutoffHour(attrs.workdayCutoffHour),
-          }),
-        },
-        autoBorrowDurationMinutes: {
-          default: 60,
-          parseHTML: (el) =>
-            Number(el.getAttribute("data-auto-borrow-duration-minutes") || 60),
-          renderHTML: (attrs) => ({
-            "data-auto-borrow-duration-minutes":
-              Number(attrs.autoBorrowDurationMinutes) || 60,
           }),
         },
         pathOrder: {
@@ -714,7 +694,6 @@ function createServerPeriodicSummaryNode(kind: PeriodicSummaryKind) {
             "data-workday-cutoff-hour": clampSummaryCutoffHour(attrs.workdayCutoffHour),
           }),
         },
-        autoBorrowDurationMinutes: { default: 60 },
         pathOrder: {
           default: "Root > File",
           parseHTML: (el) =>

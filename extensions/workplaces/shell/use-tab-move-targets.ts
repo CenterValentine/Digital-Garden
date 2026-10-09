@@ -246,5 +246,5 @@ export function useTabMoveTargets(
     (group) => !group.isCurrent || group.benches.length > 0,
   );
 
-  return { groups, hasAnyTarget, topLevelWorkspaces };
+  return { groups, hasAnyTarget };
 }
