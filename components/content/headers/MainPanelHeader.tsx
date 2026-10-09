@@ -31,6 +31,15 @@ import { useExtensionShellTabMenuSections } from "@/lib/extensions/client-regist
 import { getCollaborationBrowserSessionId } from "@/lib/domain/collaboration/runtime";
 import { registerPollingTask } from "@/lib/core/polling/scheduler";
 import { prefetchContent } from "@/lib/domain/content/prefetch";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/client/ui/tooltip";
+
+/** How long the pointer rests on a tab before its full name shows. */
+const TAB_TITLE_TOOLTIP_DELAY_MS = 1000;
 
 interface TabPresenceSession {
   sessionId: string;
@@ -761,6 +770,10 @@ export function MainPanelHeader({
           backdropFilter: glass1.backdropFilter,
         }}
       >
+        {/* A tab's full name after a 1 s rest (owner ask, 2026-10-08: titles
+            truncate, and the browser's own tooltip was unreliable). Moving
+            to a neighbour while one is showing skips the wait. */}
+        <TooltipProvider delayDuration={TAB_TITLE_TOOLTIP_DELAY_MS} skipDelayDuration={300}>
         <div
           ref={(element) => {
             tabScrollerRef.current = element;
@@ -783,8 +796,9 @@ export function MainPanelHeader({
             const isDragging = draggedTabId === tab.id;
 
             return (
+              <Tooltip key={tab.id}>
+              <TooltipTrigger asChild>
               <div
-                key={tab.id}
                 ref={(node) => {
                   if (node) {
                     tabElementsRef.current.set(tab.id, node);
@@ -804,12 +818,12 @@ export function MainPanelHeader({
                 // Hit-tested by spring-loaded tabs (use-spring-tabs.ts): a
                 // drag resting here opens this tab.
                 data-tab-id={tab.id}
-                // Tabs truncate at 22rem — hover reveals the full title. Same
-                // native-title convention as the sidebar chat tabs.
+                // Tabs truncate at 22rem — the full name shows in the tooltip
+                // below after a rest. No native title as well: two tooltips.
                 title={
                   editingTabId === tab.id
                     ? "Rename — Enter to save, Esc to cancel"
-                    : tab.title
+                    : undefined
                 }
                 draggable
                 onPointerEnter={() => {
@@ -920,6 +934,17 @@ export function MainPanelHeader({
                   </button>
                 </span>
               </div>
+              </TooltipTrigger>
+              {editingTabId === tab.id || isDragging ? null : (
+                <TooltipContent
+                  side="bottom"
+                  align="start"
+                  className="max-w-[28rem] break-words border border-black/10 bg-white text-gray-900 shadow-md dark:border-white/10 dark:bg-gray-900 dark:text-gray-100"
+                >
+                  {tab.title || "Untitled"}
+                </TooltipContent>
+              )}
+              </Tooltip>
             );
           })}
           {/* "+" — add content to this pane via the canonical tree picker.
@@ -942,6 +967,7 @@ export function MainPanelHeader({
             />
           ) : null}
         </div>
+        </TooltipProvider>
       </div>
       {/* Portalled to the body so the menu escapes the header's stacking
           context — as a header child its z-50 could not paint above an
