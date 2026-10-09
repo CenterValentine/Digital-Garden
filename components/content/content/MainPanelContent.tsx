@@ -14,6 +14,7 @@ import {
   sameCanonicalJson,
 } from "@/lib/domain/content/conflict-diff";
 import { noteSaveBody, type SaveMeta } from "@/lib/domain/content/save-meta";
+import { useProjectedLayout } from "@/components/common/useProjectedLayout";
 import { usePathname } from "next/navigation";
 import { AlertTriangle } from "lucide-react";
 import { ToolSurfaceProvider } from "@/lib/domain/tools";
@@ -387,6 +388,10 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
   const { isDebugPanelVisible, toggleDebugPanel, setDebugPanelVisible, viewMode } = useDebugViewStore();
   const isActivePane = activePaneId === paneId;
   const isMultiPane = layoutMode !== "single";
+  // What the workspace RENDERS (intent projected — the side panel bans quad,
+  // the focus route is single), not the stored intent: a quad pane is small,
+  // so its title header goes compact (globals.css `.doc-title-header[data-compact]`).
+  const isQuadPane = useProjectedLayout(layoutMode) === "quad";
   const [noteContent, setNoteContent] = useState<JSONContent | null>(null);
   // ── Markdown source-view (v3.2 T2) ──────────────────────────────────────
   // Toggle between the rich-text editor and an editable markdown *source*
@@ -2851,7 +2856,9 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
             toolbar right above already pads its row, and the two stacked into
             a ~40px hole between the icons and the title (owner, 2026-10-08). */}
         {!isEmbedMode && (
-          <div className="doc-title-header flex-none px-6 pt-2 pb-4 flex items-start justify-between shadow-[0_4px_8px_-2px_rgba(15,23,42,0.08),0_10px_24px_-6px_rgba(15,23,42,0.05)]">
+          <div
+            data-compact={isQuadPane ? "" : undefined}
+            className="doc-title-header flex-none px-6 pt-2 pb-4 flex items-start justify-between shadow-[0_4px_8px_-2px_rgba(15,23,42,0.08),0_10px_24px_-6px_rgba(15,23,42,0.05)]">
             {isTitleEditing ? (
               <input
                 ref={titleInputRef}

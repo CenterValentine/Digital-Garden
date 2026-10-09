@@ -539,6 +539,21 @@ nav[class*="fixed"] {
   -webkit-touch-callout: none;
 }
 
+/* A quad pane is a small pane: its note title header goes compact — the
+ * same type size and padding the touch-device rule below uses (owner ask,
+ * 2026-10-08: "give the user room in a tighter space"). Set by MainPanelContent
+ * from the PROJECTED layout. Size only: the no-wrap + swipe treatment below is
+ * for phones, where a tap on the title would start a rename. */
+.doc-title-header[data-compact] {
+  padding-top: 0.25rem;
+  padding-bottom: 0.375rem;
+}
+.doc-title-header[data-compact] .doc-title-text,
+.doc-title-header[data-compact] input {
+  font-size: 1.375rem;
+  line-height: 1.25;
+}
+
 /* Reclaim vertical space on touch devices: the note title header ships desktop
  * padding (pt-2 pb-4 ≈ 24px) + a drop shadow that eats precious space above the
  * fold on phones. Shrink it on coarse pointers; the title itself is unchanged. */
