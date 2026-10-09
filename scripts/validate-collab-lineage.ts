@@ -494,7 +494,10 @@ async function main() {
       /provider\?\.synced &&\s*!provider\.hasUnsyncedChanges &&\s*entry\.state\.networkState === "online" &&[\s\S]{0,200}entry\.state\.connectionState !== "synced"/.test(rt),
     );
     check("reconnect: recovering sets recoveredAt and clears it after RECOVERED_NOTICE_MS", /if \(recovering\) \{\s*entry\.state\.recoveredAt = Date\.now\(\);[\s\S]{0,300}\}, RECOVERED_NOTICE_MS\);/.test(rt));
-    check("reconnect: the notice timer is cleared when the entry goes away", rt.includes("if (entry.recoveredNoticeTimer) clearTimeout(entry.recoveredNoticeTimer);"));
+    check(
+      "reconnect: the notice timer is cleared when the entry goes away",
+      /if \(entry\.recoveredNoticeTimer\) clearTimeout\(entry\.recoveredNoticeTimer\);\s*if \(entry\.visibilitySleepTimer\) clearTimeout\(entry\.visibilitySleepTimer\);/.test(rt),
+    );
     check("reconnect: the editor says so", editor.includes("Reconnected — your changes are synced.") && editor.includes("runtimeRecoveredAt !== null"));
   }
 
