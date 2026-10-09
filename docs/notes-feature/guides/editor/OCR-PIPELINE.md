@@ -31,6 +31,23 @@ D1–D11. Code: `lib/features/ocr/`.
 
 Stages 4–6 are the accuracy levers; 6 and 7 are the structure levers.
 
+### The AI path (⌥⌘V / Ctrl+Alt+V)
+
+A second engine for what the local one cannot do. It shares stages 1 and 8
+and replaces 2–7 with one model call:
+
+| Stage | Where | What it does |
+|---|---|---|
+| Gesture | `paste-modifier.ts` `isAiPasteChord` | Physical V key with ⌥⌘ / Ctrl+Alt, not Shift, not AltGr; reads the clipboard at once. Also: editor context menu → *Paste text from image with AI*. |
+| Model | `lib/domain/ai/features/registry.ts` → `image-text` | Settings → AI → Feature Routing → *Read Text in Images (AI)*; requires vision. Unrouted: registry default, then the first vision-capable model connected. |
+| Upload | `ai-engine.ts` | Images over 3.5 MB shrink to ≤ 2400 px JPEG (Vercel caps bodies at 4.5 MB; the route accepts ≤ 4 MB). |
+| Read | `app/api/ai/image-text/route.ts` | One `generateText` call; the instructions ask for markdown — tables as tables, code/terminal in fences, icons ignored, nothing translated. **Tune the AI's behaviour here.** |
+| Into the editor | `to-content.ts` `buildAiContent` | Straight to the paste parser — no reflow (it would mangle code fences). |
+
+The image leaves the device on this path. The first AI read in a browser
+names the provider and model that read it (`editor-ocr.ts`,
+`dg:ocr-ai-notice-shown`).
+
 ---
 
 ## 2. Every tunable, with its evidence
@@ -105,6 +122,5 @@ mutation-test the gate — break the rule on purpose and confirm the check fails
 | Handwriting, stylised fonts | Outside Tesseract's training | A vision model |
 | Accents dropped | Language pack not enabled | Settings → Text recognition |
 
-The vision-model engine is the planned second member of `OcrEngine`
-(`types.ts`); it is the remedy for everything in this table that says "a
-vision model".
+"A vision model" in this table means ⌥⌘V (Ctrl+Alt+V): the `ai` engine,
+routed in Settings → AI → Feature Routing.

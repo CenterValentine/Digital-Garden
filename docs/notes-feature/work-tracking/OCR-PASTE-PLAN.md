@@ -424,6 +424,30 @@ stays a list). Reflow passes table blocks through; the speed reader flattens
 them to comma-separated rows. Gate: 12 checks, 9 mutants killed. Not
 handled: cells that wrap onto a second line — the vision-model path.
 
+### D13 — ⌥⌘V reads with the user's AI model (owner, 2026-10-09; stub)
+
+Owner: a separate special-paste shortcut for an AI model the user designates.
+**Chord: ⌥⌘V (Ctrl+Alt+V)** — "Paste Special" in Office, unbound in the app
+and the browsers, fires no native paste (the clipboard is read directly).
+Rejected: ⌥⇧⌘V (macOS Paste and Match Style — the browser pastes first).
+Matched on `event.code` (Option rewrites `event.key` on a Mac); skipped
+when `getModifierState("AltGraph")` (AltGr+V types a character on some
+Windows layouts).
+
+**Designation reuses Feature Routing**: a `image-text` feature requiring
+`vision` — no new setting UI; the user picks the model where every other
+AI feature's model is picked. The Text recognition section links there.
+Server: `POST /api/ai/image-text` (multipart, ≤ 4 MB; client shrinks larger
+images). The model returns markdown, which skips the local reflow. First use
+names the provider. Also in the editor context menu and the flashcards
+editor. Gate: chord and content rules, 4 mutants killed.
+
+**Stub limits (deliberate):** no per-call usage/cost record beyond what the
+provider bills; no "Read with AI" upgrade action on a local result's toast;
+no AI variants of the image right-click actions; no fallback chain across
+routed models (`resolvePrimaryRoute` only). Verified by typecheck, gates and
+the chord/content checks — **not yet exercised against a live model**.
+
 ### Not built — rotation detection
 
 Tesseract's own orientation detector (PSM 0/1/12, `worker.detect()`) needs
