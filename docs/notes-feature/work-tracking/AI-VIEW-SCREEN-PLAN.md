@@ -237,6 +237,13 @@ A request to look at the screen carries no id and no text that a hint could use 
 
 The description was tightened to keep the cost down: about 330 tokens before, about 200 now. `view_image` now says outright that the user's screen is `view_screen`'s job.
 
+### D16 — Scroll position, "this file", and titles without mention markup (owner smoke, 2026-10-09)
+
+- **Scroll.** A chat scrolled to its latest message was captured from its top. modern-screenshot can restore scroll positions (it translates a scrolled element's children), but `restoreScrollPosition` is **off by default**. It is now on, which covers every scrolled area: chats, long notes, the tree. Verified headless: a box scrolled 1000 px draws from LINE-1 with the flag off and from LINE-51 with it on.
+- **"Just this file."** The user typing in a chat pane asked for "this file", and the focused pane, the chat itself, was captured. `view_screen` now takes `contentId`, meaning the visible pane whose active tab shows that item. If no visible pane shows it, the capture is refused, never widened (D12). When the default pane *is* the chat and another pane is open, the result tells the model how to reach that pane.
+- **Titles.** A chat was titled `Try to just look at the @[bookcove](ec196794-147`, because the auto-title route's fallback cut the raw mention markup at 48 characters. Mentions now render as `@Title` before titling, which helps both the model-written title and the fallback. One shared mention regex (`lib/domain/ai/mention-markup.ts`) replaces four copies (input, engine, two in the message renderer). Chats already titled with the markup keep their title until renamed.
+- **Pane titles** come from the content store's active tab. The `data-active-tab` marker is gone: the editor's Tabs block renders the same attribute inside notes, so it could have been read as a pane title.
+
 ### D11 — Co-browse bound tab (phase 3, HELD)
 
 Co-browse work stays postponed (owner, 2026-10-06) until the feature it waits on is built. The design is recorded here, not built:
@@ -320,6 +327,9 @@ Phases 1 and 2 ship in one PR. Changing what the model receives is AI capability
 - [ ] App chat: "screenshot just my file tree" → the left sidebar only; with it collapsed → refused, nothing captured.
 - [ ] App chat, an image file open (e.g. a book cover PNG) → the image is IN the thumbnail and the model describes it.
 - [ ] With an image file open, "don't look at the image, take a screenshot of my screen" (GPT-4o) → `view_screen`, not `view_image` (D15).
+- [ ] A long chat scrolled to the bottom → "screenshot my screen" shows the latest messages, not the top (D16).
+- [ ] Typing in a chat pane beside a file: "screenshot just this file" → the file's pane, not the chat (D16).
+- [ ] A new chat whose first message @-mentions a file → its title reads "@name", no `@[…](…)` (D16).
 - [ ] "Look at the bookcove image" (GPT-4o, Claude, Gemini) → one `view_image` call, chip "Looked at image: bookcove" with its thumbnail, and a description of the cover — no read_content loop.
 - [ ] Same with a text-only model → `read_image_text` is offered and called (no loop), the cover's words come back.
 - [ ] A text-only model (e.g. DeepSeek) → `view_screen` is not offered; the model says it can't see.
