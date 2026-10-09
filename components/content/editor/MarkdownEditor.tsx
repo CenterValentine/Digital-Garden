@@ -1914,8 +1914,8 @@ export function MarkdownEditor({
       />
 
       {/* Template / Snippet pickers — event-driven, no props needed */}
-      <TemplatePicker />
-      <SnippetPicker />
+      <TemplatePicker editor={editor} />
+      <SnippetPicker editor={editor} />
 
       {/* "Move to Note" target picker — event-driven, addressed to THIS editor */}
       <MoveSelectionPicker editor={editor} />

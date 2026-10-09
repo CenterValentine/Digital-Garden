@@ -352,10 +352,11 @@ async function deleteSnippet(snippetId: string): Promise<boolean> {
 
 
 /**
- * Insert a template's tiptapJson at the current cursor position.
+ * Insert a template's tiptapJson at the current cursor position of `editor` —
+ * the editor that was right-clicked. Never "the first registered editor": in a
+ * split layout that is often another pane's note.
  */
-function insertTemplate(templateId: string) {
-  const editor = Object.values(useEditorInstanceStore.getState().editorsByContentId).find(Boolean) ?? null;
+function insertTemplate(editor: Editor | null, templateId: string) {
   if (!editor) return;
 
   const store = useTemplateStore.getState();
@@ -382,10 +383,10 @@ function insertTemplate(templateId: string) {
 }
 
 /**
- * Insert a snippet's content at the current cursor position.
+ * Insert a snippet's content at the current cursor position of `editor`
+ * (the right-clicked one — see insertTemplate).
  */
-function insertSnippet(snippetId: string) {
-  const editor = Object.values(useEditorInstanceStore.getState().editorsByContentId).find(Boolean) ?? null;
+function insertSnippet(editor: Editor | null, snippetId: string) {
   if (!editor) return;
 
   const store = useSnippetStore.getState();
@@ -406,10 +407,10 @@ function insertSnippet(snippetId: string) {
 }
 
 /**
- * Insert a snippet as plain text (strips all formatting).
+ * Insert a snippet as plain text (strips all formatting) into `editor`
+ * (the right-clicked one — see insertTemplate).
  */
-function insertSnippetAsText(snippetId: string) {
-  const editor = Object.values(useEditorInstanceStore.getState().editorsByContentId).find(Boolean) ?? null;
+function insertSnippetAsText(editor: Editor | null, snippetId: string) {
   if (!editor) return;
 
   const store = useSnippetStore.getState();
@@ -1097,7 +1098,7 @@ export const editorActionProvider: ContextMenuActionProvider = (ctx) => {
         insertSubmenu.push({
           id: `insert-tpl-${t.id}`,
           label: t.title,
-          onClick: () => insertTemplate(t.id),
+          onClick: () => insertTemplate(contextEditor, t.id),
         });
       }
       insertSubmenu.push({ id: "insert-tpl-divider", label: "", divider: true, disabled: true });
@@ -1116,7 +1117,7 @@ export const editorActionProvider: ContextMenuActionProvider = (ctx) => {
         submenu: templates.map((t) => ({
           id: `insert-tpl-${t.id}`,
           label: t.title,
-          onClick: () => insertTemplate(t.id),
+          onClick: () => insertTemplate(contextEditor, t.id),
         })),
       });
     }
@@ -1194,7 +1195,7 @@ export const editorActionProvider: ContextMenuActionProvider = (ctx) => {
         submenu: snippets.map((s) => ({
           id: `insert-snip-${s.id}`,
           label: s.displayTitle,
-          onClick: () => insertSnippet(s.id),
+          onClick: () => insertSnippet(contextEditor, s.id),
         })),
       });
       insertTextSubmenu.push({
@@ -1203,7 +1204,7 @@ export const editorActionProvider: ContextMenuActionProvider = (ctx) => {
         submenu: snippets.map((s) => ({
           id: `insert-snip-text-${s.id}`,
           label: s.displayTitle,
-          onClick: () => insertSnippetAsText(s.id),
+          onClick: () => insertSnippetAsText(contextEditor, s.id),
         })),
       });
     }

@@ -11,8 +11,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { X, Search, FileText } from "lucide-react";
-import type { JSONContent } from "@tiptap/core";
-import { useEditorInstanceStore } from "@/state/editor-instance-store";
+import type { Editor, JSONContent } from "@tiptap/core";
 import { useTemplateStore } from "@/state/template-store";
 import type { ContentTemplateWithCategory } from "@/lib/domain/templates";
 import { getViewerExtensions } from "@/lib/domain/editor/extensions-client";
@@ -26,7 +25,14 @@ function getTemplateInsertExtensions() {
   return templateInsertExtensions;
 }
 
-export function TemplatePicker() {
+/**
+ * Every editor mounts its own picker, and the slash command names its editor in
+ * the open event — so in a split (or inside a Note Window) only THIS editor's
+ * picker opens, and it inserts into this editor. It used to open in every pane
+ * and insert into the first registered editor, often another pane's note.
+ * Same addressing as MoveSelectionPicker.
+ */
+export function TemplatePicker({ editor }: { editor: Editor | null }) {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -36,7 +42,8 @@ export function TemplatePicker() {
 
   // Listen for the open event from slash commands
   useEffect(() => {
-    const handleOpen = () => {
+    const handleOpen = (event: Event) => {
+      if ((event as CustomEvent<{ editor?: Editor }>).detail?.editor !== editor) return;
       setIsOpen(true);
       // Reset loading state in case a previous fetch left it stuck
       useTemplateStore.setState({ isLoading: false });
@@ -46,7 +53,7 @@ export function TemplatePicker() {
 
     window.addEventListener("open-template-picker", handleOpen);
     return () => window.removeEventListener("open-template-picker", handleOpen);
-  }, [fetchTemplates, fetchCategories]);
+  }, [fetchTemplates, fetchCategories, editor]);
 
   // Auto-focus search input when opened
   useEffect(() => {
@@ -56,7 +63,6 @@ export function TemplatePicker() {
   }, [isOpen]);
 
   const handleSelect = useCallback((template: ContentTemplateWithCategory) => {
-    const editor = Object.values(useEditorInstanceStore.getState().editorsByContentId).find(Boolean) ?? null;
     if (!editor) return;
 
     const tiptapJson = template.tiptapJson as { content?: unknown[] };
@@ -83,7 +89,7 @@ export function TemplatePicker() {
     // Track usage
     fetch(`/api/content/templates/${template.id}/use`, { method: "POST" }).catch(() => {});
     fetchTemplates();
-  }, [fetchTemplates]);
+  }, [fetchTemplates, editor]);
 
   const handleClose = useCallback(() => {
     setIsOpen(false);

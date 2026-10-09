@@ -80,7 +80,7 @@ Branch `refactor/remove-workplace-claims` · plan [WORKPLACE-RESTRICTIONS-REMOVA
 - **Shared OCR engine** (`lib/features/ocr/`): lazy, one worker per page, 120 s idle termination, self-hosted worker + core (`public/ocr/`), pinned language pack. The speed reader uses it.
 - **Editor**: ⇧⌘V pastes an image's text only; image context menu *Extract text from image* / *Replace image with its text*; clipboard *Paste text from image*. Same ⇧⌘V branch in the flashcards editor.
 - **AI**: `read_content` lists a note's images (it dropped them before); new client-executed `read_image_text` reads one on the device.
-- **Fix**: editor context-menu Cut / Paste / Paste as Markdown act on the right-clicked editor (they used the first registered one).
+- **Fix — wrong-pane inserts**: editor context-menu Cut / Paste / Paste as Markdown / Insert Template / Insert Snippet act on the right-clicked editor (they used the first registered one); `/template` and `/snippet` open only the invoking editor's picker and insert there (they opened in every pane).
 - **Postponed (owner)**: co-browse `read_screen` → backlog.
 
 ### Smoke checklist (owner)
@@ -295,7 +295,7 @@ The ten lines in `OCR-PASTE-PLAN.md` §3 — ⇧⌘V vs ⌘V, both image actions
 - [ ] AI chat bound to the note: `read_content` / "read the document" never quotes private text; `list_document_outline` shows "(no text)" for a private block.
 - [ ] Publish the note → private text and block absent from the public page.
 - [ ] Global search for a private-only word finds nothing after the note saves.
-=======
+
 ## September 21, 2026 — Move tab to workplace / workbench
 
 **Tree**: worktree `.claude/worktrees/move-tab-to-workspace`, branch `feat/move-tab-to-workspace` (PR pending)
