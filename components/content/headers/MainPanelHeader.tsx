@@ -538,9 +538,17 @@ export function MainPanelHeader({
   }, [isTreeDropHover]);
 
   const updateTabRects = useCallback(() => {
+    // A tab scrolled out of its strip still has a rect — off to the side,
+    // often over the NEXT pane — and its disc, drawn at fixed coordinates,
+    // floated there with no tab under it. Only tabs whose middle is inside
+    // the strip's visible span get a disc.
+    const strip = tabScrollerRef.current?.getBoundingClientRect() ?? null;
     const nextRects: Record<string, DOMRect | null> = {};
     for (const tab of visibleTabs) {
-      nextRects[tab.id] = tabElementsRef.current.get(tab.id)?.getBoundingClientRect() ?? null;
+      const rect = tabElementsRef.current.get(tab.id)?.getBoundingClientRect() ?? null;
+      const middle = rect ? rect.left + rect.width / 2 : 0;
+      nextRects[tab.id] =
+        rect && (!strip || (middle >= strip.left && middle <= strip.right)) ? rect : null;
     }
     setTabRects(nextRects);
   }, [visibleTabs]);

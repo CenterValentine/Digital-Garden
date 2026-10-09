@@ -540,7 +540,7 @@ nav[class*="fixed"] {
 }
 
 /* Reclaim vertical space on touch devices: the note title header ships desktop
- * padding (pt-6 pb-4 ≈ 40px) + a drop shadow that eats precious space above the
+ * padding (pt-2 pb-4 ≈ 24px) + a drop shadow that eats precious space above the
  * fold on phones. Shrink it on coarse pointers; the title itself is unchanged. */
 @media (pointer: coarse) {
   .doc-title-header {

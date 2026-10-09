@@ -203,8 +203,11 @@ export function ContentToolbar({ contentId: contentIdProp }: ContentToolbarProps
   }
 
   return (
+    // Scrolls sideways in a narrow pane, but with the scrollbar hidden (as
+    // the tab strip above does): a visible bar sat under the icons as a strip
+    // of dead space (owner, 2026-10-08). Trackpad / wheel still scroll it.
     <div
-      className="flex min-h-11 shrink-0 items-center gap-1 overflow-x-auto px-3 py-1.5"
+      className="flex min-h-10 shrink-0 items-center gap-1 overflow-x-auto scrollbar-hide px-3 py-1"
       role="toolbar"
       aria-label="Content actions"
     >

@@ -2847,9 +2847,11 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
     // Main editor component
     const editorElement = (
       <div className="flex flex-col h-full">
-        {/* Note title header with debug toggle */}
+        {/* Note title header with debug toggle. pt-2, not pt-6: the content
+            toolbar right above already pads its row, and the two stacked into
+            a ~40px hole between the icons and the title (owner, 2026-10-08). */}
         {!isEmbedMode && (
-          <div className="doc-title-header flex-none px-6 pt-6 pb-4 flex items-start justify-between shadow-[0_4px_8px_-2px_rgba(15,23,42,0.08),0_10px_24px_-6px_rgba(15,23,42,0.05)]">
+          <div className="doc-title-header flex-none px-6 pt-2 pb-4 flex items-start justify-between shadow-[0_4px_8px_-2px_rgba(15,23,42,0.08),0_10px_24px_-6px_rgba(15,23,42,0.05)]">
             {isTitleEditing ? (
               <input
                 ref={titleInputRef}
