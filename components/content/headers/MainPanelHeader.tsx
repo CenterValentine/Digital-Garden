@@ -544,6 +544,12 @@ export function MainPanelHeader({
     }
     setTabRects(nextRects);
   }, [visibleTabs]);
+  // The presence poll re-measures through this, so its lifecycle stays tied to
+  // WHICH content is open, not to every change of the visible tab list.
+  const updateTabRectsRef = useRef(updateTabRects);
+  useEffect(() => {
+    updateTabRectsRef.current = updateTabRects;
+  }, [updateTabRects]);
 
   useEffect(() => {
     updateTabRects();
@@ -557,6 +563,18 @@ export function MainPanelHeader({
     for (const tab of visibleTabs) {
       const element = tabElementsRef.current.get(tab.id);
       if (element) resizeObserver?.observe(element);
+    }
+    // A tab can MOVE without resizing — the side panels lay out after mount,
+    // a sidebar opens, closes or is dragged — and the presence discs are
+    // drawn at fixed viewport coordinates measured here. Watching only the
+    // tabs left those coordinates stale, so a collaborator's disc sat where
+    // the tab used to be (often behind a sidebar) and showed in one window
+    // but not the other (owner report, 2026-10-08). The strip and the header
+    // around it DO resize when the panels shift.
+    const strip = tabScrollerRef.current;
+    if (strip) {
+      resizeObserver?.observe(strip);
+      if (strip.parentElement) resizeObserver?.observe(strip.parentElement);
     }
 
     return () => {
@@ -590,6 +608,8 @@ export function MainPanelHeader({
         if (!result.success || !result.data || isCancelled) return;
 
         setPresenceByContentId(result.data.presenceByContentId);
+        // Fresh discs get fresh positions, whatever moved since the last poll.
+        updateTabRectsRef.current();
       } catch {
         // Presence is advisory; the tab UI should not block navigation.
       }
