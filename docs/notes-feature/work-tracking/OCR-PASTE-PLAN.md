@@ -409,6 +409,21 @@ cannot stretch a row. Terminal case 64% → 10%; every other test image
 unchanged. Gate mutation run: 7 killed, after fixing two weak fixtures and
 removing one redundant filter.
 
+### D12 — Tables become tables, locally (owner, 2026-10-09)
+
+The owner's biggest issue: a three-column table pasted as flat lines.
+Measured, Tesseract read every word and row correctly (0% character error) —
+only the columns were lost. `lib/features/ocr/table.ts` recovers them from
+word boxes: a gap wider than 1.2 word heights ends a cell; the most common
+multi-cell count defines the columns; three or more consecutive rows whose
+cells fall in distinct columns become a GFM markdown table, which the
+editor's own paste parser turns into a table node (gate-verified). A missing
+cell stays empty. Guards: median cell ≤ 5 words (a two-column article stays
+text) and low-confidence glyph columns dropped (the owner's sidebar list
+stays a list). Reflow passes table blocks through; the speed reader flattens
+them to comma-separated rows. Gate: 12 checks, 9 mutants killed. Not
+handled: cells that wrap onto a second line — the vision-model path.
+
 ### Not built — rotation detection
 
 Tesseract's own orientation detector (PSM 0/1/12, `worker.detect()`) needs

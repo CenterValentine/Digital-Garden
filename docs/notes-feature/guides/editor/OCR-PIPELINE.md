@@ -24,11 +24,12 @@ D1–D11. Code: `lib/features/ocr/`.
 | 3 | **Languages** | `languages.ts` | English always; others from `editor.ocrLanguages` (Settings → Editor & Files → Text recognition). |
 | 4 | **Preprocess** | `preprocess.ts` | Grayscale; invert if the median luminance is dark; upscale narrow images. |
 | 5 | **Layout mode** | `preprocess.ts` + `local-engine.ts` | Read in normal layout (PSM 3); below 85 confidence, re-read in sparse layout (PSM 11) and keep the more confident read. |
-| 6 | **Reading order** | `layout.ts` | If most lines are 1–2-word fragments, rebuild rows from word boxes (Tesseract reads aligned short words as columns). |
+| 6 | **Tables** | `table.ts` | Cells split at gaps wider than 1.2 word heights; ≥ 3 consecutive rows whose cells fall in distinct columns become a markdown table (→ a real table node). |
+| 6b | **Reading order** | `layout.ts` | No table: if most lines are 1–2-word fragments, rebuild rows from word boxes (Tesseract reads aligned short words as columns). |
 | 7 | **Reflow** | `reflow.ts` | Which line ends are word-wraps and which are real breaks; bullets and `1)` → markdown; hyphenated wraps rejoined. |
 | 8 | **Into the editor** | `to-content.ts`, `editor-ocr.ts` | Markdown-looking text through the editor's own paste parser, else plain paragraphs; inside a code block the raw lines. |
 
-Stages 4–6 are the accuracy levers. Stage 7 is the formatting lever.
+Stages 4–6 are the accuracy levers; 6 and 7 are the structure levers.
 
 ---
 
@@ -40,6 +41,10 @@ Stages 4–6 are the accuracy levers. Stage 7 is the formatting lever.
 | `TARGET_WIDTH`, `MAX_SCALE` | `preprocess.ts` | 1600 px, 3× | Dark sidebar list: 44% → 31% | More scale = slower, little gain past 3×; slightly hurt one address-bar image (16% → 23%). |
 | `SPARSE_PASS_BELOW` | `preprocess.ts` | 85 | Prose reads at 92–95 (one pass); UI list 72 → sparse 80, error 31% → 14%; 90 gave identical results | Higher = more second passes (≈ +1 s each) on ordinary screenshots. |
 | `FRAGMENT_MAX_WORDS`, `FRAGMENTED_SHARE`, `FRAGMENTED_MIN_LINES` | `layout.ts` | 2, 60%, 4 | Terminal output 64% → 10% | Looser rules risk interleaving a real two-column article. |
+| `COLUMN_GAP_HEIGHTS` | `table.ts` | 1.2 word heights | Word spacing is a fraction of a letter's height; synthetic tables split cleanly | Lower splits ordinary words into cells; higher merges narrow columns. |
+| `MIN_TABLE_ROWS`, `MIN_COLUMNS` | `table.ts` | 3, 2 | A header plus two rows is the smallest table worth structuring | — |
+| `MAX_WORDS_PER_CELL` | `table.ts` | 5 (median) | A two-column article stayed text | Higher risks turning two prose columns into a "table". |
+| `ICON_COLUMN_CONFIDENCE` | `table.ts` | 50 | The sidebar list's icon column read at low confidence and is dropped, so the list stays a list | Higher may drop a real column of short codes. |
 | `TALL_WORD` | `layout.ts` | 1.5× median | Three stacked ✓ read as one tall "NNN" had merged three rows | — |
 | `PARAGRAPH_GAP_ROWS` | `layout.ts` | 1.6 rows | — (geometry convention) | — |
 | `SHORT_LINE_RATIO`, `MIN_WRAP_WIDTH` | `reflow.ts` | 0.6, 40 chars | A line stopping well short of the column is a real break (heading, sign-off) | See the 17 reflow fixtures before changing. |
@@ -74,7 +79,9 @@ Baseline on 2026-10-08:
 |---|---|
 | Paragraph, light / dark | 0% / 0% |
 | Terminal | 10% (✓ marks read as stray letters) |
-| Three-column table | 0% characters — **but the columns are lost** (see §4) |
+| Three-column table | 0%, pasted as a real table |
+| Table with an empty cell | 0%, empty cell kept |
+| Two-column article | not mistaken for a table |
 | Spanish, English only / + Spanish | 8% / 0% |
 
 The owner's real screenshots (2026-10-08) measured the same way: console
@@ -92,7 +99,8 @@ mutation-test the gate — break the rule on purpose and confirm the check fails
 |---|---|---|
 | "DB Al" for "DB AI", `|` for `I` | Look-alike glyphs in sans-serif UI fonts | None locally; a vision model |
 | Stray letters from icons and ✓ marks | Tesseract reads any glyph as text | None locally; a vision model |
-| A table pastes as flat lines | Recognition is right, structure is not detected | Column detection → markdown table (local, not built), or a vision model |
+| A table pastes as flat lines | A cell wraps onto a second line, or the table has fewer than three rows | Local detection handles clean single-line cells (`table.ts`); wrapped cells need a vision model |
+| Two prose columns come back interleaved line by line | Tesseract's own reading order for side-by-side text columns | A vision model |
 | Sideways phone photos | No orientation detection | Try 90/180/270° on very low confidence (not built; see plan) |
 | Handwriting, stylised fonts | Outside Tesseract's training | A vision model |
 | Accents dropped | Language pack not enabled | Settings → Text recognition |
