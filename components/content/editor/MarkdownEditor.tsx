@@ -344,6 +344,8 @@ export function MarkdownEditor({
   const runtimeEditPolicy = collaborationRuntime?.state.editPolicy ?? null;
   const runtimeConnectionState = collaborationRuntime?.state.connectionState ?? null;
   const runtimeNetworkState = collaborationRuntime?.state.networkState ?? null;
+  // Set for a few seconds when the document recovers from offline (runtime's markSynced).
+  const runtimeRecoveredAt = collaborationRuntime?.state.recoveredAt ?? null;
   const runtimeLocalDirty = collaborationRuntime?.state.localDirty ?? false;
   const runtimeUnsyncedUpdateCount = collaborationRuntime?.state.unsyncedUpdateCount ?? 0;
   const viewerExtensions = useMemo(() => getViewerExtensions(), []);
@@ -1707,6 +1709,16 @@ export function MarkdownEditor({
       {isCollaborationConnecting ? (
         <div className="border-b border-amber-500/20 bg-amber-500/10 px-4 py-2 text-sm text-amber-700 dark:text-amber-300">
           Connecting collaborative editor...
+        </div>
+      ) : null}
+      {collaborationEnabled && runtimeRecoveredAt !== null && !collaborationNotice && !isCollaborationConnecting ? (
+        // The warnings above clear the moment the document is back in sync;
+        // say so, briefly, instead of letting them just vanish.
+        <div
+          role="status"
+          className="border-b border-emerald-500/20 bg-emerald-500/10 px-4 py-2 text-sm text-emerald-700 dark:text-emerald-300"
+        >
+          Reconnected — your changes are synced.
         </div>
       ) : null}
       {/* Sprint 37: Hidden file input for image upload */}

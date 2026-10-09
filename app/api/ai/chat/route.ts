@@ -209,7 +209,11 @@ import {
   ensureConversationContentNode,
 } from "@/lib/features/conversations";
 import { publishEvent } from "@/lib/domain/notifications";
-import { resolveNativeWebSearchTool } from "@/lib/domain/ai/acquisition";
+import {
+  noteNativeSearchRejection,
+  resolveNativeWebSearchTool,
+  supportsNativeWebSearch,
+} from "@/lib/domain/ai/acquisition";
 import { userHasSearchConnection } from "@/lib/domain/ai/acquisition/search/resolve";
 import { createAppWebSearchTool } from "@/lib/domain/ai/acquisition/search/tool";
 import { repairDanglingToolCalls } from "@/lib/domain/ai/repair-dangling-tools";
@@ -245,7 +249,12 @@ import {
   viewScreenTool,
   createViewImageTool,
 } from "@/lib/domain/ai/tools/registry";
-import { READ_IMAGE_TEXT, describeImageMention } from "@/lib/domain/ai/tools/read-image-text";
+import {
+  READ_IMAGE_TEXT,
+  describeImageMention,
+  ocrAttachmentBlock,
+  type OcrExtractionProfile,
+} from "@/lib/domain/ai/tools/read-image-text";
 import { VIEW_SCREEN } from "@/lib/domain/ai/tools/view-screen";
 import { VIEW_IMAGE } from "@/lib/domain/ai/tools/view-image";
 import { deliverScreenCaptures, screenDeliveryMode } from "@/lib/domain/ai/screen-delivery";
@@ -1725,8 +1734,13 @@ export async function POST(request: Request) {
       const executedProviderId = NATIVE_TOOL_VENDORS.has(executedVendorId)
         ? executedVendorId
         : null;
+      // A model that rejects its vendor's hosted search (catalog
+      // `nativeWebSearch: false`, or learned from a rejection) falls through
+      // to the app-executed search below, like a vendor with none.
       const nativeSearch =
-        executedProviderId && NATIVE_TOOL_VENDORS.has(executedProviderId)
+        executedProviderId &&
+        NATIVE_TOOL_VENDORS.has(executedProviderId) &&
+        supportsNativeWebSearch(executedProviderId, executedBareModelId)
           ? resolveNativeWebSearchTool(executedProviderId)
           : null;
       const searchEnabled = toolConfig["search_web"]?.enabled !== false;
@@ -1989,6 +2003,7 @@ export async function POST(request: Request) {
         ),
         executedVendorId,
         audioCapable,
+        visionCapable,
       );
 
       // Convert UIMessages to ModelMessages for streamText
@@ -3596,6 +3611,20 @@ export async function POST(request: Request) {
         },
         onError: ({ error }) => {
           streamSpan.fail(error);
+          // "Tool 'web_search_preview' is not supported with gpt-4." — leave
+          // the hosted search off for that model from the next request on.
+          const rejectedModel = noteNativeSearchRejection(
+            executedVendorId,
+            error instanceof Error ? error.message : String(error),
+          );
+          if (rejectedModel) {
+            logger.warn({
+              layer: "ai",
+              event: "ai:native_search_rejected",
+              summary: `${executedVendorId} rejected hosted web search for ${rejectedModel} — off for this model from now on`,
+              attrs: { vendor: executedVendorId, model: rejectedModel },
+            });
+          }
         },
       });
 
@@ -3918,7 +3947,8 @@ const PDF_NATIVE_PROVIDERS = new Set(["anthropic", "google"]);
  * The client persists attachments as file parts (a clean chip), stashing
  * server-extracted text in `providerMetadata.app.text` for non-image
  * types. Here we adapt each user message for the model:
- *   - images → kept (vision providers consume them);
+ *   - images → kept for a vision model; for one that can't see, the text
+ *     read from them on the user's device is inlined instead (D18);
  *   - PDFs → kept for Anthropic/Google (native document parts), else the
  *     extracted text is inlined and the part dropped;
  *   - other files (txt/md/csv/json) → always inlined as text.
@@ -3931,6 +3961,7 @@ function resolveAttachmentsForModel(
   messages: unknown[],
   providerId: string,
   audioCapable: boolean,
+  visionCapable: boolean,
 ): unknown[] {
   const nativePdf = PDF_NATIVE_PROVIDERS.has(providerId);
 
@@ -3954,6 +3985,12 @@ function resolveAttachmentsForModel(
 
     const kept: unknown[] = [];
     const inlined: string[] = [];
+    // D18: number a message's images for a model that can't see them, in
+    // attachment order — pasted screenshots all share the name image.png.
+    const imageTotal = (m.parts as Array<Record<string, unknown>>).filter(
+      (x) => x?.type === "file" && typeof x.mediaType === "string" && x.mediaType.startsWith("image/"),
+    ).length;
+    let imageIndex = 0;
 
     for (const p of m.parts as Array<Record<string, unknown>>) {
       if (p?.type !== "file") {
@@ -3970,6 +4007,28 @@ function resolveAttachmentsForModel(
       const isImage = mediaType.startsWith("image/");
       const isPdf = mediaType === "application/pdf";
       const isAudio = mediaType.startsWith("audio/");
+
+      // D18: a model that can't see gets the image's TEXT, read on the user's
+      // device at attach time, labelled with how it was read and what to
+      // doubt. Never the image part — a text-only provider rejects it or
+      // drops it silently.
+      if (isImage && !visionCapable) {
+        imageIndex += 1;
+        const appMeta = (p.providerMetadata as Record<string, Record<string, unknown>> | undefined)?.app;
+        let profile: OcrExtractionProfile | null = null;
+        try {
+          profile = typeof appMeta?.ocrExtraction === "string" ? (JSON.parse(appMeta.ocrExtraction) as OcrExtractionProfile) : null;
+        } catch {
+          profile = null;
+        }
+        inlined.push(
+          ocrAttachmentBlock(filename, typeof appMeta?.ocrText === "string" ? appMeta.ocrText : "", profile, {
+            index: imageIndex,
+            total: imageTotal,
+          }),
+        );
+        continue;
+      }
 
       if (isImage || (isPdf && nativePdf) || (isAudio && audioCapable)) {
         kept.push(stripAppMeta(p));

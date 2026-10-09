@@ -30,6 +30,7 @@ const KNOWN_CODES = new Set([
   "CONTENT_FILTERED",
   "QUOTA_EXCEEDED",
   "INVALID_API_KEY",
+  "NATIVE_SEARCH_UNSUPPORTED",
 ]);
 
 /**
@@ -41,6 +42,12 @@ const KNOWN_CODES = new Set([
  */
 function inferCodeFromMessage(msg: string): string | null {
   const m = msg.toLowerCase();
+  // Before the generic "not supported" phrasings below: a model that rejects
+  // its vendor's hosted search tool ("Tool 'web_search_preview' is not
+  // supported with gpt-4."). The server switches it off for that model.
+  if (/tool '[a-z_]*search[a-z_]*' is not supported with/.test(m)) {
+    return "NATIVE_SEARCH_UNSUPPORTED";
+  }
   if (m.includes("rate limit") || m.includes("rate_limit") || m.includes("429")) {
     return "RATE_LIMITED";
   }
@@ -82,9 +89,12 @@ function inferCodeFromMessage(msg: string): string | null {
 export function parseChatError(raw: string | undefined | null): ParsedChatError {
   if (!raw) return { code: "UNKNOWN", message: "Chat request failed." };
 
-  // Fast path: not JSON, return as-is.
+  // Not JSON: a provider error forwarded mid-stream as plain text. Classify
+  // it from its words — this path used to return UNKNOWN unexamined, so no
+  // stream error ever got its friendly copy (found 2026-10-09 with OpenAI's
+  // "Tool 'web_search_preview' is not supported with gpt-4.").
   if (!raw.trim().startsWith("{")) {
-    return { code: "UNKNOWN", message: raw };
+    return { code: inferCodeFromMessage(raw) ?? "UNKNOWN", message: raw };
   }
 
   try {
@@ -152,6 +162,9 @@ export function describeChatError(parsed: ParsedChatError): string {
   }
   if (parsed.code === "INVALID_API_KEY") {
     return "The API key on the routing Connection was rejected. Update it in Settings → AI → Connections.";
+  }
+  if (parsed.code === "NATIVE_SEARCH_UNSUPPORTED") {
+    return "This model doesn't support its provider's built-in web search, so that tool has been switched off for it. Send your message again.";
   }
   if (parsed.code === "SERVER_ERROR") return "Something went wrong on the server. Try again in a moment.";
   // Known but uncategorized — show whatever the server said.

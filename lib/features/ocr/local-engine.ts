@@ -21,7 +21,7 @@ import type { LoggerMessage, PSM, Worker as TesseractWorker } from "tesseract.js
 import { useSettingsStore } from "@/state/settings-store";
 
 import { normalizeOcrLanguages, OCR_BASE_LANGUAGE } from "./languages";
-import { readingOrderText, type OcrLine } from "./layout";
+import { isFragmented, readingOrderText, type OcrLine } from "./layout";
 import { tableMarkdown } from "./table";
 import {
   LAYOUT_PSM,
@@ -175,12 +175,16 @@ async function recognize(
             })),
           ),
         );
+        // A table becomes a markdown table (table.ts); otherwise rows are
+        // rebuilt only when Tesseract shredded the page into columns (layout.ts).
+        const table = tableMarkdown(lines);
+        const text = table ?? readingOrderText(data.text ?? "", lines);
+        const structure: "table" | "rows" | "text" = table ? "table" : isFragmented(lines) ? "rows" : "text";
         return {
-          // A table becomes a markdown table (table.ts); otherwise rows are
-          // rebuilt only when Tesseract shredded the page into columns (layout.ts).
-          text: tableMarkdown(lines) ?? readingOrderText(data.text ?? "", lines),
+          text,
           confidence: typeof data.confidence === "number" ? data.confidence : 0,
           layout,
+          structure,
         };
       };
       // Normal layout first; a low-confidence read earns a sparse-mode pass
@@ -189,7 +193,7 @@ async function recognize(
       const best = needsSparsePass(first.confidence) ? pickBetterRead(first, await read("sparse")) : first;
       // Icons and decoration read as junk at low confidence: report no text.
       const text = readsAsNoText(best.confidence) ? "" : best.text;
-      return { text, confidence: best.confidence, layout: best.layout, engine: "local" as const };
+      return { text, confidence: best.confidence, layout: best.layout, structure: best.structure, engine: "local" as const };
     });
   } catch (error) {
     // A worker that threw mid-job may be wedged; respawn on the next call.

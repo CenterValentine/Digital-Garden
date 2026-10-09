@@ -28,6 +28,8 @@ import {
 } from "@/lib/domain/collaboration/presence-poll";
 import { resolvePresenceHeartbeatDelay } from "@/lib/domain/collaboration/presence-cadence";
 
+/** How long the "reconnected" notice stays after recovering from offline. */
+const RECOVERED_NOTICE_MS = 4_000;
 /** D17: how long opening a cached copy waits for the server's before editing opens anyway. */
 const LOCAL_CATCH_UP_TIMEOUT_MS = 4_000;
 /** D17: how often this browser's last-edit time reaches the manifest while typing. */
@@ -199,6 +201,11 @@ export interface CollaborationRuntimeState {
   reconnectIntent: boolean;
   readOnly: boolean;
   warning: string | null;
+  /**
+   * When the document came back to synced after being offline or degraded —
+   * set for RECOVERED_NOTICE_MS so the editor can say so, then cleared.
+   */
+  recoveredAt: number | null;
   editPolicy: CollaborationEditPolicy;
 }
 
@@ -286,6 +293,7 @@ interface DocumentRuntimeEntry {
   user: CollaborationUser | null;
   listeners: Set<() => void>;
   cooldownTimer: ReturnType<typeof setTimeout> | null;
+  recoveredNoticeTimer: ReturnType<typeof setTimeout> | null;
   idleEvictionTimer: ReturnType<typeof setTimeout> | null;
   visibilitySleepTimer: ReturnType<typeof setTimeout> | null;
   inactivitySleepTimer: ReturnType<typeof setTimeout> | null;
@@ -759,6 +767,7 @@ class CollaborationRuntimeManager {
       listeners: new Set(),
       consumers: new Map(),
       cooldownTimer: null,
+      recoveredNoticeTimer: null,
       idleEvictionTimer: null,
       visibilitySleepTimer: null,
       inactivitySleepTimer: null,
@@ -820,6 +829,7 @@ class CollaborationRuntimeManager {
         reconnectIntent: false,
         readOnly: false,
         warning: null,
+        recoveredAt: null,
         editPolicy: {
           editable: false,
           reason: "booting-local-state",
@@ -1959,6 +1969,7 @@ class CollaborationRuntimeManager {
         entry.state.connectionState = "connecting";
         entry.hocuspocusProvider.connect();
         this.emit(entry);
+        this.restoreIfStillSynced(entry);
       }
       return entry.promotionPromise ?? Promise.resolve();
     }
@@ -2014,6 +2025,7 @@ class CollaborationRuntimeManager {
 
     if (entry.hocuspocusProvider) {
       entry.hocuspocusProvider.connect();
+      this.restoreIfStillSynced(entry);
       return;
     }
 
@@ -2041,26 +2053,15 @@ class CollaborationRuntimeManager {
       },
       onSynced: ({ state }) => {
         if (!state) return;
-        this.clearProviderReconnect(entry);
-        entry.state.connectionState = "synced";
-        entry.state.bootstrapState = "ready";
-        entry.state.availabilityState = "canonical";
-        entry.state.localFallbackReason = null;
-        entry.state.warning = null;
-        entry.state.reconnectIntent = false;
-        entry.state.localDirty = false;
-        entry.state.unsyncedUpdateCount = 0;
-        this.emit(entry);
-        // Start inactivity countdown after every successful sync.
-        this.scheduleInactivitySleep(entry);
-        // Announce "synced" immediately so other sessions' badges flip from
-        // grey to live without waiting out a dormant heartbeat interval.
-        this.schedulePresenceHeartbeat(entry, 0);
+        this.markSynced(entry);
       },
       onUnsyncedChanges: ({ number }) => {
         entry.state.unsyncedUpdateCount = number;
         entry.state.localDirty = number > 0;
         this.emit(entry);
+        // Changes made while "offline" over a socket that never closed drain
+        // here; the provider was already synced, so `onSynced` stays silent.
+        if (number === 0) this.restoreIfStillSynced(entry);
       },
       onAwarenessChange: () => this.updateProviderPresence(entry),
       onAwarenessUpdate: () => this.updateProviderPresence(entry),
@@ -2073,6 +2074,70 @@ class CollaborationRuntimeManager {
       entry.consumers.size
     );
     this.emit(entry);
+  }
+
+  /**
+   * The document is in sync with the server: clear every degraded marker.
+   * The ONE place this happens — `onSynced`, and the reconnect paths below
+   * when the provider never stopped being synced.
+   *
+   * A notice says so when it recovers from a degraded state (owner smoke
+   * 2026-10-09: after going offline and back, the offline warning and
+   * "Connecting collaborative editor…" stayed up although the edit had synced).
+   */
+  private markSynced(entry: DocumentRuntimeEntry) {
+    const recovering =
+      entry.state.reconnectIntent ||
+      entry.state.warning !== null ||
+      entry.state.connectionState === "disconnectedButDirty" ||
+      entry.state.availabilityState === "localFallback";
+    this.clearProviderReconnect(entry);
+    entry.state.connectionState = "synced";
+    entry.state.bootstrapState = "ready";
+    entry.state.availabilityState = "canonical";
+    entry.state.localFallbackReason = null;
+    entry.state.warning = null;
+    entry.state.reconnectIntent = false;
+    entry.state.localDirty = false;
+    entry.state.unsyncedUpdateCount = 0;
+    if (recovering) {
+      entry.state.recoveredAt = Date.now();
+      if (entry.recoveredNoticeTimer) clearTimeout(entry.recoveredNoticeTimer);
+      entry.recoveredNoticeTimer = setTimeout(() => {
+        entry.recoveredNoticeTimer = null;
+        entry.state.recoveredAt = null;
+        this.emit(entry);
+      }, RECOVERED_NOTICE_MS);
+    }
+    this.emit(entry);
+    // Start inactivity countdown after every successful sync.
+    this.scheduleInactivitySleep(entry);
+    // Announce "synced" immediately so other sessions' badges flip from
+    // grey to live without waiting out a dormant heartbeat interval.
+    this.schedulePresenceHeartbeat(entry, 0);
+  }
+
+  /**
+   * After asking an EXISTING provider to connect: when its socket never
+   * closed, it is still synced, `connect()` is a no-op and `onSynced` never
+   * fires again (the provider emits `synced` only on a change). The browser's
+   * `offline` event does not close an open WebSocket — DevTools' offline mode,
+   * a captive portal, a flaky Wi-Fi blip — so the runtime marked itself
+   * disconnected while every edit kept syncing, then waited for a sync event
+   * that could not come. Same state change a fresh sync makes, nothing else.
+   */
+  private restoreIfStillSynced(entry: DocumentRuntimeEntry) {
+    const provider = entry.hocuspocusProvider;
+    if (
+      provider?.synced &&
+      !provider.hasUnsyncedChanges &&
+      entry.state.networkState === "online" &&
+      // Only out of a degraded state: in normal operation this is a no-op, so
+      // an acknowledged keystroke never re-emits state or sends a heartbeat.
+      entry.state.connectionState !== "synced"
+    ) {
+      this.markSynced(entry);
+    }
   }
 
   private async fetchCollaborationToken(entry: DocumentRuntimeEntry) {
@@ -2616,6 +2681,7 @@ class CollaborationRuntimeManager {
     document.removeEventListener("visibilitychange", entry.visibilityChangeHandler);
     window.removeEventListener("pagehide", entry.pageHideHandler);
     if (entry.cooldownTimer) clearTimeout(entry.cooldownTimer);
+    if (entry.recoveredNoticeTimer) clearTimeout(entry.recoveredNoticeTimer);
     if (entry.visibilitySleepTimer) clearTimeout(entry.visibilitySleepTimer);
     if (entry.inactivitySleepTimer) clearTimeout(entry.inactivitySleepTimer);
     // Abort any pending deferred initial promote so its callback doesn't
