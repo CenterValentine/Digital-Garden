@@ -381,6 +381,40 @@ in many sans-serif UI fonts ("DB Al"); tightly spaced labels can lose a space;
 badge icons can leak a stray character. The vision-model engine (§4) is the
 route for UI screenshots that must be exact.
 
+### D10 — Languages are a setting (owner, 2026-10-08)
+
+Settings → Editor & Files → **Text recognition**: English is always on;
+Spanish, French, German, Portuguese, Italian and Dutch are switches
+(`editor.ocrLanguages`, written through the settings store's editor setter).
+The engine reads the setting on every read and respawns its worker when the
+set changes. Packs come from tesseract.js's per-language default URL
+(`@tesseract.js-data/<code>/4.0.0_best_int`, 0.7–3.0 MB each, all at 1.0.0
+on 2026-10-08) — the earlier `eng@1.0.0` pin was one base URL and could not
+serve a second language. Measured: a Spanish sentence read with English only
+lost every accent and ñ (8% error); with Spanish on, exact (0%), fetching only
+the Spanish pack.
+
+### D11 — Reading order for tables and terminal output (owner smoke, 2026-10-08)
+
+Six terminal lines "✓ Compiled in 135ms" came back as three columns
+("Compiled Compiled …"). Tesseract's normal layout mode read them that way at
+86 confidence — no second pass was involved, and confidence cannot see order.
+`lib/features/ocr/layout.ts`: when at least 60% of at least four lines are
+one- or two-word fragments, the page is rebuilt row by row from word boxes;
+prose, including a true two-column article, keeps Tesseract's order. Words
+taller than 1.5× the median (glued glyphs such as three ✓ read as "NNN")
+cannot stretch a row. Terminal case 64% → 10%; every other test image
+unchanged. Gate mutation run: 7 killed, after fixing two weak fixtures and
+removing one redundant filter.
+
+### Not built — rotation detection
+
+Tesseract's own orientation detector (PSM 0/1/12, `worker.detect()`) needs
+the legacy engine core and the `osd` pack — several MB more on first use,
+beyond what an English-only reader downloads. The cheaper route, when wanted:
+only for very low first-pass confidence, try the image turned 90° / 180° /
+270° and keep the most confident read.
+
 ---
 
 ## 2. Architecture (as built)
