@@ -47,6 +47,12 @@ export interface ToolExecuteContext {
    */
   imageTextReadable?: boolean;
   /**
+   * Set with imageTextReadable: true when `view_image` is registered and
+   * enabled (a vision model). Image hints then point at SEEING the image,
+   * with read_image_text as the words-only fallback (AI-VIEW-SCREEN-PLAN D14).
+   */
+  imageViewable?: boolean;
+  /**
    * The bound Conversation entity id (sidebar multi-conv / full-page chat).
    * AI v3 core S3: lets tools associate created/read content with the
    * conversation (dual association — node + target folder).

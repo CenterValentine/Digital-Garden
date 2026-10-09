@@ -194,7 +194,7 @@ const PERCEPTION_TOOL_PARTS = new Set([
  * standing for ~1.5k image tokens, and its presigned URL expires after 7 days
  * (only the current turn's may ever be sent). These fold whatever their length.
  */
-const IMAGE_BEARING_TOOL_PARTS = new Set(["tool-view_screen"]);
+const IMAGE_BEARING_TOOL_PARTS = new Set(["tool-view_screen", "tool-view_image"]);
 
 /**
  * Re-readable content whose value ends with the reply that used it — folded
@@ -206,6 +206,8 @@ const TURN_FOLD_TOOL_PARTS = new Set([
   ...PERCEPTION_TOOL_PARTS,
   "tool-read_content",
   "tool-search_content",
+  // A file re-viewable by id (D14) — folds by turn like read_content.
+  "tool-view_image",
 ]);
 
 /** Below this, stubbing saves nothing worth the cache perturbation. */

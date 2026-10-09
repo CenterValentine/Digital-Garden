@@ -146,7 +146,13 @@ import {
   READ_IMAGE_TEXT_DESCRIPTION,
   readImageTextInputSchema,
 } from "./read-image-text";
-import { VIEW_SCREEN_DESCRIPTION, viewScreenInputSchema } from "./view-screen";
+import { VIEW_SCREEN_DESCRIPTION, viewScreenInputSchema, type ViewScreenResult } from "./view-screen";
+import {
+  VIEW_IMAGE_DESCRIPTION,
+  VIEW_IMAGE_MAX_BYTES,
+  VIEW_IMAGE_MEDIA_TYPES,
+  viewImageInputSchema,
+} from "./view-image";
 import { describeNoteImages, listNoteImages } from "@/lib/domain/content/note-images";
 
 /**
@@ -235,6 +241,60 @@ export const viewScreenTool = tool({
   description: VIEW_SCREEN_DESCRIPTION,
   inputSchema: viewScreenInputSchema,
 });
+
+/** How long a view_image link lives — the turn that uses it, and the chip's thumbnail after. */
+const VIEW_IMAGE_URL_TTL_S = 7 * 24 * 3600;
+
+/**
+ * `view_image` — SERVER-executed. AI-VIEW-SCREEN-PLAN.md D14. Registered only
+ * for a vision model. Returns the image-bearing result shape view_screen uses,
+ * so `deliverScreenCaptures` (request start AND prepareStep) hands the picture
+ * to the model. Every refusal says what to do instead.
+ */
+export function createViewImageTool(ctx: Pick<ToolExecuteContext, "userId">) {
+  return tool({
+    description: VIEW_IMAGE_DESCRIPTION,
+    inputSchema: viewImageInputSchema,
+    execute: async ({ contentId }): Promise<ViewScreenResult> => {
+      const node = await prisma.contentNode.findFirst({
+        where: { id: contentId, ownerId: ctx.userId, deletedAt: null },
+        select: {
+          title: true,
+          filePayload: {
+            select: { mimeType: true, fileSize: true, storageKey: true, storageProvider: true, uploadStatus: true },
+          },
+        },
+      });
+      const file = node?.filePayload;
+      if (!node || !file) {
+        return { ok: false, contentId, error: "No image file with that content id. Find it with search_content, or read_content for what the item is." };
+      }
+      if (!VIEW_IMAGE_MEDIA_TYPES.has(file.mimeType)) {
+        return {
+          ok: false,
+          contentId,
+          title: node.title,
+          error: `"${node.title}" is ${file.mimeType}, which vision models cannot take${file.mimeType.startsWith("image/") ? "; read_image_text can still read its text" : ""}.`,
+        };
+      }
+      if (Number(file.fileSize) > VIEW_IMAGE_MAX_BYTES) {
+        return {
+          ok: false,
+          contentId,
+          title: node.title,
+          error: `"${node.title}" is ${(Number(file.fileSize) / 1024 / 1024).toFixed(1)} MB, over the 5 MB a vision model accepts; read_image_text can still read its text.`,
+        };
+      }
+      if (file.uploadStatus !== "ready") {
+        return { ok: false, contentId, title: node.title, error: `"${node.title}" has not finished uploading.` };
+      }
+      const { getUserStorageProvider } = await import("@/lib/infrastructure/storage");
+      const storage = await getUserStorageProvider(ctx.userId, file.storageProvider as "r2" | "s3" | "vercel");
+      const imageUrl = await storage.generateDownloadUrl(file.storageKey, VIEW_IMAGE_URL_TTL_S);
+      return { ok: true, via: "file", contentId, title: node.title, imageUrl, mediaType: file.mimeType };
+    },
+  });
+}
 
 /**
  * Price the run's accumulated tokens against the executed model for
@@ -2873,6 +2933,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             ? describeNoteImages(
                 listNoteImages(content.notePayload.tiptapJson as JSONContent),
                 ctx.imageTextReadable === true,
+                ctx.imageViewable === true,
               )
             : null;
           return `${header}\nContent:\n${text}${images ? `\n\n${images}` : ""}`;
@@ -2946,10 +3007,13 @@ export function createBaseTools(ctx: ToolExecuteContext) {
                 : "\n\nNo extracted text is held for this book.";
               return `${header}\n\n${facts}${capsule ? `\n\n${capsule}` : ""}${excerpt}`;
             }
+            const isImage = f.mimeType.startsWith("image/");
             const noText =
-              f.mimeType.startsWith("image/") && ctx.imageTextReadable === true
-                ? "\n\nNo extracted text is held for this image. Read its text with read_image_text (this content id)."
-                : "\n\nNo extracted text is held for this file. Attach it to the conversation if its contents are needed.";
+              isImage && ctx.imageViewable === true
+                ? "\n\nThis is an image. To see what it shows, call view_image with this content id."
+                : isImage && ctx.imageTextReadable === true
+                  ? "\n\nNo extracted text is held for this image. Read its text with read_image_text (this content id)."
+                  : "\n\nNo extracted text is held for this file. Attach it to the conversation if its contents are needed.";
             const body = f.searchText.trim()
               ? `\n\nExtracted text:\n${f.searchText.trim()}`
               : noText;

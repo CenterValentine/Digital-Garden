@@ -35,6 +35,7 @@ import {
   listTabsTool,
   readImageTextTool,
   viewScreenTool,
+  createViewImageTool,
   openTabAndReadTool,
   readCurrentPageTool,
   readPageInBrowserTool,
@@ -112,6 +113,7 @@ export async function GET() {
     list_tabs: listTabsTool as AnyTool,
     read_image_text: readImageTextTool as AnyTool,
     view_screen: viewScreenTool as AnyTool,
+    view_image: createViewImageTool(ctx) as AnyTool,
   };
 
   const rows = Object.entries(allTools)

@@ -28,6 +28,9 @@ import { convertToModelMessages, type ModelMessage, type UIMessage } from "ai";
 
 import { deliverScreenCaptures, screenDeliveryMode, screenUserPartLabel } from "../lib/domain/ai/screen-delivery";
 import { screenSummary, VIEW_SCREEN } from "../lib/domain/ai/tools/view-screen";
+import { VIEW_IMAGE } from "../lib/domain/ai/tools/view-image";
+import { describeImageMention } from "../lib/domain/ai/tools/read-image-text";
+import { describeNoteImages } from "../lib/domain/content/note-images";
 
 const errors: string[] = [];
 function check(label: string, cond: unknown): void {
@@ -92,7 +95,7 @@ async function main() {
   check("user-part: exactly one message inserted", userPart.length === base.length + 1);
   check("user-part: the inserted message follows the tool message and is a user message", inserted?.role === "user");
   const insertedContent = (inserted?.content ?? []) as Array<{ type: string; text?: string; image?: unknown; mediaType?: string }>;
-  check("user-part: labelled as tool output, naming the call", insertedContent[0]?.text === screenUserPartLabel(["shot-1"]) && /not a message from the user/.test(insertedContent[0]?.text ?? ""));
+  check("user-part: labelled as tool output, naming the call", insertedContent[0]?.text === screenUserPartLabel([{ toolName: VIEW_SCREEN, toolCallId: "shot-1" }]) && /not a message from the user/.test(insertedContent[0]?.text ?? ""));
   check("user-part: carries the image as a URL with its media type", insertedContent[1]?.type === "image" && String(insertedContent[1]?.image) === IMG && insertedContent[1]?.mediaType === "image/jpeg");
 
   // Two screenshots in one step → one user message with both.
@@ -199,6 +202,40 @@ async function main() {
     screenSummary({ ok: true, via: "app", area: "left-sidebar" }).includes("file tree") &&
       screenSummary({ ok: true, via: "app", area: "all-panes" }).includes("every open"),
   );
+
+  // ── 8. view_image: the image file itself, to a vision model (D14) ────────
+  const fileResult = { ok: true, via: "file", contentId: "11111111-1111-4111-8111-111111111111", title: "bookcove", imageUrl: IMG, mediaType: "image/png" };
+  const viewed = await convertToModelMessages([user(), assistant([toolPart(VIEW_IMAGE, fileResult, "img-1")])]);
+  const viewedNative = resultOf(toolMessages(deliverScreenCaptures(viewed, "native"))[0], VIEW_IMAGE)?.output as { type: string; value: Array<{ type: string; url?: string }> };
+  check("view_image native: the file's image rides the tool result", viewedNative?.type === "content" && viewedNative.value[1]?.url === IMG);
+  const viewedUser = deliverScreenCaptures(viewed, "user-part");
+  const viewedLabel = (viewedUser[viewedUser.length - 1].content as Array<{ text?: string }>)[0]?.text ?? "";
+  check("view_image user-part: one labelled image message naming view_image", viewedUser.length === viewed.length + 1 && viewedLabel.includes(`${VIEW_IMAGE} call img-1`));
+  check("view_image summary: names the file and id, never the URL", screenSummary(fileResult as never).includes('"bookcove"') && !screenSummary(fileResult as never).includes(IMG));
+  check(
+    "route: delivery also runs in prepareStep (a server-run view_image is seen in the same request)",
+    /prepareStep: \(\{ stepNumber, messages: undeliveredStepMessages \}\) => \{[\s\S]{0,400}deliverScreenCaptures\(undeliveredStepMessages, screenMode\)/.test(route),
+  );
+  check("route: view_image is registered for every vision model", /\.\.\.\(visionCapable \? \{ \[VIEW_IMAGE\]: createViewImageTool\(toolCtx\) \} : \{\}\)/.test(route));
+  check("route: read_content and mentions learn whether view_image is on", route.includes("toolCtx.imageViewable = VIEW_IMAGE in tools;"));
+  // A result that names a tool turns it on — the loop fix.
+  check("route: the named tools are view_image and read_image_text", route.includes("const RESULT_NAMED_TOOLS = [VIEW_IMAGE, READ_IMAGE_TEXT];"));
+  check("route: every server tool result is scanned for named tools", /const output = await original\(input, options\);\s*activateNamedTools\(output, name\);/.test(route));
+  check("route: mentions are scanned before the first step", route.includes('activateNamedTools(mentionedContext, "mention");'));
+  check("route: this turn's earlier results are rescanned on a new request", route.includes('activateNamedTools(output, "turn-history")'));
+  check("route: an activation needs the tool registered and not yet advertised", /if \(id in tools && !isAdvertised\(id\) && text\.includes\(id\)\)/.test(route));
+  // Hints point at SEEING when the model can see.
+  const id = "11111111-1111-4111-8111-111111111111";
+  check("mention: a vision model is told to call view_image", describeImageMention(id, "image/png", true, true).includes(`view_image with contentId ${id}`));
+  check("mention: without vision it still points at read_image_text", describeImageMention(id, "image/png", true, false).includes("read_image_text"));
+  const noteImgs = [{ name: "cover.png", contentId: id, url: IMG }] as Parameters<typeof describeNoteImages>[0];
+  check("note images: a vision model is pointed at view_image", describeNoteImages(noteImgs, true, true)?.includes("view_image") === true);
+  check("note images: without vision, read_image_text", describeNoteImages(noteImgs, true, false)?.includes("read_image_text") === true);
+  const registry = read("lib/domain/ai/tools/registry.ts");
+  check("read_content: an image file points a vision model at view_image", registry.includes("To see what it shows, call view_image with this content id."));
+  const viewImage = registry.slice(registry.indexOf("export function createViewImageTool"), registry.indexOf("export function createViewImageTool") + 3000);
+  check("view_image: only the user's own, undeleted file", viewImage.includes("where: { id: contentId, ownerId: ctx.userId, deletedAt: null }"));
+  check("view_image: refuses types and sizes a vision model cannot take", viewImage.includes("VIEW_IMAGE_MEDIA_TYPES.has(file.mimeType)") && viewImage.includes("> VIEW_IMAGE_MAX_BYTES"));
 
   if (errors.length > 0) {
     console.error(`\n✖ view-screen:check failed — ${errors.length} problem(s):\n`);

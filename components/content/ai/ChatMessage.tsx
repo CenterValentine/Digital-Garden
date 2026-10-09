@@ -4069,7 +4069,7 @@ function ToolCallBubble({
     return "ok";
   }, [isRunning, wasStopped, hasError, hasResult, result, toolName, pinState]);
 
-  const screenImage = toolName === "view_screen" && hasResult ? screenImageOf(result) : null;
+  const screenImage = (toolName === "view_screen" || toolName === "view_image") && hasResult ? screenImageOf(result) : null;
 
   // Human action phrase — describes what the tool is *doing* (present
   // tense while running, past tense when done) rather than echoing the
@@ -4164,6 +4164,13 @@ function ToolCallBubble({
         if (r?.ok === false) return "Couldn't read the image";
         const chars = r?.untrustedImageText?.length ?? 0;
         return chars > 0 ? `Read text in an image (${chars.toLocaleString("en-US")} characters)` : "No text found in the image";
+      }
+      // view_image (D14): name the image looked at.
+      if (toolName === "view_image") {
+        if (isRunning) return "Looking at an image";
+        const r = result as { ok?: boolean; title?: string } | null;
+        if (!r || r.ok === false) return `Couldn't look at the image${r?.title ? `: ${r.title}` : ""}`;
+        return `Looked at image${r.title ? `: ${r.title}` : ""}`;
       }
       // view_screen (AI-VIEW-SCREEN-PLAN D10): say WHAT was looked at.
       if (toolName === "view_screen") {

@@ -621,6 +621,9 @@ const isStub = (v: unknown, word: string): boolean =>
     typeof outputOf(folded[1], 0) === "string" && !String(outputOf(folded[1], 0)).includes("r2.example"),
     "G9: the folded screenshot must carry no image URL to the model",
   );
+  // view_image (D14): the same — an earlier turn's image file folds by turn.
+  const viewed = [user(), assistant([tool("view_image", { output: { ok: true, via: "file", imageUrl: "https://r2.example/f.png" } })]), user()];
+  assert(perceptionFoldStates(viewed).get("1:0") === "folded-turn", "G9: an earlier turn's view_image result must fold even under 600 chars");
   // The size exemption is for image-bearing tools only: a short read_page stays.
   const shortRead = [user(), assistant([tool("read_page", { output: "short" })]), user()];
   assert(
