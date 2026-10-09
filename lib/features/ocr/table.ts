@@ -96,7 +96,7 @@ interface Columns {
 
 /**
  * Each cell's column, or null when the line does not fit the columns: two
- * cells in one column, or a cell running into the next column's text (a
+ * cells in one column, or a cell crossing into a neighbouring column (a
  * full-width line of prose under the table).
  */
 function placeCells(cells: Cell[], cols: Columns): (Cell | null)[] | null {
@@ -105,7 +105,11 @@ function placeCells(cells: Cell[], cols: Columns): (Cell | null)[] | null {
     const center = (cell.x0 + cell.x1) / 2;
     const col = cols.bounds.findIndex((b, i) => i < cols.count && center >= b && center < cols.bounds[i + 1]);
     if (col < 0 || placed[col]) return null;
+    // A cell must sit inside its own column on BOTH sides: it may not run into
+    // the next column's text, nor start inside the previous column's span (a
+    // full-width note under the table starts at the left margin).
     if (col + 1 < cols.count && cell.x1 > cols.lefts[col + 1]) return null;
+    if (col > 0 && cell.x0 < cols.bounds[col]) return null;
     placed[col] = cell;
   }
   return placed;
