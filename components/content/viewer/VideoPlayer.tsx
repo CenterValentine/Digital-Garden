@@ -30,6 +30,7 @@ import { Button } from "@/components/ui/glass/button";
 import { Slider } from "@/components/ui/slider";
 import { toast } from "sonner";
 import { clientLogger } from "@/lib/core/logger/client";
+import { isTypingTarget } from "@/lib/core/keyboard-target";
 
 interface VideoPlayerProps {
   downloadUrl: string;
@@ -198,6 +199,20 @@ export function VideoPlayer({ downloadUrl, fileName, mimeType, title, onDownload
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!containerRef.current) return;
 
+      // Full screen takes Option (Alt on Windows) — owner, 2026-10-09. As bare
+      // letters they fired from ANY pane, since this listener is on window:
+      // typing "r" or "f" into a note beside an open image rotated it or went
+      // full screen, and preventDefault() ate the letter. Matched on e.code —
+      // under Option macOS types "®" / "ƒ" — and skipped while the user is
+      // typing, where ⌥R / ⌥F produce those characters.
+      const optionChord =
+        e.altKey && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.isComposing && !isTypingTarget(e.target);
+      if (optionChord && e.code === "KeyF") {
+        e.preventDefault();
+        toggleFullscreen();
+        return;
+      }
+
       switch (e.key) {
         case " ":
         case "k":
@@ -223,10 +238,6 @@ export function VideoPlayer({ downloadUrl, fileName, mimeType, title, onDownload
         case "m":
           e.preventDefault();
           toggleMute();
-          break;
-        case "f":
-          e.preventDefault();
-          toggleFullscreen();
           break;
         case "p":
           e.preventDefault();
@@ -381,7 +392,7 @@ export function VideoPlayer({ downloadUrl, fileName, mimeType, title, onDownload
               variant="ghost"
               size="sm"
               className="text-white hover:bg-white/10"
-              title="Fullscreen (F)"
+              title="Fullscreen (⌥F · Alt+F)"
             >
               {isFullscreen ? (
                 <Minimize className="h-4 w-4" />
