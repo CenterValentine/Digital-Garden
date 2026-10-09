@@ -52,17 +52,20 @@ export function listNoteImages(json: JSONContent): NoteImage[] {
 
 /**
  * The block the AI's note reader appends. Null when the note has no images.
- * `canRead` says whether `read_image_text` is registered this turn.
+ * `canRead` says whether `read_image_text` is registered this turn; `canView`
+ * whether `view_image` is (a vision model — AI-VIEW-SCREEN-PLAN D14).
  */
-export function describeNoteImages(images: NoteImage[], canRead: boolean): string | null {
+export function describeNoteImages(images: NoteImage[], canRead: boolean, canView = false): string | null {
   if (images.length === 0) return null;
   const lines = images.map((image) =>
     image.contentId
       ? `- ${image.name} (contentId ${image.contentId})`
       : `- ${image.name} (external image ${image.url})`,
   );
-  const how = canRead
-    ? "Their text is not included above; read an uploaded one with read_image_text."
-    : "Their text is not included above.";
+  const how = canView
+    ? "Their contents are not included above; see an uploaded one with view_image."
+    : canRead
+      ? "Their text is not included above; read an uploaded one with read_image_text."
+      : "Their text is not included above.";
   return `Images in this note (${images.length}). ${how}\n${lines.join("\n")}`;
 }

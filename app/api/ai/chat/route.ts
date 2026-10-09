@@ -242,8 +242,13 @@ import {
   readCurrentPageTool,
   listTabsTool,
   readImageTextTool,
+  viewScreenTool,
+  createViewImageTool,
 } from "@/lib/domain/ai/tools/registry";
 import { READ_IMAGE_TEXT, describeImageMention } from "@/lib/domain/ai/tools/read-image-text";
+import { VIEW_SCREEN } from "@/lib/domain/ai/tools/view-screen";
+import { VIEW_IMAGE } from "@/lib/domain/ai/tools/view-image";
+import { deliverScreenCaptures, screenDeliveryMode } from "@/lib/domain/ai/screen-delivery";
 import { READ_PAGE_HEADLESS_OR_BROWSER } from "@/lib/domain/ai/tools/read-page-in-browser";
 import { OPEN_TAB_AND_READ } from "@/lib/domain/ai/tools/open-tab-and-read";
 import {
@@ -633,6 +638,10 @@ export async function POST(request: Request) {
       // with Worker + WebAssembly). Gates the client-executed read_image_text,
       // so a headless caller is never offered a tool nothing would execute.
       const localOcrAvailable = body.localOcrAvailable === true;
+      // AI-VIEW-SCREEN-PLAN D1: the app reports it can rasterize itself (a
+      // browser outside the side panel). With coBrowseAvailable (the panel,
+      // which captures the active web page) this gates view_screen.
+      const appCaptureAvailable = body.appCaptureAvailable === true;
       // Agentic Browsing Phase 1: derive the active research run's page budget
       // from the conversation history — the propose_research_run result always
       // rides in body.messages, whereas a client body flag can't reliably reach
@@ -1486,6 +1495,7 @@ export async function POST(request: Request) {
         charterFinalPhase: false,
         // Set after tool filtering below (read_content reads it at execute time).
         imageTextReadable: false,
+        imageViewable: false,
         // Executed model identity (cost metering): lets ledger stamps
         // price the run's tokens. Bare id + vendor, post-resolution.
         executedModel: {
@@ -1523,6 +1533,12 @@ export async function POST(request: Request) {
         // for a research turn (undefined outside a research run → default cap).
         researchPageBudget: researchPageBudget ?? undefined,
       };
+      // Can the EXECUTED model see? The connection's own model row carries
+      // capabilities the user or the fetcher saved; the bare id alone misses
+      // those (AI-VIEW-SCREEN-PLAN D2).
+      const visionCapable = effectiveCapabilities(
+        activeConnection?.models.find((m) => m.id === activeModelId) ?? { id: activeModelId },
+      ).has("vision");
       const allTools = {
         ...createBaseTools(toolCtx),
         ...createFlashcardTools(toolCtx),
@@ -1568,6 +1584,18 @@ export async function POST(request: Request) {
               [READ_IMAGE_TEXT]: readImageTextTool,
             }
           : {}),
+        // AI-VIEW-SCREEN-PLAN D1/D2: CLIENT-executed. Only where something can
+        // capture (the panel → the active page; the app → itself), and only
+        // for a model that can SEE — a text-only model offered a screenshot
+        // would "look" and invent what it saw.
+        ...((coBrowseAvailable || appCaptureAvailable) && visionCapable
+          ? {
+              [VIEW_SCREEN]: viewScreenTool,
+            }
+          : {}),
+        // AI-VIEW-SCREEN-PLAN D14: SERVER-executed — a vision model sees an
+        // image file itself (OCR's words remain the text-only fallback).
+        ...(visionCapable ? { [VIEW_IMAGE]: createViewImageTool(toolCtx) } : {}),
       };
       const toolConfig = (aiSettings as { toolConfig?: Record<
         string,
@@ -1606,6 +1634,7 @@ export async function POST(request: Request) {
       // read_content points at an image's text only when something can read it
       // this turn — registered (a browser asked for it) AND not switched off.
       toolCtx.imageTextReadable = READ_IMAGE_TEXT in tools;
+      toolCtx.imageViewable = VIEW_IMAGE in tools;
 
       // What the model is TOLD it has. The `tools` object above stays
       // complete for the rest of this request: `activeTools` narrows only what
@@ -1662,6 +1691,14 @@ export async function POST(request: Request) {
           if (id in tools) advertised.add(id);
         }
       }
+      // view_screen is advertised wherever it is registered (a vision model on
+      // a surface that can capture) — AI-VIEW-SCREEN-PLAN D15. Summonable, it
+      // was invisible: GPT-4o asked twice for "a screenshot of my screen"
+      // called view_image on the bound file, then said it could not capture
+      // the screen (owner smoke 2026-10-09). "Look at my screen" carries no
+      // id or text a hint could name it from, so only advertising reaches it
+      // (~200 tokens, only where it can run).
+      if (VIEW_SCREEN in tools) advertised.add(VIEW_SCREEN);
 
       // P0 (AI v3 core S2): provider-native web search, resolved per active
       // provider at request composition. CRITICAL: key off the EXECUTED
@@ -1788,6 +1825,28 @@ export async function POST(request: Request) {
         noticeStep: -1,
         noticeCarriedForStep: -1,
       };
+      // A RESULT THAT NAMES A TOOL TURNS IT ON (AI-VIEW-SCREEN-PLAN D14).
+      // read_content and mentions point the model at view_image /
+      // read_image_text, which are summonable rather than advertised. GPT-4o
+      // told to "call read_image_text" with no such tool in its list re-read
+      // the note in a loop (owner smoke 2026-10-09). Telling the model to call
+      // a tool it cannot see is the harness's bug, not the model's — so a
+      // registered tool a result names is advertised from the next step.
+      const RESULT_NAMED_TOOLS = [VIEW_IMAGE, READ_IMAGE_TEXT];
+      const activateNamedTools = (text: unknown, source: string) => {
+        if (typeof text !== "string") return;
+        for (const id of RESULT_NAMED_TOOLS) {
+          if (id in tools && !isAdvertised(id) && text.includes(id)) {
+            activated.add(id);
+            logger.info({
+              layer: "ai",
+              event: "ai:result_named_activation",
+              summary: `${id} advertised — named by ${source}`,
+              attrs: { tool: id, source },
+            });
+          }
+        }
+      };
       for (const [name, entry] of Object.entries(
         tools as Record<string, { execute?: unknown } | undefined>,
       )) {
@@ -1808,6 +1867,7 @@ export async function POST(request: Request) {
             });
           }
           const output = await original(input, options);
+          activateNamedTools(output, name);
           // THE BUDGET RIDES THE RESULT (§10 round 3). A trailing harness
           // USER message on every step froze the provider cache at the
           // user's own message — every run with the notice froze there,
@@ -1834,6 +1894,18 @@ export async function POST(request: Request) {
         registered,
       )) {
         activated.add(id);
+      }
+      // …and this turn's name-activations (D14): a client-run tool opens a new
+      // request, which must still advertise what an earlier result named.
+      {
+        const history = (body as { messages?: UIMessage[] }).messages ?? [];
+        const lastUser = history.map((m) => m.role).lastIndexOf("user");
+        for (const message of history.slice(lastUser + 1)) {
+          for (const part of message.parts ?? []) {
+            const output = (part as { output?: unknown }).output;
+            if (typeof output === "string") activateNamedTools(output, "turn-history");
+          }
+        }
       }
 
       // Ordering is the only focus mechanism a menu has. Tool absence used to
@@ -1920,8 +1992,16 @@ export async function POST(request: Request) {
       );
 
       // Convert UIMessages to ModelMessages for streamText
-      let modelMessages = await convertToModelMessages(
-        resolvedMessages as Parameters<typeof convertToModelMessages>[0],
+      // view_screen results carry a URL; hand the image itself to the model —
+      // inside the tool result where the adapter supports it, as a labelled
+      // image part where it doesn't (AI-VIEW-SCREEN-PLAN D8). Touches only
+      // view_screen parts; folded (earlier-turn) results carry no image.
+      const screenMode = screenDeliveryMode(activeConnection?.adapterKind);
+      let modelMessages = deliverScreenCaptures(
+        await convertToModelMessages(
+          resolvedMessages as Parameters<typeof convertToModelMessages>[0],
+        ),
+        screenMode,
       );
 
       // Fetch mentioned content for @ mentions (max 5 to limit token usage)
@@ -2174,7 +2254,7 @@ export async function POST(request: Request) {
             // without trying read_image_text (owner smoke, 2026-10-09).
             const fileMime = node.filePayload?.mimeType ?? "";
             if (node.contentType === "file" && fileMime.startsWith("image/") && !node.filePayload?.searchText?.trim()) {
-              return `### ${node.title}\n${describeImageMention(node.id, fileMime, toolCtx.imageTextReadable === true)}`;
+              return `### ${node.title}\n${describeImageMention(node.id, fileMime, toolCtx.imageTextReadable === true, toolCtx.imageViewable === true)}`;
             }
             // Derive live from the JSON, never trust the materialized column:
             // it may predate the private-content strip (or the atomic-inline
@@ -2326,6 +2406,9 @@ export async function POST(request: Request) {
           });
         }
       }
+      // A mention that tells the model to call an image tool advertises it
+      // from the first step (D14) — same rule as a tool result naming one.
+      activateNamedTools(mentionedContext, "mention");
 
       // Playbook progressive disclosure (AI v3.2 T3): inject standing rules
       // + the ACTIVE PHASE ONLY — never the whole playbook. `[[wiki-link]]`
@@ -3224,7 +3307,11 @@ export async function POST(request: Request) {
         // added the columns") — a confabulated answer is strictly worse
         // than the silence this fixes. Telling it the loop is over makes
         // the honest report the only available move.
-        prepareStep: ({ stepNumber, messages: rawStepMessages }) => {
+        prepareStep: ({ stepNumber, messages: undeliveredStepMessages }) => {
+          // Image-bearing results made IN this request (view_image runs on the
+          // server) reach the model as images too — the same pass as the
+          // transcript's, idempotent on what it already rewrote (D14).
+          const rawStepMessages = deliverScreenCaptures(undeliveredStepMessages, screenMode);
           // One spelling for a tool call whether it was made in this request
           // or resent from the transcript: the SDK's in-request messages
           // carry `openai.itemId` (sent inline as `id`), the transcript has

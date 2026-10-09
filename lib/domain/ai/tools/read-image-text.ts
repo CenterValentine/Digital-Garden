@@ -57,10 +57,14 @@ export interface ReadImageTextResult {
  * as "(no text content available)", and the model told the user the file had
  * nothing in it without ever reading it). Says what the item is, gives the id,
  * and — when the tool is offered this turn — tells the model to read it before
- * answering. `canRead` = read_image_text is registered and enabled.
+ * answering. `canRead` = read_image_text is registered and enabled; `canView`
+ * = view_image is (a vision model, AI-VIEW-SCREEN-PLAN D14) and wins.
  */
-export function describeImageMention(contentId: string, mimeType: string, canRead: boolean): string {
+export function describeImageMention(contentId: string, mimeType: string, canRead: boolean, canView = false): string {
   const what = `Image file (${mimeType}, contentId ${contentId}). Its text has not been extracted, so its contents are not shown here.`;
+  if (canView) {
+    return `${what} Before answering anything about what it shows or says, call view_image with contentId ${contentId} to see it; do not say it is empty until you have.`;
+  }
   return canRead
     ? `${what} Before answering anything about what it shows or says, call ${READ_IMAGE_TEXT} with contentId ${contentId}; do not say it is empty until you have.`
     : `${what} You cannot read images in this conversation; say so rather than calling the image empty, and suggest attaching it to the message.`;

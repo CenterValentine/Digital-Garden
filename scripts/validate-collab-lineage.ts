@@ -55,6 +55,7 @@ import {
   alignOntoServerCopy,
   mergePushedCopy,
   planAlignment,
+  planLocalCatchUp,
   sharesLineage,
   writeFragmentAsDiff,
 } from "../lib/domain/collaboration/lineage";
@@ -401,6 +402,78 @@ async function main() {
     check("re-applying keeps the live doc's client id", local.clientID === clientIdBefore);
     const met = docFrom(serverUpdate, Y.encodeStateAsUpdate(local));
     check("re-applied additions survive, and nothing doubles", show(textsOf(met)) === "one | two | four", show(textsOf(met)));
+  }
+
+  // ── 4b. A cached copy the stored note has moved past (D17) ──────────────
+  // Owner report 2026-10-09: the AI rewrote a note with no server copy (so it
+  // wrote the payload, by design); the browser kept opening its own cached
+  // copy and never compared it — the revision was invisible in the viewer and
+  // the next keystroke would have saved the stale copy over it.
+  {
+    const base = { sharesLineage: false, unionMatchesServer: false, alignment: "diverged" as const, localClean: true };
+    check("D17: clean, diverged, edited before the stored note changed → adopt", planLocalCatchUp({ ...base, lastLocalEditAt: 1000, payloadUpdatedAt: 2000 }) === "adopt");
+    check("D17: clean, diverged, edited AFTER the stored note changed → keep", planLocalCatchUp({ ...base, lastLocalEditAt: 3000, payloadUpdatedAt: 2000 }) === "keep");
+    check("D17: clean, diverged, last edit unknown (cached before tracking) → adopt", planLocalCatchUp({ ...base, lastLocalEditAt: null, payloadUpdatedAt: 2000 }) === "adopt");
+    check("D17: payload time unknown → keep", planLocalCatchUp({ ...base, lastLocalEditAt: 1000, payloadUpdatedAt: null }) === "keep");
+    check("D17: offline edits never thrown away → keep", planLocalCatchUp({ ...base, localClean: false, lastLocalEditAt: null, payloadUpdatedAt: 2000 }) === "keep");
+    check("D17: a one-sided rival follows #287 (adopt)", planLocalCatchUp({ ...base, alignment: "adopt", lastLocalEditAt: 3000, payloadUpdatedAt: 2000 }) === "adopt");
+    check("D17: a one-sided rival follows #287 (adopt-and-reapply)", planLocalCatchUp({ ...base, alignment: "adopt-and-reapply", localClean: false, lastLocalEditAt: null, payloadUpdatedAt: null }) === "adopt-and-reapply");
+    check("D17: same lineage, clean union → merge", planLocalCatchUp({ ...base, sharesLineage: true, unionMatchesServer: true, lastLocalEditAt: null, payloadUpdatedAt: null }) === "merge");
+    check("D17: same lineage, union would double → keep", planLocalCatchUp({ ...base, sharesLineage: true, unionMatchesServer: false, lastLocalEditAt: null, payloadUpdatedAt: 2000 }) === "keep");
+  }
+  {
+    // The incident, end to end: the browser cached the note as written by hand;
+    // the AI rewrote the payload; opening mints the server copy from the payload.
+    const local = seed(docOf("old heading", "old body"));
+    const server = seed(docOf("New heading", "new body", "added section"));
+    const serverUpdate = Y.encodeStateAsUpdate(server);
+    const localJson = TiptapTransformer.fromYdoc(local, "default") as JSONContent;
+    const serverJson = TiptapTransformer.fromYdoc(server, "default") as JSONContent;
+    const plan = planLocalCatchUp({
+      sharesLineage: sharesLineage(Y.encodeStateVector(local), Y.encodeStateVectorFromUpdate(serverUpdate)),
+      unionMatchesServer: false,
+      alignment: planAlignment(localJson, serverJson),
+      localClean: true,
+      lastLocalEditAt: null,
+      payloadUpdatedAt: Date.parse("2026-10-09T15:46:54Z"),
+    });
+    check("D17 incident: the stale cached copy is adopted onto the server's", plan === "adopt", plan);
+    alignOntoServerCopy(local, serverUpdate, null, "local-catch-up");
+    check("…the viewer shows the revision, once", show(textsOf(local)) === "New heading | new body | added section", show(textsOf(local)));
+    check(
+      "…and a later connect meets the server's copy as one note",
+      show(textsOf(docFrom(serverUpdate, Y.encodeStateAsUpdate(local)))) === "New heading | new body | added section",
+    );
+  }
+  {
+    // Why a shared lineage alone is not enough: a browser saved "two" through
+    // REST before solo saves carried their Y state; the server caught up on
+    // the same text with ITS items. The union shows "two" twice.
+    const origin = seed(docOf("one"));
+    const local = docFrom(Y.encodeStateAsUpdate(origin));
+    writeFragmentAsDiff(local, docOf("one", "two"));
+    const server = docFrom(Y.encodeStateAsUpdate(origin));
+    writeFragmentAsDiff(server, docOf("one", "two"));
+    const union = docFrom(Y.encodeStateAsUpdate(local), Y.encodeStateAsUpdate(server));
+    check(
+      "D17: same lineage, independently caught up — the union doubles (so it must not merge)",
+      sharesLineage(Y.encodeStateVector(local), Y.encodeStateVector(server)) && show(textsOf(union)) !== show(textsOf(server)),
+      show(textsOf(union)),
+    );
+  }
+  {
+    // The wiring: the runtime compares a cached copy before editing opens.
+    const runtimeSrc = readFileSync(join(process.cwd(), "lib/domain/collaboration/runtime.ts"), "utf8");
+    const route = readFileSync(join(process.cwd(), "app/api/collaboration/state/route.ts"), "utf8");
+    const branch = runtimeSrc.slice(runtimeSrc.indexOf("// D17: a cached copy is compared"), runtimeSrc.indexOf("if (!entry.pendingInitialContent || !pendingContentIsMeaningful) {"));
+    check("D17 wiring: a meaningful cached copy is caught up BEFORE bootstrap reports ready", /if \(localYdocIsMeaningful\) \{[\s\S]{0,200}await this\.catchUpLocalCopy\(entry\);/.test(branch) && branch.indexOf("catchUpLocalCopy") < branch.indexOf('bootstrapState = "ready"'));
+    check("D17 wiring: …and announces readiness (awaited, so the caller's emit already ran)", /bootstrapState = "ready";[\s\S]{0,300}this\.emit\(entry\);\s*return;/.test(branch));
+    check("D17 wiring: the decision is planLocalCatchUp", runtimeSrc.includes("const plan = planLocalCatchUp({"));
+    check("D17 wiring: a merge requires the union to equal the server's copy", /unionMatchesServer =\s*JSON\.stringify\(TiptapTransformer\.fromYdoc\(union, "default"\)\) === JSON\.stringify\(server\)/.test(runtimeSrc));
+    check("D17 wiring: the wait is bounded", /setTimeout\(\(\) => abortController\.abort\(\), LOCAL_CATCH_UP_TIMEOUT_MS\)/.test(runtimeSrc));
+    check("D17 wiring: the previous session's manifest is read before this one overwrites it", runtimeSrc.includes("priorCacheEntry: readLocalCacheManifest()[contentId] ?? null,"));
+    check("D17 wiring: local edits stamp lastLocalEditAt and it persists", runtimeSrc.includes("entry.lastLocalEditAt = Date.now();") && runtimeSrc.includes("lastLocalEditAt: entry.lastLocalEditAt"));
+    check("D17 wiring: the state route returns when the stored note last changed", route.includes("payloadUpdatedAt: payload?.updatedAt.toISOString() ?? null"));
   }
 
   // ── 5. The save carries the copy (request body) ──────────────────────────

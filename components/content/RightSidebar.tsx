@@ -150,7 +150,8 @@ export function RightSidebar({
   };
 
   return (
-    <div className="flex h-full flex-col">
+    // view_screen's "right-sidebar" area (AI-VIEW-SCREEN-PLAN D12).
+    <div className="flex h-full flex-col" data-capture-region="right-sidebar">
       {/* Header with tab buttons — non-interactive until the panel is ready
           so the user never clicks a tab that resolves to the wrong view. */}
       <RightSidebarHeader

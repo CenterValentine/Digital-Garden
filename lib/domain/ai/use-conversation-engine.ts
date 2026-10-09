@@ -51,6 +51,8 @@ import {
 import { READ_IMAGE_TEXT } from "@/lib/domain/ai/tools/read-image-text";
 import { isLocalOcrSupported } from "@/lib/features/ocr";
 import { readImageTextForModel } from "@/lib/features/ocr/read-for-model";
+import { VIEW_SCREEN, type ViewScreenInput } from "@/lib/domain/ai/tools/view-screen";
+import { isAppCaptureSupported, viewScreenForModel } from "@/lib/features/screen-capture";
 import { countRepeatedFailures } from "@/lib/domain/ai/tools/repair";
 import {
   isCoBrowseAvailable,
@@ -120,6 +122,7 @@ import {
 import { stopPendingToolCalls } from "@/lib/domain/ai/repair-dangling-tools";
 import { normalizeItemUrl } from "@/lib/domain/ai/tools/iteration-proposal";
 import { getContentWriteRefreshTargets } from "@/lib/domain/ai/content-write-receipts";
+import { MENTION_RE } from "@/lib/domain/ai/mention-markup";
 
 export type { OutputTarget } from "@/lib/domain/ai/output-target";
 
@@ -227,9 +230,6 @@ function maybeDispatchArtifactRefresh(part: unknown, seen: Set<string>): void {
     /* unparseable tool output — skip */
   }
 }
-
-/** Mention syntax shared by composer + send pipeline: `@[Title](id)`. */
-const MENTION_RE = /@\[([^\]]+)\]\(([^)]+)\)/g;
 
 /** Default mention search hint copy keyed by tool id. */
 const COMMAND_HINTS: Record<string, string> = {
@@ -903,7 +903,9 @@ function lastMessageHasResolvedBrowserRead({
         part.type === `tool-${LIST_TABS}` ||
         // Not a browser tool, but read the same way: client-executed, result
         // via addToolResult, and the model needs the text to continue.
-        part.type === `tool-${READ_IMAGE_TEXT}`,
+        part.type === `tool-${READ_IMAGE_TEXT}` ||
+        // view_screen (AI-VIEW-SCREEN-PLAN): client-captured, same resume.
+        part.type === `tool-${VIEW_SCREEN}`,
     ) as Array<{ state?: string }>;
   return (
     browserReadParts.length > 0 &&
@@ -2475,6 +2477,17 @@ export function useConversationEngine({
       // read_image_text (OCR-PASTE-PLAN D8): download the image and read its
       // text with the shared local engine, on this device. Every outcome is a
       // result the model can act on — readImageTextForModel never throws.
+      // view_screen (AI-VIEW-SCREEN-PLAN): screenshot what the user is looking
+      // at — the active web page in the side panel, the app elsewhere — and
+      // upload it. Never throws; the image reaches the model next request.
+      if (toolCall.toolName === VIEW_SCREEN) {
+        chat.addToolResult({
+          tool: VIEW_SCREEN,
+          toolCallId: toolCall.toolCallId,
+          output: await viewScreenForModel((toolCall.input ?? {}) as ViewScreenInput),
+        });
+        return;
+      }
       if (toolCall.toolName === READ_IMAGE_TEXT) {
         const { contentId } = (toolCall.input ?? {}) as { contentId?: string };
         chat.addToolResult({
@@ -3073,6 +3086,9 @@ export function useConversationEngine({
       coBrowseAvailable: isCoBrowseAvailable(),
       // OCR-PASTE-PLAN D8: this browser can run local OCR → read_image_text.
       localOcrAvailable: isLocalOcrSupported(),
+      // AI-VIEW-SCREEN-PLAN D1: the app can screenshot itself → view_screen
+      // (the panel's equivalent rides on coBrowseAvailable).
+      appCaptureAvailable: isAppCaptureSupported(),
     }));
     return () => {
       chatBodyResolvers.delete(conversationKey);
@@ -3550,6 +3566,8 @@ export function useConversationEngine({
           coBrowseAvailable: isCoBrowseAvailable(),
           // read_image_text gate (OCR-PASTE-PLAN D8) — same requirement.
           localOcrAvailable: isLocalOcrSupported(),
+          // view_screen gate (AI-VIEW-SCREEN-PLAN D1) — same requirement.
+          appCaptureAvailable: isAppCaptureSupported(),
         },
       },
     );

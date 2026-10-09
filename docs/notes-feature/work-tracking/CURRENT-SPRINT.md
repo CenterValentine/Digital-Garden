@@ -9,6 +9,34 @@ last_updated: 2026-05-13
 
 # Current Sprint Addendum
 
+## October 9, 2026 — The assistant can take a screenshot and see it (`view_screen`)
+
+**Tree**: worktree `.claude/worktrees/ai-screenshot`, branch `feat/ai-view-screen` (off `origin/main` at `a1f608ee`)
+**Plan**: `work-tracking/AI-VIEW-SCREEN-PLAN.md` (D1–D11)
+**Status**: phases 1–2 built; typecheck / lint / `view-screen:check` (NEW) / `context:diet:check` G9 / `private:content:check` pixel seam / `ai:drift:check` green; 22/22 mutants killed; extension 5.5.0; no schema or TipTap change. Phase 3 (co-browse bound tab) HELD.
+
+### Shipped
+- **One tool, the surface decides:** side panel → the active web page (`capture-visible-tab`, id-matched, refuses the app tab and browser pages); the app → the open pane or whole window (`modern-screenshot`, lazy).
+- **Private text stays private:** `[data-private]` and a `%%`-holding source view are left out of the image; the model is told.
+- **Delivery:** `deliverScreenCaptures` after `convertToModelMessages` — image inside the tool result for Anthropic / OpenAI, a labelled image part for every other adapter (keyed on the connection's adapter, not the vendor).
+- **History:** an earlier turn's screenshot folds whatever its length; the current turn keeps every image (no cache flush).
+- **Vision models only**, checked against the connection's own model row.
+- **A cached note copy catches up with a newer stored note on open (D17)** — the production stale-viewer report: an AI payload write to a note with no server Y copy was invisible in the viewer, and the next keystroke would have saved the old copy over it.
+- **`view_image`** (owner smoke follow-up): a vision model sees an image FILE itself; hints point at it; a result naming a tool advertises it (the loop fix).
+
+### Smoke checklist (owner, production after deploy — plan §6)
+- [ ] Side panel, Claude / GPT / Gemini: "look at this page" → thumbnail chip; the reply describes visual things not in the page text.
+- [ ] Side panel on the app tab → refused, pointed to the app's chat. On `chrome://extensions` → honest "can't capture".
+- [ ] App chat: "look at my screen" → pane thumbnail; "all my panes" / "just the file tree" / "the whole window" → that area only; a collapsed sidebar → refused.
+- [ ] App chat, an image file open → the image is in the thumbnail and the model describes it.
+- [ ] With an image file open, "don't look at the image, take a screenshot of my screen" (GPT-4o) → `view_screen`, chip "Looked at the app: …", not `view_image`.
+- [ ] A scrolled chat/note → the capture shows the scrolled view; "screenshot just this file" beside a chat → the file's pane; a first message with an @mention → title reads "@name".
+- [ ] **Stale note fix (D17):** reopen "New Resume Guidance" / "New Resume Layout and Format" → the AI's revision shows once; edit a line → saves cleanly, revision intact.
+- [ ] "Look at the bookcove image" → one `view_image` call, thumbnail chip, a description — no loop; a text-only model → `read_image_text`.
+- [ ] Commented-out text (rich view and source view) → not in the thumbnail; the model doesn't quote it.
+- [ ] Text-only model → no `view_screen`; next turn after a screenshot → folded stub, no image resent.
+- [ ] Extension not reloaded → "update/reload the extension", no hang.
+
 ## October 8, 2026 — A collaborator joining no longer duplicates a note; nested shortcuts show in workbenches
 
 **Tree**: worktree `.claude/worktrees/join-dup`, branch `fix/join-dup-nested-shortcuts` (off `origin/main` at `3f966a0c`)

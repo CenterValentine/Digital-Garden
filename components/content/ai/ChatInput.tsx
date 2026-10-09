@@ -44,6 +44,7 @@ import { useImagePreviewStore } from "@/state/image-preview-store";
 import { useContentStore } from "@/state/content-store";
 import { PanelPageContextBar } from "./PanelPageContextBar";
 import { isPanelEmbedSurface } from "@/lib/domain/browser-extension/panel-bridge";
+import { MENTION_RE } from "@/lib/domain/ai/mention-markup";
 
 // react-arborist's drag source type. Must match `type: "NODE"` in
 // node_modules/react-arborist/dist/main/dnd/drag-hook.js so the composer
@@ -57,8 +58,6 @@ interface ArboristDragItem {
   dragIds: string[];
 }
 
-/** Mention syntax: `@[Title](id)`. Used in serializer + parser + send-side. */
-const MENTION_RE = /@\[([^\]]+)\]\(([^)]+)\)/g;
 
 /** Platform-appropriate modifier name for the mention-pill open hint. */
 const OPEN_MODIFIER_LABEL =

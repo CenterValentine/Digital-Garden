@@ -134,6 +134,10 @@ export async function POST(request: NextRequest) {
       if (!file) {
         return NextResponse.json({ error: "file is required" }, { status: 400 });
       }
+      // AI-VIEW-SCREEN-PLAN D7: a view_screen capture is working material for
+      // the model, not a file the user added — its own prefix, and no
+      // referenced ContentNode (a co-browse run would litter the tree).
+      const isScreenshot = formData.get("purpose") === "screenshot";
 
       const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
       // Apple HEIC/HEIF — only Safari renders it natively and vision models
@@ -225,23 +229,22 @@ export async function POST(request: NextRequest) {
                 });
               }
             }
-            const key = `chat-attachments/${session.user.id}/${Date.now()}-${crypto
+            const key = `${isScreenshot ? "ai-screenshots" : "chat-attachments"}/${session.user.id}/${Date.now()}-${crypto
               .randomBytes(6)
               .toString("hex")}.${safeExt}`;
             const provider = await getUserStorageProvider(session.user.id);
             const url = await provider.uploadFile(key, buffer, mediaType);
             span.attr("storage_key", key);
-            const contentNodeId = await createReferencedFileNode(
-              session.user.id,
-              {
-                name: displayName,
-                mediaType,
-                size: buffer.length,
-                storageKey: key,
-                storageUrl: url,
-                buffer,
-              },
-            );
+            const contentNodeId = isScreenshot
+              ? null
+              : await createReferencedFileNode(session.user.id, {
+                  name: displayName,
+                  mediaType,
+                  size: buffer.length,
+                  storageKey: key,
+                  storageUrl: url,
+                  buffer,
+                });
             return NextResponse.json({
               kind: "image",
               url,

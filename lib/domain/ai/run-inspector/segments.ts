@@ -25,6 +25,7 @@ import {
 import { READ_PAGE_HEADLESS_OR_BROWSER } from "@/lib/domain/ai/tools/read-page-in-browser";
 import { OPEN_TAB_AND_READ } from "@/lib/domain/ai/tools/open-tab-and-read";
 import { READ_IMAGE_TEXT } from "@/lib/domain/ai/tools/read-image-text";
+import { VIEW_SCREEN } from "@/lib/domain/ai/tools/view-screen";
 import type { StepDiagnostics } from "./types";
 
 /** Tools with no server `execute` — their call ends the server stream. */
@@ -36,6 +37,7 @@ export const CLIENT_EXECUTED_TOOL_NAMES: ReadonlySet<string> = new Set([
   READ_PAGE_HEADLESS_OR_BROWSER,
   OPEN_TAB_AND_READ,
   READ_IMAGE_TEXT,
+  VIEW_SCREEN,
 ]);
 
 /** Part states that mean the stream paused for a user approval decision. */

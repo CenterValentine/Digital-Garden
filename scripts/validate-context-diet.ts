@@ -592,6 +592,46 @@ const isStub = (v: unknown, word: string): boolean =>
   );
 }
 
+// ── Gate 9: screenshots fold by turn whatever their length ──────────────────
+// AI-VIEW-SCREEN-PLAN D9. A view_screen result is a short URL standing for
+// ~1.5k image tokens (and a presigned URL that dies in 7 days) — the 600-char
+// threshold must not keep an earlier turn's screenshot in the prompt.
+
+{
+  const shot = (tag: string) =>
+    tool("view_screen", { output: { ok: true, via: "active-tab", imageUrl: `https://r2.example/${tag}.jpg` } });
+  const msgs = [
+    user(),
+    assistant([shot("old")]), // 1:0 — earlier turn
+    user(),
+    assistant([shot("a"), shot("b")]), // 3:0, 3:1 — the current turn
+  ];
+  assert(
+    JSON.stringify(outputOf(msgs[1], 0)).length < 600,
+    "G9 fixture: the screenshot result must be under the 600-char threshold, or this gate proves nothing",
+  );
+  const states = perceptionFoldStates(msgs);
+  assert(states.get("1:0") === "folded-turn", "G9: an earlier turn's screenshot must fold even under 600 chars");
+  assert(
+    states.get("3:0") === "kept" && states.get("3:1") === "kept",
+    "G9: every screenshot in the current turn must be kept (no intra-turn rewrite — the prefix cache)",
+  );
+  const folded = supersedePerceptionHistory(msgs);
+  assert(
+    typeof outputOf(folded[1], 0) === "string" && !String(outputOf(folded[1], 0)).includes("r2.example"),
+    "G9: the folded screenshot must carry no image URL to the model",
+  );
+  // view_image (D14): the same — an earlier turn's image file folds by turn.
+  const viewed = [user(), assistant([tool("view_image", { output: { ok: true, via: "file", imageUrl: "https://r2.example/f.png" } })]), user()];
+  assert(perceptionFoldStates(viewed).get("1:0") === "folded-turn", "G9: an earlier turn's view_image result must fold even under 600 chars");
+  // The size exemption is for image-bearing tools only: a short read_page stays.
+  const shortRead = [user(), assistant([tool("read_page", { output: "short" })]), user()];
+  assert(
+    perceptionFoldStates(shortRead).get("1:0") === undefined,
+    "G9: the size exemption must not extend to text tools (a short read is not worth a cache perturbation)",
+  );
+}
+
 // ── Report ──────────────────────────────────────────────────────────────────
 
 if (errors.length > 0) {

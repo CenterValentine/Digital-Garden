@@ -23,6 +23,8 @@ import { resolveChatModelFromConnection } from "@/lib/domain/ai/providers/regist
 import { publishConversationEvent } from "@/lib/features/conversations/events";
 import { logger, withRouteTrace, withSpan } from "@/lib/core/logger";
 
+import { mentionsToPlainText } from "@/lib/domain/ai/mention-markup";
+
 const ROUTE_PATH = "/api/conversations/[id]/auto-title";
 const MAX_TITLE_CHARS = 80;
 const FIRST_TURN_MESSAGE_LIMIT = 3;
@@ -205,7 +207,11 @@ export async function POST(request: NextRequest, context: RouteContext) {
   });
 }
 
-/** Pull plain text out of a UIMessage parts array (JSON-stored). */
+/**
+ * Pull plain text out of a UIMessage parts array (JSON-stored). Mention
+ * markup renders as `@Title` — both the model's prompt and the fallback title
+ * would otherwise carry `@[Title](uuid)` (owner smoke 2026-10-09).
+ */
 function extractText(parts: unknown): string {
   if (!Array.isArray(parts)) return "";
   return parts
@@ -216,7 +222,7 @@ function extractText(parts: unknown): string {
         (p as { type?: string }).type === "text" &&
         typeof (p as { text?: string }).text === "string",
     )
-    .map((p) => p.text)
+    .map((p) => mentionsToPlainText(p.text))
     .join(" ")
     .trim();
 }

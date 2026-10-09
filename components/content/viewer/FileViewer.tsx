@@ -200,6 +200,7 @@ export function FileViewer({ contentId, title }: FileViewerProps) {
     if (mimeType.startsWith("image/")) {
       return (
         <ImageViewer
+          contentId={contentId}
           downloadUrl={downloadUrl}
           fileName={fileData.fileName}
           title={title}

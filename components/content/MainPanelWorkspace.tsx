@@ -83,6 +83,8 @@ function WorkspacePane({
           ? "bg-black/[0.015] shadow-[inset_0_0_0_1px_rgba(201,168,108,0.25)]"
           : ""
       }`}
+      // view_screen captures the focused pane by this (AI-VIEW-SCREEN-PLAN D4).
+      data-workspace-pane={paneId}
       onPointerDownCapture={(event) => {
         if (keepsPaneFocus(event.target)) return;
         focusPane(paneId);
@@ -513,7 +515,8 @@ export function MainPanelWorkspace({
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden">
+    // view_screen's "all-panes" area (AI-VIEW-SCREEN-PLAN D12).
+    <div className="flex h-full min-h-0 flex-col overflow-hidden" data-capture-region="panes">
       {/* The side-panel embed hides the whole navigation bar (no back/forward,
           no pane layout at panel width); the workspace chooser renders in the
           panel shell above the file tree instead (BROWSER-REACH B1). */}

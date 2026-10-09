@@ -57,6 +57,13 @@ export async function POST(request: NextRequest) {
 
     const documentName = getCollaborationDocumentName(contentId);
     const state = await loadCollaborationYDocState(prisma, documentName);
+    // When the stored note last changed — a browser opening its cached copy
+    // compares this with its own last edit to tell a stale copy from a newer
+    // one (lineage.ts planLocalCatchUp, AI-VIEW-SCREEN-PLAN D17).
+    const payload = await prisma.notePayload.findUnique({
+      where: { contentId },
+      select: { updatedAt: true },
+    });
 
     return NextResponse.json({
       success: true,
@@ -64,6 +71,7 @@ export async function POST(request: NextRequest) {
         documentName,
         readOnly: access.readOnly,
         update: state ? Buffer.from(state).toString("base64") : null,
+        payloadUpdatedAt: payload?.updatedAt.toISOString() ?? null,
       },
     });
   } catch (error) {

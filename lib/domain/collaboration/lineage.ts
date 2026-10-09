@@ -196,3 +196,58 @@ export function alignOntoServerCopy(
     scratch.destroy();
   }
 }
+
+// ── A browser copy the stored note has moved past ──────────────────────────
+
+/**
+ * What a browser does with its cached copy when a note opens, once it has the
+ * server's copy in hand (plan: AI-VIEW-SCREEN-PLAN D17).
+ *
+ * The browser keeps a Y.Doc per note in IndexedDB and, solo, never connects
+ * (sleep mode). A note whose server copy did not exist yet was written by the
+ * AI straight to its payload — the designed path, because no Y state existed
+ * on the server — and the browser kept showing its own copy, which nothing
+ * ever compared with the payload (owner report 2026-10-09: an AI revision
+ * invisible in the viewer, present in the download). Worse, the editor's save
+ * baseline came from the FRESH payload, so the next keystroke would have
+ * saved the stale copy over the revision.
+ *
+ *   - "merge": same lineage AND the union equals the server's copy — Y.js's
+ *     own union carries the server's changes, deletions included. A shared
+ *     lineage alone is not enough: a browser that saved through REST before
+ *     solo saves carried their Y state holds items of its own for text the
+ *     server caught up on with ITS items, and that union doubles the note.
+ *   - "adopt" / "adopt-and-reapply": a rival copy where one side only adds
+ *     (planAlignment) — #287's move onto the server's lineage.
+ *   - "adopt" for a DIVERGED rival when the stored note changed after this
+ *     browser last edited its copy: every clean local edit reached the
+ *     payload through autosave, so the payload is the newer truth.
+ *   - "keep": the browser holds offline edits that never reached the server
+ *     (never thrown away), it edited after the stored note last changed, or
+ *     a same-lineage union would not equal the server's copy. Connecting
+ *     later behaves exactly as before this check existed.
+ *
+ * `lastLocalEditAt` is null for copies cached before it was tracked; a clean
+ * copy then defers to the server, whose payload holds every online edit.
+ */
+export type LocalCatchUp = "merge" | "adopt" | "adopt-and-reapply" | "keep";
+
+export function planLocalCatchUp(input: {
+  sharesLineage: boolean;
+  /** Same lineage only: the union of both copies shows exactly the server's content. */
+  unionMatchesServer: boolean;
+  alignment: Alignment;
+  /** The last session left no offline / unsynced edits behind. */
+  localClean: boolean;
+  /** When this browser last edited its copy (ms), or null when unknown. */
+  lastLocalEditAt: number | null;
+  /** When the stored note last changed (ms), or null when unknown. */
+  payloadUpdatedAt: number | null;
+}): LocalCatchUp {
+  if (input.sharesLineage) return input.unionMatchesServer ? "merge" : "keep";
+  if (input.alignment !== "diverged") return input.alignment;
+  if (!input.localClean) return "keep";
+  if (input.lastLocalEditAt === null) return "adopt";
+  if (input.payloadUpdatedAt === null) return "keep";
+  return input.payloadUpdatedAt > input.lastLocalEditAt ? "adopt" : "keep";
+}
