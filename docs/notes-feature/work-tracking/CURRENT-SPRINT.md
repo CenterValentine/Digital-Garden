@@ -37,6 +37,8 @@ last_updated: 2026-05-13
 - [ ] **Close without activating:** split panes, focus the right one, then press the x on an inactive tab in the LEFT pane → the tab closes, the right pane stays focused and the right sidebar doesn't change.
 - [ ] **Tab full name:** rest on a truncated tab → after about a second its full name appears below it; move to the next tab → its name shows at once; move away → it closes; renaming or dragging a tab shows none.
 - [ ] **Tab presence both ways:** open one note in two windows (or a window and the side panel) → each shows the other's disc on that tab; collapse or drag a sidebar in either → the disc stays on its tab.
+- [ ] **Workbenches instant:** on production, load the app, wait a few seconds, open the workspace menu and rest on a view workspace → its workbench folders appear at once, no loading state.
+- [ ] **Pill balance:** inside a workbench, the pill shows the workspace shortened first and more of the workbench name.
 - [ ] **After merge:** redeploy Hocuspocus from a tree matching `origin/main`; `/readyz` five times with `uptimeMs` climbing.
 
 ## October 8, 2026 — Open anything from any workplace (claims, borrow/share, view exceptions removed)
