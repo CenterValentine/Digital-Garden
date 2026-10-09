@@ -5,6 +5,8 @@ status: built on `feat/ocr-paste` (engine, editor surfaces, AI read_image_text) 
 
 # OCR paste — paste an image, keep only its text
 
+> **Tuning or refining the pipeline?** Start with the guide, `docs/notes-feature/guides/editor/OCR-PIPELINE.md`: every stage, every threshold with its evidence, and how to measure a change (`pnpm ocr:accuracy`). This file is the decision record.
+
 **What this is.** A paste gesture that takes an image off the clipboard, reads
 the text out of it locally, and inserts only that text. The same engine is
 reachable from a right-click on an image already in a note, and from the

@@ -19,6 +19,7 @@
     "build:tokens": "style-dictionary build --config style-dictionary.config.js",
     "ocr:assets": "node scripts/copy-ocr-assets.mjs",
     "ocr:blocks:check": "tsx scripts/validate-ocr-blocks.ts",
+    "ocr:accuracy": "node scripts/ocr-accuracy.mjs",
     "collab:schema:check": "tsx scripts/validate-collaboration-schema.ts",
     "note-edit:check": "tsx scripts/validate-note-edit-ops.ts",
     "collab:lineage:check": "tsx scripts/validate-collab-lineage.ts",

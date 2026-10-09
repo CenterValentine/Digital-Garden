@@ -1,6 +1,13 @@
 /**
  * Shared OCR — read the text out of an image, locally, on demand.
- * Plan: docs/notes-feature/work-tracking/OCR-PASTE-PLAN.md
+ *
+ * Pipeline: gesture (paste-modifier) → engine lifecycle + languages
+ * (local-engine, languages) → preprocess + layout mode (preprocess) → reading
+ * order (layout) → reflow (reflow) → editor blocks (to-content, editor-ocr).
+ *
+ * How to tune it, every threshold with its evidence, and how to measure a
+ * change (`pnpm ocr:accuracy`): docs/notes-feature/guides/editor/OCR-PIPELINE.md
+ * Decision record: docs/notes-feature/work-tracking/OCR-PASTE-PLAN.md (D1–D11)
  *
  * Client-only (the engine runs in a browser Web Worker). Importing this barrel
  * costs nothing at load: tesseract.js is a dynamic import inside the engine.
