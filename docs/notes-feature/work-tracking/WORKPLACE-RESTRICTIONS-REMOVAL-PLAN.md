@@ -1,6 +1,6 @@
 ---
 title: Workplace Restrictions Removal — claims, borrow, share, view exceptions
-status: shipped — PR #289 merged 2026-10-09 (7c940cd7), Hocuspocus rev 00014-smp; schema drop in chore/drop-workspace-claims, prod migrate deploy pending
+status: shipped — PR #289 merged 2026-10-09 (7c940cd7); schema drop PR #290 merged (1a538ac5) and applied to prod 2026-10-09 07:05 UTC; Hocuspocus rev 00015-qgc
 created: 2026-10-08
 branch: refactor/remove-workplace-claims (worktree .claude/worktrees/claims-removal, from origin/main 3f966a0c)
 decisions: "D1 keep workplace expiration (owner, 2026-10-08) · D2 MINOR · D3 drop isLocked · D4 no rename"
@@ -330,4 +330,6 @@ DROP TYPE "ContentWorkspaceItemScope";
 Not verified locally: the history-replay drift check (`--from-migrations` into the shadow DB). Local Docker stopped answering mid-session (P1001; `docker ps` hung), and restarting it was left to the owner. CI's `migration-drift` job runs the same check on the PR.
 
 **Deploy order:** merge → Vercel deploy live (code no longer reads the table) → `prisma migrate deploy` on prod (direct, non-pooling URL) → Hocuspocus redeploy (TipTap 1.21.0) → owner smoke (CURRENT-SPRINT Oct 8).
+
+**Shipped (2026-10-09):** PR #289 merged `7c940cd7`; Vercel production live; Hocuspocus rev `00014-smp`, then `00015-qgc` from `1a538ac5` so #287's collaboration fix (merged in between) was included, not masked. Schema drop PR #290 merged `1a538ac5`; `prisma migrate deploy` on prod applied `20261008000000_drop_workspace_claims` at 07:05 UTC. Read-only verification: the table, the `isLocked` column and both enums are gone; 63 workplaces and 98 open tabs intact. Trap hit on the way: the first run came from a main checkout parked at `c48218d3`, whose `prisma/migrations` lacked the drop, so `migrate deploy` reported nothing pending and looked like success — run migrations from a tree at `origin/main` and verify the `_prisma_migrations` row afterwards.
 
