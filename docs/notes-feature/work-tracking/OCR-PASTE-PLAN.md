@@ -350,6 +350,20 @@ Why local OCR and not a vision model: it works with text-only models, costs no
 tokens to recognise, and the image never leaves the device for this. The
 vision-model engine stays the planned second `OcrEngine` member (§4).
 
+**D8 addendum — mentioned and open image files (owner smoke, 2026-10-09).**
+A chat open on a PNG book cover answered "no text content available", even
+when the file was @-mentioned. The chat route renders mentioned and bound
+items itself (route.ts, the mention sections); an image file with no stored
+text fell through to the generic "(no text content available)", so the model
+reported the file empty and never called the tool. Now described by
+`describeImageMention` (read-image-text.ts): "Image file (<mime>, contentId
+…)" plus an instruction to call read_image_text before answering — or, when
+the tool is not offered, to say it cannot read images. Gate: 2 mutants killed.
+**Not addressed:** "what does it show" about a PICTURE (the boar on the
+cover) needs vision, not OCR — read_image_text reads words only. Sending a
+mentioned image to a vision-capable chat model as an image part is the
+follow-up (a provider-payload change; see BACKLOG).
+
 ### D9 — Reading hard screenshots: preprocess, then pick the layout mode (owner smoke, 2026-10-08)
 
 The first build read prose perfectly but missed a white-on-blue chat bubble
