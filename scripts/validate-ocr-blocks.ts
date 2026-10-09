@@ -386,6 +386,23 @@ console.log("table — wrapped cells (D12, owner's SEO table)");
     "This note runs under all three columns of the table and keeps going on",
   );
   check(
+    "a full-width line tucked right under the last row is not absorbed into it",
+    (tableMarkdown([...seo, line(288, [[10, "This note runs under all three columns of the table and keeps going on"]])]) ?? "").split("\n\n").pop(),
+    "This note runs under all three columns of the table and keeps going on",
+  );
+  check(
+    "long cells under a short header row are still a table",
+    rowsOf(
+      tableMarkdown([
+        line(0, [[10, "Step"], [500, "What to do"]]),
+        line(40, [[10, "Gather every receipt from the last quarter"], [500, "scan them and file them in the shared folder"]]),
+        line(80, [[10, "Reconcile each card statement line by line"], [500, "flag anything that does not match a receipt"]]),
+        line(120, [[10, "Send the summary to the finance team lead"], [500, "copy the department head on the same email"]]),
+      ]) ?? "",
+    ).length,
+    4,
+  );
+  check(
     "a title above evenly spaced rows does not merge them",
     rowsOf(
       tableMarkdown([
