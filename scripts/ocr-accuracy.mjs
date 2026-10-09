@@ -51,6 +51,14 @@ const TABLE_GAPS = [
   ["Hiring plan", "", "Next week"],
   ["Launch checklist", "Product", "Monday"],
 ];
+// A table whose cells wrap (the owner's 2026-10-09 failure, rebuilt synthetically).
+const WRAPPED = [
+  ["Practice", "Description", "Example"],
+  ["Use Keywords Strategically", "Identify primary and secondary keywords and place them in headings.", "Use best tips in the title and subheadings."],
+  ["Optimize Meta Tags", "Include relevant keywords in meta titles. Keep them concise and clear.", "Meta title: SEO Best Practices"],
+  ["Mobile Friendliness", "Optimize your website for mobile devices with responsive design.", "Test with the Mobile-Friendly Tool."],
+];
+const mdTable = (rows) => [`| ${rows[0].join(" | ")} |`, `|${" --- |".repeat(rows[0].length)}`, ...rows.slice(1).map((r) => `| ${r.join(" | ")} |`)].join("\n");
 const COLUMNS_LEFT = "The committee met on Tuesday to review the proposed budget for the coming year and agreed on most items";
 const COLUMNS_RIGHT = "Several members asked for more detail on travel costs before the final vote scheduled for next month";
 const SPANISH = "El niño comió una manzana y después bebió café con azúcar. Mañana iremos a la montaña con la señora Muñoz.";
@@ -59,8 +67,9 @@ const BUILT_IN = [
   { id: "paragraph (light)", synth: "para-light", truth: PARA },
   { id: "paragraph (dark)", synth: "para-dark", truth: PARA },
   { id: "terminal", synth: "terminal", truth: TERMINAL_MS.map((n) => `Compiled in ${n}ms`).join(" ") },
-  { id: "3-column table", synth: "table", truth: TABLE.map((r) => r.join(" ")).join(" "), table: true },
-  { id: "table, an empty cell", synth: "tableGaps", truth: TABLE_GAPS.map((r) => r.join(" ")).join(" "), table: true },
+  { id: "3-column table", synth: "table", truth: mdTable(TABLE), table: true },
+  { id: "table, an empty cell", synth: "tableGaps", truth: mdTable(TABLE_GAPS), table: true },
+  { id: "table, wrapped cells", synth: "tableWrapped", truth: mdTable(WRAPPED), table: true },
   { id: "two-column article", synth: "article", truth: null, table: false },
   { id: "spanish, English only", synth: "spanish", truth: SPANISH, langs: [] },
   { id: "spanish, + Spanish pack", synth: "spanish", truth: SPANISH, langs: ["spa"] },
@@ -100,6 +109,25 @@ const PAGE_SCRIPT = `
         g.font = (i === 0 ? "bold " : "") + "18px -apple-system, Helvetica, Arial, sans-serif"; g.fillStyle = "#1a1a1a";
         r.forEach((cell, j) => g.fillText(cell, 24 + j * 230, y));
         g.fillStyle = "#d0d0d0"; g.fillRect(16, y + 12, 688, 1); });
+      return c.convertToBlob({ type: "image/png" });
+    },
+    async tableWrapped() {
+      // Bordered, padded rows; long cells wrap inside their column (word wrap at 210 px).
+      const rows = ${JSON.stringify(WRAPPED)}; const [c, g] = W(760, 420);
+      g.fillStyle = "#ffffff"; g.fillRect(0, 0, 760, 420);
+      g.font = "16px -apple-system, Helvetica, Arial, sans-serif";
+      const xs = [16, 220, 490]; const widths = [190, 250, 250];
+      let y = 20;
+      rows.forEach((r, i) => {
+        const wrapped = r.map((cell, j) => { const out = []; let line = "";
+          for (const w of cell.split(" ")) { const t = line ? line + " " + w : w; if (g.measureText(t).width > widths[j]) { out.push(line); line = w; } else line = t; }
+          out.push(line); return out; });
+        const lines = Math.max(...wrapped.map((w) => w.length));
+        g.fillStyle = "#1a1a1a"; g.font = (i === 0 ? "bold " : "") + "16px -apple-system, Helvetica, Arial, sans-serif";
+        wrapped.forEach((cellLines, j) => cellLines.forEach((t, k) => g.fillText(t, xs[j], y + 22 + k * 22)));
+        y += 22 * lines + 24;
+        g.fillStyle = "#d0d0d0"; g.fillRect(8, y - 6, 744, 1);
+      });
       return c.convertToBlob({ type: "image/png" });
     },
     async tableGaps() {
@@ -157,6 +185,22 @@ function levenshtein(a, b) {
 }
 const stripTable = (s) => s.split("\n").filter((l) => !/^\|(\s*---\s*\|)+$/.test(l.trim())).map((l) => l.replace(/\\\|/g, "|").replace(/^\s*\||\|\s*$/g, "").replace(/\s\|\s/g, " ")).join("\n");
 const norm = (s) => stripTable(s).replace(/\s+/g, " ").trim();
+/** A markdown table's cells as rows of normalised strings (separator row dropped), or null. */
+function tableCells(s) {
+  const rows = s.split("\n").map((l) => l.trim()).filter((l) => l.startsWith("|") && l.endsWith("|"));
+  const body = rows.filter((l) => !/^\|(\s*---\s*\|)+$/.test(l));
+  if (body.length === 0) return null;
+  return body.map((l) => l.slice(1, -1).split(/(?<!\\)\|/).map((c) => c.replace(/\\\|/g, "|").replace(/\s+/g, " ").trim()));
+}
+/** Share of the truth's cells that came back with exactly the same text in the same row and column. */
+function cellScore(got, truth) {
+  const want = tableCells(truth);
+  if (!want) return null;
+  const have = tableCells(got) ?? [];
+  let total = 0, hit = 0;
+  want.forEach((row, i) => row.forEach((cell, j) => { total++; if ((have[i]?.[j] ?? null) === cell) hit++; }));
+  return `${hit}/${total}`;
+}
 const isTable = (s) => /^\|.*\|$/m.test(s) && /^\|(\s*---\s*\|)+$/m.test(s);
 
 async function main() {
@@ -198,7 +242,7 @@ async function main() {
   const urls = new Map([...files.entries()].map(([u, f]) => [f, u]));
   let total = 0;
   let scored = 0;
-  console.log(`${"case".padEnd(28)} ${"error".padStart(6)} ${"conf".padStart(5)}  layout  table`);
+  console.log(`${"case".padEnd(28)} ${"error".padStart(6)} ${"conf".padStart(5)}  layout  table    cells`);
   for (const c of list) {
     const r = await page.evaluate((input) => window.read(input), {
       synthId: c.synth ?? null,
@@ -209,7 +253,8 @@ async function main() {
     if (c.truth !== null) { total += error; scored++; }
     const table = isTable(r.text);
     const tableNote = c.table === undefined ? (table ? "yes" : "no") : table === c.table ? (table ? "yes ✓" : "no ✓") : (table ? "YES ✗" : "NO ✗");
-    console.log(`${c.id.padEnd(28)} ${(c.truth === null ? "—" : (error * 100).toFixed(0) + "%").padStart(6)} ${String(r.confidence).padStart(5)}  ${String(r.layout).padEnd(6)}  ${tableNote}`);
+    const cells = c.truth === null ? null : cellScore(r.text, c.truth);
+    console.log(`${c.id.padEnd(28)} ${(c.truth === null ? "—" : (error * 100).toFixed(0) + "%").padStart(6)} ${String(r.confidence).padStart(5)}  ${String(r.layout).padEnd(6)}  ${tableNote.padEnd(7)}  ${cells ?? ""}`);
     if (show) console.log("    " + JSON.stringify(r.text.trim()));
   }
   console.log(`${"MEAN".padEnd(28)} ${((total / Math.max(1, scored)) * 100).toFixed(1).padStart(5)}%`);

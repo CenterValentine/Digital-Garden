@@ -341,6 +341,75 @@ console.log("table — detection (D12)");
   );
 }
 
+console.log("table — wrapped cells (D12, owner's SEO table)");
+
+{
+  // The owner's table, as geometry: lines inside a cell 28 apart, rows 68
+  // apart, header → first row 40. Columns start at x 10 / 250 / 740.
+  const line = (y: number, cells: [number, string][]): OcrLine => ({
+    words: cells.flatMap(([x0, text]) => {
+      let x = x0;
+      return text.split(" ").map((t) => {
+        const w = { text: t, bbox: { x0: x, y0: y, x1: x + t.length * 9, y1: y + 18 }, confidence: 95 };
+        x += t.length * 9 + 6;
+        return w;
+      });
+    }),
+  });
+  const seo: OcrLine[] = [
+    line(0, [[10, "Best Practice"], [250, "Description"], [740, "Example"]]),
+    line(40, [[10, "Use Keywords"], [250, "Identify primary and secondary keywords."], [740, "Use best SEO tips in"]]),
+    line(68, [[10, "Strategically"], [250, "headings, titles, and content."], [740, "subheadings."]]),
+    line(136, [[10, "Optimize Meta Tags"], [250, "Include relevant keywords in meta titles."], [740, "Meta title"]]),
+    line(164, [[250, "Keep them concise and clear."]]),
+    line(232, [[10, "Ensure Mobile-"], [250, "Optimize your website for mobile."], [740, "Test with the tool."]]),
+    line(260, [[10, "Friendliness"], [250, "Use responsive design."]]),
+  ];
+  const md = tableMarkdown(seo) ?? "";
+  const rowsOf = (m: string) => m.split("\n").filter((l) => l.startsWith("|") && !l.includes("---"));
+  check("wrapped cells join: four rows, not seven", rowsOf(md).length, 4);
+  check("the header stays its own row", rowsOf(md)[0], "| Best Practice | Description | Example |");
+  check(
+    "a wrapped row joins its lines per column",
+    rowsOf(md)[1],
+    "| Use Keywords Strategically | Identify primary and secondary keywords. headings, titles, and content. | Use best SEO tips in subheadings. |",
+  );
+  check(
+    "a line with text in one column continues that cell, not ending the table",
+    rowsOf(md)[2],
+    "| Optimize Meta Tags | Include relevant keywords in meta titles. Keep them concise and clear. | Meta title |",
+  );
+  check("a wrapped hyphenated word keeps its hyphen: Mobile-Friendliness", rowsOf(md)[3].startsWith("| Ensure Mobile-Friendliness |"), true);
+  check(
+    "a full-width line under the table stays text",
+    (tableMarkdown([...seo, line(330, [[10, "This note runs under all three columns of the table and keeps going on"]])]) ?? "").split("\n\n").pop(),
+    "This note runs under all three columns of the table and keeps going on",
+  );
+  check(
+    "a title above evenly spaced rows does not merge them",
+    rowsOf(
+      tableMarkdown([
+        line(-80, [[10, "Team"]]),
+        line(0, [[10, "Name"], [250, "Role"]]),
+        line(40, [[10, "Ada"], [250, "Engineer"]]),
+        line(80, [[10, "Grace"], [250, "Compilers"]]),
+      ]) ?? "",
+    ).length,
+    3,
+  );
+  check(
+    "long cells with no short header row are prose columns, not a table",
+    tableMarkdown([
+      // Four evenly spaced lines → four rows, so only the header guard decides.
+      line(0, [[10, "the committee met on tuesday to review"], [500, "several members asked for more detail on"]]),
+      line(40, [[10, "the proposed budget for the coming year"], [500, "travel costs before the final vote next"]]),
+      line(80, [[10, "and agreed on most of the items listed"], [500, "month when the full board meets again"]]),
+      line(120, [[10, "in the draft that was circulated earlier"], [500, "to settle the remaining open questions"]]),
+    ]),
+    null,
+  );
+}
+
 console.log("AI paste — chord and content (D13)");
 
 {
