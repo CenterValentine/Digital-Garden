@@ -129,7 +129,7 @@ for (const [file, pattern] of SEAMS) {
     "private text and blocks render with data-private (the attribute view_screen filters on)",
     extension.includes('"data-private": "text"') && extension.includes('"data-private": "block"') && !/addNodeView/.test(extension),
   );
-  check("view_screen's capture leaves out [data-private]", capture.includes('PRIVATE_SELECTOR = "[data-private]"') && /!node\.matches\(PRIVATE_SELECTOR\)/.test(capture));
+  check("view_screen's capture leaves out [data-private]", capture.includes('PRIVATE_SELECTOR = "[data-private]"') && /!node\.matches\(PRIVATE_SELECTOR\) && !holdsPrivateSource\(node\)/.test(capture));
   check(
     "view_screen's capture leaves out a source view holding %% text, and the source view is marked",
     capture.includes('SOURCE_VIEW_SELECTOR = "textarea[data-markdown-source]"') && /\.value\.includes\("%%"\)/.test(capture) && sourceView.includes("data-markdown-source"),

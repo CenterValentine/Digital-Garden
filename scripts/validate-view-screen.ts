@@ -147,7 +147,7 @@ async function main() {
   const panel = read("extensions/browser-bookmarks/browser-extension/src/panel/index.js");
   const handler = panel.slice(panel.indexOf('data.type === "capture-visible-tab"'));
   check("extension: handles capture-visible-tab", panel.includes('data.type === "capture-visible-tab"'));
-  check("extension: refuses the app's own tab before capturing", /origin === appOrigin[\s\S]{0,200}code: "app-tab"/.test(handler) && handler.indexOf('"app-tab"') < handler.indexOf("captureVisibleTab("));
+  check("extension: refuses the app's own tab before capturing", /if \(origin && origin === appOrigin\) \{[\s\S]{0,200}code: "app-tab"/.test(handler) && handler.indexOf('"app-tab"') < handler.indexOf("captureVisibleTab("));
   check("extension: every reply carries the request id", (handler.slice(0, handler.indexOf("// Associated content")).match(/postToEmbed\("visible-tab-capture(-error)?", \{\s*id/g) ?? []).length >= 4);
   check("extension: never replies on the composer's `screenshot` message", !/postToEmbed\("screenshot"/.test(handler.slice(0, handler.indexOf("// Associated content"))));
   const bridge = read("lib/domain/browser-extension/panel-bridge.ts");
