@@ -28,6 +28,7 @@ last_updated: 2026-05-13
 - [ ] Side panel on the app tab → refused, pointed to the app's chat. On `chrome://extensions` → honest "can't capture".
 - [ ] App chat: "look at my screen" → pane thumbnail; "all my panes" / "just the file tree" / "the whole window" → that area only; a collapsed sidebar → refused.
 - [ ] App chat, an image file open → the image is in the thumbnail and the model describes it.
+- [ ] With an image file open, "don't look at the image, take a screenshot of my screen" (GPT-4o) → `view_screen`, chip "Looked at the app: …", not `view_image`.
 - [ ] "Look at the bookcove image" → one `view_image` call, thumbnail chip, a description — no loop; a text-only model → `read_image_text`.
 - [ ] Commented-out text (rich view and source view) → not in the thumbnail; the model doesn't quote it.
 - [ ] Text-only model → no `view_screen`; next turn after a screenshot → folded stub, no image resent.

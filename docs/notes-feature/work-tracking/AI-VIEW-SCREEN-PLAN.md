@@ -319,6 +319,7 @@ Phases 1 and 2 ship in one PR. Changing what the model receives is AI capability
 - [ ] App chat: "look at all my panes" → every open pane in one image.
 - [ ] App chat: "screenshot just my file tree" → the left sidebar only; with it collapsed → refused, nothing captured.
 - [ ] App chat, an image file open (e.g. a book cover PNG) → the image is IN the thumbnail and the model describes it.
+- [ ] With an image file open, "don't look at the image, take a screenshot of my screen" (GPT-4o) → `view_screen`, not `view_image` (D15).
 - [ ] "Look at the bookcove image" (GPT-4o, Claude, Gemini) → one `view_image` call, chip "Looked at image: bookcove" with its thumbnail, and a description of the cover — no read_content loop.
 - [ ] Same with a text-only model → `read_image_text` is offered and called (no loop), the cover's words come back.
 - [ ] A text-only model (e.g. DeepSeek) → `view_screen` is not offered; the model says it can't see.
