@@ -31,6 +31,15 @@ import { useExtensionShellTabMenuSections } from "@/lib/extensions/client-regist
 import { getCollaborationBrowserSessionId } from "@/lib/domain/collaboration/runtime";
 import { registerPollingTask } from "@/lib/core/polling/scheduler";
 import { prefetchContent } from "@/lib/domain/content/prefetch";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/client/ui/tooltip";
+
+/** How long the pointer rests on a tab before its full name shows. */
+const TAB_TITLE_TOOLTIP_DELAY_MS = 1000;
 
 interface TabPresenceSession {
   sessionId: string;
@@ -529,12 +538,26 @@ export function MainPanelHeader({
   }, [isTreeDropHover]);
 
   const updateTabRects = useCallback(() => {
+    // A tab scrolled out of its strip still has a rect — off to the side,
+    // often over the NEXT pane — and its disc, drawn at fixed coordinates,
+    // floated there with no tab under it. Only tabs whose middle is inside
+    // the strip's visible span get a disc.
+    const strip = tabScrollerRef.current?.getBoundingClientRect() ?? null;
     const nextRects: Record<string, DOMRect | null> = {};
     for (const tab of visibleTabs) {
-      nextRects[tab.id] = tabElementsRef.current.get(tab.id)?.getBoundingClientRect() ?? null;
+      const rect = tabElementsRef.current.get(tab.id)?.getBoundingClientRect() ?? null;
+      const middle = rect ? rect.left + rect.width / 2 : 0;
+      nextRects[tab.id] =
+        rect && (!strip || (middle >= strip.left && middle <= strip.right)) ? rect : null;
     }
     setTabRects(nextRects);
   }, [visibleTabs]);
+  // The presence poll re-measures through this, so its lifecycle stays tied to
+  // WHICH content is open, not to every change of the visible tab list.
+  const updateTabRectsRef = useRef(updateTabRects);
+  useEffect(() => {
+    updateTabRectsRef.current = updateTabRects;
+  }, [updateTabRects]);
 
   useEffect(() => {
     updateTabRects();
@@ -548,6 +571,18 @@ export function MainPanelHeader({
     for (const tab of visibleTabs) {
       const element = tabElementsRef.current.get(tab.id);
       if (element) resizeObserver?.observe(element);
+    }
+    // A tab can MOVE without resizing — the side panels lay out after mount,
+    // a sidebar opens, closes or is dragged — and the presence discs are
+    // drawn at fixed viewport coordinates measured here. Watching only the
+    // tabs left those coordinates stale, so a collaborator's disc sat where
+    // the tab used to be (often behind a sidebar) and showed in one window
+    // but not the other (owner report, 2026-10-08). The strip and the header
+    // around it DO resize when the panels shift.
+    const strip = tabScrollerRef.current;
+    if (strip) {
+      resizeObserver?.observe(strip);
+      if (strip.parentElement) resizeObserver?.observe(strip.parentElement);
     }
 
     return () => {
@@ -581,6 +616,8 @@ export function MainPanelHeader({
         if (!result.success || !result.data || isCancelled) return;
 
         setPresenceByContentId(result.data.presenceByContentId);
+        // Fresh discs get fresh positions, whatever moved since the last poll.
+        updateTabRectsRef.current();
       } catch {
         // Presence is advisory; the tab UI should not block navigation.
       }
@@ -761,6 +798,10 @@ export function MainPanelHeader({
           backdropFilter: glass1.backdropFilter,
         }}
       >
+        {/* A tab's full name after a 1 s rest (owner ask, 2026-10-08: titles
+            truncate, and the browser's own tooltip was unreliable). Moving
+            to a neighbour while one is showing skips the wait. */}
+        <TooltipProvider delayDuration={TAB_TITLE_TOOLTIP_DELAY_MS} skipDelayDuration={300}>
         <div
           ref={(element) => {
             tabScrollerRef.current = element;
@@ -783,8 +824,9 @@ export function MainPanelHeader({
             const isDragging = draggedTabId === tab.id;
 
             return (
+              <Tooltip key={tab.id}>
+              <TooltipTrigger asChild>
               <div
-                key={tab.id}
                 ref={(node) => {
                   if (node) {
                     tabElementsRef.current.set(tab.id, node);
@@ -804,12 +846,12 @@ export function MainPanelHeader({
                 // Hit-tested by spring-loaded tabs (use-spring-tabs.ts): a
                 // drag resting here opens this tab.
                 data-tab-id={tab.id}
-                // Tabs truncate at 22rem — hover reveals the full title. Same
-                // native-title convention as the sidebar chat tabs.
+                // Tabs truncate at 22rem — the full name shows in the tooltip
+                // below after a rest. No native title as well: two tooltips.
                 title={
                   editingTabId === tab.id
                     ? "Rename — Enter to save, Esc to cancel"
-                    : tab.title
+                    : undefined
                 }
                 draggable
                 onPointerEnter={() => {
@@ -905,12 +947,32 @@ export function MainPanelHeader({
                     // Overrides the tab's own title so hovering the X reads as
                     // "close", not as the filename tooltip.
                     title={`Close ${tab.title}`}
-                    onClick={() => closeContentTab(tab.id)}
+                    // Closing a tab never activates it: the pane doesn't take
+                    // focus for this press (a tab in the OTHER pane would
+                    // otherwise become the focused content and pull the right
+                    // sidebar to it), and the button doesn't take keyboard focus.
+                    data-keeps-pane-focus=""
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      closeContentTab(tab.id);
+                    }}
                   >
                     <X className="h-3 w-3" aria-hidden="true" />
                   </button>
                 </span>
               </div>
+              </TooltipTrigger>
+              {editingTabId === tab.id || isDragging ? null : (
+                <TooltipContent
+                  side="bottom"
+                  align="start"
+                  className="max-w-[28rem] break-words border border-black/10 bg-white text-gray-900 shadow-md dark:border-white/10 dark:bg-gray-900 dark:text-gray-100"
+                >
+                  {tab.title || "Untitled"}
+                </TooltipContent>
+              )}
+              </Tooltip>
             );
           })}
           {/* "+" — add content to this pane via the canonical tree picker.
@@ -933,6 +995,7 @@ export function MainPanelHeader({
             />
           ) : null}
         </div>
+        </TooltipProvider>
       </div>
       {/* Portalled to the body so the menu escapes the header's stacking
           context — as a header child its z-50 could not paint above an
@@ -941,6 +1004,7 @@ export function MainPanelHeader({
         ? createPortal(
             <div
               ref={tabMenuRef}
+              data-tab-menu=""
               className="fixed z-[120] min-w-56 overflow-y-auto rounded-md border border-white/10 bg-white/95 p-1 text-sm text-gray-900 shadow-lg backdrop-blur-sm dark:bg-gray-900/95 dark:text-gray-100"
               style={
                 tabMenuPosition

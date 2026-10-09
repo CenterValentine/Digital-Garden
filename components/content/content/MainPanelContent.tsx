@@ -13,7 +13,8 @@ import {
   sameProjectedText,
   sameCanonicalJson,
 } from "@/lib/domain/content/conflict-diff";
-import type { SaveMeta } from "@/lib/domain/content/save-meta";
+import { noteSaveBody, type SaveMeta } from "@/lib/domain/content/save-meta";
+import { useProjectedLayout } from "@/components/common/useProjectedLayout";
 import { usePathname } from "next/navigation";
 import { AlertTriangle } from "lucide-react";
 import { ToolSurfaceProvider } from "@/lib/domain/tools";
@@ -387,6 +388,10 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
   const { isDebugPanelVisible, toggleDebugPanel, setDebugPanelVisible, viewMode } = useDebugViewStore();
   const isActivePane = activePaneId === paneId;
   const isMultiPane = layoutMode !== "single";
+  // What the workspace RENDERS (intent projected — the side panel bans quad,
+  // the focus route is single), not the stored intent: a quad pane is small,
+  // so its title header goes compact (globals.css `.doc-title-header[data-compact]`).
+  const isQuadPane = useProjectedLayout(layoutMode) === "quad";
   const [noteContent, setNoteContent] = useState<JSONContent | null>(null);
   // ── Markdown source-view (v3.2 T2) ──────────────────────────────────────
   // Toggle between the rich-text editor and an editable markdown *source*
@@ -1349,20 +1354,19 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
               ? { "X-Body-Hash": bodyHashRef.current }
               : {}),
           },
-          body: JSON.stringify({
-            tiptapJson: content,
-            // Forward user-intent metadata from the editor. The content
-            // PATCH route uses `userInitiated` to bypass the shrink-refusal
-            // guard when there's been a recent user gesture, allowing
-            // legitimate "select all + delete" flows while still refusing
-            // bug-class auto-saves (editor mount race with no input).
-            // `secondsSinceInput` is telemetry only — surfaces in trace
-            // span attrs so we can tune the recency window with real data.
-            ...(meta?.userInitiated === true && { userInitiated: true }),
-            ...(typeof meta?.secondsSinceInput === "number" && {
-              secondsSinceInput: meta.secondsSinceInput,
-            }),
-          }),
+          // Forward user-intent metadata from the editor. The content
+          // PATCH route uses `userInitiated` to bypass the shrink-refusal
+          // guard when there's been a recent user gesture, allowing
+          // legitimate "select all + delete" flows while still refusing
+          // bug-class auto-saves (editor mount race with no input).
+          // `secondsSinceInput` is telemetry only — surfaces in trace
+          // span attrs so we can tune the recency window with real data.
+          // A solo editor's Y state rides along (SaveMeta.collaborationUpdate);
+          // templates have no collaborative copy.
+          body: noteSaveBody(
+            content,
+            isPageTemplateTab && meta ? { ...meta, collaborationUpdate: undefined } : meta,
+          ),
           // keepalive lets the request outlive a page that is unloading; an
           // abort signal would be moot there, so it is omitted for that case.
           ...(meta?.keepalive ? { keepalive: true } : { signal: abortController.signal }),
@@ -2706,6 +2710,10 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
 
   // Render content based on type
   let contentElement: React.ReactNode;
+  // A quad pane is short on height: a note's toolbar moves into its title row
+  // (owner, 2026-10-08) instead of taking a row of its own above it. Decided
+  // in the note branch below, where that title row exists.
+  let toolbarInTitleRow = false;
   const isReadOnlyPageTemplate =
     contentType === "page-template" && Boolean(contentData?.isSystem);
   const templateWarningText =
@@ -2829,6 +2837,12 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
       />
     );
   } else if (noteContent) {
+    toolbarInTitleRow =
+      isQuadPane &&
+      !isEmbedMode &&
+      contentType !== "page-template" &&
+      Boolean(selectedContentId) &&
+      !selectedContentId?.startsWith("person:");
     // Render debug view based on selected mode
     const renderDebugView = () => {
       switch (viewMode) {
@@ -2848,9 +2862,13 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
     // Main editor component
     const editorElement = (
       <div className="flex flex-col h-full">
-        {/* Note title header with debug toggle */}
+        {/* Note title header with debug toggle. pt-2, not pt-6: the content
+            toolbar right above already pads its row, and the two stacked into
+            a ~40px hole between the icons and the title (owner, 2026-10-08). */}
         {!isEmbedMode && (
-          <div className="doc-title-header flex-none px-6 pt-6 pb-4 flex items-start justify-between shadow-[0_4px_8px_-2px_rgba(15,23,42,0.08),0_10px_24px_-6px_rgba(15,23,42,0.05)]">
+          <div
+            data-compact={isQuadPane ? "" : undefined}
+            className="doc-title-header flex-none px-6 pt-2 pb-4 flex items-start justify-between shadow-[0_4px_8px_-2px_rgba(15,23,42,0.08),0_10px_24px_-6px_rgba(15,23,42,0.05)]">
             {isTitleEditing ? (
               <input
                 ref={titleInputRef}
@@ -2924,6 +2942,14 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
                 toolbar (TOOL_REGISTRY "markdown-source", order 10) — it is a
                 view control like the rest of the toolbar, and the title row
                 needs its width back on phones. */}
+            {toolbarInTitleRow ? (
+              // The pane's toolbar, beside the title instead of above it — on
+              // the title's line, not centred against title + breadcrumb. It
+              // takes what the title leaves and scrolls past that.
+              <div className="ml-2 flex min-w-0 max-w-[55%] shrink items-center self-start">
+                <ContentToolbar contentId={selectedContentId} inline />
+              </div>
+            ) : null}
             <div className="flex flex-none items-center gap-1">
               {process.env.NODE_ENV === "development" && !isMultiPane && <DebugViewToggle />}
             </div>
@@ -3043,7 +3069,8 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
           !selectedContentId.startsWith("person:") &&
           !isVirtualExtensionContent &&
           contentType !== "page-template" &&
-          !isEmbedMode && <ContentToolbar contentId={selectedContentId} />}
+          !isEmbedMode &&
+          !toolbarInTitleRow && <ContentToolbar contentId={selectedContentId} />}
 
         {/* Save-conflict resolution (stale-tab / concurrent-edit overwrite).
             Mounted at the TOP LEVEL, above every layout branch, deliberately.

@@ -83,8 +83,14 @@ function WorkspacePane({
           ? "bg-black/[0.015] shadow-[inset_0_0_0_1px_rgba(201,168,108,0.25)]"
           : ""
       }`}
-      onPointerDownCapture={() => focusPane(paneId)}
-      onFocusCapture={() => focusPane(paneId)}
+      onPointerDownCapture={(event) => {
+        if (keepsPaneFocus(event.target)) return;
+        focusPane(paneId);
+      }}
+      onFocusCapture={(event) => {
+        if (keepsPaneFocus(event.target)) return;
+        focusPane(paneId);
+      }}
       onDragOver={(event) => {
         if (!draggedTabId) return;
         event.preventDefault();
@@ -214,6 +220,18 @@ function WorkspaceReshapeTargets({
       </div>
     </div>
   );
+}
+
+/**
+ * Controls that act on a pane without making it the focused one — a tab's
+ * close "x" (owner ask, 2026-10-08: closing a tab must not activate it, nor
+ * move the right sidebar to it). The pane focuses itself in the CAPTURE phase,
+ * before the control sees the press, so the control opts out by marking
+ * itself `data-keeps-pane-focus`.
+ */
+export const KEEPS_PANE_FOCUS_ATTR = "data-keeps-pane-focus";
+function keepsPaneFocus(target: EventTarget | null): boolean {
+  return target instanceof Element && target.closest(`[${KEEPS_PANE_FOCUS_ATTR}]`) !== null;
 }
 
 export function MainPanelWorkspace({

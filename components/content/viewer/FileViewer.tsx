@@ -375,7 +375,7 @@ export function FileViewer({ contentId, title }: FileViewerProps) {
     <div className="flex flex-col h-full">
       {/* File metadata header - skip for JSON files (they have their own header) */}
       {!isJSONFile && (
-        <div className="flex-none px-6 pt-6 pb-4 border-b border-white/10">
+        <div className="flex-none px-6 pt-2 pb-4 border-b border-white/10">
           <div className="flex items-start justify-between">
             <div className="flex-1">
               <h1 className="text-2xl font-semibold text-foreground mb-2">{title}</h1>

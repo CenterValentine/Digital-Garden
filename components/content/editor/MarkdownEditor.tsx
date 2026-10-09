@@ -832,6 +832,13 @@ export function MarkdownEditor({
       // causing Doc A's content to overwrite Doc B.
       const snapshotSave = onSaveRef.current;
       const snapshotContentId = contentIdRef.current;
+      // Bound to a collaborative copy with no live connection (a note open by
+      // one person): the REST save is the only way these edits reach the
+      // server, so it carries this Y.Doc too and the stored copy keeps up.
+      // Otherwise the payload drifted ahead, the server caught up with its
+      // OWN items, and this editor's items for the same text met them when a
+      // collaborator arrived — the note doubled (collaboration/lineage.ts).
+      const snapshotYdoc = collaborationState?.document ?? null;
       if (snapshotSave) {
         // Diagnosis: record what kind of transaction is scheduling this
         // autosave. Phase A of the autosave-on-tab-switch investigation —
@@ -913,6 +920,8 @@ export function MarkdownEditor({
               secondsSinceInput: secondsSinceInput ?? undefined,
               ...(opts.flush ? { flush: true } : {}),
               ...(opts.keepalive ? { keepalive: true } : {}),
+              // Encoded at fire time, so it holds every edit up to this save.
+              ...(snapshotYdoc ? { collaborationUpdate: Y.encodeStateAsUpdate(snapshotYdoc) } : {}),
             });
             setHasUnsavedChanges(false);
           } catch (error) {

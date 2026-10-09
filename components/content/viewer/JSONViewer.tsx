@@ -294,7 +294,7 @@ export function JSONViewer({
   return (
     <div className="h-full flex flex-col relative">
       {/* Header with file title */}
-      <div className="flex-none px-6 pt-6 pb-4 border-b border-white/10">
+      <div className="flex-none px-6 pt-2 pb-4 border-b border-white/10">
         <h1 className="text-2xl font-semibold text-foreground">{title}</h1>
       </div>
 

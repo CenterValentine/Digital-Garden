@@ -9,6 +9,41 @@ last_updated: 2026-05-13
 
 # Current Sprint Addendum
 
+## October 8, 2026 — A collaborator joining no longer duplicates a note; nested shortcuts show in workbenches
+
+**Tree**: worktree `.claude/worktrees/join-dup`, branch `fix/join-dup-nested-shortcuts` (off `origin/main` at `3f966a0c`)
+**Status**: typecheck / lint 151 (0 errors, none new) / `collab:lineage:check` (new; in `build`, preflight and the collaboration-hardening workflow; mutation-tested 15 ways) / `shortcut-mirror:check` (nested-in-a-view cases; mutation-tested 3 ways) / `pnpm build` green; no schema, TipTap or extension change; **Hocuspocus redeploy required after merge** (`documents.ts` load path).
+
+### Shipped
+- **Loads catch up on the stored lineage** (`lineage.ts` `catchUpStoredCopy`): a payload newer than the mirror stamp is applied onto the stored Y.Doc as a diff — never a fresh seed — under a per-document advisory lock, and the stamp is written as of the payload's `updatedAt` (left unchanged: opening is not editing). Two loads a moment apart (canonical fetch + Hocuspocus) used to mint two rival copies.
+- **Solo saves carry their Y copy** (`SaveMeta.collaborationUpdate`, `noteSaveBody`): merged into the stored copy before the payload is written (`mergeSoloCollaborationCopy`), payload stamped only when merged; a rival copy is refused; over-size copies are left out (never fail the save).
+- **Rival copies in a browser align before the first connect** (`alignLineageBeforeFirstConnect`): adopt when the server's copy already shows everything, adopt-and-re-apply when the browser's only adds, otherwise connect as before and log `collab:lineage_rival`.
+- **Nested shortcuts in a workbench**: `outOfScopeShortcutTargets` follows shortcuts inside carried folders (cycle-safe); carried targets inside other carried folders travel inside them.
+
+### Smoke checklist (owner)
+- [ ] **Join after solo editing:** account A opens a note alone and types two new lines, waits ~3 s; account B (or a second browser profile) opens the same note → both see the note once, the two new lines once.
+- [ ] **Join, then edit live:** with A and B both on the note, each types a line → each line appears once on both sides; reload both → still once.
+- [ ] **Metadata bump:** mark a note as a charter (or run an AI quest on it), then open it in a second browser → content once.
+- [ ] **Window editing:** edit a note through a Note Window alone, then open the target note in a second browser → content once.
+- [ ] **Already-doubled notes stay doubled:** the fix prevents new duplication; a note that was doubled before needs its extra copy deleted by hand (once).
+- [ ] **Nested shortcut in a workbench:** in a workbench rooted at folder V, a shortcut to out-of-view folder A whose contents include a shortcut to out-of-view folder B → expand the outer shortcut, then the nested one → B's items show.
+- [ ] **Nested back to a parent:** a shortcut to B, and inside B a shortcut to B's parent A → expanding either shows its folder's items, none missing or repeated.
+- [ ] **Tab menu, closed:** right-click a tab → the tab's title with a copy icon (tooltip "Copy link"), then "Move tab to ›" and "Duplicate tab to ›" — no list of workplaces until asked.
+- [ ] **Half-second rest:** rest on "Move tab to" → nothing for a moment, then the workplace picker opens beside the menu (flipped left near the right edge); a click opens it at once; resting on another row closes it.
+- [ ] **Folding:** a workplace with workbenches folds out on click; the current workplace shows "current" and only its workbenches can be picked.
+- [ ] **Move:** pick another workplace → the tab leaves this one; switching there shows it.
+- [ ] **Duplicate:** "Duplicate tab to" → another workplace → the tab stays here and also appears there.
+- [ ] **Picker Recent / Open:** open the pane "+" → Recent, then Open → each row shows files on the first line (most recently viewed first, long names capped, extras running off the edge) and the folder on the second; clicking a file reveals it in the tree; the "+" still creates in the folder.
+- [ ] **Close without activating:** split panes, focus the right one, then press the x on an inactive tab in the LEFT pane → the tab closes, the right pane stays focused and the right sidebar doesn't change.
+- [ ] **Tab full name:** rest on a truncated tab → after about a second its full name appears below it; move to the next tab → its name shows at once; move away → it closes; renaming or dragging a tab shows none.
+- [ ] **Tab presence both ways:** open one note in two windows (or a window and the side panel) → each shows the other's disc on that tab; collapse or drag a sidebar in either → the disc stays on its tab.
+- [ ] **Workbenches instant:** on production, load the app, wait a few seconds, open the workspace menu and rest on a view workspace → its workbench folders appear at once, no loading state.
+- [ ] **Pill balance:** inside a workbench, the pill shows the workspace shortened first and more of the workbench name.
+- [ ] **Toolbar spacing:** in a narrow (split) pane the toolbar shows no scrollbar under its icons and still scrolls sideways; the title sits close under the toolbar (note, JSON and file views alike).
+- [ ] **Quad titles:** switch to Quad Split → each note's title is smaller with less padding; back to Vertical Split → full size again; renaming a title in quad keeps the small size.
+- [ ] **Quad toolbar:** in Quad Split, a note's toolbar icons sit to the right of its title (no toolbar row above); a narrow pane scrolls them sideways; every tool still works; a file or folder in quad keeps its toolbar row; Vertical Split puts the row back.
+- [ ] **After merge:** redeploy Hocuspocus from a tree matching `origin/main`; `/readyz` five times with `uptimeMs` climbing.
+
 ## October 8, 2026 — Open anything from any workplace (claims, borrow/share, view exceptions removed)
 
 Branch `refactor/remove-workplace-claims` · plan [WORKPLACE-RESTRICTIONS-REMOVAL-PLAN.md](WORKPLACE-RESTRICTIONS-REMOVAL-PLAN.md) (§R = regression guards). Owner decision: views and shortcuts govern what a workplace shows; nothing gates what it opens, and the user is never asked to borrow or share.
@@ -26,7 +61,7 @@ Branch `refactor/remove-workplace-claims` · plan [WORKPLACE-RESTRICTIONS-REMOVA
 
 **Post-merge (owner):** Vercel deploy live → run the drop migration (handoff script in the PR) → Hocuspocus redeploy from a tree matching `origin/main`, `/readyz` ×5.
 
-## October 5, 2026 — The file tree stops flashing; deleting is instant; rows keep their order; view shortcuts show their folder and act on it safely
+## October 5, 2026 — The file tree stops flashing; deleting is instant; rows keep their order; view shortcuts show their folder and act on it safely (PR #284, merged `c48218d3`)
 
 **Tree**: worktree `.claude/worktrees/smooth-delete`, branch `fix/smooth-delete` (off `origin/main` at `49b94490`)
 **Status**: typecheck / lint 151 (0 errors, none new) / `tree:smooth:check` 231 (new, in the quality workflow) / `shortcut-mirror:check` (out-of-view cases, row actions, view reach) / tree + workspace gates / `pnpm build` green; no schema or TipTap change; **browser-extension change** (bookmark dedupe removed — `pnpm extension:build`, reload at chrome://extensions); **Hocuspocus redeploy required** (collaborative saves now refresh media links); run `scripts/backfill-media-links.ts --apply` once per environment. Owner browser smoke pending.

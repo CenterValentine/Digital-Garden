@@ -48,6 +48,11 @@ import { IconSelector } from "@/components/content/IconSelector";
 import { Switch } from "@/components/client/ui/switch";
 import { useWorkspaceStore } from "@/extensions/workplaces/state/workspace-store";
 import { triggerMenuOpenSync } from "@/extensions/workplaces/state/workspace-sync";
+import {
+  cachedWorkbenchTree,
+  loadWorkbenchTree,
+  prefetchWorkbenchTrees,
+} from "@/extensions/workplaces/state/workbench-tree-cache";
 import type { TreeNode } from "@/lib/domain/content/types";
 import type { ContentWorkspaceResponse } from "@/extensions/workplaces/server";
 
@@ -511,10 +516,40 @@ export function WorkspaceSelector() {
   // lists one folder's children, up to settings.workbenches.maxDepth (1-3).
   const [workbenchMenu, setWorkbenchMenu] = useState<{
     workspaceId: string;
-    /** Full scoped tree, fetched ONCE per open; null = loading. */
+    /** Full scoped tree (cached — workbench-tree-cache.ts); null = loading. */
     tree: TreeNode[] | null;
     panels: Array<{ listRootId: string | null; x: number; y: number }>;
   } | null>(null);
+  // The view roots whose workbench panels the menu can open — the same rule
+  // as the row's hover handler below. Their trees are fetched ahead of time.
+  const workbenchViewRootIds = useMemo(
+    () =>
+      workspaces
+        .filter(
+          (workspace) =>
+            workspace.status === "active" &&
+            !workspace.parentWorkspaceId &&
+            workspace.isView &&
+            workspace.viewRootContentId &&
+            normalizeWorkbenchSettings(workspace.settings).enabled,
+        )
+        .map((workspace) => workspace.viewRootContentId as string),
+    [workspaces],
+  );
+  const workbenchRootsKey = workbenchViewRootIds.join(",");
+  // Warm them once the app is idle after startup, so the FIRST hover is
+  // instant too — not only hovers after the menu has been opened once.
+  useEffect(() => {
+    if (!workbenchRootsKey) return;
+    const roots = workbenchRootsKey.split(",");
+    const run = () => void prefetchWorkbenchTrees(roots);
+    if (typeof window.requestIdleCallback === "function") {
+      const handle = window.requestIdleCallback(run, { timeout: 4000 });
+      return () => window.cancelIdleCallback(handle);
+    }
+    const timer = window.setTimeout(run, 1500);
+    return () => window.clearTimeout(timer);
+  }, [workbenchRootsKey]);
   const [draggedFolderId, setDraggedFolderId] = useState<string | null>(null);
   const draggingFolderRef = useRef(false);
   const [folderDropTargetId, setFolderDropTargetId] = useState<string | null>(
@@ -707,9 +742,12 @@ export function WorkspaceSelector() {
     // label + pb-0.5 (2). Retune alongside that constant, or the first folder
     // row drifts off the arrow it is anchored to.
     const LABEL_BLOCK = 15;
+    const viewRootId = workspace.viewRootContentId;
     setWorkbenchMenu({
       workspaceId: workspace.id,
-      tree: null,
+      // Warm from the cache (prefetched at startup and on menu open), so the
+      // folders are there the moment the panel is; a refresh follows quietly.
+      tree: viewRootId ? cachedWorkbenchTree(viewRootId) : null,
       panels: [
         {
           listRootId: null,
@@ -726,18 +764,10 @@ export function WorkspaceSelector() {
     });
     // ONE scoped-tree fetch serves EVERY layer: the route returns the view
     // root's children at top level with the whole subtree beneath them, so
-    // nested panels derive locally instead of fetching per layer.
-    void fetch(
-      `/api/content/content/tree?viewRootContentId=${workspace.viewRootContentId}`,
-      { credentials: "include" },
-    )
-      .then(async (response) => {
-        const result = (await response.json()) as TreeApiResponse;
-        if (!response.ok || !result.success || !result.data) {
-          throw new Error(result.error?.message ?? "Failed to load folders");
-        }
-        return result.data.tree;
-      })
+    // nested panels derive locally instead of fetching per layer. Served from
+    // workbench-tree-cache.ts: fresh → no request at all.
+    if (!viewRootId) return;
+    void loadWorkbenchTree(viewRootId)
       .then((tree) => {
         setWorkbenchMenu((current) =>
           current && current.workspaceId === workspace.id
@@ -1299,6 +1329,8 @@ export function WorkspaceSelector() {
             // A workspace that never received a name keeps its rename form
             // ready: re-enter edit mode every time the menu opens until the
             // user actually names it.
+            // Refresh the workbench trees now, so a hover finds them current.
+            void prefetchWorkbenchTrees(workbenchViewRootIds);
             const pendingName = workspaces.find(
               (workspace) =>
                 !workspace.isMain &&
@@ -1335,12 +1367,15 @@ export function WorkspaceSelector() {
               )
             )}
             {activeParentWorkspace ? (
-              <span className="inline-flex min-w-0 max-w-44 items-center gap-1">
-                <span className="truncate">
+              // Workspace · workbench: the workbench is what you are IN, so it
+              // gets the larger share — the parent may take at most ~40% and
+              // gives way first; the workbench name keeps the rest.
+              <span className="inline-flex min-w-0 max-w-64 items-center gap-1">
+                <span className="min-w-0 max-w-[40%] shrink truncate">
                   {getWorkspaceDisplayName(activeParentWorkspace)}
                 </span>
                 <span className="shrink-0 text-gray-400">·</span>
-                <span className="truncate">
+                <span className="min-w-0 truncate">
                   {getWorkspaceDisplayName(activeWorkspace)}
                 </span>
               </span>

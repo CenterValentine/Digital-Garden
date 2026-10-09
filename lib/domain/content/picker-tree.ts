@@ -65,6 +65,8 @@ export interface FlatRow {
    * children, so `siblingIndex + 1` would not mean what it means elsewhere.
    */
   isReference: boolean;
+  /** When the content was created (ms), when the tree said — orders a folder's newest items. */
+  createdAt?: number;
 }
 
 export function flattenEligible(
@@ -97,6 +99,8 @@ export function flattenEligible(
         hasChildren: false,
         isReference: asReference,
       };
+      const createdAt = node.createdAt ? new Date(node.createdAt).getTime() : NaN;
+      if (!Number.isNaN(createdAt)) row.createdAt = createdAt;
       out.push(row);
       if (RECURSE_TYPES.has(node.contentType)) {
         const before = out.length;
@@ -120,6 +124,61 @@ export function flattenEligible(
       }
     }
     siblingIndex += 1;
+  }
+  return out;
+}
+
+/** A file named on a destination row's first line. */
+export interface DestinationFile {
+  id: string;
+  title: string;
+  contentType: string;
+}
+
+/**
+ * The files to name on a "Recent" / "Open" destination row. A folder alone
+ * confused people: they recognize the FILE they were in, and reach for it as
+ * the point of reference rather than its parent (owner ask, 2026-10-08). The
+ * destinations themselves are unchanged; this only says what lives there.
+ *
+ * Order, left to right: files viewed most recently first (`viewedAt`, the
+ * in-memory navigation history), then `alsoFirst` ids not yet viewed (open
+ * tabs), then the folder's newest creations — what made it a destination.
+ * Direct children only, never folders; capped, since the line lets the rest
+ * run out of view anyway.
+ */
+export function filesForDestination(
+  rows: readonly FlatRow[],
+  folderId: string | null,
+  viewedAt: ReadonlyMap<string, number>,
+  options: { alsoFirst?: ReadonlySet<string>; limit?: number } = {},
+): DestinationFile[] {
+  const limit = options.limit ?? 8;
+  const files = rows.filter((row) => row.parentId === folderId && row.contentType !== "folder");
+  const viewed = files
+    .filter((row) => viewedAt.has(row.id))
+    .sort((a, b) => (viewedAt.get(b.id) ?? 0) - (viewedAt.get(a.id) ?? 0));
+  const seen = new Set(viewed.map((row) => row.id));
+  const open = files.filter((row) => !seen.has(row.id) && options.alsoFirst?.has(row.id));
+  for (const row of open) seen.add(row.id);
+  const newest = files
+    .filter((row) => !seen.has(row.id) && row.createdAt !== undefined)
+    .sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
+  return [...viewed, ...open, ...newest]
+    .slice(0, limit)
+    .map((row) => ({ id: row.id, title: row.title, contentType: row.contentType }));
+}
+
+/** Latest view time per content id across every pane's history. */
+export function latestViewTimes(
+  histories: ReadonlyArray<{ history: ReadonlyArray<{ contentId: string | null; timestamp: number }> }>,
+): Map<string, number> {
+  const out = new Map<string, number>();
+  for (const pane of histories) {
+    for (const item of pane.history) {
+      if (!item.contentId) continue;
+      if (item.timestamp > (out.get(item.contentId) ?? 0)) out.set(item.contentId, item.timestamp);
+    }
   }
   return out;
 }
