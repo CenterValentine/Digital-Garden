@@ -210,6 +210,25 @@ A PNG book cover open in the image viewer captured as an empty viewer, and GPT-4
 
 **Headless check:** the same viewer captured without the fetcher shows a blank image area, reproducing the bug; with it, the image renders.
 
+### D14 — `view_image`: a vision model sees an image file itself (owner smoke, 2026-10-09)
+
+Asked to "look at the bookcove image", GPT-4o read the file's metadata. It was told to "call read_image_text", but that tool is summonable, not advertised, and was not in its tool list. It re-read the note three times instead. There were two faults:
+- the harness told the model to call a tool it could not see;
+- for a model that *can* see, words from OCR are the wrong answer anyway.
+
+**`view_image({ contentId })`:**
+- Server-run and offered to vision models only.
+- Takes the user's own, undeleted JPEG/PNG/GIF/WebP up to 5 MB (Anthropic's per-image ceiling); anything else is refused with a pointer to `read_image_text`.
+- Signs a 7-day URL and returns `view_screen`'s result shape (`via: "file"`), so the same delivery pass hands the picture over.
+- That pass now also runs in `prepareStep`, because a server-run result is produced inside the request and never passes through `convertToModelMessages`.
+- It folds by turn like `read_content`, image-exempt from the size threshold.
+
+**Hints follow capability.** `read_content` on an image file, an @-mention or bound image file, and a note's image list point a vision model at `view_image`, and a text-only model at `read_image_text`.
+
+**A result that names a tool turns it on** (harness over prompt). When a server tool result or the mention context names `view_image` or `read_image_text`, and that tool is registered but not advertised, it is advertised from the next step. The current turn's earlier results are rescanned when a client-run tool opens a new request. Each activation logs `ai:result_named_activation`.
+
+This also covers the backlog item "Mentioned images seen by vision models". The model now sees a mentioned image on demand, one call away, rather than having it attached up front.
+
 ### D11 — Co-browse bound tab (phase 3, HELD)
 
 Co-browse work stays postponed (owner, 2026-10-06) until the feature it waits on is built. The design is recorded here, not built:
@@ -292,6 +311,8 @@ Phases 1 and 2 ship in one PR. Changing what the model receives is AI capability
 - [ ] App chat: "look at all my panes" → every open pane in one image.
 - [ ] App chat: "screenshot just my file tree" → the left sidebar only; with it collapsed → refused, nothing captured.
 - [ ] App chat, an image file open (e.g. a book cover PNG) → the image is IN the thumbnail and the model describes it.
+- [ ] "Look at the bookcove image" (GPT-4o, Claude, Gemini) → one `view_image` call, chip "Looked at image: bookcove" with its thumbnail, and a description of the cover — no read_content loop.
+- [ ] Same with a text-only model → `read_image_text` is offered and called (no loop), the cover's words come back.
 - [ ] A text-only model (e.g. DeepSeek) → `view_screen` is not offered; the model says it can't see.
 - [ ] Next turn after a screenshot → the request no longer carries the image (Run Inspector shows the folded stub).
 - [ ] Settings → AI → Tools → turn View Screen off → not offered.
