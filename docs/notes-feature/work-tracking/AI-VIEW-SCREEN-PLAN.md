@@ -175,7 +175,7 @@ The chip shows a thumbnail of exactly what the model received; a click opens it 
 **Advertising:**
 
 - In the panel's `browser` mode it is advertised.
-- In the app it is summonable from the menu ("see what the user is looking at"), in the `reading` family. A request for a look reliably summons it, and it costs nothing in a turn that doesn't need it (AI-TOOL-SUMMONER-PLAN).
+- In the app it is summonable from the menu ("see what the user is looking at"), in the `reading` family. **Superseded by D15:** GPT-4o did not summon it, so it is now advertised wherever it is registered.
 
 ### D12 — Areas: the least the request needs, and never wider (owner smoke, 2026-10-09)
 
@@ -228,6 +228,14 @@ Asked to "look at the bookcove image", GPT-4o read the file's metadata. It was t
 **A result that names a tool turns it on** (harness over prompt). When a server tool result or the mention context names `view_image` or `read_image_text`, and that tool is registered but not advertised, it is advertised from the next step. The current turn's earlier results are rescanned when a client-run tool opens a new request. Each activation logs `ai:result_named_activation`.
 
 This also covers the backlog item "Mentioned images seen by vision models". The model now sees a mentioned image on demand, one call away, rather than having it attached up front.
+
+### D15 — `view_screen` is advertised wherever it is registered (owner smoke, 2026-10-09)
+
+D10 left `view_screen` summonable in the app. GPT-4o, asked twice for "a screenshot of my screen", called `view_image` on the bound file instead (that tool was on, because the mention named it). It then said it could not capture the screen. The stored transcript confirms `view_image` itself worked: GPT-4o described the cover correctly.
+
+A request to look at the screen carries no id and no text that a hint could use to name the tool, so the D14 name rule cannot reach it. Only advertising does. It is advertised only where it can run: a vision model on a capturing surface.
+
+The description was tightened to keep the cost down: about 330 tokens before, about 200 now. `view_image` now says outright that the user's screen is `view_screen`'s job.
 
 ### D11 — Co-browse bound tab (phase 3, HELD)
 

@@ -1691,6 +1691,14 @@ export async function POST(request: Request) {
           if (id in tools) advertised.add(id);
         }
       }
+      // view_screen is advertised wherever it is registered (a vision model on
+      // a surface that can capture) — AI-VIEW-SCREEN-PLAN D15. Summonable, it
+      // was invisible: GPT-4o asked twice for "a screenshot of my screen"
+      // called view_image on the bound file, then said it could not capture
+      // the screen (owner smoke 2026-10-09). "Look at my screen" carries no
+      // id or text a hint could name it from, so only advertising reaches it
+      // (~200 tokens, only where it can run).
+      if (VIEW_SCREEN in tools) advertised.add(VIEW_SCREEN);
 
       // P0 (AI v3 core S2): provider-native web search, resolved per active
       // provider at request composition. CRITICAL: key off the EXECUTED

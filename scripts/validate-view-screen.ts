@@ -218,6 +218,13 @@ async function main() {
   );
   check("route: view_image is registered for every vision model", /\.\.\.\(visionCapable \? \{ \[VIEW_IMAGE\]: createViewImageTool\(toolCtx\) \} : \{\}\)/.test(route));
   check("route: read_content and mentions learn whether view_image is on", route.includes("toolCtx.imageViewable = VIEW_IMAGE in tools;"));
+  // D15: "look at my screen" names nothing a hint could activate — so the tool is advertised wherever registered.
+  check("route: view_screen is advertised wherever it is registered", route.includes("if (VIEW_SCREEN in tools) advertised.add(VIEW_SCREEN);"));
+  check(
+    "route: …after the mode narrowing that would otherwise drop it",
+    route.indexOf("if (VIEW_SCREEN in tools) advertised.add(VIEW_SCREEN);") > route.indexOf("if (!offered.has(id)) advertised.delete(id);"),
+  );
+  check("view_image tells the model a screen request is view_screen's", read("lib/domain/ai/tools/view-image.ts").includes("Not for the user's screen: that is view_screen."));
   // A result that names a tool turns it on — the loop fix.
   check("route: the named tools are view_image and read_image_text", route.includes("const RESULT_NAMED_TOOLS = [VIEW_IMAGE, READ_IMAGE_TEXT];"));
   check("route: every server tool result is scanned for named tools", /const output = await original\(input, options\);\s*activateNamedTools\(output, name\);/.test(route));
