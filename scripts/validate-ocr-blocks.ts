@@ -16,6 +16,7 @@ import { normalizeOcrLanguages } from "@/lib/features/ocr/languages";
 import { tableMarkdown } from "@/lib/features/ocr/table";
 import { isAiPasteChord, isPasteAsTextChord } from "@/lib/features/ocr/paste-modifier";
 import { buildAiContent } from "@/lib/features/ocr/to-content";
+import { describeImageMention } from "@/lib/domain/ai/tools/read-image-text";
 import { isFragmented, readingOrderText, rowsFromWords, type OcrLine } from "@/lib/features/ocr/layout";
 import {
   grayscaleForOcr,
@@ -464,6 +465,19 @@ console.log("AI paste — chord and content (D13)");
     ["table", "bulletList", "codeBlock"],
   );
   check("an empty AI read is no blocks", buildAiContent("   ", parseAi), []);
+}
+
+console.log("chat — a mentioned image file (owner smoke 2026-10-09)");
+
+{
+  const id = "11111111-2222-3333-4444-555555555555";
+  const readable = describeImageMention(id, "image/png", true);
+  check("a mentioned image says it is an image, with its type", readable.startsWith("Image file (image/png"), true);
+  check("…tells the model to call read_image_text with its id", readable.includes(`read_image_text with contentId ${id}`), true);
+  check("…and never claims there is no content", /no text content available/i.test(readable), false);
+  const unreadable = describeImageMention(id, "image/png", false);
+  check("without the tool it does not offer a tool it cannot call", unreadable.includes("read_image_text"), false);
+  check("without the tool it still says it is an image, not empty", unreadable.startsWith("Image file (image/png"), true);
 }
 
 console.log("languages — setting (D10)");

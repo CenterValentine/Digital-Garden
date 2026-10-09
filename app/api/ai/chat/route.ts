@@ -243,7 +243,7 @@ import {
   listTabsTool,
   readImageTextTool,
 } from "@/lib/domain/ai/tools/registry";
-import { READ_IMAGE_TEXT } from "@/lib/domain/ai/tools/read-image-text";
+import { READ_IMAGE_TEXT, describeImageMention } from "@/lib/domain/ai/tools/read-image-text";
 import { READ_PAGE_HEADLESS_OR_BROWSER } from "@/lib/domain/ai/tools/read-page-in-browser";
 import { OPEN_TAB_AND_READ } from "@/lib/domain/ai/tools/open-tab-and-read";
 import {
@@ -2168,6 +2168,14 @@ export async function POST(request: Request) {
             if (dataSection) return dataSection;
             const bookSection = bookSections.get(node.id);
             if (bookSection) return bookSection;
+            // An image file with no extracted text: say it is an image and how
+            // to read it. The generic branch below said "(no text content
+            // available)", and the model reported a book-cover PNG as empty
+            // without trying read_image_text (owner smoke, 2026-10-09).
+            const fileMime = node.filePayload?.mimeType ?? "";
+            if (node.contentType === "file" && fileMime.startsWith("image/") && !node.filePayload?.searchText?.trim()) {
+              return `### ${node.title}\n${describeImageMention(node.id, fileMime, toolCtx.imageTextReadable === true)}`;
+            }
             // Derive live from the JSON, never trust the materialized column:
             // it may predate the private-content strip (or the atomic-inline
             // fix) — the same reason read_content re-derives. A note whose

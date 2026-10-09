@@ -50,3 +50,18 @@ export interface ReadImageTextResult {
   /** What went wrong, or why the text is empty, in words the model can act on. */
   note?: string;
 }
+
+/**
+ * How an image FILE is described when it is mentioned in a chat, or is the
+ * chat's bound content (owner smoke 2026-10-09: a PNG book cover was rendered
+ * as "(no text content available)", and the model told the user the file had
+ * nothing in it without ever reading it). Says what the item is, gives the id,
+ * and — when the tool is offered this turn — tells the model to read it before
+ * answering. `canRead` = read_image_text is registered and enabled.
+ */
+export function describeImageMention(contentId: string, mimeType: string, canRead: boolean): string {
+  const what = `Image file (${mimeType}, contentId ${contentId}). Its text has not been extracted, so its contents are not shown here.`;
+  return canRead
+    ? `${what} Before answering anything about what it shows or says, call ${READ_IMAGE_TEXT} with contentId ${contentId}; do not say it is empty until you have.`
+    : `${what} You cannot read images in this conversation; say so rather than calling the image empty, and suggest attaching it to the message.`;
+}
