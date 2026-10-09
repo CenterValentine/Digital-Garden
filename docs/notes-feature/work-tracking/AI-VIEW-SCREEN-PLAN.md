@@ -343,6 +343,21 @@ When nothing could be read, the block says so instead. It is never the image par
 - Control with the restore disabled: both banners still up 9 s later, the owner's screenshot exactly.
 - `collab:lineage:check` reconnect cases, 6 mutants killed.
 
+### D20 — No hosted web search for a model that rejects it; stream errors get their friendly copy (owner smoke, 2026-10-09)
+
+**Symptom.** Testing D18 with GPT-4 (text-only), every turn failed with "Tool 'web_search_preview' is not supported with gpt-4." The route attached OpenAI's hosted search tool to every OpenAI model.
+
+**Fix:**
+- **Catalog flag.** `ModelMeta.nativeWebSearch: false` is set for `gpt-4`. Such a model falls through to the app-executed search (the user's search connection), or none, exactly like a vendor without native search.
+- **Learned rejection.** For models the catalog does not list (hand-added ids, new releases), `noteNativeSearchRejection` reads the rejection from the stream's error. Hosted search is then off for that model from the next request on, logged as `ai:native_search_rejected`. This is per server instance; the catalog flag is the durable record.
+- **Plain error copy.** `NATIVE_SEARCH_UNSUPPORTED` reads: "This model doesn't support its provider's built-in web search, so that tool has been switched off for it. Send your message again."
+- **Fixed on the way.** `parseChatError` returned any **plain-text** error, which is every mid-stream provider error, as `UNKNOWN` without classifying it. So no stream error ever got its friendly copy or the settings CTA. It is now classified from its words.
+- **Toast.** The error toast now says what the in-chat banner says.
+
+**Gate:** `model-routing:check` covers the support table, the learned rejection, the error copy, and the route and toast wiring. 6 mutants, all killed.
+
+**Note for testing D18.** Classic `gpt-4` has an 8k context window, and the app's system prompt plus tool schemas fill much of it. A text-only model with room, such as `o3-mini` (200k) or DeepSeek, is the better test.
+
 ### D11 — Co-browse bound tab (phase 3, HELD)
 
 Co-browse work stays postponed (owner, 2026-10-06) until the feature it waits on is built. The design is recorded here, not built:
