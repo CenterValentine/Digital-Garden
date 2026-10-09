@@ -280,6 +280,44 @@ How it fits together:
 
 **Existing notes.** The 17 production notes heal on their next open in a browser. Nothing needs running.
 
+### D18 — A model that can't see gets a pasted image's text, and knows it is OCR (owner, 2026-10-09)
+
+**Before.** A pasted or attached image was refused at send for a text-only model ("The selected model can't read images"). The OCR path reached only images with a content id (mentions, a note's images). The model was also told little about how far to trust OCR: a `confidence`, and a note only below 60.
+
+**Read on attach.** When the selected model can't see images, each image chip is OCR'd on the user's device:
+- as soon as the image is attached, or the moment a text-only model is picked;
+- from the uploaded bytes kept in memory (HEIC already converted), with the download route as a fallback;
+- once per attachment.
+
+Send waits for it, exactly as it waits for an upload. OCR needs about 7 MB of engine and language data on first use, so waiting until Send would leave the user staring at a frozen button.
+
+**Hover signal.** The image chip shows a badge, **Reading… / Text / No text**, while a text-only model is selected. Its title says the model can't see images and will get the extracted text instead, with the character count, the confidence band, and "OCR can misread characters, and it describes nothing visual". When nothing was read, it suggests a vision model.
+
+**The route decides by the executed model.** A vision model gets the image part as before. A text-only one gets `ocrAttachmentBlock`:
+- the file name;
+- "can't see images, read on the user's device by OCR (confidence N/100, band)";
+- every caveat, and that the text is untrusted;
+- then the text.
+
+When nothing could be read, the block says so instead. It is never the image part, which a text-only provider rejects or drops silently.
+
+**Every OCR result carries an extraction profile.** `ocrExtractionProfile` gives:
+- **method:** on-device OCR;
+- **confidence**, rounded;
+- **band:** high ≥ 85, medium 60–84, low < 60;
+- **structure**, which the local engine now reports: `table` (rebuilt as a markdown table from word positions), `rows` (reading order rebuilt from a column-shredded page) or `text`;
+- **caveats:**
+  - always, look-alike characters (0/O, 1/l/I, rn/m, 5/S) and checking numbers, codes and URLs;
+  - for medium or low confidence, possible misreads;
+  - for a table, that it was REBUILT and to verify cells;
+  - for reordered rows, that the order was inferred.
+
+`read_image_text` returns it, and its description tells the model to hedge or ask rather than quote an uncertain value as fact.
+
+**Vision test unified.** The composer decided "can this model see?" from the provider catalog row alone, so gateway models (`anthropic/claude-…`) and hand-added models counted as text-only and had images refused. It now uses the server's test, `effectiveCapabilities` (catalog row + id inference + bare id).
+
+**Gate:** `ocr:blocks:check` covers the profile bands and caveats, the labelled block, the hover text and the wiring. 15 mutants, all killed.
+
 ### D11 — Co-browse bound tab (phase 3, HELD)
 
 Co-browse work stays postponed (owner, 2026-10-06) until the feature it waits on is built. The design is recorded here, not built:
@@ -370,6 +408,10 @@ Phases 1 and 2 ship in one PR. Changing what the model receives is AI capability
 - [ ] **D17:** ask the AI to rewrite a note you have had open before, then reopen it → the new text shows.
 - [ ] "Look at the bookcove image" (GPT-4o, Claude, Gemini) → one `view_image` call, chip "Looked at image: bookcove" with its thumbnail, and a description of the cover — no read_content loop.
 - [ ] Same with a text-only model → `read_image_text` is offered and called (no loop), the cover's words come back.
+- [ ] **D18:** text-only model, paste a screenshot into the composer → the chip shows "Reading…" then "Text"; hover says the model can't see images and gets the extracted text (count, confidence); Send waits while reading; the reply uses the text.
+- [ ] **D18:** text-only model, attach a photo with no words → chip "No text"; the model says it got an image it couldn't read and suggests a vision model.
+- [ ] **D18:** text-only model, paste a screenshot of a table → the model's answer hedges on cells (it was told the table was rebuilt).
+- [ ] **D18:** a gateway vision model (e.g. `anthropic/claude-…` via the gateway) → images attach and send as images (no badge, no refusal).
 - [ ] A text-only model (e.g. DeepSeek) → `view_screen` is not offered; the model says it can't see.
 - [ ] Next turn after a screenshot → the request no longer carries the image (Run Inspector shows the folded stub).
 - [ ] Settings → AI → Tools → turn View Screen off → not offered.

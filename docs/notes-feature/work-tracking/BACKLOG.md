@@ -51,6 +51,7 @@ Merged in PR #291 (2026-10-09, `0967297d`). Remaining:
 - [ ] **Safari ⇧⌘V** — record whether Safari fires a paste event for the chord (smoke item). If not, the context-menu item is the Safari path; do not add a second chord.
 - [ ] **`ai` OCR engine** behind an `editor.ocrEngine` setting — the user's vision connection as the second `OcrEngine` member (precedent: the flashcards media route); needs a vision-capability check and client-side downscale for the 4.5 MB body limit.
 - [x] **Mentioned images seen by vision models** — done as `view_image` (AI-VIEW-SCREEN-PLAN D14): a vision model is pointed at it for any mentioned, bound or listed image and sees the file on demand. Attaching up front instead stays possible if one call proves too slow.
+- [x] **Pasted / attached images for text-only models** — done as AI-VIEW-SCREEN-PLAN D18 (read on attach, hover badge, labelled OCR block with an extraction profile).
 - [ ] **External-URL images for the AI** — `read_content` lists them, but `read_image_text` takes a content id only (a cross-origin fetch usually cannot read the pixels). A server-side fetch-and-hand-off would close it.
 - Also deferred in the plan §4: full-page co-browse strips, OCR as an automatic read-ladder rung, multimodal tool output, self-hosting the language pack.
 
