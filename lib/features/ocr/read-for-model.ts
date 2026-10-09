@@ -6,15 +6,40 @@
  * the model can act on, never a thrown error: a tool that reports its real
  * outcome is the contract the chat harness depends on.
  */
-import type { ReadImageTextResult } from "@/lib/domain/ai/tools/read-image-text";
+import {
+  ocrExtractionProfile,
+  type OcrExtractionProfile,
+  type ReadImageTextResult,
+} from "@/lib/domain/ai/tools/read-image-text";
 
 import { getOcrEngine } from "./index";
 import { reflowOcrText } from "./reflow";
 
 /** A page of dense text is ~4k characters; this only guards against pathological input. */
 const MAX_CHARS = 20_000;
-/** Below this mean word confidence the model is told to treat words with care. */
-const LOW_CONFIDENCE = 60;
+
+export interface RecognizedImageText {
+  /** Reflowed, capped at MAX_CHARS. Empty when nothing readable was found. */
+  text: string;
+  truncated: boolean;
+  extraction: OcrExtractionProfile;
+}
+
+/**
+ * Read an image's text for a MODEL: reflowed, capped, and labelled with how it
+ * was read (D18). Shared by `read_image_text` and the composer's attached
+ * images for models that cannot see. Throws when recognition itself fails.
+ */
+export async function recognizeImageText(image: Blob): Promise<RecognizedImageText> {
+  const result = await getOcrEngine().recognize(image);
+  const text = reflowOcrText(result.text);
+  const truncated = text.length > MAX_CHARS;
+  return {
+    text: truncated ? text.slice(0, MAX_CHARS) : text,
+    truncated,
+    extraction: ocrExtractionProfile({ confidence: result.confidence, structure: result.structure }),
+  };
+}
 
 function describe(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -51,37 +76,28 @@ export async function readImageTextForModel(contentId: string): Promise<ReadImag
     };
   }
 
-  let raw: string;
-  let confidence: number;
+  let read: RecognizedImageText;
   try {
-    const result = await getOcrEngine().recognize(image);
-    raw = result.text;
-    confidence = Math.round(result.confidence);
+    read = await recognizeImageText(image);
   } catch (error) {
     return { ok: false, contentId, note: `Text recognition failed on this device: ${describe(error)}` };
   }
-
-  const text = reflowOcrText(raw);
-  if (!text) {
+  if (!read.text) {
     return {
       ok: true,
       contentId,
       untrustedImageText: "",
-      confidence,
+      confidence: read.extraction.confidence,
+      extraction: read.extraction,
       note: "No readable text was found. The image may be a photo or drawing without words — this tool reads text only.",
     };
   }
-  const truncated = text.length > MAX_CHARS;
-  const notes: string[] = [];
-  if (confidence < LOW_CONFIDENCE) {
-    notes.push("Low recognition confidence: the image may be blurry, small or stylised, so treat uncertain words with care.");
-  }
-  if (truncated) notes.push(`Text truncated to the first ${MAX_CHARS.toLocaleString("en-US")} characters.`);
   return {
     ok: true,
     contentId,
-    untrustedImageText: truncated ? text.slice(0, MAX_CHARS) : text,
-    confidence,
-    ...(notes.length > 0 ? { note: notes.join(" ") } : {}),
+    untrustedImageText: read.text,
+    confidence: read.extraction.confidence,
+    extraction: read.extraction,
+    ...(read.truncated ? { note: `Text truncated to the first ${MAX_CHARS.toLocaleString("en-US")} characters.` } : {}),
   };
 }

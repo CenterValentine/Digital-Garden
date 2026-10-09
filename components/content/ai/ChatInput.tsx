@@ -26,7 +26,8 @@ import {
   type KeyboardEvent,
   type FormEvent,
 } from "react";
-import { ArrowUp, Square, Mic, Paperclip, X, FileText, Loader2, ScrollText, ListChecks } from "lucide-react";
+import { ArrowUp, Square, Mic, Paperclip, X, FileText, Loader2, ScrollText, ListChecks, ScanText } from "lucide-react";
+import { imageTextHint } from "@/lib/features/ocr/attachment-hint";
 import { useDrop } from "react-dnd";
 import { cn } from "@/lib/core/utils";
 import {
@@ -812,6 +813,7 @@ export function ChatInput({
               <AttachmentChip
                 key={a.id}
                 attachment={a}
+                modelCanSee={supportsImages}
                 onRemove={() => onRemoveAttachment?.(a.id)}
               />
             ))}
@@ -876,7 +878,7 @@ export function ChatInput({
                 title={
                   supportsImages
                     ? "Attach images or text files"
-                    : "Attach text files (active model can't read images)"
+                    : "Attach files — this model can't see images, so their text is read on your device and sent instead"
                 }
                 aria-label="Attach files"
                 className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-black/[0.06] dark:hover:bg-white/10 transition-colors"
@@ -1111,13 +1113,17 @@ function insertPlainTextAtCaret(text: string) {
 
 function AttachmentChip({
   attachment,
+  modelCanSee,
   onRemove,
 }: {
   attachment: ChatAttachment;
+  /** False when the selected model can't see images (D18). */
+  modelCanSee: boolean;
   onRemove: () => void;
 }) {
   const { name, kind, status, url, error } = attachment;
   const isImage = kind === "image";
+  const textHint = isImage && !modelCanSee && status === "ready" ? imageTextHint(attachment) : null;
   return (
     <div
       className={cn(
@@ -1167,6 +1173,22 @@ function AttachmentChip({
         </button>
       ) : (
         <span className="truncate">{name}</span>
+      )}
+      {textHint && (
+        // D18: this model can't see the image — the hover says what it gets instead.
+        <span
+          title={textHint.title}
+          aria-label={textHint.title}
+          data-image-text-hint={attachment.ocrStatus ?? "pending"}
+          className="flex shrink-0 cursor-help items-center gap-0.5 rounded bg-amber-500/15 px-1 py-px text-[10px] font-medium text-amber-700 dark:text-amber-300"
+        >
+          {attachment.ocrStatus === "done" || attachment.ocrStatus === "failed" ? (
+            <ScanText className="h-3 w-3" />
+          ) : (
+            <Loader2 className="h-3 w-3 animate-spin" />
+          )}
+          {textHint.label}
+        </span>
       )}
       <button
         type="button"

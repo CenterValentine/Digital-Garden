@@ -16,7 +16,9 @@ import { normalizeOcrLanguages } from "@/lib/features/ocr/languages";
 import { tableMarkdown } from "@/lib/features/ocr/table";
 import { isAiPasteChord, isPasteAsTextChord } from "@/lib/features/ocr/paste-modifier";
 import { buildAiContent } from "@/lib/features/ocr/to-content";
-import { describeImageMention } from "@/lib/domain/ai/tools/read-image-text";
+import { describeImageMention, ocrAttachmentBlock, ocrExtractionProfile } from "@/lib/domain/ai/tools/read-image-text";
+import { imageTextHint } from "@/lib/features/ocr/attachment-hint";
+import { readFileSync } from "node:fs";
 import { isFragmented, readingOrderText, rowsFromWords, type OcrLine } from "@/lib/features/ocr/layout";
 import {
   grayscaleForOcr,
@@ -478,6 +480,59 @@ console.log("chat — a mentioned image file (owner smoke 2026-10-09)");
   const unreadable = describeImageMention(id, "image/png", false);
   check("without the tool it does not offer a tool it cannot call", unreadable.includes("read_image_text"), false);
   check("without the tool it still says it is an image, not empty", unreadable.startsWith("Image file (image/png"), true);
+}
+
+console.log("images for models that can't see — OCR extraction profile (AI-VIEW-SCREEN-PLAN D18)");
+{
+  const high = ocrExtractionProfile({ confidence: 91.4, structure: "text" });
+  check("confidence rounds; ≥ 85 is high", [high.confidence, high.confidenceBand], [91, "high"]);
+  check("60–84 is medium", ocrExtractionProfile({ confidence: 72 }).confidenceBand, "medium");
+  check("85 exactly is high, 60 exactly is medium", [ocrExtractionProfile({ confidence: 85 }).confidenceBand, ocrExtractionProfile({ confidence: 60 }).confidenceBand], ["high", "medium"]);
+  check("below 60 is low", ocrExtractionProfile({ confidence: 59 }).confidenceBand, "low");
+  check("every profile warns about look-alike characters", /0\/O, 1\/l\/I/.test(high.caveats[0]), true);
+  check("a high-confidence plain read carries only that caveat", high.caveats.length, 1);
+  check("medium adds a misread warning", ocrExtractionProfile({ confidence: 72 }).caveats.some((c) => /moderate confidence/.test(c)), true);
+  check("low adds a care warning", ocrExtractionProfile({ confidence: 40 }).caveats.some((c) => /Low recognition confidence/.test(c)), true);
+  check("a rebuilt table says it was REBUILT and to verify cells", ocrExtractionProfile({ confidence: 90, structure: "table" }).caveats.some((c) => /REBUILT from word positions/.test(c) && /verify/.test(c)), true);
+  check("reordered rows say reading order was inferred", ocrExtractionProfile({ confidence: 90, structure: "rows" }).caveats.some((c) => /Reading order was inferred/.test(c)), true);
+  check("structure defaults to text", ocrExtractionProfile({ confidence: 90 }).structure, "text");
+
+  const profile = ocrExtractionProfile({ confidence: 72, structure: "table" });
+  const block = ocrAttachmentBlock("receipt.png", "TOTAL 12.50", profile);
+  check("the block names the file and says the model can't see images", block.startsWith("[Attached image: receipt.png — the selected model can't see images"), true);
+  check("…says it was read by OCR, with confidence and band", block.includes("on the user's device by OCR (confidence 72/100, medium)"), true);
+  check("…carries every caveat", profile.caveats.every((c) => block.includes(c)), true);
+  check("…says it describes nothing visual and is untrusted", /describes nothing visual/.test(block) && /untrusted/.test(block), true);
+  check("…then the text", block.endsWith("\nTOTAL 12.50"), true);
+  check("no text read → says so, never an empty block", /No readable text was found/.test(ocrAttachmentBlock("photo.jpg", "  ", profile)), true);
+  check("no OCR at all → says no text could be read and suggests a vision model", /no text could be read from it/.test(ocrAttachmentBlock("photo.jpg", "", null)) && /vision model/.test(ocrAttachmentBlock("photo.jpg", "", null)), true);
+
+  check("hover while reading", imageTextHint({ ocrStatus: "reading" }).label, "Reading…");
+  check("hover before reading starts reads the same", imageTextHint({}).label, "Reading…");
+  const done = imageTextHint({ ocrStatus: "done", ocrText: "hello world", ocrExtraction: profile });
+  check("hover when read: says the model can't see images and gets the text instead", /can't see images/.test(done.title) && /text extracted from this image instead/.test(done.title), true);
+  check("…with how much and how sure", /11 characters/.test(done.title) && /medium confidence/.test(done.title), true);
+  check("…and that OCR can misread", /OCR can misread/.test(done.title), true);
+  check("hover when nothing was read", imageTextHint({ ocrStatus: "done", ocrText: "", ocrExtraction: profile }).label, "No text");
+  check("hover when reading failed suggests a vision model", /vision model/.test(imageTextHint({ ocrStatus: "failed" }).title), true);
+}
+{
+  const src = (f: string) => readFileSync(f, "utf8");
+  const route = src("app/api/ai/chat/route.ts");
+  const engine = src("lib/domain/ai/use-conversation-engine.ts");
+  const chip = src("components/content/ai/ChatInput.tsx");
+  const engineFile = src("lib/features/ocr/local-engine.ts");
+  const forModel = src("lib/features/ocr/read-for-model.ts");
+  check("route: a model that can't see gets the OCR block, never the image part", /if \(isImage && !visionCapable\) \{[\s\S]{0,700}inlined\.push\(ocrAttachmentBlock\([\s\S]{0,120}continue;/.test(route), true);
+  check("route: decided by the executed model's vision", /audioCapable,\s*visionCapable,\s*\);/.test(route), true);
+  check("engine: no send-time refusal for images any more", /can't read images\. Switch to a vision-capable model/.test(engine), false);
+  check("engine: OCR runs for a model that can't see, once per attachment", /if \(supportsImageAttachments\) return;[\s\S]{0,300}ocrStartedRef\.current\.has\(a\.id\)/.test(engine), true);
+  check("engine: Send waits for the read", /!supportsImageAttachments && a\.kind === "image" && a\.status === "ready" && a\.ocrStatus !== "done" && a\.ocrStatus !== "failed"/.test(engine), true);
+  check("engine: the read rides the part only once done", /a\.kind === "image" && a\.ocrStatus === "done" && a\.ocrExtraction\) \{\s*app\.ocrText/.test(engine), true);
+  check("engine: vision is the server's test (catalog row + inference + bare id)", /effectiveCapabilities\(\{ id: modelId, capabilities: model\?\.capabilities \}\)\.has\("vision"\)/.test(engine), true);
+  check("chip: image chips show the hover badge when the model can't see", /isImage && !modelCanSee && status === "ready" \? imageTextHint\(attachment\)/.test(chip) && chip.includes("title={textHint.title}"), true);
+  check("local engine reports the text's structure", /structure: "table" \| "rows" \| "text" = table \? "table" : isFragmented\(lines\) \? "rows" : "text"/.test(engineFile), true);
+  check("read_image_text returns the extraction profile", (forModel.match(/extraction: read\.extraction/g) ?? []).length >= 2, true);
 }
 
 console.log("languages — setting (D10)");

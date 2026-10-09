@@ -245,7 +245,12 @@ import {
   viewScreenTool,
   createViewImageTool,
 } from "@/lib/domain/ai/tools/registry";
-import { READ_IMAGE_TEXT, describeImageMention } from "@/lib/domain/ai/tools/read-image-text";
+import {
+  READ_IMAGE_TEXT,
+  describeImageMention,
+  ocrAttachmentBlock,
+  type OcrExtractionProfile,
+} from "@/lib/domain/ai/tools/read-image-text";
 import { VIEW_SCREEN } from "@/lib/domain/ai/tools/view-screen";
 import { VIEW_IMAGE } from "@/lib/domain/ai/tools/view-image";
 import { deliverScreenCaptures, screenDeliveryMode } from "@/lib/domain/ai/screen-delivery";
@@ -1989,6 +1994,7 @@ export async function POST(request: Request) {
         ),
         executedVendorId,
         audioCapable,
+        visionCapable,
       );
 
       // Convert UIMessages to ModelMessages for streamText
@@ -3918,7 +3924,8 @@ const PDF_NATIVE_PROVIDERS = new Set(["anthropic", "google"]);
  * The client persists attachments as file parts (a clean chip), stashing
  * server-extracted text in `providerMetadata.app.text` for non-image
  * types. Here we adapt each user message for the model:
- *   - images → kept (vision providers consume them);
+ *   - images → kept for a vision model; for one that can't see, the text
+ *     read from them on the user's device is inlined instead (D18);
  *   - PDFs → kept for Anthropic/Google (native document parts), else the
  *     extracted text is inlined and the part dropped;
  *   - other files (txt/md/csv/json) → always inlined as text.
@@ -3931,6 +3938,7 @@ function resolveAttachmentsForModel(
   messages: unknown[],
   providerId: string,
   audioCapable: boolean,
+  visionCapable: boolean,
 ): unknown[] {
   const nativePdf = PDF_NATIVE_PROVIDERS.has(providerId);
 
@@ -3970,6 +3978,22 @@ function resolveAttachmentsForModel(
       const isImage = mediaType.startsWith("image/");
       const isPdf = mediaType === "application/pdf";
       const isAudio = mediaType.startsWith("audio/");
+
+      // D18: a model that can't see gets the image's TEXT, read on the user's
+      // device at attach time, labelled with how it was read and what to
+      // doubt. Never the image part — a text-only provider rejects it or
+      // drops it silently.
+      if (isImage && !visionCapable) {
+        const appMeta = (p.providerMetadata as Record<string, Record<string, unknown>> | undefined)?.app;
+        let profile: OcrExtractionProfile | null = null;
+        try {
+          profile = typeof appMeta?.ocrExtraction === "string" ? (JSON.parse(appMeta.ocrExtraction) as OcrExtractionProfile) : null;
+        } catch {
+          profile = null;
+        }
+        inlined.push(ocrAttachmentBlock(filename, typeof appMeta?.ocrText === "string" ? appMeta.ocrText : "", profile));
+        continue;
+      }
 
       if (isImage || (isPdf && nativePdf) || (isAudio && audioCapable)) {
         kept.push(stripAppMeta(p));
