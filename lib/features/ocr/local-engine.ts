@@ -18,6 +18,10 @@
  */
 import type { LoggerMessage, PSM, Worker as TesseractWorker } from "tesseract.js";
 
+import { useSettingsStore } from "@/state/settings-store";
+
+import { normalizeOcrLanguages, OCR_BASE_LANGUAGE } from "./languages";
+import { readingOrderText, type OcrLine } from "./layout";
 import {
   LAYOUT_PSM,
   needsSparsePass,
@@ -38,14 +42,27 @@ export const OCR_IDLE_MS = 120_000;
  */
 const WORKER_PATH = "/ocr/worker.min.js";
 const CORE_PATH = "/ocr";
-/**
- * The language pack is data, not code, so it stays on the CDN. This is the
- * exact pack tesseract.js v7 uses by default for its LSTM engine (2.9 MB
- * gzipped), pinned to an immutable package version instead of "latest".
+/*
+ * Language packs are data, not code, so they stay on the CDN. No `langPath`
+ * is passed: tesseract.js then fetches each language from its own package,
+ * `@tesseract.js-data/<code>/4.0.0_best_int` — one base URL cannot address
+ * per-language packages, so the earlier `eng@1.0.0` pin could not serve a
+ * second language. Every package's current release is 1.0.0 (checked
+ * 2026-10-08). Cached in IndexedDB per language after the first download.
  */
-const LANG_PATH = "https://cdn.jsdelivr.net/npm/@tesseract.js-data/eng@1.0.0/4.0.0_best_int";
 
 let workerPromise: Promise<TesseractWorker> | null = null;
+/** The "+"-joined languages the live worker was created with. */
+let workerLanguages: string | null = null;
+
+/** The user's languages (Settings → Editor & Files → Text recognition). */
+function configuredLanguages(): string {
+  try {
+    return normalizeOcrLanguages(useSettingsStore.getState().editor?.ocrLanguages).join("+");
+  } catch {
+    return OCR_BASE_LANGUAGE;
+  }
+}
 let activeJobs = 0;
 let idleTimer: ReturnType<typeof setTimeout> | null = null;
 let jobCounter = 0;
@@ -71,13 +88,13 @@ function routeLog(message: LoggerMessage) {
   });
 }
 
-function spawnWorker(): Promise<TesseractWorker> {
+function spawnWorker(languages: string): Promise<TesseractWorker> {
+  workerLanguages = languages;
   const pending = (async () => {
     const { createWorker, OEM } = await import("tesseract.js");
-    return createWorker("eng", OEM.LSTM_ONLY, {
+    return createWorker(languages, OEM.LSTM_ONLY, {
       workerPath: WORKER_PATH,
       corePath: CORE_PATH,
-      langPath: LANG_PATH,
       workerBlobURL: false,
       logger: routeLog,
     });
@@ -111,6 +128,7 @@ export async function terminateLocalOcr(): Promise<void> {
   const pending = workerPromise;
   // Detach first: a call arriving while terminate() is in flight spawns fresh.
   workerPromise = null;
+  workerLanguages = null;
   if (!pending) return;
   try {
     const worker = await pending;
@@ -131,18 +149,32 @@ async function recognize(
   const jobId = `dg-ocr-${++jobCounter}`;
   if (opts?.onProgress) progressListeners.set(jobId, opts.onProgress);
   try {
-    workerPromise ??= spawnWorker();
-    const worker = await workerPromise;
     return await oneAtATime(async () => {
+      // A languages change in Settings takes effect on the next read: the
+      // worker was built for the old set, so retire it (reads are queued, so
+      // no other read is using it) and spawn one for the new set.
+      const languages = configuredLanguages();
+      if (workerPromise && workerLanguages !== languages) await terminateLocalOcr();
+      workerPromise ??= spawnWorker(languages);
+      const worker = await workerPromise;
       // Grayscale, invert a dark background, upscale narrow images (preprocess.ts).
       const prepared = await preprocessForOcr(image);
       const read = async (layout: OcrLayout) => {
         await worker.setParameters({
           tessedit_pageseg_mode: LAYOUT_PSM[layout] as PSM,
         });
-        const { data } = await worker.recognize(prepared, {}, { text: true }, jobId);
+        const { data } = await worker.recognize(prepared, {}, { text: true, blocks: true }, jobId);
+        // Word positions let a page Tesseract shredded into columns (terminal
+        // output, tables) be read back row by row (layout.ts).
+        const lines: OcrLine[] = (data.blocks ?? []).flatMap((block) =>
+          block.paragraphs.flatMap((paragraph) =>
+            paragraph.lines.map((line) => ({
+              words: line.words.map((word) => ({ text: word.text, bbox: word.bbox })),
+            })),
+          ),
+        );
         return {
-          text: data.text ?? "",
+          text: readingOrderText(data.text ?? "", lines),
           confidence: typeof data.confidence === "number" ? data.confidence : 0,
           layout,
         };

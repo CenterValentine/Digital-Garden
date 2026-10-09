@@ -12,6 +12,8 @@ import type { JSONContent } from "@tiptap/core";
 import { getCollaborationServerExtensions } from "@/lib/domain/collaboration/extensions";
 import { decompressMarkdown } from "@/lib/domain/content/markdown-decompress";
 import { markdownToTiptapRich, type HtmlBridge } from "@/lib/domain/content/markdown-serialize";
+import { normalizeOcrLanguages } from "@/lib/features/ocr/languages";
+import { isFragmented, readingOrderText, rowsFromWords, type OcrLine } from "@/lib/features/ocr/layout";
 import {
   grayscaleForOcr,
   needsSparsePass,
@@ -206,6 +208,51 @@ check(
   const light = new Uint8ClampedArray([...px(250, 250, 250), ...px(250, 250, 250), ...px(20, 20, 20)]);
   check("a light-background image is only grayscaled", [grayscaleForOcr(light), light[8]], [false, 20]);
 }
+
+console.log("layout — reading order (D11)");
+
+{
+  // Six terminal rows "Compiled in Nms", as Tesseract returns them: three
+  // one-word-per-line COLUMNS (x 70 / 190 / 230), top to bottom.
+  const ys = [10, 44, 78, 112, 146, 180];
+  const ms = ["135ms", "128ms", "133ms", "144ms", "153ms", "135ms"];
+  const box = (x: number, y: number, w: number, h = 24) => ({ x0: x, y0: y, x1: x + w, y1: y + h });
+  const col = (x: number, w: number, texts: string[]): OcrLine[] =>
+    texts.map((text, i) => ({ words: [{ text, bbox: box(x, ys[i], w) }] }));
+  const shredded = [...col(70, 110, ys.map(() => "Compiled")), ...col(190, 24, ys.map(() => "in")), ...col(230, 70, ms)];
+  const wanted = ms.map((m) => `Compiled in ${m}`).join("\n");
+  check("terminal columns read back as rows", readingOrderText("Compiled\nCompiled\n…", shredded), wanted);
+
+  // A tall junk "word" (three ✓ glued) spanning rows 1–3 must not merge them.
+  const withJunk: OcrLine[] = [...shredded, { words: [{ text: "NNN", bbox: { x0: 30, y0: 10, x1: 60, y1: 102 } }] }];
+  check(
+    "a tall glued glyph does not merge rows",
+    readingOrderText("", withJunk).split("\n").filter((l) => l.includes("Compiled")).length,
+    6,
+  );
+
+  const prose: OcrLine[] = [0, 1, 2, 3, 4].map((i) => ({
+    words: "the quick brown fox jumps over".split(" ").map((t, j) => ({ text: t, bbox: box(j * 60, i * 30, 50) })),
+  }));
+  check("prose lines are not fragmented", isFragmented(prose), false);
+  check("prose keeps Tesseract's own text", readingOrderText("TESSERACT ORDER", prose), "TESSERACT ORDER");
+  check("three short lines are too few to count as fragmented", isFragmented(shredded.slice(0, 3)), false);
+
+  const gapped = rowsFromWords([
+    { text: "Title", bbox: box(0, 0, 50) },
+    { text: "Body", bbox: box(0, 120, 50) },
+    { text: "More", bbox: box(0, 150, 50) },
+  ]);
+  check("a tall gap between rows is a paragraph break", gapped, "Title\n\nBody\nMore");
+}
+
+console.log("languages — setting (D10)");
+
+check("unset reads as English only", normalizeOcrLanguages(undefined), ["eng"]);
+check("English is always first and present", normalizeOcrLanguages(["spa"]), ["eng", "spa"]);
+check("unknown codes are dropped", normalizeOcrLanguages(["spa", "klingon", 7]), ["eng", "spa"]);
+check("duplicates collapse, catalogue order", normalizeOcrLanguages(["ita", "spa", "spa", "eng"]), ["eng", "spa", "ita"]);
+check("a malformed value reads as English only", normalizeOcrLanguages("spa"), ["eng"]);
 
 if (fails > 0) {
   console.log(`\nocr:blocks:check — ${fails} failure(s)`);
