@@ -908,7 +908,16 @@ export function MainPanelHeader({
                     // Overrides the tab's own title so hovering the X reads as
                     // "close", not as the filename tooltip.
                     title={`Close ${tab.title}`}
-                    onClick={() => closeContentTab(tab.id)}
+                    // Closing a tab never activates it: the pane doesn't take
+                    // focus for this press (a tab in the OTHER pane would
+                    // otherwise become the focused content and pull the right
+                    // sidebar to it), and the button doesn't take keyboard focus.
+                    data-keeps-pane-focus=""
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      closeContentTab(tab.id);
+                    }}
                   >
                     <X className="h-3 w-3" aria-hidden="true" />
                   </button>

@@ -22,6 +22,8 @@
  * Run: pnpm workspace:pane-placement:smoke
  */
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
   useContentStore,
   confirmWorkspaceWrite,
@@ -753,6 +755,41 @@ console.log("\na restore never collapses — only a user's removal does (owner r
     "…while closing the pane's last tab yourself collapses to single",
     useContentStore.getState().layoutMode,
     "single",
+  );
+}
+
+console.log("\nclosing a tab never activates it (owner ask, 2026-10-08)");
+{
+  // Pressing a tab's "x" must not make that tab — or its pane — the focused
+  // content: the right sidebar follows focus. The pane's own capture-phase
+  // focus is skipped for the button (data-keeps-pane-focus); the store must
+  // then leave focus alone when the closed tab lives in the OTHER pane.
+  useContentStore.getState().restoreWorkspace({
+    activeContentId: "A",
+    activePaneId: "top-left",
+    layoutMode: "dual-vertical",
+    paneTabContentIds: { "top-left": ["A"], "top-right": ["B", "C"] },
+  });
+  useContentStore.getState().focusPane("top-left");
+  useContentStore.getState().closeContentTab("tab:C");
+  useContentStore.getState().closeContentTab("tab:B");
+  check(
+    "closing tabs in the other pane keeps focus and the shown content where they were",
+    [useContentStore.getState().activePaneId, useContentStore.getState().selectedContentId],
+    ["top-left", "A"],
+  );
+  const header = readFileSync(join(process.cwd(), "components/content/headers/MainPanelHeader.tsx"), "utf8");
+  const pane = readFileSync(join(process.cwd(), "components/content/MainPanelWorkspace.tsx"), "utf8");
+  const closeButton = header.slice(header.indexOf("aria-label={`Close ${tab.title}`}"), header.indexOf("closeContentTab(tab.id);"));
+  check(
+    "the close button opts out of pane focus and keyboard focus",
+    [closeButton.includes("data-keeps-pane-focus"), closeButton.includes("onMouseDown={(event) => event.preventDefault()}")],
+    [true, true],
+  );
+  check(
+    "…and the pane honours the opt-out for presses and focus alike",
+    (pane.match(/if \(keepsPaneFocus\(event\.target\)\) return;/g) ?? []).length,
+    2,
   );
 }
 
