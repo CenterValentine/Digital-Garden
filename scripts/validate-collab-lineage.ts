@@ -476,6 +476,28 @@ async function main() {
     check("D17 wiring: the state route returns when the stored note last changed", route.includes("payloadUpdatedAt: payload?.updatedAt.toISOString() ?? null"));
   }
 
+  // ── 4c. Coming back online over a socket that never closed ───────────────
+  // Owner smoke 2026-10-09: the browser's offline event left the WebSocket
+  // open; on return the banners stuck because onSynced never fired again.
+  // Reproduced in a two-tab browser run (control without the restore: both
+  // banners still up 9 s later).
+  {
+    const rt = readFileSync(join(process.cwd(), "lib/domain/collaboration/runtime.ts"), "utf8");
+    const editor = readFileSync(join(process.cwd(), "components/content/editor/MarkdownEditor.tsx"), "utf8");
+    check("reconnect: onSynced clears the degraded markers through markSynced", /onSynced: \(\{ state \}\) => \{\s*if \(!state\) return;\s*this\.markSynced\(entry\);/.test(rt));
+    check("reconnect: markSynced clears the warning and the reconnect intent", /private markSynced\(entry: DocumentRuntimeEntry\) \{[\s\S]{0,800}entry\.state\.warning = null;[\s\S]{0,80}entry\.state\.reconnectIntent = false;/.test(rt));
+    check("reconnect: an existing provider asked to connect is checked for still being synced (promote)", /entry\.hocuspocusProvider\.connect\(\);\s*this\.emit\(entry\);\s*this\.restoreIfStillSynced\(entry\);/.test(rt));
+    check("reconnect: …and in promoteInternal", /entry\.hocuspocusProvider\.connect\(\);\s*this\.restoreIfStillSynced\(entry\);\s*return;/.test(rt));
+    check("reconnect: …and when pending changes drain to zero", /if \(number === 0\) this\.restoreIfStillSynced\(entry\);/.test(rt));
+    check(
+      "reconnect: the restore needs synced, nothing pending, online, and a runtime NOT already synced (a no-op in normal operation)",
+      /provider\?\.synced &&\s*!provider\.hasUnsyncedChanges &&\s*entry\.state\.networkState === "online" &&[\s\S]{0,200}entry\.state\.connectionState !== "synced"/.test(rt),
+    );
+    check("reconnect: recovering sets recoveredAt and clears it after RECOVERED_NOTICE_MS", /if \(recovering\) \{\s*entry\.state\.recoveredAt = Date\.now\(\);[\s\S]{0,300}\}, RECOVERED_NOTICE_MS\);/.test(rt));
+    check("reconnect: the notice timer is cleared when the entry goes away", rt.includes("if (entry.recoveredNoticeTimer) clearTimeout(entry.recoveredNoticeTimer);"));
+    check("reconnect: the editor says so", editor.includes("Reconnected — your changes are synced.") && editor.includes("runtimeRecoveredAt !== null"));
+  }
+
   // ── 5. The save carries the copy (request body) ──────────────────────────
   {
     const copy = Y.encodeStateAsUpdate(seed(docOf("one", "two")));
