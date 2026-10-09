@@ -299,7 +299,7 @@ Send waits for it, exactly as it waits for an upload. OCR needs about 7 MB of en
 - every caveat, and that the text is untrusted;
 - then the text.
 
-When nothing could be read, the block says so instead. It is never the image part, which a text-only provider rejects or drops silently.
+When nothing could be read, the block says so instead. It is never the image part, which a text-only provider rejects or drops silently. **Several images** in one message are numbered in attachment order ("Attached image 2 of 3: image.png"). Pasted screenshots all arrive as `image.png`, so without numbers the model could not tell "the second image" from the others. A lone image is not numbered. Each block keeps its own confidence and caveats.
 
 **Every OCR result carries an extraction profile.** `ocrExtractionProfile` gives:
 - **method:** on-device OCR;
