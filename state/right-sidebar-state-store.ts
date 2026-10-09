@@ -27,8 +27,33 @@ export const DEFAULT_RIGHT_SIDEBAR_TAB: RightSidebarTab = "outline";
 
 interface RightSidebarState {
   activeTabByContentId: Record<string, RightSidebarTab>;
+  /**
+   * The tab the user last CHOSE, on any content (owner, 2026-10-08): content
+   * with no tab of its own opens on this rail instead of the first one, so
+   * moving through notes keeps you in the panel you were working in. Set only
+   * by an explicit tab click (`recordEngagedTab`), never by programmatic
+   * opens or the live Properties override.
+   */
+  lastEngagedTab: RightSidebarTab | null;
   setActiveTab: (contentId: string, tab: RightSidebarTab) => void;
+  recordEngagedTab: (tab: RightSidebarTab) => void;
   clearContentState: (contentId: string) => void;
+}
+
+/** Tabs that describe a moment, not a place to return to. */
+const NOT_A_DEFAULT: ReadonlySet<RightSidebarTab> = new Set(["properties"]);
+
+/**
+ * The tab to show: the content's own saved tab, else the rail the user last
+ * engaged with, else the first available — each only if this content offers it.
+ */
+export function defaultRightSidebarTab(
+  savedTab: RightSidebarTab | null | undefined,
+  lastEngagedTab: RightSidebarTab | null | undefined,
+  availableTabs: RightSidebarTab[]
+): RightSidebarTab {
+  if (savedTab) return resolveRightSidebarTab(savedTab, availableTabs);
+  return resolveRightSidebarTab(lastEngagedTab, availableTabs);
 }
 
 export function resolveRightSidebarTab(
@@ -52,6 +77,7 @@ export const useRightSidebarStateStore = create<RightSidebarState>()(
   persist(
     (set) => ({
       activeTabByContentId: {},
+      lastEngagedTab: null,
 
       setActiveTab: (contentId, tab) =>
         set((state) => ({
@@ -60,6 +86,11 @@ export const useRightSidebarStateStore = create<RightSidebarState>()(
             [contentId]: tab,
           },
         })),
+
+      recordEngagedTab: (tab) =>
+        set((state) =>
+          NOT_A_DEFAULT.has(tab) || state.lastEngagedTab === tab ? state : { lastEngagedTab: tab }
+        ),
 
       clearContentState: (contentId) =>
         set((state) => {

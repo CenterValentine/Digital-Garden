@@ -2859,6 +2859,16 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
       }
     };
 
+    // A quad pane's toolbar, on the title's own line (see toolbarInTitleRow).
+    // It keeps its natural width up to 55% of the line; the title takes the
+    // rest and truncates. Being INSIDE the title line (not a sibling of the
+    // title column) is what lets the breadcrumb below span the full width.
+    const inlineToolbar = toolbarInTitleRow ? (
+      <div className="ml-auto flex min-w-0 max-w-[55%] shrink-0 items-center pl-2">
+        <ContentToolbar contentId={selectedContentId} inline />
+      </div>
+    ) : null;
+
     // Main editor component
     const editorElement = (
       <div className="flex flex-col h-full">
@@ -2880,24 +2890,27 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
                   if (e.key === "Enter") { e.preventDefault(); handleTitleCommit(); }
                   if (e.key === "Escape") { e.preventDefault(); setIsTitleEditing(false); }
                 }}
-                className="flex-1 text-3xl font-semibold text-foreground bg-transparent border-b border-primary/40 focus:border-primary focus:outline-none mb-0 mr-4"
+                className="min-w-0 flex-1 text-3xl font-semibold text-foreground bg-transparent border-b border-primary/40 focus:border-primary focus:outline-none mb-0 mr-4"
               />
-            ) : (
+            ) : null}
+            {isTitleEditing ? inlineToolbar : (
               <div className="mr-4 flex min-w-0 flex-1 flex-col">
                 <div className="flex min-w-0 items-start gap-3">
+                {/* One line, never wrapped (owner, 2026-10-08): a long title
+                    ends in "…" and shows whole in its tooltip. */}
                 <h1
-                  className={`doc-title-text min-w-0 text-3xl font-semibold text-foreground mb-0 transition-opacity ${
+                  className={`doc-title-text min-w-0 truncate text-3xl font-semibold text-foreground mb-0 transition-opacity ${
                     isReadOnlyPageTemplate
                       ? "cursor-default"
                       : "cursor-text hover:opacity-80"
                   }`}
-                  title={
+                  title={`${noteTitle}\n${
                     contentType === "page-template"
                       ? isReadOnlyPageTemplate
                         ? "System template (read-only)"
                         : "Click to rename template"
                       : "Click to rename"
-                  }
+                  }`}
                   onClick={isReadOnlyPageTemplate ? undefined : handleTitleEditStart}
                 >
                   {noteTitle}
@@ -2927,6 +2940,7 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
                     </Tooltip>
                   </TooltipProvider>
                 ) : null}
+                {inlineToolbar}
                 </div>
                 {selectedContentId && (
                   <ContentPathBreadcrumb
@@ -2942,14 +2956,6 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
                 toolbar (TOOL_REGISTRY "markdown-source", order 10) — it is a
                 view control like the rest of the toolbar, and the title row
                 needs its width back on phones. */}
-            {toolbarInTitleRow ? (
-              // The pane's toolbar, beside the title instead of above it — on
-              // the title's line, not centred against title + breadcrumb. It
-              // takes what the title leaves and scrolls past that.
-              <div className="ml-2 flex min-w-0 max-w-[55%] shrink items-center self-start">
-                <ContentToolbar contentId={selectedContentId} inline />
-              </div>
-            ) : null}
             <div className="flex flex-none items-center gap-1">
               {process.env.NODE_ENV === "development" && !isMultiPane && <DebugViewToggle />}
             </div>

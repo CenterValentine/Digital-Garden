@@ -581,6 +581,8 @@ nav[class*="fixed"] {
     line-height: 1.25;
     white-space: nowrap;
     overflow-x: auto;
+    /* Desktop truncates with "…"; here the title SCROLLS instead. */
+    text-overflow: clip;
     scrollbar-width: none;
     -webkit-mask-image: linear-gradient(
       to right,
