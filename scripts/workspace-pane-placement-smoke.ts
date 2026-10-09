@@ -379,7 +379,7 @@ console.log("\npersist → record → reconcile is a fixed point");
       ),
     );
     return {
-      id: "ws", name: "ws", slug: "ws", isMain: true, isLocked: false,
+      id: "ws", name: "ws", slug: "ws", isMain: true,
       isView: false, viewRootContentId: null, viewRoot: null,
       parentWorkspaceId: null, status: "active", expiresAt: null,
       archivedAt: null, layoutMode: s.layoutMode, activePaneId: s.activePaneId,
@@ -389,7 +389,7 @@ console.log("\npersist → record → reconcile is a fixed point");
         activeContentId: s.selectedContentId,
         paneTabContentIds,
       },
-      settings: {}, createdAt: "", updatedAt: "", items: [], contentMeta: {},
+      settings: {}, createdAt: "", updatedAt: "", contentMeta: {},
       layoutRecords: [record],
     } as never;
   };
@@ -1290,12 +1290,12 @@ console.log("\nlayout-record rebuild (the reconcile's re-arrangement)");
     };
     const WS = "ws-ack";
     const served = {
-      id: WS, name: "ws", slug: "ws", isMain: true, isLocked: false, isView: false,
+      id: WS, name: "ws", slug: "ws", isMain: true, isView: false,
       viewRootContentId: null, viewRoot: null, parentWorkspaceId: null,
       status: "active", expiresAt: null, archivedAt: null,
       layoutMode: "single", activePaneId: "top-left",
       paneState: { layoutMode: "single", activePaneId: "top-left", activeContentId: null, paneTabContentIds: {} },
-      settings: {}, createdAt: "", updatedAt: "2026-10-03T15:52:00.511Z", items: [], contentMeta: {},
+      settings: {}, createdAt: "", updatedAt: "2026-10-03T15:52:00.511Z", contentMeta: {},
     };
     globalThis.fetch = (async () =>
       new Response(JSON.stringify({ success: true, data: served }), {
@@ -1379,7 +1379,7 @@ console.log("\nlayout-record rebuild (the reconcile's re-arrangement)");
       new Date(Date.UTC(2026, 9, 3, 16, 0, 0, ++stamp)).toISOString();
     const server = {
       row: {
-        id: WS, name: "ws", slug: "ws", isMain: true, isLocked: false, isView: false,
+        id: WS, name: "ws", slug: "ws", isMain: true, isView: false,
         viewRootContentId: null, viewRoot: null, parentWorkspaceId: null,
         status: "active", expiresAt: null, archivedAt: null,
         layoutMode: "dual-vertical", activePaneId: "top-left",
@@ -1387,16 +1387,16 @@ console.log("\nlayout-record rebuild (the reconcile's re-arrangement)");
           layoutMode: "dual-vertical", activePaneId: "top-left", activeContentId: "A",
           paneTabContentIds: { "top-left": { contentIds: ["A"], activeContentId: "A" } },
         },
-        settings: {}, createdAt: "", updatedAt: nextStamp(), items: [], contentMeta: {},
+        settings: {}, createdAt: "", updatedAt: nextStamp(), contentMeta: {},
       } as Row,
       /** Every state PATCH in arrival order: its base, its panes, the verdict. */
       patches: [] as Array<{ base: string | null; panes: Record<string, string[]>; status: number }>,
       /** When set, state PATCHes wait on it — a slow server, for interleaving. */
       hold: null as Promise<void> | null,
-      // A second, NON-Main workspace: opens there go through the open-intent
-      // check, which is where the provisional-open contract lives.
+      // A second, NON-Main workspace: opens there must go straight through,
+      // exactly like Main — no intent check, no claim.
       row2: {
-        id: "ws-view", name: "view", slug: "view", isMain: false, isLocked: false, isView: false,
+        id: "ws-view", name: "view", slug: "view", isMain: false, isView: false,
         viewRootContentId: null, viewRoot: null, parentWorkspaceId: null,
         status: "active", expiresAt: null, archivedAt: null,
         layoutMode: "dual-vertical", activePaneId: "top-left",
@@ -1404,13 +1404,10 @@ console.log("\nlayout-record rebuild (the reconcile's re-arrangement)");
           layoutMode: "dual-vertical", activePaneId: "top-left", activeContentId: "A",
           paneTabContentIds: { "top-left": { contentIds: ["A"], activeContentId: "A" } },
         },
-        settings: {}, createdAt: "", updatedAt: "2026-10-03T16:00:00.000Z", items: [], contentMeta: {},
+        settings: {}, createdAt: "", updatedAt: "2026-10-03T16:00:00.000Z", contentMeta: {},
       } as Row,
-      intents: [] as Array<Record<string, unknown>>,
-      assignments: [] as Array<Record<string, unknown>>,
-      intentHold: null as Promise<void> | null,
-      intentFail: false,
-      intentAnswer: { allowed: true, alreadyCovered: false, conflict: null } as Record<string, unknown>,
+      /** Every request URL, in order — the tripwire for a returning gate. */
+      calls: [] as string[],
       /** State PATCHes the view workspace received, in order. */
       patches2: [] as Array<{ panes: Record<string, string[]>; status: number }>,
     };
@@ -1428,6 +1425,7 @@ console.log("\nlayout-record rebuild (the reconcile's re-arrangement)");
       const url = String(input);
       const method = init?.method ?? "GET";
       const body = init?.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : null;
+      server.calls.push(url);
       if (url.endsWith(`/workspaces/${WS}/state`) && method === "PATCH") {
         if (server.hold) await server.hold;
         const snapshot = body as unknown as Snapshot & { baseUpdatedAt: string | null };
@@ -1456,18 +1454,6 @@ console.log("\nlayout-record rebuild (the reconcile's re-arrangement)");
       }
       if (url.endsWith("/layout-records") || url.endsWith("/tabs")) {
         return json(200, { success: true, data: {} });
-      }
-      if (url.endsWith("/workspaces/open-intent") && method === "POST") {
-        if (server.intentHold) await server.intentHold;
-        if (server.intentFail) {
-          return json(500, { success: false, error: { message: "intent check failed" } });
-        }
-        server.intents.push(body ?? {});
-        return json(200, { success: true, data: server.intentAnswer });
-      }
-      if (url.endsWith(`/workspaces/${server.row2.id}/assignments`) && method === "POST") {
-        server.assignments.push(body ?? {});
-        return json(200, { success: true, data: server.row2 });
       }
       if (url.endsWith(`/workspaces/${server.row2.id}/state`) && method === "PATCH") {
         const snapshot = body as unknown as Snapshot;
@@ -1636,12 +1622,12 @@ console.log("\nlayout-record rebuild (the reconcile's re-arrangement)");
         [],
       );
 
-      // ── the tab is on screen before the server has agreed ─────────────
-      // In a non-Main workspace an open used to WAIT on the open-intent POST
-      // (and an assignment POST) before the tab existed. Now the tab shows at
-      // once; the row is not persisted until the server agrees; a refusal
-      // keeps the tab under the dialog and cancelling takes it back.
-      console.log("\nopening in a view workspace shows the tab before the server agrees");
+      // ── a non-Main open goes straight through ─────────────────────────
+      // Workplaces once gated opens outside Main behind an open-intent POST
+      // (claims, borrow/share). That gate is gone: every workplace opens the
+      // way Main always has — the tab exists at once and the row is written
+      // with it. No intent check and no claim write may ever be made.
+      console.log("\nopening in a non-Main workspace goes straight through");
       const WS2 = server.row2.id;
       useWorkspaceStore.setState({
         workspaces: [server.row as never, server.row2 as never],
@@ -1652,96 +1638,26 @@ console.log("\nlayout-record rebuild (the reconcile's re-arrangement)");
       const open = (id: string) =>
         useWorkspaceStore.getState().requestOpenContent(id, { title: `Note ${id}`, pin: true });
 
-      // allowed, slow server
-      let releaseIntent!: () => void;
-      server.intentHold = new Promise<void>((resolve) => { releaseIntent = resolve; });
       server.patches2.length = 0;
+      server.calls.length = 0;
       const opening = open("N");
       check("the tab exists the moment it is asked for", paneContents("top-left"), ["A", "N"]);
-      await persist();
-      check("…but the row is not written while the server is still deciding", server.patches2.length, 0);
-      releaseIntent();
-      server.intentHold = null;
       await opening;
-      check("once allowed, the claim is made first…", server.assignments.map((a) => a.contentId), ["N"]);
+      await persist();
       check(
-        "…and the deferred write follows, carrying the tab",
+        "…and the row is written carrying it",
         server.patches2.at(-1)?.panes["top-left"],
         ["A", "N"],
       );
-
-      // refused → cancel
-      server.intentAnswer = {
-        allowed: false,
-        conflict: {
-          conflictType: "overlap", workspaceId: "ws-other", workspaceName: "Other",
-          contentId: "M", contentTitle: "Note M", claimContentId: "M", claimContentTitle: "Note M",
-          scope: "item", folderScopeContentId: null, folderScopeContentTitle: null,
-        },
-      };
-      server.patches2.length = 0;
-      await open("M");
-      check("a refused open keeps the tab on screen under the dialog", [paneContents("top-left").includes("M"), useWorkspaceStore.getState().conflict !== null], [true, true]);
-      await persist();
-      check("…still unwritten while the dialog is up", server.patches2.length, 0);
-      useWorkspaceStore.getState().cancelOpenConflict();
-      check("cancel takes the tab back", paneContents("top-left").includes("M"), false);
-      await new Promise((r) => setTimeout(r, 0));
-      // The deferred persist ran — and found nothing to say: after the
-      // rollback the local snapshot is exactly what the server holds, so the
-      // echo check skips the write. The server never saw M.
+      await useWorkspaceStore
+        .getState()
+        .requestOpenContent("R", { title: "Note R", paneId: "top-right", focusPane: false });
+      check("a side-by-side open lands in the empty pane", [useContentStore.getState().layoutMode, paneContents("top-right")], ["dual-vertical", ["R"]]);
       check(
-        "…the server never saw it, and nothing is left to write",
-        [
-          server.row2.paneState.paneTabContentIds["top-left"]?.contentIds,
-          JSON.stringify(useContentStore.getState().getWorkspaceStateSnapshot().paneTabContentIds) ===
-            JSON.stringify(server.row2.paneState.paneTabContentIds),
-        ],
-        [["A", "N"], true],
+        "no open ever asks the server for permission or writes a claim",
+        server.calls.filter((url) => url.includes("/open-intent") || url.includes("/assignments")),
+        [],
       );
-
-      // refused → borrow
-      server.assignments.length = 0;
-      await open("K");
-      await useWorkspaceStore.getState().borrowPendingContent("2026-12-01T00:00:00.000Z");
-      check("borrowing keeps the tab and claims it borrowed", [paneContents("top-left").includes("K"), server.assignments[0]?.assignmentType], [true, "borrowed"]);
-
-      // refused → cancel, after an open that GREW the layout. The side-by-side
-      // open lands in the empty right pane; closing the only tab there would
-      // fold the split (the removal rule). The user never had this tab, so
-      // the rollback restores the arrangement exactly — pane management and
-      // provisional opens must not trip over each other.
-      server.intentAnswer = {
-        allowed: false,
-        conflict: {
-          conflictType: "overlap", workspaceId: "ws-other", workspaceName: "Other",
-          contentId: "R", contentTitle: "Note R", claimContentId: "R", claimContentTitle: "Note R",
-          scope: "item", folderScopeContentId: null, folderScopeContentTitle: null,
-        },
-      };
-      useContentStore.getState().closeContentTabs(["N", "K"]);
-      clearPendingWorkspaceIntents();
-      useContentStore.getState().restoreWorkspace({
-        activeContentId: "A", activePaneId: "top-left", layoutMode: "dual-vertical",
-        paneTabContentIds: { "top-left": ["A"], "top-right": [] },
-      });
-      await useWorkspaceStore.getState().requestOpenContent("R", { title: "Note R", paneId: "top-right", focusPane: false });
-      check("a refused side-by-side open sits in the empty pane meanwhile", [useContentStore.getState().layoutMode, paneContents("top-right")], ["dual-vertical", ["R"]]);
-      useWorkspaceStore.getState().cancelOpenConflict();
-      check(
-        "…and cancelling puts the layout back exactly, not folded by the removal rule",
-        [useContentStore.getState().layoutMode, paneContents("top-left"), paneContents("top-right"), useContentStore.getState().activePaneId],
-        ["dual-vertical", ["A"], [], "top-left"],
-      );
-
-      // the server never answers
-      server.intentAnswer = { allowed: true, alreadyCovered: false, conflict: null };
-      server.intentFail = true;
-      let threw = false;
-      await open("F").catch(() => { threw = true; });
-      server.intentFail = false;
-      check("an intent check that fails takes the tab back and reports", [paneContents("top-left").includes("F"), threw], [false, true]);
-      check("nothing is left provisional afterwards (the next write goes through)", await persist().then(() => server.patches2.length > 0), true);
 
       useWorkspaceStore.setState({ workspaces: [server.row as never], activeWorkspaceId: WS });
     } finally {

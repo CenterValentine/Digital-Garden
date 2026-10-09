@@ -50,7 +50,7 @@ const storage = { delete: (k: string) => memoryStorage.removeItem(k), set: (k: s
 type Panes = Record<string, string[]>;
 function workspace(id: string, name: string, isMain: boolean, panes: Panes, layoutMode = "single") {
   return {
-    id, name, slug: name, isMain, isLocked: false, isView: false,
+    id, name, slug: name, isMain, isView: false,
     viewRootContentId: null, viewRoot: null, parentWorkspaceId: null,
     status: "active", expiresAt: null, archivedAt: null,
     layoutMode, activePaneId: "top-left",
@@ -62,7 +62,7 @@ function workspace(id: string, name: string, isMain: boolean, panes: Panes, layo
       ),
     },
     settings: {}, createdAt: "", updatedAt: "2026-10-04T10:00:00.000Z",
-    items: [] as unknown[], contentMeta: {}, membershipContentIds: Object.values(panes).flat(),
+    contentMeta: {}, membershipContentIds: Object.values(panes).flat(),
   };
 }
 const MAIN = workspace("main-id", "main", true, { "top-left": ["m1", "m2"] });
@@ -77,12 +77,6 @@ globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
   calls.push(`${init?.method ?? "GET"} ${url}`);
   if (url.endsWith("/api/content/workspaces")) {
     return new Response(JSON.stringify({ success: true, data: ALL }), { status: 200 });
-  }
-  if (url.endsWith("/open-intent")) {
-    return new Response(
-      JSON.stringify({ success: true, data: { allowed: true, alreadyCovered: true, conflict: null } }),
-      { status: 200 },
-    );
   }
   return new Response(JSON.stringify({ success: true, data: {} }), { status: 200 });
 }) as typeof fetch;
@@ -231,8 +225,35 @@ function urlRestore(panes: Panes, activeContentId: string, layoutMode: "single" 
       [active(), placement()],
       ["b-id", { "top-left": ["b1", "b2", "x9"] }],
     );
-    check("…through the workspace-aware open (the claim check ran)", calls.some((c) => c.endsWith("/open-intent")), true);
-    check("…and it was agreed, not left provisional behind a conflict dialog", useWorkspaceStore.getState().conflict, null);
+    check(
+      "…through the workspace-aware open, which writes it into B at once",
+      calls.some((c) => c.startsWith("PATCH ") && c.endsWith("/workspaces/b-id/state")),
+      true,
+    );
+    check("…without asking the server for permission", calls.filter((c) => c.includes("/open-intent")), []);
+  }
+
+  console.log("\na ?content= that is one of the workspace's open tabs wins the cold load");
+  {
+    // The tiebreaker gates on the OPEN-TAB set (blob ∪ membership). It used to
+    // gate on claim rows, so in Main (which never held claims) it never fired,
+    // and elsewhere a stale claim could elect content that sat in no pane.
+    const selected = () => useContentStore.getState().selectedContentId;
+    freshPage("http://localhost/content?workspace=b-id&content=b2", "b-id");
+    await useWorkspaceStore.getState().loadWorkspaces("b-id");
+    check("…b2 is selected over B's stored active tab", [active(), selected()], ["b-id", "b2"]);
+
+    freshPage("http://localhost/content?workspace=main-id&content=m2", "main-id");
+    await useWorkspaceStore.getState().loadWorkspaces("main-id");
+    check("…and it works in Main too", [active(), selected()], ["main-id", "m2"]);
+
+    freshPage("http://localhost/content?workspace=b-id&content=zz", "b-id");
+    await useWorkspaceStore.getState().loadWorkspaces("b-id");
+    check(
+      "a ?content= that is not an open tab is never elected (no tab that sits in no pane)",
+      [selected(), placement()],
+      ["b1", { "top-left": ["b1", "b2"] }],
+    );
   }
 
   console.log("\na persist re-run never writes another workspace's tabs (self-inflicted by the write coalescing)");

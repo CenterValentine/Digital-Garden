@@ -23,7 +23,7 @@ Add one nullable column, `parentWorkspaceId` (self-FK, `onDelete: Cascade`), cre
 
 Why a real row and not JSON under the parent's `settings`:
 - `paneState` + `baseUpdatedAt` 409 conflict handling, `layoutAuthority` (desktop-only
-  layout coupling, R1–R8), open-intent/claims, offline persistence, and the
+  layout coupling, R1–R8), offline persistence, and the
   BroadcastChannel/poll sync **all key off a workspace id**. A row inherits every one of
   those behaviors for free; a JSON blob re-implements all of them.
 - `activateWorkspace(id)`, URL `?workspace=`, and per-workspace tree snapshots
@@ -36,8 +36,7 @@ Consequences to encode server-side:
 - Slug: `<parent-slug>--<folder-slug>` (unique per owner; regenerate on collision).
 - No settings affordances and **not renameable**: name/icon mirror the folder — the
   ONLY way to rename a workbench is renaming its folder (the selector's inline /
-  double-click rename is disabled on workbench rows); no expiration; `isLocked`
-  inherited from parent read-only.
+  double-click rename is disabled on workbench rows); no expiration.
 - Guard on activation + on workbench creation: target folder must currently be a
   first-level child of the parent's `viewRootContentId` (else 409 → client refreshes
   the submenu).
@@ -188,6 +187,5 @@ the database checklist.
 
 ## Open questions (owner)
 
-1. Should a workbench inherit the parent's *items/claims* for open-intent conflicts, or
-   claim independently like any workspace (recommended: independent — zero special
-   cases)?
+1. ~~Should a workbench inherit the parent's claims?~~ Moot since 2026-10-08: workplace
+   claims were removed ([WORKPLACE-RESTRICTIONS-REMOVAL-PLAN.md](WORKPLACE-RESTRICTIONS-REMOVAL-PLAN.md)).

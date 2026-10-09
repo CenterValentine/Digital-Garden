@@ -1,10 +1,7 @@
 import { prisma } from "@/lib/database/client";
 import { ensureMainWorkspaceRow } from "./ensure-main";
 import {
-  ContentWorkspaceItemAssignmentType,
-  ContentWorkspaceItemScope,
   type ContentWorkspace,
-  type ContentWorkspaceItem,
   type ContentNode,
   // Value import: createWorkbench needs the runtime
   // Prisma.PrismaClientKnownRequestError to recognise a P2002 unique
@@ -15,12 +12,10 @@ import { generateSlug } from "@/lib/domain/content";
 import { logger } from "@/lib/core/logger";
 import { reconcileMembershipFromSnapshot } from "./membership";
 import { onlyUuids } from "@/lib/domain/content/uuid";
-import { viewReachRoots } from "@/lib/domain/content/shortcut-targets";
 import { LAYOUT_RECORD_MAX_AGE_DAYS } from "./layout-records";
 import type {
   ContentWorkspaceResponse,
   WorkbenchFolderOption,
-  WorkspaceOpenIntentResponse,
   WorkspacePaneId,
   WorkspacePaneSnapshot,
   WorkspaceStatePayload,
@@ -43,12 +38,7 @@ const WORKSPACE_PANE_IDS: WorkspacePaneId[] = [
   "bottom-right",
 ];
 
-type WorkspaceWithItems = ContentWorkspace & {
-  items: Array<
-    ContentWorkspaceItem & {
-      content: Pick<ContentNode, "id" | "title" | "contentType" | "parentId">;
-    }
-  >;
+type WorkspaceWithRelations = ContentWorkspace & {
   viewRoot: Pick<ContentNode, "id" | "title"> | null;
   // Present on read paths that include fresh layout records (R5/F2).
   // R1 membership rows (read paths).
@@ -226,28 +216,6 @@ function normalizeSettings(value: Prisma.JsonValue): Record<string, unknown> {
     : {};
 }
 
-function workspaceStateHasContent(
-  workspace: Pick<
-    ContentWorkspace,
-    "paneState" | "layoutMode" | "activePaneId"
-  >,
-  contentId: string,
-) {
-  const normalizedState = normalizeWorkspaceState(
-    workspace as ContentWorkspace,
-  );
-
-  if (normalizedState.activeContentId === contentId) return true;
-
-  return Object.values(normalizedState.paneTabContentIds).some((pane) => {
-    if (!pane) return false;
-    return (
-      pane.activeContentId === contentId ||
-      (pane.contentIds ?? []).includes(contentId)
-    );
-  });
-}
-
 /** All content ids referenced by a normalized pane layout (open tabs). */
 function collectPaneContentIds(
   normalizedState: WorkspaceStatePayload,
@@ -263,18 +231,14 @@ function collectPaneContentIds(
 }
 
 export function formatWorkspace(
-  workspace: WorkspaceWithItems,
+  workspace: WorkspaceWithRelations,
   contentLookup?: Map<string, { title: string; contentType: string }>,
 ): ContentWorkspaceResponse {
   const normalizedState = normalizeWorkspaceState(workspace);
 
-  // Build contentMeta over the open-tab set (superset of items). Items carry
-  // titles inline; anything open but unassigned is filled from the lookup the
-  // read path passes in. Tabs without a resolvable title are simply omitted —
-  // the client keeps its "Loading…" default and falls back to a per-tab fetch.
-  const itemContentById = new Map(
-    workspace.items.map((item) => [item.contentId, item.content]),
-  );
+  // Build contentMeta over the open-tab set from the lookup the read path
+  // passes in. Tabs without a resolvable title are simply omitted — the client
+  // keeps its "Loading…" default and falls back to a per-tab fetch.
   const contentMeta: Record<string, { title: string; contentType: string }> = {};
   // Membership-only ids (tabs moved in, or opened by a surface that doesn't
   // write the blob) are part of the open-tab set too — name them, or they
@@ -282,13 +246,8 @@ export function formatWorkspace(
   const openIds = collectPaneContentIds(normalizedState);
   for (const tab of workspace.tabs ?? []) openIds.add(tab.contentId);
   for (const id of openIds) {
-    const fromItem = itemContentById.get(id);
-    const title = fromItem?.title ?? contentLookup?.get(id)?.title;
-    const contentType =
-      fromItem?.contentType ?? contentLookup?.get(id)?.contentType;
-    if (title != null && contentType != null) {
-      contentMeta[id] = { title, contentType };
-    }
+    const meta = contentLookup?.get(id);
+    if (meta) contentMeta[id] = { title: meta.title, contentType: meta.contentType };
   }
   const parentWorkspaceId = workspace.parentWorkspaceId ?? null;
   // A workbench's name mirrors its backing folder — renaming the folder renames
@@ -303,7 +262,6 @@ export function formatWorkspace(
     name,
     slug: workspace.slug,
     isMain: workspace.isMain,
-    isLocked: workspace.isLocked,
     isView: workspace.viewRootContentId !== null,
     viewRootContentId: workspace.viewRootContentId ?? null,
     viewRoot: workspace.viewRoot
@@ -319,20 +277,6 @@ export function formatWorkspace(
     settings: normalizeSettings(workspace.settings),
     createdAt: workspace.createdAt.toISOString(),
     updatedAt: workspace.updatedAt.toISOString(),
-    items: workspace.items.map((item) => ({
-      id: item.id,
-      workspaceId: item.workspaceId,
-      contentId: item.contentId,
-      assignmentType: item.assignmentType,
-      scope: item.scope,
-      expiresAt: item.expiresAt?.toISOString() ?? null,
-      content: {
-        id: item.content.id,
-        title: item.content.title,
-        contentType: item.content.contentType,
-        parentId: item.content.parentId,
-      },
-    })),
     contentMeta,
     membershipContentIds: workspace.tabs?.map((tab) => tab.contentId),
     layoutRecords: workspace.layoutRecords?.map((record) => ({
@@ -391,24 +335,11 @@ export async function cleanupExpiredWorkspaces(ownerId: string) {
 
   if (expiredWorkspaces.length > 0) {
     const workspaceIds = expiredWorkspaces.map((workspace) => workspace.id);
-    await prisma.$transaction([
-      prisma.contentWorkspaceItem.deleteMany({
-        where: { workspaceId: { in: workspaceIds } },
-      }),
-      prisma.contentWorkspace.updateMany({
-        where: { id: { in: workspaceIds } },
-        data: { status: "archived", archivedAt: now },
-      }),
-    ]);
+    await prisma.contentWorkspace.updateMany({
+      where: { id: { in: workspaceIds } },
+      data: { status: "archived", archivedAt: now },
+    });
   }
-
-  await prisma.contentWorkspaceItem.deleteMany({
-    where: {
-      assignmentType: "borrowed",
-      expiresAt: { lte: now },
-      workspace: { ownerId },
-    },
-  });
 }
 
 export async function ensureMainWorkspace(ownerId: string) {
@@ -426,27 +357,21 @@ export async function ensureMainWorkspace(ownerId: string) {
 }
 
 /**
- * Resolve title/type for open-tab content ids that aren't already workspace
- * items, so formatWorkspace can emit a complete `contentMeta` map (spec §3.8).
- * Items already carry titles inline and formatWorkspace prefers them, so we
- * only query the *uncovered* ids — and skip the query entirely (the common
- * case, where every open tab is an assignment) to keep the critical workspace
- * fetch lean.
+ * Resolve title/type for every open-tab content id (pane layout + R1
+ * membership), so formatWorkspace can emit a complete `contentMeta` map
+ * (spec §3.8). Skips the query entirely when nothing is open.
  */
 async function buildContentLookup(
   ownerId: string,
-  workspaces: WorkspaceWithItems[],
+  workspaces: WorkspaceWithRelations[],
 ): Promise<Map<string, { title: string; contentType: string }>> {
   const ids = new Set<string>();
-  const covered = new Set<string>();
   for (const workspace of workspaces) {
-    for (const item of workspace.items) covered.add(item.contentId);
     for (const id of collectPaneContentIds(normalizeWorkspaceState(workspace))) {
       ids.add(id);
     }
     for (const tab of workspace.tabs ?? []) ids.add(tab.contentId);
   }
-  for (const id of covered) ids.delete(id);
   if (ids.size === 0) return new Map();
 
   const nodes = await prisma.contentNode.findMany({
@@ -461,6 +386,14 @@ async function buildContentLookup(
   );
 }
 
+/** formatWorkspace with tab titles resolved — every response a client may adopt. */
+async function formatWorkspaceWithTitles(
+  ownerId: string,
+  workspace: WorkspaceWithRelations,
+): Promise<ContentWorkspaceResponse> {
+  return formatWorkspace(workspace, await buildContentLookup(ownerId, [workspace]));
+}
+
 export async function listWorkspaces(ownerId: string, includeArchived = false) {
   await ensureMainWorkspace(ownerId);
 
@@ -470,22 +403,6 @@ export async function listWorkspaces(ownerId: string, includeArchived = false) {
       status: includeArchived ? undefined : "active",
     },
     include: {
-      items: {
-        where: {
-          content: { ownerId, deletedAt: null },
-        },
-        include: {
-          content: {
-            select: {
-              id: true,
-              title: true,
-              contentType: true,
-              parentId: true,
-            },
-          },
-        },
-        orderBy: { updatedAt: "desc" },
-      },
       viewRoot: { select: { id: true, title: true } },
       // R1 membership rides the list: source of truth for the tab SET on
       // read (unioned with the legacy blob client-side).
@@ -529,22 +446,6 @@ export async function getWorkspace(ownerId: string, workspaceId: string) {
   const workspace = await prisma.contentWorkspace.findFirst({
     where: { id: workspaceId, ownerId },
     include: {
-      items: {
-        where: {
-          content: { ownerId, deletedAt: null },
-        },
-        include: {
-          content: {
-            select: {
-              id: true,
-              title: true,
-              contentType: true,
-              parentId: true,
-            },
-          },
-        },
-        orderBy: { updatedAt: "desc" },
-      },
       viewRoot: { select: { id: true, title: true } },
       // R1 membership on the single read too: a mutation response that
       // replaces a list entry must not drop the tab SET the list carried.
@@ -577,21 +478,6 @@ export async function createWorkspace(ownerId: string, name: string) {
       settings: {},
     },
     include: {
-      items: {
-        where: {
-          content: { ownerId, deletedAt: null },
-        },
-        include: {
-          content: {
-            select: {
-              id: true,
-              title: true,
-              contentType: true,
-              parentId: true,
-            },
-          },
-        },
-      },
       viewRoot: { select: { id: true, title: true } },
     },
   });
@@ -608,13 +494,6 @@ export async function duplicateWorkspace(
 
   const source = await prisma.contentWorkspace.findFirst({
     where: { id: workspaceId, ownerId, status: "active" },
-    include: {
-      items: {
-        where: {
-          content: { ownerId, deletedAt: null },
-        },
-      },
-    },
   });
 
   if (!source) return null;
@@ -629,70 +508,22 @@ export async function duplicateWorkspace(
         name: normalizedName,
         slug,
         isMain: false,
-        isLocked: source.isLocked,
         layoutMode: source.layoutMode,
         activePaneId: source.activePaneId,
         paneState: source.paneState as Prisma.InputJsonValue,
         settings: source.settings as Prisma.InputJsonValue,
       },
-      include: {
-        items: {
-          where: {
-            content: { ownerId, deletedAt: null },
-          },
-          include: {
-            content: {
-              select: {
-                id: true,
-                title: true,
-                contentType: true,
-                parentId: true,
-              },
-            },
-          },
-        },
-      },
     });
-
-    if (source.items.length > 0) {
-      await tx.contentWorkspaceItem.createMany({
-        data: source.items.map((item) => ({
-          workspaceId: workspace.id,
-          contentId: item.contentId,
-          assignmentType:
-            item.assignmentType === "borrowed" ? "borrowed" : "shared",
-          scope: item.scope,
-          expiresAt: item.expiresAt,
-        })),
-        skipDuplicates: true,
-      });
-    }
 
     return tx.contentWorkspace.findFirst({
       where: { id: workspace.id, ownerId },
       include: {
-        items: {
-          where: {
-            content: { ownerId, deletedAt: null },
-          },
-          include: {
-            content: {
-              select: {
-                id: true,
-                title: true,
-                contentType: true,
-                parentId: true,
-              },
-            },
-          },
-          orderBy: { updatedAt: "desc" },
-        },
         viewRoot: { select: { id: true, title: true } },
       },
     });
   });
 
-  return duplicated ? formatWorkspace(duplicated) : null;
+  return duplicated ? formatWorkspaceWithTitles(ownerId, duplicated) : null;
 }
 
 export async function updateWorkspace(
@@ -700,7 +531,6 @@ export async function updateWorkspace(
   workspaceId: string,
   updates: {
     name?: string;
-    isLocked?: boolean;
     expiresAt?: string | null;
     settings?: Record<string, unknown>;
     viewRootContentId?: string | null;
@@ -718,10 +548,6 @@ export async function updateWorkspace(
     const nextName = updates.name.trim() || existing.name;
     data.name = nextName;
     data.slug = await uniqueWorkspaceSlug(ownerId, nextName, workspaceId);
-  }
-
-  if (updates.isLocked !== undefined && !existing.isMain) {
-    data.isLocked = updates.isLocked;
   }
 
   if (updates.expiresAt !== undefined && !existing.isMain) {
@@ -750,26 +576,11 @@ export async function updateWorkspace(
     where: { id: workspaceId },
     data,
     include: {
-      items: {
-        where: {
-          content: { ownerId, deletedAt: null },
-        },
-        include: {
-          content: {
-            select: {
-              id: true,
-              title: true,
-              contentType: true,
-              parentId: true,
-            },
-          },
-        },
-      },
       viewRoot: { select: { id: true, title: true } },
     },
   });
 
-  return formatWorkspace(workspace);
+  return formatWorkspaceWithTitles(ownerId, workspace);
 }
 
 export async function archiveWorkspace(ownerId: string, workspaceId: string) {
@@ -780,13 +591,10 @@ export async function archiveWorkspace(ownerId: string, workspaceId: string) {
   if (!existing || existing.isMain) return null;
 
   const now = new Date();
-  await prisma.$transaction([
-    prisma.contentWorkspaceItem.deleteMany({ where: { workspaceId } }),
-    prisma.contentWorkspace.update({
-      where: { id: workspaceId },
-      data: { status: "archived", archivedAt: now },
-    }),
-  ]);
+  await prisma.contentWorkspace.update({
+    where: { id: workspaceId },
+    data: { status: "archived", archivedAt: now },
+  });
 
   return getWorkspace(ownerId, workspaceId);
 }
@@ -795,15 +603,9 @@ export async function resetWorkspaces(ownerId: string) {
   const mainWorkspace = await ensureMainWorkspace(ownerId);
 
   await prisma.$transaction([
-    prisma.contentWorkspaceItem.deleteMany({
-      where: {
-        workspace: { ownerId },
-      },
-    }),
     prisma.contentWorkspace.update({
       where: { id: mainWorkspace.id },
       data: {
-        isLocked: false,
         layoutMode: DEFAULT_LAYOUT_MODE,
         activePaneId: DEFAULT_PANE_ID,
         paneState: {},
@@ -983,22 +785,6 @@ export async function saveWorkspaceState(
   await reconcileMembershipFromSnapshot(workspaceId, paneContentIds);
 
   const stateInclude = {
-    items: {
-      where: {
-        content: { ownerId, deletedAt: null },
-      },
-      include: {
-        content: {
-          select: {
-            id: true,
-            title: true,
-            contentType: true,
-            parentId: true,
-          },
-        },
-      },
-      orderBy: { updatedAt: "desc" },
-    },
     viewRoot: { select: { id: true, title: true } },
   } satisfies Prisma.ContentWorkspaceInclude;
 
@@ -1050,13 +836,13 @@ export async function saveWorkspaceState(
       where: { id: workspaceId, ownerId },
       include: stateInclude,
     });
-    return formatWorkspace(current);
+    return formatWorkspaceWithTitles(ownerId, current);
   }
 }
 
 /**
  * Scrub a content id out of every workspace the owner has — pane tabs
- * (paneState JSON) and assignment items. Called on content delete: without
+ * (paneState JSON). Called on content delete: without
  * this, the deleted node lingers in stored pane state and the workspace
  * restore/snapshot sync resurrects its tab in the main panel.
  */
@@ -1064,10 +850,6 @@ export async function removeContentFromWorkspaces(
   ownerId: string,
   contentId: string,
 ) {
-  await prisma.contentWorkspaceItem.deleteMany({
-    where: { contentId, workspace: { ownerId } },
-  });
-
   // Workbenches backed by this node — or by anything beneath it — go dormant
   // with it. Deleting an ancestor folder must archive workbenches further
   // down the subtree, so walk descendants rather than matching the id alone.
@@ -1445,454 +1227,4 @@ export async function sweepDormantWorkbenches(now: Date): Promise<{
   }
 
   return { stamped, cleared, deleted };
-}
-
-async function getAncestorIds(ownerId: string, contentId: string) {
-  const ancestors: string[] = [];
-  let current = await prisma.contentNode.findFirst({
-    where: { id: contentId, ownerId, deletedAt: null },
-    select: { id: true, parentId: true },
-  });
-
-  while (current?.parentId) {
-    const parent = await prisma.contentNode.findFirst({
-      where: { id: current.parentId, ownerId, deletedAt: null },
-      select: { id: true, parentId: true },
-    });
-    if (!parent) break;
-    ancestors.push(parent.id);
-    current = parent;
-  }
-
-  return ancestors;
-}
-
-/**
- * Whether content outside a view's root is reached through a shortcut inside
- * the view — directly, or along a chain of shortcuts (`viewReachRoots`).
- * `lineage` is the content id followed by its ancestors.
- *
- * Asked only after the plain subtree check has failed. Every root other than
- * the view's own is a shortcut target, so unless some live shortcut points
- * into `lineage` the answer is no without reading anything else; otherwise
- * it reads the owner's live parent map once.
- */
-async function reachedThroughViewShortcuts(
-  ownerId: string,
-  viewRootContentId: string,
-  lineage: string[],
-): Promise<boolean> {
-  const shortcuts = await prisma.shortcutPayload.findMany({
-    where: { targetContentId: { not: null }, content: { ownerId, deletedAt: null } },
-    select: { contentId: true, targetContentId: true },
-  });
-  if (!shortcuts.some((shortcut) => lineage.includes(shortcut.targetContentId ?? ""))) {
-    return false;
-  }
-  const nodes = await prisma.contentNode.findMany({
-    where: { ownerId, deletedAt: null },
-    select: { id: true, parentId: true },
-  });
-  const roots = viewReachRoots(
-    viewRootContentId,
-    new Map(nodes.map((node) => [node.id, node.parentId])),
-    shortcuts.map((shortcut) => ({ id: shortcut.contentId, targetId: shortcut.targetContentId })),
-  );
-  return lineage.some((id) => roots.has(id));
-}
-
-async function findOverlappingPrimaryRecursiveClaims(
-  ownerId: string,
-  workspaceId: string,
-  contentId: string,
-  excludeWorkspaceIds: string[] = [],
-) {
-  const ancestorIds = await getAncestorIds(ownerId, contentId);
-  const claims = await prisma.contentWorkspaceItem.findMany({
-    where: {
-      assignmentType: "primary",
-      scope: "recursive",
-      workspaceId: {
-        notIn: [workspaceId, ...excludeWorkspaceIds],
-      },
-      workspace: {
-        ownerId,
-        status: "active",
-      },
-    },
-    include: {
-      workspace: {
-        select: {
-          id: true,
-          name: true,
-        },
-      },
-      content: {
-        select: {
-          id: true,
-          title: true,
-        },
-      },
-    },
-  });
-
-  const overlaps = [];
-
-  for (const claim of claims) {
-    if (
-      claim.contentId === contentId ||
-      ancestorIds.includes(claim.contentId)
-    ) {
-      overlaps.push(claim);
-      continue;
-    }
-
-    const claimAncestorIds = await getAncestorIds(ownerId, claim.contentId);
-    if (claimAncestorIds.includes(contentId)) {
-      overlaps.push(claim);
-    }
-  }
-
-  return overlaps;
-}
-
-export async function resolveOpenIntent(
-  ownerId: string,
-  workspaceId: string,
-  contentId: string,
-): Promise<WorkspaceOpenIntentResponse> {
-  await ensureMainWorkspace(ownerId);
-
-  const [workspace, content, currentAssignment] = await Promise.all([
-    prisma.contentWorkspace.findFirst({
-      where: { id: workspaceId, ownerId, status: "active" },
-      select: {
-        id: true,
-        name: true,
-        isMain: true,
-        isLocked: true,
-        viewRootContentId: true,
-        viewRoot: { select: { id: true, title: true } },
-      },
-    }),
-    prisma.contentNode.findFirst({
-      where: { id: contentId, ownerId, deletedAt: null },
-      select: {
-        id: true,
-        title: true,
-        contentType: true,
-        parentId: true,
-        parent: {
-          select: {
-            id: true,
-            title: true,
-            contentType: true,
-          },
-        },
-      },
-    }),
-    prisma.contentWorkspaceItem.findUnique({
-      where: { workspaceId_contentId: { workspaceId, contentId } },
-      select: { id: true },
-    }),
-  ]);
-
-  if (!workspace) return { allowed: false, conflict: null };
-  if (!content) return { allowed: false, conflict: null };
-
-  // The Main Workspace is the permanent catchall — opens from it are never
-  // gated by other workspaces' claims, and no claims are minted from it
-  // (alreadyCovered suppresses the client's auto-assignment).
-  if (workspace.isMain) {
-    return { allowed: true, alreadyCovered: true, conflict: null };
-  }
-
-  if (currentAssignment) {
-    return { allowed: true, alreadyCovered: true, conflict: null };
-  }
-
-  const ancestorIds = await getAncestorIds(ownerId, contentId);
-
-  // A recursive claim held by THIS workspace on the content or any ancestor
-  // (primary folder claim, or a borrow/share taken with folder scope) is a
-  // standing decision covering the whole subtree — honor it before the view
-  // scope and overlap checks, or the conflict dialog re-asks for every
-  // descendant despite the user having chosen "apply to folder and all
-  // descendants". Expired borrows are already pruned by
-  // cleanupExpiredWorkspaces (via ensureMainWorkspace above), so any
-  // surviving claim is live.
-  const coveringClaim = await prisma.contentWorkspaceItem.findFirst({
-    where: {
-      workspaceId,
-      scope: "recursive",
-      contentId: { in: [contentId, ...ancestorIds] },
-    },
-    select: { id: true },
-  });
-  if (coveringClaim) {
-    return { allowed: true, alreadyCovered: true, conflict: null };
-  }
-
-  // View scope enforcement: if active workspace is a view, content must be
-  // inside the view root subtree — or reached from the view through one of
-  // its shortcuts (owner rule, 2026-10-05): a shortcut in the view shows its
-  // target there, so opening what it shows is not leaving the view.
-  if (workspace.viewRootContentId) {
-    const isInScope =
-      contentId === workspace.viewRootContentId ||
-      ancestorIds.includes(workspace.viewRootContentId) ||
-      (await reachedThroughViewShortcuts(
-        ownerId,
-        workspace.viewRootContentId,
-        [contentId, ...ancestorIds],
-      ));
-
-    if (!isInScope) {
-      const folderScopeCandidate =
-        content.contentType === "folder"
-          ? { id: content.id, title: content.title }
-          : content.parent?.contentType === "folder"
-            ? { id: content.parent.id, title: content.parent.title }
-            : null;
-
-      return {
-        allowed: false,
-        conflict: {
-          conflictType: "viewScope",
-          workspaceId,
-          workspaceName: workspace.name,
-          contentId: content.id,
-          contentTitle: content.title,
-          claimContentId: workspace.viewRootContentId,
-          claimContentTitle: workspace.viewRoot?.title ?? "View root",
-          scope: "recursive",
-          folderScopeContentId: folderScopeCandidate?.id ?? null,
-          folderScopeContentTitle: folderScopeCandidate?.title ?? null,
-        },
-      };
-    }
-  }
-
-  const claimFilters: Prisma.ContentWorkspaceItemWhereInput[] = [
-    { contentId, scope: "item" },
-    { contentId, scope: "recursive" },
-  ];
-  if (ancestorIds.length > 0) {
-    claimFilters.push({
-      contentId: { in: ancestorIds },
-      scope: "recursive",
-    });
-  }
-
-  const candidates = await prisma.contentWorkspaceItem.findMany({
-    where: {
-      assignmentType: "primary",
-      workspaceId: { not: workspaceId },
-      workspace: {
-        ownerId,
-        isLocked: true,
-        status: "active",
-      },
-      OR: claimFilters,
-    },
-    include: {
-      workspace: true,
-      content: {
-        select: { id: true, title: true, contentType: true, parentId: true },
-      },
-    },
-    orderBy: { updatedAt: "desc" },
-    take: 25,
-  });
-
-  // Downstream sharing: if active workspace is a view, its viewRoot's ancestor chain
-  // is used to exempt claims where the active view is downstream of the claiming workspace.
-  let viewRootAncestorIds: string[] | null = null;
-  if (workspace.viewRootContentId) {
-    viewRootAncestorIds = await getAncestorIds(
-      ownerId,
-      workspace.viewRootContentId,
-    );
-  }
-
-  let claim: (typeof candidates)[number] | undefined;
-  for (const candidate of candidates) {
-    const isActive =
-      candidate.scope === "recursive" ||
-      workspaceStateHasContent(candidate.workspace, candidate.contentId);
-    if (!isActive) continue;
-
-    // Downstream sharing exception: active view's root is inside the claiming workspace's
-    // recursive scope → allow opening (vertically downstream overlap is permitted)
-    if (
-      candidate.scope === "recursive" &&
-      viewRootAncestorIds !== null &&
-      workspace.viewRootContentId &&
-      (viewRootAncestorIds.includes(candidate.contentId) ||
-        workspace.viewRootContentId === candidate.contentId)
-    ) {
-      continue;
-    }
-
-    // Nested-view exception: the claiming workspace is a view rooted strictly
-    // above this view's root, so this view is a carve-out of that workspace's
-    // area. The content already passed view-scope enforcement, so it belongs
-    // to both views at once — the parent view's claims here (tab or folder)
-    // are vertical overlap by construction, not duplicate work. Same-root
-    // views still warn: that is horizontal duplication, not nesting.
-    if (
-      viewRootAncestorIds !== null &&
-      candidate.workspace.viewRootContentId &&
-      viewRootAncestorIds.includes(candidate.workspace.viewRootContentId)
-    ) {
-      continue;
-    }
-
-    claim = candidate;
-    break;
-  }
-  if (!claim) return { allowed: true, conflict: null };
-
-  const folderScopeCandidate =
-    claim.scope === "recursive"
-      ? {
-          id: claim.content.id,
-          title: claim.content.title,
-        }
-      : content.contentType === "folder"
-        ? {
-            id: content.id,
-            title: content.title,
-          }
-        : content.parent && content.parent.contentType === "folder"
-          ? {
-              id: content.parent.id,
-              title: content.parent.title,
-            }
-          : null;
-
-  return {
-    allowed: false,
-    conflict: {
-      conflictType: "overlap",
-      workspaceId: claim.workspaceId,
-      workspaceName: claim.workspace.name,
-      contentId: content.id,
-      contentTitle: content.title,
-      claimContentId: claim.contentId,
-      claimContentTitle: claim.content.title,
-      scope: claim.scope,
-      folderScopeContentId: folderScopeCandidate?.id ?? null,
-      folderScopeContentTitle: folderScopeCandidate?.title ?? null,
-    },
-  };
-}
-
-export async function assignContentToWorkspace(
-  ownerId: string,
-  workspaceId: string,
-  contentId: string,
-  options: {
-    assignmentType: ContentWorkspaceItemAssignmentType;
-    scope?: ContentWorkspaceItemScope;
-    expiresAt?: string | null;
-    moveFromWorkspaceId?: string | null;
-  },
-) {
-  const [workspace, content] = await Promise.all([
-    prisma.contentWorkspace.findFirst({
-      where: { id: workspaceId, ownerId, status: "active" },
-      select: { id: true },
-    }),
-    prisma.contentNode.findFirst({
-      where: { id: contentId, ownerId, deletedAt: null },
-      select: { id: true },
-    }),
-  ]);
-
-  if (!workspace || !content) return null;
-
-  if (
-    options.assignmentType === "primary" &&
-    (options.scope ?? "item") === "recursive"
-  ) {
-    const overlaps = await findOverlappingPrimaryRecursiveClaims(
-      ownerId,
-      workspaceId,
-      contentId,
-      options.moveFromWorkspaceId ? [options.moveFromWorkspaceId] : [],
-    );
-
-    if (overlaps.length > 0) {
-      const labels = overlaps
-        .map((claim) => `${claim.workspace.name} (${claim.content.title})`)
-        .slice(0, 3)
-        .join(", ");
-      throw new Error(
-        `This folder overlaps with existing workspace claims: ${labels}. Resolve the overlap before saving.`,
-      );
-    }
-  }
-
-  const expiresAt =
-    options.assignmentType === "borrowed" && options.expiresAt
-      ? new Date(options.expiresAt)
-      : null;
-
-  await prisma.$transaction(async (tx) => {
-    await tx.contentWorkspaceItem.upsert({
-      where: {
-        workspaceId_contentId: {
-          workspaceId,
-          contentId,
-        },
-      },
-      update: {
-        assignmentType: options.assignmentType,
-        scope: options.scope ?? "item",
-        expiresAt,
-      },
-      create: {
-        workspaceId,
-        contentId,
-        assignmentType: options.assignmentType,
-        scope: options.scope ?? "item",
-        expiresAt,
-      },
-    });
-
-    if (
-      options.moveFromWorkspaceId &&
-      options.moveFromWorkspaceId !== workspaceId
-    ) {
-      await tx.contentWorkspaceItem.deleteMany({
-        where: {
-          workspaceId: options.moveFromWorkspaceId,
-          contentId,
-          workspace: { ownerId },
-        },
-      });
-    }
-  });
-
-  return getWorkspace(ownerId, workspaceId);
-}
-
-export async function unassignContentFromWorkspace(
-  ownerId: string,
-  workspaceId: string,
-  contentId: string,
-) {
-  await prisma.contentWorkspaceItem.deleteMany({
-    where: {
-      workspaceId,
-      contentId,
-      workspace: {
-        ownerId,
-        isMain: false,
-      },
-    },
-  });
-
-  return getWorkspace(ownerId, workspaceId);
 }

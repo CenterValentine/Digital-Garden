@@ -1,68 +1,22 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { Layers3, Loader2, Lock, RotateCcw, ShieldAlert } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Layers3, Loader2, RotateCcw, ShieldAlert } from "lucide-react";
 import { useWorkspaceStore } from "@/extensions/workplaces/state/workspace-store";
 import type { SessionData } from "@/lib/infrastructure/auth/types";
-
-interface ClaimedContentItem {
-  workspaceId: string;
-  workspaceName: string;
-  contentId: string;
-  contentTitle: string;
-  contentType: string;
-  assignmentType: "primary" | "shared" | "borrowed";
-  scope: "item" | "recursive";
-  expiresAt: string | null;
-}
 
 export default function WorkplacesSettingsDialog() {
   const workspaces = useWorkspaceStore((state) => state.workspaces);
   const activeWorkspaceId = useWorkspaceStore((state) => state.activeWorkspaceId);
   const isLoading = useWorkspaceStore((state) => state.isLoading);
-  const assignContentToWorkspace = useWorkspaceStore(
-    (state) => state.assignContentToWorkspace
-  );
-  const unassignContentFromWorkspace = useWorkspaceStore(
-    (state) => state.unassignContentFromWorkspace
-  );
   const resetWorkspaces = useWorkspaceStore((state) => state.resetWorkspaces);
 
-  const [claimsOpen, setClaimsOpen] = useState(false);
-  const [claimActionKey, setClaimActionKey] = useState<string | null>(null);
-  const [reassignTargets, setReassignTargets] = useState<Record<string, string>>({});
   const [resetCountdown, setResetCountdown] = useState<number | null>(null);
   const [resetInFlight, setResetInFlight] = useState(false);
   const [session, setSession] = useState<SessionData | null>(null);
 
   const activeWorkspace =
     workspaces.find((workspace) => workspace.id === activeWorkspaceId) ?? null;
-  const lockedCount = workspaces.filter((workspace) => workspace.isLocked).length;
-
-  const claimedItems = useMemo<ClaimedContentItem[]>(
-    () =>
-      workspaces
-        .flatMap((workspace) =>
-          workspace.items.map((item) => ({
-            workspaceId: workspace.id,
-            workspaceName: workspace.name,
-            contentId: item.contentId,
-            contentTitle: item.content.title,
-            contentType: item.content.contentType,
-            assignmentType: item.assignmentType,
-            scope: item.scope,
-            expiresAt: item.expiresAt,
-          }))
-        )
-        .sort((a, b) => {
-          const workspaceCompare = a.workspaceName.localeCompare(b.workspaceName);
-          if (workspaceCompare !== 0) return workspaceCompare;
-          return a.contentTitle.localeCompare(b.contentTitle);
-        }),
-    [workspaces]
-  );
-
-  const claimedItemCount = claimedItems.length;
   const userInitial = session?.user.username?.charAt(0).toUpperCase() ?? "M";
   const statsReady = !isLoading && workspaces.length > 0;
 
@@ -104,44 +58,6 @@ export default function WorkplacesSettingsDialog() {
     return () => controller.abort();
   }, []);
 
-  const availableWorkspacesByClaim = useMemo(() => {
-    return Object.fromEntries(
-      claimedItems.map((claim) => [
-        `${claim.workspaceId}:${claim.contentId}`,
-        workspaces.filter((workspace) => workspace.id !== claim.workspaceId),
-      ])
-    );
-  }, [claimedItems, workspaces]);
-
-  const handleReleaseClaim = async (claim: ClaimedContentItem) => {
-    const claimKey = `release:${claim.workspaceId}:${claim.contentId}`;
-    setClaimActionKey(claimKey);
-    try {
-      await unassignContentFromWorkspace(claim.workspaceId, claim.contentId);
-    } finally {
-      setClaimActionKey((current) => (current === claimKey ? null : current));
-    }
-  };
-
-  const handleReassignClaim = async (claim: ClaimedContentItem) => {
-    const selectionKey = `${claim.workspaceId}:${claim.contentId}`;
-    const nextWorkspaceId = reassignTargets[selectionKey];
-    if (!nextWorkspaceId) return;
-
-    const claimKey = `move:${selectionKey}`;
-    setClaimActionKey(claimKey);
-    try {
-      await assignContentToWorkspace(nextWorkspaceId, claim.contentId, {
-        assignmentType: claim.assignmentType,
-        scope: claim.scope,
-        expiresAt: claim.expiresAt,
-        moveFromWorkspaceId: claim.workspaceId,
-      });
-    } finally {
-      setClaimActionKey((current) => (current === claimKey ? null : current));
-    }
-  };
-
   const handleStartReset = () => {
     if (resetInFlight) return;
     setResetCountdown(10);
@@ -152,8 +68,6 @@ export default function WorkplacesSettingsDialog() {
     setResetInFlight(true);
     try {
       await resetWorkspaces();
-      setClaimsOpen(false);
-      setReassignTargets({});
       setResetCountdown(null);
     } finally {
       setResetInFlight(false);
@@ -163,11 +77,10 @@ export default function WorkplacesSettingsDialog() {
   return (
     <div className="space-y-6">
       <p className="text-sm text-gray-600 dark:text-gray-400">
-        Workplaces manages your saved layouts, content claims, and overlap
-        reminders.
+        Workplaces manages your saved layouts, views, and workbenches.
       </p>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2">
         <div className="rounded-2xl border border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.03] p-5">
           <div className="flex items-center gap-3 text-gold-primary">
             <div className="flex h-7 w-7 items-center justify-center rounded-full border border-gold-primary bg-gold-primary/20">
@@ -202,132 +115,7 @@ export default function WorkplacesSettingsDialog() {
             create workplaces.
           </p>
         </div>
-
-        <button
-          type="button"
-          onClick={() => setClaimsOpen((value) => !value)}
-          className={`rounded-2xl border p-5 text-left transition-colors ${
-            claimsOpen
-              ? "border-gold-primary/40 bg-gold-primary/10"
-              : "border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.03] hover:border-black/20 dark:hover:border-white/20 hover:bg-black/[0.04] dark:hover:bg-white/[0.05]"
-          }`}
-        >
-          <div className="flex items-center gap-3 text-gold-primary">
-            <Lock className="h-5 w-5" />
-            <span className="text-xs font-semibold uppercase tracking-[0.16em]">
-              Claimed Content
-            </span>
-          </div>
-          <div className="mt-4 text-xl font-semibold text-gray-900 dark:text-white">
-            {renderStatValue(claimedItemCount)}
-          </div>
-          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-            {lockedCount} locked workplace{lockedCount === 1 ? "" : "s"} currently
-            protect assigned files or folders.
-          </p>
-        </button>
       </div>
-
-      {claimsOpen ? (
-        <div className="rounded-2xl border border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.03] p-5">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Claimed Content</h3>
-              <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                Release claims or move them into a different workplace.
-              </p>
-            </div>
-            <div className="text-sm text-gray-600 dark:text-gray-400">
-              {claimedItemCount} claim{claimedItemCount === 1 ? "" : "s"}
-            </div>
-          </div>
-
-          <div className="mt-4 space-y-3">
-            {claimedItems.length === 0 ? (
-              <div className="rounded-xl border border-black/10 dark:border-white/10 bg-black/[0.04] dark:bg-black/20 px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
-                No content is currently claimed.
-              </div>
-            ) : (
-              claimedItems.map((claim) => {
-                const claimKey = `${claim.workspaceId}:${claim.contentId}`;
-                const availableTargets =
-                  availableWorkspacesByClaim[claimKey] ?? [];
-                const selectedTarget =
-                  reassignTargets[claimKey] ?? availableTargets[0]?.id ?? "";
-                const inFlight =
-                  claimActionKey === `release:${claimKey}` ||
-                  claimActionKey === `move:${claimKey}`;
-
-                return (
-                  <div
-                    key={claimKey}
-                    className="rounded-xl border border-black/10 dark:border-white/10 bg-black/[0.04] dark:bg-black/20 px-4 py-4"
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="min-w-0">
-                        <div className="text-sm font-semibold text-gray-900 dark:text-white">
-                          {claim.contentTitle}
-                        </div>
-                        <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                          {claim.workspaceName} · {claim.assignmentType} · {claim.scope}
-                          {claim.expiresAt
-                            ? ` · expires ${new Date(claim.expiresAt).toLocaleString()}`
-                            : ""}
-                        </div>
-                      </div>
-                      <div className="text-xs uppercase tracking-[0.14em] text-gold-primary">
-                        {claim.contentType}
-                      </div>
-                    </div>
-
-                    <div className="mt-4 flex flex-wrap items-center gap-3">
-                      <button
-                        type="button"
-                        onClick={() => void handleReleaseClaim(claim)}
-                        disabled={inFlight}
-                        className="rounded-md border border-black/10 dark:border-white/10 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 transition-colors hover:bg-black/5 dark:hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        {claimActionKey === `release:${claimKey}` ? "Releasing..." : "Release"}
-                      </button>
-
-                      <select
-                        value={selectedTarget}
-                        onChange={(event) =>
-                          setReassignTargets((current) => ({
-                            ...current,
-                            [claimKey]: event.target.value,
-                          }))
-                        }
-                        disabled={inFlight || availableTargets.length === 0}
-                        className="min-w-[14rem] rounded-md border border-black/10 dark:border-white/10 bg-black/[0.04] dark:bg-black/30 px-3 py-2 text-sm text-gray-900 dark:text-white outline-none"
-                      >
-                        {availableTargets.length === 0 ? (
-                          <option value="">No other workplace available</option>
-                        ) : (
-                          availableTargets.map((workspace) => (
-                            <option key={workspace.id} value={workspace.id}>
-                              {workspace.name}
-                            </option>
-                          ))
-                        )}
-                      </select>
-
-                      <button
-                        type="button"
-                        onClick={() => void handleReassignClaim(claim)}
-                        disabled={inFlight || !selectedTarget}
-                        className="rounded-md border border-gold-primary/30 px-3 py-2 text-sm font-medium text-gold-primary transition-colors hover:bg-gold-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        {claimActionKey === `move:${claimKey}` ? "Reassigning..." : "Reassign"}
-                      </button>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </div>
-      ) : null}
 
       <div className="rounded-2xl border border-amber-400/20 bg-amber-400/10 p-5">
         <div className="flex items-start gap-3">
@@ -337,9 +125,8 @@ export default function WorkplacesSettingsDialog() {
               Disabling Workplaces
             </h3>
             <p className="mt-2 text-sm text-amber-900/85 dark:text-amber-50/90">
-              Turning Workplaces off hides the selector, claim dialogs, and
-              workplace controls. Re-enable Workplaces to restore your prior
-              workplaces.
+              Turning Workplaces off hides the selector and workplace
+              controls. Re-enable Workplaces to restore your prior workplaces.
             </p>
           </div>
         </div>
@@ -353,8 +140,8 @@ export default function WorkplacesSettingsDialog() {
               Delete All Workplaces
             </h3>
             <p className="mt-2 text-sm text-red-900/80 dark:text-red-50/85">
-              This removes every saved workplace, its content assignments, and
-              claims, then returns you to a single main workplace.
+              This removes every saved workplace and its open tabs, then
+              returns you to a single main workplace.
             </p>
 
             <div className="mt-4 flex flex-wrap items-center gap-3">

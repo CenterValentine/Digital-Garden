@@ -20,10 +20,6 @@ export function WorkplacesTabMenuSection({
   tab,
   closeMenu,
 }: ExtensionShellTabMenuSectionProps) {
-  const activeWorkspaceId = useWorkspaceStore((state) => state.activeWorkspaceId);
-  const assignContentToWorkspace = useWorkspaceStore(
-    (state) => state.assignContentToWorkspace
-  );
   const moveTabToWorkspace = useWorkspaceStore(
     (state) => state.moveTabToWorkspace
   );
@@ -37,7 +33,7 @@ export function WorkplacesTabMenuSection({
 
   // The menu section only mounts while the menu is open, so fetching is
   // always on.
-  const { groups, hasAnyTarget, topLevelWorkspaces } = useTabMoveTargets(true);
+  const { groups, hasAnyTarget } = useTabMoveTargets(true);
 
   const movePayload = {
     id: tab.id,
@@ -63,10 +59,6 @@ export function WorkplacesTabMenuSection({
       toast.error(error instanceof Error ? error.message : "Failed to move tab");
     }
   };
-
-  const shareTargets = topLevelWorkspaces.filter(
-    (workspace) => workspace.id !== activeWorkspaceId
-  );
 
   return (
     <>
@@ -151,30 +143,6 @@ export function WorkplacesTabMenuSection({
             </div>
           );
         })
-      )}
-      <div className="my-1 h-px bg-black/10 dark:bg-white/10" />
-      <div className={HEADING_CLASS}>Share permanently</div>
-      {shareTargets.length === 0 ? (
-        <div className="px-2 py-1.5 text-xs text-gray-500">
-          Create another workplace first.
-        </div>
-      ) : (
-        shareTargets.map((workspace) => (
-          <button
-            key={`share-${workspace.id}`}
-            type="button"
-            className={ROW_CLASS}
-            onClick={() => {
-              closeMenu();
-              void assignContentToWorkspace(workspace.id, tab.contentId, {
-                assignmentType: "shared",
-                scope: tab.contentType === "folder" ? "recursive" : "item",
-              });
-            }}
-          >
-            <span className="truncate">{workspace.name}</span>
-          </button>
-        ))
       )}
     </>
   );
