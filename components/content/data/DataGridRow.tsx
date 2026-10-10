@@ -1210,7 +1210,15 @@ function DataCell({
         // tabbing across blank cells still only selects (Enter edits).
         // A modified click is a range/add gesture, never an edit.
         if (e.shiftKey || e.metaKey || e.ctrlKey) return;
-        if (canInlineEdit && !isSelectLike && value === undefined) {
+        // Long text is the exception (owner, 2026-10-09): its editor is a
+        // popover over the grid, so a click — even on a blank cell — only
+        // selects; double-click (or Enter) opens it, like everywhere else.
+        if (
+          canInlineEdit &&
+          !isSelectLike &&
+          column.type !== "longText" &&
+          value === undefined
+        ) {
           onEditEnd();
           beginEdit();
         }
