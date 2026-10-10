@@ -6,7 +6,7 @@
  * portal-aware dismissal). Owner rule 2026-10-09: a box opened by a click
  * closes when you click elsewhere; it never lingers.
  *
- * mousedown, so the click's own action (selecting a cell, opening another
+ * On press, so the click's own action (selecting a cell, opening another
  * picker) still lands after the close.
  */
 
@@ -24,12 +24,14 @@ export function useClickAway(
 
   useEffect(() => {
     if (!active) return;
-    const onDown = (e: MouseEvent) => {
+    // pointerdown + capture, like PanelPortal: mousedown is skipped when a
+    // pointerdown is cancelled, and a bubbling listener misses stopped ones.
+    const onDown = (e: PointerEvent) => {
       const target = e.target as Node | null;
       if (!target || ref.current?.contains(target)) return;
       onAwayRef.current();
     };
-    document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
+    document.addEventListener("pointerdown", onDown, true);
+    return () => document.removeEventListener("pointerdown", onDown, true);
   }, [active, ref]);
 }

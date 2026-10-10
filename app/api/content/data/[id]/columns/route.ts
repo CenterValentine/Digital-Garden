@@ -136,6 +136,29 @@ export async function POST(request: NextRequest, { params }: { params: Params })
         config?: DataColumnConfig;
         /** Relation only: also create the mirrored column on the target. */
         createBacklink?: boolean;
+        /**
+         * Fractional key to land the new column at (the grid's "Insert
+         * column left/right"). Absent = appended, as before.
+         */
+        position?: string;
+      };
+      if (
+        body.position !== undefined &&
+        (typeof body.position !== "string" ||
+          body.position.length === 0 ||
+          body.position.length > 64)
+      ) {
+        return badRequest("`position` must be a fractional key");
+      }
+      // Created at the end, then moved: one request, so the grid never
+      // shows the column at the far right first.
+      const placeAt = async (columnId: string) => {
+        if (body.position) {
+          await prisma.dataColumn.update({
+            where: { id: columnId },
+            data: { position: body.position },
+          });
+        }
       };
 
       const name = body.name?.trim();
@@ -249,6 +272,7 @@ export async function POST(request: NextRequest, { params }: { params: Params })
               sourceNode?.title ?? "Linked"
             )
         );
+        await placeAt(pair.forwardId);
         after(() => markContextDirty([id, targetId]));
         return NextResponse.json({
           success: true,
@@ -268,6 +292,7 @@ export async function POST(request: NextRequest, { params }: { params: Params })
           })
       );
 
+      await placeAt(columnId);
       // Schema changed → the AI digest changed (plan B1 route discipline).
       after(() => markContextDirty([id]));
       return NextResponse.json({ success: true, data: { columnId } });

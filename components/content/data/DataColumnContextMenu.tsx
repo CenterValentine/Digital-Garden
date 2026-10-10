@@ -1,0 +1,130 @@
+"use client";
+
+/**
+ * Right-click menu for a database column — on its header or on any of its
+ * cells (owner, 2026-10-09):
+ *
+ *   Insert column left / right → the same add-column form as the header
+ *     row's "+" (AddColumnPanel), opened on the clicked column, landing beside it.
+ *   Delete column / Delete N columns → soft delete (values are kept), with an
+ *     Undo toast. N = the selected columns when the click lands inside a
+ *     column selection; otherwise just the clicked column.
+ *
+ * Portaled at the pointer and placed by `calculateMenuPosition` (CLAUDE.md
+ * "Menu Positioning"); dismissed by clicking away, Escape, or scrolling.
+ */
+
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { ArrowLeftToLine, ArrowRightToLine, Trash2 } from "lucide-react";
+import { cn } from "@/lib/core/utils";
+import { calculateMenuPosition, type CalculatedPosition } from "@/lib/core/menu-positioning";
+
+export interface ColumnContextMenuState {
+  columnId: string;
+  x: number;
+  y: number;
+}
+
+interface DataColumnContextMenuProps {
+  menu: ColumnContextMenuState;
+  /** How many columns Delete acts on (≥1). */
+  deleteCount: number;
+  /** Delete is unavailable (e.g. a locked system column is in the set). */
+  deleteBlockedReason?: string | null;
+  onInsert: (side: "left" | "right") => void;
+  onDelete: () => void;
+  onClose: () => void;
+}
+
+const itemClass =
+  "flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent";
+
+export function DataColumnContextMenu({
+  menu,
+  deleteCount,
+  deleteBlockedReason,
+  onInsert,
+  onDelete,
+  onClose,
+}: DataColumnContextMenuProps) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<CalculatedPosition | null>(null);
+
+  // Two-phase: render hidden, measure, then place (flip/shift at edges).
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- audited: two-phase menu measurement, same pattern as PanelPortal
+    setPos(
+      calculateMenuPosition({
+        triggerPosition: { x: menu.x, y: menu.y },
+        menuDimensions: { width: r.width, height: r.height },
+      })
+    );
+  }, [menu.x, menu.y]);
+
+  // Registered once per mount with onClose read through a ref — re-subscribing
+  // per render loses presses that re-render mid-dispatch (see PanelPortal).
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+  useEffect(() => {
+    const close = () => onCloseRef.current();
+    const onDown = (e: PointerEvent) => {
+      if (ref.current?.contains(e.target as Node)) return;
+      close();
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") close();
+    };
+    document.addEventListener("pointerdown", onDown, true);
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("scroll", close, true);
+    window.addEventListener("resize", close);
+    return () => {
+      document.removeEventListener("pointerdown", onDown, true);
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("scroll", close, true);
+      window.removeEventListener("resize", close);
+    };
+  }, []);
+
+  if (typeof document === "undefined") return null;
+  return createPortal(
+    <div
+      ref={ref}
+      role="menu"
+      aria-label="Column actions"
+      className={cn(
+        "fixed z-[130] min-w-[11rem] rounded-lg border border-border bg-popover p-1 text-foreground shadow-lg"
+      )}
+      style={pos ? { left: pos.x, top: pos.y } : { left: 0, top: 0, visibility: "hidden" }}
+      onContextMenu={(e) => e.preventDefault()}
+    >
+      <button type="button" role="menuitem" className={itemClass} onClick={() => onInsert("left")}>
+        <ArrowLeftToLine className="h-3.5 w-3.5 text-muted-foreground" />
+        Insert column left
+      </button>
+      <button type="button" role="menuitem" className={itemClass} onClick={() => onInsert("right")}>
+        <ArrowRightToLine className="h-3.5 w-3.5 text-muted-foreground" />
+        Insert column right
+      </button>
+      <div className="my-1 h-px bg-border" />
+      <button
+        type="button"
+        role="menuitem"
+        className={cn(itemClass, "text-red-600 dark:text-red-400")}
+        disabled={Boolean(deleteBlockedReason)}
+        title={deleteBlockedReason ?? "Values are kept — undo from the notice"}
+        onClick={onDelete}
+      >
+        <Trash2 className="h-3.5 w-3.5" />
+        {deleteCount > 1 ? `Delete ${deleteCount} columns` : "Delete column"}
+      </button>
+    </div>,
+    document.body
+  );
+}

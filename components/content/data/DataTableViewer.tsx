@@ -47,6 +47,7 @@ import {
   deriveRowTitle,
   describeOp,
   diffRow,
+  keyBetween,
   keyForMove,
   pushOp,
   generateColumnKey,
@@ -81,7 +82,9 @@ import {
   type DataSchemaChangedDetail,
 } from "./events";
 import { overwriteFileViaUpload, uploadFilesToTable } from "./file-upload";
-import { AddColumnButton, ColumnMenu } from "./DataColumnMenu";
+import { AddColumnButton, AddColumnPanel, ColumnMenu } from "./DataColumnMenu";
+import { DataColumnContextMenu, type ColumnContextMenuState } from "./DataColumnContextMenu";
+import { toast } from "sonner";
 import { DataViewBar, type ViewPatch } from "./DataViewBar";
 import { CHECKED_GROUP, DataBoardView } from "./DataBoardView";
 import { DataListView } from "./DataListView";
@@ -134,6 +137,13 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
   const [scrollTop, setScrollTop] = useState(0);
   const [viewportHeight, setViewportHeight] = useState(600);
   const [openColumnId, setOpenColumnId] = useState<string | null>(null);
+  /** Right-click menu on a column (header or any cell). */
+  const [columnMenu, setColumnMenu] = useState<ColumnContextMenuState | null>(null);
+  /** "Insert column left/right": the add form, open on that column's header. */
+  const [insertAt, setInsertAt] = useState<{
+    columnId: string;
+    side: "left" | "right";
+  } | null>(null);
   const [dragColumnId, setDragColumnId] = useState<string | null>(null);
   const [editTarget, setEditTarget] = useState<{
     rowId: string;
@@ -1499,8 +1509,28 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
    * rectangle a drag would make — so ⌘C, Delete and the highlight all work
    * unchanged. Spans the LOADED rows (the grid pages in as it scrolls).
    */
+  /**
+   * The columns a column selection covers (header click, ⇧-click another
+   * header to span) — a rectangle running the full loaded height. Empty when
+   * the selection is anything else (a cell, a partial block).
+   */
+  const selectedColumnIds = useMemo(() => {
+    if (!selectedCell || state.rows.length === 0) return [] as string[];
+    const firstId = state.rows[0].id;
+    const lastId = state.rows[state.rows.length - 1].id;
+    const focus = rangeFocus ?? selectedCell;
+    const fullHeight =
+      (selectedCell.rowId === firstId && focus.rowId === lastId) ||
+      (selectedCell.rowId === lastId && focus.rowId === firstId);
+    if (!fullHeight || extraCells.size > 0) return [];
+    const a = columns.findIndex((c) => c.key === selectedCell.columnKey);
+    const b = columns.findIndex((c) => c.key === focus.columnKey);
+    if (a < 0 || b < 0) return [];
+    return columns.slice(Math.min(a, b), Math.max(a, b) + 1).map((c) => c.id);
+  }, [selectedCell, rangeFocus, extraCells, columns, state.rows]);
+
   const selectColumn = useCallback(
-    (columnId: string) => {
+    (columnId: string, mods?: { shift?: boolean }) => {
       const column = columns.find((c) => c.id === columnId);
       const first = state.rows[0];
       const last = state.rows[state.rows.length - 1];
@@ -1508,13 +1538,117 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
       if (!column || !first || !last) return;
       setEditTarget(null);
       setExtraCells(new Set());
-      setSelectedCell({ rowId: first.id, columnKey: column.key });
+      // ⇧-click a second header: span from the selected column(s) to here.
+      const anchorKey =
+        mods?.shift && selectedCell && selectedColumnIds.length > 0
+          ? selectedCell.columnKey
+          : column.key;
+      setSelectedCell({ rowId: first.id, columnKey: anchorKey });
       setRangeFocus(
-        last.id === first.id ? null : { rowId: last.id, columnKey: column.key }
+        last.id === first.id && anchorKey === column.key
+          ? null
+          : { rowId: last.id, columnKey: column.key }
       );
     },
-    [columns, state.rows]
+    [columns, state.rows, selectedCell, selectedColumnIds]
   );
+
+  // ── Column context menu (owner, 2026-10-09) ────────────────────────────
+
+  /** Right-click on a header or cell. Editors only; others get the browser's menu. */
+  const openColumnMenu = useCallback(
+    (e: React.MouseEvent, columnId: string) => {
+      if (!canEditData) return;
+      e.preventDefault();
+      // A click outside the current column selection acts on that column:
+      // select it, so what the menu deletes is what the user sees.
+      if (!selectedColumnIds.includes(columnId)) selectColumn(columnId);
+      setOpenColumnId(null);
+      setColumnMenu({ columnId, x: e.clientX, y: e.clientY });
+    },
+    [canEditData, selectedColumnIds, selectColumn]
+  );
+
+  /** What the menu's Delete acts on: the selection, or the clicked column. */
+  const menuDeleteIds = useMemo(() => {
+    if (!columnMenu) return [] as string[];
+    return selectedColumnIds.includes(columnMenu.columnId)
+      ? selectedColumnIds
+      : [columnMenu.columnId];
+  }, [columnMenu, selectedColumnIds]);
+
+  const menuDeleteBlocked = useMemo(() => {
+    const targets = columns.filter((c) => menuDeleteIds.includes(c.id));
+    if (targets.some((c) => c.isPrimary)) return "The title column can't be deleted";
+    if (targets.some((c) => c.config?.system === true))
+      return "System columns are locked — part of the charter's ledger machinery";
+    return null;
+  }, [columns, menuDeleteIds]);
+
+  /** The new column's key: right beside the clicked one, on the chosen side. */
+  const insertPosition = useCallback(
+    (columnId: string, side: "left" | "right") => {
+      const i = columns.findIndex((c) => c.id === columnId);
+      if (i < 0) return undefined;
+      return side === "left"
+        ? keyBetween(columns[i - 1]?.position ?? null, columns[i].position)
+        : keyBetween(columns[i].position, columns[i + 1]?.position ?? null);
+    },
+    [columns]
+  );
+
+  /**
+   * Delete one or several columns — soft deletes, so values survive and the
+   * toast's Undo is a metadata flip (DELETE {restore}). One reload at the end,
+   * not one per column.
+   */
+  const deleteColumns = useCallback(
+    async (ids: string[]) => {
+      const names = columns.filter((c) => ids.includes(c.id)).map((c) => c.name);
+      const send = (columnId: string, restore = false) =>
+        fetch(`/api/content/data/${contentId}/columns`, {
+          method: "DELETE",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(restore ? { columnId, restore: true } : { columnId }),
+        })
+          .then(async (res) => ({ ok: res.ok && (await res.json())?.success === true }))
+          .catch(() => ({ ok: false }));
+      const deleted: string[] = [];
+      for (const id of ids) {
+        if ((await send(id)).ok) deleted.push(id);
+      }
+      setOpenColumnId(null);
+      setSelectedCell(null);
+      setRangeFocus(null);
+      await load(state.view?.id ?? null);
+      dispatchDataSchemaChanged(contentId, "grid");
+      if (deleted.length < ids.length) {
+        setNotice(`${ids.length - deleted.length} column(s) could not be deleted.`);
+      }
+      if (deleted.length === 0) return;
+      const label =
+        deleted.length === 1
+          ? `Column "${names[ids.indexOf(deleted[0])] ?? ""}" deleted`
+          : `${deleted.length} columns deleted`;
+      toast(label, {
+        description: "Their values are kept.",
+        duration: 8000,
+        action: {
+          label: "Undo",
+          onClick: () => {
+            void (async () => {
+              for (const id of deleted) await send(id, true);
+              await load(viewRef.current?.id ?? null);
+              dispatchDataSchemaChanged(contentId, "grid");
+            })();
+          },
+        },
+      });
+    },
+    [columns, contentId, load, state.view]
+  );
+
 
   const hoverCell = useCallback((rowId: string, columnKey: string) => {
     if (!dragSelectingRef.current) return;
@@ -2254,6 +2388,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
                 menuOpen={openColumnId === column.id}
                 onSelectColumn={selectColumn}
                 onOpenMenu={setOpenColumnId}
+                onContextMenu={openColumnMenu}
                 isDragSource={dragColumnId === column.id}
                 dropIndicator={
                   dropTarget?.columnId === column.id ? dropTarget.side : null
@@ -2284,6 +2419,21 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
                     onClose={() => setOpenColumnId(null)}
                   />
                 )}
+                {insertAt?.columnId === column.id && (
+                  <AddColumnPanel
+                    tableId={contentId}
+                    columns={columns}
+                    open
+                    heading={`Insert column ${insertAt.side === "left" ? "left" : "right"} of “${column.name}”`}
+                    onClose={() => setInsertAt(null)}
+                    onAdd={(input) =>
+                      columnRequest("POST", {
+                        ...input,
+                        position: insertPosition(column.id, insertAt.side),
+                      }).then(() => undefined)
+                    }
+                  />
+                )}
               </DataColumnHeader>
               );
             })}
@@ -2312,6 +2462,12 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
             onPointerMove={rowHold.move}
             onPointerUp={rowHold.cancel}
             onPointerLeave={rowHold.cancel}
+            onContextMenu={(e) => {
+              const key = (e.target as HTMLElement | null)
+                ?.closest<HTMLElement>("[data-column-key]")?.dataset.columnKey;
+              const column = key ? columns.find((c) => c.key === key) : undefined;
+              if (column) openColumnMenu(e, column.id);
+            }}
           >
             <div
               style={{
@@ -2370,6 +2526,24 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
           )}
         </div>
       </div>
+      )}
+
+      {columnMenu && (
+        <DataColumnContextMenu
+          menu={columnMenu}
+          deleteCount={menuDeleteIds.length}
+          deleteBlockedReason={menuDeleteBlocked}
+          onClose={() => setColumnMenu(null)}
+          onInsert={(side) => {
+            setInsertAt({ columnId: columnMenu.columnId, side });
+            setColumnMenu(null);
+          }}
+          onDelete={() => {
+            const ids = menuDeleteIds;
+            setColumnMenu(null);
+            void deleteColumns(ids);
+          }}
+        />
       )}
 
       {peekRow && state.view?.mode !== "split" && (

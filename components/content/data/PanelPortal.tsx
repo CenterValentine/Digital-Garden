@@ -108,8 +108,24 @@ function usePanelPlacement(open: boolean) {
  * Outside-click + Escape dismissal, portal-aware.
  *
  * The anchor element is exempted from "outside": its own click handler
- * toggles the panel, and dismissing on mousedown first would
- * close-then-reopen — a menu that cannot be toggled shut.
+ * toggles the panel, and dismissing on press first would close-then-reopen
+ * — a menu that cannot be toggled shut.
+ *
+ * POINTERDOWN in the CAPTURE phase (owner report 2026-10-09: long-text
+ * editors stacked up instead of closing). `mousedown` is not a reliable
+ * "click-away" signal: a browser skips it entirely when anything cancels
+ * the pointerdown (drag/resize/pane libraries do), and a bubbling listener
+ * misses presses whose propagation was stopped. And a press inside an
+ * IFRAME (another pane's embed) never reaches this document at all — focus
+ * moving into one is caught on window blur instead.
+ *
+ * The listener is registered ONCE per open, with `onDismiss` read through a
+ * ref. Callers pass inline callbacks, and re-subscribing on every render
+ * dropped clicks: a press that makes some earlier listener set state (the
+ * pane focusing itself) re-renders React synchronously mid-dispatch, the
+ * effect swaps this listener out, and per the DOM spec neither the removed
+ * nor the re-added one runs for that event. That is how long-text editors
+ * stacked up instead of closing (owner report 2026-10-09).
  */
 function useDismiss(
   open: boolean,
@@ -117,24 +133,38 @@ function useDismiss(
   markerRef: React.RefObject<HTMLSpanElement | null>,
   onDismiss: () => void
 ) {
+  const onDismissRef = useRef(onDismiss);
+  useEffect(() => {
+    onDismissRef.current = onDismiss;
+  }, [onDismiss]);
+
   useEffect(() => {
     if (!open) return;
-    const onDown = (e: MouseEvent) => {
+    const dismiss = () => onDismissRef.current();
+    const onDown = (e: PointerEvent) => {
       const target = e.target as Node;
       if (panelRef.current?.contains(target)) return;
       if (markerRef.current?.parentElement?.contains(target)) return;
-      onDismiss();
+      dismiss();
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onDismiss();
+      if (e.key === "Escape") dismiss();
     };
-    document.addEventListener("mousedown", onDown);
+    const onBlur = () => {
+      // Alt-tab also blurs the window — only a move INTO an iframe counts.
+      window.setTimeout(() => {
+        if (document.activeElement?.tagName === "IFRAME") dismiss();
+      }, 0);
+    };
+    document.addEventListener("pointerdown", onDown, true);
     document.addEventListener("keydown", onKey);
+    window.addEventListener("blur", onBlur);
     return () => {
-      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("pointerdown", onDown, true);
       document.removeEventListener("keydown", onKey);
+      window.removeEventListener("blur", onBlur);
     };
-  }, [open, panelRef, markerRef, onDismiss]);
+  }, [open, panelRef, markerRef]);
 }
 
 export interface PanelPortalProps {

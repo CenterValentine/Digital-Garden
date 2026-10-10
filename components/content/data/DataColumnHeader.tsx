@@ -47,9 +47,11 @@ interface DataColumnHeaderProps {
    * Single click (owner, 2026-10-09): select the whole column, like a
    * spreadsheet. Works on read-only tables too — selecting is for copying.
    */
-  onSelectColumn?: (columnId: string) => void;
+  onSelectColumn?: (columnId: string, mods?: { shift?: boolean }) => void;
   /** Double-click or click-and-hold: open the column editor. */
   onOpenMenu?: (columnId: string) => void;
+  /** Right-click: insert left/right, delete (DataColumnContextMenu). */
+  onContextMenu?: (e: React.MouseEvent, columnId: string) => void;
   /** True while THIS column is being dragged — dims it in place. */
   isDragSource?: boolean;
   /** Which edge shows the insertion line while another column hovers here. */
@@ -77,6 +79,7 @@ export function DataColumnHeader({
   menuOpen = false,
   onSelectColumn,
   onOpenMenu,
+  onContextMenu,
   isDragSource = false,
   dropIndicator = null,
   onColumnDragStart,
@@ -108,10 +111,11 @@ export function DataColumnHeader({
         isDragSource && "opacity-40"
       )}
       style={{ width }}
-      title={canOpen ? "Click to select the column · double-click or hold to edit it" : undefined}
+      title={canOpen ? "Click to select the column (⇧-click to span) · double-click or hold to edit · right-click for more" : undefined}
       // Native HTML5 drag: a completed drag suppresses the click, so these
       // stay safe without a movement threshold; a drag also cancels a hold.
-      onClick={onSelectColumn ? () => onSelectColumn(column.id) : undefined}
+      onClick={onSelectColumn ? (e) => onSelectColumn(column.id, { shift: e.shiftKey }) : undefined}
+      onContextMenu={onContextMenu ? (e) => onContextMenu(e, column.id) : undefined}
       onDoubleClick={canOpen ? () => onOpenMenu?.(column.id) : undefined}
       onPointerDown={canOpen ? (e) => hold.start(e, column.id) : undefined}
       onPointerMove={canOpen ? hold.move : undefined}

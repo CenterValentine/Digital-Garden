@@ -465,6 +465,8 @@ function DataCell({
   // here extends through the cells the pointer enters; a plain click still
   // selects exactly as before. Spread onto every cell wrapper.
   const selectHandlers = {
+    // Which column a right-click landed in (the grid's column menu).
+    "data-column-key": column.key,
     onMouseDown: (e: React.MouseEvent) => {
       if (e.button !== 0) return;
       onSelect(rowId, column.key, {
