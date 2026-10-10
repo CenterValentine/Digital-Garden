@@ -174,11 +174,48 @@ async function main() {
     check("a failed save still lets the waiting one run", second);
   }
 
+  // 9. A load requested WHILE a save runs, answered with the pre-save
+  //    version, landing AFTER the save finished — must not roll back.
+  {
+    const id = "note-midsave-load";
+    const server = makeServer("h0");
+    noteLoaded(id, "h0", noteSaveGeneration(id));
+    const saving = runNoteSave(id, server.save(id, "edit"));
+    await sleep(5);
+    const genMidSave = noteSaveGeneration(id); // requested mid-save
+    await saving;
+    noteLoaded(id, "h0", genMidSave); // its pre-save answer arrives late
+    await runNoteSave(id, server.save(id, "edit more"));
+    check(
+      "a load asked mid-save, answered late, does not roll back",
+      server.log.every((l) => l.status === 200),
+      JSON.stringify(server.log),
+    );
+  }
+
+  // 10. …and one landing while the save is still settling (after the server
+  //     answered, before the save released the queue) is ignored too.
+  {
+    const id = "note-settling-load";
+    const server = makeServer("h0");
+    noteLoaded(id, "h0", noteSaveGeneration(id));
+    let loadDuringSettle = () => {};
+    const settling = runNoteSave(id, async () => {
+      await server.save(id, "edit")();
+      // Stamp updated (noteSaved ran); the save has not released yet.
+      loadDuringSettle();
+      await sleep(10);
+    });
+    loadDuringSettle = () => noteLoaded(id, "h0", noteSaveGeneration(id));
+    await settling;
+    check("a load landing while a save settles is ignored", noteBodyHash(id) === server.hash, String(noteBodyHash(id)));
+  }
+
   if (failures > 0) {
     console.error(`note-save:check — ${failures} failure(s)`);
     process.exit(1);
   }
-  console.log("note-save:check — OK (overlap, burst, pane move, late load, cache seed, other device, keepalive, failure)");
+  console.log("note-save:check — OK (overlap, burst, pane move, late load, mid-save load, settling load, cache seed, other device, keepalive, failure)");
 }
 
 void main();

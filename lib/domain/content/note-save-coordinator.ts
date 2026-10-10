@@ -16,8 +16,9 @@
  *
  * The stamp only ever learns from two sources:
  *   - this browser's OWN successful saves (`saved`), and
- *   - FRESH loads from the server (`loaded`), unless a save started since the
- *     load was requested (its result is newer) or one is running now.
+ *   - FRESH loads from the server (`loaded`), unless a save started or
+ *     finished since the load was requested (its result is newer), or one is
+ *     running now.
  * A change made by another device never enters it, so that still draws an
  * honest 409. A copy painted from cache (`cached`) sets the stamp only when
  * this browser knows nothing about the note yet.
@@ -29,7 +30,12 @@
 interface NoteSaveState {
   /** Latest version this browser knows the server holds (null = unknown). */
   bodyHash: string | null;
-  /** Bumped when a save starts — a load requested before it is stale. */
+  /**
+   * Bumped when a save STARTS and when it FINISHES. A load requested before
+   * a save started is stale (the save is newer); so is one requested WHILE a
+   * save ran — the server may have answered with the pre-save version, and
+   * its reply can land after the save finished.
+   */
   generation: number;
   running: boolean;
   /** The ONE save waiting behind the running one — newest wins. */
@@ -118,6 +124,7 @@ async function start(
     await save();
   } finally {
     state.running = false;
+    state.generation += 1;
     const next = state.pending;
     state.pending = null;
     if (next) {
