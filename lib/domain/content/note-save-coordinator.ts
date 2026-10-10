@@ -31,10 +31,10 @@ interface NoteSaveState {
   /** Latest version this browser knows the server holds (null = unknown). */
   bodyHash: string | null;
   /**
-   * Bumped when a save STARTS and when it FINISHES. A load requested before
-   * a save started is stale (the save is newer); so is one requested WHILE a
-   * save ran — the server may have answered with the pre-save version, and
-   * its reply can land after the save finished.
+   * Bumped when a save FINISHES. A load requested before that is stale: the
+   * server may have answered it with the pre-save version, and the reply can
+   * land after the save finished. (One landing WHILE a save runs is refused
+   * by `running`.)
    */
   generation: number;
   running: boolean;
@@ -58,7 +58,7 @@ export function noteBodyHash(contentId: string): string | null {
   return notes.get(contentId)?.bodyHash ?? null;
 }
 
-/** Capture before requesting a load; pass to `loaded` with its result. */
+/** Capture before requesting a load; pass to `noteLoaded` with its result. */
 export function noteSaveGeneration(contentId: string): number {
   return notes.get(contentId)?.generation ?? 0;
 }
@@ -119,7 +119,6 @@ async function start(
   save: () => Promise<void>
 ): Promise<void> {
   state.running = true;
-  state.generation += 1;
   try {
     await save();
   } finally {
