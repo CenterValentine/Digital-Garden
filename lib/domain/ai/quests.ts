@@ -49,6 +49,12 @@ import type { DataColumn } from "@/lib/domain/data";
  * DataRowLink and survive any cell edit. v1 ledgers upgrade in place on
  * their next sitting (ensureQuestRelation / ensureOutputRelation are
  * find-or-create).
+ *
+ * 2026-10-09 (owner): the USER's output table carries ONE "Quest" column for
+ * every quest that captures into it (`ensureOutputQuestColumn` → the master
+ * ledger, whose rows ARE the quests). The ledger's "Output row" relation is
+ * one-way. Before, each ledger's relation pair dropped a "Quest · <label>"
+ * backlink on the user's table, so a table shared by N quests grew N columns.
  */
 export const QUEST_SCHEMA_VERSION = 2;
 /** Charter-note metadata key holding its master ledger's node id (D10 stamp). */
@@ -250,6 +256,8 @@ export interface QuestInfo {
   questRelationColumnId?: string;
   /** v2: output-table id → the ledger's relation column id into that table. */
   outputRelations?: Record<string, string>;
+  /** Output-table id → that table's ONE shared "Quest" column (→ master). */
+  outputQuestColumns?: Record<string, string>;
 }
 
 export function parseQuestInfo(value: unknown): QuestInfo | null {
@@ -375,14 +383,14 @@ export async function ensureQuestRelation(
  * Ledger → output-table-row relation, ONE PER OUTPUT TABLE (a relation
  * targets a single table, so a quest capturing into several tables gets
  * several columns), minted when a sitting first captures into that table.
- * The forward column is system; the backlink lands on the USER's output
- * table under the quest's name and is deliberately not locked — that table
- * is theirs.
+ * System, and ONE-WAY: it adds nothing to the user's table. The user's side
+ * of the link is the table's single shared "Quest" column
+ * (`ensureOutputQuestColumn`). Ledgers minted before 2026-10-09 keep their
+ * old pair — found here and reused; the old backlink is the user's to delete.
  */
 export async function ensureOutputRelation(
   questLedgerId: string,
   outputTableId: string,
-  questLabel: string,
 ): Promise<string> {
   const existing = (await ledgerRelations(questLedgerId))[outputTableId];
   if (existing) return existing;
@@ -391,17 +399,80 @@ export async function ensureOutputRelation(
     select: { title: true },
   });
   const title = target?.title ?? "Output";
-  const pair = await createRelationPair(
-    questLedgerId,
-    outputTableId,
-    {
-      name: `Output row · ${title}`.slice(0, 255),
-      description: `The captured row in "${title}" for this item, when admitted. Linked by the machinery.`.slice(0, 280),
-    },
-    `Quest · ${questLabel}`.slice(0, 255),
-  );
-  await markColumnSystem(pair.forwardId);
-  return pair.forwardId;
+  return createColumn(questLedgerId, {
+    name: `Output row · ${title}`.slice(0, 255),
+    type: "relation",
+    description: `The captured row in "${title}" for this item, when admitted. Linked by the machinery.`.slice(0, 280),
+    config: { relationTableId: outputTableId, system: true },
+  });
+}
+
+/**
+ * The user's output table → the quest that captured each row: ONE column per
+ * table, shared by every quest of the charter (its target is the master
+ * ledger, whose rows are the quests). Find-or-create by TARGET, not by name,
+ * so a column the user renamed is still the one — never a second. Not locked:
+ * the table is the user's. One-way, so the master gains no column per table.
+ */
+export async function ensureOutputQuestColumn(
+  outputTableId: string,
+  masterId: string,
+): Promise<string> {
+  const cols = await prisma.dataColumn.findMany({
+    where: { tableId: outputTableId, deletedAt: null },
+    select: { id: true, name: true, type: true, config: true },
+    orderBy: { createdAt: "asc" },
+  });
+  const existing = cols.find((c) => {
+    if (c.type !== "relation") return false;
+    const cfg = (c.config ?? {}) as { relationTableId?: unknown; isBacklink?: unknown };
+    return cfg.relationTableId === masterId && cfg.isBacklink !== true;
+  });
+  if (existing) return existing.id;
+  // "Quest" unless the user already has a column by that name for something
+  // else — then say whose quests these are.
+  const taken = new Set(cols.map((c) => c.name.trim().toLowerCase()));
+  let name = "Quest";
+  if (taken.has("quest")) {
+    const master = await prisma.contentNode.findFirst({
+      where: { id: masterId },
+      select: { title: true },
+    });
+    name = `Quest · ${master?.title ?? "ledger"}`.slice(0, 255);
+  }
+  return createColumn(outputTableId, {
+    name,
+    type: "relation",
+    description:
+      "The quest whose run captured or last updated this row — its row in the charter's master ledger. Linked by the machinery; one column for every quest.",
+    config: { relationTableId: masterId },
+  });
+}
+
+/**
+ * The quest labels on a master ledger, newest first — what the model is shown
+ * so it CONTINUES a quest instead of minting one per item (owner rule
+ * 2026-10-09: reuse by default).
+ */
+export async function listQuestLabels(
+  masterId: string,
+  masterCols: Record<string, string>,
+): Promise<string[]> {
+  const questKey = masterCols["Quest"];
+  if (!questKey) return [];
+  const rows = await prisma.dataRow.findMany({
+    where: { tableId: masterId, deletedAt: null },
+    select: { data: true },
+    orderBy: { updatedAt: "desc" },
+  });
+  const labels: string[] = [];
+  for (const row of rows) {
+    const value = ((row.data ?? {}) as Record<string, unknown>)[questKey];
+    if (typeof value === "string" && value.trim() && !labels.includes(value.trim())) {
+      labels.push(value.trim());
+    }
+  }
+  return labels;
 }
 
 /** Every output relation on a ledger (output-table id → column id) —
@@ -1073,6 +1144,15 @@ export async function recordQuestItem(input: {
         : undefined;
     if (outCol && item.outputRowId) {
       await linkRows(outCol, rowId, item.outputRowId);
+    }
+    // The user's side: the captured row names its quest in the table's one
+    // shared "Quest" column.
+    const questCol =
+      item.outputRowId && item.outputTableId
+        ? quest.outputQuestColumns?.[item.outputTableId]
+        : undefined;
+    if (questCol && item.outputRowId) {
+      await linkRows(questCol, item.outputRowId, quest.questRowId);
     }
   } catch (error) {
     logger.warn({

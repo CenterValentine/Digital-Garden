@@ -83,6 +83,11 @@ jobs:
       - name: Smooth tree checks
         run: pnpm tree:smooth:check
 
+      # One REST save of a note at a time, per NOTE: an overlapping save used
+      # to carry a stale X-Body-Hash and 409 against the user's own write.
+      - name: Note save coordinator checks
+        run: pnpm note-save:check
+
   markdown-safety:
     name: Markdown block-safety
     runs-on: ubuntu-latest

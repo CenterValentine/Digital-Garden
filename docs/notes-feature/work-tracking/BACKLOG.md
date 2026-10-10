@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-10-08
+last_updated: 2026-10-09
 ---
 
 # Sprint Backlog
@@ -9,6 +9,21 @@ last_updated: 2026-10-08
 **Sprint Execution Protocol**: Before commencing any sprint, always ask the user for input before planning and executing — there may be additions or modifications.
 
 ---
+
+## Note saves take 2.5–5.5 s on production (2026-10-09, found diagnosing 409s)
+
+- ⚪ Vercel logs show content PATCHes of a 33 KB note taking 2.5–5.5 s; most of that is server time. Likely candidates:
+  - the solo Y-copy merge (advisory lock + two Y transforms + upsert);
+  - the sanitize round-trip;
+  - the image and window-reference syncs.
+
+  Per-step span timings are already in the trace logs (`withSpan`), so measure those first. Single-flight saves (PR #295) remove the 409s this caused, but slow saves still delay the "saved" state.
+
+## Database column links — follow-ups (2026-10-09, from `feat/database-column-links`)
+
+- ⚪ Clicking a `[[Jobs#Status]]` link opens the database but does not scroll to or highlight the column. The database viewer should take the `column:` anchor from `state/content-anchor-store.ts`.
+- ⚪ Query-mode tables list no columns. Their projection columns are synthesized and have no `DataColumn` id to anchor on.
+- ⚪ Folder context capsules summarize notes without the column block. The summarizer reads through `ai-context/source-resolver.ts`, which is not a describer seam yet.
 
 ## Collaboration lineage — follow-ups (2026-10-08, from `fix/join-dup-nested-shortcuts`)
 

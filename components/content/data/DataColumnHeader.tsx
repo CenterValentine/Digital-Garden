@@ -11,6 +11,7 @@
 
 import { Info, Lock } from "lucide-react";
 import { cn } from "@/lib/core/utils";
+import { usePressHold } from "./use-press-hold";
 import type { DataColumn, DataColumnType } from "@/lib/domain/data";
 
 /** Compact type marks. Mono glyphs read at 11px where an icon would not. */
@@ -42,7 +43,15 @@ interface DataColumnHeaderProps {
   width?: number;
   editable?: boolean;
   menuOpen?: boolean;
-  onToggleMenu?: (columnId: string) => void;
+  /**
+   * Single click (owner, 2026-10-09): select the whole column, like a
+   * spreadsheet. Works on read-only tables too — selecting is for copying.
+   */
+  onSelectColumn?: (columnId: string, mods?: { shift?: boolean }) => void;
+  /** Double-click or click-and-hold: open the column editor. */
+  onOpenMenu?: (columnId: string) => void;
+  /** Right-click: insert left/right, delete (DataColumnContextMenu). */
+  onContextMenu?: (e: React.MouseEvent, columnId: string) => void;
   /** True while THIS column is being dragged — dims it in place. */
   isDragSource?: boolean;
   /** Which edge shows the insertion line while another column hovers here. */
@@ -68,7 +77,9 @@ export function DataColumnHeader({
   width = DEFAULT_COLUMN_WIDTH,
   editable = false,
   menuOpen = false,
-  onToggleMenu,
+  onSelectColumn,
+  onOpenMenu,
+  onContextMenu,
   isDragSource = false,
   dropIndicator = null,
   onColumnDragStart,
@@ -87,22 +98,37 @@ export function DataColumnHeader({
       ? "▣"
       : (TYPE_GLYPH[column.type] ?? "·");
 
+  const canOpen = editable && !!onOpenMenu;
+  const hold = usePressHold<string>((columnId) => onOpenMenu?.(columnId));
+
   return (
     <div
       className={cn(
-        "relative flex shrink-0 items-center gap-2 border-r border-border/60 px-3 py-2",
+        "relative flex shrink-0 select-none items-center gap-2 border-r border-border/60 px-3 py-2",
         "text-xs font-medium text-muted-foreground",
-        editable && "cursor-pointer hover:bg-muted/60",
+        onSelectColumn && "cursor-pointer hover:bg-muted/60",
         menuOpen && "bg-muted/60",
         isDragSource && "opacity-40"
       )}
       style={{ width }}
-      onClick={editable ? () => onToggleMenu?.(column.id) : undefined}
-      // Native HTML5 drag: a completed drag suppresses the click, so the
-      // menu toggle above stays safe without a movement threshold.
+      title={canOpen ? "Click to select the column (⇧-click to span) · double-click or hold to edit · right-click for more" : undefined}
+      // Native HTML5 drag: a completed drag suppresses the click, so these
+      // stay safe without a movement threshold; a drag also cancels a hold.
+      onClick={onSelectColumn ? (e) => onSelectColumn(column.id, { shift: e.shiftKey }) : undefined}
+      onContextMenu={onContextMenu ? (e) => onContextMenu(e, column.id) : undefined}
+      onDoubleClick={canOpen ? () => onOpenMenu?.(column.id) : undefined}
+      onPointerDown={canOpen ? (e) => hold.start(e, column.id) : undefined}
+      onPointerMove={canOpen ? hold.move : undefined}
+      onPointerUp={canOpen ? hold.cancel : undefined}
+      onPointerLeave={canOpen ? hold.cancel : undefined}
       draggable={editable && !!onColumnDragStart}
       onDragStart={
-        onColumnDragStart ? (e) => onColumnDragStart(e, column.id) : undefined
+        onColumnDragStart
+          ? (e) => {
+              hold.cancel();
+              onColumnDragStart(e, column.id);
+            }
+          : undefined
       }
       onDragOver={
         onColumnDragOver ? (e) => onColumnDragOver(e, column.id) : undefined
@@ -134,6 +160,7 @@ export function DataColumnHeader({
             e.stopPropagation();
           }}
           onClick={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
           className="flex shrink-0 items-center"
         >
           <input
@@ -202,6 +229,7 @@ export function DataColumnHeader({
             onResizeStart(e, column.id);
           }}
           onClick={(e) => e.stopPropagation()}
+          onDoubleClick={(e) => e.stopPropagation()}
           className={cn(
             "absolute inset-y-0 -right-[3px] z-10 w-1.5 cursor-col-resize",
             "hover:bg-primary/50 active:bg-primary"

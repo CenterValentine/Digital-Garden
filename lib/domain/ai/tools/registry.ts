@@ -65,9 +65,11 @@ import {
 import {
   closeSitting,
   ensureMasterLedger,
+  ensureOutputQuestColumn,
   ensureOutputRelation,
   ensureQuest,
   ledgerOutputRelations,
+  listQuestLabels,
   parseQuestInfo,
   questSeenKeys,
   recordQuestItem,
@@ -79,6 +81,9 @@ import {
 import { computeTurnCost } from "@/lib/features/ai-connections/usage/pricing";
 import { resolveDocumentArgs } from "./write-args";
 import type { JSONContent } from "@tiptap/core";
+import { stripPrivateContent } from "@/lib/domain/content/private-content";
+import { collectColumnLinkIds } from "@/lib/domain/data/column-anchor";
+import { describeLinkedColumns } from "@/lib/domain/data/server/column-links";
 import { listCharters, isCharterMetadata } from "@/lib/domain/ai/charters/registry";
 import {
   generateUniqueSlug,
@@ -753,7 +758,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
       // types — is made below, and a miss comes back as a RESULT the model
       // fixes in one step instead of a rejection that ends the call.
       inputSchema: ITERATION_PROPOSAL_INPUT,
-      execute: async ({ objective: objectiveArg, source: sourceArg, items: itemsArg, rowIds: rowIdsArg, itemCap: itemCapArg, budget: budgetArg, batchSize: batchSizeArg, ledgerLabel: ledgerLabelArg, captureTo: captureToArg, quest: questArg, questColumns: questColumnsArg, deliverables: deliverablesArg, stepsPerItem: stepsPerItemArg }) => {
+      execute: async ({ objective: objectiveArg, source: sourceArg, items: itemsArg, rowIds: rowIdsArg, itemCap: itemCapArg, budget: budgetArg, batchSize: batchSizeArg, ledgerLabel: ledgerLabelArg, captureTo: captureToArg, quest: questArg, newQuest: newQuestArg, questColumns: questColumnsArg, deliverables: deliverablesArg, stepsPerItem: stepsPerItemArg }) => {
         // ── Shape → meaning (iteration-proposal.ts resolvers) ────────────
         const objective = clipText(objectiveArg, 400) ?? "";
         if (!objective) {
@@ -1095,6 +1100,27 @@ export function createBaseTools(ctx: ToolExecuteContext) {
               // policy 2026-09-02).
               questHomeFolderId = master.questHomeFolderId;
               const questLabel = (questArg ?? label).trim().slice(0, 120);
+              // REUSE BY DEFAULT (owner rule 2026-10-09). A charter's quests
+              // are its ongoing matters; the "Apply for a job" runs minted
+              // one per job ("Apply for a job — SeatGeek …"), and every new
+              // quest grew a column on the shared output table. A name that
+              // matches no existing quest is refused unless the model says
+              // the user asked for a separate one (`newQuest`). The first
+              // quest of a charter is always free to mint.
+              const existingQuests = await listQuestLabels(master.masterId, master.masterCols);
+              const continuesExisting = existingQuests.some(
+                (existing) => existing.toLowerCase() === questLabel.toLowerCase(),
+              );
+              if (existingQuests.length > 0 && !continuesExisting && newQuestArg !== true) {
+                const shown = existingQuests.slice(0, 12).map((q) => `"${q}"`).join(", ");
+                return {
+                  ok: false,
+                  refusal:
+                    `${questArg ? `No quest named "${questLabel}" exists` : "No quest was named"} — and this charter's quests are reused by default. Existing quests: ${shown}${existingQuests.length > 12 ? ", …" : ""}. ` +
+                    "Re-propose with `quest` set to the existing one this run belongs to (an item such as one job is an ITEM of a quest, not a quest of its own). Only if the user explicitly asked for a separate quest, re-propose with `newQuest: true`; if it is unclear, ask them.",
+                  nextAction: "Re-propose with an existing quest name (or newQuest: true only on the user's explicit request). Do NOT start processing items.",
+                };
+              }
               const ensured = await ensureQuest({
                 userId: ctx.userId,
                 charterTitle: ctx.activeCharter.title,
@@ -1126,11 +1152,14 @@ export function createBaseTools(ctx: ToolExecuteContext) {
                 // sitting gets its relation column on the ledger; the map is
                 // recomputed from the ledger so earlier sittings' tables stay
                 // linkable (a quest may capture into several tables).
+                // The user's table gets ONE shared "Quest" column for every
+                // quest (find-or-create by target), never one per quest.
+                const outputQuestColumns: Record<string, string> = {};
                 if (captureCfg) {
-                  await ensureOutputRelation(
-                    ensured.questLedgerId,
+                  await ensureOutputRelation(ensured.questLedgerId, captureCfg.tableId);
+                  outputQuestColumns[captureCfg.tableId] = await ensureOutputQuestColumn(
                     captureCfg.tableId,
-                    questLabel,
+                    master.masterId,
                   );
                 }
                 const outputRelations = await ledgerOutputRelations(
@@ -1162,6 +1191,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
                   ledgerCols: await tableColumnKeys(ensured.questLedgerId),
                   questRelationColumnId: ensured.questRelationColumnId,
                   outputRelations,
+                  outputQuestColumns,
                 };
                 // Quest memory (rejects INCLUDED): items this quest already
                 // scored in ANY earlier sitting — the recurring token saver
@@ -2908,7 +2938,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
 
         // Notes and folders: the folder "Notes" editor writes a notePayload
         // too, so both render the same way.
-        const renderNoteText = (): string => {
+        const renderNoteText = async (): Promise<string> => {
           if (!content.notePayload) {
             return content.contentType === "folder"
               ? `${header}\n\nThis folder has no notes content of its own. Its sources and children are read with read_folder_context.`
@@ -2936,7 +2966,18 @@ export function createBaseTools(ctx: ToolExecuteContext) {
                 ctx.imageViewable === true,
               )
             : null;
-          return `${header}\nContent:\n${text}${images ? `\n\n${images}` : ""}`;
+          // `[[Database#Column]]` links: the column's header + description
+          // (lib/domain/data/server/column-links.ts). Collected after the
+          // private strip, so a commented-out link describes nothing.
+          const columns = content.notePayload.tiptapJson
+            ? await describeLinkedColumns(
+                ctx.userId,
+                collectColumnLinkIds(
+                  stripPrivateContent(content.notePayload.tiptapJson as JSONContent),
+                ),
+              )
+            : "";
+          return `${header}\nContent:\n${text}${images ? `\n\n${images}` : ""}${columns ? `\n\n${columns}` : ""}`;
         };
 
         /**
@@ -2950,8 +2991,8 @@ export function createBaseTools(ctx: ToolExecuteContext) {
          * refusal (the `default:`-hides-gaps lesson).
          */
         const renderers: Record<ContentType, () => Promise<string>> = {
-          note: async () => renderNoteText(),
-          folder: async () => renderNoteText(),
+          note: renderNoteText,
+          folder: renderNoteText,
 
           data: async () => {
             const preview = await renderDataNodePreview(contentId, {

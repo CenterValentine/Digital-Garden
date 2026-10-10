@@ -30,6 +30,7 @@ import {
   type HtmlBridge,
 } from "@/lib/domain/content/markdown-serialize";
 import { stripPrivateContent } from "@/lib/domain/content/private-content";
+import { columnLinkSyntax } from "@/lib/domain/data/column-anchor";
 
 /**
  * Charter bodies land in the SYSTEM PROMPT, so private (commented-out) content
@@ -52,6 +53,9 @@ const WL_OPEN = "⟦⟦";
 const WL_CLOSE = "⟧⟧";
 
 function wikiLinkSyntax(node: JSONContent): string {
+  // `[[Jobs#Status]]` — the manifest names the column and its description.
+  const column = columnLinkSyntax(node.attrs ?? {});
+  if (column) return column;
   const targetTitle =
     typeof node.attrs?.targetTitle === "string" ? node.attrs.targetTitle : "";
   const displayText =
