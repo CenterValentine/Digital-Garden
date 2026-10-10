@@ -12,8 +12,10 @@
  *     pending-anchor slot (state/content-anchor-store.ts); the viewer that
  *     opens the target takes it and scrolls/jumps there.
  *
- * Kinds today: `annotation` (reader highlights/notes/bookmarks) and `verse`
- * (scripture: `verse:alma/32/21-23`, typed directly as `[[Alma 32:21`).
+ * Kinds today: `annotation` (reader highlights/notes/bookmarks), `verse`
+ * (scripture: `verse:alma/32/21-23`, typed directly as `[[Alma 32:21`) and
+ * `column` (one database column — lib/domain/data/column-anchor.ts; its
+ * lister is core, composed ahead of the extensions' in MainPanelContent).
  * Designed for more — headings in other notes, block refs, PDF pages, media
  * timestamps — each added by its owner, no schema change.
  *

@@ -79,6 +79,9 @@ import {
 import { computeTurnCost } from "@/lib/features/ai-connections/usage/pricing";
 import { resolveDocumentArgs } from "./write-args";
 import type { JSONContent } from "@tiptap/core";
+import { stripPrivateContent } from "@/lib/domain/content/private-content";
+import { collectColumnLinkIds } from "@/lib/domain/data/column-anchor";
+import { describeLinkedColumns } from "@/lib/domain/data/server/column-links";
 import { listCharters, isCharterMetadata } from "@/lib/domain/ai/charters/registry";
 import {
   generateUniqueSlug,
@@ -2908,7 +2911,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
 
         // Notes and folders: the folder "Notes" editor writes a notePayload
         // too, so both render the same way.
-        const renderNoteText = (): string => {
+        const renderNoteText = async (): Promise<string> => {
           if (!content.notePayload) {
             return content.contentType === "folder"
               ? `${header}\n\nThis folder has no notes content of its own. Its sources and children are read with read_folder_context.`
@@ -2936,7 +2939,18 @@ export function createBaseTools(ctx: ToolExecuteContext) {
                 ctx.imageViewable === true,
               )
             : null;
-          return `${header}\nContent:\n${text}${images ? `\n\n${images}` : ""}`;
+          // `[[Database#Column]]` links: the column's header + description
+          // (lib/domain/data/server/column-links.ts). Collected after the
+          // private strip, so a commented-out link describes nothing.
+          const columns = content.notePayload.tiptapJson
+            ? await describeLinkedColumns(
+                ctx.userId,
+                collectColumnLinkIds(
+                  stripPrivateContent(content.notePayload.tiptapJson as JSONContent),
+                ),
+              )
+            : "";
+          return `${header}\nContent:\n${text}${images ? `\n\n${images}` : ""}${columns ? `\n\n${columns}` : ""}`;
         };
 
         /**
@@ -2950,8 +2964,8 @@ export function createBaseTools(ctx: ToolExecuteContext) {
          * refusal (the `default:`-hides-gaps lesson).
          */
         const renderers: Record<ContentType, () => Promise<string>> = {
-          note: async () => renderNoteText(),
-          folder: async () => renderNoteText(),
+          note: renderNoteText,
+          folder: renderNoteText,
 
           data: async () => {
             const preview = await renderDataNodePreview(contentId, {

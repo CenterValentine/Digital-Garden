@@ -57,6 +57,7 @@ import {
 } from "@/lib/domain/ai/resumable/association";
 import type { JSONContent } from "@tiptap/core";
 import { extractSearchTextFromTipTap } from "@/lib/domain/content/search-text";
+import { stripPrivateContent } from "@/lib/domain/content/private-content";
 import { requireAuth } from "@/lib/infrastructure/auth";
 import { getUserSettings } from "@/lib/features/settings";
 import { getChatContextBody } from "@/lib/features/chat-contexts";
@@ -307,6 +308,8 @@ import type {
   ResolvedModelRoute,
 } from "@/lib/domain/ai/model-directive";
 import { renderCharterSection } from "@/lib/domain/ai/charters/render";
+import { collectColumnLinkIds } from "@/lib/domain/data/column-anchor";
+import { describeLinkedColumns } from "@/lib/domain/data/server/column-links";
 import { buildCharterIngest } from "@/lib/domain/ai/charters/ingest";
 import { autoApprovedToolsFrom } from "@/lib/domain/ai/tools/approval-policy";
 import type { ParsedCharter } from "@/lib/domain/ai/charters/parse";
@@ -506,11 +509,31 @@ async function resolveCharterReferenceContext(
       "\n\n**Referenced folder context:**\n\n" + sections.join("\n\n");
   }
 
+  // `[[Database#Column]]` links name ONE column: give the model its header
+  // and description up front (lib/domain/data/server/column-links.ts).
+  // Picker-made links carry the column id; hand-typed ones resolve by name
+  // within the database they name.
+  const columnRefs = references.filter(
+    (reference) => reference.column && byTitle.get(reference.targetTitle)?.contentType === "data",
+  );
+  const linkedColumns = columnRefs.length
+    ? await describeLinkedColumns(
+        userId,
+        columnRefs.flatMap((reference) => (reference.column?.id ? [reference.column.id] : [])),
+        columnRefs.flatMap((reference) =>
+          reference.column && !reference.column.id
+            ? [{ databaseId: byTitle.get(reference.targetTitle)!.id, name: reference.column.name }]
+            : [],
+        ),
+      )
+    : "";
+
   return {
     manifest:
       "\n\n**Linked extensions** " +
       "(call read_content with the contentId below when the current phase needs one — not preloaded):\n" +
       lines.join("\n") +
+      (linkedColumns ? `\n\n${linkedColumns}` : "") +
       folderCapsules,
     activeReferenceContentIds,
   };
@@ -2290,6 +2313,22 @@ export async function POST(request: Request) {
             return `### ${node.title}\n${props ? `${props}\n\n` : ""}${text.slice(0, 2000)}`;
           });
           sections.push(...linkedFolderSections);
+          // `[[Database#Column]]` links in the mentioned notes: the column's
+          // header + description (lib/domain/data/server/column-links.ts),
+          // from the private-stripped JSON the text above was derived from.
+          const mentionedColumns = await describeLinkedColumns(
+            session.user.id,
+            mentionedNodes.flatMap((node) =>
+              node.notePayload?.tiptapJson &&
+              !folderSections.has(node.id) &&
+              !dataSections.has(node.id)
+                ? collectColumnLinkIds(
+                    stripPrivateContent(node.notePayload.tiptapJson as JSONContent),
+                  )
+                : [],
+            ),
+          );
+          if (mentionedColumns) sections.push(mentionedColumns);
           mentionedContext = `\n\nThe user has referenced the following content:\n\n${sections.join("\n\n")}`;
         }
       }

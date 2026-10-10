@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-10-08
+last_updated: 2026-10-09
 ---
 
 # Sprint Backlog
@@ -9,6 +9,22 @@ last_updated: 2026-10-08
 **Sprint Execution Protocol**: Before commencing any sprint, always ask the user for input before planning and executing — there may be additions or modifications.
 
 ---
+
+## Database UX — header clicks and popovers (2026-10-09, owner; queued after `feat/database-column-links`)
+
+- ⚪ **The column-description indicator must not cover the header.** The ⓘ glyph sits over the header text (screenshot: "Coverage Outcome ⓘ"). Reserve space for it in the header's layout instead of overlaying.
+- ⚪ **A single click on a header selects the whole column.** Today it opens the column editor (name / description / limit). **Double-click, or click-and-hold, opens the editor.**
+- ⚪ **Clicking away dismisses any database popover opened by a click.** Applies to every click-opened database box, not only the column editor. Exception: a box opened by click-and-hold in a row may stay open (pinned). One opened by double-click is dismissed by clicking away.
+
+## Quest backlinks pile up on shared output tables (2026-10-09, owner report)
+
+- ⚪ Each quest that captures into the same output table adds another `Quest · <label>` backlink column to that table (the owner's Career Evidence Library has one per job). The cause is `ensureOutputRelation` (`lib/domain/ai/quests.ts`): one relation pair per quest ledger × output table, and the backlink always lands on the user's table. This is harness behaviour, not the model's. The design is in `EXTRACTION-TO-DATABASE-PLAN.md` (quests v2), which did not consider N quests sharing one table. Solution options were given to the owner on 2026-10-09; awaiting a decision.
+
+## Database column links — follow-ups (2026-10-09, from `feat/database-column-links`)
+
+- ⚪ Clicking a `[[Jobs#Status]]` link opens the database but does not scroll to or highlight the column. The database viewer should take the `column:` anchor from `state/content-anchor-store.ts`.
+- ⚪ Query-mode tables list no columns. Their projection columns are synthesized and have no `DataColumn` id to anchor on.
+- ⚪ Folder context capsules summarize notes without the column block. The summarizer reads through `ai-context/source-resolver.ts`, which is not a describer seam yet.
 
 ## Collaboration lineage — follow-ups (2026-10-08, from `fix/join-dup-nested-shortcuts`)
 

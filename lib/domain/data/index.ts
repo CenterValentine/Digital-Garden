@@ -15,3 +15,4 @@ export * from "./read-format";
 export * from "./ordering";
 export * from "./defaults";
 export * from "./undo";
+export * from "./column-anchor";

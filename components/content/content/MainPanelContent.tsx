@@ -139,6 +139,7 @@ import { usePanelStore } from "@/state/panel-store";
 import { useIsMobile } from "@/components/common/useIsMobile";
 
 import { setLinkAnchorLister, setLinkAnchorSuggester } from "@/lib/domain/content/link-anchor";
+import { listDatabaseColumnAnchors } from "@/lib/domain/data/column-link-anchors";
 
 interface ContentResponse {
   success: boolean;
@@ -1665,11 +1666,16 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
     setSourceDraft("");
   }, [selectedContentId]);
 
-  // The link menu's `[[Title#` step lists spots inside a target through the
-  // enabled extensions (the reader: book highlights). Installed, never
-  // cleared — every pane installs the same lister.
+  // The link menu's `[[Title#` step lists spots inside a target: a
+  // database's columns (core content), then the enabled extensions (the
+  // reader: book highlights). Installed, never cleared — every pane installs
+  // the same lister.
   useEffect(() => {
-    setLinkAnchorLister(listExtensionLinkAnchors);
+    setLinkAnchorLister(
+      async (target, query) =>
+        (await listDatabaseColumnAnchors(target, query)) ??
+        listExtensionLinkAnchors(target, query)
+    );
     setLinkAnchorSuggester(suggestExtensionLinkAnchors);
   }, []);
 
