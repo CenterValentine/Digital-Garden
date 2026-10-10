@@ -20,7 +20,16 @@ import { onlyUuids } from "@/lib/domain/content/uuid";
 export interface ColumnNameRef {
   databaseId: string;
   name: string;
+  /** For the "no such column" line — the model needs to say WHICH table. */
+  databaseTitle?: string;
 }
+
+/**
+ * What the model does about a column that is named but not there. Also the
+ * wording the charter preflight uses — one rule, one phrasing.
+ */
+export const MISSING_COLUMN_RULE =
+  "Do not substitute another column or invent one: stop and offer to create it (propose_database_columns) — unless the user says it exists under another name, then use that one.";
 
 /** Enough for a link-heavy note; a model that needs more reads the schema. */
 const MAX_DESCRIBED_COLUMNS = 25;
@@ -103,7 +112,21 @@ export async function describeLinkedColumns(
 ): Promise<string> {
   try {
     const columns = await loadColumns(userId, columnIds, byName);
-    if (columns.length === 0) return "";
+    // A link that names a column which is not there is a FINDING, not
+    // noise: the reader (often a charter run) is about to rely on it. Say
+    // so, and say what to do — stop and offer, never substitute
+    // (DATABASE-COLUMN-LINKS, owner rule 2026-10-09).
+    const foundIds = new Set(columns.map((column) => column.id.toLowerCase()));
+    const missingIds = onlyUuids(columnIds).filter((id) => !foundIds.has(id.toLowerCase()));
+    const missingNames = byName.filter(
+      (ref) =>
+        !columns.some(
+          (column) =>
+            column.databaseId === ref.databaseId &&
+            column.name.toLowerCase() === ref.name.trim().toLowerCase(),
+        ),
+    );
+    if (columns.length === 0 && missingIds.length === 0 && missingNames.length === 0) return "";
     const lines = columns.map(
       (column) =>
         `- [[${column.databaseTitle}#${column.name}]] — column "${column.name}" (${column.type}) in database "${column.databaseTitle}" (query_database databaseId: ${column.databaseId}). ` +
@@ -111,6 +134,17 @@ export async function describeLinkedColumns(
           ? `Description: ${column.description}`
           : "No description written for this column."),
     );
+    for (const ref of missingNames) {
+      const table = ref.databaseTitle ? `"${ref.databaseTitle}"` : `databaseId ${ref.databaseId}`;
+      lines.push(
+        `- [[${ref.databaseTitle ?? "Database"}#${ref.name.trim()}]] — NO column named "${ref.name.trim()}" exists in ${table}. ${MISSING_COLUMN_RULE}`,
+      );
+    }
+    if (missingIds.length > 0) {
+      lines.push(
+        `- ${missingIds.length} linked column${missingIds.length === 1 ? " no longer exists" : "s no longer exist"} (deleted, or in a database you cannot read). ${MISSING_COLUMN_RULE}`,
+      );
+    }
     return (
       "**Linked database columns** (a `[[Database#Column]]` link points at one column — its header and description):\n" +
       lines.join("\n")

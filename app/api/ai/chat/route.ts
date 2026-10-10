@@ -284,7 +284,12 @@ import {
   type PrefixFingerprint,
 } from "@/lib/domain/ai/prompt-prefix-diag";
 import { readRunLedgerCaptureConfig } from "@/lib/domain/ai/run-ledger";
-import { MASTER_LEDGER_META_KEY, parseQuestInfo } from "@/lib/domain/ai/quests";
+import {
+  MASTER_LEDGER_META_KEY,
+  listQuestLabels,
+  parseQuestInfo,
+  tableColumnKeys,
+} from "@/lib/domain/ai/quests";
 import { after } from "next/server";
 import { assembleFolderChatContext } from "@/extensions/studio/server/source-selection";
 import { refreshContextOnAccess } from "@/lib/domain/ai-context/context-refresh";
@@ -308,7 +313,9 @@ import type {
   ResolvedModelRoute,
 } from "@/lib/domain/ai/model-directive";
 import { renderCharterSection } from "@/lib/domain/ai/charters/render";
-import { collectColumnLinkIds } from "@/lib/domain/data/column-anchor";
+import { CHARTER_SCHEMA_PREFLIGHT } from "@/lib/domain/ai/charters/schema-preflight";
+import { collectColumnLinkIds, parseColumnAnchor } from "@/lib/domain/data/column-anchor";
+import { onlyUuids } from "@/lib/domain/content/uuid";
 import { describeLinkedColumns } from "@/lib/domain/data/server/column-links";
 import { buildCharterIngest } from "@/lib/domain/ai/charters/ingest";
 import { autoApprovedToolsFrom } from "@/lib/domain/ai/tools/approval-policy";
@@ -522,7 +529,13 @@ async function resolveCharterReferenceContext(
         columnRefs.flatMap((reference) => (reference.column?.id ? [reference.column.id] : [])),
         columnRefs.flatMap((reference) =>
           reference.column && !reference.column.id
-            ? [{ databaseId: byTitle.get(reference.targetTitle)!.id, name: reference.column.name }]
+            ? [
+                {
+                  databaseId: byTitle.get(reference.targetTitle)!.id,
+                  databaseTitle: reference.targetTitle,
+                  name: reference.column.name,
+                },
+              ]
             : [],
         ),
       )
@@ -549,6 +562,19 @@ export async function POST(request: Request) {
       );
 
       const body = await request.json();
+
+      // Column mentions (`@[Jobs#Status](column:<id>)`, the composer's Tab
+      // drill) are not content ids: split them off BEFORE any lookup sees
+      // them — every consumer below queries a @db.Uuid column, and a
+      // non-UUID there throws instead of matching nothing.
+      const columnMentionIds: string[] = [];
+      if (Array.isArray(body.mentionedContentIds)) {
+        body.mentionedContentIds = body.mentionedContentIds.filter((id: unknown) => {
+          const columnId = typeof id === "string" ? parseColumnAnchor(id) : null;
+          if (columnId) columnMentionIds.push(columnId);
+          return !columnId;
+        });
+      }
 
       // AI SDK v6 sends messages as UIMessage[] with `parts` arrays
       // Cache volley (§10 round 3): the transcript is cut at the pending
@@ -2333,6 +2359,33 @@ export async function POST(request: Request) {
         }
       }
 
+      // Mentioned COLUMNS: header + description from the one describer, and
+      // their databases attached to the chat so query_database reaches them
+      // (a column mention is a mention of its table too).
+      if (columnMentionIds.length > 0) {
+        const columnsBlock = await describeLinkedColumns(session.user.id, columnMentionIds);
+        if (columnsBlock) {
+          mentionedContext += mentionedContext
+            ? `\n\n${columnsBlock}`
+            : `\n\nThe user has referenced the following database columns:\n\n${columnsBlock}`;
+        }
+        if (conversationIdForAssoc) {
+          const columnTables = await prisma.dataColumn
+            .findMany({
+              where: { id: { in: onlyUuids(columnMentionIds) }, deletedAt: null },
+              select: { tableId: true },
+            })
+            .catch(() => []);
+          void Promise.all(
+            Array.from(new Set(columnTables.map((column) => column.tableId))).map((tableId) =>
+              addAutoAssociation(session.user.id, conversationIdForAssoc, tableId, "mention").catch(
+                () => null,
+              ),
+            ),
+          );
+        }
+      }
+
       // Folder Studio grounding (Phase 3): a conversation whose contentId is
       // one of the user's folders gets that folder's selected sources in the
       // system prompt. Returns null fast for non-folders; grounding is
@@ -2548,8 +2601,19 @@ export async function POST(request: Request) {
                     select: { id: true, title: true },
                   })
                 : null;
+            // Reuse by default (owner rule 2026-10-09): the model can only
+            // continue a quest it knows the name of — list them.
+            const existingQuests = masterLedger
+              ? await listQuestLabels(masterLedger.id, await tableColumnKeys(masterLedger.id)).catch(() => [])
+              : [];
+            const questsNote = existingQuests.length
+              ? ` Existing quests (REUSE one — pass its exact name as \`quest\`; an item such as one job is never its own quest): ${existingQuests
+                  .slice(0, 12)
+                  .map((q) => `"${q}"`)
+                  .join(", ")}${existingQuests.length > 12 ? ", …" : ""}.`
+              : "";
             const ledgerNote = masterLedger
-              ? `\n\n**Ledgers:** this charter's master ledger is the database "${masterLedger.title}" (id ${masterLedger.id}) — one row per QUEST (an ongoing matter, e.g. one job hunt). A quest and its per-item QUEST LEDGER are created when the user approves propose_item_iteration with a \`quest\` name; never create quest rows by hand. The user may extend either ledger with propose_database_columns (add-only). Their SYSTEM columns are locked — no rename, retype, option edit, or delete — say so if asked. Do NOT call propose_output_database to "create this charter's database": it exists. Output databases are only for CAPTURED items (captureTo).`
+              ? `\n\n**Ledgers:** this charter's master ledger is the database "${masterLedger.title}" (id ${masterLedger.id}) — one row per QUEST (an ongoing matter, e.g. one job hunt).${questsNote} A quest and its per-item QUEST LEDGER are created when the user approves propose_item_iteration with a \`quest\` name; never create quest rows by hand. The user may extend either ledger with propose_database_columns (add-only). Their SYSTEM columns are locked — no rename, retype, option edit, or delete — say so if asked. Do NOT call propose_output_database to "create this charter's database": it exists. Output databases are only for CAPTURED items (captureTo).`
               : "";
             const placeholderCount = countStarterPlaceholderPhases(parsed);
             const placeholderNote =
@@ -2639,7 +2703,7 @@ export async function POST(request: Request) {
                 (standingText
                   ? `**Standing rules (always apply):**\n${standingText}\n\n`
                   : "") +
-                `**Current phase (the ONLY phase detail loaded):**\n${phaseText}${referenceContext.manifest}` +
+                `**Current phase (the ONLY phase detail loaded):**\n${phaseText}${referenceContext.manifest}\n\n${CHARTER_SCHEMA_PREFLIGHT}` +
                 ledgerNote +
                 placeholderNote +
                 duplicateNote;
@@ -2743,7 +2807,8 @@ export async function POST(request: Request) {
                 : "") +
               (phaseText ||
                 "This rooted charter contains no executable instructions. Tell the user it needs content before it can run.") +
-              referenceContext.manifest;
+              referenceContext.manifest +
+              `\n\n${CHARTER_SCHEMA_PREFLIGHT}`;
           }
         } catch (rootedPlaybookError) {
           logger.warn({

@@ -14,6 +14,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useClickAway } from "./use-click-away";
 import { Link2, Loader2, Plus, RefreshCw, X } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/core/utils";
@@ -271,6 +272,12 @@ function FieldInput({
   // above the switch per rules-of-hooks.
   const [addingOption, setAddingOption] = useState(false);
   const [newOptionLabel, setNewOptionLabel] = useState("");
+  // Clicking away from a half-typed option cancels it, like Escape.
+  const addOptionRef = useRef<HTMLDivElement | null>(null);
+  useClickAway(addOptionRef, addingOption, () => {
+    setAddingOption(false);
+    setNewOptionLabel("");
+  });
   const submitNewOption = async (commitWith: (id: string) => void) => {
     if (!onCreateOption) return;
     const label = newOptionLabel.trim();
@@ -309,7 +316,7 @@ function FieldInput({
       const canCreate = editable && Boolean(onCreateOption);
       if (addingOption && canCreate) {
         return (
-          <div className="flex items-center gap-1">
+          <div ref={addOptionRef} className="flex items-center gap-1">
             <input
               autoFocus
               value={newOptionLabel}
@@ -395,7 +402,7 @@ function FieldInput({
           ))}
           {canCreate &&
             (addingOption ? (
-              <div className="mt-0.5 flex items-center gap-1">
+              <div ref={addOptionRef} className="mt-0.5 flex items-center gap-1">
                 <input
                   autoFocus
                   value={newOptionLabel}
@@ -540,6 +547,8 @@ function RelationField({
   const [picking, setPicking] = useState(autoOpen && editable);
   useAutoOpenOnToken(autoOpen, autoOpenToken, editable, () => setPicking(true));
   const fieldRef = useScrollIntoViewOnFocus(autoOpen, autoOpenToken);
+  // Click-away closes the link picker (owner rule 2026-10-09).
+  useClickAway(fieldRef, picking, () => setPicking(false));
   const [candidates, setCandidates] = useState<
     Array<{ id: string; title: string }> | null
   >(null);
@@ -1195,6 +1204,7 @@ function PersonField({
   const [picking, setPicking] = useState(autoOpen && canPick);
   useAutoOpenOnToken(autoOpen, autoOpenToken, canPick, () => setPicking(true));
   const fieldRef = useScrollIntoViewOnFocus(autoOpen, autoOpenToken);
+  useClickAway(fieldRef, picking, () => setPicking(false));
   const [query, setQuery] = useState("");
   const [options, setOptions] = useState<
     Array<{ id: string; name: string }> | null

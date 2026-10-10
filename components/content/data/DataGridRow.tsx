@@ -310,6 +310,7 @@ function DataGridRowImpl({
 }: DataGridRowProps) {
   return (
     <div
+      data-row-id={row.id}
       className={cn(
         "group flex border-b border-border/40",
         selected ? "bg-primary/5" : "hover:bg-muted/40"

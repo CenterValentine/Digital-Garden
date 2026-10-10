@@ -24,6 +24,10 @@ import {
   type CalculatedPosition,
 } from "@/lib/core/menu-positioning";
 
+/** Gap between anchor and panel, and the panel's minimum viewport margin. */
+const GAP = 4;
+const EDGE = 8;
+
 /** Panel chrome shared by every consumer, so the popovers read as one family. */
 export const panelClass = cn(
   "fixed z-[120] w-64 rounded-lg border border-border bg-popover p-3 shadow-lg"
@@ -49,12 +53,31 @@ function usePanelPlacement(open: boolean) {
     if (!anchor || !panel) return;
     const a = anchor.getBoundingClientRect();
     const p = panel.getBoundingClientRect();
-    setPos(
-      calculateMenuPosition({
-        triggerPosition: { x: a.left, y: a.bottom + 4 },
-        menuDimensions: { width: p.width, height: p.height },
-      })
-    );
+    // Horizontal flip/shift from the shared helper; vertical is decided here
+    // against the anchor's BOX. The helper flips a point — its "above" ends
+    // at the trigger y, which for us is the anchor's bottom edge, so a
+    // flipped panel sat ON the column header it was editing (owner,
+    // 2026-10-09). A panel never covers its anchor: below if it fits, else
+    // above the anchor's top, else on the roomier side, scrolling.
+    const { x } = calculateMenuPosition({
+      triggerPosition: { x: a.left, y: a.bottom + GAP },
+      menuDimensions: { width: p.width, height: p.height },
+    });
+    const vh = window.innerHeight;
+    const below = vh - (a.bottom + GAP) - EDGE;
+    const above = a.top - GAP - EDGE;
+    // `scrollHeight`, not the rect: once capped the rect is the cap.
+    const want = panel.scrollHeight || p.height;
+    let y: number;
+    let maxHeight: number;
+    if (want <= below || below >= above) {
+      y = a.bottom + GAP;
+      maxHeight = below;
+    } else {
+      maxHeight = above;
+      y = a.top - GAP - Math.min(want, above);
+    }
+    setPos({ x, y, maxHeight: Math.max(120, maxHeight) });
   }, []);
 
   useLayoutEffect(() => {
@@ -152,6 +175,11 @@ export function PanelPortal({ open, onDismiss, className, children }: PanelPorta
             // anchor's onClick and toggles the panel shut mid-edit.
             onClick={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
+            // Same for the anchor's double-click / press-and-hold gestures
+            // (column header): a long press on Save must not re-open, and
+            // swallow the click of, the panel it is in.
+            onDoubleClick={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
           >
             {children}
           </div>,

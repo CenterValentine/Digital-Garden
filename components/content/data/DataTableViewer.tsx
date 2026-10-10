@@ -73,6 +73,7 @@ import {
   type CellSelectMods,
 } from "./DataGridRow";
 import { DataColumnHeader, DEFAULT_COLUMN_WIDTH } from "./DataColumnHeader";
+import { usePressHold } from "./use-press-hold";
 import { ContentPathBreadcrumb } from "../content/ContentPathBreadcrumb";
 import {
   DATA_SCHEMA_CHANGED_EVENT,
@@ -161,6 +162,11 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
   const lastToggledRowRef = useRef<string | null>(null);
   const [peekRowId, setPeekRowId] = useState<string | null>(null);
   const [peekFocusColumnId, setPeekFocusColumnId] = useState<string | null>(null);
+  /**
+   * A peek opened by click-and-HOLD on a row stays put (owner, 2026-10-09);
+   * one opened by a click or double-click is dismissed by clicking away.
+   */
+  const [peekPinned, setPeekPinned] = useState(false);
   /** Bumped on every grid-"+" click so a field's auto-open can re-fire even
    * when the peek (and the target column's focus) is already in place —
    * an initializer-only read misses that case entirely. */
@@ -1488,6 +1494,28 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
     [selectedCell]
   );
 
+  /**
+   * Header click (owner, 2026-10-09): the whole column, as the same
+   * rectangle a drag would make — so ⌘C, Delete and the highlight all work
+   * unchanged. Spans the LOADED rows (the grid pages in as it scrolls).
+   */
+  const selectColumn = useCallback(
+    (columnId: string) => {
+      const column = columns.find((c) => c.id === columnId);
+      const first = state.rows[0];
+      const last = state.rows[state.rows.length - 1];
+      setOpenColumnId(null);
+      if (!column || !first || !last) return;
+      setEditTarget(null);
+      setExtraCells(new Set());
+      setSelectedCell({ rowId: first.id, columnKey: column.key });
+      setRangeFocus(
+        last.id === first.id ? null : { rowId: last.id, columnKey: column.key }
+      );
+    },
+    [columns, state.rows]
+  );
+
   const hoverCell = useCallback((rowId: string, columnKey: string) => {
     if (!dragSelectingRef.current) return;
     setRangeFocus((prev) =>
@@ -1833,7 +1861,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
   );
 
   const openRow = useCallback(
-    (rowId: string, focusColumnId?: string) => {
+    (rowId: string, focusColumnId?: string, options?: { pinned?: boolean }) => {
       if (isQuery) {
         // The row IS a note/file — open the real thing, never a row page.
         const row = state.rows.find((r) => r.id === rowId);
@@ -1846,11 +1874,14 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
       }
       setPeekRowId(rowId);
       setPeekFocusColumnId(focusColumnId ?? null);
+      setPeekPinned(options?.pinned === true);
       if (focusColumnId) setPeekFocusToken((t) => t + 1);
       setEditTarget(null);
     },
     [isQuery, state.rows, selectNode, clearRowParam]
   );
+
+  const rowHold = usePressHold<string>((rowId) => openRow(rowId, undefined, { pinned: true }));
 
   /**
    * Click-away dismissal for the OVERLAY peek — reaching for the ✕ every
@@ -1862,7 +1893,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
    * The split variant is a pane, not an overlay — it never dismisses.
    */
   const overlayPeekOpen =
-    peekRowId !== null && state.view?.mode !== "split" && !isQuery;
+    peekRowId !== null && state.view?.mode !== "split" && !isQuery && !peekPinned;
   useEffect(() => {
     if (!overlayPeekOpen) return;
     const onDown = (e: MouseEvent) => {
@@ -2221,11 +2252,8 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
                 width={columnWidths[column.id]}
                 editable={canEditData}
                 menuOpen={openColumnId === column.id}
-                onToggleMenu={(columnId) =>
-                  setOpenColumnId((current) =>
-                    current === columnId ? null : columnId
-                  )
-                }
+                onSelectColumn={selectColumn}
+                onOpenMenu={setOpenColumnId}
                 isDragSource={dragColumnId === column.id}
                 dropIndicator={
                   dropTarget?.columnId === column.id ? dropTarget.side : null
@@ -2268,8 +2296,23 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
             )}
           </div>
 
-          {/* Spacer preserves true scroll height while only a slice renders. */}
-          <div style={{ height: totalHeight, position: "relative" }}>
+          {/* Spacer preserves true scroll height while only a slice renders.
+              Click-and-HOLD anywhere on a row (not on its controls) opens
+              the row as a PINNED peek — it stays until closed (owner,
+              2026-10-09). Moving cancels it: that is a drag-select. */}
+          <div
+            style={{ height: totalHeight, position: "relative" }}
+            onPointerDown={(e) => {
+              if (isQuery) return;
+              const target = e.target as HTMLElement | null;
+              if (!target || target.closest("input, textarea, select, button, a, [contenteditable=true]")) return;
+              const rowId = target.closest<HTMLElement>("[data-row-id]")?.dataset.rowId;
+              if (rowId) rowHold.start(e, rowId);
+            }}
+            onPointerMove={rowHold.move}
+            onPointerUp={rowHold.cancel}
+            onPointerLeave={rowHold.cancel}
+          >
             <div
               style={{
                 transform: `translateY(${firstVisible * ROW_HEIGHT}px)`,
@@ -2345,6 +2388,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
           onCommitCell={commitCell}
           onRefresh={() => void load(state.view?.id ?? null)}
           onNavigate={navigatePeek}
+          pinned={peekPinned}
           onClose={() => {
             setPeekRowId(null);
             setPeekFocusColumnId(null);

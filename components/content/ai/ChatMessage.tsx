@@ -82,6 +82,7 @@ import { FlashcardCardProposalList } from "./FlashcardCardProposalList";
 import { cn } from "@/lib/core/utils";
 import { calculateMenuPosition, type CalculatedPosition } from "@/lib/core/menu-positioning";
 import { useContentStore } from "@/state/content-store";
+import { parseColumnAnchor } from "@/lib/domain/data/column-anchor";
 import { ArtifactContextMenu, openArtifactInSplitPane } from "./artifact-open";
 import { useSettingsStore } from "@/state/settings-store";
 import { useNotesPanelStore } from "@/state/notes-panel-store";
@@ -3020,12 +3021,17 @@ function AssistantAvatar({
 
 /** Clickable mention pill — navigates to the referenced content */
 function MentionPill({ title, contentId }: { title: string; contentId: string }) {
+  // A column mention (`column:<id>`) names part of a table, not a content
+  // node — it has nothing of its own to open.
+  const isColumn = parseColumnAnchor(contentId) !== null;
   return (
     <button
       type="button"
       onClick={() => {
+        if (isColumn) return;
         useContentStore.getState().setSelectedContentId(contentId);
       }}
+      title={isColumn ? "Database column — the AI reads its description" : undefined}
       // Same data contract as the composer's pills, so a copy from a bubble
       // serializes to `@[Title](id)` (serializeSelectionForCopy).
       data-mention="true"
@@ -3730,7 +3736,9 @@ function ApprovalPreviewRest({
     const objective = str("objective");
     if (objective) fields.push(["Objective", objective]);
     const quest = str("quest");
-    if (quest) fields.push(["Quest", quest]);
+    // Quests are reused by default; a new one is the user's explicit call,
+    // so the card says so where they approve it.
+    if (quest) fields.push(["Quest", a.newQuest === true ? `${quest} — NEW quest` : quest]);
     fields.push([
       "Source",
       rowsPass
