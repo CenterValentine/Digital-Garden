@@ -10,16 +10,6 @@ last_updated: 2026-10-09
 
 ---
 
-## Database UX — header clicks and popovers (2026-10-09, owner; queued after `feat/database-column-links`)
-
-- ⚪ **The column-description indicator must not cover the header.** The ⓘ glyph sits over the header text (screenshot: "Coverage Outcome ⓘ"). Reserve space for it in the header's layout instead of overlaying.
-- ⚪ **A single click on a header selects the whole column.** Today it opens the column editor (name / description / limit). **Double-click, or click-and-hold, opens the editor.**
-- ⚪ **Clicking away dismisses any database popover opened by a click.** Applies to every click-opened database box, not only the column editor. Exception: a box opened by click-and-hold in a row may stay open (pinned). One opened by double-click is dismissed by clicking away.
-
-## Quest backlinks pile up on shared output tables (2026-10-09, owner report)
-
-- ⚪ Each quest that captures into the same output table adds another `Quest · <label>` backlink column to that table. On prod, Job Opportunities Library has four (one deleted by the owner). **Trigger:** a model call to `propose_item_iteration` that names a NEW quest per job (`quest: "Apply for a job — SeatGeek Technical Architect"`, then "— Clay Partner Technical Engineer") with `captureTo` = that same Library. Every backlink was created about 3 s after its quest ledger, and no chat ever called a column tool on the Library. **Mechanism:** `ensureOutputRelation` (`lib/domain/ai/quests.ts`) mints one relation pair per quest ledger × output table, and the backlink lands on the user's table. The quests-v2 design in `EXTRACTION-TO-DATABASE-PLAN.md` did not consider N quests sharing one table, nor a quest whose capture table is its own source (`source: database-rows`, so it updates in place). **Charter wording:** the "Apply for a job" Outputs list asks for "Quest, the quest used to run this charter" in the Library, a column that does not exist there. Options were given to the owner on 2026-10-09; awaiting a decision.
-
 ## Database column links — follow-ups (2026-10-09, from `feat/database-column-links`)
 
 - ⚪ Clicking a `[[Jobs#Status]]` link opens the database but does not scroll to or highlight the column. The database viewer should take the `column:` anchor from `state/content-anchor-store.ts`.
