@@ -212,6 +212,9 @@ export function PanelPortal({ open, onDismiss, className, children }: PanelPorta
         createPortal(
           <div
             ref={panelRef}
+            // Marks "inside a database box" for grid-level click tracking
+            // (one-click editing stays armed while you work in an editor).
+            data-db-panel=""
             className={cn(panelClass, className)}
             style={
               pos

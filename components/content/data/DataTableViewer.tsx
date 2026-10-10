@@ -84,7 +84,7 @@ import {
 import { overwriteFileViaUpload, uploadFilesToTable } from "./file-upload";
 import { AddColumnButton, AddColumnPanel, ColumnMenu } from "./DataColumnMenu";
 import { DataColumnContextMenu, type ColumnContextMenuState } from "./DataColumnContextMenu";
-import { toast } from "sonner";
+import { HiddenColumnsButton } from "./HiddenColumnsButton";
 import { DataViewBar, type ViewPatch } from "./DataViewBar";
 import { CHECKED_GROUP, DataBoardView } from "./DataBoardView";
 import { DataListView } from "./DataListView";
@@ -132,7 +132,16 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
     error: null,
   });
   const [stack, setStack] = useState<UndoStackState>(createUndoStack);
-  const [notice, setNotice] = useState<string | null>(null);
+  /**
+   * The grid's ONE status surface (the banner under the header): saves that
+   * failed, "⌘Z to undo" confirmations, copies — and, with an `action`, an
+   * inline Undo for what ⌘Z doesn't cover (column deletes). Owner,
+   * 2026-10-09: a toast for column deletes beside this banner for everything
+   * else was two surfaces for one job.
+   */
+  const [notice, setNotice] = useState<
+    string | { text: string; action?: { label: string; run: () => void } } | null
+  >(null);
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [scrollTop, setScrollTop] = useState(0);
   const [viewportHeight, setViewportHeight] = useState(600);
@@ -177,6 +186,33 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
    * one opened by a click or double-click is dismissed by clicking away.
    */
   const [peekPinned, setPeekPinned] = useState(false);
+  /**
+   * One-click editing (owner, 2026-10-09): the first cell edit takes a
+   * double-click; after that a single click edits, until Esc or a click
+   * outside the grid's cells (header, toolbar, another pane).
+   */
+  const [clickEditArmed, setClickEditArmed] = useState(false);
+  const armClickEdit = useCallback(() => setClickEditArmed(true), []);
+  useEffect(() => {
+    if (!clickEditArmed) return;
+    const onDown = (e: PointerEvent) => {
+      const target = e.target as Element | null;
+      if (!target) return;
+      if (target.closest("[data-db-panel]")) return; // working in an editor
+      const cell = target.closest("[data-column-key]");
+      if (cell && rootRef.current?.contains(cell)) return;
+      setClickEditArmed(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setClickEditArmed(false);
+    };
+    document.addEventListener("pointerdown", onDown, true);
+    document.addEventListener("keydown", onKey, true);
+    return () => {
+      document.removeEventListener("pointerdown", onDown, true);
+      document.removeEventListener("keydown", onKey, true);
+    };
+  }, [clickEditArmed]);
   /** Bumped on every grid-"+" click so a field's auto-open can re-fire even
    * when the peek (and the target column's focus) is already in place —
    * an initializer-only read misses that case entirely. */
@@ -251,9 +287,27 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
     viewRef.current = state.view;
   }, [state.view]);
 
-  const columns = useMemo(
+  /** Every live column — filters, sorts, the peek and the other views. */
+  const allColumns = useMemo(
     () => state.table?.columns.filter((c) => !c.deletedAt) ?? [],
     [state.table]
+  );
+  /**
+   * The columns the GRID shows: hiding is a per-VIEW choice (owner,
+   * 2026-10-09 — `columnPrefs[id].hidden`), never a schema change. Other
+   * views and the row peek keep every field.
+   */
+  const gridMode = !state.view || state.view.mode === "grid" || state.view.mode === "split";
+  const columns = useMemo(
+    () =>
+      gridMode
+        ? allColumns.filter((c) => !state.view?.columnPrefs?.[c.id]?.hidden)
+        : allColumns,
+    [allColumns, gridMode, state.view]
+  );
+  const hiddenColumns = useMemo(
+    () => allColumns.filter((c) => state.view?.columnPrefs?.[c.id]?.hidden),
+    [allColumns, state.view]
   );
 
   // Effective widths: the view's stored prefs overlaid with live drag
@@ -320,6 +374,65 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
         });
         setNotice(json?.error?.message ?? "Could not save the column width");
       }
+    },
+    [contentId]
+  );
+
+  /**
+   * Hide / show columns IN THIS VIEW (owner, 2026-10-09). Stored on the
+   * view's columnPrefs, so another view of the same table is untouched, and
+   * nothing about the schema or the data changes. Optimistic; a refused save
+   * (locked view, lost access) reverts and says so.
+   */
+  const setColumnsHidden = useCallback(
+    async (ids: string[], hidden: boolean, opts?: { quiet?: boolean }) => {
+      const view = viewRef.current;
+      if (!view || ids.length === 0) return;
+      const before = view.columnPrefs ?? {};
+      const merged: Record<string, ColumnPref> = { ...before };
+      for (const id of ids) {
+        const next: ColumnPref = { ...before[id] };
+        if (hidden) next.hidden = true;
+        else delete next.hidden;
+        merged[id] = next;
+      }
+      const apply = (prefs: Record<string, ColumnPref>) =>
+        setState((cur) =>
+          cur.view && cur.view.id === view.id
+            ? { ...cur, view: { ...cur.view, columnPrefs: prefs } }
+            : cur
+        );
+      apply(merged);
+      setSelectedCell(null);
+      setRangeFocus(null);
+      setColumnMenu(null);
+      const res = await fetch(`/api/content/data/${contentId}/views`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ viewId: view.id, columnPrefs: merged }),
+      }).catch(() => null);
+      const json = res ? await res.json().catch(() => null) : null;
+      if (!res?.ok || !json?.success) {
+        apply(before);
+        setNotice(json?.error?.message ?? "Could not change which columns this view shows");
+        return;
+      }
+      if (opts?.quiet) return;
+      const n = ids.length;
+      const what = n === 1 ? "1 column" : `${n} columns`;
+      setNotice({
+        text: hidden
+          ? `Hid ${what} in the “${view.name}” view — other views still show ${n === 1 ? "it" : "them"}.`
+          : `Showing ${what} again.`,
+        action: {
+          label: "Undo",
+          run: () => {
+            setNotice(null);
+            void setColumnsHidden(ids, !hidden, { quiet: true });
+          },
+        },
+      });
     },
     [contentId]
   );
@@ -1023,18 +1136,6 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
     [columnRequest]
   );
 
-  const deleteColumn = useCallback(
-    async (columnId: string) => {
-      const done = await columnRequest("DELETE", { columnId });
-      if (done) {
-        setOpenColumnId(null);
-        // Cell data survives a column delete — that is what makes restoring
-        // one a metadata flip rather than a recovery job (plan B4).
-        setNotice("Column removed. Its values are kept.");
-      }
-    },
-    [columnRequest]
-  );
 
   // ── Column drag reorder ────────────────────────────────────────────────
   //
@@ -1623,24 +1724,29 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
       setRangeFocus(null);
       await load(state.view?.id ?? null);
       dispatchDataSchemaChanged(contentId, "grid");
-      if (deleted.length < ids.length) {
-        setNotice(`${ids.length - deleted.length} column(s) could not be deleted.`);
+      if (deleted.length === 0) {
+        setNotice(ids.length === 1 ? "That column could not be deleted." : "Those columns could not be deleted.");
+        return;
       }
-      if (deleted.length === 0) return;
-      const label =
+      const what =
         deleted.length === 1
-          ? `Column "${names[ids.indexOf(deleted[0])] ?? ""}" deleted`
-          : `${deleted.length} columns deleted`;
-      toast(label, {
-        description: "Their values are kept.",
-        duration: 8000,
+          ? `Column "${names[ids.indexOf(deleted[0])] ?? ""}"`
+          : `${deleted.length} columns`;
+      setNotice({
+        text:
+          `${what} deleted — values are kept.` +
+          (deleted.length < ids.length
+            ? ` ${ids.length - deleted.length} could not be deleted.`
+            : ""),
         action: {
           label: "Undo",
-          onClick: () => {
+          run: () => {
+            setNotice(null);
             void (async () => {
               for (const id of deleted) await send(id, true);
               await load(viewRef.current?.id ?? null);
               dispatchDataSchemaChanged(contentId, "grid");
+              setNotice(`${what} restored.`);
             })();
           },
         },
@@ -2223,7 +2329,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
 
       <DataViewBar
         views={state.table.views}
-        columns={columns}
+        columns={allColumns}
         activeViewId={state.view?.id ?? null}
         defaultViewId={state.table.defaultViewId}
         canWrite={state.canWrite}
@@ -2236,7 +2342,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
       {state.view && !isQuery && (
         <DataFilterBar
           view={state.view}
-          columns={columns}
+          columns={allColumns}
           canWrite={state.canWrite}
           onSave={(filters) => updateView(state.view!.id, { filters })}
           onSaveSorts={(sorts) => updateView(state.view!.id, { sorts })}
@@ -2273,7 +2379,16 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
           // the muted grey that reads as a status line.
           className="border-b border-amber-300/60 bg-amber-500/10 px-4 py-1.5 text-xs text-amber-900 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-200"
         >
-          {notice}
+          {typeof notice === "string" ? notice : notice.text}
+          {typeof notice !== "string" && notice.action && (
+            <button
+              type="button"
+              onClick={notice.action.run}
+              className="ml-2 font-medium underline"
+            >
+              {notice.action.label}
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setNotice(null)}
@@ -2288,7 +2403,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
         <div className="min-h-0 flex-1">
           <DataBoardView
             view={state.view}
-            columns={columns}
+            columns={allColumns}
             rows={state.rows}
             editable={canEditData}
             onCommitCell={commitCell}
@@ -2300,14 +2415,14 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
         <div className="min-h-0 flex-1 overflow-y-auto">
           <DataListView
             rows={state.rows}
-            columns={columns}
+            columns={allColumns}
             onOpenRow={openRow}
           />
         </div>
       ) : state.view?.mode === "form" ? (
         <div className="min-h-0 flex-1 overflow-y-auto">
           <DataFormView
-            columns={columns}
+            columns={allColumns}
             view={state.view}
             canWrite={canEditData}
             onSubmit={submitFormRow}
@@ -2317,7 +2432,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
         <div className="min-h-0 flex-1 overflow-y-auto">
           <DataGalleryView
             rows={state.rows}
-            columns={columns}
+            columns={allColumns}
             view={state.view}
             onOpenRow={openRow}
           />
@@ -2327,7 +2442,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
           <div className="w-72 shrink-0 overflow-y-auto border-r border-border">
             <DataListView
               rows={state.rows}
-              columns={columns}
+              columns={allColumns}
               onOpenRow={openRow}
             />
           </div>
@@ -2337,7 +2452,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
                 variant="inline"
                 tableId={contentId}
                 row={peekRow}
-                columns={columns}
+                columns={allColumns}
                 editable={canEditData}
                 index={peekIndex}
                 total={state.rows.length}
@@ -2415,14 +2530,14 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
                   <ColumnMenu
                     column={column}
                     onSave={(patch) => saveColumn(column.id, patch)}
-                    onDelete={() => deleteColumn(column.id)}
+                    onDelete={() => deleteColumns([column.id])}
                     onClose={() => setOpenColumnId(null)}
                   />
                 )}
                 {insertAt?.columnId === column.id && (
                   <AddColumnPanel
                     tableId={contentId}
-                    columns={columns}
+                    columns={allColumns}
                     open
                     heading={`Insert column ${insertAt.side === "left" ? "left" : "right"} of “${column.name}”`}
                     onClose={() => setInsertAt(null)}
@@ -2437,10 +2552,17 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
               </DataColumnHeader>
               );
             })}
+            {hiddenColumns.length > 0 && (
+              <HiddenColumnsButton
+                hidden={hiddenColumns}
+                viewName={state.view?.name}
+                onShow={(ids) => void setColumnsHidden(ids, false)}
+              />
+            )}
             {canEditData && (
               <AddColumnButton
                 tableId={contentId}
-                columns={columns}
+                columns={allColumns}
                 onAdd={addColumn}
               />
             )}
@@ -2504,6 +2626,8 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
                   onHoverCell={hoverCell}
                   onOpenRow={openRow}
                   onOpenContent={openContent}
+                  clickToEdit={clickEditArmed}
+                  onArmClickEdit={armClickEdit}
                   onAdvance={advanceEdit}
                   onEditEnd={clearEditTarget}
                 />
@@ -2543,6 +2667,15 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
             setColumnMenu(null);
             void deleteColumns(ids);
           }}
+          onHide={() => void setColumnsHidden(menuDeleteIds, true)}
+          hideBlockedReason={
+            columns.length - menuDeleteIds.length < 1
+              ? "A view needs at least one visible column"
+              : null
+          }
+          hiddenCount={hiddenColumns.length}
+          onShowHidden={() => void setColumnsHidden(hiddenColumns.map((c) => c.id), false)}
+          viewName={state.view?.name}
         />
       )}
 
@@ -2550,7 +2683,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
         <DataRowPeek
           tableId={contentId}
           row={peekRow}
-          columns={columns}
+          columns={allColumns}
           editable={canEditData}
           index={peekIndex}
           total={state.rows.length}

@@ -6,9 +6,11 @@
  *
  *   Insert column left / right → the same add-column form as the header
  *     row's "+" (AddColumnPanel), opened on the clicked column, landing beside it.
- *   Delete column / Delete N columns → soft delete (values are kept), with an
- *     Undo toast. N = the selected columns when the click lands inside a
- *     column selection; otherwise just the clicked column.
+ *   Hide column / Hide N columns → in THIS VIEW only (columnPrefs.hidden);
+ *     "Show N hidden columns" and the header row's "N hidden" undo it.
+ *   Delete column / Delete N columns → soft delete (values are kept), with
+ *     Undo in the grid's banner. N = the selected columns when the click
+ *     lands inside a column selection; otherwise just the clicked column.
  *
  * Portaled at the pointer and placed by `calculateMenuPosition` (CLAUDE.md
  * "Menu Positioning"); dismissed by clicking away, Escape, or scrolling.
@@ -16,7 +18,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ArrowLeftToLine, ArrowRightToLine, Trash2 } from "lucide-react";
+import { ArrowLeftToLine, ArrowRightToLine, Eye, EyeOff, Trash2 } from "lucide-react";
 import { cn } from "@/lib/core/utils";
 import { calculateMenuPosition, type CalculatedPosition } from "@/lib/core/menu-positioning";
 
@@ -34,6 +36,15 @@ interface DataColumnContextMenuProps {
   deleteBlockedReason?: string | null;
   onInsert: (side: "left" | "right") => void;
   onDelete: () => void;
+  /** Hide acts on the same set as Delete — in THIS VIEW only. */
+  onHide: () => void;
+  /** Why Hide is unavailable (e.g. it would hide every column). */
+  hideBlockedReason?: string | null;
+  /** Columns this view hides — "Show N hidden columns" brings them back. */
+  hiddenCount: number;
+  onShowHidden: () => void;
+  /** The view hiding applies to, named in the menu so the scope is plain. */
+  viewName?: string;
   onClose: () => void;
 }
 
@@ -46,6 +57,11 @@ export function DataColumnContextMenu({
   deleteBlockedReason,
   onInsert,
   onDelete,
+  onHide,
+  hideBlockedReason,
+  hiddenCount,
+  onShowHidden,
+  viewName,
   onClose,
 }: DataColumnContextMenuProps) {
   const ref = useRef<HTMLDivElement>(null);
@@ -117,6 +133,25 @@ export function DataColumnContextMenu({
         <ArrowRightToLine className="h-3.5 w-3.5 text-muted-foreground" />
         Insert column right
       </button>
+      <div className="my-1 h-px bg-border" />
+      <button
+        type="button"
+        role="menuitem"
+        className={itemClass}
+        disabled={Boolean(hideBlockedReason)}
+        title={hideBlockedReason ?? `Only in ${viewName ? `the “${viewName}” view` : "this view"} — other views keep showing it`}
+        onClick={onHide}
+      >
+        <EyeOff className="h-3.5 w-3.5 text-muted-foreground" />
+        {deleteCount > 1 ? `Hide ${deleteCount} columns` : "Hide column"}
+        <span className="ml-auto pl-3 text-[10px] text-muted-foreground">this view</span>
+      </button>
+      {hiddenCount > 0 && (
+        <button type="button" role="menuitem" className={itemClass} onClick={onShowHidden}>
+          <Eye className="h-3.5 w-3.5 text-muted-foreground" />
+          {hiddenCount === 1 ? "Show 1 hidden column" : `Show ${hiddenCount} hidden columns`}
+        </button>
+      )}
       <div className="my-1 h-px bg-border" />
       <button
         type="button"

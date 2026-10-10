@@ -284,6 +284,14 @@ interface DataGridRowProps {
   onAdvance: (rowId: string, columnKey: string, dir: 1 | -1) => void;
   /** Enter/Escape ended an edit — the parent clears any forced target. */
   onEditEnd: () => void;
+  /**
+   * One-click editing is armed (owner, 2026-10-09): the first edit of a
+   * session takes a double-click; after that a single click edits, until
+   * Esc or a click outside the grid's cells.
+   */
+  clickToEdit?: boolean;
+  /** A double-click opened an editor — arm one-click editing. */
+  onArmClickEdit?: () => void;
 }
 
 function DataGridRowImpl({
@@ -307,6 +315,8 @@ function DataGridRowImpl({
   onOpenContent,
   onAdvance,
   onEditEnd,
+  clickToEdit = false,
+  onArmClickEdit,
 }: DataGridRowProps) {
   return (
     <div
@@ -378,6 +388,8 @@ function DataGridRowImpl({
             onOpenContent={onOpenContent}
             onAdvance={onAdvance}
             onEditEnd={onEditEnd}
+            clickToEdit={clickToEdit}
+            onArmClickEdit={onArmClickEdit}
           />
         );
       })}
@@ -427,6 +439,8 @@ interface DataCellProps {
   onOpenContent: (ref: ContentRef) => void;
   onAdvance: (rowId: string, columnKey: string, dir: 1 | -1) => void;
   onEditEnd: () => void;
+  clickToEdit?: boolean;
+  onArmClickEdit?: () => void;
 }
 
 /** Modifier keys on a cell mousedown — ⇧ extends the range, ⌘/Ctrl adds a cell. */
@@ -458,6 +472,8 @@ function DataCell({
   onOpenContent,
   onAdvance,
   onEditEnd,
+  clickToEdit = false,
+  onArmClickEdit,
 }: DataCellProps) {
   const canInlineEdit = editable && INLINE_EDITABLE_TYPES.has(column.type);
 
@@ -1213,11 +1229,12 @@ function DataCell({
         // Long text is the exception (owner, 2026-10-09): its editor is a
         // popover over the grid, so a click — even on a blank cell — only
         // selects; double-click (or Enter) opens it, like everywhere else.
+        // …and once a double-click has opened an editor, a single click
+        // edits any cell until the session ends (clickToEdit).
         if (
           canInlineEdit &&
           !isSelectLike &&
-          column.type !== "longText" &&
-          value === undefined
+          (clickToEdit || (column.type !== "longText" && value === undefined))
         ) {
           onEditEnd();
           beginEdit();
@@ -1227,6 +1244,7 @@ function DataCell({
         if (canInlineEdit && !isSelectLike) {
           onEditEnd();
           beginEdit();
+          onArmClickEdit?.();
         }
       }}
       title={display || undefined}
