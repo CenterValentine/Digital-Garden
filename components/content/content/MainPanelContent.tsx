@@ -665,6 +665,24 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
   // a different document, we abort any pending fetch to prevent Doc A's content
   // from being written to Doc B's API endpoint.
   const saveAbortControllerRef = useRef<AbortController | null>(null);
+  /**
+   * ONE save in flight per pane (prod 2026-10-09: "this note changed
+   * elsewhere" after nearly every edit, with no one else editing). A save
+   * takes 2.5–5.5 s on production; autosave fires ~2.5 s after a pause, so a
+   * second save routinely left while the first was still running. Aborting
+   * the first only stopped the BROWSER waiting — the server committed it —
+   * so its new bodyHash never came back, and the second save carried the
+   * stale one into the If-Match check: a 409 against the user's own write.
+   * Every prod 409 in the logs had a save of the same note still in flight.
+   * Now a save asked for meanwhile waits here (newest content wins) and
+   * leaves when the in-flight one settles, with the fresh hash.
+   */
+  const saveInFlightRef = useRef<string | null>(null);
+  const pendingSaveRef = useRef<{
+    contentId: string;
+    content: JSONContent;
+    meta?: SaveMeta;
+  } | null>(null);
 
   // Optimistic-concurrency baseline (spec: write persistence). The bodyHash
   // the server returned the last time we loaded/saved this doc. Echoed as the
@@ -1317,6 +1335,18 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
         return;
       }
 
+      // Single flight (see saveInFlightRef). A keepalive flush is the page
+      // going away — it cannot wait, so it still leaves at once.
+      const serialized = !meta?.keepalive;
+      if (serialized) {
+        if (saveInFlightRef.current === selectedContentId) {
+          pendingSaveRef.current = { contentId: selectedContentId, content, meta };
+          setHasUnsavedChanges(true);
+          return;
+        }
+        saveInFlightRef.current = selectedContentId;
+      }
+
       // Cancel any previous in-flight save. A flush stays OUT of this: it is
       // the last write for a document we are leaving, and the next document's
       // first save must not be able to abort it.
@@ -1470,6 +1500,19 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
         throw err; // Re-throw so editor knows save failed
       } finally {
         setIsSaving(false);
+        if (serialized && saveInFlightRef.current === selectedContentId) {
+          saveInFlightRef.current = null;
+          const next = pendingSaveRef.current;
+          if (next && next.contentId === selectedContentId) {
+            pendingSaveRef.current = null;
+            // Same closure, so it targets the note the content came from even
+            // if the pane has moved on; `flush` lets it past the cross-
+            // document guard for exactly that reason.
+            void handleSave(next.content, { ...next.meta, flush: true }).catch(() => {
+              // Already logged inside; the editor keeps the unsaved state.
+            });
+          }
+        }
       }
     },
     [

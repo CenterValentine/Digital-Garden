@@ -711,9 +711,21 @@ export function NoteWindowNodeView({
   // Vercel's edge eats standard If-Match with a 412 before the function
   // runs. On 409 the window NEVER overwrites: banner + refresh is the
   // v1 resolution (no conflict-store port).
+  // One save in flight at a time (same race as MainPanelContent's
+  // saveInFlightRef): an overlapping save carried the hash from before the
+  // first one committed and drew a 409 against its own write. A save asked
+  // for meanwhile waits (newest wins) and leaves with the fresh hash.
+  const plainSaveInFlightRef = useRef(false);
+  const pendingPlainSaveRef = useRef<{ json: JSONContent; meta?: SaveMeta } | null>(null);
   const handlePlainSave = useCallback(
     async (json: JSONContent, meta?: SaveMeta) => {
       if (!targetContentId) return;
+      if (plainSaveInFlightRef.current && !meta?.keepalive) {
+        pendingPlainSaveRef.current = { json, meta };
+        return;
+      }
+      const serialized = !meta?.keepalive;
+      if (serialized) plainSaveInFlightRef.current = true;
       try {
         const res = await fetch(
           `/api/content/content/${encodeURIComponent(targetContentId)}`,
@@ -757,6 +769,15 @@ export function NoteWindowNodeView({
         setDirty(false);
       } catch {
         // network hiccup — stay dirty; the editor's debounce will retry
+      } finally {
+        if (serialized) {
+          plainSaveInFlightRef.current = false;
+          const next = pendingPlainSaveRef.current;
+          if (next) {
+            pendingPlainSaveRef.current = null;
+            void handlePlainSave(next.json, next.meta);
+          }
+        }
       }
     },
     [targetContentId, fetchKey],
