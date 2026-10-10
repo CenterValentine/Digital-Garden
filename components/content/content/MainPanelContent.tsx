@@ -139,6 +139,15 @@ import { usePanelStore } from "@/state/panel-store";
 import { useIsMobile } from "@/components/common/useIsMobile";
 
 import { setLinkAnchorLister, setLinkAnchorSuggester } from "@/lib/domain/content/link-anchor";
+import {
+  noteAdoptServerVersion,
+  noteBodyHash,
+  noteCached,
+  noteLoaded,
+  noteSaved,
+  noteSaveGeneration,
+  runNoteSave,
+} from "@/lib/domain/content/note-save-coordinator";
 import { listDatabaseColumnAnchors } from "@/lib/domain/data/column-link-anchors";
 
 interface ContentResponse {
@@ -664,25 +673,7 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
   // AbortController for in-flight save requests. When the user navigates to
   // a different document, we abort any pending fetch to prevent Doc A's content
   // from being written to Doc B's API endpoint.
-  const saveAbortControllerRef = useRef<AbortController | null>(null);
-  /**
-   * ONE save in flight per pane (prod 2026-10-09: "this note changed
-   * elsewhere" after nearly every edit, with no one else editing). A save
-   * takes 2.5–5.5 s on production; autosave fires ~2.5 s after a pause, so a
-   * second save routinely left while the first was still running. Aborting
-   * the first only stopped the BROWSER waiting — the server committed it —
-   * so its new bodyHash never came back, and the second save carried the
-   * stale one into the If-Match check: a 409 against the user's own write.
-   * Every prod 409 in the logs had a save of the same note still in flight.
-   * Now a save asked for meanwhile waits here (newest content wins) and
-   * leaves when the in-flight one settles, with the fresh hash.
-   */
-  const saveInFlightRef = useRef<string | null>(null);
-  const pendingSaveRef = useRef<{
-    contentId: string;
-    content: JSONContent;
-    meta?: SaveMeta;
-  } | null>(null);
+
 
   // Optimistic-concurrency baseline (spec: write persistence). The bodyHash
   // the server returned the last time we loaded/saved this doc. Echoed as the
@@ -690,7 +681,6 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
   // we loaded it) gets a 409 instead of silently overwriting newer content.
   // Only the plain/REST save path uses this — collaboration docs persist via
   // Hocuspocus and never reach handleSave's network call.
-  const bodyHashRef = useRef<string | null>(null);
 
   const setConflict = useSaveConflictStore((s) => s.setConflict);
   const clearConflict = useSaveConflictStore((s) => s.clearConflict);
@@ -798,16 +788,29 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
     // showing Doc B. Reads are safe to drop — unlike writes — so this guards
     // the commit, not the fetch.
     let cancelled = false;
+    // Saves of this note that start after this point make this load's
+    // version stamp stale (note-save-coordinator `noteLoaded`).
+    const loadGeneration = noteSaveGeneration(selectedContentId);
 
     // The side-effecting half of applying a payload: refs, stores, logging,
     // the stashed-draft check. Paired with applyContentFacts (component scope,
     // pure); the network path runs both, the warm path runs only this when
     // render already applied the facts.
-    const applyContentSideEffects = (data: ContentResponse["data"]) => {
-      // Capture the optimistic-concurrency baseline for the plain/REST save
-      // path. (SSR fast-path results have no note.bodyHash; that's fine —
-      // the first real save just proceeds without an If-Match.)
-      bodyHashRef.current = data.note?.bodyHash ?? null;
+    const applyContentSideEffects = (
+      data: ContentResponse["data"],
+      source: "network" | "cached" = "network"
+    ) => {
+      // The optimistic-concurrency stamp for the plain/REST save path lives
+      // per NOTE in the save coordinator, shared by every pane and window
+      // showing it. A fresh load updates it unless one of our saves started
+      // since this load was requested; a cache paint only seeds an unknown
+      // note. (SSR fast-path results have no note.bodyHash; the first real
+      // save then proceeds without an X-Body-Hash.)
+      const loadedHash = data.note?.bodyHash ?? null;
+      if (!isPageTemplateTab) {
+        if (source === "cached") noteCached(selectedContentId, loadedHash);
+        else noteLoaded(selectedContentId, loadedHash, loadGeneration);
+      }
 
       // Provide creation/updated dates to inline-timestamp nodes
       setDocumentDates(
@@ -847,7 +850,8 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
 
       if (!cancelled && !isPageTemplateTab) {
         const draft = loadConflictDraft(selectedContentId);
-        if (draft && bodyHashRef.current) {
+        const draftBaseHash = noteBodyHash(selectedContentId) ?? loadedHash;
+        if (draft && draftBaseHash) {
           const serverJson = (data.note?.tiptapJson ?? null) as JSONContent | null;
           if (serverJson && sameProjectedText(draft, serverJson)) {
             const structuralOnly = !sameCanonicalJson(draft, serverJson);
@@ -867,7 +871,7 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
             setConflict({
               contentId: selectedContentId,
               mine: draft,
-              theirHash: bodyHashRef.current,
+              theirHash: draftBaseHash,
             });
             setNoteContent(draft);
             setOutline(selectedContentId, extractOutline(draft));
@@ -892,7 +896,7 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
       // below the hooks); doing it again here would hand the editor a NEW
       // noteContent object for the same document and reset the caret.
       if (warmAppliedFor !== selectedContentId) applyContentFacts(warm.data);
-      applyContentSideEffects(warm.data);
+      applyContentSideEffects(warm.data, "cached");
     }
 
     const fetchNote = async () => {
@@ -1056,7 +1060,7 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
             isCollaborative: isCollaborativeRef.current,
           });
           if (!apply) {
-            // NOTE: we deliberately do NOT advance `bodyHashRef` here. It is
+            // NOTE: we deliberately do NOT advance the note's save stamp here. It is
             // tempting — a fresh hash would stop the next save from 409-ing.
             // But the screen still shows the CACHED copy, so adopting the
             // server's newer hash would let that stale copy overwrite the
@@ -1335,31 +1339,22 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
         return;
       }
 
-      // Single flight (see saveInFlightRef). A keepalive flush is the page
-      // going away — it cannot wait, so it still leaves at once.
-      const serialized = !meta?.keepalive;
-      if (serialized) {
-        if (saveInFlightRef.current === selectedContentId) {
-          pendingSaveRef.current = { contentId: selectedContentId, content, meta };
-          setHasUnsavedChanges(true);
-          return;
-        }
-        saveInFlightRef.current = selectedContentId;
-      }
-
-      // Cancel any previous in-flight save. A flush stays OUT of this: it is
-      // the last write for a document we are leaving, and the next document's
-      // first save must not be able to abort it.
-      const abortController = new AbortController();
-      if (!meta?.flush) {
-        if (saveAbortControllerRef.current) {
-          saveAbortControllerRef.current.abort();
-        }
-        saveAbortControllerRef.current = abortController;
+      // ONE save of a note at a time, per NOTE (lib/domain/content/note-save-
+      // coordinator.ts): a save asked for while another is running waits
+      // (newest wins) and leaves with the stamp that one brought back — even
+      // if the note has since moved to another pane. A keepalive flush (the
+      // page is going away) cannot wait and leaves at once.
+      setHasUnsavedChanges(true);
+      const sendSave = async (): Promise<void> => {
+      // A 409 may have opened a conflict while this save waited its turn.
+      const waitingConflict = useSaveConflictStore.getState().getConflict(selectedContentId);
+      if (!isPageTemplateTab && waitingConflict) {
+        stashConflictDraft(selectedContentId, content);
+        useSaveConflictStore.getState().setConflict({ ...waitingConflict, mine: content });
+        return;
       }
 
       setIsSaving(true);
-      setHasUnsavedChanges(true);
 
       try {
         const response = await tracedFetch(
@@ -1381,8 +1376,8 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
             // and rejects it with a 412 *before the request reaches the function*
             // (our responses have no matching ETag), so the app's check never
             // runs. A non-conditional `X-Body-Hash` header passes through.
-            ...(!isPageTemplateTab && bodyHashRef.current
-              ? { "X-Body-Hash": bodyHashRef.current }
+            ...(!isPageTemplateTab && noteBodyHash(selectedContentId)
+              ? { "X-Body-Hash": noteBodyHash(selectedContentId)! }
               : {}),
           },
           // Forward user-intent metadata from the editor. The content
@@ -1400,7 +1395,7 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
           ),
           // keepalive lets the request outlive a page that is unloading; an
           // abort signal would be moot there, so it is omitted for that case.
-          ...(meta?.keepalive ? { keepalive: true } : { signal: abortController.signal }),
+          ...(meta?.keepalive ? { keepalive: true } : {}),
           }
         );
 
@@ -1414,25 +1409,23 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
           response.status === 409 &&
           result?.meta?.reason === "if_match"
         ) {
-          const postSaveId = getPaneActiveContentId(
-            useContentStore.getState(),
-            paneId
-          );
-          if (postSaveId === selectedContentId) {
-            stashConflictDraft(selectedContentId, content);
-            setConflict({
-              contentId: selectedContentId,
-              mine: content,
-              theirHash: result.meta.currentBodyHash ?? bodyHashRef.current ?? "",
-            });
-            setHasUnsavedChanges(true);
-            clientLogger.warn({
-              layer: "ui",
-              event: "save:conflict_detected",
-              summary: "save refused — document changed elsewhere (409)",
-              attrs: { content_id: selectedContentId },
-            });
-          }
+          // The conflict belongs to the NOTE (the store and the stash are
+          // keyed by it), so it is raised even when this pane has moved on —
+          // the banner shows wherever the note is open next. Before, a 409
+          // after a pane move was dropped: not saved, not stashed, no banner.
+          stashConflictDraft(selectedContentId, content);
+          setConflict({
+            contentId: selectedContentId,
+            mine: content,
+            theirHash: result.meta.currentBodyHash ?? noteBodyHash(selectedContentId) ?? "",
+          });
+          setHasUnsavedChanges(true);
+          clientLogger.warn({
+            layer: "ui",
+            event: "save:conflict_detected",
+            summary: "save refused — document changed elsewhere (409)",
+            attrs: { content_id: selectedContentId },
+          });
           return;
         }
 
@@ -1443,6 +1436,20 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
         } else if (!response.ok || !result.success) {
           throw new Error(result.error?.message || "Failed to save note");
         }
+
+        // Note-scoped facts FIRST — they hold whichever pane shows the note
+        // now. The stamp used to be advanced only after the pane guard below,
+        // so a save that finished after a pane move left it stale and the
+        // next save of the note drew a 409 against this very write.
+        if (!isPageTemplateTab) {
+          noteSaved(selectedContentId, result.data?.note?.bodyHash);
+          clearConflictDraft(selectedContentId);
+        }
+        // The MRU cache still holds the PRE-save payload. Left there, a switch
+        // away and back would warm-paint the old body over freshly saved work
+        // — which reads as lost writing even though the server has it. Drop
+        // the entry so the next visit re-fetches.
+        invalidateTabPayload(selectedContentId);
 
         // Final guard: verify we're still on the same document before
         // updating parent state. This catches the edge case where the user
@@ -1459,22 +1466,9 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
         }
 
         setLastSaved(new Date());
-        // Advance the optimistic-concurrency baseline to the version we just
-        // wrote, so the next save's If-Match matches. Clear any stashed draft —
-        // a successful write means there's nothing unresolved to recover.
-        if (!isPageTemplateTab) {
-          bodyHashRef.current = result.data?.note?.bodyHash ?? bodyHashRef.current;
-          clearConflictDraft(selectedContentId);
-        }
         // Keep parent state in sync so re-mounts (e.g., ExpandableEditor
         // collapse/reopen) receive the latest persisted content
         setNoteContent(content);
-
-        // The MRU cache still holds the PRE-save payload. Left there, a switch
-        // away and back would warm-paint the old body over freshly saved work
-        // — which reads as lost writing even though the server has it. Drop
-        // the entry so the next visit re-fetches.
-        invalidateTabPayload(selectedContentId);
       } catch (err: unknown) {
         // AbortError is expected when we cancel a save due to navigation —
         // not worth a log line, the navigation that triggered it is the signal.
@@ -1500,20 +1494,9 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
         throw err; // Re-throw so editor knows save failed
       } finally {
         setIsSaving(false);
-        if (serialized && saveInFlightRef.current === selectedContentId) {
-          saveInFlightRef.current = null;
-          const next = pendingSaveRef.current;
-          if (next && next.contentId === selectedContentId) {
-            pendingSaveRef.current = null;
-            // Same closure, so it targets the note the content came from even
-            // if the pane has moved on; `flush` lets it past the cross-
-            // document guard for exactly that reason.
-            void handleSave(next.content, { ...next.meta, flush: true }).catch(() => {
-              // Already logged inside; the editor keeps the unsaved state.
-            });
-          }
-        }
       }
+      };
+      return runNoteSave(selectedContentId, sendSave, { keepalive: meta?.keepalive });
     },
     [
       isPageTemplateTab,
@@ -1556,7 +1539,7 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
 
   const handleConflictKeepMine = useCallback(() => {
     if (!activeConflict || !selectedContentId) return;
-    bodyHashRef.current = activeConflict.theirHash;
+    noteAdoptServerVersion(selectedContentId, activeConflict.theirHash);
     const mine = activeConflict.mine;
     clearConflict(selectedContentId);
     clearConflictDraft(selectedContentId);
