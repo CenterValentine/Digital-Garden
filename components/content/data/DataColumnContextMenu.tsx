@@ -56,7 +56,6 @@ export function DataColumnContextMenu({
     const el = ref.current;
     if (!el) return;
     const r = el.getBoundingClientRect();
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- audited: two-phase menu measurement, same pattern as PanelPortal
     setPos(
       calculateMenuPosition({
         triggerPosition: { x: menu.x, y: menu.y },
@@ -73,6 +72,12 @@ export function DataColumnContextMenu({
   }, [onClose]);
   useEffect(() => {
     const close = () => onCloseRef.current();
+    // A scroll already in flight when the menu opened (trackpad momentum, the
+    // browser bringing the clicked column into view) is not the user leaving.
+    const openedAt = performance.now();
+    const onScroll = () => {
+      if (performance.now() - openedAt > 250) close();
+    };
     const onDown = (e: PointerEvent) => {
       if (ref.current?.contains(e.target as Node)) return;
       close();
@@ -82,12 +87,12 @@ export function DataColumnContextMenu({
     };
     document.addEventListener("pointerdown", onDown, true);
     document.addEventListener("keydown", onKey);
-    document.addEventListener("scroll", close, true);
+    document.addEventListener("scroll", onScroll, true);
     window.addEventListener("resize", close);
     return () => {
       document.removeEventListener("pointerdown", onDown, true);
       document.removeEventListener("keydown", onKey);
-      document.removeEventListener("scroll", close, true);
+      document.removeEventListener("scroll", onScroll, true);
       window.removeEventListener("resize", close);
     };
   }, []);

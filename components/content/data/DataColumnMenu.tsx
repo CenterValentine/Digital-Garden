@@ -17,7 +17,7 @@
  * migrate" is both cheaper to build and clearer about what happens to data.
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Check, Lock, Plus, Trash2, X } from "lucide-react";
 import { cn } from "@/lib/core/utils";
 import { PanelPortal } from "./PanelPortal";
@@ -166,21 +166,7 @@ export function AddColumnPanel({
   heading?: string;
 }) {
   const [name, setName] = useState("");
-  // Focus the name once the panel is PLACED. PanelPortal mounts it invisible
-  // for one measuring frame, and autoFocus on a `visibility:hidden` input is
-  // a no-op — opened from the column menu, typing went nowhere.
-  const nameRef = useRef<HTMLInputElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    let second = 0;
-    const first = requestAnimationFrame(() => {
-      second = requestAnimationFrame(() => nameRef.current?.focus());
-    });
-    return () => {
-      cancelAnimationFrame(first);
-      cancelAnimationFrame(second);
-    };
-  }, [open]);
+
   const [type, setType] = useState<DataColumnType | typeof IMAGES_KIND>(
     "text"
   );
@@ -348,7 +334,6 @@ export function AddColumnPanel({
           Name
         </label>
         <input
-          ref={nameRef}
           autoFocus
           value={name}
           onChange={(e) => setName(e.target.value)}

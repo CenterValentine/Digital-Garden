@@ -178,6 +178,31 @@ export interface PanelPortalProps {
 export function PanelPortal({ open, onDismiss, className, children }: PanelPortalProps) {
   const { markerRef, panelRef, pos } = usePanelPlacement(open);
   useDismiss(open, panelRef, markerRef, onDismiss);
+  const onDismissRef = useRef(onDismiss);
+  useEffect(() => {
+    onDismissRef.current = onDismiss;
+  }, [onDismiss]);
+
+  /**
+   * Focus leaving the panel for another FIELD or CONTROL (Tab, a keyboard
+   * shortcut, script focus) is a click-away too. A focus move to <body> is
+   * a plain press elsewhere, which the press listener already handles, and
+   * a window blur (alt-tab) is not leaving — `document.hasFocus()` guards it.
+   */
+  const handleBlur = (e: React.FocusEvent) => {
+    const next = e.relatedTarget as Node | null;
+    if (next && (panelRef.current?.contains(next) || markerRef.current?.parentElement?.contains(next))) {
+      return;
+    }
+    window.setTimeout(() => {
+      if (!document.hasFocus()) return;
+      const active = document.activeElement;
+      if (!active || active === document.body) return;
+      if (panelRef.current?.contains(active)) return;
+      if (markerRef.current?.parentElement?.contains(active)) return;
+      onDismissRef.current();
+    }, 0);
+  };
 
   return (
     <>
@@ -197,8 +222,12 @@ export function PanelPortal({ open, onDismiss, className, children }: PanelPorta
                     overflowY: "auto",
                   }
                 : // Measurement frame: mounted but invisible, so the real
-                  // position is computed from true dimensions.
-                  { left: 0, top: 0, visibility: "hidden" }
+                  // position is computed from true dimensions. OPACITY, not
+                  // `visibility: hidden` — a hidden element cannot take focus,
+                  // so every `autoFocus` field in a panel (the long-text
+                  // editor's textarea, the add-column name) opened unfocused
+                  // and the user's keys drove the grid behind it instead.
+                  { left: 0, top: 0, opacity: 0, pointerEvents: "none" }
             }
             // React portals propagate synthetic events through the COMPONENT
             // tree, so without this a click inside the panel bubbles to the
@@ -210,6 +239,7 @@ export function PanelPortal({ open, onDismiss, className, children }: PanelPorta
             // swallow the click of, the panel it is in.
             onDoubleClick={(e) => e.stopPropagation()}
             onPointerDown={(e) => e.stopPropagation()}
+            onBlur={handleBlur}
           >
             {children}
           </div>,
