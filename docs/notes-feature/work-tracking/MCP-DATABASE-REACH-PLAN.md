@@ -405,7 +405,7 @@ Why elicitation and not a staged deletion: staging needs a new pending state on 
 resolve it, while elicitation is the protocol's own answer to "ask the human", and the clients
 that lack it are the API connectors, where the user is not present anyway.
 
-**Issue reporting.** PR #211 (open) ships `POST /api/feedback`: templates and an area allowlist in
+**Issue reporting.** PR #211 (merged 2026-10-12) ships `POST /api/feedback`: templates and an area allowlist in
 `lib/domain/feedback/issue-templates.ts` (`composeIssue`), filing to GitHub through
 `GITHUB_FEEDBACK_TOKEN`, rate-limited 5/h and 15/day, with a `feedback:check` gate. Once it
 merges, MCP wraps it:
@@ -416,7 +416,8 @@ merges, MCP wraps it:
 | Directing the agent | three layers, none of them a prompt hack: (1) the server's `initialize` result carries `instructions`, the protocol's own place for standing guidance, saying *if a garden tool fails twice with the same internal error, or a result contradicts what you just read, file it with `garden_report_issue`*; (2) every internal error result carries `reportable: true` and a prefilled `issue` body (tool, input shape, error id, no content), so filing is one call; (3) an MCP **prompt** named `report-garden-issue` for clients that list prompts, so a user can invoke it by hand |
 | Caveat | the repo is public and PR #211 already warns the user; MCP filings carry the same warning in the tool description and strip note content from the prefilled body |
 
-Dependency: PR #211 merges first; until then the tool is absent, not stubbed.
+Dependency satisfied: PR #211 merged 2026-10-12 (`c2526747`), so `POST /api/feedback` and
+`composeIssue` are on main and the tool can ship with M1.
 
 ### 2.9 Why three tools were folded (2026-10-11)
 

@@ -20,7 +20,7 @@ Prep PR (each item stands alone without MCP; plan §6.8):
 - ⚪ Seam registration of the MCP read module in `scripts/validate-private-content.ts`.
 - ⚪ `McpToken` model + migration + handoff script.
 - ⚪ `AI-AUTHORSHIP-SIGNAL-PLAN.md` build (its own PR; MCP writes carry the stamp from day one).
-- ⚪ `garden_report_issue` depends on PR #211 (`POST /api/feedback`) merging.
+- ✅ `garden_report_issue`'s dependency, PR #211 (`POST /api/feedback`), merged 2026-10-12; the tool can ship with M1.
 
 Deletion follow-ups (from `feat/ai-row-deletion-policy`):
 
