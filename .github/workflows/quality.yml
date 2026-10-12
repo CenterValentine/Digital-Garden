@@ -33,9 +33,9 @@ jobs:
       - name: Generate Prisma client
         run: pnpm exec prisma generate
 
-      # The lint script has `--max-warnings 175` as a ratchet so new code
-      # cannot drift past the current warning count. To lower the cap,
-      # reduce the number in package.json once warnings have been fixed.
+      # The lint script has a `--max-warnings` ratchet (the number lives in
+      # package.json) so new code cannot drift past the current warning count.
+      # To lower the cap, reduce that number once warnings have been fixed.
       - name: Lint
         run: pnpm lint
 

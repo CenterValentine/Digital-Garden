@@ -15,7 +15,7 @@
  * the tree re-renders. The visible symptom is the inline-rename input losing
  * focus and caret position mid-keystroke, which is the same class of bug the
  * repo already hit with `OnlyOfficeEditor`'s `Date.now()` key (see CLAUDE.md,
- * "Lessons learned"). Neither tsc nor eslint can see it, and the production
+ * "Quality Gates"). Neither tsc nor eslint can see it, and the production
  * build is perfectly happy, so it needs a gate.
  *
  * Also pins the behaviour the chip and its placement arrow depend on: ordering
