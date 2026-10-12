@@ -22,6 +22,11 @@ import { useCallback, useEffect, useState } from "react";
 import { ChevronDown, ChevronRight, Info, Loader2 } from "lucide-react";
 import { cn } from "@/lib/core/utils";
 import type { DataColumnType, DataTable } from "@/lib/domain/data";
+import {
+  AI_DELETE_POLICIES,
+  AI_DELETE_POLICY_LABELS,
+  type AiDeletePolicy,
+} from "@/lib/domain/data/ai-policy";
 import { TYPE_GLYPH } from "./DataColumnHeader";
 import {
   AddColumnButton,
@@ -101,6 +106,39 @@ export function DataSchemaRail({ contentId }: DataSchemaRailProps) {
         setNotice(err instanceof Error ? err.message : "Could not change AI digests");
       } finally {
         setDigestBusy(false);
+      }
+    },
+    [contentId]
+  );
+
+  // AI deletion policy (MCP-DATABASE-REACH-PLAN §2.8): the table owner
+  // decides whether the assistant may delete rows at all, and whether it
+  // must ask first. Same PATCH as the digests switch, one key in the bag.
+  const [policyBusy, setPolicyBusy] = useState(false);
+  const setDeletePolicy = useCallback(
+    async (next: AiDeletePolicy) => {
+      if (!contentId) return;
+      setPolicyBusy(true);
+      try {
+        const res = await fetch(`/api/content/data/${contentId}`, {
+          method: "PATCH",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ aiPolicy: { delete: next } }),
+        });
+        const json = await res.json().catch(() => null);
+        if (!res.ok || json?.success === false) {
+          throw new Error(json?.error?.message ?? "Could not change the AI deletion policy");
+        }
+        setState((cur) =>
+          cur.table
+            ? { ...cur, table: { ...cur.table, aiPolicy: { ...cur.table.aiPolicy, delete: next } } }
+            : cur
+        );
+      } catch (err) {
+        setNotice(err instanceof Error ? err.message : "Could not change the AI deletion policy");
+      } finally {
+        setPolicyBusy(false);
       }
     },
     [contentId]
@@ -380,6 +418,37 @@ export function DataSchemaRail({ contentId }: DataSchemaRailProps) {
           {digestLine && (
             <p className="mt-1 text-[10px] leading-snug text-muted-foreground">{digestLine}</p>
           )}
+        </div>
+      )}
+
+      {!isQuery && state.table && (
+        <div className="border-t border-border/60 px-3 py-1.5">
+          <div className="flex items-center justify-between">
+            <label
+              htmlFor={`ai-delete-policy-${contentId}`}
+              className="text-[11px] text-muted-foreground"
+              title="Whether the assistant may delete rows in this database, and whether it must ask you first. Deleted rows restore from Undo."
+            >
+              AI deletes rows
+            </label>
+            <select
+              id={`ai-delete-policy-${contentId}`}
+              value={state.table.aiPolicy.delete}
+              disabled={!canEditSchema || policyBusy}
+              onChange={(e) => void setDeletePolicy(e.target.value as AiDeletePolicy)}
+              className="rounded-md border border-border/60 bg-transparent px-1.5 py-0.5 text-[11px] text-foreground disabled:opacity-50"
+              title={canEditSchema ? "Change what the assistant may delete here" : "Only the owner can change this"}
+            >
+              {AI_DELETE_POLICIES.map((p) => (
+                <option key={p} value={p}>
+                  {AI_DELETE_POLICY_LABELS[p].label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <p className="mt-1 text-[10px] leading-snug text-muted-foreground">
+            {AI_DELETE_POLICY_LABELS[state.table.aiPolicy.delete].hint}
+          </p>
         </div>
       )}
 

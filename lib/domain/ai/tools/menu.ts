@@ -70,6 +70,7 @@ export const TOOL_MENU: Readonly<Record<string, ToolMenuEntry>> = {
   insert_rows: { family: "databases", selectWhen: "Append new rows to a database" },
   update_row: { family: "databases", selectWhen: "Change cells in ONE row" },
   update_rows: { family: "databases", selectWhen: "Change cells across SEVERAL rows in one transaction — sweep a column, backfill a field" },
+  delete_rows: { family: "databases", selectWhen: "Remove rows the user named — pauses for their approval unless the table allows it" },
   propose_output_database: { family: "databases", selectWhen: "Propose ONE new table for the user to approve" },
   propose_linked_databases: { family: "databases", selectWhen: "Propose SEVERAL tables that reference each other, in one card" },
   propose_database_columns: { family: "databases", selectWhen: "Propose new columns on a table the user already has" },

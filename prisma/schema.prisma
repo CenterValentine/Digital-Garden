@@ -1498,6 +1498,12 @@ model DataPayload {
   /// AI row digests opt-in (AI-BULK-ROW-READING-PLAN §5): one AI-written
   /// line per row, refreshed in the background, read by query_database.
   rowDigests    Boolean @default(false)
+  /// What the assistant may do beyond cells (MCP-DATABASE-REACH-PLAN §2.8).
+  /// A bag, not columns, so later rules join without a migration (Database
+  /// II D11). Today: { delete: "confirm" | "allow" | "deny" }, default
+  /// confirm. Read through readAiPolicy (tolerant), written through
+  /// parseAiPolicyPatch (strict).
+  aiPolicy      Json    @default("{}")
 
   createdAt DateTime @default(now()) @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @db.Timestamptz(6)

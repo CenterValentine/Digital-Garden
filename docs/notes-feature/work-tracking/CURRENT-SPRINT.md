@@ -4,11 +4,38 @@ epoch: 12 (Main Panel Tabs + Split Workspace)
 duration: multi-session
 branch: epoch-12/sprint-55-wire-blocks
 status: complete
-last_updated: 2026-10-04
+last_updated: 2026-10-12
 ---
 
 # Current Sprint Addendum
 
+## October 12, 2026 — The assistant can delete rows, with the owner's consent (`delete_rows` + per-database AI policy)
+
+**Tree**: worktree `.claude/worktrees/ai-delete`, branch `feat/ai-row-deletion-policy` (off `origin/main` at `f60971ab`)
+**Plan**: `work-tracking/MCP-DATABASE-REACH-PLAN.md` §2.8 (the in-app half; the MCP tool rides the MCP PR and uses elicitation)
+**Status**: typecheck / lint 151 (0 errors, none new) / `data:delete-policy:check` (NEW) / `ai:drift:check` / `data:read:check` green; **schema change** (`DataPayload.aiPolicy`) → migration owner-run; browser smoke pending.
+
+### Shipped
+
+- **`delete_rows`** (`lib/domain/ai/tools/data-tools.ts`): ≤25 rows by handle, `reason` required; all-or-nothing on reference resolution; soft delete through `softDeleteRows`, so the grid's Undo is the inverse. Registered in `DATA_TOOL_IDS`, settings metadata, the summon menu and the prompt's database block.
+- **Consent is the table's, not the model's.** `needsApproval` reads the table's policy: `confirm` (default) parks the loop on the approval card the user answers; `allow` deletes and posts an `ai.notify` inbox notice with the undo hint (published as the `ai` actor so the user receives it); `deny` refuses and names the setting. No `confirmedByUser` flag — the gate asserts it never appears in the tool.
+- **`DataPayload.aiPolicy`** Json bag, `lib/domain/data/ai-policy.ts` (tolerant `readAiPolicy`, strict `parseAiPolicyPatch`, `mergeAiPolicy`), `DataTable.aiPolicy` filled by `loadTable`, table PATCH accepts `aiPolicy`, schema rail "AI deletes rows" selector (Ask me / Allowed / Never) with a hint line.
+- **Gate `pnpm data:delete-policy:check`**: pure-module rules (default is confirm, exact matching, strict patch, merge keeps nothing unknown) and source-scan wiring (tool exists, asks through `needsApproval`, deletes through the service, registered everywhere, rail and route wired). In `build` and `ai-drift.yml`.
+- **Plans**: `MCP-DATABASE-REACH-PLAN.md` and `AI-AUTHORSHIP-SIGNAL-PLAN.md`.
+
+### Migration (owner-run, before deploy)
+
+```sql
+-- AlterTable
+ALTER TABLE "DataPayload" ADD COLUMN     "aiPolicy" JSONB NOT NULL DEFAULT '{}';
+```
+
+### Smoke (pending)
+
+- Open a database → schema rail shows "AI deletes rows: Ask me" → in a chat on that database, ask to delete one named row → an approval card appears naming the row and the reason → Approve → the row is gone and Undo restores it.
+- Set "Never" → the same request is refused and the reply names the rail setting.
+- Set "Allowed" → the row is deleted without a card and an inbox notice appears with the undo hint.
+- Ask to delete "all the rows" → the model asks which rows, or refuses, rather than calling the tool.
 ## October 4, 2026 — In-app feedback; the AI 3.x line closes; CLAUDE.md matches the build (PR #211)
 
 **Tree**: worktree `.claude/worktrees/t6-closeout`, branch `docs/t6-acquisition-closeout` (Sep 4; merged with `origin/main` at `45d697ba`)

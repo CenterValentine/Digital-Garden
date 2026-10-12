@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-10-09
+last_updated: 2026-10-12
 ---
 
 # Sprint Backlog
@@ -9,6 +9,24 @@ last_updated: 2026-10-09
 **Sprint Execution Protocol**: Before commencing any sprint, always ask the user for input before planning and executing — there may be additions or modifications.
 
 ---
+
+## MCP server — prep PR and follow-ups (2026-10-12, from `MCP-DATABASE-REACH-PLAN.md`)
+
+Prep PR (each item stands alone without MCP; plan §6.8):
+
+- ⚪ `recordPreWriteSnapshot` → `ContentHistory` (exists, zero writers) at the four serializer-write sites, with a gate. Only serializer-driven writes, per the owner: the backup matters where the lossless round trip is in play.
+- ⚪ Shared search service extracted from `app/api/content/search/route.ts`; `search_content` and MCP call it. Chat gains row-text search.
+- ⚪ `Conversation.searchText` fed from message text (migration) — chat list and MCP `garden_chats_search` gain body search.
+- ⚪ Seam registration of the MCP read module in `scripts/validate-private-content.ts`.
+- ⚪ `McpToken` model + migration + handoff script.
+- ⚪ `AI-AUTHORSHIP-SIGNAL-PLAN.md` build (its own PR; MCP writes carry the stamp from day one).
+- ✅ `garden_report_issue`'s dependency, PR #211 (`POST /api/feedback`), merged 2026-10-12; the tool can ship with M1.
+
+Deletion follow-ups (from `feat/ai-row-deletion-policy`):
+
+- ⚪ Control-panel section under AI context listing every database's AI policy (today only the schema rail sets it).
+- ⚪ MCP `garden_delete_rows`: `confirm` via elicitation where the client declares it, refusal otherwise (plan §2.8).
+- ⚪ "Reason" on the approval card: the generic card shows the tool input; a dedicated card for `delete_rows` that leads with the reason and the row titles would read better.
 
 ## Note saves take 2.5–5.5 s on production (2026-10-09, found diagnosing 409s)
 

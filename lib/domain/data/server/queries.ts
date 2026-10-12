@@ -19,6 +19,7 @@ import { prisma } from "@/lib/database/client";
 // sentinel, not a type.
 import { Prisma } from "@/lib/database/generated/prisma";
 import { attachRowDigests } from "@/lib/domain/data/server/digest-read";
+import { readAiPolicy } from "@/lib/domain/data/ai-policy";
 import {
   cellToText,
   isFilterGroup,
@@ -137,6 +138,7 @@ export async function loadTable(
     defaultViewId: payload.defaultViewId,
     rowCount: payload.rowCount,
     rowDigests: payload.rowDigests,
+    aiPolicy: readAiPolicy(payload.aiPolicy),
     columns,
     views,
   };

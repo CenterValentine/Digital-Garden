@@ -76,9 +76,12 @@ import {
 import { NEW_TABLE_REF_PREFIX } from "@/lib/domain/data/server/linked-schema";
 import {
   createRows,
+  softDeleteRows,
   writeCells,
   type CellWrite,
 } from "@/lib/domain/data/server/mutations";
+import { readAiPolicy, type AiDeletePolicy } from "@/lib/domain/data/ai-policy";
+import { publishEvent } from "@/lib/domain/notifications/service";
 import { ensureLedgersForMasterRows } from "@/lib/domain/ai/quests";
 import {
   AI_PROPOSABLE_COLUMN_TYPES,
@@ -514,6 +517,31 @@ async function openForWrite(
 
 /** Cap on rows a single bulk update may touch. Mirrors INSERT_CAP. */
 const UPDATE_ROW_CAP = 25;
+/** Cap on rows a single delete may touch. Mirrors UPDATE_ROW_CAP. */
+const DELETE_ROW_CAP = 25;
+
+/**
+ * The table's delete policy for `needsApproval`, which runs BEFORE execute
+ * and cannot refuse — it can only decide whether to pause. Anything that
+ * fails to resolve reads as "confirm": the card then shows a request the
+ * user can reject, and execute reports the real problem if they approve.
+ */
+async function deletePolicyFor(
+  ctx: ToolExecuteContext,
+  databaseId: string | undefined
+): Promise<AiDeletePolicy> {
+  try {
+    const dbRef = await resolveDatabaseRef(ctx, databaseId);
+    if ("refusal" in dbRef) return "confirm";
+    const payload = await prisma.dataPayload.findUnique({
+      where: { contentId: dbRef.id },
+      select: { aiPolicy: true },
+    });
+    return readAiPolicy(payload?.aiPolicy).delete;
+  } catch {
+    return "confirm";
+  }
+}
 /** Cells one row may change in a single update. */
 const UPDATE_CELL_CAP = 10;
 
@@ -1645,6 +1673,113 @@ export function createDataTools(ctx: ToolExecuteContext) {
             error,
           });
           return "Updating the rows failed with an internal error — nothing may have been written; tell the user.";
+        }
+      },
+    }),
+
+    // ─── delete_rows ─────────────────────────────────────────
+    // Consent is the whole design (MCP-DATABASE-REACH-PLAN §2.8, owner
+    // 2026-10-12). The TABLE's policy decides: "confirm" (default) parks the
+    // loop on an approval card the USER answers — never a model-set flag,
+    // which is attestation, not consent; "allow" deletes and posts an inbox
+    // notice with the undo hint; "deny" refuses and names the setting.
+    // Deletes are soft (restoreRows is the inverse; the grid's Undo knows
+    // it), so a wrong approval costs a restore, not a loss.
+    delete_rows: tool({
+      description:
+        "Soft-delete rows from a reachable database. rowIds are the [handles] (or ids) from a query_database result; max 25 per call. The database's owner sets its AI deletion policy in the schema rail: 'confirm' (the default) pauses this call on an approval card the user answers; 'allow' deletes at once and posts a notice to the user's inbox; 'deny' refuses. Give `reason` in the user's own words — it appears on the card and in the notice. Deleted rows can be restored from the grid's Undo. Never delete rows the user did not name or clearly describe, and never retry a request the user rejected.",
+      inputSchema: z.object({
+        databaseId: z
+          .string()
+          .optional()
+          .describe(
+            "The database's id or exact name; omit in a chat open on the database"
+          ),
+        rowIds: z
+          .array(z.string())
+          .describe("The [handles] or ids of the rows to delete, from a query_database result"),
+        reason: z
+          .string()
+          .describe(
+            "Why these rows are being deleted, in the user's words (≤280 chars)"
+          ),
+      }),
+      // The card is the consent. Resolution failures read as "confirm" so
+      // an unresolvable table can never slip through as "allow"; execute
+      // then refuses with the real reason.
+      needsApproval: async (input) => {
+        const policy = await deletePolicyFor(ctx, input.databaseId);
+        return policy === "confirm";
+      },
+      execute: async (input) => {
+        try {
+          const refs = (input.rowIds ?? []).map((r) => r.trim()).filter(Boolean);
+          if (refs.length === 0) return "No rows given — nothing to delete.";
+          if (refs.length > DELETE_ROW_CAP) {
+            return `At most ${DELETE_ROW_CAP} rows per call — narrow the set with a filter first, or delete in batches the user approves one at a time.`;
+          }
+          const reason = (input.reason ?? "").trim().slice(0, 280);
+          if (reason.length === 0) {
+            return "Say why these rows go (reason) — the user sees it on the card and in the notice.";
+          }
+          const gate = await openForWrite(ctx, input.databaseId);
+          if ("refusal" in gate) return gate.refusal;
+          const { databaseId, table } = gate;
+          const policy = table.aiPolicy.delete;
+          if (policy === "deny") {
+            return `Deleting rows in "${table.title}" is turned off for the assistant (schema rail → "AI deletes rows": Never). Tell the user; they can delete in the grid or change that setting.`;
+          }
+
+          const resolved = await resolveRowRefs(databaseId, refs);
+          const ids: string[] = [];
+          const refusals: string[] = [];
+          resolved.forEach((r, i) => {
+            if ("refusal" in r) refusals.push(`${refs[i]}: ${r.refusal}`);
+            else ids.push(r.id);
+          });
+          if (refusals.length > 0) {
+            // All-or-nothing on the reference set: a request naming a row
+            // that does not exist is a request the user did not read back.
+            return `Nothing deleted — ${refusals.length} reference(s) did not resolve:\n${refusals.slice(0, 8).join("\n")}\nRe-read the rows with query_database and try again with handles from that result.`;
+          }
+
+          const deleted = await softDeleteRows(databaseId, ids, ctx.userId);
+          const handles = ids.map((id) => `[${id.slice(0, 8)}]`).join(" ");
+
+          if (policy === "allow") {
+            try {
+              await publishEvent(prisma, {
+                kind: "ai.notify",
+                actorType: "ai",
+                actorLabel: "Assistant",
+                payload: {
+                  title: `Assistant deleted ${deleted} row${deleted === 1 ? "" : "s"} from ${table.title}`,
+                  body: `${reason}\nRows: ${handles}\nIf this was wrong, open the table and use Undo to restore them. Change what the assistant may delete in the schema rail ("AI deletes rows").`,
+                  ...(ctx.conversationId ? { conversationId: ctx.conversationId } : {}),
+                },
+                subjectType: "content",
+                subjectId: databaseId,
+                recipients: [{ userId: ctx.userId }],
+              });
+            } catch (error) {
+              logger.warn({
+                layer: "ai",
+                event: "data_tools:delete_rows_notice_failed",
+                summary: "delete_rows could not post the inbox notice",
+                error,
+              });
+            }
+          }
+
+          return `Deleted ${deleted} of ${ids.length} row${ids.length === 1 ? "" : "s"} from "${table.title}": ${handles}. Policy: ${policy}${policy === "allow" ? " (an inbox notice was posted)" : " (the user approved this on the card)"}. The user can restore them from the grid's Undo.`;
+        } catch (error) {
+          logger.warn({
+            layer: "ai",
+            event: "data_tools:delete_rows_caught",
+            summary: "delete_rows failed",
+            error,
+          });
+          return "Deleting the rows failed with an internal error — nothing may have changed; tell the user.";
         }
       },
     }),
