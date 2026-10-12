@@ -12,6 +12,7 @@ export const DATA_TOOL_IDS = [
   "insert_rows",
   "update_row",
   "update_rows",
+  "delete_rows",
   "propose_column_options",
   "propose_database_columns",
   "propose_output_database",
@@ -48,6 +49,11 @@ export const DATA_TOOL_METADATA: Record<
     name: "Update Database Rows",
     description:
       "Change cells across several existing rows in one transaction — sweeping a column or backfilling a field as a single write and a single undo, all-or-nothing across every row, with the same compare-and-set protection as a single-row edit (\u226425 rows per call; more than 10 requires your confirmation; cannot create or delete rows)",
+  },
+  delete_rows: {
+    name: "Delete Database Rows",
+    description:
+      "Soft-delete rows the user named, under each database's own AI deletion policy (schema rail → \"AI deletes rows\"): Ask me pauses on an approval card you answer, Allowed deletes and posts an inbox notice, Never refuses. Deleted rows restore from the grid's Undo (≤25 per call)",
   },
   propose_column_options: {
     name: "Propose Column Options",
