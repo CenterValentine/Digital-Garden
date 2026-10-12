@@ -11,9 +11,11 @@
  *      (tool ids, settings metadata, the summon menu); the schema rail
  *      offers the policy; the table PATCH accepts it.
  *
- * Mutation-tested at introduction (2026-10-12): flipping the default to
- * "allow", accepting a mis-cased value, dropping `needsApproval` from the
- * tool, and unregistering the tool from the menu each fail.
+ * Mutation-tested at introduction (2026-10-12), five mutants killed:
+ * flipping the default to "allow", accepting a mis-cased value, renaming
+ * `needsApproval` off the tool (a word-boundary match — a substring match
+ * let that one survive on the first run), unregistering the tool from the
+ * menu, and skipping the strict parse in the route.
  *
  * Usage: pnpm data:delete-policy:check
  */
@@ -79,7 +81,7 @@ if (toolStart >= 0) {
   // The tool's own block runs to the next `: tool(` definition.
   const next = tools.indexOf(": tool(", toolStart + "delete_rows: tool(".length);
   const block = tools.slice(toolStart, next === -1 ? undefined : next);
-  check(block.includes("needsApproval"), "delete_rows asks through needsApproval");
+  check(/\bneedsApproval\s*:/.test(block), "delete_rows asks through needsApproval");
   check(!block.includes("confirmedByUser"), "delete_rows never takes a model-set confirmation flag");
   check(block.includes("softDeleteRows("), "delete_rows deletes through the soft-delete service");
   check(block.includes("readAiPolicy") || tools.includes("readAiPolicy("), "delete_rows reads the table policy through readAiPolicy");
