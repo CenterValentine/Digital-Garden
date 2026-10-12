@@ -593,7 +593,7 @@ export function SearchPanel() {
               />
             </svg>
             <p>Type to search your documents</p>
-            <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">Press Cmd+/ to close search</p>
+            <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">Press Cmd+Shift+F to close search</p>
           </div>
         )}
 

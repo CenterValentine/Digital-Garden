@@ -81,7 +81,7 @@ export function LeftSidebarCollapsed() {
             ? "text-gold-primary bg-white/10"
             : "text-gray-600 dark:text-gray-400 hover:bg-black/[0.05] dark:hover:bg-white/10 hover:text-gold-primary"
         }`}
-        title="Search (Cmd+/)"
+        title="Search (Cmd+Shift+F)"
         type="button"
       >
         <Search className="h-5 w-5" />
