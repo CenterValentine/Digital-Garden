@@ -73,6 +73,21 @@ jobs:
       - name: Output-target checks
         run: pnpm output-targets:check
 
+      # The picker's row walk: eligibility decides what can be PICKED, folders
+      # are always browsed (a notes-only picker once listed only top-level notes).
+      - name: Picker tree checks
+        run: pnpm picker:tree:check
+
+      # The tree never flashes its skeleton after a mutation (it unmounted
+      # react-arborist and lost the user's place); delete is optimistic.
+      - name: Smooth tree checks
+        run: pnpm tree:smooth:check
+
+      # One REST save of a note at a time, per NOTE: an overlapping save used
+      # to carry a stale X-Body-Hash and 409 against the user's own write.
+      - name: Note save coordinator checks
+        run: pnpm note-save:check
+
   markdown-safety:
     name: Markdown block-safety
     runs-on: ubuntu-latest
@@ -107,3 +122,9 @@ jobs:
 
       - name: Markdown round-trip smoke
         run: pnpm markdown:smoke
+
+      # OCR text → paste-ready blocks (lib/features/ocr/reflow.ts): which line
+      # ends are word-wraps and which are real breaks, and the hand-off to the
+      # markdown paste parser. Mutation-tested (13 mutants killed, 2026-10-06).
+      - name: OCR reflow gate
+        run: pnpm ocr:blocks:check

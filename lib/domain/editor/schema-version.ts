@@ -81,7 +81,7 @@
  * See: docs/notes-feature/TIPTAP-SCHEMA-EVOLUTION-GUIDE.md
  */
 
-export const TIPTAP_SCHEMA_VERSION = "1.20.0";
+export const TIPTAP_SCHEMA_VERSION = "1.21.0";
 
 export interface SchemaVersion {
   version: string;
@@ -109,6 +109,22 @@ export interface SchemaChange {
  * 4. Run tests: pnpm test lib/domain/export
  */
 export const SCHEMA_HISTORY: SchemaVersion[] = [
+  {
+    version: "1.21.0",
+    date: "2026-10-08",
+    changes: [
+      {
+        type: "remove",
+        target: "node",
+        name: "dailySummary / weeklySummary",
+        description:
+          "Removed `autoBorrowDurationMinutes` (data-auto-borrow-duration-minutes): Workplaces no longer gates opens, so there is nothing to borrow. MINOR, not MAJOR: ProseMirror builds attrs from the spec only, so documents and Y.Docs that still carry the attr load unchanged and simply drop it; no migration. ⚠ Hocuspocus redeploy after merge so the server schema stops declaring it.",
+        breaking: false,
+        migrationsAvailable: [],
+      },
+    ],
+    migrationsRequired: false,
+  },
   {
     version: "1.20.0",
     date: "2026-10-03",

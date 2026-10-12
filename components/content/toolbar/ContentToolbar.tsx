@@ -64,9 +64,16 @@ interface ContentToolbarProps {
    * pane's activity from reflowing this toolbar (flashcard/publish width churn).
    */
   contentId?: string | null;
+  /**
+   * Rendered INSIDE another row (a quad pane's note title row) instead of as
+   * its own: no row padding or min height, and it shrinks — scrolling
+   * sideways, scrollbar hidden — so the title keeps its room. Same tools,
+   * same component: placement changes, the toolbar does not.
+   */
+  inline?: boolean;
 }
 
-export function ContentToolbar({ contentId: contentIdProp }: ContentToolbarProps = {}) {
+export function ContentToolbar({ contentId: contentIdProp, inline = false }: ContentToolbarProps = {}) {
   const toolSurface = useToolSurface();
   const globalSelectedContentId = useContentStore((state) => state.selectedContentId);
   const selectedContentId =
@@ -203,8 +210,15 @@ export function ContentToolbar({ contentId: contentIdProp }: ContentToolbarProps
   }
 
   return (
+    // Scrolls sideways in a narrow pane, but with the scrollbar hidden (as
+    // the tab strip above does): a visible bar sat under the icons as a strip
+    // of dead space (owner, 2026-10-08). Trackpad / wheel still scroll it.
     <div
-      className="flex min-h-11 shrink-0 items-center gap-1 overflow-x-auto px-3 py-1.5"
+      className={
+        inline
+          ? "flex min-w-0 shrink items-center gap-0.5 overflow-x-auto scrollbar-hide"
+          : "flex min-h-10 shrink-0 items-center gap-1 overflow-x-auto scrollbar-hide px-3 py-1"
+      }
       role="toolbar"
       aria-label="Content actions"
     >

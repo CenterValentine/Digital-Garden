@@ -45,17 +45,6 @@ enum ContentWorkspaceStatus {
   archived
 }
 
-enum ContentWorkspaceItemAssignmentType {
-  primary
-  shared
-  borrowed
-}
-
-enum ContentWorkspaceItemScope {
-  item
-  recursive
-}
-
 enum FlashcardReviewOutcome {
   review
   mastered
@@ -179,7 +168,6 @@ model ContentNode {
   trashBinEntry                TrashBin?
   viewGrants                   ViewGrant[]
   calendarEvents               CalendarEvent[]
-  workspaceItems               ContentWorkspaceItem[]
   workspaceTabs                ContentWorkspaceTab[]
   viewWorkspaces               ContentWorkspace[]        @relation("WorkspaceViewRoot")
   periodicNoteIndexes          PeriodicNoteIndex[]
@@ -618,7 +606,6 @@ model ContentWorkspace {
   name              String                 @db.VarChar(120)
   slug              String                 @db.VarChar(120)
   isMain            Boolean                @default(false)
-  isLocked          Boolean                @default(false)
   status            ContentWorkspaceStatus @default(active)
   expiresAt         DateTime?              @db.Timestamptz(6)
   archivedAt        DateTime?              @db.Timestamptz(6)
@@ -634,7 +621,6 @@ model ContentWorkspace {
 
   owner           User                           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   viewRoot        ContentNode?                   @relation("WorkspaceViewRoot", fields: [viewRootContentId], references: [id], onDelete: SetNull)
-  items           ContentWorkspaceItem[]
   tabs            ContentWorkspaceTab[]
   layoutRecords   ContentWorkspaceLayoutRecord[]
   parentWorkspace ContentWorkspace?              @relation("WorkspaceWorkbenches", fields: [parentWorkspaceId], references: [id], onDelete: Cascade)
@@ -646,25 +632,6 @@ model ContentWorkspace {
   @@index([ownerId, isMain])
   @@index([expiresAt])
   @@index([parentWorkspaceId])
-}
-
-model ContentWorkspaceItem {
-  id             String                             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  workspaceId    String                             @db.Uuid
-  contentId      String                             @db.Uuid
-  assignmentType ContentWorkspaceItemAssignmentType @default(primary)
-  scope          ContentWorkspaceItemScope          @default(item)
-  expiresAt      DateTime?                          @db.Timestamptz(6)
-  createdAt      DateTime                           @default(now()) @db.Timestamptz(6)
-  updatedAt      DateTime                           @updatedAt @db.Timestamptz(6)
-
-  workspace ContentWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  content   ContentNode      @relation(fields: [contentId], references: [id], onDelete: Cascade)
-
-  @@unique([workspaceId, contentId])
-  @@index([contentId, assignmentType, expiresAt])
-  @@index([workspaceId, assignmentType])
-  @@index([expiresAt])
 }
 
 /// R1 (layout-intent spec): workspace-scoped tab MEMBERSHIP - the always-synced

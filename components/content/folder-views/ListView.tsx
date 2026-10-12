@@ -16,6 +16,7 @@ import { useContentStore } from "@/state/content-store";
 import { getDisplayExtension } from "@/lib/domain/content/file-extension-utils";
 import { buildContentListUrl } from "./content-query";
 import { clientLogger } from "@/lib/core/logger/client";
+import { compareSiblings } from "@/lib/domain/content/sibling-order";
 
 interface ContentChild {
   id: string;
@@ -70,10 +71,10 @@ export function ListView({
           b.title.localeCompare(a.title)
         );
       } else {
-        // null = manual order via displayOrder
-        items = items.sort((a: ContentChild, b: ContentChild) =>
-          a.displayOrder - b.displayOrder
-        );
+        // null = manual order: the tree's order exactly (displayOrder, then
+        // title, then id). displayOrder alone left ties in whatever order the
+        // API returned, so this view could disagree with the tree.
+        items = items.sort(compareSiblings);
       }
 
       setChildren(items);

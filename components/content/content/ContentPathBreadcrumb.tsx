@@ -274,8 +274,10 @@ export function ContentPathBreadcrumb({
         }
         aria-current={isCurrent ? "page" : undefined}
         className={cn(
+          // No per-crumb width cap (owner, 2026-10-08): the row folds
+          // middle crumbs into "…" and then shrinks the survivors, so a cap
+          // only cut names short while the line had room for them.
           "truncate rounded px-1 py-0.5 transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
-          isCurrent ? "max-w-[18rem]" : "max-w-[10rem]",
           // While measuring, crumbs hold their natural width so overflow is
           // detectable; once fully folded they share the remaining space,
           // root yielding first (higher shrink factor) so the current item

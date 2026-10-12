@@ -14,6 +14,7 @@ import {
   isWikiLinkInlineView,
   type WikiLinkInlineView,
 } from "@/lib/domain/content/wiki-link-markdown";
+import { parseColumnAnchor } from "@/lib/domain/data/column-anchor";
 
 export type { WikiLinkInlineView };
 
@@ -94,18 +95,20 @@ export function wikiLinkViewOf(attrs: { view?: string | null }): WikiLinkInlineV
 
 /**
  * What a link shows: the alias, else the title — plus the anchor's label for
- * an anchored link ("Pride and Prejudice › “It is a truth…”").
+ * an anchored link ("Pride and Prejudice › “It is a truth…”"). A column is a
+ * name, not a quotation, so it goes unquoted ("Jobs › Status").
  */
 export function wikiLinkDisplayText(attrs: {
   displayText?: string | null;
   targetTitle?: string | null;
+  anchor?: string | null;
   anchorLabel?: string | null;
 }): string {
   if (attrs.displayText) return attrs.displayText;
   const title = attrs.targetTitle || "Unknown";
   if (!attrs.anchorLabel) return title;
   const label = attrs.anchorLabel.length > 40 ? `${attrs.anchorLabel.slice(0, 39)}…` : attrs.anchorLabel;
-  return `${title} › “${label}”`;
+  return parseColumnAnchor(attrs.anchor) ? `${title} › ${label}` : `${title} › “${label}”`;
 }
 
 /**

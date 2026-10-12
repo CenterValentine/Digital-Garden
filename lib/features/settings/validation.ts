@@ -33,6 +33,24 @@ const uiSettingsSchema = z
      * top-level section does (the fourth registration everyone forgets).
      */
     openDestination: z.enum(["fill", "opposite", "active"]).optional(),
+    /**
+     * Shortcuts' OWN sorts, by shortcut id (owner, 2026-10-06): how a shortcut
+     * shows its folder, never written to the folder itself. A shortcut not
+     * listed follows its folder's order. Kept in user settings because
+     * neither a shortcut's row nor its payload has a field for it (that would
+     * take a migration); shortcuts are only ever their owner's, so per-user
+     * is per-shortcut. Same shape as a folder's kept sort (sibling-order.ts
+     * `KeptSort`). Under `ui` for the same reason as `openDestination`.
+     */
+    shortcutSorts: z
+      .record(
+        z.string(),
+        z.object({
+          float: z.enum(["folders", "nested"]).optional(),
+          name: z.enum(["asc", "desc"]).optional(),
+        }),
+      )
+      .optional(),
     panelLayout: z
       .object({
         leftSidebarWidth: z.number().min(200).max(600).optional(),
@@ -78,6 +96,10 @@ const editorSettingsSchema = z
     // newly inserted windows (range mirrors the block schema). Unset =
     // the block's built-in default.
     noteWindowDefaultHeight: z.number().int().min(160).max(1200).optional(),
+    // Text recognition (OCR) languages beyond English, as Tesseract codes
+    // ("spa", "fra", …). Shape only; lib/features/ocr/languages.ts decides
+    // what is valid (unknown codes are ignored, English is always on).
+    ocrLanguages: z.array(z.string().max(8)).max(16).optional(),
   })
   .optional();
 

@@ -26,6 +26,7 @@ import { MainPanelNavigation } from "./MainPanelNavigation";
 import { PanelOverlayCornerTargets } from "./PanelOverlayCornerTargets";
 import { MainPanelHeader } from "./headers/MainPanelHeader";
 import { MainPanelContent } from "./content/MainPanelContent";
+import { useSpringTabs } from "./use-spring-tabs";
 import { useExtensionShellControllers } from "@/lib/extensions/client-registry";
 import type { ContentDetailResponse } from "@/lib/domain/content/api-types";
 
@@ -82,8 +83,16 @@ function WorkspacePane({
           ? "bg-black/[0.015] shadow-[inset_0_0_0_1px_rgba(201,168,108,0.25)]"
           : ""
       }`}
-      onPointerDownCapture={() => focusPane(paneId)}
-      onFocusCapture={() => focusPane(paneId)}
+      // view_screen captures the focused pane by this (AI-VIEW-SCREEN-PLAN D4).
+      data-workspace-pane={paneId}
+      onPointerDownCapture={(event) => {
+        if (keepsPaneFocus(event.target)) return;
+        focusPane(paneId);
+      }}
+      onFocusCapture={(event) => {
+        if (keepsPaneFocus(event.target)) return;
+        focusPane(paneId);
+      }}
       onDragOver={(event) => {
         if (!draggedTabId) return;
         event.preventDefault();
@@ -215,6 +224,18 @@ function WorkspaceReshapeTargets({
   );
 }
 
+/**
+ * Controls that act on a pane without making it the focused one — a tab's
+ * close "x" (owner ask, 2026-10-08: closing a tab must not activate it, nor
+ * move the right sidebar to it). The pane focuses itself in the CAPTURE phase,
+ * before the control sees the press, so the control opts out by marking
+ * itself `data-keeps-pane-focus`.
+ */
+export const KEEPS_PANE_FOCUS_ATTR = "data-keeps-pane-focus";
+function keepsPaneFocus(target: EventTarget | null): boolean {
+  return target instanceof Element && target.closest(`[${KEEPS_PANE_FOCUS_ATTR}]`) !== null;
+}
+
 export function MainPanelWorkspace({
   initialContent = null,
 }: { initialContent?: InitialContent } = {}) {
@@ -241,6 +262,9 @@ export function MainPanelWorkspace({
   const isPanelEmbedSurfacePath = pathname?.startsWith("/embed/panel") ?? false;
   const [draggedTabId, setDraggedTabId] = useState<string | null>(null);
   const [draggedFromPaneId, setDraggedFromPaneId] = useState<WorkspacePaneId | null>(null);
+  // Content dragged out of a note opens a tab it rests on; releasing switches
+  // the pane it came from back (spring-tabs.ts).
+  useSpringTabs();
   const [hoveredSinglePaneTargetId, setHoveredSinglePaneTargetId] = useState<string | null>(null);
 
   const handleTabDragStart = (tabId: string, paneId: WorkspacePaneId) => {
@@ -491,7 +515,8 @@ export function MainPanelWorkspace({
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden">
+    // view_screen's "all-panes" area (AI-VIEW-SCREEN-PLAN D12).
+    <div className="flex h-full min-h-0 flex-col overflow-hidden" data-capture-region="panes">
       {/* The side-panel embed hides the whole navigation bar (no back/forward,
           no pane layout at panel width); the workspace chooser renders in the
           panel shell above the file tree instead (BROWSER-REACH B1). */}

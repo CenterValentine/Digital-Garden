@@ -405,6 +405,81 @@ export function capturePageContent(scope = "full"): Promise<CapturedPageContent>
   });
 }
 
+/** A screenshot of the active tab, for view_screen (AI-VIEW-SCREEN-PLAN D3). */
+export interface VisibleTabCapture {
+  ok: boolean;
+  dataUrl?: string;
+  url?: string;
+  title?: string;
+  /** `app-tab` (the app itself — refused, D6), `restricted` (a browser page), `timeout`, `failed`. */
+  code?: string;
+  error?: string;
+}
+
+/** An extension older than 5.5.0 ignores the request; this is how long we wait. */
+const VISIBLE_TAB_CAPTURE_TIMEOUT_MS = 10_000;
+let visibleTabCaptureSeq = 0;
+
+/**
+ * Screenshot the visible area of the active tab for the AI. Its own
+ * id-correlated message, NOT `capture-screenshot`: that reply carries no id and
+ * the panel shell attaches every `screenshot` it hears to the composer.
+ * Panel-only, like co-browse — never on the page-bridge every site can reach.
+ */
+export function captureVisibleTabImage(): Promise<VisibleTabCapture> {
+  return new Promise((resolve) => {
+    if (!isPanelEmbedSurface()) {
+      resolve({ ok: false, code: "failed", error: "capturing a web page is only available in the side panel" });
+      return;
+    }
+    const id = ++visibleTabCaptureSeq;
+    let settled = false;
+    const finish = (result: VisibleTabCapture) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timer);
+      window.removeEventListener("message", onMessage);
+      resolve(result);
+    };
+    function onMessage(event: MessageEvent) {
+      if (!isAllowedEmbedMessageOrigin(event.origin)) return;
+      const data = event.data;
+      if (!data || typeof data !== "object" || data.v !== 1 || data.source !== "dg-panel-host") return;
+      const p = data.payload ?? {};
+      if (p.id !== id) return;
+      if (data.type === "visible-tab-capture" && typeof p.dataUrl === "string") {
+        finish({
+          ok: true,
+          dataUrl: p.dataUrl,
+          url: typeof p.url === "string" ? p.url : undefined,
+          title: typeof p.title === "string" ? p.title : undefined,
+        });
+      } else if (data.type === "visible-tab-capture-error") {
+        finish({
+          ok: false,
+          code: typeof p.code === "string" ? p.code : "failed",
+          error: typeof p.message === "string" ? p.message : "couldn't capture this page",
+        });
+      }
+    }
+    const timer = window.setTimeout(
+      () =>
+        finish({
+          ok: false,
+          code: "timeout",
+          error:
+            "the browser extension did not answer — it may need updating to 5.5.0 or later (reload it at chrome://extensions)",
+        }),
+      VISIBLE_TAB_CAPTURE_TIMEOUT_MS,
+    );
+    window.addEventListener("message", onMessage);
+    window.parent.postMessage(
+      { v: 1, source: "dg-panel-embed", type: "capture-visible-tab", payload: { id } },
+      "*",
+    );
+  });
+}
+
 /** Decode a data: URL into a File for the chat's attachment path. */
 export function dataUrlToFile(dataUrl: string, filename: string): File | null {
   try {

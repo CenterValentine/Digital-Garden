@@ -42,6 +42,25 @@ import {
 import { MarkdownPasteToast } from "./MarkdownPasteToast";
 import { clientLogger } from "@/lib/core/logger/client";
 import { uploadImage } from "@/lib/domain/editor/hooks/use-image-upload";
+import { useInTextMediaTracker } from "@/lib/domain/editor/hooks/use-in-text-media-tracker";
+import {
+  dropForeignEditorDrag,
+  foreignEditorDrag,
+  isForeignEditorDropOn,
+  recordEditorDrag,
+  usePendingDragRemovals,
+} from "@/lib/domain/editor/hooks/use-cross-editor-drag";
+import { useEditorDragStore } from "@/state/editor-drag-store";
+import { pasteImageAsText } from "@/lib/features/ocr/editor-ocr";
+import {
+  handleAiPasteChord,
+  handlePasteAsTextChord,
+  installPasteModifierTracker,
+  isAiPasteChord,
+  isPasteAsText,
+  isPasteAsTextChord,
+  notePasteEvent,
+} from "@/lib/features/ocr/paste-modifier";
 import { isImageUrl } from "@/lib/domain/editor/utils/image-url";
 import { useEditorInstanceStore } from "@/state/editor-instance-store";
 import { useSettingsStore } from "@/state/settings-store";
@@ -312,6 +331,8 @@ export function MarkdownEditor({
   // (useEditor doesn't re-apply editorProps on re-renders), so they'd capture a
   // stale version where editor=null. Same pattern as onSaveRef/contentIdRef.
   const insertImageFromFileRef = useRef<(file: File) => void>(() => {});
+  // Same frozen-closure reason: ⇧⌘V with an image pastes its OCR'd text.
+  const pasteImagesAsTextRef = useRef<(files: File[], engine?: "local" | "ai") => void>(() => {});
   const shouldUseCollaboration =
     collaborationEnabled && Boolean(contentId) && Boolean(collaborationRuntime);
   const runtimeYdoc = collaborationRuntime?.ydoc ?? null;
@@ -323,6 +344,8 @@ export function MarkdownEditor({
   const runtimeEditPolicy = collaborationRuntime?.state.editPolicy ?? null;
   const runtimeConnectionState = collaborationRuntime?.state.connectionState ?? null;
   const runtimeNetworkState = collaborationRuntime?.state.networkState ?? null;
+  // Set for a few seconds when the document recovers from offline (runtime's markSynced).
+  const runtimeRecoveredAt = collaborationRuntime?.state.recoveredAt ?? null;
   const runtimeLocalDirty = collaborationRuntime?.state.localDirty ?? false;
   const runtimeUnsyncedUpdateCount = collaborationRuntime?.state.unsyncedUpdateCount ?? 0;
   const viewerExtensions = useMemo(() => getViewerExtensions(), []);
@@ -464,6 +487,9 @@ export function MarkdownEditor({
     : isPlainEditorFallback
       ? "plain-fallback"
       : "plain";
+  // The document this editor instance must be bound to; a useEditor dep (see
+  // the deps comment there). Identity, not contents — one ydoc per note.
+  const collaborationDocument = collaborationState?.document ?? null;
   const shouldSkipRestAutosaveForCollaboration =
     shouldUseCollaboration &&
     (runtimeNetworkState === "offline" ||
@@ -596,16 +622,52 @@ export function MarkdownEditor({
           }
           return false;
         },
-        drop: () => false,
+        // Content dragged out of another note's editor is the wrapper's
+        // onDrop's to place (it also removes it from the source); claimed
+        // here so ProseMirror's built-in drop doesn't insert it a second time.
+        drop: (view) => isForeignEditorDropOn(view),
+      },
+      // ⇧⌘V with only an image on the clipboard: Chromium fires NO paste event
+      // ("paste and match style" is text-only), so watch the chord itself and
+      // read the clipboard when no paste follows. See paste-modifier.ts.
+      handleKeyDown: (view, event) => {
+        // ⌥⌘V / Ctrl+Alt+V: the user's AI model reads the clipboard image.
+        if (isAiPasteChord(event)) {
+          event.preventDefault();
+          handleAiPasteChord((image) => {
+            const file = new File([image], "pasted-image.png", { type: image.type });
+            pasteImagesAsTextRef.current([file], "ai");
+          });
+          return true;
+        }
+        if (isPasteAsTextChord(event)) {
+          handlePasteAsTextChord({
+            onImage: (image) => {
+              const file = new File([image], "pasted-image.png", { type: image.type });
+              pasteImagesAsTextRef.current([file]);
+            },
+            // ProseMirror's own plain-text paste pipeline (paste handlers run).
+            onText: (text) => view.pasteText(text),
+          });
+        }
+        return false;
       },
       // Sprint 37: Image paste handler
       // Uses insertImageFromFileRef to avoid stale closure (see ref declaration)
       handlePaste: (view, event) => {
+        // Tells the ⇧⌘V chord watcher the browser delivered a real paste.
+        notePasteEvent(event);
         const files = Array.from(event.clipboardData?.files || []);
         const imageFiles = files.filter((f) => f.type.startsWith("image/"));
 
         if (imageFiles.length > 0) {
           event.preventDefault();
+          // ⇧⌘V is "paste as text"; an image's text is its OCR. The image
+          // itself is never uploaded on this path.
+          if (isPasteAsText()) {
+            pasteImagesAsTextRef.current(imageFiles);
+            return true;
+          }
           for (const file of imageFiles) {
             insertImageFromFileRef.current(file);
           }
@@ -817,6 +879,13 @@ export function MarkdownEditor({
       // causing Doc A's content to overwrite Doc B.
       const snapshotSave = onSaveRef.current;
       const snapshotContentId = contentIdRef.current;
+      // Bound to a collaborative copy with no live connection (a note open by
+      // one person): the REST save is the only way these edits reach the
+      // server, so it carries this Y.Doc too and the stored copy keeps up.
+      // Otherwise the payload drifted ahead, the server caught up with its
+      // OWN items, and this editor's items for the same text met them when a
+      // collaborator arrived — the note doubled (collaboration/lineage.ts).
+      const snapshotYdoc = collaborationState?.document ?? null;
       if (snapshotSave) {
         // Diagnosis: record what kind of transaction is scheduling this
         // autosave. Phase A of the autosave-on-tab-switch investigation —
@@ -898,6 +967,8 @@ export function MarkdownEditor({
               secondsSinceInput: secondsSinceInput ?? undefined,
               ...(opts.flush ? { flush: true } : {}),
               ...(opts.keepalive ? { keepalive: true } : {}),
+              // Encoded at fire time, so it holds every edit up to this save.
+              ...(snapshotYdoc ? { collaborationUpdate: Y.encodeStateAsUpdate(snapshotYdoc) } : {}),
             });
             setHasUnsavedChanges(false);
           } catch (error) {
@@ -922,13 +993,30 @@ export function MarkdownEditor({
         }, autoSaveDelay);
       }
     },
-    // Recreate the editor ONLY when the collaboration provider's presence
-    // changes (editorMode encodes it) — that transition genuinely requires a
-    // new editor instance. Everything else is handled without recreation:
-    // editability via the setEditable effect below, autosave skipping via
+    // Recreate the editor when the collaboration provider's presence changes
+    // (editorMode encodes it) — that transition genuinely requires a new
+    // editor instance — and when the Y.Doc it is bound to changes identity.
+    //
+    // The second one is load-bearing. The Collaboration extension takes the
+    // document at creation; nothing re-points it. This instance is reused
+    // across documents (contentIdRef), and a switch between two notes whose
+    // runtimes are BOTH warm — the other pane has the note open, or it was
+    // viewed in the last five minutes — hands over the new ydoc with
+    // editorMode unchanged ("collaboration" → "collaboration"). Without this
+    // dep the editor kept showing, and WRITING TO, the previous note's Y.Doc
+    // under the new note's title (owner report 2026-10-06: dragging tabs
+    // between panes put one note's body under another's name — an edit there
+    // would have gone into the wrong note). A cold runtime never hit it: the
+    // handle is null for a render, editorMode dips to "plain", and the
+    // recreate happened by accident.
+    //
+    // Everything else is handled without recreation: editability via the
+    // setEditable effect below, autosave skipping via
     // shouldSkipRestAutosaveRef. Recreating on those transient flags is what
-    // turned every connection blip into a stolen caret.
-  }, [editorMode]);
+    // turned every connection blip into a stolen caret — and a reconnect does
+    // NOT change the ydoc (Path A: one ydoc per note for the runtime's life),
+    // so this dep stays quiet through blips.
+  }, [editorMode, collaborationDocument]);
 
   useEffect(() => {
     if (!editor) return;
@@ -1097,6 +1185,22 @@ export function MarkdownEditor({
       }
     };
   }, [contentId, editor]);
+
+  // Images and audio entering or leaving this note's text show in the file
+  // tree at once, not after the save (lib/features/content/in-text-media.ts).
+  useInTextMediaTracker(editor, contentId);
+  // Content dragged out of this note while its editor wasn't mounted (a tab
+  // opened by hovering it replaced the pane's editor) leaves it once it's back.
+  // Only once the editor is bound to the note's collaborative document
+  // (live or offline): a first paint from cache is replaced, so a removal
+  // made there would be lost. A plain editor is ready at once.
+  usePendingDragRemovals(
+    editor,
+    contentId,
+    !shouldUseCollaboration ||
+      editorMode === "collaboration" ||
+      editorMode === "collaboration-local",
+  );
 
   // Handle Cmd+K / Ctrl+K keyboard shortcut for link dialog
   useEffect(() => {
@@ -1493,6 +1597,23 @@ export function MarkdownEditor({
   );
   insertImageFromFileRef.current = insertImageFromFile;
 
+  // ⇧⌘V with image(s): OCR each in turn and insert only the text. A failed or
+  // empty read offers "Paste image instead", which runs the normal upload.
+  useEffect(() => {
+    installPasteModifierTracker();
+    pasteImagesAsTextRef.current = (files: File[], engine: "local" | "ai" = "local") => {
+      if (!editor) return;
+      void (async () => {
+        for (const file of files) {
+          await pasteImageAsText(editor, file, {
+            pasteImageInstead: () => insertImageFromFile(file),
+            engine,
+          });
+        }
+      })();
+    };
+  }, [editor, insertImageFromFile]);
+
   // Sprint 37: Handle file input change (image selected from file picker)
   const handleFileInputChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1590,6 +1711,16 @@ export function MarkdownEditor({
           Connecting collaborative editor...
         </div>
       ) : null}
+      {collaborationEnabled && runtimeRecoveredAt !== null && !collaborationNotice && !isCollaborationConnecting ? (
+        // The warnings above clear the moment the document is back in sync;
+        // say so, briefly, instead of letting them just vanish.
+        <div
+          role="status"
+          className="border-b border-emerald-500/20 bg-emerald-500/10 px-4 py-2 text-sm text-emerald-700 dark:text-emerald-300"
+        >
+          Reconnected — your changes are synced.
+        </div>
+      ) : null}
       {/* Sprint 37: Hidden file input for image upload */}
       <input
         ref={fileInputRef}
@@ -1606,15 +1737,29 @@ export function MarkdownEditor({
       <div
         ref={editorScrollRef}
         className="relative flex-1 overflow-y-auto"
+        onDragStart={() => {
+          // A drag ProseMirror just started here: recorded so another note's
+          // editor can take it (cross-editor-move.ts).
+          if (editor) recordEditorDrag(editor, contentId ?? null);
+        }}
+        onDragEnd={() => {
+          // Dropped nowhere that took it (or cancelled): forget it. A drop
+          // that took it already did; this fires after the drop.
+          const drag = useEditorDragStore.getState().drag;
+          if (drag && drag.editor === editor) useEditorDragStore.getState().clear();
+        }}
         onDragOver={(e) => {
           const isFile = e.dataTransfer.types.includes("Files");
           const isAiImage = e.dataTransfer.types.includes("application/x-dg-ai-image");
           const isInternalPMDrag = editor
             ? !!(editor.view as unknown as { dragging: unknown }).dragging
             : false;
-          if (isFile || isAiImage || isInternalPMDrag) {
+          // Content dragged out of another note's editor lands here too.
+          const foreign = foreignEditorDrag(editor);
+          if (isFile || isAiImage || isInternalPMDrag || foreign) {
             e.preventDefault();
-            e.dataTransfer.dropEffect = isInternalPMDrag ? "move" : "copy";
+            e.dataTransfer.dropEffect =
+              isInternalPMDrag || foreign?.move ? "move" : "copy";
           }
         }}
         onDragEnter={(e) => {
@@ -1623,9 +1768,11 @@ export function MarkdownEditor({
           const isInternalPMDrag = editor
             ? !!(editor.view as unknown as { dragging: unknown }).dragging
             : false;
-          if (isFile || isAiImage || isInternalPMDrag) {
+          const foreign = foreignEditorDrag(editor);
+          if (isFile || isAiImage || isInternalPMDrag || foreign) {
             e.preventDefault();
-            e.dataTransfer.dropEffect = isInternalPMDrag ? "move" : "copy";
+            e.dataTransfer.dropEffect =
+              isInternalPMDrag || foreign?.move ? "move" : "copy";
           }
         }}
         onContextMenu={(e) => {
@@ -1710,6 +1857,17 @@ export function MarkdownEditor({
             return;
           }
 
+          // Content dragged out of ANOTHER note's editor (another pane, or a
+          // tab opened by hovering it): insert it here, remove it there.
+          if (
+            editor &&
+            dropForeignEditorDrag(editor, contentId ?? null, { left: e.clientX, top: e.clientY })
+          ) {
+            e.preventDefault();
+            e.stopPropagation();
+            return;
+          }
+
           // Internal ProseMirror drag (node move): React's onDrop fires before PM's
           // native listener on view.dom, so view.dragging is still set here. We can't
           // reliably re-dispatch through PM's event pipeline (posAtCoords may return
@@ -1725,7 +1883,14 @@ export function MarkdownEditor({
             const pmDragging = (editor.view as unknown as { dragging: DraggingState | null }).dragging;
             if (pmDragging) {
               e.preventDefault();
-              const { slice, move, node: draggingNode } = pmDragging;
+              const { move, node: draggingNode } = pmDragging;
+              // The document's own content, not ProseMirror's drag slice —
+              // that one went through `transformCopied` (clipboard.ts),
+              // which rewrites image sources to public links for pasting
+              // OUTSIDE the app; a move within the note must not change them.
+              const slice = draggingNode
+                ? editor.state.doc.slice(draggingNode.from, draggingNode.to)
+                : editor.state.selection.content();
               const eventPos = editor.view.posAtCoords({ left: e.clientX, top: e.clientY });
               if (eventPos) {
                 const { state } = editor.view;
@@ -1797,8 +1962,8 @@ export function MarkdownEditor({
       />
 
       {/* Template / Snippet pickers — event-driven, no props needed */}
-      <TemplatePicker />
-      <SnippetPicker />
+      <TemplatePicker editor={editor} />
+      <SnippetPicker editor={editor} />
 
       {/* "Move to Note" target picker — event-driven, addressed to THIS editor */}
       <MoveSelectionPicker editor={editor} />

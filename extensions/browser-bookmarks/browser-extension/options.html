@@ -52,10 +52,6 @@
       <section class="card stack">
         <div class="muted">Defaults</div>
         <div class="row">
-          <select id="default-dedupe-enabled">
-            <option value="false">Dedupe Off</option>
-            <option value="true">Dedupe On</option>
-          </select>
           <select id="default-preserve-html">
             <option value="false">Preserve HTML Off</option>
             <option value="true">Preserve HTML On</option>
@@ -69,16 +65,16 @@
           <button
             class="icon-help"
             type="button"
-            title='Rules are JSON. Example: [{"hostnameSuffix":"docs.example.com","actions":{"resourceType":"documentation","userIntent":"learn","dedupeEnabled":true}}]. Use them to route matching domains, apply defaults, and control domain intelligence.'
+            title='Rules are JSON. Example: [{"hostnameSuffix":"docs.example.com","actions":{"resourceType":"documentation","userIntent":"learn"}}]. Use them to route matching domains, apply defaults, and control domain intelligence.'
           >
             ?
           </button>
         </div>
         <div class="hint">
           Rules are JSON. Use them to route matching domains into a connection or folder path, apply
-          resource classification defaults, toggle dedupe, and control domain-intelligence behavior.
+          resource classification defaults, and control domain-intelligence behavior.
         </div>
-        <textarea id="rules-json" placeholder='[{"hostnameSuffix":"docs.example.com","actions":{"resourceType":"documentation","userIntent":"learn","dedupeEnabled":true}}]'></textarea>
+        <textarea id="rules-json" placeholder='[{"hostnameSuffix":"docs.example.com","actions":{"resourceType":"documentation","userIntent":"learn"}}]'></textarea>
         <div class="row">
           <button id="save-rules">Save Rules</button>
           <button class="secondary" id="export-rules">Export Rules</button>

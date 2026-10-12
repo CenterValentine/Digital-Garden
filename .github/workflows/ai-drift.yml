@@ -18,6 +18,11 @@ on:
       - "lib/features/settings/validation.ts"
       - "scripts/validate-ai-drift.ts"
       - "scripts/validate-context-diet.ts"
+      - "scripts/validate-view-screen.ts"
+      - "lib/features/screen-capture/**"
+      - "lib/domain/browser-extension/panel-bridge.ts"
+      - "app/api/ai/attachments/upload/**"
+      - "extensions/browser-bookmarks/browser-extension/src/panel/**"
       - "scripts/validate-iteration-proposal.ts"
       - "scripts/generate-ai-capability-matrix.ts"
       - "docs/notes-feature/core/AI-CAPABILITY-MATRIX.md"
@@ -55,6 +60,9 @@ jobs:
 
       - name: Validate context-diet transforms
         run: pnpm context:diet:check
+
+      - name: Validate view_screen delivery and wiring
+        run: pnpm view-screen:check
 
       - name: Validate proposal shapes reach execute
         run: pnpm proposal:shape:check

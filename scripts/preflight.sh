@@ -19,6 +19,7 @@ run "Prisma client (generate)" pnpm exec prisma generate
 run "Typecheck" pnpm typecheck
 run "Lint (--max-warnings ratchet)" pnpm lint
 run "Collaboration schema" pnpm collab:schema:check
+run "Collaboration lineage" pnpm collab:lineage:check
 run "Extensions registry" pnpm extensions:check
 run "Publishing schema" pnpm publishing:schema:check
 run "Publishing defaults" pnpm publishing:audit:defaults

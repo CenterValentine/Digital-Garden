@@ -184,7 +184,17 @@ const PERCEPTION_TOOL_PARTS = new Set([
   "tool-open_tab_and_read",
   "tool-read_page",
   "tool-list_tabs",
+  // AI-VIEW-SCREEN-PLAN D9: a screenshot is perception too — and the heaviest
+  // kind, since its weight is the image a short URL stands for.
+  "tool-view_screen",
 ]);
+
+/**
+ * Results whose weight is not their text: a view_screen result is a short URL
+ * standing for ~1.5k image tokens, and its presigned URL expires after 7 days
+ * (only the current turn's may ever be sent). These fold whatever their length.
+ */
+const IMAGE_BEARING_TOOL_PARTS = new Set(["tool-view_screen", "tool-view_image"]);
 
 /**
  * Re-readable content whose value ends with the reply that used it — folded
@@ -196,6 +206,8 @@ const TURN_FOLD_TOOL_PARTS = new Set([
   ...PERCEPTION_TOOL_PARTS,
   "tool-read_content",
   "tool-search_content",
+  // A file re-viewable by id (D14) — folds by turn like read_content.
+  "tool-view_image",
 ]);
 
 /** Below this, stubbing saves nothing worth the cache perturbation. */
@@ -316,6 +328,7 @@ export function shouldSupersedePart(part: unknown): boolean {
   const p = part as { type?: string; state?: string; output?: unknown };
   if (!p.type || !PERCEPTION_TOOL_PARTS.has(p.type)) return false;
   if (p.state !== "output-available") return false;
+  if (IMAGE_BEARING_TOOL_PARTS.has(p.type)) return true;
   return JSON.stringify(p.output ?? "").length >= SUPERSEDE_MIN_CHARS;
 }
 
@@ -324,6 +337,7 @@ function isTurnFoldable(part: unknown): boolean {
   const p = part as { type?: string; state?: string; output?: unknown };
   if (!p.type || !TURN_FOLD_TOOL_PARTS.has(p.type)) return false;
   if (p.state !== "output-available") return false;
+  if (IMAGE_BEARING_TOOL_PARTS.has(p.type)) return true;
   return JSON.stringify(p.output ?? "").length >= SUPERSEDE_MIN_CHARS;
 }
 

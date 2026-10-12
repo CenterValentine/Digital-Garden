@@ -13,6 +13,7 @@ import { useSearchStore } from "@/state/search-store";
 import { useLeftPanelCollapseStore } from "@/state/left-panel-collapse-store";
 import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
 import { LeftSidebarHeaderActions } from "./LeftSidebarHeaderActions";
+import { FileTreeSortMenu } from "./FileTreeSortMenu";
 import { Inbox, PanelLeftClose, PanelLeft } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { renderExtensionIcon } from "@/lib/extensions";
@@ -364,8 +365,9 @@ export function LeftSidebarHeader({
             );
           })}
 
-          {/* Plus button — snapped to right edge */}
+          {/* Sort + Plus — snapped to right edge */}
           <div className="flex-1" />
+          <FileTreeSortMenu className={subInactive} />
           <LeftSidebarHeaderActions
             onCreateFolder={onCreateFolder ? () => onCreateFolder() : undefined}
             onCreateNote={onCreateNote ? () => onCreateNote() : undefined}

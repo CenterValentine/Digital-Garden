@@ -13,6 +13,12 @@ import {
   ydocUpdateHasMeaningfulDefaultContent,
 } from "@/lib/domain/collaboration/content-safety";
 import { getCollaborationServerExtensions } from "@/lib/domain/collaboration/extensions";
+import {
+  alignOntoServerCopy,
+  planAlignment,
+  planLocalCatchUp,
+  sharesLineage,
+} from "@/lib/domain/collaboration/lineage";
 import { sanitizeTipTapJsonWithExtensions } from "@/lib/domain/editor/unsupported-content";
 import { onNativeMessage } from "@/lib/mobile-bridge/client";
 import { clientLogger } from "@/lib/core/logger/client";
@@ -21,6 +27,13 @@ import {
   type PresenceRecord,
 } from "@/lib/domain/collaboration/presence-poll";
 import { resolvePresenceHeartbeatDelay } from "@/lib/domain/collaboration/presence-cadence";
+
+/** How long the "reconnected" notice stays after recovering from offline. */
+const RECOVERED_NOTICE_MS = 4_000;
+/** D17: how long opening a cached copy waits for the server's before editing opens anyway. */
+const LOCAL_CATCH_UP_TIMEOUT_MS = 4_000;
+/** D17: how often this browser's last-edit time reaches the manifest while typing. */
+const LOCAL_EDIT_PERSIST_EVERY_MS = 5_000;
 
 // Initial-promote deferral.
 //
@@ -188,6 +201,11 @@ export interface CollaborationRuntimeState {
   reconnectIntent: boolean;
   readOnly: boolean;
   warning: string | null;
+  /**
+   * When the document came back to synced after being offline or degraded —
+   * set for RECOVERED_NOTICE_MS so the editor can say so, then cleared.
+   */
+  recoveredAt: number | null;
   editPolicy: CollaborationEditPolicy;
 }
 
@@ -230,6 +248,8 @@ interface CollaborationStateResponse {
     documentName: string;
     readOnly: boolean;
     update: string | null;
+    /** When the stored note last changed (ISO) — D17's staleness test. */
+    payloadUpdatedAt?: string | null;
   };
   error?: { message?: string };
 }
@@ -273,6 +293,7 @@ interface DocumentRuntimeEntry {
   user: CollaborationUser | null;
   listeners: Set<() => void>;
   cooldownTimer: ReturnType<typeof setTimeout> | null;
+  recoveredNoticeTimer: ReturnType<typeof setTimeout> | null;
   idleEvictionTimer: ReturnType<typeof setTimeout> | null;
   visibilitySleepTimer: ReturnType<typeof setTimeout> | null;
   inactivitySleepTimer: ReturnType<typeof setTimeout> | null;
@@ -300,6 +321,23 @@ interface DocumentRuntimeEntry {
   pendingInitialContent: JSONContent | null;
   hasSeededInitialContent: boolean;
   isBootstrappingInitialContent: boolean;
+  /**
+   * True once this copy was compared with the server's before its first
+   * connect (`alignLineageBeforeFirstConnect`). Every copy is compared — one
+   * filled from the canonical state too: a solo session can stay local for
+   * hours, and the server's copy can be replaced meanwhile (a Hocuspocus not
+   * yet redeployed with the lineage fix, the manual reseed). Verified in a
+   * two-browser smoke: skipping such a copy doubled the note.
+   */
+  lineageChecked: boolean;
+  /**
+   * The manifest entry the PREVIOUS session left (read before this session
+   * overwrites it): did it leave offline edits behind? D17.
+   */
+  priorCacheEntry: LocalCacheManifestEntry | null;
+  /** When this browser last edited its copy (ms); carried across sessions. D17. */
+  lastLocalEditAt: number | null;
+  lastLocalEditPersistedAt: number;
   promotionPromise: Promise<void> | null;
   authVerificationPromise: Promise<void> | null;
   ydocUpdateHandler:
@@ -374,6 +412,12 @@ interface LocalCacheManifestEntry {
   lastAccessedAt: number;
   dirty: boolean;
   unsyncedUpdateCount: number;
+  /**
+   * When this browser last edited its copy (ms). Absent on entries written
+   * before it was tracked. AI-VIEW-SCREEN-PLAN D17: a stored note changed
+   * after this moment was changed elsewhere, so a clean copy defers to it.
+   */
+  lastLocalEditAt?: number;
 }
 
 type LocalCacheManifest = Record<string, LocalCacheManifestEntry>;
@@ -421,6 +465,7 @@ function updateLocalCacheManifest(entry: DocumentRuntimeEntry) {
     lastAccessedAt: Date.now(),
     dirty: entry.state.localDirty,
     unsyncedUpdateCount: entry.state.unsyncedUpdateCount,
+    ...(entry.lastLocalEditAt !== null ? { lastLocalEditAt: entry.lastLocalEditAt } : {}),
   };
   writeLocalCacheManifest(manifest);
 }
@@ -722,6 +767,7 @@ class CollaborationRuntimeManager {
       listeners: new Set(),
       consumers: new Map(),
       cooldownTimer: null,
+      recoveredNoticeTimer: null,
       idleEvictionTimer: null,
       visibilitySleepTimer: null,
       inactivitySleepTimer: null,
@@ -740,6 +786,10 @@ class CollaborationRuntimeManager {
       pendingInitialContent: null,
       hasSeededInitialContent: false,
       isBootstrappingInitialContent: false,
+      lineageChecked: false,
+      priorCacheEntry: readLocalCacheManifest()[contentId] ?? null,
+      lastLocalEditAt: readLocalCacheManifest()[contentId]?.lastLocalEditAt ?? null,
+      lastLocalEditPersistedAt: 0,
       promotionPromise: null,
       authVerificationPromise: null,
       ydocUpdateHandler: null,
@@ -779,6 +829,7 @@ class CollaborationRuntimeManager {
         reconnectIntent: false,
         readOnly: false,
         warning: null,
+        recoveredAt: null,
         editPolicy: {
           editable: false,
           reason: "booting-local-state",
@@ -792,6 +843,14 @@ class CollaborationRuntimeManager {
       if (entry.state.persistenceState !== "localReady") return;
 
       this.noteLocalActivity(entry);
+
+      // D17: remember when this browser last edited its copy, across sessions
+      // (throttled — a localStorage write per keystroke is not free).
+      entry.lastLocalEditAt = Date.now();
+      if (entry.lastLocalEditAt - entry.lastLocalEditPersistedAt > LOCAL_EDIT_PERSIST_EVERY_MS) {
+        entry.lastLocalEditPersistedAt = entry.lastLocalEditAt;
+        updateLocalCacheManifest(entry);
+      }
 
       // Cancel any pending sleep timers — the user is actively editing.
       if (entry.inactivitySleepTimer) {
@@ -957,12 +1016,36 @@ class CollaborationRuntimeManager {
       localYdocIsMeaningful ||
       (entry.ydoc.getXmlFragment("default").length > 0 && !pendingContentIsMeaningful)
     ) {
+      // D17: a cached copy is compared with the server's before editing opens
+      // — the stored note may have moved past it (an AI write to a note with
+      // no server copy yet, another device). Editing stays locked for this one
+      // round trip; on any failure the cached copy opens exactly as before.
+      if (localYdocIsMeaningful) {
+        entry.isBootstrappingInitialContent = true;
+        try {
+          await this.catchUpLocalCopy(entry);
+        } catch (error) {
+          clientLogger.warn({
+            layer: "editor",
+            event: "collab:local_catch_up_failed",
+            summary: "could not compare the cached copy with the server's — opening it as before",
+            attrs: { content_id: entry.contentId },
+            error,
+          });
+        } finally {
+          entry.isBootstrappingInitialContent = false;
+        }
+        if (entry.hasSeededInitialContent || this.entries.get(entry.contentId) !== entry) return;
+      }
       this.clearBootstrapWatch(entry);
       entry.hasSeededInitialContent = true;
       entry.state.bootstrapState = "ready";
       entry.state.availabilityState = "canonical";
       entry.state.localFallbackReason = null;
       entry.state.warning = null;
+      // Awaited above, so the caller's emit has already run with the state
+      // still pending — announce readiness here or the editor stays locked.
+      this.emit(entry);
       return;
     }
 
@@ -1204,6 +1287,122 @@ class CollaborationRuntimeManager {
     this.emit(entry);
   }
 
+  /**
+   * AI-VIEW-SCREEN-PLAN D17 — bring a cached copy up to the server's before
+   * editing opens. The decision is `planLocalCatchUp` (lineage.ts, pinned by
+   * collab:lineage:check); this applies it. Never throws past the caller's
+   * catch, never blocks longer than LOCAL_CATCH_UP_TIMEOUT_MS, and never
+   * discards offline edits.
+   *
+   * Asking for the canonical state also MINTS the server copy of a note that
+   * had none (the load path seeds it from the payload), so from here on an AI
+   * write to it goes through Y.js — on the lineage this browser now shares.
+   */
+  private async catchUpLocalCopy(entry: DocumentRuntimeEntry) {
+    const abortController = typeof AbortController === "undefined" ? null : new AbortController();
+    const timer = abortController ? setTimeout(() => abortController.abort(), LOCAL_CATCH_UP_TIMEOUT_MS) : null;
+    let canonical: Awaited<ReturnType<CollaborationRuntimeManager["fetchCanonicalYDocState"]>>;
+    try {
+      canonical = await this.fetchCanonicalYDocState(entry.contentId, abortController?.signal);
+    } catch {
+      return; // offline, slow, or refused — the cached copy opens as before
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+    if (!canonical.update || this.entries.get(entry.contentId) !== entry) return;
+    const serverUpdate = canonical.update;
+
+    const local = TiptapTransformer.fromYdoc(entry.ydoc, "default") as JSONContent;
+    const serverDoc = new Y.Doc();
+    Y.applyUpdate(serverDoc, serverUpdate);
+    const server = TiptapTransformer.fromYdoc(serverDoc, "default") as JSONContent;
+    serverDoc.destroy();
+    const shares = sharesLineage(Y.encodeStateVector(entry.ydoc), Y.encodeStateVectorFromUpdate(serverUpdate));
+    let unionMatchesServer = false;
+    if (shares) {
+      const union = new Y.Doc();
+      Y.applyUpdate(union, Y.encodeStateAsUpdate(entry.ydoc));
+      Y.applyUpdate(union, serverUpdate);
+      unionMatchesServer =
+        JSON.stringify(TiptapTransformer.fromYdoc(union, "default")) === JSON.stringify(server);
+      union.destroy();
+      // Already the same document — nothing to carry.
+      if (unionMatchesServer && JSON.stringify(local) === JSON.stringify(server)) return;
+    }
+
+    const prior = entry.priorCacheEntry;
+    const plan = planLocalCatchUp({
+      sharesLineage: shares,
+      unionMatchesServer,
+      alignment: planAlignment(local, server),
+      localClean: !prior || (!prior.dirty && prior.unsyncedUpdateCount === 0),
+      lastLocalEditAt: entry.lastLocalEditAt,
+      payloadUpdatedAt: canonical.payloadUpdatedAt,
+    });
+    clientLogger.info({
+      layer: "editor",
+      event: "collab:local_catch_up",
+      summary: `cached copy compared with the server's — ${plan}`,
+      attrs: { content_id: entry.contentId, plan, shares_lineage: shares },
+    });
+    if (plan === "keep") return;
+    if (plan === "merge") {
+      Y.applyUpdate(entry.ydoc, serverUpdate, "local-catch-up");
+    } else {
+      alignOntoServerCopy(entry.ydoc, serverUpdate, plan === "adopt-and-reapply" ? local : null, "local-catch-up");
+    }
+    // `lineageChecked` stays false on purpose: the first connect compares again
+    // (#287) — a solo session can wait for hours while the server's copy moves.
+  }
+
+  /**
+   * Before this copy first meets the server, make sure the meeting cannot
+   * double the note. A copy seeded independently from the same JSON shares no
+   * item with the server's, and Y.js's union then shows everything twice —
+   * and persists it (owner report 2026-10-08: a collaborator joining
+   * duplicated the note). Such copies sit in IndexedDB from server rebuilds
+   * before the lineage fix, come from the local seed fallback when the
+   * canonical fetch failed, or turn rival while a solo session waits (the
+   * server's copy replaced by a Hocuspocus without the fix, or a reseed).
+   *
+   * Moves onto the server's lineage only when content-wise nothing is lost
+   * (`planAlignment`); when both sides hold blocks the other lacks there is
+   * no safe choice, so it connects as before and says so in the log.
+   */
+  private async alignLineageBeforeFirstConnect(entry: DocumentRuntimeEntry) {
+    if (!ydocHasMeaningfulDefaultContent(entry.ydoc)) return;
+    let serverUpdate: Uint8Array | null;
+    try {
+      serverUpdate = (await this.fetchCanonicalYDocState(entry.contentId)).update;
+    } catch {
+      return; // can't tell — connect as before
+    }
+    if (!serverUpdate || this.entries.get(entry.contentId) !== entry) return;
+    if (sharesLineage(Y.encodeStateVector(entry.ydoc), Y.encodeStateVectorFromUpdate(serverUpdate))) {
+      return;
+    }
+
+    const local = TiptapTransformer.fromYdoc(entry.ydoc, "default") as JSONContent;
+    const serverDoc = new Y.Doc();
+    Y.applyUpdate(serverDoc, serverUpdate);
+    const server = TiptapTransformer.fromYdoc(serverDoc, "default") as JSONContent;
+    serverDoc.destroy();
+    const plan = planAlignment(local, server);
+    clientLogger.warn({
+      layer: "editor",
+      event: "collab:lineage_rival",
+      summary: `this browser's copy shares no history with the server's — ${plan}`,
+      attrs: { content_id: entry.contentId, plan },
+    });
+    if (plan === "diverged") return;
+    alignOntoServerCopy(
+      entry.ydoc,
+      serverUpdate,
+      plan === "adopt-and-reapply" ? local : null,
+      "lineage-align"
+    );
+  }
+
   private async fetchCanonicalYDocState(contentId: string, signal?: AbortSignal) {
     const response = await fetch("/api/collaboration/state", {
       method: "POST",
@@ -1216,10 +1415,12 @@ class CollaborationRuntimeManager {
     if (!response.ok || !result.success || !result.data) {
       throw new Error(result.error?.message || "Failed to load collaboration state");
     }
+    const payloadUpdatedAt = result.data.payloadUpdatedAt ? Date.parse(result.data.payloadUpdatedAt) : NaN;
     return {
       documentName: result.data.documentName,
       readOnly: result.data.readOnly,
       update: result.data.update ? base64ToUint8Array(result.data.update) : null,
+      payloadUpdatedAt: Number.isFinite(payloadUpdatedAt) ? payloadUpdatedAt : null,
     };
   }
 
@@ -1768,6 +1969,7 @@ class CollaborationRuntimeManager {
         entry.state.connectionState = "connecting";
         entry.hocuspocusProvider.connect();
         this.emit(entry);
+        this.restoreIfStillSynced(entry);
       }
       return entry.promotionPromise ?? Promise.resolve();
     }
@@ -1823,7 +2025,15 @@ class CollaborationRuntimeManager {
 
     if (entry.hocuspocusProvider) {
       entry.hocuspocusProvider.connect();
+      this.restoreIfStillSynced(entry);
       return;
+    }
+
+    if (!entry.lineageChecked) {
+      entry.lineageChecked = true;
+      await this.alignLineageBeforeFirstConnect(entry);
+      // Released while we compared — nothing left to connect.
+      if (this.entries.get(entry.contentId) !== entry || entry.hocuspocusProvider) return;
     }
 
     entry.hocuspocusProvider = new HocuspocusProvider({
@@ -1843,26 +2053,15 @@ class CollaborationRuntimeManager {
       },
       onSynced: ({ state }) => {
         if (!state) return;
-        this.clearProviderReconnect(entry);
-        entry.state.connectionState = "synced";
-        entry.state.bootstrapState = "ready";
-        entry.state.availabilityState = "canonical";
-        entry.state.localFallbackReason = null;
-        entry.state.warning = null;
-        entry.state.reconnectIntent = false;
-        entry.state.localDirty = false;
-        entry.state.unsyncedUpdateCount = 0;
-        this.emit(entry);
-        // Start inactivity countdown after every successful sync.
-        this.scheduleInactivitySleep(entry);
-        // Announce "synced" immediately so other sessions' badges flip from
-        // grey to live without waiting out a dormant heartbeat interval.
-        this.schedulePresenceHeartbeat(entry, 0);
+        this.markSynced(entry);
       },
       onUnsyncedChanges: ({ number }) => {
         entry.state.unsyncedUpdateCount = number;
         entry.state.localDirty = number > 0;
         this.emit(entry);
+        // Changes made while "offline" over a socket that never closed drain
+        // here; the provider was already synced, so `onSynced` stays silent.
+        if (number === 0) this.restoreIfStillSynced(entry);
       },
       onAwarenessChange: () => this.updateProviderPresence(entry),
       onAwarenessUpdate: () => this.updateProviderPresence(entry),
@@ -1875,6 +2074,70 @@ class CollaborationRuntimeManager {
       entry.consumers.size
     );
     this.emit(entry);
+  }
+
+  /**
+   * The document is in sync with the server: clear every degraded marker.
+   * The ONE place this happens — `onSynced`, and the reconnect paths below
+   * when the provider never stopped being synced.
+   *
+   * A notice says so when it recovers from a degraded state (owner smoke
+   * 2026-10-09: after going offline and back, the offline warning and
+   * "Connecting collaborative editor…" stayed up although the edit had synced).
+   */
+  private markSynced(entry: DocumentRuntimeEntry) {
+    const recovering =
+      entry.state.reconnectIntent ||
+      entry.state.warning !== null ||
+      entry.state.connectionState === "disconnectedButDirty" ||
+      entry.state.availabilityState === "localFallback";
+    this.clearProviderReconnect(entry);
+    entry.state.connectionState = "synced";
+    entry.state.bootstrapState = "ready";
+    entry.state.availabilityState = "canonical";
+    entry.state.localFallbackReason = null;
+    entry.state.warning = null;
+    entry.state.reconnectIntent = false;
+    entry.state.localDirty = false;
+    entry.state.unsyncedUpdateCount = 0;
+    if (recovering) {
+      entry.state.recoveredAt = Date.now();
+      if (entry.recoveredNoticeTimer) clearTimeout(entry.recoveredNoticeTimer);
+      entry.recoveredNoticeTimer = setTimeout(() => {
+        entry.recoveredNoticeTimer = null;
+        entry.state.recoveredAt = null;
+        this.emit(entry);
+      }, RECOVERED_NOTICE_MS);
+    }
+    this.emit(entry);
+    // Start inactivity countdown after every successful sync.
+    this.scheduleInactivitySleep(entry);
+    // Announce "synced" immediately so other sessions' badges flip from
+    // grey to live without waiting out a dormant heartbeat interval.
+    this.schedulePresenceHeartbeat(entry, 0);
+  }
+
+  /**
+   * After asking an EXISTING provider to connect: when its socket never
+   * closed, it is still synced, `connect()` is a no-op and `onSynced` never
+   * fires again (the provider emits `synced` only on a change). The browser's
+   * `offline` event does not close an open WebSocket — DevTools' offline mode,
+   * a captive portal, a flaky Wi-Fi blip — so the runtime marked itself
+   * disconnected while every edit kept syncing, then waited for a sync event
+   * that could not come. Same state change a fresh sync makes, nothing else.
+   */
+  private restoreIfStillSynced(entry: DocumentRuntimeEntry) {
+    const provider = entry.hocuspocusProvider;
+    if (
+      provider?.synced &&
+      !provider.hasUnsyncedChanges &&
+      entry.state.networkState === "online" &&
+      // Only out of a degraded state: in normal operation this is a no-op, so
+      // an acknowledged keystroke never re-emits state or sends a heartbeat.
+      entry.state.connectionState !== "synced"
+    ) {
+      this.markSynced(entry);
+    }
   }
 
   private async fetchCollaborationToken(entry: DocumentRuntimeEntry) {
@@ -2418,6 +2681,7 @@ class CollaborationRuntimeManager {
     document.removeEventListener("visibilitychange", entry.visibilityChangeHandler);
     window.removeEventListener("pagehide", entry.pageHideHandler);
     if (entry.cooldownTimer) clearTimeout(entry.cooldownTimer);
+    if (entry.recoveredNoticeTimer) clearTimeout(entry.recoveredNoticeTimer);
     if (entry.visibilitySleepTimer) clearTimeout(entry.visibilitySleepTimer);
     if (entry.inactivitySleepTimer) clearTimeout(entry.inactivitySleepTimer);
     // Abort any pending deferred initial promote so its callback doesn't

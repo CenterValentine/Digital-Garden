@@ -34,6 +34,12 @@ export interface OptimisticTreeRow {
   mimeType?: string;
   /** Shortcut rows: the target, so the row shows its icon while pending. */
   shortcutTarget?: { id: string; contentType: string; title: string };
+  /**
+   * Where the create puts it, when the caller knows: the top of its parent,
+   * or right after a sibling. Without it the row is shown where the server
+   * sorts a default (displayOrder 0) row.
+   */
+  place?: "top" | { afterId: string };
 }
 
 export type TreeOptimisticDetail =

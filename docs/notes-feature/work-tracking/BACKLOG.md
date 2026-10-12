@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-10-04
+last_updated: 2026-10-09
 ---
 
 # Sprint Backlog
@@ -9,6 +9,66 @@ last_updated: 2026-10-04
 **Sprint Execution Protocol**: Before commencing any sprint, always ask the user for input before planning and executing — there may be additions or modifications.
 
 ---
+
+## Note saves take 2.5–5.5 s on production (2026-10-09, found diagnosing 409s)
+
+- ⚪ Vercel logs show content PATCHes of a 33 KB note taking 2.5–5.5 s; most of that is server time. Likely candidates:
+  - the solo Y-copy merge (advisory lock + two Y transforms + upsert);
+  - the sanitize round-trip;
+  - the image and window-reference syncs.
+
+  Per-step span timings are already in the trace logs (`withSpan`), so measure those first. Single-flight saves (PR #295) remove the 409s this caused, but slow saves still delay the "saved" state.
+
+## Database column links — follow-ups (2026-10-09, from `feat/database-column-links`)
+
+- ⚪ Clicking a `[[Jobs#Status]]` link opens the database but does not scroll to or highlight the column. The database viewer should take the `column:` anchor from `state/content-anchor-store.ts`.
+- ⚪ Query-mode tables list no columns. Their projection columns are synthesized and have no `DataColumn` id to anchor on.
+- ⚪ Folder context capsules summarize notes without the column block. The summarizer reads through `ai-context/source-resolver.ts`, which is not a describer seam yet.
+
+## Collaboration lineage — follow-ups (2026-10-08, from `fix/join-dup-nested-shortcuts`)
+
+The join duplication is fixed at its three sources (`lib/domain/collaboration/lineage.ts`,
+`CONTENT-LOAD-CASCADE.md §9.4`). What is deliberately left:
+
+- **Diverged rival copies still union.** When a browser's rival copy and the
+  server's each hold blocks the other lacks, `planAlignment` returns
+  `"diverged"` and the browser connects as before (the note doubles, nothing is
+  lost), logging `collab:lineage_rival`. The cure is a resolution step — offer
+  the browser's version through the save-conflict banner ("Keep mine / Take
+  theirs") instead of letting the union stand. Watch the log event first: if it
+  never fires, this stays parked.
+- **Notes already doubled in production** are not repaired by the fix. A
+  one-off script could find candidates (snapshotJson whose block list is two
+  identical halves) for the owner to review; never auto-dedupe.
+- **Solo saves send the whole Y state.** Cheap for ordinary notes; for very
+  large ones a diff since the last acknowledged state vector would do (the
+  route merges either). Only if save latency or body size shows up.
+- **Keepalive flushes over 64 KiB carry no Y copy** (the browser refuses the
+  request). The last edits before closing the tab then reach the stored copy
+  only through the payload catch-up — the editor's own items for them can meet
+  the server's later (a few words doubled). Same diff-since-last-ack idea fixes it.
+
+---
+
+## AI view_screen — follow-ups (2026-10-09, branch `feat/ai-view-screen`; plan `AI-VIEW-SCREEN-PLAN.md`)
+
+- [ ] **Co-browse bound tab (HELD — co-browse postponement, owner 2026-10-06)** — plan D11: when a co-browse session is bound, the panel's `view_screen` captures THAT tab with CDP `Page.captureScreenshot` through a validated `cobrowse-screenshot` handler (never a generic CDP message); works backgrounded, supports an element clip. Supersedes the OCR plan's `read_screen` below.
+- [ ] **Gateway tool-result images** — `vercel-gateway` is on the user-part path because tool-result images through the gateway are unverified. Smoke a gateway Claude model with the native shape; promote it in `NATIVE_ADAPTERS` (screen-delivery.ts) and flip the mode table in `view-screen:check` if it holds.
+- [ ] **`ai-screenshots/` lifecycle** — screenshots are stored without a ContentNode (D7), so nothing deletes them. Delete with the conversation, or age out after the 7-day URL life.
+- [ ] **Images without a content id** — D13 loads uploads through the download route by `data-content-id`; other cross-origin images (external URLs in notes, link-preview thumbnails) still rasterize blank and are reported in `notes`. A server-side image proxy would close it.
+- [ ] **Full-page / element captures** — v1 is the visible area only.
+
+## OCR paste — follow-ups (2026-10-06, branch `feat/ocr-paste`; plan `OCR-PASTE-PLAN.md`)
+
+Merged in PR #291 (2026-10-09, `0967297d`). Remaining:
+
+- [ ] **Co-browse `read_screen` (POSTPONED 2026-10-06, owner; superseded in design by `view_screen` D11 above — the picture, with OCR still callable on it)** — waits on a prerequisite feature the owner named; not built in this run because that feature was not. Design in the plan D5: a `co_browse_act` action that screenshots the BOUND tab via `Page.captureScreenshot` on the debugger session (not `captureVisibleTab`), OCRs it app-side after the bridge returns, answers as `untrustedWebContent`. Extension 5.5.0. Smoke on a backgrounded bound tab.
+- [ ] **Safari ⇧⌘V** — record whether Safari fires a paste event for the chord (smoke item). If not, the context-menu item is the Safari path; do not add a second chord.
+- [ ] **`ai` OCR engine** behind an `editor.ocrEngine` setting — the user's vision connection as the second `OcrEngine` member (precedent: the flashcards media route); needs a vision-capability check and client-side downscale for the 4.5 MB body limit.
+- [x] **Mentioned images seen by vision models** — done as `view_image` (AI-VIEW-SCREEN-PLAN D14): a vision model is pointed at it for any mentioned, bound or listed image and sees the file on demand. Attaching up front instead stays possible if one call proves too slow.
+- [x] **Pasted / attached images for text-only models** — done as AI-VIEW-SCREEN-PLAN D18 (read on attach, hover badge, labelled OCR block with an extraction profile).
+- [ ] **External-URL images for the AI** — `read_content` lists them, but `read_image_text` takes a content id only (a cross-origin fetch usually cannot read the pixels). A server-side fetch-and-hand-off would close it.
+- Also deferred in the plan §4: full-page co-browse strips, OCR as an automatic read-ladder rung, multimodal tool output, self-hosting the language pack.
 
 ## Split Pane Placement — behaviour as a setting (2026-10-02, from `feat/open-into-opposite-pane`)
 
@@ -79,6 +139,25 @@ path and probably belongs to the same control.
 - [ ] **Picker polish to revisit only if reported** — the Active pill's folder name truncates hard at the picker's 300px (`MENU_WIDTH`; widening ~20px is one constant); `deriveDestinations` ignores `createdAt` ties; `jumpToDestination` forgets a folder absent at Root without telling the user.
 
 ---
+
+## File-tree order — remaining ties (2026-10-05, from `fix/smooth-delete`)
+
+The order audit fixed the causes that moved rows between refreshes (anchored drops, owner-scoped moves, one total comparator, stale refreshes dropped, new rows shown where they land). What's left can't reorder rows on its own any more — `compareSiblings` makes every order deterministic — but a few writes still pick a position that may not be the one the user expects:
+
+- [ ] **Duplicate lands tied with its original** (`duplicate/route.ts` copies `displayOrder`), so the copy sits above or below the original by title, then id. Placing it directly after the original needs a renumber, like the move route does.
+- [ ] **Restore from trash keeps the old `displayOrder`**; siblings renumbered since then can put it beside different neighbours. Restore could re-anchor after its old previous sibling if that still exists.
+- [ ] **People mounts keep their own order space** (`/api/people/mounts`, still index-based); a content row and a mount row can't be anchored to each other — anchors skip mount rows.
+- [x] **Re-parenting without a position landed mid-list** — Folder assistant (with Undo restoring position) and Studio outputs now place deliberately (2026-10-06, `sibling-slot.ts`); bookmark dedupe, the third writer, was removed the same day.
+- [ ] **Spring-opened tabs add back/forward history entries.** Resting a drag on a tab activates it through `activateContentTab`, and releasing switches back the same way; `MainPanelNavigation` records each change, so a drag through tabs leaves entries behind. Suppressing history for spring switches needs a flag the navigation recorder honours (`use-spring-tabs.ts`).
+- [ ] **A move out of a note saved over REST could trash the image.** Live collaborative saves never trash media, but a note saved through the REST path (only when live collaboration is unavailable) runs `syncImageReferences` with clean-up on: if the source note saves before the receiving note has saved its `image-ref` link, the moved image has no live link at that moment and is soft-deleted (recoverable from the trash). A short grace period before trashing, or a hint from the client that the media moved, would close it.
+- [ ] **Media deleted from a live note's text is never cleaned up.** Collaborative saves keep links exact but never trash (`trashOrphans: false` — a cut-then-paste across one save would trash the image in between), so an image deleted from a live note's text stays as content in its folder's referenced items. A deferred clean-up — trash referenced media with no live link after a grace period (a cron beside `app/api/cron/`), or on the note's next REST save — would close it. Deliberately not done in `fix/smooth-delete`.
+- [ ] **Main-panel List/Gallery views don't apply a folder's kept sort.** They read stored order (manual mode), so an item that arrives in a sorted folder after its last sort shows sorted in the tree but at the top there until the folder is sorted again. Fix: have the folder-children endpoint return the folder's `treeSort` with nested flags, and order by `applyKeptSort` there too.
+- [ ] **Creates that store displayOrder 0 still tie with the first row** — uploads are fixed (2026-10-06); still on 0: AI documents/images/speech (`lib/domain/ai/documents.ts`, `image/generate-and-store.ts`, `speech/generate-and-store.ts`), workflows (`extensions/workflows/server/documents.ts`, `dispatch.ts`), reader library/shelf, flashcards media, data promotion. Each needs only `claimSiblingSlot` (top for user-facing outputs, bottom for appended records) in its create transaction.
+- [ ] **The inline-create placeholder can be wiped** by a refresh that starts while the name is being typed (the stale-response guard brackets moves and deletes only; a create would need an end that runs on submit, cancel AND unmount — a missed end drops every later refresh).
+
+## File-tree shortcuts — decided (2026-10-05, from `fix/smooth-delete`)
+
+- [x] **Opening through a shortcut in a view raised the out-of-view warning.** Owner: "count view from a shortcut as in scope for any check related to the view targeting." Built on the same branch — `viewReachRoots` in the open guard's view-scope check; locked-workspace overlap checks unchanged.
 
 ## E-reader — proposed (2026-09-29, plan `EREADER-PLAN.md`)
 
@@ -336,7 +415,6 @@ true async-batch substrate.
 Built and committed: workbench rows (`parentWorkspaceId` + `dormantAt`), dwell submenu nestable to 3 layers, hide/reorder per layer, lifecycle hooks (archive on delete, purge on hard delete, dormant-clearout cron), tab counts, tri-state tree scope, and the redundant view-root row fix. Remaining:
 
 - [ ] **`vercel.json` cron entry for `/api/cron/dormant-workbenches`** — the route exists and is CRON_SECRET-guarded, but nothing invokes it in production yet, so dormant benches accumulate silently. Daily is the intended cadence (matches `purge-trash`).
-- [ ] **Claims: inherit vs independent** (the plan's one open question). Workbenches currently claim content independently, like any workspace — zero special cases, but two benches under one parent can each borrow the same note and conflict with each other. Revisit only if that actually bites; the alternative (inheriting the parent's claims) makes open-intent resolution depth-aware.
 - [ ] **Server list endpoint is root-only.** `listWorkbenchFolders` serves layer 1; nested layers derive client-side from the one scoped-tree fetch. Fine while the submenu is the only consumer — if a second surface (mobile, extension panel) ever needs workbenches, it needs a depth parameter rather than a second tree walk.
 - [ ] **Dormant sweep is per-row.** `sweepDormantWorkbenches` does a hop-walk per workbench (≤3 point reads each). Correct and cheap at personal-vault scale; if a tenant ever holds hundreds of benches, batch the ancestor resolution.
 - [ ] **`membershipContentIds` union for tab counts** is computed client-side per row. If the count ever needs to appear somewhere without the full workspace payload, push it into `ContentWorkspaceResponse` as a scalar.
@@ -1083,18 +1161,17 @@ The following sprints were originally 38-42 in Epoch 9 but are deferred to Epoch
 
 ## Epoch 14: Saved Content Workspaces
 
-**Goal**: Persist named tab/pane workspaces with locked claims, temporary borrowing, permanent sharing, and expiration cleanup.
+**Goal**: Persist named tab/pane workspaces with expiration cleanup.
 **Detailed plan**: [epoch-14-saved-content-workspaces.md](epochs/epoch-14-saved-content-workspaces.md)
+**2026-10-08:** the claims / borrow / share half of this epoch was removed by owner decision — views and shortcuts govern what a workplace shows, nothing gates what it opens ([WORKPLACE-RESTRICTIONS-REMOVAL-PLAN.md](WORKPLACE-RESTRICTIONS-REMOVAL-PLAN.md)). The claim items below are withdrawn, not pending.
 
-### Sprint 65: Workspace Persistence + Claims
-- [ ] DB-backed `ContentWorkspace` and `ContentWorkspaceItem` models
+### Sprint 65: Workspace Persistence
+- [ ] DB-backed `ContentWorkspace` model
 - [ ] Main Workspace fallback for unassigned/catchall tabs
 - [ ] Workspace selector and settings popup in the main-panel navigation chrome
 - [ ] Per-workspace tab/pane layout persistence and restoration
-- [ ] Locked recursive folder/content claims with conflict reminder
-- [ ] Temporary borrowing with auto-release and permanent sharing
-- [ ] Tab context menu actions to move or share tabs across workspaces
-- [ ] Workspace expiration archive/release flow
+- [ ] Tab context menu action to move tabs across workspaces
+- [ ] Workspace expiration archive flow
 - [ ] Build + smoke gate on port `3014`
 
 ---

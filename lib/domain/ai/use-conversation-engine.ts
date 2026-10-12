@@ -48,6 +48,12 @@ import {
   LIST_TABS,
   stripTrackingParams,
 } from "@/lib/domain/ai/tools/co-browse-tools";
+import { READ_IMAGE_TEXT } from "@/lib/domain/ai/tools/read-image-text";
+import { isLocalOcrSupported } from "@/lib/features/ocr";
+import { readImageTextForModel, recognizeImageText } from "@/lib/features/ocr/read-for-model";
+import type { OcrExtractionProfile } from "@/lib/domain/ai/tools/read-image-text";
+import { VIEW_SCREEN, type ViewScreenInput } from "@/lib/domain/ai/tools/view-screen";
+import { isAppCaptureSupported, viewScreenForModel } from "@/lib/features/screen-capture";
 import { countRepeatedFailures } from "@/lib/domain/ai/tools/repair";
 import {
   isCoBrowseAvailable,
@@ -84,6 +90,7 @@ import {
 } from "@/lib/domain/ai/tools/metadata";
 import { PROVIDER_CATALOG } from "@/lib/domain/ai/providers/catalog";
 import { effectiveCapabilities } from "@/lib/domain/ai/features/capabilities";
+import { describeChatError, parseChatError } from "@/lib/domain/ai/chat-errors";
 import {
   useModelSelection,
 } from "@/components/content/ai/ModelPicker";
@@ -117,6 +124,7 @@ import {
 import { stopPendingToolCalls } from "@/lib/domain/ai/repair-dangling-tools";
 import { normalizeItemUrl } from "@/lib/domain/ai/tools/iteration-proposal";
 import { getContentWriteRefreshTargets } from "@/lib/domain/ai/content-write-receipts";
+import { MENTION_RE } from "@/lib/domain/ai/mention-markup";
 
 export type { OutputTarget } from "@/lib/domain/ai/output-target";
 
@@ -224,9 +232,6 @@ function maybeDispatchArtifactRefresh(part: unknown, seen: Set<string>): void {
     /* unparseable tool output — skip */
   }
 }
-
-/** Mention syntax shared by composer + send pipeline: `@[Title](id)`. */
-const MENTION_RE = /@\[([^\]]+)\]\(([^)]+)\)/g;
 
 /** Default mention search hint copy keyed by tool id. */
 const COMMAND_HINTS: Record<string, string> = {
@@ -662,6 +667,18 @@ export interface ChatAttachment {
   /** Text, or extracted document text — folded into the message on send. */
   text?: string;
   error?: string;
+  /**
+   * Image: the uploaded bytes, kept in memory so OCR can run on this device
+   * without downloading them back (AI-VIEW-SCREEN-PLAN D18).
+   */
+  localFile?: Blob;
+  /**
+   * Image + a model that can't see: its text, read on this device. Sent in
+   * the part's metadata; the chat route inlines it for a text-only model.
+   */
+  ocrStatus?: "reading" | "done" | "failed";
+  ocrText?: string;
+  ocrExtraction?: OcrExtractionProfile;
 }
 
 /** Playbook summary shape returned by GET /api/content/charters. */
@@ -897,7 +914,12 @@ function lastMessageHasResolvedBrowserRead({
         part.type === `tool-${CO_BROWSE_OPEN}` ||
         part.type === `tool-${CO_BROWSE_ACT}` ||
         part.type === `tool-${READ_CURRENT_PAGE}` ||
-        part.type === `tool-${LIST_TABS}`,
+        part.type === `tool-${LIST_TABS}` ||
+        // Not a browser tool, but read the same way: client-executed, result
+        // via addToolResult, and the model needs the text to continue.
+        part.type === `tool-${READ_IMAGE_TEXT}` ||
+        // view_screen (AI-VIEW-SCREEN-PLAN): client-captured, same resume.
+        part.type === `tool-${VIEW_SCREEN}`,
     ) as Array<{ state?: string }>;
   return (
     browserReadParts.length > 0 &&
@@ -2466,6 +2488,29 @@ export function useConversationEngine({
       // panel's content-script capture: no new tab, no re-fetch, no debugger
       // banner. Distinct from read_page (refetches a URL) and co_browse_open
       // (opens a fresh tab). For "summarize this page".
+      // read_image_text (OCR-PASTE-PLAN D8): download the image and read its
+      // text with the shared local engine, on this device. Every outcome is a
+      // result the model can act on — readImageTextForModel never throws.
+      // view_screen (AI-VIEW-SCREEN-PLAN): screenshot what the user is looking
+      // at — the active web page in the side panel, the app elsewhere — and
+      // upload it. Never throws; the image reaches the model next request.
+      if (toolCall.toolName === VIEW_SCREEN) {
+        chat.addToolResult({
+          tool: VIEW_SCREEN,
+          toolCallId: toolCall.toolCallId,
+          output: await viewScreenForModel((toolCall.input ?? {}) as ViewScreenInput),
+        });
+        return;
+      }
+      if (toolCall.toolName === READ_IMAGE_TEXT) {
+        const { contentId } = (toolCall.input ?? {}) as { contentId?: string };
+        chat.addToolResult({
+          tool: READ_IMAGE_TEXT,
+          toolCallId: toolCall.toolCallId,
+          output: await readImageTextForModel(contentId ?? ""),
+        });
+        return;
+      }
       if (toolCall.toolName === READ_CURRENT_PAGE) {
         try {
           const captured = await capturePageContent("full");
@@ -2798,7 +2843,9 @@ export function useConversationEngine({
       }
       // Don't stomp an in-flight reconnect's own toast with a duplicate.
       if (!reconnectingRef.current) {
-        toast.error(err.message || "Chat request failed");
+        // Same words as the in-chat banner (ChatErrorBanner): a recognised
+        // provider error reads as a sentence, anything else as before.
+        toast.error(err.message ? describeChatError(parseChatError(err.message)) : "Chat request failed");
       }
     },
     onFinish: (event) => {
@@ -3053,6 +3100,11 @@ export function useConversationEngine({
       browserExtensionAvailable: isExtensionAcquireAvailable(),
       // Slice 5c: co-browse is trust-gated to the side panel — true only there.
       coBrowseAvailable: isCoBrowseAvailable(),
+      // OCR-PASTE-PLAN D8: this browser can run local OCR → read_image_text.
+      localOcrAvailable: isLocalOcrSupported(),
+      // AI-VIEW-SCREEN-PLAN D1: the app can screenshot itself → view_screen
+      // (the panel's equivalent rides on coBrowseAvailable).
+      appCaptureAvailable: isAppCaptureSupported(),
     }));
     return () => {
       chatBodyResolvers.delete(conversationKey);
@@ -3224,15 +3276,64 @@ export function useConversationEngine({
 
   // ── attachments (Session 5b) ──
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
-  const attachmentsUploading = attachments.some((a) => a.status === "uploading");
 
-  // Does the active model accept image inputs? Drives the composer's
-  // image affordance + the send-time guard.
+  // Does the active model accept image inputs? Drives the composer's image
+  // affordance and whether attached images are read as text (D18). The same
+  // test the server applies: the catalog row PLUS id inference and the bare
+  // id of a namespaced model — a gateway's `anthropic/claude-…` or a
+  // hand-added model used to count as text-only here and had images refused.
   const supportsImageAttachments = useMemo(() => {
     const provider = PROVIDER_CATALOG.find((p) => p.id === providerId);
     const model = provider?.models.find((m) => m.id === modelId);
-    return Boolean(model?.capabilities?.includes("vision"));
+    return effectiveCapabilities({ id: modelId, capabilities: model?.capabilities }).has("vision");
   }, [providerId, modelId]);
+
+  // An image is not sendable to a model that can't see until its text has
+  // been read (or reading failed) — Send waits as it does for an upload.
+  const attachmentsUploading = attachments.some(
+    (a) =>
+      a.status === "uploading" ||
+      (!supportsImageAttachments && a.kind === "image" && a.status === "ready" && a.ocrStatus !== "done" && a.ocrStatus !== "failed"),
+  );
+
+  // D18: a model that can't see gets an image's TEXT. Read on this device as
+  // soon as the image is attached — or the moment a text-only model is picked
+  // — so Send never waits on a cold OCR engine. Started once per attachment.
+  const ocrStartedRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (supportsImageAttachments) return;
+    for (const a of attachments) {
+      if (a.kind !== "image" || a.status !== "ready" || a.ocrStatus || ocrStartedRef.current.has(a.id)) continue;
+      ocrStartedRef.current.add(a.id);
+      const { id, localFile, contentNodeId } = a;
+      void (async () => {
+        setAttachments((prev) => prev.map((x) => (x.id === id ? { ...x, ocrStatus: "reading" } : x)));
+        try {
+          let source = localFile;
+          if (!source && contentNodeId) {
+            const res = await fetch(`/api/content/content/${encodeURIComponent(contentNodeId)}/download?stream=true`, {
+              credentials: "include",
+            });
+            if (!res.ok) throw new Error(`could not load the image (HTTP ${res.status})`);
+            source = await res.blob();
+          }
+          if (!source) throw new Error("the image is not available on this device");
+          const read = await recognizeImageText(source);
+          setAttachments((prev) =>
+            prev.map((x) => (x.id === id ? { ...x, ocrStatus: "done", ocrText: read.text, ocrExtraction: read.extraction } : x)),
+          );
+        } catch (error) {
+          setAttachments((prev) =>
+            prev.map((x) =>
+              x.id === id
+                ? { ...x, ocrStatus: "failed", error: error instanceof Error ? error.message : "text could not be read" }
+                : x,
+            ),
+          );
+        }
+      })();
+    }
+  }, [attachments, supportsImageAttachments]);
 
   // Does the active model accept audio inputs (audio-input capability)? Uses
   // effectiveCapabilities so id-inferred audio models (Gemini, gpt-4o-audio)
@@ -3288,6 +3389,8 @@ export function useConversationEngine({
                     contentNodeId: body.contentNodeId,
                     mediaType: body.mediaType,
                     text: body.text,
+                    // D18: kept for on-device OCR when the model can't see.
+                    ...(body.kind === "image" ? { localFile: uploadFile } : {}),
                   }
                 : a,
             ),
@@ -3384,7 +3487,6 @@ export function useConversationEngine({
     researchRunRef.current = null;
     const text = input.trim();
     const ready = attachments.filter((a) => a.status === "ready" && a.url);
-    const hasImageParts = ready.some((a) => a.kind === "image");
     const hasAudioParts = ready.some((a) => a.kind === "audio");
 
     // Nothing to send (no text, no ready attachments).
@@ -3396,13 +3498,9 @@ export function useConversationEngine({
     // a state that's about to change.
     clearFollowUps();
 
-    // Vision guard: a text-only model can't read images.
-    if (hasImageParts && !supportsImageAttachments) {
-      toast.error(
-        "The selected model can't read images. Switch to a vision-capable model or remove the image.",
-      );
-      return;
-    }
+    // No vision guard (D18): a model that can't see gets each image's text,
+    // read on this device (the OCR effect; Send waits for it through
+    // attachmentsUploading). The chat route inlines it.
 
     // Audio guard: only audio-input-capable models can hear a clip. Without
     // this the model silently gets a placeholder and ignores the audio.
@@ -3470,6 +3568,12 @@ export function useConversationEngine({
       // non-native files, `key` so trash purge can delete the blob.
       const app: Record<string, string> = {};
       if (a.kind !== "image" && a.text) app.text = a.text;
+      // D18: the image's text for a model that can't see it. A vision model
+      // still gets the image itself — the route decides by the executed model.
+      if (a.kind === "image" && a.ocrStatus === "done" && a.ocrExtraction) {
+        app.ocrText = a.ocrText ?? "";
+        app.ocrExtraction = JSON.stringify(a.ocrExtraction);
+      }
       if (a.storageKey) app.key = a.storageKey;
       if (a.contentNodeId) app.contentNodeId = a.contentNodeId;
       if (Object.keys(app).length > 0) part.providerMetadata = { app };
@@ -3528,6 +3632,10 @@ export function useConversationEngine({
           browserExtensionAvailable: isExtensionAcquireAvailable(),
           // Slice 5c co-browse gate — same per-call-body requirement.
           coBrowseAvailable: isCoBrowseAvailable(),
+          // read_image_text gate (OCR-PASTE-PLAN D8) — same requirement.
+          localOcrAvailable: isLocalOcrSupported(),
+          // view_screen gate (AI-VIEW-SCREEN-PLAN D1) — same requirement.
+          appCaptureAvailable: isAppCaptureSupported(),
         },
       },
     );
@@ -3536,7 +3644,6 @@ export function useConversationEngine({
     attachments,
     attachmentsUploading,
     folderGates,
-    supportsImageAttachments,
     supportsAudioAttachments,
     pendingUserPartsRef,
     sendMessage,

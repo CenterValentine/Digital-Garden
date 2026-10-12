@@ -11,8 +11,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { X, Search, Scissors } from "lucide-react";
-import type { JSONContent } from "@tiptap/core";
-import { useEditorInstanceStore } from "@/state/editor-instance-store";
+import type { Editor, JSONContent } from "@tiptap/core";
 import { useSnippetStore } from "@/state/snippet-store";
 import type { SnippetWithCategory } from "@/lib/domain/snippets";
 import { getViewerExtensions } from "@/lib/domain/editor/extensions-client";
@@ -25,7 +24,14 @@ function getSnippetInsertExtensions() {
   return snippetInsertExtensions;
 }
 
-export function SnippetPicker() {
+/**
+ * Every editor mounts its own picker, and the slash command names its editor in
+ * the open event — so in a split (or inside a Note Window) only THIS editor's
+ * picker opens, and it inserts into this editor. It used to open in every pane
+ * and insert into the first registered editor, often another pane's note.
+ * Same addressing as MoveSelectionPicker.
+ */
+export function SnippetPicker({ editor }: { editor: Editor | null }) {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -34,7 +40,8 @@ export function SnippetPicker() {
 
   // Listen for the open event from slash commands
   useEffect(() => {
-    const handleOpen = () => {
+    const handleOpen = (event: Event) => {
+      if ((event as CustomEvent<{ editor?: Editor }>).detail?.editor !== editor) return;
       setIsOpen(true);
       // Reset loading state in case a previous fetch left it stuck
       useSnippetStore.setState({ isLoading: false });
@@ -44,7 +51,7 @@ export function SnippetPicker() {
 
     window.addEventListener("open-snippet-picker", handleOpen);
     return () => window.removeEventListener("open-snippet-picker", handleOpen);
-  }, [fetchSnippets, fetchCategories]);
+  }, [fetchSnippets, fetchCategories, editor]);
 
   // Auto-focus search input when opened
   useEffect(() => {
@@ -54,7 +61,6 @@ export function SnippetPicker() {
   }, [isOpen]);
 
   const handleSelect = useCallback((snippet: SnippetWithCategory) => {
-    const editor = Object.values(useEditorInstanceStore.getState().editorsByContentId).find(Boolean) ?? null;
     if (!editor) return;
 
     // If snippet has tiptapJson, use that; otherwise insert plain text
@@ -80,7 +86,7 @@ export function SnippetPicker() {
     // Track usage
     fetch(`/api/content/snippets/${snippet.id}/use`, { method: "POST" }).catch(() => {});
     fetchSnippets();
-  }, [fetchSnippets]);
+  }, [fetchSnippets, editor]);
 
   const handleClose = useCallback(() => {
     setIsOpen(false);

@@ -6,17 +6,17 @@ export const workplacesExtensionManifest: ExtensionManifest = {
   id: WORKPLACES_EXTENSION_ID,
   label: "Workplaces",
   description:
-    "Built-in workplace extension for saved workspace layouts, ownership flows, and overlap protection.",
+    "Built-in workplace extension for saved workspace layouts, views, and workbenches.",
   iconName: "Briefcase",
   enabledByDefault: true,
   canDisable: true,
   navItems: [],
-  surfaces: ["shell", "global-dialog"],
+  surfaces: ["shell"],
   settings: {
     path: "/settings/extensions/workplaces",
     label: "Workplaces",
     title: "Workplaces",
-    description: "Manage saved workplaces and claimed content.",
+    description: "Manage saved workplaces.",
     order: 40,
   },
 };

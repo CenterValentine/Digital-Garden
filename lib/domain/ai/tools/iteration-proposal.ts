@@ -556,7 +556,13 @@ export const ITERATION_PROPOSAL_INPUT = z.object({
     .string()
     .optional()
     .describe(
-      'The ongoing MATTER this run belongs to (continue-or-create): pass the quest\'s name when the user mentions a past matter to continue ("my job hunt") — the same quest across sittings shares one ledger and skips already-scored items. Omit for a brand-new matter (a quest is then created from the run\'s label).',
+      'The ongoing MATTER this run belongs to. Quests are REUSED BY DEFAULT: pass the EXACT name of the existing quest this run continues (the charter context lists them) — the same quest across sittings shares one ledger and skips already-scored items. One job, one company, one URL is an ITEM of a quest, never a quest of its own. A name that matches no existing quest is refused unless newQuest is true. The charter\'s first quest is created from this name (or the run\'s label).',
+    ),
+  newQuest: z
+    .boolean()
+    .optional()
+    .describe(
+      "true ONLY when the user explicitly asked for a separate, new quest (a new matter) although the charter already has quests. Never set it to file one item under its own quest.",
     ),
   questColumns: z
     .array(

@@ -57,6 +57,7 @@ import {
 } from "@/lib/domain/ai/resumable/association";
 import type { JSONContent } from "@tiptap/core";
 import { extractSearchTextFromTipTap } from "@/lib/domain/content/search-text";
+import { stripPrivateContent } from "@/lib/domain/content/private-content";
 import { requireAuth } from "@/lib/infrastructure/auth";
 import { getUserSettings } from "@/lib/features/settings";
 import { getChatContextBody } from "@/lib/features/chat-contexts";
@@ -209,7 +210,11 @@ import {
   ensureConversationContentNode,
 } from "@/lib/features/conversations";
 import { publishEvent } from "@/lib/domain/notifications";
-import { resolveNativeWebSearchTool } from "@/lib/domain/ai/acquisition";
+import {
+  noteNativeSearchRejection,
+  resolveNativeWebSearchTool,
+  supportsNativeWebSearch,
+} from "@/lib/domain/ai/acquisition";
 import { userHasSearchConnection } from "@/lib/domain/ai/acquisition/search/resolve";
 import { createAppWebSearchTool } from "@/lib/domain/ai/acquisition/search/tool";
 import { repairDanglingToolCalls } from "@/lib/domain/ai/repair-dangling-tools";
@@ -241,7 +246,19 @@ import {
   coBrowseActTool,
   readCurrentPageTool,
   listTabsTool,
+  readImageTextTool,
+  viewScreenTool,
+  createViewImageTool,
 } from "@/lib/domain/ai/tools/registry";
+import {
+  READ_IMAGE_TEXT,
+  describeImageMention,
+  ocrAttachmentBlock,
+  type OcrExtractionProfile,
+} from "@/lib/domain/ai/tools/read-image-text";
+import { VIEW_SCREEN } from "@/lib/domain/ai/tools/view-screen";
+import { VIEW_IMAGE } from "@/lib/domain/ai/tools/view-image";
+import { deliverScreenCaptures, screenDeliveryMode } from "@/lib/domain/ai/screen-delivery";
 import { READ_PAGE_HEADLESS_OR_BROWSER } from "@/lib/domain/ai/tools/read-page-in-browser";
 import { OPEN_TAB_AND_READ } from "@/lib/domain/ai/tools/open-tab-and-read";
 import {
@@ -267,7 +284,12 @@ import {
   type PrefixFingerprint,
 } from "@/lib/domain/ai/prompt-prefix-diag";
 import { readRunLedgerCaptureConfig } from "@/lib/domain/ai/run-ledger";
-import { MASTER_LEDGER_META_KEY, parseQuestInfo } from "@/lib/domain/ai/quests";
+import {
+  MASTER_LEDGER_META_KEY,
+  listQuestLabels,
+  parseQuestInfo,
+  tableColumnKeys,
+} from "@/lib/domain/ai/quests";
 import { after } from "next/server";
 import { assembleFolderChatContext } from "@/extensions/studio/server/source-selection";
 import { refreshContextOnAccess } from "@/lib/domain/ai-context/context-refresh";
@@ -291,6 +313,10 @@ import type {
   ResolvedModelRoute,
 } from "@/lib/domain/ai/model-directive";
 import { renderCharterSection } from "@/lib/domain/ai/charters/render";
+import { CHARTER_SCHEMA_PREFLIGHT } from "@/lib/domain/ai/charters/schema-preflight";
+import { collectColumnLinkIds, parseColumnAnchor } from "@/lib/domain/data/column-anchor";
+import { onlyUuids } from "@/lib/domain/content/uuid";
+import { describeLinkedColumns } from "@/lib/domain/data/server/column-links";
 import { buildCharterIngest } from "@/lib/domain/ai/charters/ingest";
 import { autoApprovedToolsFrom } from "@/lib/domain/ai/tools/approval-policy";
 import type { ParsedCharter } from "@/lib/domain/ai/charters/parse";
@@ -490,11 +516,37 @@ async function resolveCharterReferenceContext(
       "\n\n**Referenced folder context:**\n\n" + sections.join("\n\n");
   }
 
+  // `[[Database#Column]]` links name ONE column: give the model its header
+  // and description up front (lib/domain/data/server/column-links.ts).
+  // Picker-made links carry the column id; hand-typed ones resolve by name
+  // within the database they name.
+  const columnRefs = references.filter(
+    (reference) => reference.column && byTitle.get(reference.targetTitle)?.contentType === "data",
+  );
+  const linkedColumns = columnRefs.length
+    ? await describeLinkedColumns(
+        userId,
+        columnRefs.flatMap((reference) => (reference.column?.id ? [reference.column.id] : [])),
+        columnRefs.flatMap((reference) =>
+          reference.column && !reference.column.id
+            ? [
+                {
+                  databaseId: byTitle.get(reference.targetTitle)!.id,
+                  databaseTitle: reference.targetTitle,
+                  name: reference.column.name,
+                },
+              ]
+            : [],
+        ),
+      )
+    : "";
+
   return {
     manifest:
       "\n\n**Linked extensions** " +
       "(call read_content with the contentId below when the current phase needs one — not preloaded):\n" +
       lines.join("\n") +
+      (linkedColumns ? `\n\n${linkedColumns}` : "") +
       folderCapsules,
     activeReferenceContentIds,
   };
@@ -510,6 +562,19 @@ export async function POST(request: Request) {
       );
 
       const body = await request.json();
+
+      // Column mentions (`@[Jobs#Status](column:<id>)`, the composer's Tab
+      // drill) are not content ids: split them off BEFORE any lookup sees
+      // them — every consumer below queries a @db.Uuid column, and a
+      // non-UUID there throws instead of matching nothing.
+      const columnMentionIds: string[] = [];
+      if (Array.isArray(body.mentionedContentIds)) {
+        body.mentionedContentIds = body.mentionedContentIds.filter((id: unknown) => {
+          const columnId = typeof id === "string" ? parseColumnAnchor(id) : null;
+          if (columnId) columnMentionIds.push(columnId);
+          return !columnId;
+        });
+      }
 
       // AI SDK v6 sends messages as UIMessage[] with `parts` arrays
       // Cache volley (§10 round 3): the transcript is cut at the pending
@@ -627,6 +692,14 @@ export async function POST(request: Request) {
       // panel (the client sends true only from the /embed/panel surface); gates
       // the client-executed co_browse_* tools.
       const coBrowseAvailable = body.coBrowseAvailable === true;
+      // OCR-PASTE-PLAN D8: the client reports it can run local OCR (a browser
+      // with Worker + WebAssembly). Gates the client-executed read_image_text,
+      // so a headless caller is never offered a tool nothing would execute.
+      const localOcrAvailable = body.localOcrAvailable === true;
+      // AI-VIEW-SCREEN-PLAN D1: the app reports it can rasterize itself (a
+      // browser outside the side panel). With coBrowseAvailable (the panel,
+      // which captures the active web page) this gates view_screen.
+      const appCaptureAvailable = body.appCaptureAvailable === true;
       // Agentic Browsing Phase 1: derive the active research run's page budget
       // from the conversation history — the propose_research_run result always
       // rides in body.messages, whereas a client body flag can't reliably reach
@@ -1478,6 +1551,9 @@ export async function POST(request: Request) {
           (aiSettings as { toolConfig?: unknown }).toolConfig,
         ),
         charterFinalPhase: false,
+        // Set after tool filtering below (read_content reads it at execute time).
+        imageTextReadable: false,
+        imageViewable: false,
         // Executed model identity (cost metering): lets ledger stamps
         // price the run's tokens. Bare id + vendor, post-resolution.
         executedModel: {
@@ -1515,6 +1591,12 @@ export async function POST(request: Request) {
         // for a research turn (undefined outside a research run → default cap).
         researchPageBudget: researchPageBudget ?? undefined,
       };
+      // Can the EXECUTED model see? The connection's own model row carries
+      // capabilities the user or the fetcher saved; the bare id alone misses
+      // those (AI-VIEW-SCREEN-PLAN D2).
+      const visionCapable = effectiveCapabilities(
+        activeConnection?.models.find((m) => m.id === activeModelId) ?? { id: activeModelId },
+      ).has("vision");
       const allTools = {
         ...createBaseTools(toolCtx),
         ...createFlashcardTools(toolCtx),
@@ -1553,6 +1635,25 @@ export async function POST(request: Request) {
               [LIST_TABS]: listTabsTool,
             }
           : {}),
+        // OCR-PASTE-PLAN D8: CLIENT-executed (no server `execute`). The engine's
+        // onToolCall downloads the image and reads its text on the user's device.
+        ...(localOcrAvailable
+          ? {
+              [READ_IMAGE_TEXT]: readImageTextTool,
+            }
+          : {}),
+        // AI-VIEW-SCREEN-PLAN D1/D2: CLIENT-executed. Only where something can
+        // capture (the panel → the active page; the app → itself), and only
+        // for a model that can SEE — a text-only model offered a screenshot
+        // would "look" and invent what it saw.
+        ...((coBrowseAvailable || appCaptureAvailable) && visionCapable
+          ? {
+              [VIEW_SCREEN]: viewScreenTool,
+            }
+          : {}),
+        // AI-VIEW-SCREEN-PLAN D14: SERVER-executed — a vision model sees an
+        // image file itself (OCR's words remain the text-only fallback).
+        ...(visionCapable ? { [VIEW_IMAGE]: createViewImageTool(toolCtx) } : {}),
       };
       const toolConfig = (aiSettings as { toolConfig?: Record<
         string,
@@ -1588,6 +1689,10 @@ export async function POST(request: Request) {
             !(browserExtensionAvailable && id === "read_page"),
         ),
       );
+      // read_content points at an image's text only when something can read it
+      // this turn — registered (a browser asked for it) AND not switched off.
+      toolCtx.imageTextReadable = READ_IMAGE_TEXT in tools;
+      toolCtx.imageViewable = VIEW_IMAGE in tools;
 
       // What the model is TOLD it has. The `tools` object above stays
       // complete for the rest of this request: `activeTools` narrows only what
@@ -1644,6 +1749,14 @@ export async function POST(request: Request) {
           if (id in tools) advertised.add(id);
         }
       }
+      // view_screen is advertised wherever it is registered (a vision model on
+      // a surface that can capture) — AI-VIEW-SCREEN-PLAN D15. Summonable, it
+      // was invisible: GPT-4o asked twice for "a screenshot of my screen"
+      // called view_image on the bound file, then said it could not capture
+      // the screen (owner smoke 2026-10-09). "Look at my screen" carries no
+      // id or text a hint could name it from, so only advertising reaches it
+      // (~200 tokens, only where it can run).
+      if (VIEW_SCREEN in tools) advertised.add(VIEW_SCREEN);
 
       // P0 (AI v3 core S2): provider-native web search, resolved per active
       // provider at request composition. CRITICAL: key off the EXECUTED
@@ -1670,8 +1783,13 @@ export async function POST(request: Request) {
       const executedProviderId = NATIVE_TOOL_VENDORS.has(executedVendorId)
         ? executedVendorId
         : null;
+      // A model that rejects its vendor's hosted search (catalog
+      // `nativeWebSearch: false`, or learned from a rejection) falls through
+      // to the app-executed search below, like a vendor with none.
       const nativeSearch =
-        executedProviderId && NATIVE_TOOL_VENDORS.has(executedProviderId)
+        executedProviderId &&
+        NATIVE_TOOL_VENDORS.has(executedProviderId) &&
+        supportsNativeWebSearch(executedProviderId, executedBareModelId)
           ? resolveNativeWebSearchTool(executedProviderId)
           : null;
       const searchEnabled = toolConfig["search_web"]?.enabled !== false;
@@ -1770,6 +1888,28 @@ export async function POST(request: Request) {
         noticeStep: -1,
         noticeCarriedForStep: -1,
       };
+      // A RESULT THAT NAMES A TOOL TURNS IT ON (AI-VIEW-SCREEN-PLAN D14).
+      // read_content and mentions point the model at view_image /
+      // read_image_text, which are summonable rather than advertised. GPT-4o
+      // told to "call read_image_text" with no such tool in its list re-read
+      // the note in a loop (owner smoke 2026-10-09). Telling the model to call
+      // a tool it cannot see is the harness's bug, not the model's — so a
+      // registered tool a result names is advertised from the next step.
+      const RESULT_NAMED_TOOLS = [VIEW_IMAGE, READ_IMAGE_TEXT];
+      const activateNamedTools = (text: unknown, source: string) => {
+        if (typeof text !== "string") return;
+        for (const id of RESULT_NAMED_TOOLS) {
+          if (id in tools && !isAdvertised(id) && text.includes(id)) {
+            activated.add(id);
+            logger.info({
+              layer: "ai",
+              event: "ai:result_named_activation",
+              summary: `${id} advertised — named by ${source}`,
+              attrs: { tool: id, source },
+            });
+          }
+        }
+      };
       for (const [name, entry] of Object.entries(
         tools as Record<string, { execute?: unknown } | undefined>,
       )) {
@@ -1790,6 +1930,7 @@ export async function POST(request: Request) {
             });
           }
           const output = await original(input, options);
+          activateNamedTools(output, name);
           // THE BUDGET RIDES THE RESULT (§10 round 3). A trailing harness
           // USER message on every step froze the provider cache at the
           // user's own message — every run with the notice froze there,
@@ -1816,6 +1957,18 @@ export async function POST(request: Request) {
         registered,
       )) {
         activated.add(id);
+      }
+      // …and this turn's name-activations (D14): a client-run tool opens a new
+      // request, which must still advertise what an earlier result named.
+      {
+        const history = (body as { messages?: UIMessage[] }).messages ?? [];
+        const lastUser = history.map((m) => m.role).lastIndexOf("user");
+        for (const message of history.slice(lastUser + 1)) {
+          for (const part of message.parts ?? []) {
+            const output = (part as { output?: unknown }).output;
+            if (typeof output === "string") activateNamedTools(output, "turn-history");
+          }
+        }
       }
 
       // Ordering is the only focus mechanism a menu has. Tool absence used to
@@ -1899,11 +2052,20 @@ export async function POST(request: Request) {
         ),
         executedVendorId,
         audioCapable,
+        visionCapable,
       );
 
       // Convert UIMessages to ModelMessages for streamText
-      let modelMessages = await convertToModelMessages(
-        resolvedMessages as Parameters<typeof convertToModelMessages>[0],
+      // view_screen results carry a URL; hand the image itself to the model —
+      // inside the tool result where the adapter supports it, as a labelled
+      // image part where it doesn't (AI-VIEW-SCREEN-PLAN D8). Touches only
+      // view_screen parts; folded (earlier-turn) results carry no image.
+      const screenMode = screenDeliveryMode(activeConnection?.adapterKind);
+      let modelMessages = deliverScreenCaptures(
+        await convertToModelMessages(
+          resolvedMessages as Parameters<typeof convertToModelMessages>[0],
+        ),
+        screenMode,
       );
 
       // Fetch mentioned content for @ mentions (max 5 to limit token usage)
@@ -2150,6 +2312,14 @@ export async function POST(request: Request) {
             if (dataSection) return dataSection;
             const bookSection = bookSections.get(node.id);
             if (bookSection) return bookSection;
+            // An image file with no extracted text: say it is an image and how
+            // to read it. The generic branch below said "(no text content
+            // available)", and the model reported a book-cover PNG as empty
+            // without trying read_image_text (owner smoke, 2026-10-09).
+            const fileMime = node.filePayload?.mimeType ?? "";
+            if (node.contentType === "file" && fileMime.startsWith("image/") && !node.filePayload?.searchText?.trim()) {
+              return `### ${node.title}\n${describeImageMention(node.id, fileMime, toolCtx.imageTextReadable === true, toolCtx.imageViewable === true)}`;
+            }
             // Derive live from the JSON, never trust the materialized column:
             // it may predate the private-content strip (or the atomic-inline
             // fix) — the same reason read_content re-derives. A note whose
@@ -2169,7 +2339,50 @@ export async function POST(request: Request) {
             return `### ${node.title}\n${props ? `${props}\n\n` : ""}${text.slice(0, 2000)}`;
           });
           sections.push(...linkedFolderSections);
+          // `[[Database#Column]]` links in the mentioned notes: the column's
+          // header + description (lib/domain/data/server/column-links.ts),
+          // from the private-stripped JSON the text above was derived from.
+          const mentionedColumns = await describeLinkedColumns(
+            session.user.id,
+            mentionedNodes.flatMap((node) =>
+              node.notePayload?.tiptapJson &&
+              !folderSections.has(node.id) &&
+              !dataSections.has(node.id)
+                ? collectColumnLinkIds(
+                    stripPrivateContent(node.notePayload.tiptapJson as JSONContent),
+                  )
+                : [],
+            ),
+          );
+          if (mentionedColumns) sections.push(mentionedColumns);
           mentionedContext = `\n\nThe user has referenced the following content:\n\n${sections.join("\n\n")}`;
+        }
+      }
+
+      // Mentioned COLUMNS: header + description from the one describer, and
+      // their databases attached to the chat so query_database reaches them
+      // (a column mention is a mention of its table too).
+      if (columnMentionIds.length > 0) {
+        const columnsBlock = await describeLinkedColumns(session.user.id, columnMentionIds);
+        if (columnsBlock) {
+          mentionedContext += mentionedContext
+            ? `\n\n${columnsBlock}`
+            : `\n\nThe user has referenced the following database columns:\n\n${columnsBlock}`;
+        }
+        if (conversationIdForAssoc) {
+          const columnTables = await prisma.dataColumn
+            .findMany({
+              where: { id: { in: onlyUuids(columnMentionIds) }, deletedAt: null },
+              select: { tableId: true },
+            })
+            .catch(() => []);
+          void Promise.all(
+            Array.from(new Set(columnTables.map((column) => column.tableId))).map((tableId) =>
+              addAutoAssociation(session.user.id, conversationIdForAssoc, tableId, "mention").catch(
+                () => null,
+              ),
+            ),
+          );
         }
       }
 
@@ -2300,6 +2513,9 @@ export async function POST(request: Request) {
           });
         }
       }
+      // A mention that tells the model to call an image tool advertises it
+      // from the first step (D14) — same rule as a tool result naming one.
+      activateNamedTools(mentionedContext, "mention");
 
       // Playbook progressive disclosure (AI v3.2 T3): inject standing rules
       // + the ACTIVE PHASE ONLY — never the whole playbook. `[[wiki-link]]`
@@ -2385,8 +2601,19 @@ export async function POST(request: Request) {
                     select: { id: true, title: true },
                   })
                 : null;
+            // Reuse by default (owner rule 2026-10-09): the model can only
+            // continue a quest it knows the name of — list them.
+            const existingQuests = masterLedger
+              ? await listQuestLabels(masterLedger.id, await tableColumnKeys(masterLedger.id)).catch(() => [])
+              : [];
+            const questsNote = existingQuests.length
+              ? ` Existing quests (REUSE one — pass its exact name as \`quest\`; an item such as one job is never its own quest): ${existingQuests
+                  .slice(0, 12)
+                  .map((q) => `"${q}"`)
+                  .join(", ")}${existingQuests.length > 12 ? ", …" : ""}.`
+              : "";
             const ledgerNote = masterLedger
-              ? `\n\n**Ledgers:** this charter's master ledger is the database "${masterLedger.title}" (id ${masterLedger.id}) — one row per QUEST (an ongoing matter, e.g. one job hunt). A quest and its per-item QUEST LEDGER are created when the user approves propose_item_iteration with a \`quest\` name; never create quest rows by hand. The user may extend either ledger with propose_database_columns (add-only). Their SYSTEM columns are locked — no rename, retype, option edit, or delete — say so if asked. Do NOT call propose_output_database to "create this charter's database": it exists. Output databases are only for CAPTURED items (captureTo).`
+              ? `\n\n**Ledgers:** this charter's master ledger is the database "${masterLedger.title}" (id ${masterLedger.id}) — one row per QUEST (an ongoing matter, e.g. one job hunt).${questsNote} A quest and its per-item QUEST LEDGER are created when the user approves propose_item_iteration with a \`quest\` name; never create quest rows by hand. The user may extend either ledger with propose_database_columns (add-only). Their SYSTEM columns are locked — no rename, retype, option edit, or delete — say so if asked. Do NOT call propose_output_database to "create this charter's database": it exists. Output databases are only for CAPTURED items (captureTo).`
               : "";
             const placeholderCount = countStarterPlaceholderPhases(parsed);
             const placeholderNote =
@@ -2476,7 +2703,7 @@ export async function POST(request: Request) {
                 (standingText
                   ? `**Standing rules (always apply):**\n${standingText}\n\n`
                   : "") +
-                `**Current phase (the ONLY phase detail loaded):**\n${phaseText}${referenceContext.manifest}` +
+                `**Current phase (the ONLY phase detail loaded):**\n${phaseText}${referenceContext.manifest}\n\n${CHARTER_SCHEMA_PREFLIGHT}` +
                 ledgerNote +
                 placeholderNote +
                 duplicateNote;
@@ -2580,7 +2807,8 @@ export async function POST(request: Request) {
                 : "") +
               (phaseText ||
                 "This rooted charter contains no executable instructions. Tell the user it needs content before it can run.") +
-              referenceContext.manifest;
+              referenceContext.manifest +
+              `\n\n${CHARTER_SCHEMA_PREFLIGHT}`;
           }
         } catch (rootedPlaybookError) {
           logger.warn({
@@ -3198,7 +3426,11 @@ export async function POST(request: Request) {
         // added the columns") — a confabulated answer is strictly worse
         // than the silence this fixes. Telling it the loop is over makes
         // the honest report the only available move.
-        prepareStep: ({ stepNumber, messages: rawStepMessages }) => {
+        prepareStep: ({ stepNumber, messages: undeliveredStepMessages }) => {
+          // Image-bearing results made IN this request (view_image runs on the
+          // server) reach the model as images too — the same pass as the
+          // transcript's, idempotent on what it already rewrote (D14).
+          const rawStepMessages = deliverScreenCaptures(undeliveredStepMessages, screenMode);
           // One spelling for a tool call whether it was made in this request
           // or resent from the transcript: the SDK's in-request messages
           // carry `openai.itemId` (sent inline as `id`), the transcript has
@@ -3483,6 +3715,20 @@ export async function POST(request: Request) {
         },
         onError: ({ error }) => {
           streamSpan.fail(error);
+          // "Tool 'web_search_preview' is not supported with gpt-4." — leave
+          // the hosted search off for that model from the next request on.
+          const rejectedModel = noteNativeSearchRejection(
+            executedVendorId,
+            error instanceof Error ? error.message : String(error),
+          );
+          if (rejectedModel) {
+            logger.warn({
+              layer: "ai",
+              event: "ai:native_search_rejected",
+              summary: `${executedVendorId} rejected hosted web search for ${rejectedModel} — off for this model from now on`,
+              attrs: { vendor: executedVendorId, model: rejectedModel },
+            });
+          }
         },
       });
 
@@ -3805,7 +4051,8 @@ const PDF_NATIVE_PROVIDERS = new Set(["anthropic", "google"]);
  * The client persists attachments as file parts (a clean chip), stashing
  * server-extracted text in `providerMetadata.app.text` for non-image
  * types. Here we adapt each user message for the model:
- *   - images → kept (vision providers consume them);
+ *   - images → kept for a vision model; for one that can't see, the text
+ *     read from them on the user's device is inlined instead (D18);
  *   - PDFs → kept for Anthropic/Google (native document parts), else the
  *     extracted text is inlined and the part dropped;
  *   - other files (txt/md/csv/json) → always inlined as text.
@@ -3818,6 +4065,7 @@ function resolveAttachmentsForModel(
   messages: unknown[],
   providerId: string,
   audioCapable: boolean,
+  visionCapable: boolean,
 ): unknown[] {
   const nativePdf = PDF_NATIVE_PROVIDERS.has(providerId);
 
@@ -3841,6 +4089,12 @@ function resolveAttachmentsForModel(
 
     const kept: unknown[] = [];
     const inlined: string[] = [];
+    // D18: number a message's images for a model that can't see them, in
+    // attachment order — pasted screenshots all share the name image.png.
+    const imageTotal = (m.parts as Array<Record<string, unknown>>).filter(
+      (x) => x?.type === "file" && typeof x.mediaType === "string" && x.mediaType.startsWith("image/"),
+    ).length;
+    let imageIndex = 0;
 
     for (const p of m.parts as Array<Record<string, unknown>>) {
       if (p?.type !== "file") {
@@ -3857,6 +4111,28 @@ function resolveAttachmentsForModel(
       const isImage = mediaType.startsWith("image/");
       const isPdf = mediaType === "application/pdf";
       const isAudio = mediaType.startsWith("audio/");
+
+      // D18: a model that can't see gets the image's TEXT, read on the user's
+      // device at attach time, labelled with how it was read and what to
+      // doubt. Never the image part — a text-only provider rejects it or
+      // drops it silently.
+      if (isImage && !visionCapable) {
+        imageIndex += 1;
+        const appMeta = (p.providerMetadata as Record<string, Record<string, unknown>> | undefined)?.app;
+        let profile: OcrExtractionProfile | null = null;
+        try {
+          profile = typeof appMeta?.ocrExtraction === "string" ? (JSON.parse(appMeta.ocrExtraction) as OcrExtractionProfile) : null;
+        } catch {
+          profile = null;
+        }
+        inlined.push(
+          ocrAttachmentBlock(filename, typeof appMeta?.ocrText === "string" ? appMeta.ocrText : "", profile, {
+            index: imageIndex,
+            total: imageTotal,
+          }),
+        );
+        continue;
+      }
 
       if (isImage || (isPdf && nativePdf) || (isAudio && audioCapable)) {
         kept.push(stripAppMeta(p));

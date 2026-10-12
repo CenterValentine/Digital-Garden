@@ -82,6 +82,7 @@ import { FlashcardCardProposalList } from "./FlashcardCardProposalList";
 import { cn } from "@/lib/core/utils";
 import { calculateMenuPosition, type CalculatedPosition } from "@/lib/core/menu-positioning";
 import { useContentStore } from "@/state/content-store";
+import { parseColumnAnchor } from "@/lib/domain/data/column-anchor";
 import { ArtifactContextMenu, openArtifactInSplitPane } from "./artifact-open";
 import { useSettingsStore } from "@/state/settings-store";
 import { useNotesPanelStore } from "@/state/notes-panel-store";
@@ -163,7 +164,9 @@ import {
   type OutputTarget,
 } from "@/lib/domain/ai/output-target";
 import { inferReplyExportTitle } from "@/lib/domain/ai/reply-export";
+import { screenImageOf } from "@/lib/domain/ai/tools/view-screen";
 import { toast } from "sonner";
+import { MENTION_RE as MENTION_PATTERN } from "@/lib/domain/ai/mention-markup";
 
 /**
  * Detect tool parts in AI SDK v6 UIMessage.
@@ -658,7 +661,7 @@ export const ChatMessage = memo(function ChatMessage({
     // user sees readable text; we restore the canonical form on save.
     const map: Array<{ label: string; id: string }> = [];
     const cleaned = messageText.replace(
-      /@\[([^\]]+)\]\(([^)]+)\)/g,
+      new RegExp(MENTION_PATTERN.source, "g"),
       (_, label, id) => {
         map.push({ label, id });
         return `@${label}`;
@@ -1981,7 +1984,6 @@ function MessageActionButton({
 
 // ─── Markdown Renderer ───────────────────────────────────────
 
-const MENTION_PATTERN = /@\[([^\]]+)\]\(([^)]+)\)/g;
 
 /**
  * `[[Title]]` / `[[Title|Display]]` as the model writes it — copied from the
@@ -3019,12 +3021,17 @@ function AssistantAvatar({
 
 /** Clickable mention pill — navigates to the referenced content */
 function MentionPill({ title, contentId }: { title: string; contentId: string }) {
+  // A column mention (`column:<id>`) names part of a table, not a content
+  // node — it has nothing of its own to open.
+  const isColumn = parseColumnAnchor(contentId) !== null;
   return (
     <button
       type="button"
       onClick={() => {
+        if (isColumn) return;
         useContentStore.getState().setSelectedContentId(contentId);
       }}
+      title={isColumn ? "Database column — the AI reads its description" : undefined}
       // Same data contract as the composer's pills, so a copy from a bubble
       // serializes to `@[Title](id)` (serializeSelectionForCopy).
       data-mention="true"
@@ -3729,7 +3736,9 @@ function ApprovalPreviewRest({
     const objective = str("objective");
     if (objective) fields.push(["Objective", objective]);
     const quest = str("quest");
-    if (quest) fields.push(["Quest", quest]);
+    // Quests are reused by default; a new one is the user's explicit call,
+    // so the card says so where they approve it.
+    if (quest) fields.push(["Quest", a.newQuest === true ? `${quest} — NEW quest` : quest]);
     fields.push([
       "Source",
       rowsPass
@@ -4068,6 +4077,8 @@ function ToolCallBubble({
     return "ok";
   }, [isRunning, wasStopped, hasError, hasResult, result, toolName, pinState]);
 
+  const screenImage = (toolName === "view_screen" || toolName === "view_image") && hasResult ? screenImageOf(result) : null;
+
   // Human action phrase — describes what the tool is *doing* (present
   // tense while running, past tense when done) rather than echoing the
   // raw tool identifier.
@@ -4152,6 +4163,42 @@ function ToolCallBubble({
         }
         const suffix = host ? `: ${host}` : "";
         return `${isRunning ? "Reading" : "Read"} the page you're on${suffix}`;
+      }
+      // read_image_text — local OCR. The chip says what came back, so "no text"
+      // and a failure read differently from a successful read.
+      if (toolName === "read_image_text") {
+        if (isRunning) return "Reading text in an image";
+        const r = result as { ok?: boolean; untrustedImageText?: string } | null;
+        if (r?.ok === false) return "Couldn't read the image";
+        const chars = r?.untrustedImageText?.length ?? 0;
+        return chars > 0 ? `Read text in an image (${chars.toLocaleString("en-US")} characters)` : "No text found in the image";
+      }
+      // view_image (D14): name the image looked at.
+      if (toolName === "view_image") {
+        if (isRunning) return "Looking at an image";
+        const r = result as { ok?: boolean; title?: string } | null;
+        if (!r || r.ok === false) return `Couldn't look at the image${r?.title ? `: ${r.title}` : ""}`;
+        return `Looked at image${r.title ? `: ${r.title}` : ""}`;
+      }
+      // view_screen (AI-VIEW-SCREEN-PLAN D10): say WHAT was looked at.
+      if (toolName === "view_screen") {
+        if (isRunning) return "Looking at the screen";
+        const r = result as { ok?: boolean; via?: string; area?: string; url?: string; title?: string } | null;
+        if (!r || r.ok === false) return "Couldn't capture the screen";
+        if (r.via === "active-tab") {
+          let host = "";
+          try {
+            if (r.url) host = new URL(r.url).hostname.replace(/^www\./, "");
+          } catch {
+            // best-effort host label
+          }
+          return `Looked at the page${host ? `: ${host}` : ""}`;
+        }
+        if (r.area === "window") return "Looked at the app window";
+        if (r.area === "all-panes") return "Looked at all open panes";
+        if (r.area === "left-sidebar") return "Looked at the file tree";
+        if (r.area === "right-sidebar") return "Looked at the right sidebar";
+        return `Looked at the app${r.title ? `: ${r.title}` : ""}`;
       }
       if (toolName === "co_browse_open") {
         const host = hostFromToolArgs(args);
@@ -4283,6 +4330,24 @@ function ToolCallBubble({
           />
         )}
       </button>
+      {screenImage && (
+        // What the model saw — exactly the uploaded image (D10).
+        <a
+          href={screenImage.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block border-t border-black/[0.06] dark:border-white/[0.06] px-3 py-2"
+          title="Open the screenshot the assistant received"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element -- presigned storage URL, not a static asset */}
+          <img
+            src={screenImage.url}
+            alt="Screenshot the assistant looked at"
+            className="max-h-40 w-auto max-w-full rounded border border-black/10 dark:border-white/10"
+            loading="lazy"
+          />
+        </a>
+      )}
       {hasDetails && expanded && resultString && (
         <div className="border-t border-black/[0.06] dark:border-white/[0.06] bg-black/[0.02] dark:bg-black/20">
           <div className="flex items-center justify-between px-3 py-1 text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-500">

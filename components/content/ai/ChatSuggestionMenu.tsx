@@ -9,7 +9,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { FileText, Folder, MessageCircle, File, Wrench, ScrollText, Table } from "lucide-react";
+import { FileText, Folder, MessageCircle, File, Wrench, ScrollText, Table, Columns3, Database } from "lucide-react";
 import { cn } from "@/lib/core/utils";
 
 export interface SuggestionItem {
@@ -32,6 +32,10 @@ interface ChatSuggestionMenuProps {
   selectedIndex: number;
   onSelect: (item: SuggestionItem) => void;
   mode: "mention" | "command";
+  /** Replaces the default header (e.g. "Columns of Jobs" while drilled in). */
+  header?: string;
+  /** A one-line hint under the list (e.g. Tab on a database). */
+  footer?: string;
 }
 
 function getItemIcon(item: SuggestionItem, mode: "mention" | "command") {
@@ -50,6 +54,10 @@ function getItemIcon(item: SuggestionItem, mode: "mention" | "command") {
       return <MessageCircle className={cn(cls, "text-green-400")} />;
     case "data-row":
       return <Table className={cn(cls, "text-teal-400")} />;
+    case "data":
+      return <Database className={cn(cls, "text-teal-400")} />;
+    case "data-column":
+      return <Columns3 className={cn(cls, "text-teal-400")} />;
     default:
       return <File className={cn(cls, "text-gray-600 dark:text-gray-400")} />;
   }
@@ -60,6 +68,8 @@ export function ChatSuggestionMenu({
   selectedIndex,
   onSelect,
   mode,
+  header,
+  footer,
 }: ChatSuggestionMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -91,7 +101,7 @@ export function ChatSuggestionMenu({
       )}
     >
       <div className="px-2 py-1.5 text-[10px] uppercase tracking-wider text-gray-500 font-medium border-b border-black/5 dark:border-white/5">
-        {mode === "mention" ? "Mention a file" : "Commands"}
+        {header ?? (mode === "mention" ? "Mention a file" : "Commands")}
       </div>
       {items.map((item, i) => (
         <button
@@ -117,6 +127,11 @@ export function ChatSuggestionMenu({
           )}
         </button>
       ))}
+      {footer && (
+        <div className="sticky bottom-0 border-t border-black/5 bg-white px-3 py-1 text-[10px] text-gray-500 dark:border-white/5 dark:bg-[#1a1a1a]">
+          {footer}
+        </div>
+      )}
     </div>
   );
 }

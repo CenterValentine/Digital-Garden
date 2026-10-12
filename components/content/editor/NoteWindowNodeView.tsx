@@ -75,6 +75,14 @@ import {
   useContentPresence,
   isActiveTransport,
 } from "@/lib/domain/collaboration/presence-poll";
+import { noteSaveBody, type SaveMeta } from "@/lib/domain/content/save-meta";
+import {
+  noteBodyHash,
+  noteLoaded,
+  noteSaved,
+  noteSaveGeneration,
+  runNoteSave,
+} from "@/lib/domain/content/note-save-coordinator";
 
 /** Depth at and beyond which nested windows render as inert chips. */
 const NESTED_CHIP_DEPTH = 3;
@@ -398,7 +406,6 @@ export function NoteWindowNodeView({
   // the PATCH round-trip.
   const [titleDraft, setTitleDraft] = useState<string | null>(null);
   const [optimisticTitle, setOptimisticTitle] = useState<string | null>(null);
-  const bodyHashRef = useRef<string | null>(null);
   const retargetBtnRef = useRef<HTMLButtonElement | null>(null);
   const historyBtnRef = useRef<HTMLButtonElement | null>(null);
   const titleInputRef = useRef<HTMLInputElement | null>(null);
@@ -439,6 +446,8 @@ export function NoteWindowNodeView({
     const commit = (state: FetchResult) => {
       if (!cancelled) setFetchResult({ key: fetchKey, state });
     };
+    // Saves of the note that start after this make this load's stamp stale.
+    const loadGeneration = noteSaveGeneration(targetContentId);
     (async () => {
       try {
         const res = await fetch(
@@ -475,7 +484,9 @@ export function NoteWindowNodeView({
           commit({ phase: "not-found" });
           return;
         }
-        bodyHashRef.current = result.data.note?.bodyHash ?? null;
+        // The stamp is per NOTE, shared with the main pane and any other
+        // window of it (lib/domain/content/note-save-coordinator.ts).
+        noteLoaded(targetContentId, result.data.note?.bodyHash ?? null, loadGeneration);
         commit({
           phase: "ready",
           target: {
@@ -710,62 +721,61 @@ export function NoteWindowNodeView({
   // Vercel's edge eats standard If-Match with a 412 before the function
   // runs. On 409 the window NEVER overwrites: banner + refresh is the
   // v1 resolution (no conflict-store port).
+  // Saves go through the per-NOTE coordinator — one at a time across the
+  // main pane and every window of this note, each sent with the stamp the
+  // previous one brought back (an overlapping save used to 409 against its
+  // own write).
   const handlePlainSave = useCallback(
-    async (
-      json: JSONContent,
-      meta?: { userInitiated?: boolean; secondsSinceInput?: number },
-    ) => {
+    async (json: JSONContent, meta?: SaveMeta) => {
       if (!targetContentId) return;
-      try {
-        const res = await fetch(
-          `/api/content/content/${encodeURIComponent(targetContentId)}`,
-          {
-            method: "PATCH",
-            credentials: "include",
-            headers: {
-              "Content-Type": "application/json",
-              ...(bodyHashRef.current
-                ? { "X-Body-Hash": bodyHashRef.current }
-                : {}),
+      const noteId = targetContentId;
+      const send = async (): Promise<void> => {
+        try {
+          const res = await fetch(
+            `/api/content/content/${encodeURIComponent(noteId)}`,
+            {
+              method: "PATCH",
+              credentials: "include",
+              headers: {
+                "Content-Type": "application/json",
+                ...(noteBodyHash(noteId)
+                  ? { "X-Body-Hash": noteBodyHash(noteId)! }
+                  : {}),
+              },
+              body: noteSaveBody(json, meta),
             },
-            body: JSON.stringify({
-              tiptapJson: json,
-              ...(meta?.userInitiated === true && { userInitiated: true }),
-              ...(typeof meta?.secondsSinceInput === "number" && {
-                secondsSinceInput: meta.secondsSinceInput,
-              }),
-            }),
-          },
-        );
-        if (res.status === 409) {
-          setConflict(true);
-          return;
-        }
-        if (res.status === 404 || res.status === 403) {
-          // Target vanished mid-session — swap the body for the same
-          // placeholder the initial load would show.
-          if (fetchKey) {
-            setFetchResult({
-              key: fetchKey,
-              state:
-                res.status === 404
-                  ? { phase: "not-found" }
-                  : { phase: "forbidden" },
-            });
+          );
+          if (res.status === 409) {
+            setConflict(true);
+            return;
           }
-          return;
+          if (res.status === 404 || res.status === 403) {
+            // Target vanished mid-session — swap the body for the same
+            // placeholder the initial load would show.
+            if (fetchKey) {
+              setFetchResult({
+                key: fetchKey,
+                state:
+                  res.status === 404
+                    ? { phase: "not-found" }
+                    : { phase: "forbidden" },
+              });
+            }
+            return;
+          }
+          const result = (await res.json().catch(() => null)) as {
+            success?: boolean;
+            data?: { note?: { bodyHash?: string } };
+          } | null;
+          if (!res.ok || !result?.success) return; // stay dirty; next debounce retries
+          const freshHash = result.data?.note?.bodyHash;
+          noteSaved(noteId, freshHash);
+          setDirty(false);
+        } catch {
+          // network hiccup — stay dirty; the editor's debounce will retry
         }
-        const result = (await res.json().catch(() => null)) as {
-          success?: boolean;
-          data?: { note?: { bodyHash?: string } };
-        } | null;
-        if (!res.ok || !result?.success) return; // stay dirty; next debounce retries
-        const freshHash = result.data?.note?.bodyHash;
-        if (freshHash) bodyHashRef.current = freshHash;
-        setDirty(false);
-      } catch {
-        // network hiccup — stay dirty; the editor's debounce will retry
-      }
+      };
+      return runNoteSave(noteId, send, { keepalive: meta?.keepalive });
     },
     [targetContentId, fetchKey],
   );
@@ -870,7 +880,18 @@ export function NoteWindowNodeView({
     const newTitle = raw.trim();
     if (!newTitle || newTitle === displayTitle || !targetContentId) return;
     const previous = optimisticTitle;
+    const shownBefore = displayTitle;
     setOptimisticTitle(newTitle);
+    const broadcast = (title: string) =>
+      window.dispatchEvent(
+        new CustomEvent("content-updated", {
+          detail: { contentId: targetContentId, updates: { title } },
+        }),
+      );
+    // The file tree, tabs and breadcrumbs take the new name at once (owner,
+    // 2026-10-06) — not after the save, which on a slow database left them
+    // stale for seconds. A failed save puts the old name back everywhere.
+    broadcast(newTitle);
     try {
       const res = await fetch(
         `/api/content/content/${encodeURIComponent(targetContentId)}`,
@@ -887,13 +908,9 @@ export function NoteWindowNodeView({
       // The API can return 200 with success:false — check both.
       if (!res.ok || !result?.success) throw new Error("rename failed");
       if (hostEditable) updateAttrs({ targetTitle: newTitle });
-      window.dispatchEvent(
-        new CustomEvent("content-updated", {
-          detail: { contentId: targetContentId, updates: { title: newTitle } },
-        }),
-      );
     } catch {
       setOptimisticTitle(previous);
+      broadcast(shownBefore);
       toast.error("Failed to rename");
     }
   }, [titleDraft, displayTitle, targetContentId, optimisticTitle, hostEditable, updateAttrs]);

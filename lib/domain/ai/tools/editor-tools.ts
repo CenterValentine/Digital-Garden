@@ -38,6 +38,8 @@ import { prisma } from "@/lib/database/client";
 import { chunkDocument, getChunk, formatChunkOutput } from "./chunking";
 import type { JSONContent } from "@tiptap/core";
 import { stripPrivateContent } from "@/lib/domain/content/private-content";
+import { columnIdsInText } from "@/lib/domain/data/column-anchor";
+import { describeLinkedColumns } from "@/lib/domain/data/server/column-links";
 import { getContentWriteReceiptEnvelope } from "@/lib/domain/ai/content-write-receipts.server";
 import type { ToolExecuteContext } from "./types";
 import type { Extensions } from "@tiptap/core";
@@ -323,6 +325,15 @@ export function createEditorTools(ctx: ToolExecuteContext) {
     return { node, payload: node.notePayload };
   }
 
+  // A chunk is markdown, where a column link reads
+  // `[[Jobs#^column:<id>]]{label="Status"}` — append that column's header
+  // and description (lib/domain/data/server/column-links.ts). Chunks are cut
+  // from the private-stripped document, so only visible links are described.
+  async function withLinkedColumns(chunkOutput: string): Promise<string> {
+    const columns = await describeLinkedColumns(ctx.userId, columnIdsInText(chunkOutput));
+    return columns ? `${chunkOutput}\n\n${columns}` : chunkOutput;
+  }
+
   // ═══════════════════════════════════════════════════════════
   // TOOL DEFINITIONS
   // ═══════════════════════════════════════════════════════════
@@ -346,7 +357,7 @@ export function createEditorTools(ctx: ToolExecuteContext) {
           `Document: "${node.title}"`,
           `Words: ~${(payload.searchText || "").split(/\s+/).filter(Boolean).length}`,
           "",
-          formatChunkOutput(chunk),
+          await withLinkedColumns(formatChunkOutput(chunk)),
         ].join("\n");
       },
     }),
@@ -374,7 +385,7 @@ export function createEditorTools(ctx: ToolExecuteContext) {
           return `You've reached the end of the document. Last chunk was ${currentChunkIndex} of ${chunks.length}.`;
         }
 
-        return formatChunkOutput(getChunk(chunks, nextIndex));
+        return withLinkedColumns(formatChunkOutput(getChunk(chunks, nextIndex)));
       },
     }),
 
@@ -401,7 +412,7 @@ export function createEditorTools(ctx: ToolExecuteContext) {
           return `You're at the beginning of the document. First chunk is index 0.`;
         }
 
-        return formatChunkOutput(getChunk(chunks, prevIndex));
+        return withLinkedColumns(formatChunkOutput(getChunk(chunks, prevIndex)));
       },
     }),
 

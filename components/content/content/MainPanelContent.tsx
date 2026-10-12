@@ -13,7 +13,8 @@ import {
   sameProjectedText,
   sameCanonicalJson,
 } from "@/lib/domain/content/conflict-diff";
-import type { SaveMeta } from "@/lib/domain/content/save-meta";
+import { noteSaveBody, type SaveMeta } from "@/lib/domain/content/save-meta";
+import { useProjectedLayout } from "@/components/common/useProjectedLayout";
 import { usePathname } from "next/navigation";
 import { AlertTriangle } from "lucide-react";
 import { ToolSurfaceProvider } from "@/lib/domain/tools";
@@ -138,6 +139,16 @@ import { usePanelStore } from "@/state/panel-store";
 import { useIsMobile } from "@/components/common/useIsMobile";
 
 import { setLinkAnchorLister, setLinkAnchorSuggester } from "@/lib/domain/content/link-anchor";
+import {
+  noteAdoptServerVersion,
+  noteBodyHash,
+  noteCached,
+  noteLoaded,
+  noteSaved,
+  noteSaveGeneration,
+  runNoteSave,
+} from "@/lib/domain/content/note-save-coordinator";
+import { listDatabaseColumnAnchors } from "@/lib/domain/data/column-link-anchors";
 
 interface ContentResponse {
   success: boolean;
@@ -387,6 +398,10 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
   const { isDebugPanelVisible, toggleDebugPanel, setDebugPanelVisible, viewMode } = useDebugViewStore();
   const isActivePane = activePaneId === paneId;
   const isMultiPane = layoutMode !== "single";
+  // What the workspace RENDERS (intent projected — the side panel bans quad,
+  // the focus route is single), not the stored intent: a quad pane is small,
+  // so its title header goes compact (globals.css `.doc-title-header[data-compact]`).
+  const isQuadPane = useProjectedLayout(layoutMode) === "quad";
   const [noteContent, setNoteContent] = useState<JSONContent | null>(null);
   // ── Markdown source-view (v3.2 T2) ──────────────────────────────────────
   // Toggle between the rich-text editor and an editable markdown *source*
@@ -658,7 +673,7 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
   // AbortController for in-flight save requests. When the user navigates to
   // a different document, we abort any pending fetch to prevent Doc A's content
   // from being written to Doc B's API endpoint.
-  const saveAbortControllerRef = useRef<AbortController | null>(null);
+
 
   // Optimistic-concurrency baseline (spec: write persistence). The bodyHash
   // the server returned the last time we loaded/saved this doc. Echoed as the
@@ -666,7 +681,6 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
   // we loaded it) gets a 409 instead of silently overwriting newer content.
   // Only the plain/REST save path uses this — collaboration docs persist via
   // Hocuspocus and never reach handleSave's network call.
-  const bodyHashRef = useRef<string | null>(null);
 
   const setConflict = useSaveConflictStore((s) => s.setConflict);
   const clearConflict = useSaveConflictStore((s) => s.clearConflict);
@@ -774,16 +788,29 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
     // showing Doc B. Reads are safe to drop — unlike writes — so this guards
     // the commit, not the fetch.
     let cancelled = false;
+    // Saves of this note that start after this point make this load's
+    // version stamp stale (note-save-coordinator `noteLoaded`).
+    const loadGeneration = noteSaveGeneration(selectedContentId);
 
     // The side-effecting half of applying a payload: refs, stores, logging,
     // the stashed-draft check. Paired with applyContentFacts (component scope,
     // pure); the network path runs both, the warm path runs only this when
     // render already applied the facts.
-    const applyContentSideEffects = (data: ContentResponse["data"]) => {
-      // Capture the optimistic-concurrency baseline for the plain/REST save
-      // path. (SSR fast-path results have no note.bodyHash; that's fine —
-      // the first real save just proceeds without an If-Match.)
-      bodyHashRef.current = data.note?.bodyHash ?? null;
+    const applyContentSideEffects = (
+      data: ContentResponse["data"],
+      source: "network" | "cached" = "network"
+    ) => {
+      // The optimistic-concurrency stamp for the plain/REST save path lives
+      // per NOTE in the save coordinator, shared by every pane and window
+      // showing it. A fresh load updates it unless one of our saves started
+      // since this load was requested; a cache paint only seeds an unknown
+      // note. (SSR fast-path results have no note.bodyHash; the first real
+      // save then proceeds without an X-Body-Hash.)
+      const loadedHash = data.note?.bodyHash ?? null;
+      if (!isPageTemplateTab) {
+        if (source === "cached") noteCached(selectedContentId, loadedHash);
+        else noteLoaded(selectedContentId, loadedHash, loadGeneration);
+      }
 
       // Provide creation/updated dates to inline-timestamp nodes
       setDocumentDates(
@@ -823,7 +850,8 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
 
       if (!cancelled && !isPageTemplateTab) {
         const draft = loadConflictDraft(selectedContentId);
-        if (draft && bodyHashRef.current) {
+        const draftBaseHash = noteBodyHash(selectedContentId) ?? loadedHash;
+        if (draft && draftBaseHash) {
           const serverJson = (data.note?.tiptapJson ?? null) as JSONContent | null;
           if (serverJson && sameProjectedText(draft, serverJson)) {
             const structuralOnly = !sameCanonicalJson(draft, serverJson);
@@ -843,7 +871,7 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
             setConflict({
               contentId: selectedContentId,
               mine: draft,
-              theirHash: bodyHashRef.current,
+              theirHash: draftBaseHash,
             });
             setNoteContent(draft);
             setOutline(selectedContentId, extractOutline(draft));
@@ -868,7 +896,7 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
       // below the hooks); doing it again here would hand the editor a NEW
       // noteContent object for the same document and reset the caret.
       if (warmAppliedFor !== selectedContentId) applyContentFacts(warm.data);
-      applyContentSideEffects(warm.data);
+      applyContentSideEffects(warm.data, "cached");
     }
 
     const fetchNote = async () => {
@@ -1032,7 +1060,7 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
             isCollaborative: isCollaborativeRef.current,
           });
           if (!apply) {
-            // NOTE: we deliberately do NOT advance `bodyHashRef` here. It is
+            // NOTE: we deliberately do NOT advance the note's save stamp here. It is
             // tempting — a fresh hash would stop the next save from 409-ing.
             // But the screen still shows the CACHED copy, so adopting the
             // server's newer hash would let that stale copy overwrite the
@@ -1311,19 +1339,22 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
         return;
       }
 
-      // Cancel any previous in-flight save. A flush stays OUT of this: it is
-      // the last write for a document we are leaving, and the next document's
-      // first save must not be able to abort it.
-      const abortController = new AbortController();
-      if (!meta?.flush) {
-        if (saveAbortControllerRef.current) {
-          saveAbortControllerRef.current.abort();
-        }
-        saveAbortControllerRef.current = abortController;
+      // ONE save of a note at a time, per NOTE (lib/domain/content/note-save-
+      // coordinator.ts): a save asked for while another is running waits
+      // (newest wins) and leaves with the stamp that one brought back — even
+      // if the note has since moved to another pane. A keepalive flush (the
+      // page is going away) cannot wait and leaves at once.
+      setHasUnsavedChanges(true);
+      const sendSave = async (): Promise<void> => {
+      // A 409 may have opened a conflict while this save waited its turn.
+      const waitingConflict = useSaveConflictStore.getState().getConflict(selectedContentId);
+      if (!isPageTemplateTab && waitingConflict) {
+        stashConflictDraft(selectedContentId, content);
+        useSaveConflictStore.getState().setConflict({ ...waitingConflict, mine: content });
+        return;
       }
 
       setIsSaving(true);
-      setHasUnsavedChanges(true);
 
       try {
         const response = await tracedFetch(
@@ -1345,27 +1376,26 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
             // and rejects it with a 412 *before the request reaches the function*
             // (our responses have no matching ETag), so the app's check never
             // runs. A non-conditional `X-Body-Hash` header passes through.
-            ...(!isPageTemplateTab && bodyHashRef.current
-              ? { "X-Body-Hash": bodyHashRef.current }
+            ...(!isPageTemplateTab && noteBodyHash(selectedContentId)
+              ? { "X-Body-Hash": noteBodyHash(selectedContentId)! }
               : {}),
           },
-          body: JSON.stringify({
-            tiptapJson: content,
-            // Forward user-intent metadata from the editor. The content
-            // PATCH route uses `userInitiated` to bypass the shrink-refusal
-            // guard when there's been a recent user gesture, allowing
-            // legitimate "select all + delete" flows while still refusing
-            // bug-class auto-saves (editor mount race with no input).
-            // `secondsSinceInput` is telemetry only — surfaces in trace
-            // span attrs so we can tune the recency window with real data.
-            ...(meta?.userInitiated === true && { userInitiated: true }),
-            ...(typeof meta?.secondsSinceInput === "number" && {
-              secondsSinceInput: meta.secondsSinceInput,
-            }),
-          }),
+          // Forward user-intent metadata from the editor. The content
+          // PATCH route uses `userInitiated` to bypass the shrink-refusal
+          // guard when there's been a recent user gesture, allowing
+          // legitimate "select all + delete" flows while still refusing
+          // bug-class auto-saves (editor mount race with no input).
+          // `secondsSinceInput` is telemetry only — surfaces in trace
+          // span attrs so we can tune the recency window with real data.
+          // A solo editor's Y state rides along (SaveMeta.collaborationUpdate);
+          // templates have no collaborative copy.
+          body: noteSaveBody(
+            content,
+            isPageTemplateTab && meta ? { ...meta, collaborationUpdate: undefined } : meta,
+          ),
           // keepalive lets the request outlive a page that is unloading; an
           // abort signal would be moot there, so it is omitted for that case.
-          ...(meta?.keepalive ? { keepalive: true } : { signal: abortController.signal }),
+          ...(meta?.keepalive ? { keepalive: true } : {}),
           }
         );
 
@@ -1379,25 +1409,23 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
           response.status === 409 &&
           result?.meta?.reason === "if_match"
         ) {
-          const postSaveId = getPaneActiveContentId(
-            useContentStore.getState(),
-            paneId
-          );
-          if (postSaveId === selectedContentId) {
-            stashConflictDraft(selectedContentId, content);
-            setConflict({
-              contentId: selectedContentId,
-              mine: content,
-              theirHash: result.meta.currentBodyHash ?? bodyHashRef.current ?? "",
-            });
-            setHasUnsavedChanges(true);
-            clientLogger.warn({
-              layer: "ui",
-              event: "save:conflict_detected",
-              summary: "save refused — document changed elsewhere (409)",
-              attrs: { content_id: selectedContentId },
-            });
-          }
+          // The conflict belongs to the NOTE (the store and the stash are
+          // keyed by it), so it is raised even when this pane has moved on —
+          // the banner shows wherever the note is open next. Before, a 409
+          // after a pane move was dropped: not saved, not stashed, no banner.
+          stashConflictDraft(selectedContentId, content);
+          setConflict({
+            contentId: selectedContentId,
+            mine: content,
+            theirHash: result.meta.currentBodyHash ?? noteBodyHash(selectedContentId) ?? "",
+          });
+          setHasUnsavedChanges(true);
+          clientLogger.warn({
+            layer: "ui",
+            event: "save:conflict_detected",
+            summary: "save refused — document changed elsewhere (409)",
+            attrs: { content_id: selectedContentId },
+          });
           return;
         }
 
@@ -1408,6 +1436,20 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
         } else if (!response.ok || !result.success) {
           throw new Error(result.error?.message || "Failed to save note");
         }
+
+        // Note-scoped facts FIRST — they hold whichever pane shows the note
+        // now. The stamp used to be advanced only after the pane guard below,
+        // so a save that finished after a pane move left it stale and the
+        // next save of the note drew a 409 against this very write.
+        if (!isPageTemplateTab) {
+          noteSaved(selectedContentId, result.data?.note?.bodyHash);
+          clearConflictDraft(selectedContentId);
+        }
+        // The MRU cache still holds the PRE-save payload. Left there, a switch
+        // away and back would warm-paint the old body over freshly saved work
+        // — which reads as lost writing even though the server has it. Drop
+        // the entry so the next visit re-fetches.
+        invalidateTabPayload(selectedContentId);
 
         // Final guard: verify we're still on the same document before
         // updating parent state. This catches the edge case where the user
@@ -1424,22 +1466,9 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
         }
 
         setLastSaved(new Date());
-        // Advance the optimistic-concurrency baseline to the version we just
-        // wrote, so the next save's If-Match matches. Clear any stashed draft —
-        // a successful write means there's nothing unresolved to recover.
-        if (!isPageTemplateTab) {
-          bodyHashRef.current = result.data?.note?.bodyHash ?? bodyHashRef.current;
-          clearConflictDraft(selectedContentId);
-        }
         // Keep parent state in sync so re-mounts (e.g., ExpandableEditor
         // collapse/reopen) receive the latest persisted content
         setNoteContent(content);
-
-        // The MRU cache still holds the PRE-save payload. Left there, a switch
-        // away and back would warm-paint the old body over freshly saved work
-        // — which reads as lost writing even though the server has it. Drop
-        // the entry so the next visit re-fetches.
-        invalidateTabPayload(selectedContentId);
       } catch (err: unknown) {
         // AbortError is expected when we cancel a save due to navigation —
         // not worth a log line, the navigation that triggered it is the signal.
@@ -1466,6 +1495,8 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
       } finally {
         setIsSaving(false);
       }
+      };
+      return runNoteSave(selectedContentId, sendSave, { keepalive: meta?.keepalive });
     },
     [
       isPageTemplateTab,
@@ -1508,7 +1539,7 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
 
   const handleConflictKeepMine = useCallback(() => {
     if (!activeConflict || !selectedContentId) return;
-    bodyHashRef.current = activeConflict.theirHash;
+    noteAdoptServerVersion(selectedContentId, activeConflict.theirHash);
     const mine = activeConflict.mine;
     clearConflict(selectedContentId);
     clearConflictDraft(selectedContentId);
@@ -1661,11 +1692,16 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
     setSourceDraft("");
   }, [selectedContentId]);
 
-  // The link menu's `[[Title#` step lists spots inside a target through the
-  // enabled extensions (the reader: book highlights). Installed, never
-  // cleared — every pane installs the same lister.
+  // The link menu's `[[Title#` step lists spots inside a target: a
+  // database's columns (core content), then the enabled extensions (the
+  // reader: book highlights). Installed, never cleared — every pane installs
+  // the same lister.
   useEffect(() => {
-    setLinkAnchorLister(listExtensionLinkAnchors);
+    setLinkAnchorLister(
+      async (target, query) =>
+        (await listDatabaseColumnAnchors(target, query)) ??
+        listExtensionLinkAnchors(target, query)
+    );
     setLinkAnchorSuggester(suggestExtensionLinkAnchors);
   }, []);
 
@@ -2706,6 +2742,10 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
 
   // Render content based on type
   let contentElement: React.ReactNode;
+  // A quad pane is short on height: a note's toolbar moves into its title row
+  // (owner, 2026-10-08) instead of taking a row of its own above it. Decided
+  // in the note branch below, where that title row exists.
+  let toolbarInTitleRow = false;
   const isReadOnlyPageTemplate =
     contentType === "page-template" && Boolean(contentData?.isSystem);
   const templateWarningText =
@@ -2829,6 +2869,12 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
       />
     );
   } else if (noteContent) {
+    toolbarInTitleRow =
+      isQuadPane &&
+      !isEmbedMode &&
+      contentType !== "page-template" &&
+      Boolean(selectedContentId) &&
+      !selectedContentId?.startsWith("person:");
     // Render debug view based on selected mode
     const renderDebugView = () => {
       switch (viewMode) {
@@ -2845,12 +2891,26 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
       }
     };
 
+    // A quad pane's toolbar, on the title's own line (see toolbarInTitleRow).
+    // It keeps its natural width up to 55% of the line; the title takes the
+    // rest and truncates. Being INSIDE the title line (not a sibling of the
+    // title column) is what lets the breadcrumb below span the full width.
+    const inlineToolbar = toolbarInTitleRow ? (
+      <div className="ml-auto flex min-w-0 max-w-[55%] shrink-0 items-center pl-2">
+        <ContentToolbar contentId={selectedContentId} inline />
+      </div>
+    ) : null;
+
     // Main editor component
     const editorElement = (
       <div className="flex flex-col h-full">
-        {/* Note title header with debug toggle */}
+        {/* Note title header with debug toggle. pt-2, not pt-6: the content
+            toolbar right above already pads its row, and the two stacked into
+            a ~40px hole between the icons and the title (owner, 2026-10-08). */}
         {!isEmbedMode && (
-          <div className="doc-title-header flex-none px-6 pt-6 pb-4 flex items-start justify-between shadow-[0_4px_8px_-2px_rgba(15,23,42,0.08),0_10px_24px_-6px_rgba(15,23,42,0.05)]">
+          <div
+            data-compact={isQuadPane ? "" : undefined}
+            className="doc-title-header flex-none px-6 pt-2 pb-4 flex items-start justify-between shadow-[0_4px_8px_-2px_rgba(15,23,42,0.08),0_10px_24px_-6px_rgba(15,23,42,0.05)]">
             {isTitleEditing ? (
               <input
                 ref={titleInputRef}
@@ -2862,24 +2922,27 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
                   if (e.key === "Enter") { e.preventDefault(); handleTitleCommit(); }
                   if (e.key === "Escape") { e.preventDefault(); setIsTitleEditing(false); }
                 }}
-                className="flex-1 text-3xl font-semibold text-foreground bg-transparent border-b border-primary/40 focus:border-primary focus:outline-none mb-0 mr-4"
+                className="min-w-0 flex-1 text-3xl font-semibold text-foreground bg-transparent border-b border-primary/40 focus:border-primary focus:outline-none mb-0 mr-4"
               />
-            ) : (
+            ) : null}
+            {isTitleEditing ? inlineToolbar : (
               <div className="mr-4 flex min-w-0 flex-1 flex-col">
                 <div className="flex min-w-0 items-start gap-3">
+                {/* One line, never wrapped (owner, 2026-10-08): a long title
+                    ends in "…" and shows whole in its tooltip. */}
                 <h1
-                  className={`doc-title-text min-w-0 text-3xl font-semibold text-foreground mb-0 transition-opacity ${
+                  className={`doc-title-text min-w-0 truncate text-3xl font-semibold text-foreground mb-0 transition-opacity ${
                     isReadOnlyPageTemplate
                       ? "cursor-default"
                       : "cursor-text hover:opacity-80"
                   }`}
-                  title={
+                  title={`${noteTitle}\n${
                     contentType === "page-template"
                       ? isReadOnlyPageTemplate
                         ? "System template (read-only)"
                         : "Click to rename template"
                       : "Click to rename"
-                  }
+                  }`}
                   onClick={isReadOnlyPageTemplate ? undefined : handleTitleEditStart}
                 >
                   {noteTitle}
@@ -2909,6 +2972,7 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
                     </Tooltip>
                   </TooltipProvider>
                 ) : null}
+                {inlineToolbar}
                 </div>
                 {selectedContentId && (
                   <ContentPathBreadcrumb
@@ -3043,7 +3107,8 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
           !selectedContentId.startsWith("person:") &&
           !isVirtualExtensionContent &&
           contentType !== "page-template" &&
-          !isEmbedMode && <ContentToolbar contentId={selectedContentId} />}
+          !isEmbedMode &&
+          !toolbarInTitleRow && <ContentToolbar contentId={selectedContentId} />}
 
         {/* Save-conflict resolution (stale-tab / concurrent-edit overwrite).
             Mounted at the TOP LEVEL, above every layout branch, deliberately.

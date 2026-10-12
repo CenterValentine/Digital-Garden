@@ -20,6 +20,8 @@ import { openai } from "@ai-sdk/openai";
 import { google } from "@ai-sdk/google";
 import { xai } from "@ai-sdk/xai";
 
+import { PROVIDER_CATALOG } from "@/lib/domain/ai/providers/catalog";
+
 /** Mirrors the acquisition per-turn page budget. */
 const MAX_SEARCHES_PER_TURN = 5;
 
@@ -46,4 +48,39 @@ export function resolveNativeWebSearchTool(providerId: string) {
       // the owned pipeline (P1+) remains available via read_page.
       return null;
   }
+}
+
+// ── Models that reject their vendor's hosted search ─────────────────────────
+
+/**
+ * Learned this process's lifetime: a model whose provider rejected the hosted
+ * search tool is not offered it again. The catalog's `nativeWebSearch: false`
+ * is the durable record; this catches models the catalog does not list
+ * (hand-added ids, new releases) after their first rejection.
+ */
+const rejectedNativeSearch = new Set<string>();
+
+const key = (vendorId: string, bareModelId: string) => `${vendorId}/${bareModelId}`;
+
+/** May the vendor's hosted search tool be attached for this model? */
+export function supportsNativeWebSearch(vendorId: string, bareModelId: string): boolean {
+  if (rejectedNativeSearch.has(key(vendorId, bareModelId))) return false;
+  const model = PROVIDER_CATALOG.find((p) => p.id === vendorId)?.models.find((m) => m.id === bareModelId);
+  return model?.nativeWebSearch !== false;
+}
+
+/**
+ * The provider's rejection, e.g. OpenAI's "Tool 'web_search_preview' is not
+ * supported with gpt-4." Returns the model id it names, or null.
+ */
+export function nativeSearchRejectedModel(message: string): string | null {
+  const match = /Tool '[a-z_]*search[a-z_]*' is not supported with ([\w.:\-]+?)\.?(?:\s|$)/i.exec(message);
+  return match ? match[1] : null;
+}
+
+/** Remember a rejection so the next request for that model leaves the tool off. */
+export function noteNativeSearchRejection(vendorId: string, message: string): string | null {
+  const model = nativeSearchRejectedModel(message);
+  if (model) rejectedNativeSearch.add(key(vendorId, model));
+  return model;
 }

@@ -1189,6 +1189,20 @@ function collapseForOccupancy(
   preferredActivePaneId: WorkspacePaneId,
   snapshots: Record<WorkspaceLayoutMode, WorkspaceLayoutSnapshot>
 ): Partial<ContentState> | null {
+  // Only a pane emptied BY THIS OPERATION may fold the layout (owner rule,
+  // 2026-10-06: "the only thing that should collapse it is closing the last
+  // content in a pane — no external factors"). Occupancy alone is not enough:
+  // a split with a pane the user left empty on purpose (split the layout,
+  // haven't filled it yet) must survive a close or a reorder in the OTHER
+  // pane. Before this, any tab removal anywhere — including a drop back onto
+  // the same strip, which a slightly sloppy click registers as — read the
+  // pre-existing empty pane as "just emptied" and collapsed to single.
+  const emptiedNow = getVisiblePaneIds(fromLayoutMode).some(
+    (paneId) =>
+      (state.panes[paneId]?.tabIds.length ?? 0) > 0 &&
+      panes[paneId].tabIds.length === 0
+  );
+  if (!emptiedNow) return null;
   const target = resolveLayoutForOccupancy(fromLayoutMode, panes);
   if (!target) return null;
   // A constrained surface can't leave its pinned layout (see setLayoutMode).
@@ -1503,6 +1517,62 @@ function syncBrowserState(state: Pick<
   window.history.replaceState({}, "", url);
 }
 
+/**
+ * Which tab each pane showed most recently, newest first. When the active tab
+ * leaves a pane (closed, or dragged to another pane) the pane falls back to
+ * what the user was looking at BEFORE it — not to whichever neighbour slid
+ * into its slot. Owner report 2026-10-06: dragging the active note to the
+ * other pane left the source pane on a chat "that was never selected"; the
+ * old rule took the index neighbour. Module state like the intents: it is a
+ * memory of this session's clicks, not workspace data, so it is neither
+ * persisted nor reconciled. Maintained in commitWorkspace so every path that
+ * changes a pane's active tab feeds it.
+ */
+const paneRecentTabIds: Partial<Record<WorkspacePaneId, string[]>> = {};
+const PANE_RECENT_LIMIT = 24;
+
+function noteRecentTabs(after: Record<WorkspacePaneId, WorkspacePaneState>) {
+  for (const paneId of WORKSPACE_PANE_IDS) {
+    const tabId = after[paneId]?.activeTabId;
+    // Record what the pane shows NOW, not only a change: the tab a pane was
+    // restored with is its first memory, and it is what the pane must fall
+    // back to when the next tab the user opens there leaves again.
+    if (!tabId || paneRecentTabIds[paneId]?.[0] === tabId) continue;
+    const recent = (paneRecentTabIds[paneId] ?? []).filter((id) => id !== tabId);
+    recent.unshift(tabId);
+    paneRecentTabIds[paneId] = recent.slice(0, PANE_RECENT_LIMIT);
+  }
+}
+
+/**
+ * The tab a pane should show once `leavingTabId` is gone: the most recently
+ * shown tab still in `remainingTabIds`, else the index neighbour (the old
+ * rule — right neighbour, then left), else nothing.
+ */
+function nextActiveAfterLeaving(
+  paneId: WorkspacePaneId,
+  remainingTabIds: string[],
+  leavingTabId: string,
+  leavingIndex: number
+): string | null {
+  const recent = paneRecentTabIds[paneId] ?? [];
+  const remembered = recent.find(
+    (id) => id !== leavingTabId && remainingTabIds.includes(id)
+  );
+  return (
+    remembered ??
+    remainingTabIds[leavingIndex] ??
+    remainingTabIds[leavingIndex - 1] ??
+    remainingTabIds[0] ??
+    null
+  );
+}
+
+/** Test seam: forget every pane's recent-tab memory. */
+export function __resetPaneRecentTabsForTests(): void {
+  for (const paneId of WORKSPACE_PANE_IDS) delete paneRecentTabIds[paneId];
+}
+
 function commitWorkspace(
   set: (
     partial:
@@ -1514,6 +1584,7 @@ function commitWorkspace(
   set((state: ContentState) => {
     const updates = recipe(state);
     const nextState = { ...state, ...updates } as ContentState;
+    if (updates.panes) noteRecentTabs(nextState.panes);
     // Tracer (lib/core/workspace-trace.ts): every placement change reports the
     // action that made it. Flag-gated; the fingerprint is only computed when on.
     if (isWorkspaceTraceEnabled()) {
@@ -2025,11 +2096,12 @@ export const useContentStore = create<ContentState>((set, get) => ({
       const sourceIndex = sourcePane.tabIds.indexOf(tabId);
       sourcePane.tabIds = sourcePane.tabIds.filter((candidateTabId) => candidateTabId !== tabId);
       if (sourcePane.activeTabId === tabId) {
-        sourcePane.activeTabId =
-          sourcePane.tabIds[sourceIndex] ??
-          sourcePane.tabIds[sourceIndex - 1] ??
-          sourcePane.tabIds[0] ??
-          null;
+        sourcePane.activeTabId = nextActiveAfterLeaving(
+          ownerPaneId,
+          sourcePane.tabIds,
+          tabId,
+          sourceIndex
+        );
       }
 
       const targetPane = nextPanes[paneId];
@@ -2130,8 +2202,12 @@ export const useContentStore = create<ContentState>((set, get) => ({
         const removedIndex = pane.tabIds.indexOf(tabId);
         pane.tabIds = pane.tabIds.filter((candidateTabId) => candidateTabId !== tabId);
         if (pane.activeTabId === tabId) {
-          pane.activeTabId =
-            pane.tabIds[removedIndex] ?? pane.tabIds[removedIndex - 1] ?? null;
+          pane.activeTabId = nextActiveAfterLeaving(
+            paneId,
+            pane.tabIds,
+            tabId,
+            removedIndex
+          );
         }
 
         if (paneId === state.activePaneId) {
@@ -2337,6 +2413,34 @@ export const useContentStore = create<ContentState>((set, get) => ({
       // merging, so a snapshot predating a local change silently undoes it —
       // in both directions. Mutating normalizedWorkspace (not just the loop
       // below) keeps the activeContentId re-add further down consistent.
+      // The active CONTENT outranks the requested active PANE. A URL carries
+      // `content=` always but `pane=` only when the focused pane is not
+      // top-left, and a snapshot can name an activeContentId that lives in a
+      // pane other than its activePaneId. Before: the focused pane got no
+      // active tab (the content was not in it → fell to its first tab, or to
+      // nothing), resolveActivePaneForLayout then focused whichever pane HAD
+      // an active tab, and the page opened on a different note than the URL
+      // named (owner trace, 2026-10-06: `content=Capture`, restore asked for
+      // top-left, committed focus=top-right on W41). Focus the pane that
+      // holds the content.
+      // …but only when the requested pane has nothing local to keep (a cold
+      // start, or an empty pane). A reconcile whose focused pane is showing
+      // something keeps it — R3: a stale server activeContentId never moves
+      // this surface's focus.
+      if (normalizedWorkspace.activeContentId) {
+        const requested = normalizedWorkspace.activePaneId;
+        const requestedShowsSomething = Boolean(
+          requested && state.panes[requested]?.activeTabId
+        );
+        const holder = requestedPaneIds.find((paneId) =>
+          (normalizedWorkspace.paneTabContentIds?.[paneId] ?? []).includes(
+            normalizedWorkspace.activeContentId as string
+          )
+        );
+        if (holder && holder !== requested && !requestedShowsSomething) {
+          normalizedWorkspace.activePaneId = holder;
+        }
+      }
       const intentPaneId =
         normalizedWorkspace.activePaneId &&
         requestedPaneIds.includes(normalizedWorkspace.activePaneId)

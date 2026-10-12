@@ -1025,7 +1025,6 @@ export function getSlashCommands(): SlashCommand[] {
             blockType: "dailySummary",
             summaryDate: getDefaultPeriodicSummaryDate("daily"),
             workdayCutoffHour: 0,
-            autoBorrowDurationMinutes: 60,
             pathOrder: "Root > File",
             showBackground: true,
             showBorder: true,
@@ -1047,7 +1046,6 @@ export function getSlashCommands(): SlashCommand[] {
             blockType: "weeklySummary",
             weekStartDate: getDefaultPeriodicSummaryDate("weekly"),
             workdayCutoffHour: 0,
-            autoBorrowDurationMinutes: 60,
             pathOrder: "Root > File",
             showBackground: true,
             showBorder: true,
@@ -1097,7 +1095,7 @@ export function getSlashCommands(): SlashCommand[] {
       icon: FileText,
       command: ({ editor, range }) => {
         editor.chain().focus().deleteRange(range).run();
-        window.dispatchEvent(new CustomEvent("open-template-picker"));
+        window.dispatchEvent(new CustomEvent("open-template-picker", { detail: { editor } }));
       },
       aliases: ["tpl", "templates"],
     },
@@ -1107,7 +1105,7 @@ export function getSlashCommands(): SlashCommand[] {
       icon: Scissors,
       command: ({ editor, range }) => {
         editor.chain().focus().deleteRange(range).run();
-        window.dispatchEvent(new CustomEvent("open-snippet-picker"));
+        window.dispatchEvent(new CustomEvent("open-snippet-picker", { detail: { editor } }));
       },
       aliases: ["snip", "snippets", "reusable"],
     },

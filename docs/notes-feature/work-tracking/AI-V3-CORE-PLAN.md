@@ -65,11 +65,10 @@ and clean PR streams, and each gets dedicated resources.
   independence, and settle-then-associate timing (umbrella decisions
   #13/#14) are defined by the umbrella; the API shape is defined here.
   **RESOLVED at S6 (2026-07-18): the entity + API already exist** — the
-  app's `ContentWorkspace` / `ContentWorkspaceItem` tables (named tab-sets
-  with `paneState`, `settings` JSON, `viewRootContentId`, per-item
-  assignments) and the complete route surface under
-  `app/api/content/workspaces/` (CRUD, `[id]/state`, `[id]/assignments`,
-  `[id]/duplicate`, `open-intent`, `reset`). BROWSER-REACH should consume
+  app's `ContentWorkspace` table (named tab-sets with `paneState`, `settings`
+  JSON, `viewRootContentId`) and the complete route surface under
+  `app/api/content/workspaces/` (CRUD, `[id]/state`, `[id]/tabs`,
+  `[id]/duplicate`, `reset`). BROWSER-REACH should consume
   these routes as-is for the "Browser Sessions" listing; the per-workspace
   default target folder can ride the existing `settings` JSON column —
   no schema change required. No new entity was (or should be) built.

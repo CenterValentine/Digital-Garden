@@ -2,6 +2,7 @@
  * Wiki-Link Autocomplete Suggestion
  *
  * Shows a popup menu when typing [[ to select notes to link to.
+ * Tab on a database drills into its columns ([[Jobs# → [[Jobs#Status]]).
  * Typing [[# switches to in-document heading mode: the list comes from the
  * current document's derived heading slugs (no fetch), and selecting inserts
  * a heading link ([[#Heading]] — wikiLink with `headingSlug`).
@@ -23,6 +24,7 @@ import {
   type LinkAnchorItem,
   type LinkAnchorTarget,
 } from "@/lib/domain/content/link-anchor";
+import { parseColumnAnchor } from "@/lib/domain/data/column-anchor";
 
 // Extends the fetcher's shape because note items are built by spreading it
 // (`{ kind: "note", ...note }`) — new fetcher fields flow through untouched.
@@ -177,6 +179,15 @@ export const WikiLinkList = forwardRef<WikiLinkListRef, WikiLinkListProps>((prop
   }
 
   const canDrill = Boolean(props.drill) && props.items.some((item) => item.kind === "note" && !item.row);
+  // A database (highlighted, or drilled into for its columns) gets its own
+  // hint: a column link is worth making because every AI read of the note
+  // adds that column's description (lib/domain/data/server/column-links.ts).
+  const selected = props.items[selectedIndex];
+  const databaseHighlighted =
+    selected?.kind === "note" && !selected.row && selected.contentType === "data";
+  const listingColumns = props.items.some(
+    (item) => item.kind === "anchor" && parseColumnAnchor(item.anchor.anchor) !== null
+  );
 
   return (
     <div className="rounded-lg border border-white/10 bg-gray-900/95 shadow-xl backdrop-blur-sm overflow-hidden">
@@ -245,11 +256,19 @@ export const WikiLinkList = forwardRef<WikiLinkListRef, WikiLinkListProps>((prop
           </button>
         ))}
       </div>
-      {canDrill && (
+      {listingColumns ? (
+        <div className="border-t border-white/10 px-3 py-1 text-[10px] text-gray-500">
+          AI reads the linked column&apos;s description
+        </div>
+      ) : canDrill && databaseHighlighted ? (
+        <div className="border-t border-white/10 px-3 py-1 text-[10px] text-gray-500">
+          Tab — link a column · AI reads its description
+        </div>
+      ) : canDrill ? (
         <div className="border-t border-white/10 px-3 py-1 text-[10px] text-gray-500">
           Tab — link to a passage inside
         </div>
-      )}
+      ) : null}
     </div>
   );
 });

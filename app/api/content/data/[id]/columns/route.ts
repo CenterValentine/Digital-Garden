@@ -1,6 +1,7 @@
 /**
  * Database columns API — the schema surface.
  *
+ * GET    /api/content/data/[id]/columns  — list live columns (read access)
  * POST   /api/content/data/[id]/columns  — add a column
  * PATCH  /api/content/data/[id]/columns  — rename / describe / reconfigure
  * DELETE /api/content/data/[id]/columns  — soft-delete or restore
@@ -82,6 +83,43 @@ async function authorize(id: string) {
   return { session } as const;
 }
 
+// ── GET ──────────────────────────────────────────────────────────────────
+
+/**
+ * The live columns, in position order — what the link menu's `[[Database#`
+ * step lists (lib/domain/data/column-link-anchors.ts). READ access only: a
+ * reader may link a column it can see; only `authorize` (schema changes)
+ * needs `canAlterSchema`. Query tables list nothing — their projection
+ * columns are not DataColumn rows, so there is no id to anchor on.
+ */
+export async function GET(request: NextRequest, { params }: { params: Params }) {
+  return withRouteTrace(request, { route: ROUTE_PATH }, async () => {
+    try {
+      const session = await requireAuth();
+      const { id } = await params;
+      const level = await resolveDataTableAccess(id, session.user.id);
+      if (!canRead(level)) return notFound();
+      const columns = await prisma.dataColumn.findMany({
+        where: { tableId: id, deletedAt: null },
+        orderBy: { position: "asc" },
+        select: { id: true, name: true, type: true, description: true, isPrimary: true },
+      });
+      return NextResponse.json({ success: true, data: { columns } });
+    } catch (error) {
+      logger.error({
+        layer: "content",
+        event: "data:column_get:caught",
+        summary: "failed to list columns",
+        error,
+      });
+      return NextResponse.json(
+        { success: false, error: { code: "INTERNAL_ERROR", message: "Failed to list columns" } },
+        { status: 500 }
+      );
+    }
+  });
+}
+
 // ── POST ─────────────────────────────────────────────────────────────────
 
 export async function POST(request: NextRequest, { params }: { params: Params }) {
@@ -98,6 +136,29 @@ export async function POST(request: NextRequest, { params }: { params: Params })
         config?: DataColumnConfig;
         /** Relation only: also create the mirrored column on the target. */
         createBacklink?: boolean;
+        /**
+         * Fractional key to land the new column at (the grid's "Insert
+         * column left/right"). Absent = appended, as before.
+         */
+        position?: string;
+      };
+      if (
+        body.position !== undefined &&
+        (typeof body.position !== "string" ||
+          body.position.length === 0 ||
+          body.position.length > 64)
+      ) {
+        return badRequest("`position` must be a fractional key");
+      }
+      // Created at the end, then moved: one request, so the grid never
+      // shows the column at the far right first.
+      const placeAt = async (columnId: string) => {
+        if (body.position) {
+          await prisma.dataColumn.update({
+            where: { id: columnId },
+            data: { position: body.position },
+          });
+        }
       };
 
       const name = body.name?.trim();
@@ -211,6 +272,7 @@ export async function POST(request: NextRequest, { params }: { params: Params })
               sourceNode?.title ?? "Linked"
             )
         );
+        await placeAt(pair.forwardId);
         after(() => markContextDirty([id, targetId]));
         return NextResponse.json({
           success: true,
@@ -230,6 +292,7 @@ export async function POST(request: NextRequest, { params }: { params: Params })
           })
       );
 
+      await placeAt(columnId);
       // Schema changed → the AI digest changed (plan B1 route discipline).
       after(() => markContextDirty([id]));
       return NextResponse.json({ success: true, data: { columnId } });

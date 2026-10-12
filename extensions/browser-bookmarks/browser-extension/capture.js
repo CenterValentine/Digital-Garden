@@ -89,7 +89,6 @@ function buildPayload() {
     resourceType: resourceTypeControl?.getValue() || null,
     resourceRelationship: resourceRelationshipControl?.getValue() || null,
     userIntent: userIntentControl?.getValue() || null,
-    dedupeEnabled: document.getElementById("capture-dedupe").value === "true",
     preserveHtml:
       document.getElementById("capture-preserve-html").value === "true",
   };

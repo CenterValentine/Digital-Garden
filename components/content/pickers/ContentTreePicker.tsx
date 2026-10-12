@@ -83,9 +83,19 @@ import {
 import { cn } from "@/lib/core/utils";
 import { calculateMenuPosition } from "@/lib/core/menu-positioning";
 import { useWorkspaceStore } from "@/state/workspace-store";
+import {
+  filesForDestination,
+  flattenEligible,
+  latestViewTimes,
+  type DestinationFile,
+  type FlatRow,
+  type TreeNodeLite,
+} from "@/lib/domain/content/picker-tree";
+import { useNavigationHistoryStore } from "@/state/navigation-history-store";
 import { useTreeStateStore } from "@/state/tree-state-store";
 import { useContentStore } from "@/state/content-store";
 import { collectPaneAttachedTabs } from "@/state/workspace-tab-filter-store";
+import { withOptimisticTreeRow } from "@/lib/features/content/tree-optimistic";
 import {
   recordCreateDestination,
   useCreateDestinationStore,
@@ -105,27 +115,7 @@ export const DEFAULT_ELIGIBLE_TYPES = new Set([
   "html",
   "code",
 ]);
-/** Types we recurse into when flattening (containers of more content). */
-const RECURSE_TYPES = new Set(["folder", "note"]);
-
 const EMPTY_DOC = { type: "doc", content: [{ type: "paragraph" }] };
-
-interface TreeNodeLite {
-  id: string;
-  title: string;
-  contentType: string;
-  treeNodeKind?: string;
-  note?: unknown;
-  /** ISO string over the wire — read to derive "where you last created". */
-  createdAt?: string | Date;
-  children?: TreeNodeLite[];
-  /**
-   * Referenced children, partitioned out of `children` by the tree API. They
-   * have to be walked separately or attachments are invisible to browse —
-   * which is what kept referenced content reachable by search only.
-   */
-  references?: TreeNodeLite[];
-}
 
 export interface PickerTarget {
   id: string;
@@ -169,83 +159,6 @@ export function useWorkspaceViewOptions(): {
 /** A folder holding open content, with how many open items it holds. */
 interface OpenDestination extends CreateDestination {
   count: number;
-}
-
-interface FlatRow {
-  id: string;
-  title: string;
-  contentType: string;
-  depth: number;
-  hasNote: boolean;
-  /** Real parent id — for scoped trees, top-level rows' parent is the view root. */
-  parentId: string | null;
-  /** Index among content-kind siblings in tree order — the move route's splice index space. */
-  siblingIndex: number;
-  /** True when this row has renderable nested content (expand affordance). */
-  hasChildren: boolean;
-  /**
-   * Row came from a parent's `references` array — an attachment or generated
-   * deliverable rather than authored content. Marked so it can carry the same
-   * link badge the file tree uses, and so the "insert after" gap is
-   * suppressed: references occupy a separate index space from primary
-   * children, so `siblingIndex + 1` would not mean what it means elsewhere.
-   */
-  isReference: boolean;
-}
-
-function flattenEligible(
-  nodes: TreeNodeLite[],
-  eligibleTypes: ReadonlySet<string>,
-  parentId: string | null,
-  depth = 0,
-  out: FlatRow[] = [],
-  asReference = false,
-): FlatRow[] {
-  let siblingIndex = 0;
-  for (const node of nodes) {
-    // Synthetic people rows (peopleGroup:/person:) are not real content —
-    // offering them would present un-createable / un-windowable parents.
-    // They also don't occupy displayOrder slots, so they don't advance
-    // the sibling index.
-    if (node.treeNodeKind && node.treeNodeKind !== "content") continue;
-    const eligible = eligibleTypes.has(node.contentType);
-    if (eligible) {
-      const row: FlatRow = {
-        id: node.id,
-        title: node.title,
-        contentType: node.contentType,
-        depth,
-        hasNote: Boolean(node.note),
-        parentId,
-        siblingIndex,
-        hasChildren: false,
-        isReference: asReference,
-      };
-      out.push(row);
-      if (RECURSE_TYPES.has(node.contentType)) {
-        const before = out.length;
-        if (node.children?.length) {
-          flattenEligible(node.children, eligibleTypes, node.id, depth + 1, out);
-        }
-        // Second pass for the parent's reference block. Listed after primary
-        // children, matching the file tree's default placement, and flagged so
-        // the rows read as attachments rather than authored content.
-        if (node.references?.length) {
-          flattenEligible(
-            node.references,
-            eligibleTypes,
-            node.id,
-            depth + 1,
-            out,
-            true,
-          );
-        }
-        row.hasChildren = out.length > before;
-      }
-    }
-    siblingIndex += 1;
-  }
-  return out;
 }
 
 /**
@@ -368,40 +281,51 @@ async function createContent(
   title: string,
   parentId: string | null,
   newDisplayOrder: number,
+  place: "top" | { afterId: string },
 ): Promise<PickerTarget | null> {
-  // Notes seed an empty doc; databases send contentType and let the server
-  // seed the Name column + default view (the same POST the databases rail
-  // used before its quick-add moved here).
-  const res = await fetch("/api/content/content", {
-    method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(
-      kind === "data"
-        ? { title, parentId, contentType: "data" }
-        : { title, parentId, tiptapJson: EMPTY_DOC },
-    ),
-  });
-  const body = (await res.json().catch(() => null)) as {
-    success?: boolean;
-    data?: { id?: string };
-  } | null;
-  if (!res.ok || !body?.success || !body.data?.id) return null;
-  const newId = body.data.id;
-  // Exact placement: the move route renumbers siblings in one
-  // transaction. Non-fatal on failure — the note exists either way.
-  await fetch("/api/content/content/move", {
-    method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contentId: newId,
-      targetParentId: parentId,
-      newDisplayOrder,
-    }),
-  }).catch(() => {});
-  window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
-  return { id: newId, title, contentType: kind };
+  // Shown in the file tree at once, where it lands (owner, 2026-10-06: a
+  // create from the main panel's "+" or a Note Window didn't reach the tree
+  // until a full refetch — seconds on a large tree, or never if that refetch
+  // was dropped). The placeholder becomes the real row, then the tree
+  // reconciles quietly — the path the reader's creates take.
+  return withOptimisticTreeRow(
+    { title, contentType: kind, parentId, place },
+    async () => {
+      // Notes seed an empty doc; databases send contentType and let the
+      // server seed the Name column + default view (the same POST the
+      // databases rail used before its quick-add moved here).
+      const res = await fetch("/api/content/content", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          kind === "data"
+            ? { title, parentId, contentType: "data" }
+            : { title, parentId, tiptapJson: EMPTY_DOC },
+        ),
+      });
+      const body = (await res.json().catch(() => null)) as {
+        success?: boolean;
+        data?: { id?: string };
+      } | null;
+      if (!res.ok || !body?.success || !body.data?.id) return null;
+      const newId = body.data.id;
+      // Exact placement: the move route renumbers siblings in one
+      // transaction. Non-fatal on failure — the note exists either way.
+      await fetch("/api/content/content/move", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contentId: newId,
+          targetParentId: parentId,
+          newDisplayOrder,
+        }),
+      }).catch(() => {});
+      return { id: newId, title, contentType: kind } satisfies PickerTarget;
+    },
+    (created) => created?.id ?? null,
+  );
 }
 
 export function ContentTreePicker({
@@ -684,6 +608,27 @@ export function ContentTreePicker({
     }).slice(0, 8);
   }, [tree, panes, tabs, lookupNode]);
 
+  // The files each destination holds, for the row's first line — people
+  // recognize the file they were in more readily than its folder. Same
+  // destinations as before; only what the row shows changes. Viewed-most-
+  // recently first (every pane's navigation history), then open tabs, then
+  // the folder's newest items.
+  const historyByPane = useNavigationHistoryStore((s) => s.byPaneId);
+  const viewedAt = useMemo(() => latestViewTimes(Object.values(historyByPane)), [historyByPane]);
+  const openTabIds = useMemo(
+    () => new Set(collectPaneAttachedTabs(panes, tabs).map((tab) => tab.contentId)),
+    [panes, tabs],
+  );
+  const filesFor = useCallback(
+    (destination: CreateDestination, section: "recent" | "open"): DestinationFile[] =>
+      tree
+        ? filesForDestination(tree, destination.id, viewedAt, {
+            alsoFirst: section === "open" ? openTabIds : undefined,
+          })
+        : [],
+    [tree, viewedAt, openTabIds],
+  );
+
   // The active tab's folder (the folder itself when the active content IS a
   // folder): the "+" row's natural target — "add beside what I'm working
   // on". Absent when nothing is active or the loaded tree can't see it
@@ -847,7 +792,11 @@ export function ContentTreePicker({
   // parent is SERVER space (the view root's real id, never tree-space
   // null) — exactly what the destination store expects.
   const runCreate = useCallback(
-    async (parentId: string | null, newDisplayOrder: number) => {
+    async (
+      parentId: string | null,
+      newDisplayOrder: number,
+      place: "top" | { afterId: string },
+    ) => {
       if (!quickCreate) return;
       setCreateError(null);
       const created = await createContent(
@@ -855,6 +804,7 @@ export function ContentTreePicker({
         quickCreate.defaultTitle,
         parentId,
         newDisplayOrder,
+        place,
       );
       if (!created) {
         setCreateError(`Couldn't create the ${createNoun.toLowerCase()}.`);
@@ -869,13 +819,13 @@ export function ContentTreePicker({
   // "Inside" — top of a container (by id), or top of the current scope (null).
   const quickCreateInside = useCallback(
     (parentContentId: string | null) =>
-      runCreate(parentContentId ?? scopeRootParentId, 0),
+      runCreate(parentContentId ?? scopeRootParentId, 0, "top"),
     [runCreate, scopeRootParentId],
   );
 
   // "Between" — the insertion gap under a row: sibling slot right after it.
   const quickCreateAfter = useCallback(
-    (row: FlatRow) => runCreate(row.parentId, row.siblingIndex + 1),
+    (row: FlatRow) => runCreate(row.parentId, row.siblingIndex + 1, { afterId: row.id }),
     [runCreate],
   );
 
@@ -883,7 +833,7 @@ export function ContentTreePicker({
   // the very top slot of that group (top of an expanded folder, or top
   // of root / the scoped view).
   const quickCreateAtStart = useCallback(
-    (row: FlatRow) => runCreate(row.parentId, 0),
+    (row: FlatRow) => runCreate(row.parentId, 0, "top"),
     [runCreate],
   );
 
@@ -891,7 +841,7 @@ export function ContentTreePicker({
   // space, so no scope remap: it creates in that folder even when the
   // picker is scoped to a view that can't see it.
   const quickCreateAtDestination = useCallback(
-    (destination: CreateDestination) => runCreate(destination.id, 0),
+    (destination: CreateDestination) => runCreate(destination.id, 0, "top"),
     [runCreate],
   );
 
@@ -1019,6 +969,7 @@ export function ContentTreePicker({
           onSection={setDestinationsSection}
           noun={createNoun}
           lookupTitle={(id) => (id ? (lookupNode(id)?.title ?? null) : null)}
+          filesFor={filesFor}
           onJump={jumpToDestination}
           onCreate={(d) => void quickCreateAtDestination(d)}
         />
@@ -1048,6 +999,7 @@ export function ContentTreePicker({
                   ...item,
                   depth: 0,
                   hasNote: item.contentType === "note",
+                  pickable: true,
                   parentId: null,
                   siblingIndex: 0,
                   hasChildren: false,
@@ -1082,6 +1034,7 @@ export function ContentTreePicker({
                       contentType: "note",
                       depth: 0,
                       hasNote: true,
+                      pickable: true,
                       parentId: null,
                       siblingIndex: 0,
                       hasChildren: false,
@@ -1394,6 +1347,7 @@ function JumpTo({
   onSection,
   noun,
   lookupTitle,
+  filesFor,
   onJump,
   onCreate,
 }: {
@@ -1408,6 +1362,8 @@ function JumpTo({
   noun: string;
   /** Live title from the loaded tree, when it can see the folder. */
   lookupTitle: (id: string | null) => string | null;
+  /** The files to name on a destination's first line, most recently viewed first. */
+  filesFor: (destination: CreateDestination, section: "recent" | "open") => DestinationFile[];
   onJump: (destination: CreateDestination) => void;
   onCreate: (destination: CreateDestination) => void;
 }) {
@@ -1509,47 +1465,88 @@ function JumpTo({
 
       {list.length > 0 ? (
         <div className="max-h-40 overflow-y-auto">
-        {list.map((d) => (
+        {list.map((d) => {
+          const files = section ? filesFor(d, section) : [];
+          return (
           <div
             key={d.id ?? "root"}
             className="group flex w-full items-center gap-2 py-1.5 pr-2 pl-3 text-xs transition-colors hover:bg-black/[0.04] dark:hover:bg-white/5"
           >
-            <button
-              type="button"
-              onClick={() => onJump(d)}
-              title="Go there in the tree"
-              className="flex min-w-0 flex-1 items-center gap-2 text-left"
-            >
-              {destIcon(d, "h-3.5 w-3.5 shrink-0 text-yellow-500/80")}
-              <span className="truncate text-gray-700 dark:text-gray-300">
-                {titleOf(d)}
+            {/* Two lines (owner ask, 2026-10-08): the files the user was in —
+                what they recognize — then the folder they live in, which is
+                still the destination. The files run left to right, newest
+                first, each capped so one long name can't crowd the rest, and
+                simply run out of view: no "+N", no ellipsis for the line. */}
+            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+              {files.length > 0 ? (
+                <div className="flex min-w-0 items-center gap-1 overflow-hidden whitespace-nowrap">
+                  {files.map((file) => (
+                    <button
+                      key={file.id}
+                      type="button"
+                      onClick={() => onJump({ id: file.id, title: file.title, parentPath: [], at: 0 })}
+                      title={`${file.title} — go there in the tree`}
+                      className="inline-flex max-w-[9rem] shrink-0 items-center gap-1 rounded px-1 py-px text-gray-700 hover:bg-black/[0.06] dark:text-gray-200 dark:hover:bg-white/10"
+                    >
+                      <TypeIcon contentType={file.contentType} className="h-3 w-3 shrink-0 text-gray-400" />
+                      <span className="truncate">{file.title}</span>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => onJump(d)}
+                title="Go there in the tree"
+                className={cn(
+                  "flex min-w-0 items-center gap-1.5 text-left",
+                  files.length > 0 && "pl-1 text-[10px]",
+                )}
+              >
+                {destIcon(d, files.length > 0 ? "h-3 w-3 shrink-0 text-yellow-500/70" : "h-3.5 w-3.5 shrink-0 text-yellow-500/80")}
+                <span
+                  className={cn(
+                    "truncate",
+                    files.length > 0 ? "text-gray-500 dark:text-gray-400" : "text-gray-700 dark:text-gray-300",
+                  )}
+                >
+                  {titleOf(d)}
+                </span>
+                {pathOf(d) ? (
+                  <span className="truncate text-[10px] text-gray-400 dark:text-gray-500">
+                    {pathOf(d)}
+                  </span>
+                ) : null}
+              </button>
+            </div>
+            {section === "open" && d.count && d.count > 1 ? (
+              <span className="shrink-0 rounded-full bg-black/[0.05] px-1.5 text-[10px] text-gray-500 dark:bg-white/[0.08] dark:text-gray-400">
+                {d.count} open
               </span>
-              {pathOf(d) ? (
-                <span className="truncate text-[10px] text-gray-400 dark:text-gray-500">
-                  {pathOf(d)}
-                </span>
-              ) : null}
-              {section === "open" && d.count && d.count > 1 ? (
-                <span className="ml-auto shrink-0 rounded-full bg-black/[0.05] px-1.5 text-[10px] text-gray-500 dark:bg-white/[0.08] dark:text-gray-400">
-                  {d.count} open
-                </span>
-              ) : null}
-            </button>
+            ) : null}
             <QuickCreateButton
               noun={noun}
               title={`+ New ${noun} in ${titleOf(d)}`}
               onClick={() => onCreate(d)}
             />
           </div>
-        ))}
+          );
+        })}
         </div>
       ) : null}
     </div>
   );
 }
 
-function PickRow({
+/**
+ * One picker row — exported so other pickers built on this design (the tab
+ * menu's workplace picker) render rows exactly like this one instead of
+ * re-drawing them.
+ */
+export function PickRow({
   row,
+  icon,
+  showPickDot = true,
   disabled,
   disabledReason,
   isExpanded = false,
@@ -1562,6 +1559,10 @@ function PickRow({
   onQuickCreateInside,
 }: {
   row: FlatRow;
+  /** Replaces the content-type icon (a row that isn't content, e.g. a workplace). */
+  icon?: React.ReactNode;
+  /** The has-note dot; meaningless for rows that aren't notes. */
+  showPickDot?: boolean;
   disabled?: boolean;
   disabledReason?: string;
   isExpanded?: boolean;
@@ -1581,8 +1582,12 @@ function PickRow({
   onQuickCreateInside?: (row: FlatRow) => void;
 }) {
   const expandable = Boolean(row.hasChildren && onToggle);
-  const pick = () =>
+  // A folder shown only so its contents can be reached (the picker doesn't
+  // accept folders) browses and offers "+ New", but never commits as a pick.
+  const pick = () => {
+    if (!row.pickable) return;
     onPick({ id: row.id, title: row.title, contentType: row.contentType });
+  };
 
   /**
    * Press and hold to pick a container, matching the file tree's gesture.
@@ -1601,7 +1606,7 @@ function PickRow({
   const suppressNextToggleRef = useRef(false);
   const longPress = useLongPress(
     () => {
-      if (disabled || !expandable) return;
+      if (disabled || !expandable || !row.pickable) return;
       suppressNextToggleRef.current = true;
       pick();
     },
@@ -1610,9 +1615,13 @@ function PickRow({
 
   const tooltip = disabled
     ? (disabledReason ?? "Not selectable here")
-    : expandable
-      ? `Click to expand · Double-click or hold to ${commitLabel}`
-      : `Click to ${commitLabel}`;
+    : !row.pickable
+      ? expandable
+        ? "Click to expand"
+        : "Not selectable here"
+      : expandable
+        ? `Click to expand · Double-click or hold to ${commitLabel}`
+        : `Click to ${commitLabel}`;
 
   return (
     <div
@@ -1654,7 +1663,7 @@ function PickRow({
           // the list shifts under the cursor at the moment of commit.
           if (expandable) {
             onToggle?.(row.id);
-            pick();
+            pick(); // no-op for a browse-only folder: the toggle is the whole gesture
           }
         }}
         className={cn(
@@ -1681,7 +1690,9 @@ function PickRow({
         <span
           className={cn("relative inline-flex shrink-0", row.isReference && "mr-0.5")}
         >
-          {row.contentType === "folder" ? (
+          {icon ? (
+            icon
+          ) : row.contentType === "folder" ? (
             isExpanded ? (
               <FolderOpen className="h-3.5 w-3.5 shrink-0 text-yellow-500/80" />
             ) : (
@@ -1719,14 +1730,18 @@ function PickRow({
         {disabled && disabledReason ? (
           <span className="text-[10px] text-gray-500">({disabledReason})</span>
         ) : null}
-        <span
-          className={cn(
-            "ml-auto h-1.5 w-1.5 shrink-0 rounded-full",
-            row.hasNote
-              ? "bg-emerald-500/80"
-              : "border border-gray-400 dark:border-gray-500",
-          )}
-        />
+        {/* The has-content dot belongs to things you can pick; a browse-only
+            folder has nothing to report. */}
+        {row.pickable && showPickDot ? (
+          <span
+            className={cn(
+              "ml-auto h-1.5 w-1.5 shrink-0 rounded-full",
+              row.hasNote
+                ? "bg-emerald-500/80"
+                : "border border-gray-400 dark:border-gray-500",
+            )}
+          />
+        ) : null}
       </button>
       {onQuickCreateInside && !disabled ? (
         <span title={`+ New ${createNoun} (inside this folder)`}>
