@@ -193,6 +193,9 @@ export function TemplateFieldsPanel({ contentId }: { contentId: string }) {
   const [busy, setBusy] = useState(false);
   const [problems, setProblems] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
+  /** The last re-render's outcome, kept in the footer — a toast alone is
+   * too easy to miss while the main panel reloads the office viewer. */
+  const [lastRender, setLastRender] = useState<{ at: string; summary: string } | null>(null);
 
   const load = useCallback(async () => {
     setError(null);
@@ -263,16 +266,16 @@ export function TemplateFieldsPanel({ contentId }: { contentId: string }) {
       }
       setDirty(false);
       const r = body.data?.report;
-      toast.success("Document re-rendered", {
-        description: [
-          r?.filled,
-          r?.overLength?.length ? `${r.overLength.length} over length` : "",
-          body.data?.templateChanged ? "template had changed — refreshed" : "",
-          body.data?.droppedKeys?.length ? `dropped (no longer in template): ${body.data.droppedKeys.join(", ")}` : "",
-        ]
-          .filter(Boolean)
-          .join(" · "),
-      });
+      const summary = [
+        r?.filled,
+        r?.overLength?.length ? `${r.overLength.length} over length` : "",
+        body.data?.templateChanged ? "template had changed — refreshed" : "",
+        body.data?.droppedKeys?.length ? `dropped (no longer in template): ${body.data.droppedKeys.join(", ")}` : "",
+      ]
+        .filter(Boolean)
+        .join(" · ");
+      setLastRender({ at: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }), summary });
+      toast.success("Document re-rendered", { description: summary });
       // Same id, new bytes: the open viewer refetches on a non-title update.
       window.dispatchEvent(new CustomEvent("content-updated", { detail: { contentId, updates: { overwritten: true } } }));
       window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
@@ -355,7 +358,13 @@ export function TemplateFieldsPanel({ contentId }: { contentId: string }) {
           </button>
         </div>
         <p className="text-[11px] leading-snug text-gray-500 dark:text-gray-400">
-          {dirty ? "Unsaved edits — re-render writes them into this same file." : "No AI call · re-renders into this same file."}
+          {busy
+            ? "Rendering and saving into this same file…"
+            : dirty
+              ? "Unsaved edits — re-render writes them into this same file."
+              : lastRender
+                ? `Re-rendered ${lastRender.at} · ${lastRender.summary} · the viewer reloads the file`
+                : "No AI call · re-renders into this same file."}
         </p>
       </div>
     </div>
