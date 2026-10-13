@@ -24,6 +24,7 @@ last_updated: 2026-10-13
 - **Settings → MCP** (`components/settings/McpSettingsPage.tsx`): tokens with capabilities, reach picker (folders + databases from the tree), all-chats, expiry; client snippets; revoke/purge. Sidebar badge "Soon" → "New".
 - **Files without a cookie** (`lib/domain/mcp/media.ts`): the app's `/api/content/content/{id}/download` links need the user's session, which no MCP client has. Every such link in a note read or `garden://note` resource is rewritten to a 15-minute presigned storage URL (`generateDownloadUrl`); a file read carries the same URL; an image file read attaches the pixels as an MCP `image` block (≤ 4 MB); `garden_read` `parts: ["images"]` attaches a note's images (≤ 6, ≤ 6 MB); `garden://file/{id}` serves a binary as a `blob`. The ChatGPT `fetch` alias stays text-only.
 - **Serializer**: zeed-dom's `xmlns="http://www.w3.org/1999/xhtml"` is stripped from server-side HTML-tier output in `markdown-serialize.ts`, so an empty paragraph reads `<p></p>` on Node as in the browser (`markdown:blocks:check` + `markdown:smoke` green).
+- **Context writes report real outcomes** (found in the owner's smoke: Claude Code wrote a Page Notes summary, got `changed: true`, and the signals section had been silently discarded). `garden_update_ai_context` now returns `dropped: [{section, reason}]` in both channels — unknown keys, user-owned sections (`role-strategy`, `directives`), and `signals` when the node does not resolve to Enhanced mode — and its description lists the writable keys (the old one suggested a `howToUse` key that was never stored). `garden_read`'s context part shows the one-liner (`MetadataView` gains `oneLiner`) and the resolved mode. Three new `mcp:surface:check` checks, mutation-tested.
 - **Extractions**: `lib/domain/content/backlinks.ts` (route now imports it), `lib/domain/content/create-note.ts`; `getInsertBlockCatalog` / `buildBlockNode` / `findBlocksInDoc` exported from editor-tools.
 - **Gate** `pnpm mcp:surface:check`: flat schemas with descriptions, annotations on every tool, capability check on every write, delete destructive + policy + elicitation, one write path, one read seam, bearer auth. **Smoke** `pnpm mcp:smoke` (+ `SMOKE_WRITE=1`), token mint helper for dev.
 
@@ -34,6 +35,7 @@ last_updated: 2026-10-13
 - A token scoped to one folder → `garden_read` on a note outside it is refused with the reach message.
 - `garden_delete_rows` on an "Ask me" table from Claude Code → a confirmation prompt appears; decline → nothing deleted.
 - Claude Code: read a note that holds an image → the markdown's image link is an `https://` storage URL (no `/api/content/`), and `parts: ["images"]` makes the model describe the picture.
+- Claude Code: "summarise the Page Notes database into its AI context" on a Standard-mode table → the agent reports that signals were not stored and why; the right rail's Context tab on that database shows the summary; a read back shows the one-liner.
 
 ## October 12, 2026 — The ground under the MCP server (conversion backup, one search builder, chat body search, MCP tokens, read seam, Cmd+Shift+F)
 
