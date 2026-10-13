@@ -328,16 +328,19 @@ export function TemplateFieldsPanel({ contentId }: { contentId: string }) {
           </ul>
         )}
       </div>
-      <div className="border-t border-black/10 dark:border-white/10 p-3 flex items-center gap-2">
-        <button
-          type="button"
-          disabled={busy || !dirty}
-          onClick={rerender}
-          className="px-3 py-1.5 rounded-lg text-xs font-medium bg-primary/20 hover:bg-primary/30 border border-primary/30 text-primary disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          {busy ? "Re-rendering…" : "Re-render document"}
-        </button>
-        {dirty && !busy && (
+      {/* Footer: controls on one non-wrapping row, the hint on its own
+          line — a narrow rail must not fold the button label, and the
+          busy label must not reflow the row. */}
+      <div className="border-t border-black/10 dark:border-white/10 px-3 py-2.5 space-y-1.5">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            disabled={busy || !dirty}
+            onClick={rerender}
+            className="shrink-0 min-w-[7.25rem] whitespace-nowrap px-3 py-1.5 rounded-lg text-xs font-medium bg-primary/20 hover:bg-primary/30 border border-primary/30 text-primary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            {busy ? "Re-rendering…" : "Re-render"}
+          </button>
           <button
             type="button"
             onClick={() => {
@@ -345,12 +348,15 @@ export function TemplateFieldsPanel({ contentId }: { contentId: string }) {
               setDirty(false);
               setProblems([]);
             }}
-            className="text-xs text-gray-500 dark:text-gray-400 hover:underline"
+            disabled={!dirty || busy}
+            className="shrink-0 whitespace-nowrap text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:underline disabled:invisible"
           >
             Discard edits
           </button>
-        )}
-        <span className="ml-auto text-[11px] text-gray-500 dark:text-gray-400">No AI call · same file</span>
+        </div>
+        <p className="text-[11px] leading-snug text-gray-500 dark:text-gray-400">
+          {dirty ? "Unsaved edits — re-render writes them into this same file." : "No AI call · re-renders into this same file."}
+        </p>
       </div>
     </div>
   );
