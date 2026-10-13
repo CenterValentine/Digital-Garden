@@ -63,6 +63,8 @@ export const TOOL_MENU: Readonly<Record<string, ToolMenuEntry>> = {
   create_folder: { family: "writing", selectWhen: "Create a folder to hold new items" },
   create_shortcut: { family: "writing", selectWhen: "Place an alias to an existing item somewhere else in the tree" },
   create_docx: { family: "writing", selectWhen: "Produce a .docx file the user can download" },
+  read_docx_template: { family: "writing", selectWhen: "See which document templates exist, or the fields one of them needs" },
+  fill_docx_template: { family: "writing", selectWhen: "Produce a .docx from one of the user's own templates, keeping its layout" },
 
   // ── databases ──────────────────────────────────────────────────────────
   query_database: { family: "databases", selectWhen: "Read rows — filtered, searched, sorted, counted, or deduped against" },

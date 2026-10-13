@@ -19,6 +19,7 @@ import { prisma } from "@/lib/database/client";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import { logger, spanPayload, withRouteTrace, withSpan } from "@/lib/core/logger";
 import { WINDOW_REF_LINK_TYPE } from "@/lib/domain/content/window-refs";
+import { readTemplateRecord } from "@/lib/domain/ai/docx-templates/record";
 import { toWindowReferenceRow } from "@/lib/features/content/window-reference";
 
 const ROUTE_PATH = "/api/content/content/tree";
@@ -270,6 +271,9 @@ export async function GET(request: NextRequest) {
                   fileSize: true,
                   uploadStatus: true,
                   thumbnailUrl: true,
+                  // Only read for the document-template flag below; the
+                  // JSON itself never leaves the server.
+                  storageMetadata: true,
                 },
               },
               htmlPayload: { select: { isTemplate: true } },
@@ -518,6 +522,9 @@ export async function GET(request: NextRequest) {
             fileSize: item.filePayload.fileSize.toString(),
             uploadStatus: item.filePayload.uploadStatus,
             thumbnailUrl: item.filePayload.thumbnailUrl,
+            ...(readTemplateRecord(item.filePayload.storageMetadata)
+              ? { isDocxTemplate: true }
+              : {}),
           };
         }
         if (item.htmlPayload) {

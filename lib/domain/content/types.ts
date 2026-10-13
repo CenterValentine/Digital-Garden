@@ -140,6 +140,8 @@ export interface TreeNode {
     fileSize: string;
     uploadStatus: "uploading" | "ready" | "failed";
     thumbnailUrl?: string | null;
+    /** A .docx marked as a document template (storageMetadata.custom.docxTemplate). */
+    isDocxTemplate?: boolean;
   };
   html?: {
     isTemplate: boolean;

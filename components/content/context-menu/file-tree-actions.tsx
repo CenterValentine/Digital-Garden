@@ -43,6 +43,9 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useImportSkillStore } from "@/state/import-skill-store";
+
+const DOCX_MIME_TYPE =
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 import { useCharterDialogStore } from "@/state/charter-dialog-store";
 import { useDataFlashcardsDialogStore } from "@/state/data-flashcards-dialog-store";
 import {
@@ -112,7 +115,9 @@ export interface FileTreeContext {
     /** Whether this shortcut's mirror is currently hiding nested shortcuts. */
     nestedShortcutsHidden?: boolean;
     externalUrl?: string; // Phase 2: External link URL
-    file?: { mimeType?: string } | null; // For supportsCustomIcon check
+    file?: { mimeType?: string; fileName?: string } | null; // For supportsCustomIcon check
+    /** A .docx already marked as a document template (fill_docx_template). */
+    isDocxTemplate?: boolean;
     isCharter?: boolean; // v3.6: note/folder already marked as a playbook
     charterDescription?: string; // v3.6: seeds the edit-description dialog
   };
@@ -426,6 +431,82 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
               title: playbookTitle,
               editing: false,
             }),
+        });
+      }
+    }
+
+    // Document template toggle — a .docx the user already keeps becomes the
+    // layout fill_docx_template fills. Same shape as the charter toggle:
+    // the file stays where it is; the mark is a record on its payload.
+    if (
+      isSingleSelection &&
+      clickedId &&
+      clickedNode &&
+      !isMirrorRow &&
+      clickedNode.contentType === "file" &&
+      (clickedNode.file?.mimeType === DOCX_MIME_TYPE ||
+        clickedNode.file?.fileName?.toLowerCase().endsWith(".docx"))
+    ) {
+      const contentId = clickedId;
+      if (clickedNode.isDocxTemplate) {
+        playbookActions.push({
+          id: "unmark-docx-template",
+          label: "Unmark Document Template",
+          icon: <BookMinus className="h-4 w-4" />,
+          onClick: async () => {
+            try {
+              const res = await fetch(
+                `/api/content/docx-templates?contentId=${encodeURIComponent(contentId)}`,
+                { method: "DELETE", credentials: "include" },
+              );
+              if (!res.ok) throw new Error("request failed");
+              window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
+              toast.success("Unmarked — no longer offered as a document template");
+            } catch {
+              toast.error("Failed to unmark document template");
+            }
+          },
+        });
+      } else {
+        playbookActions.push({
+          id: "mark-docx-template",
+          label: "Mark as Document Template",
+          icon: <ScrollText className="h-4 w-4" />,
+          onClick: async () => {
+            const pending = toast.loading("Checking the template's fields…");
+            try {
+              const res = await fetch("/api/content/docx-templates", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                credentials: "include",
+                body: JSON.stringify({ contentId }),
+              });
+              const body = (await res.json().catch(() => ({}))) as {
+                success?: boolean;
+                data?: { summary?: { fieldCount?: number; sectionCount?: number } };
+                error?: { message?: string; details?: Array<{ near?: string; part?: string }> };
+              };
+              toast.dismiss(pending);
+              if (!res.ok || !body.success) {
+                const near = body.error?.details?.[0]?.near;
+                toast.error(body.error?.message ?? "Failed to mark document template", {
+                  description: near ? `Near: “${near}”` : undefined,
+                  duration: 8000,
+                });
+                return;
+              }
+              window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
+              const s = body.data?.summary;
+              toast.success("Marked as a document template", {
+                description: s
+                  ? `${s.fieldCount ?? 0} field${s.fieldCount === 1 ? "" : "s"}, ${s.sectionCount ?? 0} repeating section${s.sectionCount === 1 ? "" : "s"}`
+                  : undefined,
+              });
+            } catch {
+              toast.dismiss(pending);
+              toast.error("Failed to mark document template");
+            }
+          },
         });
       }
     }

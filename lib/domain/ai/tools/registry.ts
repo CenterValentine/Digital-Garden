@@ -28,6 +28,7 @@ import { resolveChatModelFromConnection } from "@/lib/domain/ai/providers/regist
 import { addAutoAssociation } from "@/lib/features/conversations";
 import {
   createDocxDocument,
+  storeDocxDocument,
   findOrCreateFolder,
   findOrCreateShortcut,
 } from "@/lib/domain/ai/documents";
@@ -80,6 +81,18 @@ import {
 } from "@/lib/domain/ai/quests";
 import { computeTurnCost } from "@/lib/features/ai-connections/usage/pricing";
 import { resolveDocumentArgs } from "./write-args";
+import {
+  getDocxTemplateRecord,
+  listDocxTemplates,
+  loadDocxTemplate,
+  describeTemplateForModel,
+} from "@/lib/domain/ai/docx-templates/templates";
+import { judgeRender } from "@/lib/domain/ai/docx-templates/judge";
+import {
+  isDocxRendererConfigured,
+  renderDocxTemplate,
+  type TemplateValue,
+} from "@/lib/domain/ai/docx-templates/renderer-client";
 import type { JSONContent } from "@tiptap/core";
 import { stripPrivateContent } from "@/lib/domain/content/private-content";
 import { collectColumnLinkIds } from "@/lib/domain/data/column-anchor";
@@ -2670,6 +2683,228 @@ export function createBaseTools(ctx: ToolExecuteContext) {
               "created",
               "Word document",
             )),
+          };
+        } catch (error) {
+          return `Could not create the document: ${error instanceof Error ? error.message : "unknown error"}.`;
+        }
+      },
+    }),
+    // Document templates: the user's own .docx, marked in place, filled from
+    // keyed values by the renderer service (server/docx-renderer). The model
+    // reads a small CONTRACT, never the file — that is the token economy the
+    // feature exists for. read = list/contract; fill = render + file.
+    read_docx_template: tool({
+      description:
+        "Read a document template's field contract, or list the user's document templates (their own .docx files marked as templates) when templateId is omitted. The contract names every field and repeating section the template fills, the user's notes on them, and the checksum to pass to fill_docx_template. Call it before fill_docx_template — the contract is small; the file itself is never sent to you.",
+      inputSchema: z.object({
+        templateId: z
+          .string()
+          .optional()
+          .describe("Content id of the template file. Omit to list every marked template with its id."),
+      }),
+      execute: async ({ templateId }) => {
+        if (!isDocxRendererConfigured()) {
+          return {
+            ok: false,
+            refusal: "Document templates are not available here: the renderer is not configured. Use create_docx for a Word document.",
+          };
+        }
+        if (!templateId) {
+          const templates = await listDocxTemplates(ctx.userId);
+          return {
+            ok: true,
+            templates: templates.map((t) => ({
+              templateId: t.contentId,
+              title: t.title,
+              fileName: t.fileName,
+              fields: t.fieldCount,
+              sections: t.sectionCount,
+            })),
+            ...(templates.length === 0
+              ? { note: "No document templates are marked yet. The user marks one by right-clicking a .docx in the file tree → Mark as Document Template." }
+              : {}),
+          };
+        }
+        const loaded = await getDocxTemplateRecord(ctx.userId, templateId);
+        const record = loaded.record;
+        if (!loaded.ok || !record) {
+          return { ok: false, refusal: loaded.error ?? "Could not read the template.", ...(loaded.errors ? { templateErrors: loaded.errors } : {}) };
+        }
+        return {
+          ok: true,
+          templateId,
+          title: loaded.title,
+          checksum: record.checksum,
+          contract: describeTemplateForModel(record),
+          valuesShape:
+            "A JSON object. Top-level keys are the field roots and the sections; a dotted field nests (header.name → { header: { name } }); a section is an array (of objects, or of strings when marked list of strings); a rich field takes { text, url }. Leave a field empty (\"\" or null) rather than inventing a fact, and tell the user which fields you left empty.",
+          ...(record.warnings.length > 0 ? { warnings: record.warnings } : {}),
+          ...(loaded.refreshed ? { note: "The template file changed since it was marked; this contract was refreshed from the current file." } : {}),
+        };
+      },
+    }),
+    fill_docx_template: tool({
+      // Same HITL gate as create_docx, and the SAME user setting: a filled
+      // template is a Word document the chat is creating; a fourth toggle
+      // would ask the user to decide the same thing twice.
+      needsApproval: async (rawArgs) => {
+        const overwriteId =
+          typeof (rawArgs as { overwriteContentId?: unknown }).overwriteContentId === "string"
+            ? ((rawArgs as { overwriteContentId: string }).overwriteContentId.trim() || null)
+            : null;
+        if (!ctx.autoApprovedTools?.has("create_docx")) return true;
+        return !toolAutoApproves(ctx.autoApprovedTools, {
+          tool: "create_docx",
+          ...(overwriteId
+            ? { overwrite: { targetCreatedInThisChat: await contentCreatedInThisChat(ctx, overwriteId) } }
+            : {}),
+        });
+      },
+      description:
+        "Fill one of the user's document templates — a .docx they marked as a template — with keyed values, and file the result as a Word document that keeps the template's layout. Use ONLY when the user chose a template (by name, by @mention, or through a charter that names one); otherwise use create_docx. Call read_docx_template first and make `values` follow its contract exactly. Never invent a fact: leave the field empty and tell the user which fields you left empty. " +
+        "Targeting works as in create_docx: omit placement fields to use the configured output-target preset; pass outputLocation when the user or active charter routes this document; parentId only for a resolved folder id; overwriteContentId to regenerate an existing document in place (same id, so every File cell and shortcut keeps pointing at it — never create a second copy for an update).",
+      inputSchema: z.object({
+        templateId: z.string().describe("Content id of the template file, from read_docx_template."),
+        values: z
+          .record(z.string(), z.unknown())
+          .describe("The filled contract — field roots and sections as keys, exactly as read_docx_template described them."),
+        title: z
+          .string()
+          .optional()
+          .describe("Title for the document (also its file name); defaults to the template's title."),
+        expectedChecksum: z
+          .string()
+          .optional()
+          .describe("The checksum read_docx_template returned. The fill is refused if the template changed since, so values are never poured into a layout you did not read."),
+        parentId: z.string().optional().describe("Destination folder id — only when the user explicitly named a folder."),
+        outputLocation: z
+          .string()
+          .optional()
+          .describe('Per-document relative destination: "under_chat", "under_content" or "beside_content" — only when the user or charter routes this document differently from the preset.'),
+        alsoShortcutTo: z.string().optional().describe("Folder id to ALSO mirror the document into via a shortcut."),
+        overwriteContentId: z
+          .string()
+          .optional()
+          .describe("Id of an EXISTING document to overwrite in place. Placement fields are ignored in overwrite mode."),
+      }),
+      execute: async (rawArgs) => {
+        const { templateId, values, expectedChecksum, parentId, outputLocation, alsoShortcutTo, overwriteContentId } = rawArgs;
+        if (!isDocxRendererConfigured()) {
+          return { ok: false, refusal: "Document templates are not available here: the renderer is not configured. Use create_docx instead." };
+        }
+        if (!values || typeof values !== "object" || Array.isArray(values)) {
+          return {
+            ok: false,
+            refusal: "fill_docx_template needs `values` as a JSON object.",
+            nextAction: "Call read_docx_template for the contract, then call fill_docx_template again with `values` set.",
+          };
+        }
+        const loaded = await loadDocxTemplate(ctx.userId, templateId);
+        const template = loaded.template;
+        if (!loaded.ok || !template) {
+          return { ok: false, refusal: loaded.error ?? "Could not load the template.", ...(loaded.errors ? { templateErrors: loaded.errors } : {}) };
+        }
+        if (expectedChecksum && expectedChecksum.trim() && expectedChecksum.trim() !== template.record.checksum) {
+          return {
+            ok: false,
+            refusal: "The template file changed since you read its contract.",
+            checksum: template.record.checksum,
+            contract: describeTemplateForModel(template.record),
+            nextAction: "Check your values against this contract and call fill_docx_template again with the new checksum.",
+          };
+        }
+        const typedValues = values as Record<string, TemplateValue>;
+        const rendered = await renderDocxTemplate(template.bytes, typedValues, {
+          expectedChecksum: template.record.checksum,
+          fileName: template.node.filePayload.fileName,
+        });
+        const docx = rendered.docx;
+        const diagnostics = rendered.diagnostics;
+        if (!rendered.ok || !docx || !diagnostics) {
+          const failure = rendered.error ?? { code: "renderer_failed", message: "no document came back" };
+          return {
+            ok: false,
+            refusal: `The renderer could not fill the template: ${failure.message}`,
+            code: failure.code,
+            ...(failure.details ? { templateErrors: failure.details } : {}),
+          };
+        }
+        // The renderer reported; the product judges (docx-templates/judge.ts).
+        const verdict = judgeRender(template.record, typedValues, diagnostics);
+        if (!verdict.accept) {
+          return { ok: false, refusal: verdict.refusal ?? "The filled document was not accepted.", gaps: verdict.gaps };
+        }
+        const title = (rawArgs.title?.trim() || template.node.title.replace(/\.docx$/i, "")).trim();
+        const stored = { title, buffer: docx, searchText: rendered.text ?? "" };
+        // Compact on purpose: the tool result re-enters the model's context.
+        // No values echo, no text, no diagnostics beyond what changes the
+        // model's next sentence to the user.
+        const compact = {
+          templateId,
+          templateTitle: template.node.title,
+          ...(verdict.gaps.length > 0 ? { gaps: verdict.gaps } : {}),
+          renderMs: diagnostics.durationMs,
+          ...(template.refreshed
+            ? { note: "The template file had changed since it was marked; its contract was refreshed before filling." }
+            : {}),
+        };
+        const effectiveOutputLocation =
+          (outputLocation as ToolOutputLocation | undefined) ??
+          resolveCharterOutputLocation(ctx.charterOutputDirectives, title);
+
+        if (overwriteContentId) {
+          try {
+            const result = await storeDocxDocument(ctx.userId, { ...stored, overwriteContentId });
+            return {
+              __docPayload: true,
+              contentNodeId: result.contentNodeId,
+              fileName: result.fileName,
+              overwritten: true,
+              ...compact,
+              ...(await getContentWriteReceiptEnvelope(ctx.userId, result.contentNodeId, "updated", "Word document")),
+            };
+          } catch (error) {
+            return `Could not overwrite the document: ${error instanceof Error ? error.message : "unknown error"}.`;
+          }
+        }
+
+        const placement = resolveToolOutputPlacement(ctx, parentId, effectiveOutputLocation);
+        if (placement.error) return placement.error;
+        const destination = placement.parentId;
+        if (!destination) {
+          return "No destination folder: this chat has no target folder set. Ask the user to pick a target (the folder chip in the header) or to name a folder, then use create_folder.";
+        }
+        const owned = await prisma.contentNode.findFirst({
+          where: { id: destination, ownerId: ctx.userId, contentType: "folder", deletedAt: null },
+          select: { id: true },
+        });
+        if (!owned) return `Destination folder ${destination} was not found or is not a folder.`;
+        try {
+          const result = await storeDocxDocument(ctx.userId, {
+            ...stored,
+            parentFolderId: destination,
+            ...(placement.ownedByNoteId
+              ? { role: "referenced" as const, ownedByNoteId: placement.ownedByNoteId }
+              : {}),
+          });
+          if (ctx.conversationId) {
+            void addAutoAssociation(ctx.userId, ctx.conversationId, result.contentNodeId, "tool-call").catch(() => null);
+          }
+          let mirror: Record<string, unknown> = {};
+          if (alsoShortcutTo) {
+            const s = await findOrCreateShortcut(ctx.userId, result.contentNodeId, alsoShortcutTo);
+            mirror = s.contentNodeId
+              ? { shortcutId: s.contentNodeId, shortcutParentId: alsoShortcutTo }
+              : { shortcutError: s.error ?? "could not create the shortcut" };
+          }
+          return {
+            __docPayload: true,
+            contentNodeId: result.contentNodeId,
+            fileName: result.fileName,
+            parentFolderId: destination,
+            ...mirror,
+            ...compact,
+            ...(await getContentWriteReceiptEnvelope(ctx.userId, result.contentNodeId, "created", "Word document")),
           };
         } catch (error) {
           return `Could not create the document: ${error instanceof Error ? error.message : "unknown error"}.`;
