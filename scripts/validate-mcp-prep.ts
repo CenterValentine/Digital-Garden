@@ -113,7 +113,11 @@ function json(v: unknown): string {
   check(NOTE_HISTORY_TTL_MS === 24 * 60 * 60 * 1000, "history: snapshots live for exactly one day (owner, 2026-10-12)");
   check(historyCutoff(new Date("2026-10-13T07:00:00Z")).toISOString() === "2026-10-12T07:00:00.000Z", "history: the cutoff is now minus the TTL");
   const histSrc = src("lib/domain/content/note-history.ts");
-  check(/changedAt: \{ lt: historyCutoff\(/.test(histSrc), "history: recording prunes by age");
+  const recordFn = histSrc.slice(
+    histSrc.indexOf("export async function recordNoteHistory"),
+    histSrc.indexOf("export async function listNoteHistory"),
+  );
+  check(/changedAt: \{ lt: historyCutoff\(/.test(recordFn), "history: recording prunes by age (inside recordNoteHistory)");
   check(/changedAt: \{ gte: historyCutoff\(/.test(histSrc), "history: listing stays inside the window");
   check(/export async function purgeExpiredNoteHistory/.test(histSrc), "history: a sweep exists for notes never rewritten again");
   check(/purgeExpiredNoteHistory\(/.test(src("app/api/cron/purge-note-history/route.ts")), "history: the sweep has a cron route");
