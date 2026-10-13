@@ -213,6 +213,10 @@ export async function read(
       }
       const capped = capText(body, cap, "Narrow the read with parts, or for a database use garden_query_rows.");
       structured.truncated = capped.truncated;
+      // The body goes into BOTH channels. Claude Code renders only
+      // structuredContent when a tool returns one, so a body that lives
+      // only in the text block never reaches that client.
+      structured.body = capped.text;
       sections.push(capped.text);
     }
 

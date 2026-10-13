@@ -79,6 +79,7 @@ async function main() {
     const sc = structured(r);
     expect(sc.type === "note" && typeof sc.updatedAt === "string", `garden_read note "${noteHits[0].title}" with updatedAt`);
     expect("aiContext" in sc && "backlinks" in sc && "outline" in sc, "read carries aiContext, backlinks and outline");
+    expect(typeof sc.body === "string" && text(r).includes(sc.body), "structured body is the same markdown as the text block (clients that show only structuredContent need it)");
     const res = await client.readResource({ uri: `garden://note/${noteHits[0].id}` });
     expect(res.contents.length === 1 && typeof (res.contents[0] as { text?: string }).text === "string", "garden://note resource reads");
   }
