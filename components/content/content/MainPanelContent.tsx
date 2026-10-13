@@ -99,6 +99,8 @@ import {
   readTabPayload,
   shouldApplyRevalidation,
 } from "@/lib/domain/content/tab-payload-cache";
+import { readFillRecord } from "@/lib/domain/ai/docx-templates/record";
+import { useDocxFillStore } from "@/state/docx-fill-store";
 import { getViewerExtensions } from "@/lib/domain/editor/extensions-client";
 import { sanitizeTipTapJsonWithExtensions } from "@/lib/domain/editor/unsupported-content";
 import { resolveWikiLinkTarget } from "@/lib/domain/editor/wiki-link-resolve";
@@ -479,6 +481,17 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
       setContentIsPublished(Boolean(data.isPublished));
       setContentType(data.contentType);
       setContentMimeType(data.file?.mimeType ?? null);
+      // A file filled from a document template offers the Template Fields
+      // rail (right sidebar) — the flag rides the payload's own metadata.
+      useDocxFillStore
+        .getState()
+        .setFilled(
+          data.id,
+          Boolean(
+            data.file &&
+              readFillRecord((data.file as { storageMetadata?: unknown }).storageMetadata),
+          ),
+        );
       setContentExternalResourceType(data.external?.resourceType ?? null);
       // Stamp WHICH item these type facts describe: the render guard exists
       // because viewers were drawing a new id using the previous item's type

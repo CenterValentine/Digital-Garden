@@ -113,6 +113,10 @@ export interface ContentWriteRefreshTargets {
   tree: boolean;
   noteContentIds: string[];
   workflowContentIds: string[];
+  /** Files overwritten in place (create_docx / fill_docx_template with
+   * overwriteContentId): an open viewer must refetch, or it keeps showing
+   * the previous bytes. */
+  overwrittenFileContentIds: string[];
 }
 
 /**
@@ -141,6 +145,13 @@ export function getContentWriteRefreshTargets(
       new Set(
         receipts
           .filter((receipt) => receipt.contentType === "workflow")
+          .map((receipt) => receipt.contentId),
+      ),
+    ),
+    overwrittenFileContentIds: Array.from(
+      new Set(
+        receipts
+          .filter((receipt) => receipt.contentType === "file" && receipt.operation === "updated")
           .map((receipt) => receipt.contentId),
       ),
     ),

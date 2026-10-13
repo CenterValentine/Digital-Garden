@@ -18,6 +18,8 @@ export type RightSidebarTab =
   | "studio"
   | "context"
   | "database"
+  // A file produced from a document template: edit its values, re-render.
+  | "templateFields"
   | "extension";
 
 // Outline leads the rail (2026-07-16); "backlinks"/"tags" remain in the union

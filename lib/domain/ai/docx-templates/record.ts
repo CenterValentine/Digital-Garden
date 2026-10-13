@@ -61,6 +61,63 @@ export function recordFromContract(
   };
 }
 
+// ---------------------------------------------------------------------------
+// The fill record — on the OUTPUT file
+
+export const DOCX_FILL_RECORD_KEY = "docxFill";
+
+/** Where each factual value came from: field path (`experience_bullets[2]`,
+ * `summary`) → source row ids or handles the model cited. */
+export type FillProvenance = Record<string, string[]>;
+
+export interface DocxFillCompactReport {
+  filled: string;
+  sections?: Record<string, number>;
+  overLength?: string[];
+  uncited?: string[];
+  links?: number;
+  textChars: number;
+}
+
+/**
+ * What a filled document remembers about itself, stored at
+ * `storageMetadata.custom.docxFill` on the OUTPUT file: enough to re-render
+ * without a model turn (the values), to show where facts came from (the
+ * provenance), and to know which template version produced it.
+ */
+export interface DocxFillRecord {
+  version: 1;
+  templateId: string;
+  templateChecksum: string;
+  values: Record<string, unknown>;
+  provenance?: FillProvenance;
+  renderedAt: string;
+  report?: DocxFillCompactReport;
+}
+
+export function readFillRecord(storageMetadata: unknown): DocxFillRecord | null {
+  const custom = getMetadata(storageMetadata).custom;
+  const record = custom?.[DOCX_FILL_RECORD_KEY] as Partial<DocxFillRecord> | undefined;
+  if (
+    !record ||
+    record.version !== 1 ||
+    typeof record.templateId !== "string" ||
+    !record.values ||
+    typeof record.values !== "object"
+  ) {
+    return null;
+  }
+  return {
+    version: 1,
+    templateId: record.templateId,
+    templateChecksum: typeof record.templateChecksum === "string" ? record.templateChecksum : "",
+    values: record.values as Record<string, unknown>,
+    ...(record.provenance && typeof record.provenance === "object" ? { provenance: record.provenance } : {}),
+    renderedAt: typeof record.renderedAt === "string" ? record.renderedAt : "",
+    ...(record.report ? { report: record.report } : {}),
+  };
+}
+
 /**
  * The contract as the model reads it: one line per field, sections as
  * indented blocks. Compact on purpose — this text is what replaces the

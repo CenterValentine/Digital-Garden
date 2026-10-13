@@ -32,6 +32,7 @@ import {
   useRightSidebarStateStore,
 } from "@/state/right-sidebar-state-store";
 import type { RightSidebarTab } from "@/state/right-sidebar-state-store";
+import { useDocxFillStore } from "@/state/docx-fill-store";
 
 interface RightSidebarProps {
   /**
@@ -88,6 +89,11 @@ export function RightSidebar({
   const isVirtualContent = Boolean(
     selectedContentId && resolveExtensionVirtualContentType(selectedContentId)
   );
+  // A file produced from a document template offers its fields for editing
+  // and re-rendering (per-node flag, set when the payload loads).
+  const isTemplateFill = useDocxFillStore((s) =>
+    Boolean(selectedContentId && s.filled[selectedContentId]),
+  );
 
   const availableTabs = useMemo(() => {
     if (isVirtualContent) {
@@ -109,12 +115,15 @@ export function RightSidebar({
     if (selectedBlockId && !tabs.includes("properties")) {
       tabs.push("properties");
     }
+    if (isTemplateFill && !tabs.includes("templateFields")) {
+      tabs.push("templateFields");
+    }
     if (claimedPanel && !tabs.includes("extension")) {
       tabs.unshift("extension");
     }
 
     return tabs;
-  }, [selectedContentType, selectedBlockId, studioEnabled, excludeTabs, claimedPanel, isVirtualContent]);
+  }, [selectedContentType, selectedBlockId, studioEnabled, excludeTabs, claimedPanel, isVirtualContent, isTemplateFill]);
 
   // The saved tab is sacred: it ONLY changes via an explicit user action
   // (handleTabChange). Selecting a block shows the Properties panel as a LIVE,

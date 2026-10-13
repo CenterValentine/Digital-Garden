@@ -18,7 +18,7 @@
  * per-section counts, and fields over the length the user's notes set.
  */
 
-import type { DocxTemplateRecord } from "./record";
+import type { DocxTemplateRecord, FillProvenance } from "./record";
 import type { RenderDiagnostics, TemplateValue } from "./renderer-client";
 
 export interface RenderReport {
@@ -28,6 +28,8 @@ export interface RenderReport {
   sectionCounts: Record<string, number>;
   /** Fields longer than the `maxLength` note the user set — advisory. */
   overLength: string[];
+  /** Items of list-of-strings sections (bullets) with no cited source — advisory. */
+  uncited: string[];
   links: number;
   textChars: number;
   renderMs: number;
@@ -182,11 +184,42 @@ function sectionCounts(
   return counts;
 }
 
+/** Bullet-like items (list-of-strings sections) the provenance map does
+ * not cover — neither the item (`experience_bullets[2]`) nor the whole
+ * section (`experience_bullets`) is cited. The factual lines of a resume
+ * are its bullets; this is where an uncited claim would hide. */
+export function uncitedItems(
+  record: DocxTemplateRecord,
+  values: Record<string, TemplateValue>,
+  provenance: FillProvenance | undefined,
+): string[] {
+  if (!provenance) return [];
+  const cited = (key: string) => Array.isArray(provenance[key]) && provenance[key].length > 0;
+  const out: string[] = [];
+  const walk = (sections: DocxTemplateRecord["sections"], scope: unknown, prefix: string) => {
+    for (const s of sections) {
+      const list = at(scope, s.path);
+      if (!Array.isArray(list)) continue;
+      const key = prefix + s.path;
+      list.forEach((item, index) => {
+        const label = `${key}[${index}]`;
+        if (s.itemIsValue) {
+          if (!isEmpty(item) && !cited(label) && !cited(key)) out.push(label);
+          return;
+        }
+        walk(s.sections, item, `${label}.`);
+      });
+    }
+  };
+  walk(record.sections, values, "");
+  return out;
+}
+
 export function judgeRender(
   record: DocxTemplateRecord,
   values: Record<string, TemplateValue>,
   diagnostics: RenderDiagnostics,
-  extra: { links?: number } = {},
+  extra: { links?: number; provenance?: FillProvenance } = {},
 ): RenderVerdict {
   // 1. Tags left in the output.
   if (diagnostics.unresolved.length > 0) {
@@ -235,6 +268,7 @@ export function judgeRender(
       filled: { fields: declaredCount, declared: declaredCount },
       sectionCounts: sectionCounts(record, values),
       overLength: overLengthFields(record, values),
+      uncited: uncitedItems(record, values, extra.provenance),
       links: extra.links ?? 0,
       textChars: diagnostics.textChars,
       renderMs: diagnostics.durationMs,

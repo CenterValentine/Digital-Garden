@@ -85,6 +85,7 @@ export const PROPOSAL_BOUNDS = {
  */
 export const DELIVERABLE_TOOLS = [
   "create_docx",
+  "fill_docx_template",
   "create_note",
   "update_note",
   "append_to_document",
@@ -107,6 +108,11 @@ const DELIVERABLE_ALIASES: Record<string, DeliverableTool> = {
   document: "create_docx",
   resume: "create_docx",
   word: "create_docx",
+  // A charter that names the user's template: "deliverables: template".
+  template: "fill_docx_template",
+  "docx-template": "fill_docx_template",
+  "templated-docx": "fill_docx_template",
+  "fill-template": "fill_docx_template",
   note: "create_note",
   "roll-up": "create_note",
   rollup: "create_note",
@@ -267,8 +273,14 @@ export const CHARTER_TURN_DELIVERABLES: readonly DeliverableTool[] = [
   "insert_rows",
 ];
 
-/** Tools a charter turn's tail keeps beside the deliverables (its close). */
-export const CHARTER_TAIL_EXTRA = ["phase_checkpoint"] as const;
+/**
+ * Tools a charter turn's tail keeps beside the deliverables (its close).
+ * `fill_docx_template` rides here, not in the deliverables: a turn produces
+ * ONE document, by whichever document tool the charter named, so the
+ * template path must be allowed in the reserved tail without adding a
+ * step to every charter turn (the measured budget stays 16 / tail 6).
+ */
+export const CHARTER_TAIL_EXTRA = ["phase_checkpoint", "fill_docx_template"] as const;
 
 /**
  * ONE PROMPT PER TURN (ITERATION-RUN-HARNESS-FIXES §10 L2): a charter turn
@@ -289,6 +301,11 @@ export const CHARTER_TURN_TOOLS: readonly string[] = [
   "record_item_result",
   "record_iteration_findings",
   "create_docx",
+  // The template path (STAGE2-CHARTER-RECIPE §3): the contract read and
+  // the fill ride the same turn as create_docx, so a Materials phase that
+  // names a template never needs a summon.
+  "read_docx_template",
+  "fill_docx_template",
   "create_note",
   "update_note",
   "update_row",

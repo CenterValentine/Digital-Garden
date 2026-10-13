@@ -88,6 +88,7 @@ import {
   describeTemplateForModel,
 } from "@/lib/domain/ai/docx-templates/templates";
 import { judgeRender } from "@/lib/domain/ai/docx-templates/judge";
+import { compactReport, verifyProvenance, writeFillRecord } from "@/lib/domain/ai/docx-templates/fills";
 import {
   isDocxRendererConfigured,
   renderDocxTemplate,
@@ -2744,7 +2745,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           checksum: record.checksum,
           contract: describeTemplateForModel(record),
           valuesShape:
-            "A JSON object. Top-level keys are the field roots and the sections; a dotted field nests (header.name → { header: { name } }); a section is an array (of objects, or of strings when marked list of strings); a rich field takes { text, url }. Leave a field empty (\"\" or null) rather than inventing a fact, and tell the user which fields you left empty.",
+            "A JSON object. Top-level keys are the field roots and the sections; a dotted field nests (header.name → { header: { name } }); a section is an array (of objects, or of strings when marked list of strings); a rich field takes { text, url }. Titles follow the contract: ONE title field gets \"Title — Employer\" combined; split fields (title, company) stay split; titles, employers and dates are copied from the source of record exactly. Never invent a fact: a required field you cannot fill from the evidence is a question for the user, not a blank. Cite sources in `provenance` (field path → row ids).",
           ...(record.warnings.length > 0 ? { warnings: record.warnings } : {}),
           ...(loaded.refreshed ? { note: "The template file changed since it was marked; this contract was refreshed from the current file." } : {}),
         };
@@ -2783,6 +2784,12 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           .string()
           .optional()
           .describe("The checksum read_docx_template returned. The fill is refused if the template changed since, so values are never poured into a layout you did not read."),
+        provenance: z
+          .record(z.string(), z.array(z.string()))
+          .optional()
+          .describe(
+            "Where each factual value came from: field path (summary, experience_bullets[2], experience[0].title) → the source row ids it was taken from (the evidence database's claim rows, as query_database returned them). Cite bullets, figures, titles and dates. A cited id that does not exist is a refusal; uncited bullets are reported to the user.",
+          ),
         parentId: z.string().optional().describe("Destination folder id — only when the user explicitly named a folder."),
         outputLocation: z
           .string()
@@ -2795,7 +2802,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           .describe("Id of an EXISTING document to overwrite in place. Placement fields are ignored in overwrite mode."),
       }),
       execute: async (rawArgs) => {
-        const { templateId, values, expectedChecksum, parentId, outputLocation, alsoShortcutTo, overwriteContentId } = rawArgs;
+        const { templateId, values, expectedChecksum, provenance, parentId, outputLocation, alsoShortcutTo, overwriteContentId } = rawArgs;
         if (!isDocxRendererConfigured()) {
           return { ok: false, refusal: "Document templates are not available here: the renderer is not configured. Use create_docx instead." };
         }
@@ -2821,6 +2828,17 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           };
         }
         const typedValues = values as Record<string, TemplateValue>;
+        // Provenance is checked BEFORE rendering: a citation that does not
+        // resolve to one of the user's rows means the model cited something
+        // it never read, and no document should be produced from it.
+        const citations = await verifyProvenance(ctx.userId, provenance ?? {});
+        if (citations.notFound.length > 0) {
+          return {
+            ok: false,
+            refusal: `Refused: cited source rows do not exist — ${citations.notFound.slice(0, 5).join(", ")}. Cite only row ids you read with query_database in this conversation.`,
+            nextAction: "Re-read the evidence rows, correct the provenance, and call fill_docx_template again.",
+          };
+        }
         const rendered = await renderDocxTemplate(template.bytes, typedValues, {
           expectedChecksum: template.record.checksum,
           fileName: template.node.filePayload.fileName,
@@ -2840,6 +2858,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         // a bad write is refused with a reason the model can act on.
         const verdict = judgeRender(template.record, typedValues, diagnostics, {
           links: countHyperlinkValues(typedValues),
+          provenance,
         });
         if (!verdict.accept) {
           return {
@@ -2854,26 +2873,36 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         // Compact on purpose: the tool result re-enters the model's context.
         // No values echo, no text — the positive report and what changes
         // the model's next sentence to the user.
-        const report = verdict.report;
+        const report = compactReport(verdict);
         const compact = {
           templateId,
           templateTitle: template.node.title,
-          ...(report
-            ? {
-                report: {
-                  filled: `${report.filled.fields} of ${report.filled.declared} fields`,
-                  ...(Object.keys(report.sectionCounts).length > 0 ? { sections: report.sectionCounts } : {}),
-                  ...(report.overLength.length > 0 ? { overLength: report.overLength } : {}),
-                  ...(report.links > 0 ? { links: report.links } : {}),
-                  textChars: report.textChars,
-                },
-              }
+          ...(report ? { report } : {}),
+          ...(citations.total > 0
+            ? { provenance: { verified: citations.verified, unverified: citations.unverified.length } }
             : {}),
           renderMs: diagnostics.durationMs,
           ...(template.refreshed
             ? { note: "The template file had changed since it was marked; its contract was refreshed before filling." }
             : {}),
         };
+        // The output remembers its values and provenance (record.ts
+        // docxFill) — what the Template Fields sidebar edits and re-renders
+        // without a model turn.
+        const recordFill = (contentNodeId: string, overwritten: boolean) =>
+          writeFillRecord(
+            contentNodeId,
+            {
+              version: 1,
+              templateId,
+              templateChecksum: template.record.checksum,
+              values: typedValues,
+              ...(provenance ? { provenance } : {}),
+              renderedAt: new Date().toISOString(),
+              ...(report ? { report } : {}),
+            },
+            { overwritten, renderMs: diagnostics.durationMs, bytes: diagnostics.bytes, provenance: citations, via: "tool" },
+          );
         const effectiveOutputLocation =
           (outputLocation as ToolOutputLocation | undefined) ??
           resolveCharterOutputLocation(ctx.charterOutputDirectives, title);
@@ -2881,6 +2910,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         if (overwriteContentId) {
           try {
             const result = await storeDocxDocument(ctx.userId, { ...stored, overwriteContentId });
+            await recordFill(result.contentNodeId, true);
             return {
               __docPayload: true,
               contentNodeId: result.contentNodeId,
@@ -2913,6 +2943,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
               ? { role: "referenced" as const, ownedByNoteId: placement.ownedByNoteId }
               : {}),
           });
+          await recordFill(result.contentNodeId, false);
           if (ctx.conversationId) {
             void addAutoAssociation(ctx.userId, ctx.conversationId, result.contentNodeId, "tool-call").catch(() => null);
           }
