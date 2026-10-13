@@ -28,6 +28,8 @@ import {
 } from "@/lib/domain/collaboration/presence-poll";
 import { resolvePresenceHeartbeatDelay } from "@/lib/domain/collaboration/presence-cadence";
 
+/** How long the "merged with an outside change" notice stays after a sync. */
+const REMOTE_WRITE_NOTICE_MS = 12_000;
 /** How long the "reconnected" notice stays after recovering from offline. */
 const RECOVERED_NOTICE_MS = 4_000;
 /** D17: how long opening a cached copy waits for the server's before editing opens anyway. */
@@ -206,6 +208,15 @@ export interface CollaborationRuntimeState {
    * set for RECOVERED_NOTICE_MS so the editor can say so, then cleared.
    */
   recoveredAt: number | null;
+  /**
+   * When a sync merged this tab's own unsynced edits with a change the server
+   * document received while the tab was detached (asleep or offline) — an
+   * outside write by an agent, a script or another device. The merge is the
+   * resolution (Y.js keeps both sides); this only tells the user it happened.
+   * Set for REMOTE_WRITE_NOTICE_MS, then cleared. Owner decision 2026-10-13:
+   * resolve by merge, notify only when the tab had edits of its own.
+   */
+  remoteWriteMergedAt: number | null;
   editPolicy: CollaborationEditPolicy;
 }
 
@@ -312,6 +323,19 @@ interface DocumentRuntimeEntry {
   presenceReleased: boolean;
   /** Unsubscribe from the shared presence poller; null when not subscribed. */
   presencePollUnsubscribe: (() => void) | null;
+  /**
+   * The server document's stamp the presence poll last reported (ms). While
+   * detached, a stamp past this one means the live document changed without
+   * us — the wake-on-write signal for an outside write.
+   */
+  lastSeenDocumentStampMs: number | null;
+  /**
+   * Remote updates applied to the Y.Doc while this tab was detached WITH
+   * unsynced edits of its own. Non-zero at `markSynced` means the sync was a
+   * merge, which is what `remoteWriteMergedAt` reports.
+   */
+  remoteUpdatesWhileDetached: number;
+  remoteWriteNoticeTimer: ReturnType<typeof setTimeout> | null;
   // True once the tab has been hidden past VISIBILITY_SLEEP_DELAY_MS. Blocks
   // the presence subscription from (re)opening and selects the deep-dormant
   // heartbeat cadence. Cleared when the tab becomes visible again.
@@ -780,6 +804,9 @@ class CollaborationRuntimeManager {
       presenceHeartbeatInFlight: false,
       presenceReleased: false,
       presencePollUnsubscribe: null,
+      lastSeenDocumentStampMs: null,
+      remoteUpdatesWhileDetached: 0,
+      remoteWriteNoticeTimer: null,
       presenceSuspended: false,
       broadcastChannel: null,
       knownBrowserSessions: new Map(),
@@ -830,6 +857,7 @@ class CollaborationRuntimeManager {
         readOnly: false,
         warning: null,
         recoveredAt: null,
+        remoteWriteMergedAt: null,
         editPolicy: {
           editable: false,
           reason: "booting-local-state",
@@ -838,8 +866,24 @@ class CollaborationRuntimeManager {
       },
     };
 
-    entry.ydocUpdateHandler = (_update, _origin, _doc, transaction) => {
-      if (!transaction.local || entry.isBootstrappingInitialContent) return;
+    entry.ydocUpdateHandler = (_update, origin, _doc, transaction) => {
+      if (!transaction.local) {
+        // A remote update (origin = the provider) landing while this tab is
+        // detached with unsynced edits of its own means the coming sync is a
+        // MERGE, not a plain catch-up. Count it so markSynced can say so.
+        // Y.js emits no update for an empty diff, so a reconnect that brings
+        // nothing new never counts.
+        if (
+          entry.hocuspocusProvider !== null &&
+          origin === entry.hocuspocusProvider &&
+          entry.state.connectionState !== "synced" &&
+          (entry.state.localDirty || entry.state.unsyncedUpdateCount > 0)
+        ) {
+          entry.remoteUpdatesWhileDetached += 1;
+        }
+        return;
+      }
+      if (entry.isBootstrappingInitialContent) return;
       if (entry.state.persistenceState !== "localReady") return;
 
       this.noteLocalActivity(entry);
@@ -1543,8 +1587,8 @@ class CollaborationRuntimeManager {
     // Deep-hidden tabs don't need live badge updates; resubscribes on
     // tab-visible.
     if (entry.presenceSuspended) return;
-    entry.presencePollUnsubscribe = subscribeContentPresence(entry.contentId, (sessions) => {
-      this.handleRemotePresence(entry, sessions);
+    entry.presencePollUnsubscribe = subscribeContentPresence(entry.contentId, (sessions, documentStampMs) => {
+      this.handleRemotePresence(entry, sessions, documentStampMs);
     });
   }
 
@@ -1731,27 +1775,53 @@ class CollaborationRuntimeManager {
     });
   }
 
-  private handleRemotePresence(entry: DocumentRuntimeEntry, sessions: PresenceRecord[]) {
+  private handleRemotePresence(
+    entry: DocumentRuntimeEntry,
+    sessions: PresenceRecord[],
+    documentStampMs: number | null = null
+  ) {
     this.applyRemotePresenceSessions(entry, sessions);
+    this.applyDocumentStamp(entry, documentStampMs);
     // Fan out to the other tabs of this browser so only the leader subscribes.
     // Kept from the SSE design: the poller is shared per-tab, not cross-tab.
     entry.broadcastChannel?.postMessage({
       type: "remote-presence-snapshot",
       contentId: entry.contentId,
       sessions,
+      documentStampMs,
       timestamp: Date.now(),
     });
+  }
+
+  /**
+   * Wake-on-write for a tab that cannot hear the broadcast. The presence poll
+   * reports the server document's stamp; while this tab is detached, a stamp
+   * past the one it last saw means the live document changed without it, so
+   * it reconnects through the same path the in-app chat uses after its own
+   * writes. The first stamp seen is only a baseline. Connected tabs received
+   * the change already and are skipped by `wakeForRemoteWrite`.
+   */
+  private applyDocumentStamp(entry: DocumentRuntimeEntry, documentStampMs: number | null) {
+    if (documentStampMs === null) return;
+    const previous = entry.lastSeenDocumentStampMs;
+    if (previous !== null && documentStampMs <= previous) return;
+    entry.lastSeenDocumentStampMs = documentStampMs;
+    if (previous === null) return;
+    const { connectionState } = entry.state;
+    if (connectionState === "connected" || connectionState === "synced") return;
+    this.wakeForRemoteWrite(entry.contentId);
   }
 
   private handleBroadcastMessage(entry: DocumentRuntimeEntry, payload: unknown) {
     if (!payload || typeof payload !== "object") return;
     const message = payload as { type?: string; contentId?: string };
     if (message.type === "remote-presence-snapshot" && message.contentId === entry.contentId) {
-      this.applyRemotePresenceSessions(
-        entry,
-        (payload as { sessions?: Array<{ sessionId?: string; surfaceCount?: number }> }).sessions ??
-          []
-      );
+      const snapshot = payload as {
+        sessions?: Array<{ sessionId?: string; surfaceCount?: number }>;
+        documentStampMs?: number | null;
+      };
+      this.applyRemotePresenceSessions(entry, snapshot.sessions ?? []);
+      this.applyDocumentStamp(entry, typeof snapshot.documentStampMs === "number" ? snapshot.documentStampMs : null);
       return;
     }
 
@@ -2091,6 +2161,7 @@ class CollaborationRuntimeManager {
       entry.state.warning !== null ||
       entry.state.connectionState === "disconnectedButDirty" ||
       entry.state.availabilityState === "localFallback";
+    const merged = this.consumeDetachedMerge(entry);
     this.clearProviderReconnect(entry);
     entry.state.connectionState = "synced";
     entry.state.bootstrapState = "ready";
@@ -2109,12 +2180,40 @@ class CollaborationRuntimeManager {
         this.emit(entry);
       }, RECOVERED_NOTICE_MS);
     }
+    // The merge itself is the resolution (both sides kept); the notice is so a
+    // rewrite by an agent never silently reshapes text the user was editing.
+    // A plain catch-up (no local edits) says nothing.
+    if (merged) {
+      entry.state.remoteWriteMergedAt = Date.now();
+      if (entry.remoteWriteNoticeTimer) clearTimeout(entry.remoteWriteNoticeTimer);
+      entry.remoteWriteNoticeTimer = setTimeout(() => {
+        entry.remoteWriteNoticeTimer = null;
+        entry.state.remoteWriteMergedAt = null;
+        this.emit(entry);
+      }, REMOTE_WRITE_NOTICE_MS);
+    }
     this.emit(entry);
     // Start inactivity countdown after every successful sync.
     this.scheduleInactivitySleep(entry);
     // Announce "synced" immediately so other sessions' badges flip from
     // grey to live without waiting out a dormant heartbeat interval.
     this.schedulePresenceHeartbeat(entry, 0);
+  }
+
+  /**
+   * Was the sync that just completed a MERGE: this tab had unsynced edits of
+   * its own AND the server sent changes it did not have (counted by the update
+   * handler while detached)? Read before markSynced clears the dirty markers;
+   * resets the count either way.
+   */
+  private consumeDetachedMerge(entry: DocumentRuntimeEntry): boolean {
+    const merged =
+      entry.remoteUpdatesWhileDetached > 0 &&
+      (entry.state.localDirty ||
+        entry.state.unsyncedUpdateCount > 0 ||
+        entry.state.connectionState === "disconnectedButDirty");
+    entry.remoteUpdatesWhileDetached = 0;
+    return merged;
   }
 
   /**
@@ -2681,6 +2780,7 @@ class CollaborationRuntimeManager {
     document.removeEventListener("visibilitychange", entry.visibilityChangeHandler);
     window.removeEventListener("pagehide", entry.pageHideHandler);
     if (entry.cooldownTimer) clearTimeout(entry.cooldownTimer);
+    if (entry.remoteWriteNoticeTimer) clearTimeout(entry.remoteWriteNoticeTimer);
     if (entry.recoveredNoticeTimer) clearTimeout(entry.recoveredNoticeTimer);
     if (entry.visibilitySleepTimer) clearTimeout(entry.visibilitySleepTimer);
     if (entry.inactivitySleepTimer) clearTimeout(entry.inactivitySleepTimer);
