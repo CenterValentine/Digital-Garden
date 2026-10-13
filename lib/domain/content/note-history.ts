@@ -59,17 +59,16 @@ export async function recordNoteHistory(
           snapshot: envelope as unknown as Prisma.InputJsonValue,
         },
       });
-      // Prune by AGE first (one-day window), then by count as a safety cap.
+      // Prune by AGE across EVERY note (one-day window) — no cron needed:
+      // the table is small and any write anywhere sweeps it — then by count
+      // for this note as a safety cap within the day.
+      await purgeExpiredNoteHistory();
       const floor = pruneBelowVersion(version);
-      await prisma.contentHistory.deleteMany({
-        where: {
-          contentId: input.contentId,
-          OR: [
-            { changedAt: { lt: historyCutoff(new Date()) } },
-            ...(floor > 0 ? [{ version: { lte: floor } }] : []),
-          ],
-        },
-      });
+      if (floor > 0) {
+        await prisma.contentHistory.deleteMany({
+          where: { contentId: input.contentId, version: { lte: floor } },
+        });
+      }
       return { version };
     } catch (error) {
       const code = (error as { code?: string }).code;
@@ -98,9 +97,9 @@ export async function listNoteHistory(contentId: string, limit = 20) {
 }
 
 /**
- * The daily sweep: a note that is never rewritten again would otherwise keep
- * its last snapshot forever, because pruning runs on record. Returns the
- * number of expired rows removed across every note.
+ * Remove every expired snapshot in the table. Called on each record, so a
+ * note that is never rewritten again is still swept by the next write to
+ * any other note. Returns the number of rows removed.
  */
 export async function purgeExpiredNoteHistory(now: Date = new Date()): Promise<number> {
   const result = await prisma.contentHistory.deleteMany({

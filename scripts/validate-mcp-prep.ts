@@ -117,11 +117,9 @@ function json(v: unknown): string {
     histSrc.indexOf("export async function recordNoteHistory"),
     histSrc.indexOf("export async function listNoteHistory"),
   );
-  check(/changedAt: \{ lt: historyCutoff\(/.test(recordFn), "history: recording prunes by age (inside recordNoteHistory)");
+  check(/await purgeExpiredNoteHistory\(\)/.test(recordFn), "history: recording sweeps every expired snapshot (no cron needed)");
   check(/changedAt: \{ gte: historyCutoff\(/.test(histSrc), "history: listing stays inside the window");
-  check(/export async function purgeExpiredNoteHistory/.test(histSrc), "history: a sweep exists for notes never rewritten again");
-  check(/purgeExpiredNoteHistory\(/.test(src("app/api/cron/purge-note-history/route.ts")), "history: the sweep has a cron route");
-  check(/"\/api\/cron\/purge-note-history"/.test(src("vercel.json")), "history: the cron route is scheduled in vercel.json");
+  check(/export async function purgeExpiredNoteHistory/.test(histSrc) && /changedAt: \{ lt: historyCutoff\(now\)/.test(histSrc), "history: the sweep deletes by age across every note");
 
   const write = src("lib/domain/content/write-note-content.ts");
   const payloadFn = write.indexOf("async function writeNotePayload(");
