@@ -45,8 +45,11 @@ function check(ok: boolean, message: string): void {
   failures += 1;
   console.error(`✗ ${message}`);
 }
+/** Source with comments removed, so a commented-out call cannot satisfy a scan. */
 function src(rel: string): string {
-  return readFileSync(resolve(process.cwd(), rel), "utf8");
+  return readFileSync(resolve(process.cwd(), rel), "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/^\s*\/\/.*$/gm, "");
 }
 function json(v: unknown): string {
   return JSON.stringify(v);
@@ -107,9 +110,14 @@ function json(v: unknown): string {
   check(pruneBelowVersion(25) === 25 - NOTE_HISTORY_KEEP && pruneBelowVersion(3) < 1, "history: prune floor is latest minus keep, and nothing is pruned early");
 
   const write = src("lib/domain/content/write-note-content.ts");
-  const calls = (write.match(/recordNoteHistory\(/g) ?? []).length;
-  check(calls >= 2, `history: writeNoteContent records on both routes (found ${calls} call(s))`);
-  check(write.indexOf("recordNoteHistory(") < write.indexOf("prisma.notePayload.upsert("), "history: the payload route records BEFORE the upsert");
+  const payloadFn = write.indexOf("async function writeNotePayload(");
+  check(payloadFn > 0, "history: writeNotePayload exists");
+  const collabPart = write.slice(0, payloadFn);
+  const payloadPart = write.slice(payloadFn);
+  check(/await recordNoteHistory\(/.test(collabPart) && /route: "collaboration"/.test(collabPart), "history: the collaboration route records from the live document's before");
+  const payloadCall = payloadPart.indexOf("await recordNoteHistory(");
+  const payloadUpsert = payloadPart.indexOf("prisma.notePayload.upsert(");
+  check(payloadCall > 0 && payloadUpsert > payloadCall, "history: the payload route records BEFORE its upsert");
   check(/recordNoteHistory\(/.test(src("lib/domain/ai/run-ledger.ts")), "history: the run ledger records before its full-document upsert");
   check(/recordNoteHistory\(/.test(src("app/api/content/content/[id]/route.ts")), "history: the content PATCH records when a markdown body replaces the note");
   check(/\/history`/.test(src("components/content/content/MainPanelContent.tsx")) && /source: "source-view"/.test(src("components/content/content/MainPanelContent.tsx")), "history: the source-view toggle POSTs the pre-conversion document");
