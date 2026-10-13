@@ -26,6 +26,10 @@
  *   - remote updates are counted without the local-dirty condition
  *   - markSynced never sets remoteWriteMergedAt
  *   - the editor stops rendering the merged notice
+ *   - the planner keeps a same-lineage copy the server strictly supersedes
+ *   - a kept or failed catch-up no longer marks itself incomplete
+ *   - the catch-up stops recording the state's stamp as the baseline
+ *   - the beacon drops collab:* warnings again
  */
 
 import { readFileSync } from "node:fs";
@@ -61,7 +65,21 @@ check(/stampMoved/.test(poll) && /recordsEqual\(prev, fresh\) && !stampMoved/.te
 const runtime = src("lib/domain/collaboration/runtime.ts");
 const applyStamp = fnBody(runtime, "private applyDocumentStamp(", "private handleBroadcastMessage(");
 check(applyStamp.length > 0, "runtime: applyDocumentStamp exists");
-check(/if \(previous === null\) return;/.test(applyStamp), "runtime: the first stamp seen is only a baseline (no wake)");
+check(/if \(previous === null\) \{\s*(\/\/[^\n]*\n\s*)*if \(!entry\.catchUpIncomplete\) return;/.test(applyStamp), "runtime: without a baseline the first stamp wakes only a copy whose open-time catch-up was incomplete");
+// The baseline comes from the state a tab took, not from the first poll:
+// a tab that opened behind would otherwise never learn it is behind.
+const state = src("app/api/collaboration/state/route.ts");
+check(/documentStampMs: document\?\.updatedAt\.getTime\(\)/.test(state), "state route: the response carries the stored document's stamp");
+check(/withRouteTrace\(request, \{ route: "\/api\/collaboration\/state" \}/.test(state) && /event: "state:served"/.test(state), "state route: traced, and what it served is logged");
+const catchUp = fnBody(runtime, "private async catchUpLocalCopy(", "private async fetchCanonicalYDocState(");
+check((catchUp.match(/entry\.lastSeenDocumentStampMs = canonical\.documentStampMs;/g) ?? []).length >= 2, "runtime: a catch-up that leaves the copy current records the state's stamp as the baseline (same-document and applied paths)");
+check((catchUp.match(/entry\.catchUpIncomplete = true;/g) ?? []).length >= 2, "runtime: a failed fetch and a kept copy both mark the catch-up incomplete");
+check(/entry\.lastSeenDocumentStampMs = canonicalState\.documentStampMs;/.test(runtime), "runtime: a copy seeded from the server's state records its stamp as the baseline");
+check(/clientLogger\[plan === "keep" \? "warn" : "info"\]/.test(catchUp), "runtime: a kept copy is logged at warn so the beacon forwards the decision");
+const beacon = src("app/api/logs/client/route.ts");
+check(/ev\.level === "warn" && typeof ev\.event === "string" && ev\.event\.startsWith\("collab:"\)/.test(beacon), "beacon: collab:* warnings from the browser reach the server log");
+const lineage = src("lib/domain/collaboration/lineage.ts");
+check(/if \(input\.sharesLineage\) \{\s*if \(input\.unionMatchesServer\) return "merge";\s*return input\.alignment !== "diverged" \? input\.alignment : "keep";/.test(lineage), "planner: a same-lineage copy whose union would double adopts the server's copy when one side only adds");
 check(/connectionState === "connected" \|\| connectionState === "synced"\) return;/.test(applyStamp), "runtime: a connected or synced document is never woken (it heard the broadcast)");
 check(/this\.wakeForRemoteWrite\(entry\.contentId\)/.test(applyStamp), "runtime: a detached document with a newer stamp wakes through wakeForRemoteWrite");
 check(/this\.applyDocumentStamp\(entry, documentStampMs\)/.test(runtime) && /documentStampMs,\s*timestamp: Date\.now\(\)/.test(runtime.replace(/\n/g, " ")), "runtime: the poll handler applies the stamp and fans it out to the other tabs");

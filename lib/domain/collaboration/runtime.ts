@@ -261,6 +261,8 @@ interface CollaborationStateResponse {
     update: string | null;
     /** When the stored note last changed (ISO) — D17's staleness test. */
     payloadUpdatedAt?: string | null;
+    /** The stored document's stamp (ms): the wake-on-write baseline for a tab that takes this state. */
+    documentStampMs?: number | null;
   };
   error?: { message?: string };
 }
@@ -329,6 +331,13 @@ interface DocumentRuntimeEntry {
    * us — the wake-on-write signal for an outside write.
    */
   lastSeenDocumentStampMs: number | null;
+  /**
+   * The open-time comparison with the server's copy did not bring this copy
+   * up to date (fetch failed, or the planner kept the cached copy). The first
+   * document stamp the poll reports then wakes the document instead of
+   * becoming its baseline, so a tab that opened behind does not stay behind.
+   */
+  catchUpIncomplete: boolean;
   /**
    * Remote updates applied to the Y.Doc while this tab was detached WITH
    * unsynced edits of its own. Non-zero at `markSynced` means the sync was a
@@ -805,6 +814,7 @@ class CollaborationRuntimeManager {
       presenceReleased: false,
       presencePollUnsubscribe: null,
       lastSeenDocumentStampMs: null,
+      catchUpIncomplete: false,
       remoteUpdatesWhileDetached: 0,
       remoteWriteNoticeTimer: null,
       presenceSuspended: false,
@@ -1128,6 +1138,8 @@ class CollaborationRuntimeManager {
           return;
         }
         Y.applyUpdate(entry.ydoc, canonicalState.update);
+        // Seeded from the server's document as of this stamp: the wake-on-write baseline.
+        entry.lastSeenDocumentStampMs = canonicalState.documentStampMs;
       } else if (pendingContentIsMeaningful) {
         this.markBootstrapFailed(
           entry,
@@ -1349,7 +1361,11 @@ class CollaborationRuntimeManager {
     try {
       canonical = await this.fetchCanonicalYDocState(entry.contentId, abortController?.signal);
     } catch {
-      return; // offline, slow, or refused — the cached copy opens as before
+      // Offline, slow, or refused — the cached copy opens as before, and the
+      // first document stamp the presence poll reports wakes it instead of
+      // becoming its baseline (applyDocumentStamp).
+      entry.catchUpIncomplete = true;
+      return;
     } finally {
       if (timer) clearTimeout(timer);
     }
@@ -1371,7 +1387,10 @@ class CollaborationRuntimeManager {
         JSON.stringify(TiptapTransformer.fromYdoc(union, "default")) === JSON.stringify(server);
       union.destroy();
       // Already the same document — nothing to carry.
-      if (unionMatchesServer && JSON.stringify(local) === JSON.stringify(server)) return;
+      if (unionMatchesServer && JSON.stringify(local) === JSON.stringify(server)) {
+        entry.lastSeenDocumentStampMs = canonical.documentStampMs;
+        return;
+      }
     }
 
     const prior = entry.priorCacheEntry;
@@ -1383,18 +1402,29 @@ class CollaborationRuntimeManager {
       lastLocalEditAt: entry.lastLocalEditAt,
       payloadUpdatedAt: canonical.payloadUpdatedAt,
     });
-    clientLogger.info({
+    // "keep" is the one outcome that leaves the tab behind the server; it is
+    // logged at warn so the beacon forwards it and the decision is visible
+    // server-side (2026-10-13: a whole afternoon of guessing from the server).
+    clientLogger[plan === "keep" ? "warn" : "info"]({
       layer: "editor",
       event: "collab:local_catch_up",
       summary: `cached copy compared with the server's — ${plan}`,
-      attrs: { content_id: entry.contentId, plan, shares_lineage: shares },
+      attrs: { content_id: entry.contentId, plan, shares_lineage: shares, union_matches_server: unionMatchesServer },
     });
-    if (plan === "keep") return;
+    if (plan === "keep") {
+      // Connecting later behaves as before this check existed; let the first
+      // document stamp the poll reports trigger that instead of being a baseline.
+      entry.catchUpIncomplete = true;
+      return;
+    }
     if (plan === "merge") {
       Y.applyUpdate(entry.ydoc, serverUpdate, "local-catch-up");
     } else {
       alignOntoServerCopy(entry.ydoc, serverUpdate, plan === "adopt-and-reapply" ? local : null, "local-catch-up");
     }
+    // The copy now reflects the server's document as of this stamp: the
+    // wake-on-write baseline (a poll stamp past it means a later write).
+    entry.lastSeenDocumentStampMs = canonical.documentStampMs;
     // `lineageChecked` stays false on purpose: the first connect compares again
     // (#287) — a solo session can wait for hours while the server's copy moves.
   }
@@ -1465,6 +1495,7 @@ class CollaborationRuntimeManager {
       readOnly: result.data.readOnly,
       update: result.data.update ? base64ToUint8Array(result.data.update) : null,
       payloadUpdatedAt: Number.isFinite(payloadUpdatedAt) ? payloadUpdatedAt : null,
+      documentStampMs: typeof result.data.documentStampMs === "number" ? result.data.documentStampMs : null,
     };
   }
 
@@ -1806,7 +1837,12 @@ class CollaborationRuntimeManager {
     const previous = entry.lastSeenDocumentStampMs;
     if (previous !== null && documentStampMs <= previous) return;
     entry.lastSeenDocumentStampMs = documentStampMs;
-    if (previous === null) return;
+    if (previous === null) {
+      // No baseline: the open-time comparison set one when it brought the
+      // copy up to date. Without it the copy may be behind — wake only then.
+      if (!entry.catchUpIncomplete) return;
+      entry.catchUpIncomplete = false;
+    }
     const { connectionState } = entry.state;
     if (connectionState === "connected" || connectionState === "synced") return;
     this.wakeForRemoteWrite(entry.contentId);
