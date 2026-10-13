@@ -115,10 +115,17 @@ Templates), keyed by path so they survive a re-inspect.
    string) as the source of a fill, so the values live in the garden as
    prose the user edits. Not built; the Template Fields rail covers the
    edit-and-rerender case for now.
-5. **Your template → loops.** The real template is 17 numbered slots; under
-   the refusal policy a 3-bullet fill is refused until the model asks for
-   bullets 4–5. Converting the slots to `{% for %}` loops makes a shorter
-   list simply a shorter list. Offered; needs the `.docx`.
+5. ~~Your template → loops~~ **Done 2026-10-13** — `David_Valentine_Resume_
+   Template (loops).docx` stored beside the original (dev garden): contract
+   = `capabilities[]`, `tools[]`, `experience_bullets[]`, `independent_
+   bullets[]`. Owner wants counts dynamic; nested `positions[] → bullets[]`
+   (or `employers[] → roles[] → bullets[]`) is the shape for one-or-two
+   roles — pattern 3 in `guides/ai/DOCX-TEMPLATE-AUTHORING.md`.
+6. **AI authoring a template.** The AI cannot author a Word layout. Today:
+   the authoring guide + `read_docx_template`'s `authoring` coaching when
+   no template exists. Planned: `templatize_docx` — take a finished `.docx`,
+   replace user-named spans with tags (the conversion done by hand on
+   2026-10-13, as a tool with an approval card), store beside the original.
 
 ## 7. Deploy runbook (owner-run; not yet executed)
 

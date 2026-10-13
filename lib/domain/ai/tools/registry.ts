@@ -2730,7 +2730,11 @@ export function createBaseTools(ctx: ToolExecuteContext) {
               sections: t.sectionCount,
             })),
             ...(templates.length === 0
-              ? { note: "No document templates are marked yet. The user marks one by right-clicking a .docx in the file tree → Mark as Document Template." }
+              ? {
+                  note: "No document templates are marked yet. The user marks one by right-clicking a .docx in the file tree → Mark as Document Template.",
+                  authoring:
+                    "If the user wants to make one, coach them to tag their own Word file (you cannot author its layout): {{ name }} for one value; {% for c in list %}{{ c }}{% if not loop.last %} • {% endif %}{% endfor %} for an inline list; a paragraph {%p for b in bullets %}, one bullet {{ b }}, a paragraph {%p endfor %} for a bullet list of any length; nest the same for positions → bullets; {% if x %}…{% endif %} for optional text. Each {%p %} tag alone in its own paragraph; never format mid-tag; dynamic counts are loops, not numbered slots. Guide: docs/notes-feature/guides/ai/DOCX-TEMPLATE-AUTHORING.md.",
+                }
               : {}),
           };
         }
