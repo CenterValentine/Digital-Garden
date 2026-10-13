@@ -14,8 +14,8 @@ last_updated: 2026-10-12
 
 - ⚪ **M3 — OAuth for hosted clients** (claude.ai, ChatGPT, Gemini CLI with OAuth): the garden as its own authorization server. Note the 2026-07-28 spec the handler now serves deprecates dynamic client registration for **client-ID metadata documents** (CIMD); plan §8.1 needs that revision before building. `protectedResourceHandler` + `/.well-known/oauth-protected-resource` come with it.
 - ⚪ **M4 — MCP client in chat** (external servers, namespacing, approval gates; MCP-PLAN §4).
-- ⚪ Image OCR over MCP: `readImageTextForModel` is client-only; wire the server-side engine so `garden_read` on an image returns recognised text, and page PDFs through `createPDFProcessor`.
-- ⚪ Empty paragraphs serialise as an XHTML `<p>` in `tiptapToMarkdown` (seen in the smoke on an empty daily note). Harmless, ugly; a codec for the empty paragraph would fix it for every markdown surface.
+- ⚪ Image OCR over MCP: `readImageTextForModel` is client-only; wire the server-side engine so `garden_read` on an image returns recognised text for text-only models (vision models already get the pixels as an `image` block), and page PDFs through `createPDFProcessor`.
+- ⚪ Presigned links in MCP reads are 15-minute storage URLs; a long-lived public link would need the public-file-link machinery from #227 (opt-in per file), not a longer presign.
 - ⚪ `garden_insert_block` content for columns/tabs (today only stacking containers accept markdown children).
 - ⚪ Chat's inline `create_note` should call `createNoteFromMarkdown` (extracted for MCP) so there is one create path.
 - ⚪ A token's daily call cap (`dailyCallCap`) is stored but not enforced yet; wire it through the verifier with the context-spend pattern.

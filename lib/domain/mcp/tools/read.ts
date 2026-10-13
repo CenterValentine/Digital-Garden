@@ -22,7 +22,9 @@ import { loadTable } from "@/lib/domain/data/server/queries";
 import { rowHandle } from "@/lib/domain/data/read-format";
 import { assembleFolderCapsule } from "@/lib/domain/ai-context/capsule";
 import { findBlocksInDoc } from "@/lib/domain/ai/tools/editor-tools";
+import { listNoteImages } from "@/lib/domain/content/note-images";
 import { listConversationsByContent } from "@/lib/features/conversations";
+import { imageBlock, imageBlocks, presignFile, rewriteDownloadLinks, type ImageBlock } from "../media";
 import type { McpPrincipal } from "../auth";
 import { renderNoteForMcp } from "../read";
 import type { McpScope } from "../jurisdiction";
@@ -142,6 +144,7 @@ export async function read(
       parent: node.parent ? { id: node.parent.id, title: node.parent.title } : null,
     };
     const sections: string[] = [`# ${node.title}\n(${node.contentType}, ${node.id}, updated ${node.updatedAt.toISOString()}${node.parent ? `, in "${node.parent.title}"` : ""})`];
+    const images: ImageBlock[] = [];
 
     if (parts.has("tags")) {
       const tags = node.contentTags.map((t) => t.tag.slug);
@@ -155,6 +158,12 @@ export async function read(
         case "note": {
           const json = (node.notePayload?.tiptapJson as JSONContent | undefined) ?? { type: "doc", content: [] };
           body = renderNoteForMcp(json);
+          // In-app download links need a session cookie no MCP client has;
+          // swap them for short-lived storage URLs (fetchable by anyone who
+          // holds this result for the next 15 minutes).
+          const links = await rewriteDownloadLinks(scope.userId, body);
+          body = links.text;
+          if (links.rewritten > 0) structured.presignedLinks = links.rewritten;
           const fences = (body.match(FENCE) ?? []).length;
           if (fences > 0) body += `\n\n[${fences} \`\`\`dg-block fence${fences === 1 ? "" : "s"} above: blocks the serializer could not express as markdown. Leave them exactly as they are if you write this note back.]`;
           break;
@@ -203,6 +212,23 @@ export async function read(
           body = f
             ? `${f.fileName} (${f.mimeType}, ${Number(f.fileSize)} bytes)${f.searchText ? `\n\n## Extracted text\n${f.searchText}` : "\n\n(No text was extracted for this file.)"}`
             : "(no file payload)";
+          // A fetchable URL for clients that can fetch, and for images the
+          // pixels themselves, so a model sees the picture without a cookie.
+          const signed = await presignFile(scope.userId, node.id).catch(() => null);
+          if (signed) {
+            structured.presignedUrl = signed.url;
+            structured.presignedExpiresInSeconds = 900;
+            body += `\n\nDownload (15 min): ${signed.url}`;
+          }
+          if (f?.mimeType.startsWith("image/")) {
+            const block = await imageBlock(scope.userId, node.id).catch(() => null);
+            if (block) {
+              images.push(block);
+              body += "\n\n[The image itself is attached to this result.]";
+            } else {
+              body += "\n\n[Image too large to attach; use the download link.]";
+            }
+          }
           break;
         }
         case "shortcut":
@@ -261,7 +287,19 @@ export async function read(
       sections.push(renderAiContext(ctx));
     }
 
-    return ok(sections.join("\n\n"), structured);
+    if (parts.has("images") && node.notePayload?.tiptapJson) {
+      const refs = listNoteImages(stripPrivateContent(node.notePayload.tiptapJson as JSONContent))
+        .map((i) => i.contentId)
+        .filter((id): id is string => typeof id === "string");
+      const got = await imageBlocks(scope.userId, refs);
+      images.push(...got.blocks);
+      structured.images = got.blocks.map((b) => b._meta);
+      sections.push(`## Images\n${got.blocks.length} attached${got.skipped > 0 ? `, ${got.skipped} skipped (too large, not an image, or over the per-read cap)` : ""}.`);
+    }
+
+    const result = ok(sections.join("\n\n"), structured);
+    result.content.push(...images);
+    return result;
   } catch (error) {
     logger.warn({ layer: "ai", event: "mcp:read_caught", summary: "garden_read failed", error });
     return internalError("garden_read", error, Object.keys(input));

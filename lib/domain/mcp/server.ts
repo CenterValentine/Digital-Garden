@@ -129,7 +129,7 @@ export function createGardenMcpServer(server: McpServer): void {
     {
       title: "Read one item",
       description:
-        'Read one item by id. Notes come back as markdown (the same text garden_write_note accepts); databases as their schema plus a 25-row preview (add parts: ["profile"] for value distributions); folders as their AI context and contents; files as their extracted text. parts may add "backlinks" (what links here; chats only when backlinkTypes includes "conversation"), "outline" (headings and typed blocks with ids), and may omit "body". Every read includes the item\'s AI context and whether it is stale.',
+        'Read one item by id. Notes come back as markdown (the same text garden_write_note accepts) with any file links rewritten to 15-minute download URLs; databases as their schema plus a 25-row preview (add parts: ["profile"] for value distributions); folders as their AI context and contents; files as their extracted text plus a download URL, and an image file is attached as an image you can see. parts may add "images" (a note\'s images attached as images, up to 6), "backlinks" (what links here; chats only when backlinkTypes includes "conversation"), "outline" (headings and typed blocks with ids), and may omit "body". Every read includes the item\'s AI context and whether it is stale.',
       inputSchema: readInput,
       annotations: READ,
     },
@@ -359,7 +359,9 @@ export function createGardenMcpServer(server: McpServer): void {
     },
     withSession(async (s, args) => {
       const r = await read(s.scope, s.principal, { id: args.id, parts: ["body", "tags"] });
-      const text = r.content.map((c) => c.text).join("\n");
+      // ChatGPT's fetch contract is text-only; an attached image (a file
+      // read) stays out of the JSON — the presigned URL in the text covers it.
+      const text = r.content.map((c) => (c.type === "text" ? c.text : "")).filter(Boolean).join("\n");
       const sc = (r.structuredContent ?? {}) as Record<string, unknown>;
       return { content: [{ type: "text", text: JSON.stringify({ id: args.id, title: sc.title ?? args.id, text, url: `garden://item/${args.id}`, metadata: { type: sc.type ?? null, updatedAt: sc.updatedAt ?? null } }) }] };
     })
@@ -385,8 +387,11 @@ export function createGardenMcpServer(server: McpServer): void {
     { title: "File", description: "A code, HTML or uploaded file as text", mimeType: "text/markdown" },
     async (uri, vars, ctx) => {
       const s = sessionFrom(ctx);
-      const text = s ? await fileResource(s.scope, String(vars.id)) : null;
-      return text === null ? notFound(uri) : { contents: [{ uri: uri.href, mimeType: "text/markdown", text }] };
+      const file = s ? await fileResource(s.scope, String(vars.id)) : null;
+      if (!file) return notFound(uri);
+      return file.kind === "blob"
+        ? { contents: [{ uri: uri.href, mimeType: file.mimeType, blob: file.data }] }
+        : { contents: [{ uri: uri.href, mimeType: file.mimeType, text: file.text }] };
     }
   );
 

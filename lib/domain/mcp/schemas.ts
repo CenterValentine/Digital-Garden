@@ -57,14 +57,14 @@ export const listTreeInput = z.object({
   depth: z.number().int().min(1).max(3).optional().describe("Levels to descend. Default 1, max 3."),
 });
 
-export const READ_PARTS = ["body", "tags", "backlinks", "outline", "profile", "context"] as const;
+export const READ_PARTS = ["body", "tags", "backlinks", "outline", "profile", "context", "images"] as const;
 
 export const readInput = z.object({
   id,
   parts: z
     .array(z.enum(READ_PARTS))
     .optional()
-    .describe('What to include. Default ["body", "tags", "context"]. Add "backlinks" (what links here), "outline" (blocks with their ids and types), "profile" (databases only: value distributions over up to 5,000 rows). Omit "body" for a cheap metadata read.'),
+    .describe('What to include. Default ["body", "tags", "context"]. Add "backlinks" (what links here), "outline" (blocks with their ids and types), "profile" (databases only: value distributions over up to 5,000 rows), "images" (the note\'s images as image content you can see directly, up to 6). Omit "body" for a cheap metadata read.'),
   backlinkTypes: z
     .array(z.enum([...CONTENT_TYPES, "conversation"]))
     .optional()

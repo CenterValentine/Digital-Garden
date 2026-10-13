@@ -188,10 +188,10 @@ a code node (`CodePayload`), an HTML node, or an uploaded binary (`FilePayload`)
 
 | Payload | Returns | Backs onto |
 |---|---|---|
-| note | markdown, private content stripped | `tiptapToMarkdown(stripPrivateContent(json))` |
+| note | markdown, private content stripped; every in-app `/download` link rewritten to a 15-minute presigned storage URL (no MCP client holds a session cookie); `parts: ["images"]` attaches the note's images as MCP `image` blocks (≤ 6, ≤ 4 MB each) — built 2026-10-13, `lib/domain/mcp/media.ts` | `tiptapToMarkdown(stripPrivateContent(json))`, `generateDownloadUrl`, `listNoteImages` |
 | code | the source text plus `language` | `CodePayload` |
 | html | the text content | `HtmlPayload` |
-| file, image mime | the recognized text, with the OCR confidence note | `readImageTextForModel` in `lib/features/ocr/read-for-model.ts` (PR #291) |
+| file, image mime | the extracted text, a presigned download URL, and the picture itself as an `image` block (vision models) — built; the OCR text for text-only models is backlog | `readImageTextForModel` in `lib/features/ocr/read-for-model.ts` (PR #291) |
 | file, PDF | extracted text, page-delimited, capped by the token budget with `nextPage` | `createPDFProcessor` in `lib/infrastructure/media/pdf-processor.ts` |
 | file, other | metadata plus a short-lived presigned download URL | the download route's default JSON envelope |
 

@@ -108,6 +108,48 @@ async function main() {
     expect(text(c).includes("## Diagnostics"), "garden_chat_read renders diagnostics");
   }
 
+  // Files without a cookie: an image file read attaches the pixels and a
+  // presigned URL; a note's in-app download links come back presigned; the
+  // file resource serves a blob.
+  const files = await client.callTool({ name: "garden_search", arguments: { query: "", types: ["file"], limit: 10 } });
+  const fileHits = (structured(files).hits as Array<{ id: string; title: string }>) ?? [];
+  let imageHit: { id: string; title: string } | undefined;
+  for (const hit of fileHits) {
+    const r = await client.callTool({ name: "garden_read", arguments: { id: hit.id, parts: ["body"] } });
+    const f = structured(r).file as { mimeType?: string } | null | undefined;
+    if (f?.mimeType?.startsWith("image/")) {
+      imageHit = hit;
+      const img = (r.content ?? []).find((c) => c.type === "image") as { mimeType?: string; data?: string } | undefined;
+      expect(Boolean(img?.data && img.mimeType === f.mimeType), `garden_read of image "${hit.title}" attaches an image block (${img?.data?.length ?? 0} base64 chars)`);
+      const sc = structured(r);
+      expect(typeof sc.presignedUrl === "string" && /^https:\/\//.test(sc.presignedUrl as string) && !(sc.presignedUrl as string).includes("/api/content/"), "image read carries a presigned storage URL");
+      const probe = await fetch(sc.presignedUrl as string, { method: "GET", headers: { range: "bytes=0-0" } });
+      expect(probe.ok, `the presigned URL fetches without a cookie (HTTP ${probe.status})`);
+      const res = await client.readResource({ uri: `garden://file/${hit.id}` });
+      const first = res.contents[0] as { blob?: string; mimeType?: string } | undefined;
+      expect(Boolean(first?.blob) && first?.mimeType === f.mimeType, "garden://file resource returns the image as a blob");
+      break;
+    }
+  }
+  if (!imageHit) console.log("(no image file in reach; image read not exercised)");
+
+  let linkedNote: { id: string; title: string } | undefined;
+  const moreNotes = await client.callTool({ name: "garden_search", arguments: { query: "", types: ["note"], limit: 20 } });
+  for (const hit of (structured(moreNotes).hits as Array<{ id: string; title: string }>) ?? []) {
+    const r = await client.callTool({ name: "garden_read", arguments: { id: hit.id, parts: ["body", "images"] } });
+    const sc = structured(r);
+    if (typeof sc.presignedLinks === "number" && sc.presignedLinks > 0) {
+      linkedNote = hit;
+      const body = String(sc.body ?? "");
+      expect(!/\/api\/content\/content\/[0-9a-f-]{36}\/download/.test(body), `note "${hit.title}": ${sc.presignedLinks} download link(s) rewritten, none left in-app`);
+      expect(!body.includes('xmlns="http://www.w3.org/1999/xhtml"'), "no xmlns attribute in the markdown body");
+      const imgs = (r.content ?? []).filter((c) => c.type === "image");
+      expect(Array.isArray(sc.images), `parts: ["images"] attached ${imgs.length} image block(s)`);
+      break;
+    }
+  }
+  if (!linkedNote) console.log("(no note with file links in reach; link rewrite not exercised)");
+
   // Capability refusal: a bad token reach is tested by the server; here a
   // write tool with a read-only token is the owner's manual line.
 

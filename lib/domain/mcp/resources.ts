@@ -17,6 +17,7 @@ import { loadRowPage, loadRowsByIds, loadTable } from "@/lib/domain/data/server/
 import { allBulkColumns, formatRows, indexTierColumns, type DataView } from "@/lib/domain/data";
 import { renderNoteForMcp } from "./read";
 import type { McpScope } from "./jurisdiction";
+import { fileBlob, rewriteDownloadLinks } from "./media";
 import { capText } from "./results";
 
 export const RESOURCE_BUDGET = INGEST_MAX_TOKENS;
@@ -29,10 +30,19 @@ export async function noteResource(scope: McpScope, id: string): Promise<string 
   });
   if (!node) return null;
   const json = (node.notePayload?.tiptapJson as JSONContent | undefined) ?? { type: "doc", content: [] };
-  return capText(`# ${node.title}\n\n${renderNoteForMcp(json)}`, RESOURCE_BUDGET, "Read the rest with garden_read.").text;
+  const body = (await rewriteDownloadLinks(scope.userId, renderNoteForMcp(json))).text;
+  return capText(`# ${node.title}\n\n${body}`, RESOURCE_BUDGET, "Read the rest with garden_read.").text;
 }
 
-export async function fileResource(scope: McpScope, id: string): Promise<string | null> {
+export type FileResourceContents =
+  | { kind: "text"; text: string; mimeType: string }
+  | { kind: "blob"; data: string; mimeType: string };
+
+/**
+ * Code and HTML as text; an uploaded binary (image, PDF, …) as its bytes
+ * when under the cap, so a client can show an image without a cookie.
+ */
+export async function fileResource(scope: McpScope, id: string): Promise<FileResourceContents | null> {
   if (!(await scope.nodeInScope(id))) return null;
   const node = await prisma.contentNode.findFirst({
     where: { id, ownerId: scope.userId, deletedAt: null, contentType: { in: ["code", "html", "file"] } },
@@ -45,13 +55,17 @@ export async function fileResource(scope: McpScope, id: string): Promise<string 
     },
   });
   if (!node) return null;
+  if (node.contentType === "file") {
+    const blob = await fileBlob(scope.userId, id).catch(() => null);
+    if (blob) return { kind: "blob", data: blob.data, mimeType: blob.mimeType };
+    const text = `${node.filePayload?.fileName ?? node.title} (${node.filePayload?.mimeType ?? "?"})\n\n${node.filePayload?.searchText ?? "(no extracted text; file too large to embed)"}`;
+    return { kind: "text", text: capText(`# ${node.title}\n\n${text}`, RESOURCE_BUDGET, "Read the rest with garden_read.").text, mimeType: "text/markdown" };
+  }
   const body =
     node.contentType === "code"
       ? `\`\`\`${node.codePayload?.language ?? ""}\n${node.codePayload?.code ?? ""}\n\`\`\``
-      : node.contentType === "html"
-        ? node.htmlPayload?.searchText ?? ""
-        : `${node.filePayload?.fileName ?? node.title} (${node.filePayload?.mimeType ?? "?"})\n\n${node.filePayload?.searchText ?? "(no extracted text)"}`;
-  return capText(`# ${node.title}\n\n${body}`, RESOURCE_BUDGET, "Read the rest with garden_read.").text;
+      : node.htmlPayload?.searchText ?? "";
+  return { kind: "text", text: capText(`# ${node.title}\n\n${body}`, RESOURCE_BUDGET, "Read the rest with garden_read.").text, mimeType: "text/markdown" };
 }
 
 export async function databaseSchemaResource(scope: McpScope, id: string): Promise<string | null> {
