@@ -138,6 +138,14 @@ check(/lib\/domain\/mcp\/read\.ts/.test(src("scripts/validate-private-content.ts
 const resources = src("lib/domain/mcp/resources.ts");
 check(/renderNoteForMcp\(/.test(resources), "resources: the note resource renders through the seam");
 
+// Tools report real outcomes: a context write names what it did NOT store
+// (unknown keys, user-owned sections, signals outside Enhanced mode) in
+// both channels, so "changed" never reads as "everything landed".
+const context = src("lib/domain/mcp/tools/context.ts");
+check(/applyGeneratedSections\(/.test(context), "context: writes go through the engine's applyGeneratedSections");
+check(/resolvedMode !== ContextMode\.ENHANCED/.test(context) && /section: "signals"/.test(context), "context: signals sent outside Enhanced mode are reported as dropped");
+check(/dropped: result\.dropped/.test(toolBlock("garden_update_ai_context") ?? ""), "context: the tool result carries dropped in structuredContent");
+
 // ── D. auth ───────────────────────────────────────────────────────────
 
 const route = src("app/api/mcp/route.ts");

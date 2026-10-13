@@ -57,6 +57,8 @@ export interface MetadataView {
   contextMode: ContextMode | null;
   /** Effective mode after ancestor resolution — what the engine acts on. */
   resolvedMode: ContextMode;
+  /** The stored index line (plan D3) — a scalar beside the sections. */
+  oneLiner: string | null;
 }
 
 const SECTION_KINDS: MetadataSectionKind[] = [
@@ -276,6 +278,7 @@ export async function getMetadataForNode(
       optedOut: resolvedMode === ContextMode.OPT_OUT,
       contextMode: null,
       resolvedMode,
+      oneLiner: null,
     };
   }
 
@@ -295,6 +298,7 @@ export async function getMetadataForNode(
     optedOut: resolvedMode === ContextMode.OPT_OUT,
     contextMode: record.contextMode,
     resolvedMode,
+    oneLiner: readOneLiner(record.tiptapJson),
   };
 }
 

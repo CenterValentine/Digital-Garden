@@ -258,7 +258,7 @@ export function createGardenMcpServer(server: McpServer): void {
     {
       title: "Update AI context",
       description:
-        'Write a node\'s AI context (summary, structure, signals, a one-liner) — the standing description the garden\'s assistant and other agents read first. Use it when garden_read reports the context as stale after you have read the whole item. merge (default) updates the keys you give; replace rewrites. Opted-out nodes refuse.',
+        'Write a node\'s AI context — the standing description the garden\'s assistant and other agents read first. Writable: sections.summary (required), sections.structure, sections.signals (kept only when the node\'s context mode is Enhanced; garden_read shows the mode), and oneLiner. Anything else you send is reported back under "dropped" with the reason, not stored. Use it when garden_read reports the context as stale after you have read the whole item. merge (default) updates the keys you give; replace rewrites. Opted-out nodes refuse.',
       inputSchema: updateAiContextInput,
       annotations: WRITE,
     },
@@ -274,7 +274,9 @@ export function createGardenMcpServer(server: McpServer): void {
         sections: args.sections,
         mode: args.mode ?? "merge",
       });
-      return result.ok ? ok(`AI context ${result.changed ? "updated" : "unchanged"} for ${args.id}.`, { id: args.id, changed: result.changed }) : refuse(result.reason ?? "Could not update AI context.");
+      if (!result.ok) return refuse(result.reason ?? "Could not update AI context.", { dropped: result.dropped });
+      const droppedText = result.dropped.length > 0 ? ` NOT stored: ${result.dropped.map((d) => `${d.section} (${d.reason})`).join("; ")}.` : "";
+      return ok(`AI context ${result.changed ? "updated" : "unchanged"} for ${args.id}.${droppedText}`, { id: args.id, changed: result.changed, dropped: result.dropped });
     })
   );
 

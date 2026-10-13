@@ -167,6 +167,18 @@ async function main() {
         expect(text(back).includes("Second line"), "read-back contains the appended line");
         const block = await client.callTool({ name: "garden_insert_block", arguments: { noteId: cs.id, blockType: "pullQuote", attrs: {} } });
         console.log(trim(text(block), 200));
+
+        // AI context: the write names what it did not store; the read shows
+        // the one-liner and the mode that decides whether signals persist.
+        const before = await client.callTool({ name: "garden_read", arguments: { id: cs.id, parts: ["context"] } });
+        const mode = String((structured(before).aiContext as { mode?: string } | undefined)?.mode ?? "");
+        const ctx = await client.callTool({ name: "garden_update_ai_context", arguments: { id: cs.id, oneLiner: "Smoke note", sections: { summary: "A note the MCP smoke wrote.", signals: "none", howToUse: "ignore" } } });
+        const droppedNames = ((structured(ctx).dropped as Array<{ section: string }>) ?? []).map((d) => d.section);
+        const signalsShouldDrop = mode !== "ENHANCED";
+        expect(droppedNames.includes("howToUse") && droppedNames.includes("signals") === signalsShouldDrop && text(ctx).includes("howToUse"), `update_ai_context (mode ${mode}) reports dropped in both channels: ${droppedNames.join(", ") || "none"}`);
+        const after = await client.callTool({ name: "garden_read", arguments: { id: cs.id, parts: ["context"] } });
+        const ac = structured(after).aiContext as { oneLiner?: string | null; mode?: string } | undefined;
+        expect(ac?.oneLiner === "Smoke note" && typeof ac?.mode === "string" && text(after).includes("one-liner: Smoke note"), "read shows the one-liner and the context mode");
       }
     }
     if (dbHits[0]) {

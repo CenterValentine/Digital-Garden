@@ -223,7 +223,7 @@ export const updateAiContextInput = z.object({
   sections: z
     .record(z.string(), z.string())
     .optional()
-    .describe("Context sections by kind, e.g. {\"summary\": \"…\", \"howToUse\": \"…\"}."),
+    .describe('Context sections by kind: {"summary": "…", "structure": "…", "signals": "…"}. summary is required on a first write. Other keys are not stored and come back under "dropped".'),
   mode: z.enum(["merge", "replace"]).optional().describe("merge (default) updates the given keys; replace rewrites the context."),
 });
 
