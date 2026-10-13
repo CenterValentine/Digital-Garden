@@ -299,7 +299,7 @@ export function LeftSidebarHeader({
             className={`rounded p-0.5 transition-colors ${
               activeView === "search" ? subActive : subInactive
             }`}
-            title="Search (Cmd+/)"
+            title="Search (Cmd+Shift+F)"
             type="button"
           >
             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

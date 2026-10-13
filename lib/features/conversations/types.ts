@@ -149,6 +149,15 @@ export interface ListConversationsOptions {
    */
   forContentNodeIds?: string[];
   /**
+   * Text match against the title OR any visible message's plaintext
+   * (`ConversationMessage.textCache`), case-insensitive. The MCP
+   * `garden_chats_search` tool and the chat list share this
+   * (MCP-DATABASE-REACH-PLAN §2.1). No denormalised column: the message
+   * text is already kept per message, and a single-owner garden's chat
+   * count is small enough for the subquery.
+   */
+  query?: string;
+  /**
    * Restrict to conversations whose target folder is this node — the
    * "chats of this folder" history view (AI v3 core S3).
    */

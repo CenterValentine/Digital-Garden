@@ -96,6 +96,7 @@ import {
 } from "@/lib/domain/ai/docx-templates/renderer-client";
 import type { JSONContent } from "@tiptap/core";
 import { stripPrivateContent } from "@/lib/domain/content/private-content";
+import { ALL_SEARCH_FIELDS, buildSearchWhere } from "@/lib/domain/content/search-service";
 import { collectColumnLinkIds } from "@/lib/domain/data/column-anchor";
 import { describeLinkedColumns } from "@/lib/domain/data/server/column-links";
 import { listCharters, isCharterMetadata } from "@/lib/domain/ai/charters/registry";
@@ -3025,31 +3026,19 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         // a time until the step cap cut it off. Listing is the answer to
         // "which ones are there?"; matching can't be.
         const term = query.trim();
+        // ONE query builder with the search route (lib/domain/content/
+        // search-service.ts, 2026-10-12). The tool used to match only the
+        // title, note text and a database's schema text; it now matches
+        // every indexed payload the route does — including database ROWS,
+        // which roll up to their table — so "find the job at Acme" lands on
+        // the table that holds that row.
         const results = await prisma.contentNode.findMany({
-          where: {
+          where: buildSearchWhere({
             ownerId: ctx.userId,
-            deletedAt: null,
-            contentType: { in: scope },
-            ...(term
-              ? {
-                  OR: [
-                    { title: { contains: term, mode: "insensitive" } },
-                    {
-                      notePayload: {
-                        searchText: { contains: term, mode: "insensitive" },
-                      },
-                    },
-                    // Databases index title + column names here (schema B2),
-                    // so a table is findable by a FIELD the user names.
-                    {
-                      dataPayload: {
-                        searchText: { contains: term, mode: "insensitive" },
-                      },
-                    },
-                  ],
-                }
-              : {}),
-          },
+            query: term,
+            types: scope,
+            fields: ALL_SEARCH_FIELDS,
+          }),
           select: {
             id: true,
             title: true,
