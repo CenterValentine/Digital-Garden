@@ -25,6 +25,7 @@
     "collab:lineage:check": "tsx scripts/validate-collab-lineage.ts",
     "extensions:check": "tsx scripts/validate-extensions.ts",
     "reader:check": "tsx scripts/validate-reader.ts",
+    "docx:renderer:smoke": "tsx scripts/docx-renderer-smoke.ts",
     "picker:tree:check": "tsx scripts/validate-picker-tree.ts",
     "right-sidebar:default:check": "tsx scripts/validate-right-sidebar-default.ts",
     "note-save:check": "tsx scripts/validate-note-save-coordinator.ts",

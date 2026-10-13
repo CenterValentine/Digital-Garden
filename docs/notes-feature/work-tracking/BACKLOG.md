@@ -10,6 +10,15 @@ last_updated: 2026-10-12
 
 ---
 
+## DOCX template renderer — follow-ups (2026-10-12, from `DOCX-TEMPLATE-RENDERER-PLAN.md`)
+
+- ⚪ **Owner: judge policy** (`lib/domain/ai/docx-templates/judge.ts` TODO) — unresolved tags / empty required fields / unused keys: refuse or ship-with-gaps (plan §6.1).
+- ⚪ **Deploy the renderer** (owner-run, after merge): WIF pool + provider for Vercel OIDC, invoker SA, Secret Manager token, `gcloud builds submit --config cloudbuild.docx-renderer.yaml .`, Vercel env (plan §7). Then the production smoke.
+- ⚪ Rerender without an AI call: persist `{ templateId, checksum, values }` beside the output file and add an edit-values form (plan §6.2).
+- ⚪ PDF preview image (LibreOffice; measured < 1 s per conversion) — step 4, only once the DOCX path is live in prod.
+- ⚪ `STAGE2-CHARTER-RECIPE.md` materials phase: name the template and `fill_docx_template`.
+- ⚪ Templates whose tags Word split beyond docxtpl's repair: an "Open in Word and retype the tag" affordance from the error toast.
+
 ## MCP server — prep PR and follow-ups (2026-10-12, from `MCP-DATABASE-REACH-PLAN.md`)
 
 Prep PR (each item stands alone without MCP; plan §6.8):

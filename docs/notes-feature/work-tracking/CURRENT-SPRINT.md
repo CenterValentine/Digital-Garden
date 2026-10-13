@@ -9,6 +9,27 @@ last_updated: 2026-10-12
 
 # Current Sprint Addendum
 
+## October 12, 2026 — The AI fills your own Word template (`fill_docx_template` + the docx-renderer service)
+
+**Tree**: worktree `.claude/worktrees/docx-template`, branch `feat/docx-template-renderer` (off `origin/main` at `dc44cef9`)
+**Plan**: `work-tracking/DOCX-TEMPLATE-RENDERER-PLAN.md`
+**Status**: typecheck / lint 151 (0 errors, none new) / `ai:drift:check` (74 tools) / run-harness / proposal shape / output-target / context-diet green; `server/docx-renderer/scripts/smoke.py` 40/40; `pnpm docx:renderer:smoke` green; **renderer not deployed** (owner-run, plan §7); browser smoke pending.
+
+### Shipped
+
+- **`server/docx-renderer/`** — FastAPI + docxtpl 0.20.2 (sandboxed Jinja). `/inspect` derives the contract from the AST (body + headers + footers; `rich`, `required`, nested sections; `template_syntax` errors name the paragraph). `/render` fills, reads the text back, reports `unresolved` / `missing` / `unused`, refuses a stale checksum. `cloudbuild.docx-renderer.yaml`: separate Cloud Run service, us-west1, min 0, concurrency 1, IAM-gated.
+- **`lib/domain/ai/docx-templates/`** — renderer client (Vercel OIDC → WIF → impersonated ID token; shared-token second factor), template record on `storageMetadata.custom.docxTemplate` (no schema change; re-inspects after an overwrite), `judge.ts` (`requiredGaps` to the list item; **policy TODO(owner)**).
+- **Tools** `read_docx_template` / `fill_docx_template` — explicit, never a reinterpretation of `create_docx`; same auto-approve setting and overwrite rule; charter output directives + placement as `create_docx`; compact results.
+- **`storeDocxDocument`** — one storage path for finished `.docx` bytes; `createDocxDocument` delegates.
+- **Marking** — tree context-menu toggle on `.docx` rows (`isDocxTemplate` on the tree payload), `/api/content/docx-templates`, Settings → Templates "Document Templates" card with per-field notes; approval card previews the values.
+
+### Smoke (pending — dev stack with `DOCX_RENDERER_URL=http://localhost:8081`)
+
+- Upload `server/docx-renderer/fixtures/resume-template.docx` → right-click → Mark as Document Template → toast "5 fields, 3 repeating sections"; the Settings → Templates card lists it; expanding shows the fields; a note saved on `summary` appears in `read_docx_template`'s contract.
+- Upload `resume-template-malformed.docx` → Mark → error toast names the paragraph ("Near: {{ summary").
+- Chat: "Fill my resume template with …" → `read_docx_template` then `fill_docx_template` → approval card shows the values with empties as "—" → Approve → the `.docx` opens; "update it" → `overwriteContentId` → same node id.
+- Unmark from the tree → the Settings card no longer lists it; `read_docx_template` lists none.
+
 ## October 12, 2026 — The assistant can delete rows, with the owner's consent (`delete_rows` + per-database AI policy)
 
 **Tree**: worktree `.claude/worktrees/ai-delete`, branch `feat/ai-row-deletion-policy` (off `origin/main` at `f60971ab`)
