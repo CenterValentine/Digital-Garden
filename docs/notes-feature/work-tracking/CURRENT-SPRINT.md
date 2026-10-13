@@ -22,8 +22,13 @@ last_updated: 2026-10-12
 - **Tools** `read_docx_template` / `fill_docx_template` — explicit, never a reinterpretation of `create_docx`; same auto-approve setting and overwrite rule; charter output directives + placement as `create_docx`; compact results.
 - **`storeDocxDocument`** — one storage path for finished `.docx` bytes; `createDocxDocument` delegates.
 - **Marking** — tree context-menu toggle on `.docx` rows (`isDocxTemplate` on the tree payload), `/api/content/docx-templates`, Settings → Templates "Document Templates" card with per-field notes; approval card previews the values.
+- **2026-10-13 refinement (charter prompt):** judge policy decided and built (refuse tag / unknown key with nearest-field hint / empty required slot; positive report); `provenance` verified before render; `docxFill` on the output + **Template Fields** right-sidebar rail + `POST /api/content/docx-templates/rerender` (no model turn, same id); charter wiring (`CHARTER_TURN_TOOLS`, `CHARTER_TAIL_EXTRA`, `deliverables: ["template"]`, prompt line, recipe §3); viewer refresh after in-place overwrite; `docx:templates:check` gate (build + `ai-drift.yml`, 8/8 mutants killed); telemetry event `docx_templates:fill`.
 
 ### Smoke (pending — dev stack with `DOCX_RENDERER_URL=http://localhost:8081`)
+
+- Chat with a charter whose Materials phase names the template and cites claim rows: `fill_docx_template` is called with `provenance` → the result reports `provenance: { verified: n }`; a deliberately wrong row id → refusal "cited source rows do not exist".
+- Open the filled `.docx` → the right sidebar offers **Template Fields** → edit one bullet → **Re-render document** → toast with the report, the viewer shows the new text, the node id is unchanged (Materials cell still resolves). Clear a required field → Re-render → refusal lists the path, file unchanged.
+- From chat, "update it" → `overwriteContentId` → the open viewer refreshes without reopening.
 
 - Upload `server/docx-renderer/fixtures/resume-template.docx` → right-click → Mark as Document Template → toast "5 fields, 3 repeating sections"; the Settings → Templates card lists it; expanding shows the fields; a note saved on `summary` appears in `read_docx_template`'s contract.
 - Upload `resume-template-malformed.docx` → Mark → error toast names the paragraph ("Near: {{ summary").

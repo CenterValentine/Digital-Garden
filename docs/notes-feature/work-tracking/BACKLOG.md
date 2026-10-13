@@ -12,12 +12,14 @@ last_updated: 2026-10-12
 
 ## DOCX template renderer — follow-ups (2026-10-12, from `DOCX-TEMPLATE-RENDERER-PLAN.md`)
 
-- ⚪ **Owner: judge policy** (`lib/domain/ai/docx-templates/judge.ts` TODO) — unresolved tags / empty required fields / unused keys: refuse or ship-with-gaps (plan §6.1).
-- ⚪ **Deploy the renderer** (owner-run, after merge): WIF pool + provider for Vercel OIDC, invoker SA, Secret Manager token, `gcloud builds submit --config cloudbuild.docx-renderer.yaml .`, Vercel env (plan §7). Then the production smoke.
-- ⚪ Rerender without an AI call: persist `{ templateId, checksum, values }` beside the output file and add an edit-values form (plan §6.2).
+- ✅ Judge policy decided + built 2026-10-13 (refuse a bad write; positive report).
+- ✅ Rerender without an AI call (Template Fields rail + `/rerender`) and the Stage 2 recipe §3 — 2026-10-13.
+- ⚪ **Deploy the renderer** (owner-run, after merge): WIF pool + provider for Vercel OIDC, invoker SA, Secret Manager token, `gcloud builds submit --config cloudbuild.docx-renderer.yaml .`, Vercel env (plan §7). Then the production smoke + the templated-vs-markdown token/latency comparison.
+- ⚪ Convert the owner's resume template from 17 numbered slots to loops (plan §6.5) — needs the `.docx`.
+- ⚪ Values from a note (`valuesFromContentId`: heading → field, bullets → list) — plan §6.4.
 - ⚪ PDF preview image (LibreOffice; measured < 1 s per conversion) — step 4, only once the DOCX path is live in prod.
-- ⚪ `STAGE2-CHARTER-RECIPE.md` materials phase: name the template and `fill_docx_template`.
 - ⚪ Templates whose tags Word split beyond docxtpl's repair: an "Open in Word and retype the tag" affordance from the error toast.
+- ⚪ Own auto-approve toggle for template fills, if sharing "Auto-approve documents" proves confusing (plan §6.3).
 
 ## MCP server — prep PR and follow-ups (2026-10-12, from `MCP-DATABASE-REACH-PLAN.md`)
 

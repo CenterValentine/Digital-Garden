@@ -1,6 +1,6 @@
 ---
-last_updated: 2026-10-12
-status: built (steps 1–3); renderer NOT deployed; judge policy open
+last_updated: 2026-10-13
+status: built (steps 1–3 + charter refinement); renderer NOT deployed; browser smoke + PR pending
 branch: feat/docx-template-renderer
 worktree: .claude/worktrees/docx-template
 ---
@@ -44,8 +44,13 @@ no code. Everything below was built and gated in this worktree.
 | Cloud Build | `cloudbuild.docx-renderer.yaml` | Separate service `digital-garden-docx-renderer`, us-west1, min 0 / max 1, concurrency 1, 60 s, `--no-allow-unauthenticated`, secret `digital-garden-docx-renderer-token`. |
 | Node client | `lib/domain/ai/docx-templates/renderer-client.ts` | Multipart calls; Google ID token via Vercel OIDC → WIF → impersonated SA (`Impersonated.fetchIdToken`); `X-Renderer-Token`; localhost needs neither. Flat outcomes (tsconfig is not strict). |
 | Template record | `lib/domain/ai/docx-templates/record.ts` (pure) · `templates.ts` (server) | Read/mark/unmark/list/load, notes, `describeTemplateForModel`. |
-| Judge | `lib/domain/ai/docx-templates/judge.ts` | `requiredGaps` + `judgeRender` (**TODO(owner)** policy; placeholder refuses only unresolved tags). |
-| Tools | `lib/domain/ai/tools/registry.ts` | `read_docx_template` (list / contract + `valuesShape`), `fill_docx_template` (load → render → judge → `storeDocxDocument`). Shares `create_docx`'s auto-approve setting and overwrite rule; charter output directives + output-target placement as `create_docx`. |
+| Judge | `lib/domain/ai/docx-templates/judge.ts` | **Refuses** a tag in the output, an unknown key (names the nearest field), an empty required slot / unsupplied root; **reports** filled count, per-section counts, over-length vs. the user's notes, uncited bullets, links. |
+| Fill record + rerender | `lib/domain/ai/docx-templates/fills.ts` · `record.ts` (`docxFill`) | The OUTPUT file remembers template id + checksum, values, provenance, report. `verifyProvenance` (owner-scoped `DataRow` ids; a missing id refuses). `rerenderDocxFill` = same template, same node id, same judge, no model turn. `docx_templates:fill` telemetry event (via, renderMs, bytes, fields, citations). |
+| Tools | `lib/domain/ai/tools/registry.ts` | `read_docx_template` (list / contract + `valuesShape` incl. combined/split-title rule), `fill_docx_template` (load → **verify provenance** → render → **judge** → `storeDocxDocument` → fill record). Shares `create_docx`'s auto-approve setting and overwrite rule; charter output directives + output-target placement as `create_docx`; result carries the compact report, never the document. |
+| Charter wiring | `lib/domain/ai/tools/iteration-proposal.ts` · `system-prompt.ts` · `guides/ai/STAGE2-CHARTER-RECIPE.md §3` | Both tools ride `CHARTER_TURN_TOOLS`; the fill stands in for `create_docx` in the reserved tail (`CHARTER_TAIL_EXTRA`, budget stays 16/6); `deliverables: ["template"]`; the prompt routes a named template to the fill; the recipe is the standing guidance (per-run prose = rows + template + destination). |
+| Template Fields rail | `components/content/docx-templates/TemplateFieldsPanel.tsx` · `state/docx-fill-store.ts` · `RightSidebar*` | Core right-sidebar tab, offered when the open file carries `docxFill` (flag set as the payload loads). Edit values in contract order, see citations per field, **Re-render** (no AI call) → `POST /api/content/docx-templates/rerender`; refusals list the problems and leave the file untouched. |
+| Viewer refresh | `content-write-receipts.ts` · `use-conversation-engine.ts` | `overwrittenFileContentIds` → `content-updated` so an open viewer refetches after an in-place overwrite (also fixes `create_docx` overwrites). |
+| Gate | `scripts/validate-docx-templates.ts` (`pnpm docx:templates:check`, in `build` + `ai-drift.yml`) | Judge rules, record reads, client auth headers + refusal flattening (fetch stubbed: 401 / 422 / 500 / 200 / invalid template / unconfigured), fill ordering (provenance before render, judge before store, overwrite by id), charter wiring, renderer hygiene (sandbox, no exec, no credentials, IAM-gated deploy). Mutation-tested: 8/8 killed. |
 | Storage path | `lib/domain/ai/documents.ts` | `storeDocxDocument` — one path for finished bytes (create / overwrite in place / `role: referenced`); `createDocxDocument` delegates to it. |
 | Marking UI | `components/content/context-menu/file-tree-actions.tsx` | "Mark as Document Template" / "Unmark" on `.docx` rows; preflight errors toast the paragraph. `isDocxTemplate` rides the tree payload. |
 | Settings | `app/(authenticated)/settings/templates/DocxTemplateManager.tsx` | Listing + per-field notes (description, max chars) + unmark. |
@@ -101,13 +106,19 @@ Templates), keyed by path so they survive a re-inspect.
    positive report (filled count, per-section counts, over-length against
    the user's `maxLength` notes, links, text size). Over-length is advisory.
    Also decided: keep the JSON record, no `isTemplate` column.
-2. **Rerender without an AI call.** The review surface today is the approval
-   card + the opened file. A "edit values → rerender" form (no model turn)
-   needs the values persisted beside the output; proposed home:
-   `storageMetadata.custom.docxFill = { templateId, checksum, values }` on
-   the OUTPUT file, written by `storeDocxDocument`. Not built.
+2. ~~Rerender without an AI call~~ **Built 2026-10-13** — `docxFill` on the
+   output + the Template Fields rail + `/rerender`.
 3. **Scope of auto-approve.** The fill shares "Auto-approve documents". Keep,
    or give templates their own toggle?
+4. **Values from a note** (owner question 2026-10-13): `valuesFromContentId`
+   — a note whose headings are field names (bullets → list, paragraph →
+   string) as the source of a fill, so the values live in the garden as
+   prose the user edits. Not built; the Template Fields rail covers the
+   edit-and-rerender case for now.
+5. **Your template → loops.** The real template is 17 numbered slots; under
+   the refusal policy a 3-bullet fill is refused until the model asks for
+   bullets 4–5. Converting the slots to `{% for %}` loops makes a shorter
+   list simply a shorter list. Offered; needs the `.docx`.
 
 ## 7. Deploy runbook (owner-run; not yet executed)
 
@@ -155,19 +166,22 @@ Local dev: `cd server/docx-renderer && .venv/bin/uvicorn app:app --port 8081`,
 
 ## 8. Remaining steps
 
-- [ ] Owner: judge policy (§6.1).
-- [ ] Browser smoke on the dev stack: mark the fixture template (upload it
-      first), Settings → Templates shows it with fields, add a note, chat
-      "fill my resume template for …" → approval card lists the values →
-      file opens → overwrite in place keeps the id.
+- [x] Judge policy (§6.1) — decided and built 2026-10-13.
+- [x] Rerender without AI, charter recipe, charter-turn wiring, provenance,
+      gate — 2026-10-13.
+- [ ] Browser smoke on the dev stack (lines in CURRENT-SPRINT.md): mark the
+      fixture template, Settings card, chat fill with provenance → approval
+      card → file opens → Template Fields rail → edit → Re-render (same id,
+      viewer refreshes) → overwrite from chat keeps the Materials id.
 - [ ] Draft PR (summary / gates / pre-merge smoke lines) — deploy is a
       separate owner step after merge; the tool stays unavailable until
       `DOCX_RENDERER_URL` is set, so merging first is safe.
-- [ ] Post-deploy production smoke (AI capability → production): one
-      `read_docx_template` list, one fill, one overwrite; check Cloud Run
-      logs show `render` events with `durationMs`.
+- [ ] Deploy (§7), then the production smoke (AI capability → production):
+      `read_docx_template` list, one fill with citations, one overwrite;
+      Cloud Run logs show `render` events; app logs show
+      `docx_templates:fill` with `renderMs`. Compare a templated and a
+      markdown resume turn: per-turn tokens are in the conversation's
+      per-message diagnostics; the fill event carries duration and size.
 - [ ] Step 4: PDF preview image (LibreOffice) only after the DOCX path is
       live; measurements in §5 say it is cheap.
-- [ ] Rerender-without-AI form (§6.2).
-- [ ] Charter recipe: STAGE2-CHARTER-RECIPE.md materials phase names the
-      template and `fill_docx_template` (today it names `create_docx`).
+- [ ] §6.4 values-from-a-note; §6.5 convert the owner's template to loops.
