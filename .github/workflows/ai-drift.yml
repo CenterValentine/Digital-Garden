@@ -74,5 +74,8 @@ jobs:
       - name: Validate AI row deletion is consent-gated
         run: pnpm data:delete-policy:check
 
+      - name: Document templates (judge rules, renderer client auth, charter wiring)
+        run: pnpm docx:templates:check
+
       - name: Validate capability matrix freshness
         run: pnpm ai:matrix:check
