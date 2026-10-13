@@ -4,10 +4,33 @@ epoch: 12 (Main Panel Tabs + Split Workspace)
 duration: multi-session
 branch: epoch-12/sprint-55-wire-blocks
 status: complete
-last_updated: 2026-10-12
+last_updated: 2026-10-13
 ---
 
 # Current Sprint Addendum
+
+## October 13, 2026 — The garden is an MCP server (`/api/mcp`, 17 tools + 2 aliases, 5 resources, 2 prompts, Settings → MCP)
+
+**Tree**: worktree `.claude/worktrees/mcp-server`, branch `feat/mcp-server` (off `origin/main` at `a7b89ad2`)
+**Plan**: `work-tracking/MCP-DATABASE-REACH-PLAN.md` (M1 + M2 in one PR; M3 OAuth, M4 in-chat client and the authorship signal stay out)
+**Status**: typecheck / lint 151 (0 errors, none new) / `mcp:surface:check` (NEW) / `mcp:prep:check` / `private:content:check` / `ai:drift:check` / `data:delete-policy:check` green; `pnpm mcp:smoke` (real MCP client, reads + writes) OK against a local server; no schema change.
+
+### Shipped
+
+- **Transport + auth**: `app/api/mcp/route.ts` (`mcp-handler` 2.x + `@modelcontextprotocol/server` 2.x — stateless Streamable HTTP, serves the 2026-07-28 protocol and 2025-era clients), `withMcpAuth` → `verifyMcpBearer` → `validateMcpToken` (one verifier). `proxy.ts` already passed `/api/*`; no change.
+- **Scope**: `lib/domain/mcp/jurisdiction.ts` — roots (empty = whole garden), subtree membership from one owner-wide (id, parent, type) read, databases reachable by relation via `relationReachableTableIds`, then the owner's own `resolveDataTableAccess`.
+- **Tools** (`lib/domain/mcp/tools/*`): read.ts (search over the shared builder, tree, type-dispatched read), data.ts (query with chat's filter compiler + index tier + token cap paging; insert/update through `applyRowInserts` / `applyRowUpdates`, now exported from `data-tools.ts`; delete under `aiPolicy.delete` with `inputRequired` elicitation on 2026-era clients and `elicitInput` on 2025-era ones), files.ts (notes through `createNoteFromMarkdown` + `writeNoteContent` with the shrink guard ON; code; uploads with base64 or server-fetched `sourceUrl`; folders via `findOrCreateFolder`; blocks through the exported catalog + `buildBlockNode`), context.ts (`getMetadataForNode` read, `applyGeneratedSections` write), chats.ts (scoped search, transcript, diagnostics via `readTurnDiagnostics`), issues.ts (#211 pipeline).
+- **Resources** `garden://note|file|database|database/view|row` with the ingest budget; **prompts** `charter` (compiled via `parseCharter` + `renderCharterSection`) and `report-garden-issue`.
+- **Settings → MCP** (`components/settings/McpSettingsPage.tsx`): tokens with capabilities, reach picker (folders + databases from the tree), all-chats, expiry; client snippets; revoke/purge. Sidebar badge "Soon" → "New".
+- **Extractions**: `lib/domain/content/backlinks.ts` (route now imports it), `lib/domain/content/create-note.ts`; `getInsertBlockCatalog` / `buildBlockNode` / `findBlocksInDoc` exported from editor-tools.
+- **Gate** `pnpm mcp:surface:check`: flat schemas with descriptions, annotations on every tool, capability check on every write, delete destructive + policy + elicitation, one write path, one read seam, bearer auth. **Smoke** `pnpm mcp:smoke` (+ `SMOKE_WRITE=1`), token mint helper for dev.
+
+### Smoke (pending in the browser) — plus the 4 lines carried from #296 / #297
+
+- Settings → MCP: mint a token with Read + Write rows, pick one folder as reach → it lists with that reach; copy the Claude Code snippet; revoke → "Revoked"; Remove.
+- Claude Code: `claude mcp add --transport http garden <origin>/api/mcp --header "Authorization: Bearer …"` → `/mcp` shows digital-garden with 19 tools; ask "what databases do I have" → `garden_search` lists them.
+- A token scoped to one folder → `garden_read` on a note outside it is refused with the reach message.
+- `garden_delete_rows` on an "Ask me" table from Claude Code → a confirmation prompt appears; decline → nothing deleted.
 
 ## October 12, 2026 — The ground under the MCP server (conversion backup, one search builder, chat body search, MCP tokens, read seam, Cmd+Shift+F)
 

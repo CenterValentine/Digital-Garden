@@ -93,6 +93,11 @@ jobs:
       - name: MCP preparatory layer checks
         run: pnpm mcp:prep:check
 
+      # The MCP server's contract: flat schemas, annotations, capability
+      # checks on every write, one write path, one read seam, bearer auth.
+      - name: MCP server surface checks
+        run: pnpm mcp:surface:check
+
   markdown-safety:
     name: Markdown block-safety
     runs-on: ubuntu-latest

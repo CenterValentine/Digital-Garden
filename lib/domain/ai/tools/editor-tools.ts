@@ -66,7 +66,7 @@ let insertBlockCatalog: {
   extensions: Extensions;
 } | null = null;
 
-function getInsertBlockCatalog() {
+export function getInsertBlockCatalog() {
   if (insertBlockCatalog) return insertBlockCatalog;
   const extensions = getServerExtensions();
   // Phase 2: all authorable blocks, including containers (which accept a nested
@@ -106,7 +106,7 @@ function getInsertBlockCatalog() {
 }
 
 /** A block the model wants to author; containers may carry nested `content`. */
-interface BlockSpec {
+export interface BlockSpec {
   blockType: string;
   attrs?: Record<string, unknown>;
   content?: BlockSpec[];
@@ -138,7 +138,7 @@ function emptyParagraph(): JSONContent {
 }
 
 /** Every registered block instance in a document, in reading order. */
-function findBlocksInDoc(
+export function findBlocksInDoc(
   doc: JSONContent
 ): Array<{ blockId: string; blockType: string; attrs: Record<string, unknown> }> {
   const out: Array<{ blockId: string; blockType: string; attrs: Record<string, unknown> }> = [];
@@ -202,7 +202,7 @@ function coerceJsonStringAttrs(
  * Built directly as TipTap JSON (not via the drag-builder converter) so every
  * container — including blockColumns — is handled uniformly.
  */
-function buildBlockNode(
+export function buildBlockNode(
   spec: BlockSpec,
   blocks: BlockDefinition[],
   depth: number
