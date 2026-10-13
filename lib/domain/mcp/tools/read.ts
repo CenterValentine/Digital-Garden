@@ -22,6 +22,7 @@ import { loadTable } from "@/lib/domain/data/server/queries";
 import { rowHandle } from "@/lib/domain/data/read-format";
 import { assembleFolderCapsule } from "@/lib/domain/ai-context/capsule";
 import { findBlocksInDoc } from "@/lib/domain/ai/tools/editor-tools";
+import { contentUpdatedAt } from "@/lib/domain/content/content-updated-at";
 import { listNoteImages } from "@/lib/domain/content/note-images";
 import { listConversationsByContent } from "@/lib/features/conversations";
 import { imageBlock, imageBlocks, presignFile, rewriteDownloadLinks, type ImageBlock } from "../media";
@@ -54,9 +55,10 @@ export async function search(
         contentType: true,
         updatedAt: true,
         parent: { select: { title: true, parent: { select: { title: true } } } },
-        notePayload: { select: { searchText: true } },
-        dataPayload: { select: { description: true, rowCount: true } },
-        filePayload: { select: { mimeType: true } },
+        notePayload: { select: { searchText: true, updatedAt: true } },
+        dataPayload: { select: { description: true, rowCount: true, updatedAt: true } },
+        filePayload: { select: { mimeType: true, updatedAt: true } },
+        codePayload: { select: { updatedAt: true } },
       },
       orderBy: SEARCH_ORDER,
       take: allowed ? limit * 4 : limit,
@@ -66,7 +68,7 @@ export async function search(
     for (const r of rows) {
       if (allowed && !allowed.has(r.id)) continue;
       const path = [r.parent?.parent?.title, r.parent?.title].filter(Boolean).join(" / ");
-      const hit: Record<string, unknown> = { id: r.id, type: r.contentType, title: r.title, path: path || null, updatedAt: r.updatedAt.toISOString() };
+      const hit: Record<string, unknown> = { id: r.id, type: r.contentType, title: r.title, path: path || null, updatedAt: contentUpdatedAt(r).toISOString() };
       if (r.notePayload?.searchText) {
         const text = r.notePayload.searchText;
         const at = term ? text.toLowerCase().indexOf(term) : -1;
@@ -123,12 +125,12 @@ export async function read(
     const node = await prisma.contentNode.findFirst({
       where: { id: input.id, ownerId: scope.userId, deletedAt: null },
       include: {
-        notePayload: { select: { tiptapJson: true } },
-        codePayload: { select: { code: true, language: true } },
-        htmlPayload: { select: { searchText: true } },
-        externalPayload: { select: { url: true, description: true, readingStatus: true, resourceType: true } },
-        filePayload: { select: { fileName: true, mimeType: true, fileSize: true, searchText: true } },
-        dataPayload: { select: { rowCount: true, description: true } },
+        notePayload: { select: { tiptapJson: true, updatedAt: true } },
+        codePayload: { select: { code: true, language: true, updatedAt: true } },
+        htmlPayload: { select: { searchText: true, updatedAt: true } },
+        externalPayload: { select: { url: true, description: true, readingStatus: true, resourceType: true, updatedAt: true } },
+        filePayload: { select: { fileName: true, mimeType: true, fileSize: true, searchText: true, updatedAt: true } },
+        dataPayload: { select: { rowCount: true, description: true, updatedAt: true } },
         contentTags: { select: { tag: { select: { name: true, slug: true } } } },
         parent: { select: { id: true, title: true } },
       },
@@ -136,14 +138,18 @@ export async function read(
     if (!node) return refuse("That item does not exist.");
     const parts = new Set(input.parts && input.parts.length > 0 ? input.parts : ["body", "tags", "context"]);
     const cap = principal.token.readTokenCap ?? DEFAULT_READ_TOKEN_CAP;
+    // The content stamp, not the node row: a collaborative save stamps only
+    // the payload, and this value is what garden_write_note's expectUpdatedAt
+    // is compared against.
+    const updatedAt = contentUpdatedAt(node).toISOString();
     const structured: Record<string, unknown> = {
       id: node.id,
       type: node.contentType,
       title: node.title,
-      updatedAt: node.updatedAt.toISOString(),
+      updatedAt,
       parent: node.parent ? { id: node.parent.id, title: node.parent.title } : null,
     };
-    const sections: string[] = [`# ${node.title}\n(${node.contentType}, ${node.id}, updated ${node.updatedAt.toISOString()}${node.parent ? `, in "${node.parent.title}"` : ""})`];
+    const sections: string[] = [`# ${node.title}\n(${node.contentType}, ${node.id}, updated ${updatedAt}${node.parent ? `, in "${node.parent.title}"` : ""})`];
     const images: ImageBlock[] = [];
 
     if (parts.has("tags")) {

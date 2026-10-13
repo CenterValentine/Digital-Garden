@@ -135,11 +135,17 @@ check(!/prisma\.notePayload\.(update|upsert|create)\(/.test(files), "notes: the 
 // chat tool's old "you can't update this chat's notes" bug, and the MCP
 // copy had it until the owner's first database smoke (2026-10-13).
 check(!/ownedNode\(scope, input\.id, \[/.test(noteFn), "notes: garden_write_note accepts any owned item, not only notes (the notes panel of a database, folder, file or chat)");
+// A collaborative save stamps only the payload row; a compare-and-set keyed
+// on ContentNode.updatedAt passed for a second writer (owner's smoke,
+// 2026-10-13). The stamp every read reports and every expect compares is the
+// content stamp.
+check(/contentUpdatedAt\(node\)/.test(files) && /PAYLOAD_STAMP_SELECT/.test(files), "writes: the expectUpdatedAt compare-and-set uses the content stamp (payload rows included), not the node row");
 check(/NOTES/.test(server) && /AI CONTEXT/.test(server), "instructions: the two text slots and the default between them are stated");
 
 const read = src("lib/domain/mcp/tools/read.ts");
 check(/renderNoteForMcp\(/.test(read), "reads: notes render through the MCP seam");
 check(/## Notes/.test(read) && /structured\.notes = /.test(read), "reads: a non-note item's read shows its notes panel, filled or empty, as a slot distinct from AI context");
+check(/contentUpdatedAt\(/.test(read) && !/updatedAt: node\.updatedAt\.toISOString\(\)/.test(read) && !/updatedAt: r\.updatedAt\.toISOString\(\)/.test(read), "reads: search hits and reads report the content stamp, not the node row");
 check(/lib\/domain\/mcp\/read\.ts/.test(src("scripts/validate-private-content.ts")), "reads: the seam is registered with the private-content gate");
 const resources = src("lib/domain/mcp/resources.ts");
 check(/renderNoteForMcp\(/.test(resources), "resources: the note resource renders through the seam");

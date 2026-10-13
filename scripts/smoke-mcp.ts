@@ -161,10 +161,21 @@ async function main() {
       const cs = structured(created);
       expect(cs.created === true && typeof cs.id === "string", `created note ${cs.id}`);
       if (typeof cs.id === "string") {
+        const fresh = await client.callTool({ name: "garden_read", arguments: { id: cs.id, parts: ["body"] } });
+        const stamp0 = String(structured(fresh).updatedAt ?? "");
         const appended = await client.callTool({ name: "garden_write_note", arguments: { id: cs.id, content: "Second line, appended." } });
         expect(!appended.isError, `append: ${trim(text(appended), 160)}`);
+        const stamp1 = String(structured(appended).updatedAt ?? "");
+        expect(Boolean(stamp0) && Boolean(stamp1) && stamp1 > stamp0, `the content stamp moved with the append (${stamp0} → ${stamp1})`);
         const back = await client.callTool({ name: "garden_read", arguments: { id: cs.id, parts: ["body"] } });
         expect(text(back).includes("Second line"), "read-back contains the appended line");
+        expect(String(structured(back).updatedAt ?? "") === stamp1, "the read reports the same stamp the write returned");
+        // Compare-and-set: a stale stamp is refused, the current one is accepted.
+        const body = String(structured(back).body ?? "");
+        const staleReplace = await client.callTool({ name: "garden_write_note", arguments: { id: cs.id, mode: "replace", content: `${body}\n\nThird line.`, expectUpdatedAt: stamp0 } });
+        expect(staleReplace.isError === true && structured(staleReplace).stale === true, "replace with the pre-append stamp is refused as stale");
+        const freshReplace = await client.callTool({ name: "garden_write_note", arguments: { id: cs.id, mode: "replace", content: `${body}\n\nThird line.`, expectUpdatedAt: stamp1 } });
+        expect(!freshReplace.isError && String(structured(freshReplace).updatedAt ?? "") > stamp1, `replace with the current stamp succeeds: ${trim(text(freshReplace), 120)}`);
         const block = await client.callTool({ name: "garden_insert_block", arguments: { noteId: cs.id, blockType: "pullQuote", attrs: {} } });
         console.log(trim(text(block), 200));
 

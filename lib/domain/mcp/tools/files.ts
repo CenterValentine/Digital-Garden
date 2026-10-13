@@ -13,6 +13,7 @@ import type { JSONContent } from "@tiptap/core";
 import { prisma } from "@/lib/database/client";
 import type { Prisma } from "@/lib/database/generated/prisma";
 import { logger } from "@/lib/core/logger";
+import { PAYLOAD_STAMP_SELECT, contentUpdatedAt } from "@/lib/domain/content/content-updated-at";
 import { createNoteFromMarkdown } from "@/lib/domain/content/create-note";
 import { markdownToTiptapResult } from "@/lib/domain/content/markdown";
 import { extractSearchTextFromCode } from "@/lib/domain/content/search-text";
@@ -37,9 +38,18 @@ async function ownedNode(scope: McpScope, id: string, types?: string[]) {
   if (!(await scope.nodeInScope(id))) return null;
   const node = await prisma.contentNode.findFirst({
     where: { id, ownerId: scope.userId, deletedAt: null, ...(types ? { contentType: { in: types as never[] } } : {}) },
-    select: { id: true, title: true, contentType: true, parentId: true, updatedAt: true },
+    select: { id: true, title: true, contentType: true, parentId: true, updatedAt: true, ...PAYLOAD_STAMP_SELECT },
   });
-  return node;
+  // The compare-and-set stamp is the CONTENT stamp (payload rows included),
+  // not the node row: a collaborative save never touches the node row, so a
+  // replace keyed on it would pass for a second writer after a live edit.
+  return node ? { ...node, updatedAt: contentUpdatedAt(node) } : null;
+}
+
+/** The content stamp after a write, for the result. */
+async function stampAfter(id: string): Promise<string | null> {
+  const node = await prisma.contentNode.findUnique({ where: { id }, select: { updatedAt: true, ...PAYLOAD_STAMP_SELECT } });
+  return node ? contentUpdatedAt(node).toISOString() : null;
 }
 
 async function resolveParentFolder(scope: McpScope, parentId: string | undefined): Promise<{ id: string } | { refusal: string }> {
@@ -95,10 +105,10 @@ export async function writeNote(
     const json = linkifyWikiRefsInTiptap(conversion.json);
     try {
       const result = await writeNoteContent({ contentId: node.id, ownerId: scope.userId, mode, content: json, destructiveApproved: false });
-      const after = await prisma.contentNode.findUnique({ where: { id: node.id }, select: { updatedAt: true } });
+      const updatedAt = await stampAfter(node.id);
       return ok(
-        `${mode === "append" ? "Appended to" : "Replaced"} "${node.title}"${slot} (${node.id}) via ${result.route}: ${result.blocksBefore} → ${result.blocksAfter} blocks, ${result.charsBefore} → ${result.charsAfter} chars.${result.mayBeMaskedInOpenEditor ? " The note is open in an editor that may not show this until it reloads." : ""}${conversion.degraded ? " Some markdown was kept as plain paragraphs." : ""}`,
-        { id: node.id, contentType: node.contentType, slot: node.contentType === "note" ? "note" : "notesPanel", mode, route: result.route, blocksBefore: result.blocksBefore, blocksAfter: result.blocksAfter, updatedAt: after?.updatedAt.toISOString() ?? null, degraded: conversion.degraded }
+        `${mode === "append" ? "Appended to" : "Replaced"} "${node.title}"${slot} (${node.id}) via ${result.route}: ${result.blocksBefore} → ${result.blocksAfter} blocks, ${result.charsBefore} → ${result.charsAfter} chars. Now updatedAt ${updatedAt}.${result.mayBeMaskedInOpenEditor ? " The note is open in an editor that may not show this until it reloads." : ""}${conversion.degraded ? " Some markdown was kept as plain paragraphs." : ""}`,
+        { id: node.id, contentType: node.contentType, slot: node.contentType === "note" ? "note" : "notesPanel", mode, route: result.route, blocksBefore: result.blocksBefore, blocksAfter: result.blocksAfter, updatedAt, degraded: conversion.degraded }
       );
     } catch (error) {
       if (error instanceof NoteEditRefused) {
@@ -134,8 +144,8 @@ export async function writeCode(
         prisma.codePayload.update({ where: { contentId: node.id }, data: { code: input.code, ...(input.language ? { language } : {}), searchText } }),
         prisma.contentNode.update({ where: { id: node.id }, data: { updatedAt: new Date() } }),
       ]);
-      const after = await prisma.contentNode.findUnique({ where: { id: node.id }, select: { updatedAt: true } });
-      return ok(`Overwrote "${node.title}" (${node.id}), ${input.code.length} chars.`, { id: node.id, updatedAt: after?.updatedAt.toISOString() ?? null });
+      const updatedAt = await stampAfter(node.id);
+      return ok(`Overwrote "${node.title}" (${node.id}), ${input.code.length} chars. Now updatedAt ${updatedAt}.`, { id: node.id, updatedAt });
     }
     const title = input.title?.trim();
     if (!title) return refuse("title is required to create a code node.");
