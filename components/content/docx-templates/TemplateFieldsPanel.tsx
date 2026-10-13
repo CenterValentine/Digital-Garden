@@ -249,7 +249,11 @@ export function TemplateFieldsPanel({ contentId }: { contentId: string }) {
       });
       const body = (await res.json()) as {
         success?: boolean;
-        data?: { report?: { filled?: string; overLength?: string[]; uncited?: string[] }; templateChanged?: boolean };
+        data?: {
+          report?: { filled?: string; overLength?: string[]; uncited?: string[] };
+          templateChanged?: boolean;
+          droppedKeys?: string[];
+        };
         error?: { message?: string; problems?: string[] };
       };
       if (!res.ok || !body.success) {
@@ -260,7 +264,12 @@ export function TemplateFieldsPanel({ contentId }: { contentId: string }) {
       setDirty(false);
       const r = body.data?.report;
       toast.success("Document re-rendered", {
-        description: [r?.filled, r?.overLength?.length ? `${r.overLength.length} over length` : "", body.data?.templateChanged ? "template had changed — refreshed" : ""]
+        description: [
+          r?.filled,
+          r?.overLength?.length ? `${r.overLength.length} over length` : "",
+          body.data?.templateChanged ? "template had changed — refreshed" : "",
+          body.data?.droppedKeys?.length ? `dropped (no longer in template): ${body.data.droppedKeys.join(", ")}` : "",
+        ]
           .filter(Boolean)
           .join(" · "),
       });

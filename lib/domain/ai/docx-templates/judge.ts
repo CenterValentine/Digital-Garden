@@ -90,7 +90,7 @@ export function requiredGaps(
 
 /** Every top-level name the template reads — roots of dotted fields and
  * section paths — which is what `values`' own keys are judged against. */
-function declaredRoots(record: DocxTemplateRecord): string[] {
+export function declaredRoots(record: DocxTemplateRecord): string[] {
   const roots = new Set<string>();
   for (const f of record.fields) roots.add(f.path.split(".")[0]);
   for (const s of record.sections) roots.add(s.path.split(".")[0]);

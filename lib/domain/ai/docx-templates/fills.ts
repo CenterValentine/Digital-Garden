@@ -25,7 +25,7 @@ import {
 } from "./record";
 import { loadDocxTemplate } from "./templates";
 import { renderDocxTemplate, type TemplateValue } from "./renderer-client";
-import { judgeRender, type RenderVerdict } from "./judge";
+import { declaredRoots, judgeRender, type RenderVerdict } from "./judge";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -130,6 +130,8 @@ export interface RerenderOutcome {
   report?: DocxFillCompactReport;
   /** The template file changed since this document was first filled. */
   templateChanged?: boolean;
+  /** Stored values whose slot no longer exists in the changed template — pruned. */
+  droppedKeys?: string[];
   error?: string;
 }
 
@@ -155,8 +157,25 @@ export async function rerenderDocxFill(
   if (!loaded.ok || !template) {
     return { ok: false, error: loaded.error ?? "The template could not be loaded." };
   }
-  const values = (input.values ?? fill.values) as Record<string, TemplateValue>;
+  const templateChanged = fill.templateChecksum !== "" && fill.templateChecksum !== template.record.checksum;
+  const values = { ...((input.values ?? fill.values) as Record<string, TemplateValue>) };
   const provenance = input.provenance ?? fill.provenance;
+
+  // The template lost a slot since this document was filled (the user
+  // deleted `{{CAPABILITY_7}}` in Word): the stored value for it has no
+  // field to go to and no box in the rail to delete it from. Prune and
+  // report, rather than refuse a key the user cannot see. An unknown key
+  // against an UNCHANGED template is still a refusal (judge rule 2).
+  const droppedKeys: string[] = [];
+  if (templateChanged) {
+    const declared = new Set(declaredRoots(template.record));
+    for (const key of Object.keys(values)) {
+      if (!declared.has(key)) {
+        droppedKeys.push(key);
+        delete values[key];
+      }
+    }
+  }
 
   const rendered = await renderDocxTemplate(template.bytes, values, {
     expectedChecksum: template.record.checksum,
@@ -195,6 +214,7 @@ export async function rerenderDocxFill(
   return {
     ok: true,
     report,
-    templateChanged: fill.templateChecksum !== "" && fill.templateChecksum !== template.record.checksum,
+    templateChanged,
+    ...(droppedKeys.length > 0 ? { droppedKeys } : {}),
   };
 }

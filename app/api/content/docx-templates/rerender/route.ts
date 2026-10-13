@@ -50,7 +50,14 @@ export async function POST(request: NextRequest) {
           { status: 422 },
         );
       }
-      return NextResponse.json({ success: true, data: { report: outcome.report, templateChanged: outcome.templateChanged === true } });
+      return NextResponse.json({
+        success: true,
+        data: {
+          report: outcome.report,
+          templateChanged: outcome.templateChanged === true,
+          ...(outcome.droppedKeys ? { droppedKeys: outcome.droppedKeys } : {}),
+        },
+      });
     } catch (error) {
       if (error instanceof Error && error.message === "Authentication required") {
         return NextResponse.json({ success: false, error: { message: error.message } }, { status: 401 });
