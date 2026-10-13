@@ -182,6 +182,12 @@ async function main() {
       }
     }
     if (dbHits[0]) {
+      // A database's notes panel is a writable slot distinct from its AI context.
+      const dbNote = await client.callTool({ name: "garden_write_note", arguments: { id: dbHits[0].id, content: `MCP smoke wrote this to the database's notes at ${new Date().toISOString()}.` } });
+      const dn = structured(dbNote);
+      expect(!dbNote.isError && dn.slot === "notesPanel" && text(dbNote).includes("notes panel of this data"), `garden_write_note on database "${dbHits[0].title}" appends to its notes panel`);
+      const dbRead = await client.callTool({ name: "garden_read", arguments: { id: dbHits[0].id, parts: ["body"] } });
+      expect(text(dbRead).includes("## Notes") && String(structured(dbRead).notes ?? "").includes("MCP smoke wrote this"), "the database read shows its notes panel with the line just written");
       const ins = await client.callTool({ name: "garden_insert_rows", arguments: { database: dbHits[0].id, rows: [{}] } });
       console.log(trim(text(ins), 300));
       expect(true, "insert_rows answered (an empty row exercises the path; see text)");

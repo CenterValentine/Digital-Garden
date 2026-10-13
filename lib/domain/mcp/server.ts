@@ -66,6 +66,7 @@ export const SERVER_INFO = { name: "digital-garden", version: "1.0.0" } as const
 export const SERVER_INSTRUCTIONS = `This is a user's Digital Garden: notes, folders, databases (tables with typed columns and rows), files and chats.
 Find before you guess: garden_search (empty query + types lists what exists), garden_list_tree, then garden_read for one item. Databases: garden_read gives the schema and a preview; garden_query_rows pages rows — start from the index tier, narrow with columns/filters/view, follow nextCursor until it is null before claiming completeness. Rows are addressed by [8-hex handles].
 Writes need the token's capability and are named for their consent model: garden_insert_rows (partial on bad cells), garden_update_rows (all-or-nothing, expect is required), garden_delete_rows (the table's own policy decides; you may be asked to confirm), garden_write_note (append by default; replace requires expectUpdatedAt and never approves a destructive rewrite), garden_write_code, garden_upload_file, garden_create_folder, garden_insert_block / garden_update_block (typed blocks by catalog), garden_update_ai_context (when a read says the context is stale).
+Two writable text slots on every item: its NOTES (a note's body, or the notes panel of a database, folder, file or chat — garden_write_note with the item's id) and its AI CONTEXT (garden_update_ai_context). Notes are what the user reads; context is what agents read. A summary or write-up the user asks for goes in the notes unless they say "context" or "AI context"; then say in your reply that the context can be updated too. If the request names both, or you cannot tell which reader is meant, ask before writing.
 Leave any \`\`\`dg-block fences exactly as read. Never create at the garden root. Chats are a separate tool pair (garden_chats_search, garden_chat_read) and read-only.
 If a tool fails twice with the same internal error, or a result contradicts what you just read, file it with garden_report_issue (never paste note content), then continue on a safer path.`;
 
@@ -189,7 +190,7 @@ export function createGardenMcpServer(server: McpServer): void {
     {
       title: "Write a note",
       description:
-        "Create a note (omit id; give title and parentId — never the garden root, use garden_list_tree to choose) or write to an existing one. mode append (default) adds markdown at the end and can never lose content. mode replace rewrites the whole note, requires expectUpdatedAt from your last read, and is refused if it would destroy most of the note. Leave any ```dg-block fences you read exactly as they were.",
+        "Create a note (omit id; give title and parentId — never the garden root, use garden_list_tree to choose) or write to an existing item. With a note's id this writes the note; with a database, folder, file or chat id it writes that item's notes panel (\"Add notes\" in the app) — the place a summary the USER asked for belongs, where they will read it. AI context is a different slot (garden_update_ai_context). mode append (default) adds markdown at the end and can never lose content. mode replace rewrites the whole document, requires expectUpdatedAt from your last read, and is refused if it would destroy most of it. Leave any ```dg-block fences you read exactly as they were.",
       inputSchema: writeNoteInput,
       annotations: WRITE,
     },
@@ -258,7 +259,7 @@ export function createGardenMcpServer(server: McpServer): void {
     {
       title: "Update AI context",
       description:
-        'Write a node\'s AI context — the standing description the garden\'s assistant and other agents read first. Writable: sections.summary (required), sections.structure, sections.signals (kept only when the node\'s context mode is Enhanced; garden_read shows the mode), and oneLiner. Anything else you send is reported back under "dropped" with the reason, not stored. Use it when garden_read reports the context as stale after you have read the whole item. merge (default) updates the keys you give; replace rewrites. Opted-out nodes refuse.',
+        'Write a node\'s AI context — the standing description the garden\'s assistant and other agents read first. It is NOT the item\'s notes: a summary the user asked to read goes in the notes via garden_write_note; write context when the user says "context" or "AI context", or when a read reports it stale, and otherwise offer it. Writable: sections.summary (required), sections.structure, sections.signals (kept only when the node\'s context mode is Enhanced; garden_read shows the mode), and oneLiner. Anything else you send is reported back under "dropped" with the reason, not stored. Use it when garden_read reports the context as stale after you have read the whole item. merge (default) updates the keys you give; replace rewrites. Opted-out nodes refuse.',
       inputSchema: updateAiContextInput,
       annotations: WRITE,
     },

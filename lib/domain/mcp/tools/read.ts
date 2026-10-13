@@ -237,6 +237,17 @@ export async function read(
         default:
           body = `(${node.contentType} content has no text rendering yet)`;
       }
+      // Every item except a note has a sidecar notes panel ("Add notes" in
+      // the app) beside its main content: the slot a summary written FOR
+      // THE USER goes in. Show it, filled or empty, so the agent sees it as
+      // distinct from the AI context (the slot agents read).
+      if (node.contentType !== "note") {
+        const sidecar = node.notePayload?.tiptapJson as JSONContent | undefined;
+        let notes = sidecar ? renderNoteForMcp(sidecar).trim() : "";
+        if (notes) notes = (await rewriteDownloadLinks(scope.userId, notes)).text;
+        structured.notes = notes || null;
+        body += `\n\n## Notes\n${notes || "(none yet — garden_write_note with this id writes this item's notes panel; the AI context below is a different slot, for agents)"}`;
+      }
       const capped = capText(body, cap, "Narrow the read with parts, or for a database use garden_query_rows.");
       structured.truncated = capped.truncated;
       // The body goes into BOTH channels. Claude Code renders only

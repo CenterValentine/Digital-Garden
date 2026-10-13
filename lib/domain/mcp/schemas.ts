@@ -163,7 +163,7 @@ export const deleteRowsInput = z.object({
 });
 
 export const writeNoteInput = z.object({
-  id: z.string().optional().describe("The note to write to. Omit to CREATE a new note."),
+  id: z.string().optional().describe("The item to write to: a note (its body), or a database, folder, file or chat (its notes panel). Omit to CREATE a new note."),
   title: z.string().optional().describe("Title for a new note (required when id is omitted)."),
   parentId: z
     .string()

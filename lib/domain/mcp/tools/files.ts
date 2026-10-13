@@ -74,8 +74,14 @@ export async function writeNote(
       );
     }
 
-    const node = await ownedNode(scope, input.id, ["note"]);
-    if (!node) return refuse("That note is not reachable with this token, or is not a note.");
+    // Any owned item, not only notes: a database, folder, file or chat has
+    // a sidecar notes panel keyed by its own id (the app's "Add notes").
+    // The in-app chat tool learned this the hard way — a `["note"]` filter
+    // was the "you can't update this chat's notes" bug — and the MCP copy
+    // carried the same filter until the owner's first database smoke.
+    const node = await ownedNode(scope, input.id);
+    if (!node) return refuse("That item is not reachable with this token.");
+    const slot = node.contentType === "note" ? "" : ` (the notes panel of this ${node.contentType})`;
     const mode = input.mode ?? "append";
     if (mode === "replace") {
       if (!input.expectUpdatedAt) {
@@ -91,8 +97,8 @@ export async function writeNote(
       const result = await writeNoteContent({ contentId: node.id, ownerId: scope.userId, mode, content: json, destructiveApproved: false });
       const after = await prisma.contentNode.findUnique({ where: { id: node.id }, select: { updatedAt: true } });
       return ok(
-        `${mode === "append" ? "Appended to" : "Replaced"} "${node.title}" (${node.id}) via ${result.route}: ${result.blocksBefore} → ${result.blocksAfter} blocks, ${result.charsBefore} → ${result.charsAfter} chars.${result.mayBeMaskedInOpenEditor ? " The note is open in an editor that may not show this until it reloads." : ""}${conversion.degraded ? " Some markdown was kept as plain paragraphs." : ""}`,
-        { id: node.id, mode, route: result.route, blocksBefore: result.blocksBefore, blocksAfter: result.blocksAfter, updatedAt: after?.updatedAt.toISOString() ?? null, degraded: conversion.degraded }
+        `${mode === "append" ? "Appended to" : "Replaced"} "${node.title}"${slot} (${node.id}) via ${result.route}: ${result.blocksBefore} → ${result.blocksAfter} blocks, ${result.charsBefore} → ${result.charsAfter} chars.${result.mayBeMaskedInOpenEditor ? " The note is open in an editor that may not show this until it reloads." : ""}${conversion.degraded ? " Some markdown was kept as plain paragraphs." : ""}`,
+        { id: node.id, contentType: node.contentType, slot: node.contentType === "note" ? "note" : "notesPanel", mode, route: result.route, blocksBefore: result.blocksBefore, blocksAfter: result.blocksAfter, updatedAt: after?.updatedAt.toISOString() ?? null, degraded: conversion.degraded }
       );
     } catch (error) {
       if (error instanceof NoteEditRefused) {
