@@ -10,9 +10,20 @@ last_updated: 2026-10-12
 
 ---
 
-## MCP server — prep PR and follow-ups (2026-10-12, from `MCP-DATABASE-REACH-PLAN.md`)
+## MCP server — follow-ups (2026-10-13, from `feat/mcp-server`)
 
-Prep PR (`feat/mcp-prep`, 2026-10-12 — each item stands alone without MCP; plan §6.8):
+- ⚪ **M3 — OAuth for hosted clients** (claude.ai, ChatGPT, Gemini CLI with OAuth): the garden as its own authorization server. Note the 2026-07-28 spec the handler now serves deprecates dynamic client registration for **client-ID metadata documents** (CIMD); plan §8.1 needs that revision before building. `protectedResourceHandler` + `/.well-known/oauth-protected-resource` come with it.
+- ⚪ **M4 — MCP client in chat** (external servers, namespacing, approval gates; MCP-PLAN §4).
+- ⚪ Image OCR over MCP: `readImageTextForModel` is client-only; wire the server-side engine so `garden_read` on an image returns recognised text for text-only models (vision models already get the pixels as an `image` block), and page PDFs through `createPDFProcessor`.
+- ⚪ Presigned links in MCP reads are 15-minute storage URLs; a long-lived public link would need the public-file-link machinery from #227 (opt-in per file), not a longer presign.
+- ⚪ `garden_insert_block` content for columns/tabs (today only stacking containers accept markdown children).
+- ⚪ Chat's inline `create_note` should call `createNoteFromMarkdown` (extracted for MCP) so there is one create path.
+- ⚪ A token's daily call cap (`dailyCallCap`) is stored but not enforced yet; wire it through the verifier with the context-spend pattern.
+- ⚪ Audit view on Settings → MCP (recent calls per token) — needs call logging on the route.
+
+## MCP server — prep PR (2026-10-12, from `MCP-DATABASE-REACH-PLAN.md`)
+
+Prep PR (`feat/mcp-prep`, MERGED 2026-10-13 as #297 — each item stands alone without MCP; plan §6.8):
 
 - ✅ `recordNoteHistory` → `ContentHistory` at every serializer-driven write (write service both routes, run ledger, content PATCH markdown body, source-view toggle), gate `mcp:prep:check`.
 - ⚪ **Restore affordance** over `GET /api/content/content/[id]/history`: a "Previous versions" view in the right sidebar (content-driven claim) that reads a snapshot and writes it back through `writeNoteContent`.
@@ -30,7 +41,7 @@ Keyboard shortcuts (found 2026-10-12 while moving search off Cmd+/):
 Deletion follow-ups (from `feat/ai-row-deletion-policy`):
 
 - ⚪ Control-panel section under AI context listing every database's AI policy (today only the schema rail sets it).
-- ⚪ MCP `garden_delete_rows`: `confirm` via elicitation where the client declares it, refusal otherwise (plan §2.8).
+- ✅ MCP `garden_delete_rows`: `confirm` via elicitation where the client declares it, refusal otherwise (plan §2.8) — shipped in `feat/mcp-server`.
 - ⚪ "Reason" on the approval card: the generic card shows the tool input; a dedicated card for `delete_rows` that leads with the reason and the row titles would read better.
 
 ## Note saves take 2.5–5.5 s on production (2026-10-09, found diagnosing 409s)

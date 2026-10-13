@@ -419,7 +419,12 @@ async function main() {
     check("D17: a one-sided rival follows #287 (adopt)", planLocalCatchUp({ ...base, alignment: "adopt", lastLocalEditAt: 3000, payloadUpdatedAt: 2000 }) === "adopt");
     check("D17: a one-sided rival follows #287 (adopt-and-reapply)", planLocalCatchUp({ ...base, alignment: "adopt-and-reapply", localClean: false, lastLocalEditAt: null, payloadUpdatedAt: null }) === "adopt-and-reapply");
     check("D17: same lineage, clean union → merge", planLocalCatchUp({ ...base, sharesLineage: true, unionMatchesServer: true, lastLocalEditAt: null, payloadUpdatedAt: null }) === "merge");
-    check("D17: same lineage, union would double → keep", planLocalCatchUp({ ...base, sharesLineage: true, unionMatchesServer: false, lastLocalEditAt: null, payloadUpdatedAt: 2000 }) === "keep");
+    check("D17: same lineage, union would double, both sides unique → keep", planLocalCatchUp({ ...base, sharesLineage: true, unionMatchesServer: false, lastLocalEditAt: null, payloadUpdatedAt: 2000 }) === "keep");
+    // Owner smoke 2026-10-13: a solo tab two blocks behind an MCP append kept
+    // its copy through every refresh. The server showed everything the tab
+    // did, so adopting it loses nothing and doubles nothing.
+    check("D17: same lineage, union would double, server shows everything local does → adopt", planLocalCatchUp({ ...base, sharesLineage: true, unionMatchesServer: false, alignment: "adopt", lastLocalEditAt: 3000, payloadUpdatedAt: 2000 }) === "adopt");
+    check("D17: same lineage, union would double, local only adds → adopt-and-reapply", planLocalCatchUp({ ...base, sharesLineage: true, unionMatchesServer: false, alignment: "adopt-and-reapply", localClean: false, lastLocalEditAt: null, payloadUpdatedAt: null }) === "adopt-and-reapply");
   }
   {
     // The incident, end to end: the browser cached the note as written by hand;

@@ -47,11 +47,20 @@ export interface HtmlBridge {
   toJson(html: string, extensions: Extensions): JSONContent;
 }
 
+/**
+ * zeed-dom (the Node serializer) stamps `xmlns="http://www.w3.org/1999/xhtml"`
+ * on every element it emits. The browser never does, parseHTML never needs
+ * it, and it reached users as `<p xmlns=…></p>` wherever a block fell to the
+ * HTML tier server-side (an empty paragraph read over MCP, 2026-10-13).
+ * Strip it so both environments emit the same HTML.
+ */
+const XHTML_NS_ATTR = / xmlns="http:\/\/www\.w3\.org\/1999\/xhtml"/g;
+
 // Environment-split default: native DOM in the browser, zeed-dom in Node.
 const defaultBridge: HtmlBridge = {
   toHtml: (json, extensions) =>
     typeof window === "undefined"
-      ? generateHTMLServer(json, extensions)
+      ? generateHTMLServer(json, extensions).replace(XHTML_NS_ATTR, "")
       : generateHTML(json, extensions),
   toJson: (html, extensions) =>
     (typeof window === "undefined"

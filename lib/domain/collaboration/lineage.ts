@@ -222,10 +222,18 @@ export function alignOntoServerCopy(
  *   - "adopt" for a DIVERGED rival when the stored note changed after this
  *     browser last edited its copy: every clean local edit reached the
  *     payload through autosave, so the payload is the newer truth.
+ *   - "adopt" / "adopt-and-reapply" for a SAME-lineage copy whose union would
+ *     double the note, when one side only adds (planAlignment): the server
+ *     already shows everything this copy does (adopt), or this copy only adds
+ *     blocks (adopt-and-reapply) — taking the server's copy drops the
+ *     browser's own items for text the server holds under its own, and
+ *     re-adds any local-only blocks once. Owner smoke 2026-10-13: a solo tab
+ *     kept a copy two blocks behind an MCP append through every refresh,
+ *     because "keep" had no path back to the server for a solo session.
  *   - "keep": the browser holds offline edits that never reached the server
  *     (never thrown away), it edited after the stored note last changed, or
- *     a same-lineage union would not equal the server's copy. Connecting
- *     later behaves exactly as before this check existed.
+ *     both copies hold blocks the other lacks. Connecting later behaves
+ *     exactly as before this check existed.
  *
  * `lastLocalEditAt` is null for copies cached before it was tracked; a clean
  * copy then defers to the server, whose payload holds every online edit.
@@ -244,7 +252,10 @@ export function planLocalCatchUp(input: {
   /** When the stored note last changed (ms), or null when unknown. */
   payloadUpdatedAt: number | null;
 }): LocalCatchUp {
-  if (input.sharesLineage) return input.unionMatchesServer ? "merge" : "keep";
+  if (input.sharesLineage) {
+    if (input.unionMatchesServer) return "merge";
+    return input.alignment !== "diverged" ? input.alignment : "keep";
+  }
   if (input.alignment !== "diverged") return input.alignment;
   if (!input.localClean) return "keep";
   if (input.lastLocalEditAt === null) return "adopt";

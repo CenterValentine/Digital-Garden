@@ -1,6 +1,6 @@
 ---
 title: MCP Database Reach — find garden content and use it, databases first
-status: 🔭 PLANNED (design model — no implementation yet)
+status: 🟡 BUILDING — M1 + M2 on `feat/mcp-server` (2026-10-13); M3 OAuth, M4 in-chat client and the authorship signal remain
 created: 2026-10-07
 last_updated: 2026-10-07
 owner: davidvalentine
@@ -188,10 +188,10 @@ a code node (`CodePayload`), an HTML node, or an uploaded binary (`FilePayload`)
 
 | Payload | Returns | Backs onto |
 |---|---|---|
-| note | markdown, private content stripped | `tiptapToMarkdown(stripPrivateContent(json))` |
+| note | markdown, private content stripped; every in-app `/download` link rewritten to a 15-minute presigned storage URL (no MCP client holds a session cookie); `parts: ["images"]` attaches the note's images as MCP `image` blocks (≤ 6, ≤ 4 MB each) — built 2026-10-13, `lib/domain/mcp/media.ts` | `tiptapToMarkdown(stripPrivateContent(json))`, `generateDownloadUrl`, `listNoteImages` |
 | code | the source text plus `language` | `CodePayload` |
 | html | the text content | `HtmlPayload` |
-| file, image mime | the recognized text, with the OCR confidence note | `readImageTextForModel` in `lib/features/ocr/read-for-model.ts` (PR #291) |
+| file, image mime | the extracted text, a presigned download URL, and the picture itself as an `image` block (vision models) — built; the OCR text for text-only models is backlog | `readImageTextForModel` in `lib/features/ocr/read-for-model.ts` (PR #291) |
 | file, PDF | extracted text, page-delimited, capped by the token budget with `nextPage` | `createPDFProcessor` in `lib/infrastructure/media/pdf-processor.ts` |
 | file, other | metadata plus a short-lived presigned download URL | the download route's default JSON envelope |
 
@@ -572,7 +572,7 @@ Five calls, no approval UI, nothing read that the token's roots do not cover.
    | `aiPolicy` Json on `DataPayload` with the `delete` key and the schema-rail switch | the in-app AI can honour the same policy on its own `softDeleteRows` path today | ✅ PR #296 |
    | search off Cmd+/ (the owner's extra prep item) | the editor's comment-out toggle shared the chord | ✅ `feat/mcp-prep` — Cmd+Shift+F |
 
-   The AI-authorship signal (its own plan) is the remaining prerequisite before M1.
+   Order as built: the prep PR (#297), then the server (M1 + M2 together on `feat/mcp-server`), then the authorship signal, which attaches to the same write services the server already calls.
 
 Proposed layout:
 
@@ -605,6 +605,8 @@ scripts/validate-mcp-surface.ts   gate: every tool's input schema parses the fix
 ---
 
 ## 8. Client compatibility: Claude and OpenAI
+
+> **Revision note (2026-10-13):** the server is built on `mcp-handler` 2.x / `@modelcontextprotocol/server` 2.x, which serve the **2026-07-28** protocol natively (stateless, per-request envelope, `inputRequired` multi-round-trip for elicitation) with a fallback for 2025-era clients. That spec revision **deprecates dynamic client registration** in favour of **client-ID metadata documents (CIMD)**: a hosted OAuth client identifies itself with an HTTPS URL serving its metadata. Every mention of DCR below should be read as "CIMD, with DCR for older clients" when M3 is designed.
 
 MCP is one protocol, so one server serves both vendors. The differences are in their clients.
 Six consumers matter, and they split into two families by how they authenticate:

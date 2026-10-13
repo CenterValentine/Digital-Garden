@@ -346,6 +346,9 @@ export function MarkdownEditor({
   const runtimeNetworkState = collaborationRuntime?.state.networkState ?? null;
   // Set for a few seconds when the document recovers from offline (runtime's markSynced).
   const runtimeRecoveredAt = collaborationRuntime?.state.recoveredAt ?? null;
+  // Set for a few seconds when a sync merged this tab's own edits with a change
+  // the server document received while the tab was detached (runtime's markSynced).
+  const runtimeRemoteWriteMergedAt = collaborationRuntime?.state.remoteWriteMergedAt ?? null;
   const runtimeLocalDirty = collaborationRuntime?.state.localDirty ?? false;
   const runtimeUnsyncedUpdateCount = collaborationRuntime?.state.unsyncedUpdateCount ?? 0;
   const viewerExtensions = useMemo(() => getViewerExtensions(), []);
@@ -1719,6 +1722,18 @@ export function MarkdownEditor({
           className="border-b border-emerald-500/20 bg-emerald-500/10 px-4 py-2 text-sm text-emerald-700 dark:text-emerald-300"
         >
           Reconnected — your changes are synced.
+        </div>
+      ) : null}
+      {collaborationEnabled && runtimeRemoteWriteMergedAt !== null && !collaborationNotice && !isCollaborationConnecting ? (
+        // The merge already kept both sides; this only says it happened, so a
+        // rewrite made by an agent while this tab was asleep or offline never
+        // silently reshapes text the user was editing. The version before that
+        // change is in the note's history (conversion backup, #297).
+        <div
+          role="status"
+          className="border-b border-sky-500/20 bg-sky-500/10 px-4 py-2 text-sm text-sky-700 dark:text-sky-300"
+        >
+          Merged with a change made outside this tab while it was detached — your edits were kept. The version before that change is in this note&apos;s history.
         </div>
       ) : null}
       {/* Sprint 37: Hidden file input for image upload */}
