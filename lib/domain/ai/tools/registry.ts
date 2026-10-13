@@ -419,6 +419,13 @@ async function renderHtmlPayload(
 }
 
 
+/** `{ text, url }` values in a template fill — the hyperlinks the render emits. */
+function countHyperlinkValues(value: unknown): number {
+  if (!value || typeof value !== "object") return 0;
+  if (!Array.isArray(value) && "url" in (value as Record<string, unknown>)) return 1;
+  return Object.values(value as Record<string, unknown>).reduce<number>((n, v) => n + countHyperlinkValues(v), 0);
+}
+
 /**
  * True when `contentId` is a file THIS chat created: associated with the
  * conversation and created after the conversation began. The association
@@ -2829,20 +2836,39 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             ...(failure.details ? { templateErrors: failure.details } : {}),
           };
         }
-        // The renderer reported; the product judges (docx-templates/judge.ts).
-        const verdict = judgeRender(template.record, typedValues, diagnostics);
+        // The renderer reported; the product judges (docx-templates/judge.ts):
+        // a bad write is refused with a reason the model can act on.
+        const verdict = judgeRender(template.record, typedValues, diagnostics, {
+          links: countHyperlinkValues(typedValues),
+        });
         if (!verdict.accept) {
-          return { ok: false, refusal: verdict.refusal ?? "The filled document was not accepted.", gaps: verdict.gaps };
+          return {
+            ok: false,
+            refusal: verdict.refusal ?? "The filled document was not accepted.",
+            problems: verdict.gaps,
+            nextAction: "Do not write the document anywhere else. Fix the values (or ask the user) and call fill_docx_template again.",
+          };
         }
         const title = (rawArgs.title?.trim() || template.node.title.replace(/\.docx$/i, "")).trim();
         const stored = { title, buffer: docx, searchText: rendered.text ?? "" };
         // Compact on purpose: the tool result re-enters the model's context.
-        // No values echo, no text, no diagnostics beyond what changes the
-        // model's next sentence to the user.
+        // No values echo, no text — the positive report and what changes
+        // the model's next sentence to the user.
+        const report = verdict.report;
         const compact = {
           templateId,
           templateTitle: template.node.title,
-          ...(verdict.gaps.length > 0 ? { gaps: verdict.gaps } : {}),
+          ...(report
+            ? {
+                report: {
+                  filled: `${report.filled.fields} of ${report.filled.declared} fields`,
+                  ...(Object.keys(report.sectionCounts).length > 0 ? { sections: report.sectionCounts } : {}),
+                  ...(report.overLength.length > 0 ? { overLength: report.overLength } : {}),
+                  ...(report.links > 0 ? { links: report.links } : {}),
+                  textChars: report.textChars,
+                },
+              }
+            : {}),
           renderMs: diagnostics.durationMs,
           ...(template.refreshed
             ? { note: "The template file had changed since it was marked; its contract was refreshed before filling." }

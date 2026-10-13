@@ -94,12 +94,13 @@ Templates), keyed by path so they survive a re-inspect.
 
 ## 6. Open decisions (owner)
 
-1. **Judge policy** (`judge.ts` TODO). Does an unresolved tag ever ship (no,
-   proposed)? May a required field ship empty — a deliberate gap the user
-   fills by hand — or is that a refusal that sends the model back for the
-   fact or an explicit placeholder? Is an unused key (`sumary`) a refusal or
-   a warning? The placeholder accepts with visible gaps and refuses only
-   unresolved tags.
+1. ~~Judge policy~~ **Decided 2026-10-13: a bad write is refused.** Unresolved
+   tag → refuse; unused key → refuse naming the nearest declared field;
+   empty required slot (or a root not supplied) → refuse, the model fills
+   from the notes or asks the user, never invents. Accepted renders carry a
+   positive report (filled count, per-section counts, over-length against
+   the user's `maxLength` notes, links, text size). Over-length is advisory.
+   Also decided: keep the JSON record, no `isTemplate` column.
 2. **Rerender without an AI call.** The review surface today is the approval
    card + the opened file. A "edit values → rerender" form (no model turn)
    needs the values persisted beside the output; proposed home:

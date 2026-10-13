@@ -74,8 +74,24 @@ async function main(): Promise<number> {
   check(gaps.length === 1 && gaps[0] === "experience[1].title", "empty required field found down to the item", gaps);
   check(!gaps.includes("experience[1].location"), "optional (guarded) field not a gap");
   const verdict = judgeRender(record, VALUES, rendered.diagnostics!);
-  check(typeof verdict.accept === "boolean" && Array.isArray(verdict.gaps), "verdict shape");
-  console.log(`      verdict: accept=${verdict.accept} gaps=${JSON.stringify(verdict.gaps)}`);
+  check(verdict.accept === false && /experience\[1\]\.title/.test(verdict.refusal ?? ""), "empty required slot refused, named", verdict);
+  const complete = { ...VALUES, experience: VALUES.experience.map((j) => ({ ...j, title: j.title || "Independent study" })) };
+  const completeRender = await renderDocxTemplate(template, complete, { expectedChecksum: contract.checksum });
+  const okVerdict = judgeRender(
+    { ...record, notes: { summary: { maxLength: 20 } } },
+    complete,
+    completeRender.diagnostics!,
+    { links: 1 },
+  );
+  check(okVerdict.accept === true && !!okVerdict.report, "complete fill accepted with a report", okVerdict);
+  check(okVerdict.report?.sectionCounts["experience"] === 2 && okVerdict.report?.sectionCounts["experience.bullets"] === 2, "section counts", okVerdict.report?.sectionCounts);
+  check(okVerdict.report?.overLength.length === 1 && okVerdict.report.overLength[0].startsWith("summary:"), "over-length advisory from the user's note", okVerdict.report?.overLength);
+  console.log(`      report: ${JSON.stringify(okVerdict.report)}`);
+  const typo = { ...complete, sumary: complete.summary } as Record<string, unknown>;
+  delete typo.summary;
+  const typoRender = await renderDocxTemplate(template, typo as typeof complete, { expectedChecksum: contract.checksum });
+  const typoVerdict = judgeRender(record, typo as typeof complete, typoRender.diagnostics!);
+  check(typoVerdict.accept === false && /sumary \(did you mean summary\?\)/.test(typoVerdict.refusal ?? ""), "typo'd key refused with the nearest field", typoVerdict.refusal);
 
   console.log("refusals");
   const stale = await renderDocxTemplate(template, VALUES, { expectedChecksum: "0".repeat(64) });
