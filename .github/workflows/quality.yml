@@ -88,6 +88,11 @@ jobs:
       - name: Note save coordinator checks
         run: pnpm note-save:check
 
+      # One search query builder, the conversion backup at every
+      # serializer-driven write, MCP capabilities and the MCP read seam.
+      - name: MCP preparatory layer checks
+        run: pnpm mcp:prep:check
+
   markdown-safety:
     name: Markdown block-safety
     runs-on: ubuntu-latest

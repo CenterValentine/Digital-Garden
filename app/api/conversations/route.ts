@@ -38,6 +38,8 @@ export async function GET(request: NextRequest) {
 
       const forIdsParam = url.searchParams.get("forContentNodeIds");
       const targetFolderId = url.searchParams.get("targetFolderId");
+      const q = url.searchParams.get("q");
+      if (q && q.trim()) opts.query = q.trim().slice(0, 200);
       if (forIdsParam) {
         opts.forContentNodeIds = forIdsParam
           .split(",")

@@ -11,8 +11,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/database/client";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import type { ContentType } from "@/lib/domain/content/types";
-import type { Prisma } from "@/lib/database/generated/prisma";
 import { logger, spanPayload, withRouteTrace, withSpan } from "@/lib/core/logger";
+import {
+  ALL_SEARCH_FIELDS,
+  SEARCH_ORDER,
+  buildSearchWhere,
+} from "@/lib/domain/content/search-service";
+import { resolveTagScope } from "@/lib/domain/content/search-service.server";
 import { isCharterMetadata } from "@/lib/domain/ai/charters/registry";
 
 const ROUTE_PATH = "/api/content/search";
@@ -39,144 +44,39 @@ export async function GET(request: NextRequest) {
         .map((t) => t.trim().toLowerCase())
         .filter(Boolean);
 
-      let contentIds: string[] | undefined;
-
-      // Tag-based filtering first (if specified)
-      if (tagSlugs.length > 0) {
-        contentIds = await withSpan(
-          { layer: "content", name: "search_by_tags" },
-          { attrs: { tag_count: tagSlugs.length } },
-          async (span) => {
-            const contentWithTags = await prisma.contentTag.groupBy({
-              by: ["contentId"],
-              where: {
-                tag: {
-                  userId: session.user.id,
-                  slug: { in: tagSlugs },
-                },
-              },
-              having: {
-                contentId: {
-                  _count: { gte: tagSlugs.length },
-                },
-              },
-            });
-            const ids = contentWithTags.map((ct) => ct.contentId);
-            span.attr("matches", ids.length).summary(`${ids.length} content with all tags`);
-            return ids;
-          },
-        );
-
-        if (contentIds.length === 0) {
-          return NextResponse.json({
-            success: true,
-            data: { items: [], total: 0 },
-          });
-        }
+      // Tag-based filtering first (if specified). AND semantics: a hit must
+      // carry every tag. An empty scope short-circuits to no results.
+      const contentIds = await withSpan(
+        { layer: "content", name: "search_by_tags" },
+        { attrs: { tag_count: tagSlugs.length } },
+        async (span) => {
+          const ids = await resolveTagScope(session.user.id, tagSlugs);
+          span.attr("matches", ids?.length ?? -1).summary(
+            ids ? `${ids.length} content with all tags` : "no tag filter",
+          );
+          return ids;
+        },
+      );
+      if (contentIds && contentIds.length === 0) {
+        return NextResponse.json({
+          success: true,
+          data: { items: [], total: 0 },
+        });
       }
 
-      const where: Prisma.ContentNodeWhereInput = {
+      // ONE query builder with the chat tool (lib/domain/content/
+      // search-service.ts, 2026-10-12). Match semantics — title plus every
+      // indexed payload, rows rolled up to their table, shortcuts excluded
+      // unless asked for by type — live there, not here.
+      const where = buildSearchWhere({
         ownerId: session.user.id,
-        deletedAt: null,
-      };
-
-      if (contentIds) {
-        where.id = { in: contentIds };
-      }
-
-      const searchMode = caseSensitive ? "default" : "insensitive";
-
-      if (query.trim()) {
-        where.OR = [
-          {
-            title: {
-              contains: query,
-              mode: searchMode,
-            },
-          },
-          {
-            AND: [
-              { notePayload: { isNot: null } },
-              {
-                notePayload: {
-                  searchText: { contains: query, mode: searchMode },
-                },
-              },
-            ],
-          },
-          {
-            AND: [
-              { htmlPayload: { isNot: null } },
-              {
-                htmlPayload: {
-                  searchText: { contains: query, mode: searchMode },
-                },
-              },
-            ],
-          },
-          {
-            AND: [
-              { codePayload: { isNot: null } },
-              {
-                codePayload: {
-                  searchText: { contains: query, mode: searchMode },
-                },
-              },
-            ],
-          },
-          {
-            AND: [
-              { filePayload: { isNot: null } },
-              {
-                filePayload: {
-                  searchText: { contains: query, mode: searchMode },
-                },
-              },
-            ],
-          },
-          // Databases (plan B2): match on the table's own searchText (title +
-          // column names — findable by its schema) OR on any live row's
-          // derived text. Rolled up to the TABLE node: rows are not
-          // ContentNodes, so surfacing them individually would need a result
-          // type this endpoint does not have. Deliberate v1 presentation.
-          {
-            AND: [
-              { dataPayload: { isNot: null } },
-              {
-                OR: [
-                  {
-                    dataPayload: {
-                      searchText: { contains: query, mode: searchMode },
-                    },
-                  },
-                  {
-                    dataPayload: {
-                      rows: {
-                        some: {
-                          deletedAt: null,
-                          searchText: { contains: query, mode: searchMode },
-                        },
-                      },
-                    },
-                  },
-                ],
-              },
-            ],
-          },
-        ];
-      }
-
-      if (typeParam && typeParam !== "all") {
-        // An explicit type filter is honoured verbatim — including "shortcut",
-        // so the rows remain reachable for anyone who deliberately asks.
-        where.contentType = typeParam as ContentType;
-      } else {
-        // Shortcuts are pointers, not content: they carry their target's title
-        // but none of its body, so an unfiltered search would return the same
-        // note twice — once real, once as every shortcut aimed at it — with
-        // the duplicates ranking on title alone.
-        where.contentType = { not: "shortcut" };
-      }
+        query,
+        types:
+          typeParam && typeParam !== "all" ? [typeParam as ContentType] : undefined,
+        tagContentIds: contentIds,
+        caseSensitive,
+        fields: ALL_SEARCH_FIELDS,
+      });
 
       const items = await withSpan(
         { layer: "content", name: "search" },
@@ -216,7 +116,7 @@ export async function GET(request: NextRequest) {
               codePayload: { select: { searchText: true } },
               filePayload: { select: { fileName: true, mimeType: true } },
             },
-            orderBy: { updatedAt: "desc" },
+            orderBy: SEARCH_ORDER,
             take: 100,
           });
           span.attr("hits", result.length).summary(`${result.length} hits`);

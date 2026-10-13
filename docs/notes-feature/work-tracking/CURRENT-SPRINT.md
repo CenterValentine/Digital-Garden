@@ -9,6 +9,35 @@ last_updated: 2026-10-12
 
 # Current Sprint Addendum
 
+## October 12, 2026 — The ground under the MCP server (conversion backup, one search builder, chat body search, MCP tokens, read seam, Cmd+Shift+F)
+
+**Tree**: worktree `.claude/worktrees/mcp-prep`, branch `feat/mcp-prep` (off `origin/main` at `dc44cef9`)
+**Plan**: `work-tracking/MCP-DATABASE-REACH-PLAN.md` §6.8 (prep PR)
+**Status**: typecheck / lint 151 (0 errors, none new) / `mcp:prep:check` (NEW) / `private:content:check` / `ai:drift:check` green; **schema change** (`McpToken`) → migration owner-run; browser smoke pending.
+
+### Shipped
+
+- **Conversion backup.** `lib/domain/content/note-history-envelope.ts` (pure: envelope, empty-doc rule, prune floor) + `note-history.ts` (`recordNoteHistory`, never throws, keeps 20 per note, `listNoteHistory`). Recorded in `writeNoteContent` on both routes (payload: before the upsert; collaboration: from the live document's `before`), in `upsertRunLedger` before its full replace, in the content PATCH when a `markdown` body replaces the note, and from `applySourceMode` via `POST /api/content/content/[id]/history` (only the `source-view` source is accepted there). `GET` lists snapshots for a restore affordance (not built).
+- **One search query builder.** `buildSearchWhere` + `ALL_SEARCH_FIELDS` + `SEARCH_ORDER` (pure) and `resolveTagScope` + `searchContentNodes` (server). `/api/content/search` and `search_content` both call it; the tool gained html/code/file text and database-row matches.
+- **Chat body search.** `listConversations({ query })` matches title OR any non-hidden message's `textCache`; route param `q`.
+- **`McpToken`** (schema) + `lib/domain/mcp/capabilities.ts` (pure vocabulary, `garden:read` always present) + `tokens.ts` (hash, create, validate, list, revoke, delete) + `GET/POST /api/mcp/tokens`, `DELETE /api/mcp/tokens/[id]`.
+- **MCP read seam** `lib/domain/mcp/read.ts` → `renderNoteForMcp`, in the private-content SEAMS list.
+- **Cmd+Shift+F opens search**; Cmd+/ stays the editor's comment-out toggle. Hints updated on the search panel and both sidebar buttons.
+- **Gate `pnpm mcp:prep:check`** in `build` and `quality.yml`.
+
+### Migration (owner-run, before deploy)
+
+See the PR body: `20261012210000_mcp_token`.
+
+### Smoke (pending) — plus the 13 lines carried from PR #296
+
+- Source view: open a note → toggle source → edit markdown → apply → `GET /api/content/content/<id>/history` lists one snapshot with `source: "source-view"` whose `tiptapJson` is the pre-edit doc.
+- Chat `update_note` append on a closed note → a `write-note-content` snapshot appears; on a note open in a collaborative editor → same, with `route: "collaboration"`.
+- Search panel: a term that appears only in a database row surfaces the table; the same term in the chat tool `search_content` surfaces the same table.
+- `GET /api/conversations?q=<word in a message>` returns that chat; a word only in a hidden (superseded) message does not.
+- `POST /api/mcp/tokens {capabilities:["garden:write-rows"]}` → token shown once, prefix `dgmcp_`, capabilities include `garden:read`; `DELETE` revokes; an unknown capability is a 400 naming it.
+- Cmd+Shift+F opens and closes search from anywhere; Cmd+/ inside a note toggles private content and does not open search.
+
 ## October 12, 2026 — The assistant can delete rows, with the owner's consent (`delete_rows` + per-database AI policy)
 
 **Tree**: worktree `.claude/worktrees/ai-delete`, branch `feat/ai-row-deletion-policy` (off `origin/main` at `f60971ab`)

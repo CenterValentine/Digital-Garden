@@ -12,15 +12,20 @@ last_updated: 2026-10-12
 
 ## MCP server — prep PR and follow-ups (2026-10-12, from `MCP-DATABASE-REACH-PLAN.md`)
 
-Prep PR (each item stands alone without MCP; plan §6.8):
+Prep PR (`feat/mcp-prep`, 2026-10-12 — each item stands alone without MCP; plan §6.8):
 
-- ⚪ `recordPreWriteSnapshot` → `ContentHistory` (exists, zero writers) at the four serializer-write sites, with a gate. Only serializer-driven writes, per the owner: the backup matters where the lossless round trip is in play.
-- ⚪ Shared search service extracted from `app/api/content/search/route.ts`; `search_content` and MCP call it. Chat gains row-text search.
-- ⚪ `Conversation.searchText` fed from message text (migration) — chat list and MCP `garden_chats_search` gain body search.
-- ⚪ Seam registration of the MCP read module in `scripts/validate-private-content.ts`.
-- ⚪ `McpToken` model + migration + handoff script.
+- ✅ `recordNoteHistory` → `ContentHistory` at every serializer-driven write (write service both routes, run ledger, content PATCH markdown body, source-view toggle), gate `mcp:prep:check`.
+- ⚪ **Restore affordance** over `GET /api/content/content/[id]/history`: a "Previous versions" view in the right sidebar (content-driven claim) that reads a snapshot and writes it back through `writeNoteContent`.
+- ✅ One search query builder (`lib/domain/content/search-service.ts`); route and `search_content` call it; the tool matches rows now.
+- ✅ Chat body search via `listConversations({ query })` over per-message `textCache` — no column, no migration. Revisit with a denormalised column only if the subquery proves slow.
+- ✅ MCP read seam registered in `validate-private-content.ts`.
+- ✅ `McpToken` model + helpers + `/api/mcp/tokens` routes; migration owner-run (script in the PR body). Settings page = M1.
 - ⚪ `AI-AUTHORSHIP-SIGNAL-PLAN.md` build (its own PR; MCP writes carry the stamp from day one).
 - ✅ `garden_report_issue`'s dependency, PR #211 (`POST /api/feedback`), merged 2026-10-12; the tool can ship with M1.
+
+Keyboard shortcuts (found 2026-10-12 while moving search off Cmd+/):
+
+- ⚪ `callout.ts` and `cloze-deletion.ts` both bind `Mod-Shift-c`; TipTap resolves by extension order, so one never fires. Decide which keeps it (callout is the older, Obsidian-shaped binding; cloze is a flashcards affordance that could take `Mod-Shift-k` or live on the bubble menu only).
 
 Deletion follow-ups (from `feat/ai-row-deletion-policy`):
 
