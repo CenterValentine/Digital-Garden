@@ -108,6 +108,10 @@ const SEAMS: Array<[string, RegExp]> = [
   // The PIXEL seam (AI-VIEW-SCREEN-PLAN D5): view_screen's in-app capture
   // leaves every [data-private] element out of the screenshot.
   ["lib/features/screen-capture/capture-app.ts", /filter: isCapturable/],
+  // The MCP seam (MCP-DATABASE-REACH-PLAN §4): every note an external agent
+  // reads through the garden's MCP server renders through this one function.
+  // Registered before the server exists, so the gate knows the seam first.
+  ["lib/domain/mcp/read.ts", /stripPrivateContent\(/],
 ];
 for (const [file, pattern] of SEAMS) {
   const source = readFileSync(resolve(process.cwd(), file), "utf8");

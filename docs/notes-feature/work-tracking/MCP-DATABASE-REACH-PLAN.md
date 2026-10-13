@@ -562,16 +562,17 @@ Five calls, no approval UI, nothing read that the token's roots do not cover.
 8. **Prep PR (owner direction, 2026-10-12).** A preliminary PR that lands the pieces valuable
    on their own, before any MCP code, so the MCP PR is adapter work only:
 
-   | Item | Why it stands alone |
-   |---|---|
-   | `recordPreWriteSnapshot` → `ContentHistory` at the four serializer-write sites, plus a gate | recovery for every markdown-driven write the app already does |
-   | the shared search service (§6.1) | chat gains row-text search; one query instead of two |
-   | `Conversation.searchText` fed from message text, plus a migration | the in-app chat list gains body search |
-   | seam registration of the new read module in `validate-private-content.ts` | the gate learns the seam before the seam has traffic |
-   | `McpToken` model and migration, with the handoff script | additive, deploys ahead of code, and the settings page can be built against it |
-   | `aiPolicy` Json on `DataPayload` with the `delete` key and the schema-rail switch | the in-app AI can honour the same policy on its own `softDeleteRows` path today |
+   | Item | Why it stands alone | Status |
+   |---|---|---|
+   | `recordNoteHistory` → `ContentHistory` at every serializer-driven write, plus a gate | recovery for every markdown-driven write the app already does | ✅ `feat/mcp-prep` |
+   | the shared search service (§6.1) | chat gains row-text search; one query instead of two | ✅ `feat/mcp-prep` |
+   | chat body search | the in-app chat list gains body search | ✅ `feat/mcp-prep` — over per-message `textCache`, no column (revisit if slow) |
+   | seam registration of the new read module in `validate-private-content.ts` | the gate learns the seam before the seam has traffic | ✅ `feat/mcp-prep` (`lib/domain/mcp/read.ts`) |
+   | `McpToken` model and migration, with the handoff script | additive, deploys ahead of code, and the settings page can be built against it | ✅ `feat/mcp-prep` + helpers + `/api/mcp/tokens` |
+   | `aiPolicy` Json on `DataPayload` with the `delete` key and the schema-rail switch | the in-app AI can honour the same policy on its own `softDeleteRows` path today | ✅ PR #296 |
+   | search off Cmd+/ (the owner's extra prep item) | the editor's comment-out toggle shared the chord | ✅ `feat/mcp-prep` — Cmd+Shift+F |
 
-   The owner has one more pre-prep idea to fold into this PR; it is recorded here when named.
+   The AI-authorship signal (its own plan) is the remaining prerequisite before M1.
 
 Proposed layout:
 

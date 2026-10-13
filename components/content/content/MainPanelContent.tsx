@@ -1635,13 +1635,32 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
   // that moment. `emitUpdate: false` avoids firing the editor's own autosave —
   // for plain notes we persist explicitly below.
   const applySourceMode = useCallback(async () => {
+    const editor = useEditorInstanceStore.getState().getEditor(selectedContentId);
+
+    // Conversion backup (owner, 2026-10-12): the lossless round trip is
+    // trusted, not proven, so keep the document the re-parse is about to
+    // replace BEFORE it lands. Best-effort — a failed backup never blocks
+    // the user's edit; the server logs it.
+    const beforeApply = editor?.getJSON() ?? noteContent;
+    if (selectedContentId && beforeApply) {
+      try {
+        await fetch(`/api/content/content/${selectedContentId}/history`, {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ source: "source-view", tiptapJson: beforeApply }),
+        });
+      } catch {
+        // best-effort by design
+      }
+    }
+
     const result = markdownToTiptapResult(sourceDraft);
     const collabAuthoritative =
       collaborationEnabled &&
       contentType === "note" &&
       Boolean(selectedContentId) &&
       Boolean(collaborationRuntime);
-    const editor = useEditorInstanceStore.getState().getEditor(selectedContentId);
 
     if (collabAuthoritative) {
       if (!editor) {
@@ -1670,6 +1689,7 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
     setSourceMode(false);
   }, [
     sourceDraft,
+    noteContent,
     collaborationEnabled,
     contentType,
     selectedContentId,

@@ -27,6 +27,7 @@ import {
 } from "@/lib/domain/content";
 import { normalizeUrl } from "@/lib/domain/content/external-validation";
 import { syncContentTags } from "@/lib/domain/content/tag-sync";
+import { recordNoteHistory } from "@/lib/domain/content/note-history";
 import {
   syncImageReferences,
   softDeleteIfOrphaned,
@@ -855,6 +856,19 @@ export async function PATCH(
               parsedJson,
               getServerExtensions()
             ).json;
+            // Conversion backup (owner, 2026-10-12): a markdown body is a
+            // serializer-driven replace of the stored document. Keep what it
+            // overwrites. JSON bodies are the editor's own saves — not kept.
+            if (markdown && existing.notePayload?.tiptapJson) {
+              await recordNoteHistory({
+                contentId: id,
+                changedBy: userId,
+                snapshot: existing.notePayload.tiptapJson as JSONContent,
+                source: "content-patch-markdown",
+                mode: "replace",
+                route: "payload",
+              });
+            }
 
             const searchText = extractSearchTextFromTipTap(json);
             const wordCount = searchText.split(/\s+/).filter(Boolean).length;
