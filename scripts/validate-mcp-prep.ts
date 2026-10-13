@@ -29,7 +29,9 @@ import {
 } from "../lib/domain/content/search-service";
 import {
   NOTE_HISTORY_KEEP,
+  NOTE_HISTORY_TTL_MS,
   buildNoteHistoryEnvelope,
+  historyCutoff,
   isEmptyDoc,
   pruneBelowVersion,
 } from "../lib/domain/content/note-history-envelope";
@@ -106,8 +108,16 @@ function json(v: unknown): string {
   check(buildNoteHistoryEnvelope({ source: "source-view", tiptapJson: { type: "doc", content: [] }, capturedAt: at }) === null, "history: an empty document is never recorded");
   const env = buildNoteHistoryEnvelope({ source: "write-note-content", mode: "replace", route: "payload", tiptapJson: { type: "doc", content: [{ type: "paragraph" }] }, capturedAt: at });
   check(env?.kind === "note-snapshot" && env.source === "write-note-content" && env.mode === "replace" && env.route === "payload" && env.capturedAt === "2026-10-12T00:00:00.000Z", "history: the envelope carries kind, source, mode, route, time");
-  check(NOTE_HISTORY_KEEP >= 10, "history: keeps at least ten snapshots");
+  check(NOTE_HISTORY_KEEP >= 10, "history: keeps at least ten snapshots within the window");
   check(pruneBelowVersion(25) === 25 - NOTE_HISTORY_KEEP && pruneBelowVersion(3) < 1, "history: prune floor is latest minus keep, and nothing is pruned early");
+  check(NOTE_HISTORY_TTL_MS === 24 * 60 * 60 * 1000, "history: snapshots live for exactly one day (owner, 2026-10-12)");
+  check(historyCutoff(new Date("2026-10-13T07:00:00Z")).toISOString() === "2026-10-12T07:00:00.000Z", "history: the cutoff is now minus the TTL");
+  const histSrc = src("lib/domain/content/note-history.ts");
+  check(/changedAt: \{ lt: historyCutoff\(/.test(histSrc), "history: recording prunes by age");
+  check(/changedAt: \{ gte: historyCutoff\(/.test(histSrc), "history: listing stays inside the window");
+  check(/export async function purgeExpiredNoteHistory/.test(histSrc), "history: a sweep exists for notes never rewritten again");
+  check(/purgeExpiredNoteHistory\(/.test(src("app/api/cron/purge-note-history/route.ts")), "history: the sweep has a cron route");
+  check(/"\/api\/cron\/purge-note-history"/.test(src("vercel.json")), "history: the cron route is scheduled in vercel.json");
 
   const write = src("lib/domain/content/write-note-content.ts");
   const payloadFn = write.indexOf("async function writeNotePayload(");

@@ -17,6 +17,7 @@ import type { Prisma } from "@/lib/database/generated/prisma";
 import { logger } from "@/lib/core/logger";
 import {
   buildNoteHistoryEnvelope,
+  historyCutoff,
   pruneBelowVersion,
   type NoteHistorySource,
 } from "./note-history-envelope";
@@ -58,12 +59,17 @@ export async function recordNoteHistory(
           snapshot: envelope as unknown as Prisma.InputJsonValue,
         },
       });
+      // Prune by AGE first (one-day window), then by count as a safety cap.
       const floor = pruneBelowVersion(version);
-      if (floor > 0) {
-        await prisma.contentHistory.deleteMany({
-          where: { contentId: input.contentId, version: { lte: floor } },
-        });
-      }
+      await prisma.contentHistory.deleteMany({
+        where: {
+          contentId: input.contentId,
+          OR: [
+            { changedAt: { lt: historyCutoff(new Date()) } },
+            ...(floor > 0 ? [{ version: { lte: floor } }] : []),
+          ],
+        },
+      });
       return { version };
     } catch (error) {
       const code = (error as { code?: string }).code;
@@ -81,12 +87,24 @@ export async function recordNoteHistory(
   return null;
 }
 
-/** Newest first. The restore affordance reads this; nothing writes through it. */
+/** Newest first, within the retention window. The restore affordance reads this. */
 export async function listNoteHistory(contentId: string, limit = 20) {
   return prisma.contentHistory.findMany({
-    where: { contentId },
+    where: { contentId, changedAt: { gte: historyCutoff(new Date()) } },
     orderBy: { version: "desc" },
     take: limit,
     select: { id: true, version: true, changedAt: true, changedBy: true, snapshot: true },
   });
+}
+
+/**
+ * The daily sweep: a note that is never rewritten again would otherwise keep
+ * its last snapshot forever, because pruning runs on record. Returns the
+ * number of expired rows removed across every note.
+ */
+export async function purgeExpiredNoteHistory(now: Date = new Date()): Promise<number> {
+  const result = await prisma.contentHistory.deleteMany({
+    where: { changedAt: { lt: historyCutoff(now) } },
+  });
+  return result.count;
 }

@@ -20,8 +20,21 @@ export type NoteHistorySource =
   | "content-patch-markdown"
   | "run-ledger";
 
-/** How many snapshots a note keeps; older ones are pruned on each record. */
+/**
+ * How long a snapshot lives (owner, 2026-10-12: one day). A snapshot is a
+ * recovery window, not an archive — long enough to notice a bad round trip
+ * the same day, short enough that history never becomes a second copy of
+ * the garden. Pruned on each record and by the daily sweep.
+ */
+export const NOTE_HISTORY_TTL_MS = 24 * 60 * 60 * 1000;
+
+/** Safety cap within the day; a note rewritten 200 times keeps the last 20. */
 export const NOTE_HISTORY_KEEP = 20;
+
+/** Snapshots captured before this instant are expired. */
+export function historyCutoff(now: Date, ttlMs: number = NOTE_HISTORY_TTL_MS): Date {
+  return new Date(now.getTime() - ttlMs);
+}
 
 export interface NoteHistoryEnvelope {
   kind: "note-snapshot";
