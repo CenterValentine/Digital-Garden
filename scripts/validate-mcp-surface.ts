@@ -139,7 +139,8 @@ check(!/ownedNode\(scope, input\.id, \[/.test(noteFn), "notes: garden_write_note
 // on ContentNode.updatedAt passed for a second writer (owner's smoke,
 // 2026-10-13). The stamp every read reports and every expect compares is the
 // content stamp.
-check(/contentUpdatedAt\(node\)/.test(files) && /PAYLOAD_STAMP_SELECT/.test(files), "writes: the expectUpdatedAt compare-and-set uses the content stamp (payload rows included), not the node row");
+const ownedFn = files.slice(files.indexOf("async function ownedNode"), files.indexOf("async function stampAfter"));
+check(/updatedAt: contentUpdatedAt\(node\)/.test(ownedFn) && /PAYLOAD_STAMP_SELECT/.test(ownedFn), "writes: the node every write compares expectUpdatedAt against carries the content stamp (payload rows included), not the node row");
 check(/NOTES/.test(server) && /AI CONTEXT/.test(server), "instructions: the two text slots and the default between them are stated");
 
 const read = src("lib/domain/mcp/tools/read.ts");
