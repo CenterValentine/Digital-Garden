@@ -25,6 +25,20 @@ interface UploadRequest {
   mimeType: string;
 }
 
+/** Google's reason from an error body: the JSON `error.message` when the
+ * body is JSON, else the (short) plain-text body itself. Bounded. */
+function googleErrorReason(body: string): string {
+  const text = body.trim();
+  try {
+    const parsed = JSON.parse(text) as { error?: { message?: unknown } | string };
+    const message = typeof parsed.error === "string" ? parsed.error : parsed.error?.message;
+    if (typeof message === "string" && message.trim()) return message.trim().slice(0, 300);
+  } catch {
+    // not JSON — fall through to the raw text
+  }
+  return (text || "no reason given").slice(0, 300);
+}
+
 export async function POST(request: NextRequest) {
   return withRouteTrace(request, { route: ROUTE_PATH }, async () => {
     try {
@@ -137,13 +151,17 @@ export async function POST(request: NextRequest) {
         },
         async (span) => {
           const uploadResponse = await fetch(
-            "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&convert=true",
+            // `fields` asks for webViewLink — the default response omits it,
+            // so the link stored below was always empty. No hand-set
+            // Content-Length: the runtime computes it from the body, and a
+            // header that disagrees with what is actually sent is exactly
+            // the kind of request Google refuses with a terse 400.
+            "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&convert=true&fields=id,name,mimeType,webViewLink",
             {
               method: "POST",
               headers: {
                 Authorization: `Bearer ${accessToken}`,
                 "Content-Type": `multipart/related; boundary=${boundary}`,
-                "Content-Length": multipartBody.length.toString(),
               },
               body: multipartBody,
             }
@@ -152,13 +170,23 @@ export async function POST(request: NextRequest) {
 
           if (!uploadResponse.ok) {
             const errorText = await uploadResponse.text();
+            const reason = googleErrorReason(errorText);
+            // Google's own error message (never file content) — logging only
+            // its length left a production 400 undiagnosable (2026-10-14).
             logger.warn({
               layer: "external",
               event: "google_drive_upload:failed",
-              summary: `status ${uploadResponse.status}`,
-              attrs: { status: uploadResponse.status, body_size: errorText.length },
+              summary: `status ${uploadResponse.status}: ${reason}`,
+              attrs: {
+                status: uploadResponse.status,
+                body_size: errorText.length,
+                google_error: reason,
+                file_bytes: fileBuffer.byteLength,
+                name_chars: fileName.length,
+                mime: mimeType,
+              },
             });
-            throw new Error(`Google Drive upload failed: ${uploadResponse.status}`);
+            throw new Error(`Google Drive refused the upload (${uploadResponse.status}): ${reason}`);
           }
 
           const result = await uploadResponse.json();
