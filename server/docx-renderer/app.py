@@ -27,7 +27,7 @@ import sys
 import time
 from typing import Any
 
-from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
 
 from contract import inspect_template
@@ -49,10 +49,14 @@ def _event(event: str, **attrs: Any) -> None:
     log.info(json.dumps({"event": event, **attrs}, default=str))
 
 
-def _check_token(token: str | None) -> None:
+def require_token(x_renderer_token: str | None = Header(default=None)) -> None:
+    """Second factor behind Cloud Run IAM. A route DEPENDENCY, not a call
+    inside the handler: FastAPI resolves dependencies before it validates
+    the body, so a caller without the token gets 401 — never a 422 that
+    describes the request schema."""
     if not SHARED_TOKEN:
         return
-    if not token or not hmac.compare_digest(token, SHARED_TOKEN):
+    if not x_renderer_token or not hmac.compare_digest(x_renderer_token, SHARED_TOKEN):
         raise HTTPException(status_code=401, detail={"code": "unauthorized"})
 
 
@@ -68,17 +72,15 @@ async def _read_template(upload: UploadFile) -> bytes:
     return data
 
 
-@app.get("/healthz")
-async def healthz() -> dict:
+# Not /healthz: Cloud Run's front end reserves paths ending in "z" and
+# answers them itself (a Google 404) before IAM or the container sees them.
+@app.get("/health")
+async def health() -> dict:
     return {"ok": True, "service": "docx-renderer"}
 
 
-@app.post("/inspect")
-async def inspect(
-    template: UploadFile = File(...),
-    x_renderer_token: str | None = Header(default=None),
-) -> JSONResponse:
-    _check_token(x_renderer_token)
+@app.post("/inspect", dependencies=[Depends(require_token)])
+async def inspect(template: UploadFile = File(...)) -> JSONResponse:
     data = await _read_template(template)
     started = time.perf_counter()
     contract = inspect_template(data)
@@ -93,14 +95,12 @@ async def inspect(
     return JSONResponse(contract.to_dict(), status_code=200 if contract.ok else 422)
 
 
-@app.post("/render")
+@app.post("/render", dependencies=[Depends(require_token)])
 async def render(
     template: UploadFile = File(...),
     values: str = Form(...),
     expectedChecksum: str | None = Form(default=None),
-    x_renderer_token: str | None = Header(default=None),
 ) -> JSONResponse:
-    _check_token(x_renderer_token)
     data = await _read_template(template)
     if len(values.encode("utf-8")) > MAX_VALUES_BYTES:
         raise HTTPException(status_code=413, detail={"code": "values_too_large", "limitBytes": MAX_VALUES_BYTES})

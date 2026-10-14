@@ -37,7 +37,7 @@ no code. Everything below was built and gated in this worktree.
 
 | Piece | Where | Notes |
 |---|---|---|
-| Renderer service | `server/docx-renderer/` | FastAPI + docxtpl 0.20.2 under Jinja `SandboxedEnvironment`. `POST /inspect`, `POST /render`, `GET /healthz`. No credentials, no DB. |
+| Renderer service | `server/docx-renderer/` | FastAPI + docxtpl 0.20.2 under Jinja `SandboxedEnvironment`. `POST /inspect`, `POST /render`, `GET /health`. No credentials, no DB. |
 | Contract derivation | `server/docx-renderer/contract.py` | Jinja AST → scalars, sections (`item`, `itemIsValue`, nested), `{{r }}` → `rich`, `{% if %}` guard → `required:false`; body + headers + footers; malformed tag → `template_syntax` with `part`/`paragraph`/`near`. |
 | Render + diagnostics | `server/docx-renderer/render.py` | Fills, saves, reads the text back (body, tables, headers, footers), reports `unresolved` / `missing` / `unused` / `durationMs` / `bytes`; refuses a stale `expectedChecksum`. |
 | Python smoke | `server/docx-renderer/scripts/smoke.py` | 40 checks through the HTTP contract, incl. split-run and malformed fixtures. |
@@ -156,11 +156,13 @@ gcloud secrets add-iam-policy-binding digital-garden-docx-renderer-token --proje
 ```bash
 gcloud builds submit --config cloudbuild.docx-renderer.yaml . --project=digital-garden-482805
 URL=$(gcloud run services describe digital-garden-docx-renderer --project=digital-garden-482805 --region=us-west1 --format='value(status.url)')
-curl -s -o /dev/null -w '%{http_code}\n' "$URL/healthz"
-curl -s -H "Authorization: Bearer $(gcloud auth print-identity-token --audiences=$URL)" "$URL/healthz"
+curl -s -o /dev/null -w '%{http_code}\n' "$URL/health"
+curl -s -H "Authorization: Bearer $(gcloud auth print-identity-token --audiences=$URL)" "$URL/health"
 ```
 
-Expected `403` then `{"ok":true,"service":"docx-renderer"}`. A `200` on the
+Expected `403` then `{"ok":true,"service":"docx-renderer"}`. (Never probe
+`/healthz` here: Cloud Run reserves paths ending in `z` and answers them
+with a Google 404 that proves nothing.) A `200` on the
 bare call means the IAM gate did not take (Hocuspocus once had exactly
 this) — remove the `allUsers` invoker binding before going on.
 
@@ -200,6 +202,12 @@ but GCP_WIF_AUDIENCE…"* = env; `unauthorized` on a 403 = IAM/audience;
 
 Local dev: `cd server/docx-renderer && .venv/bin/uvicorn app:app --port 8081`,
 `DOCX_RENDERER_URL=http://localhost:8081` in `.env.local`.
+
+**Deployed 2026-10-14** (Cloud Build `4c842aef`, 1m50s): `https://digital-garden-docx-renderer-2qjfg3gkwq-uw.a.run.app`,
+us-west1 only, runtime SA `dg-docx-renderer`, max 1, concurrency 1, 60 s.
+Verified: no identity → 403; identity without / with a wrong shared token
+→ 401; both credentials + the fixture template → 200, correct contract,
+< 1 s. Steps 3–6 pending (invoker binding, WIF, Vercel env, prod smoke).
 
 ## 8. Remaining steps
 

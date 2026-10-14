@@ -12,12 +12,12 @@ run under Jinja's `SandboxedEnvironment` — a template is user-authored input.
 
 | Route | Body | Returns |
 |---|---|---|
-| `GET /healthz` | — | `{ ok }` |
+| `GET /health` | — | `{ ok }` (not `/healthz` — Cloud Run reserves paths ending in `z`) |
 | `POST /inspect` | multipart `template` (.docx) | the **contract** (below); `422` with `errors[]` when a tag does not parse |
 | `POST /render` | multipart `template` + form `values` (JSON object) + optional `expectedChecksum` | `{ ok, docxBase64, mimeType, text, checksum, diagnostics }`; `422` with `error.code` on refusal |
 
 Auth: `X-Renderer-Token` must equal `RENDERER_SHARED_TOKEN` when that env var is
-set (local dev: unset → open). In production Cloud Run IAM gates the invoker as
+set — checked as a route dependency, so it answers 401 before any body validation (local dev: unset → open). In production Cloud Run IAM gates the invoker as
 well (`--no-allow-unauthenticated`).
 
 Limits: template ≤ 5 MB (`RENDERER_MAX_TEMPLATE_BYTES`), values ≤ 1 MB

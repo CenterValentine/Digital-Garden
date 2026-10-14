@@ -253,6 +253,9 @@ async function main(): Promise<void> {
     assert.doesNotMatch(src, /psycopg|sqlalchemy|prisma|anthropic|openai/i, `${name}: no database or AI client`);
   }
   assert.match(pyApp, /MAX_TEMPLATE_BYTES/, "the renderer enforces an input limit");
+  assert.doesNotMatch(pyApp, /@app\.get\("\/[a-z]*z"\)/, "no route ends in `z` — Cloud Run's front end reserves those paths (a /healthz probe hits a Google 404)");
+  assert.match(pyApp, /@app\.post\("\/inspect", dependencies=\[Depends\(require_token\)\]\)/, "/inspect checks the shared token as a dependency (401 before body validation)");
+  assert.match(pyApp, /@app\.post\("\/render", dependencies=\[Depends\(require_token\)\]\)/, "/render checks the shared token as a dependency (401 before body validation)");
   assert.match(pyRender, /_UNRESOLVED|unresolved/, "the renderer reports unresolved tags");
   const cloudbuild = read("cloudbuild.docx-renderer.yaml");
   assert.match(cloudbuild, /--no-allow-unauthenticated/, "Cloud Run is IAM-gated");
