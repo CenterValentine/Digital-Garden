@@ -88,6 +88,12 @@ jobs:
       - name: Note save coordinator checks
         run: pnpm note-save:check
 
+      # The Google Drive upload body is built from CRLF bytes: string-literal
+      # CRLFs were folded by the production minifier into bare LFs, and
+      # every Drive upload failed "Malformed multipart body." for months.
+      - name: Google Drive multipart body checks
+        run: pnpm google:multipart:check
+
       # One search query builder, the conversion backup at every
       # serializer-driven write, MCP capabilities and the MCP read seam.
       - name: MCP preparatory layer checks

@@ -13,6 +13,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession, getValidGoogleAccessToken, GoogleAuthError } from "@/lib/infrastructure/auth";
 import { prisma } from "@/lib/database/client";
 import { setGoogleDriveMetadata } from "@/lib/domain/content/metadata-types";
+import { buildDriveMultipartBody } from "@/lib/infrastructure/google/drive-multipart";
 import type { Prisma } from "@/lib/database/generated/prisma";
 import { logger, spanPayload, withRouteTrace, withSpan } from "@/lib/core/logger";
 
@@ -107,36 +108,13 @@ export async function POST(request: NextRequest) {
       const googleMimeType = convertToGoogleMimeType(mimeType);
 
       // 3. Upload to Google Drive using multipart upload
-      const boundary = "-------314159265358979323846";
-
-      const metadata = {
-        name: fileName,
-        mimeType: googleMimeType,
-      };
-
-      const metadataPart = [
-        `--${boundary}`,
-        "Content-Type: application/json; charset=UTF-8",
-        "",
-        JSON.stringify(metadata),
-        "",
-      ].join("\r\n");
-
-      const filePart = [
-        `--${boundary}`,
-        `Content-Type: ${mimeType}`,
-        "",
-        "",
-      ].join("\r\n");
-
-      const closeDelimiter = `\r\n--${boundary}--`;
-
-      const multipartBody = Buffer.concat([
-        Buffer.from(metadataPart, "utf8"),
-        Buffer.from(filePart, "utf8"),
-        Buffer.from(fileBuffer),
-        Buffer.from(closeDelimiter, "utf8"),
-      ]);
+      // Built from bytes — see drive-multipart.ts for why a string-literal
+      // CRLF broke every production upload.
+      const { body: multipartBody, contentType: multipartContentType } = buildDriveMultipartBody({
+        metadata: { name: fileName, mimeType: googleMimeType },
+        mimeType,
+        file: fileBuffer,
+      });
 
       const uploadResult = await withSpan(
         { layer: "external", name: "google_drive_upload" },
@@ -161,7 +139,7 @@ export async function POST(request: NextRequest) {
               method: "POST",
               headers: {
                 Authorization: `Bearer ${accessToken}`,
-                "Content-Type": `multipart/related; boundary=${boundary}`,
+                "Content-Type": multipartContentType,
               },
               body: multipartBody,
             }
