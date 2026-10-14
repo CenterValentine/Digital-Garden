@@ -294,12 +294,24 @@ assert.deepEqual(
         contentType: "workflow",
         noun: "workflow",
       },
+      // An in-place overwrite (create_docx / fill_docx_template with
+      // overwriteContentId): the open viewer must refetch the new bytes.
+      {
+        ...writeReceipt,
+        operation: "updated",
+        contentId: "overwritten-docx-id",
+        title: "Tailored resume.docx",
+        contentType: "file",
+        noun: "Word document",
+      },
     ],
   }),
   {
     tree: true,
     noteContentIds: ["90c01845-bdb9-40e8-8ffc-410f4044b900"],
     workflowContentIds: ["workflow-id"],
+    // A CREATED file is not listed — nothing is open under its id yet.
+    overwrittenFileContentIds: ["overwritten-docx-id"],
   },
   "generic receipts must refresh the tree for files and route surgical events by content type",
 );

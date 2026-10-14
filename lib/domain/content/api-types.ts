@@ -51,6 +51,8 @@ export interface ContentListItem {
     thumbnailUrl?: string | null;
     width?: number | null;
     height?: number | null;
+    /** A .docx marked as a document template (storageMetadata.custom.docxTemplate). */
+    isDocxTemplate?: boolean;
   };
   html?: {
     isTemplate: boolean;

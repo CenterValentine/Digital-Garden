@@ -3551,7 +3551,8 @@ function ApprovalPreview({
     toolName === "create_note" ||
     toolName === "update_note" ||
     toolName === "rename_note" ||
-    toolName === "create_docx"
+    toolName === "create_docx" ||
+    toolName === "fill_docx_template"
   ) {
     return <DocumentApprovalPreview toolName={toolName} args={args} str={str} />;
   }
@@ -3608,23 +3609,38 @@ function DocumentApprovalPreview({
   str: (key: string) => string | undefined;
 }) {
   {
-    const title = str("title") ?? str("fileName") ?? "(untitled)";
+    const isTemplateFill = toolName === "fill_docx_template";
+    const title =
+      str("title") ?? str("fileName") ?? (isTemplateFill ? "(template's title)" : "(untitled)");
     const abstract = str("abstract");
     const content = str("content") ?? str("markdown");
+    const templateValues =
+      isTemplateFill &&
+      args &&
+      typeof args === "object" &&
+      typeof (args as { values?: unknown }).values === "object" &&
+      (args as { values?: unknown }).values !== null
+        ? ((args as { values: Record<string, unknown> }).values)
+        : null;
     return (
       <>
         <div className="mx-3 mb-1.5 rounded-md border border-black/10 dark:border-white/10 bg-white/70 dark:bg-black/25 px-3 py-2">
           <div className="text-[12.5px] font-semibold text-gray-800 dark:text-gray-200">
             {title}
-            {toolName === "create_docx" && (
+            {(toolName === "create_docx" || isTemplateFill) && (
               <span className="ml-1.5 text-[10px] font-normal text-gray-500">
-                .docx
+                {isTemplateFill ? ".docx · from your template" : ".docx"}
               </span>
             )}
           </div>
           {abstract && (
             <div className="mt-0.5 text-[11px] italic text-gray-500 dark:text-gray-400">
               {abstract}
+            </div>
+          )}
+          {templateValues && (
+            <div className="mt-1.5 max-h-52 overflow-auto border-t border-black/[0.06] dark:border-white/[0.08] pt-1.5 text-[11px] leading-snug text-gray-700 dark:text-gray-300">
+              <TemplateValuesPreview values={templateValues} />
             </div>
           )}
           {content && (
@@ -3643,6 +3659,58 @@ function DocumentApprovalPreview({
     );
   }
 
+}
+
+/**
+ * The values a template fill will pour into the user's layout, as a
+ * field list — what the approval decides on. Empty required fields are
+ * the thing to look for, so empties render as a visible "—" rather than
+ * vanishing. Depth-limited: a resume is header/experience[]/bullets[].
+ */
+function TemplateValuesPreview({ values }: { values: Record<string, unknown> }) {
+  const renderScalar = (v: unknown): string => {
+    if (v === null || v === undefined || v === "") return "—";
+    if (typeof v === "object" && v !== null && "url" in (v as Record<string, unknown>)) {
+      const link = v as { text?: unknown; url?: unknown };
+      return `${typeof link.text === "string" && link.text ? link.text : String(link.url)} ↗`;
+    }
+    const s = String(v);
+    return s.length > 160 ? `${s.slice(0, 157)}…` : s;
+  };
+  const isLink = (v: unknown): boolean =>
+    typeof v === "object" && v !== null && !Array.isArray(v) && "url" in (v as Record<string, unknown>);
+  const renderEntries = (obj: Record<string, unknown>, depth: number, prefix: string): React.ReactNode[] =>
+    Object.entries(obj).flatMap<React.ReactNode>(([key, v]) => {
+      const label = prefix ? `${prefix}.${key}` : key;
+      if (Array.isArray(v)) {
+        return [
+          <div key={label} className="mt-1 font-medium text-gray-800 dark:text-gray-200">
+            {label} <span className="font-normal text-gray-500">({v.length})</span>
+          </div>,
+          ...v.slice(0, 12).map((item, i) =>
+            item && typeof item === "object" && !Array.isArray(item) && !isLink(item) && depth < 3 ? (
+              <div key={`${label}[${i}]`} className="ml-3 border-l border-black/[0.08] dark:border-white/10 pl-2">
+                {renderEntries(item as Record<string, unknown>, depth + 1, "")}
+              </div>
+            ) : (
+              <div key={`${label}[${i}]`} className="ml-3">
+                • {renderScalar(item)}
+              </div>
+            ),
+          ),
+          ...(v.length > 12 ? [<div key={`${label}-more`} className="ml-3 text-gray-500">…{v.length - 12} more</div>] : []),
+        ];
+      }
+      if (v && typeof v === "object" && !isLink(v) && depth < 3) {
+        return renderEntries(v as Record<string, unknown>, depth + 1, label);
+      }
+      return [
+        <div key={label}>
+          <span className="text-gray-500">{label}:</span> {renderScalar(v)}
+        </div>,
+      ];
+    });
+  return <>{renderEntries(values, 0, "")}</>;
 }
 
 function ApprovalPreviewRest({

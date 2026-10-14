@@ -28,6 +28,7 @@ import {
   STUDIO_TAB_KEY,
 } from "@/extensions/studio/manifest";
 import type { RightSidebarTab } from "@/state/right-sidebar-state-store";
+import { useDocxFillStore } from "@/state/docx-fill-store";
 
 /** Inline SVG paths keyed by tabKey (project pattern: inline SVG in headers) */
 const TAB_SVG_PATHS: Record<string, string> = {
@@ -50,6 +51,9 @@ const TAB_SVG_PATHS: Record<string, string> = {
   // Table (lucide Table) — the database context rail's schema identity.
   database:
     "M3 5a2 2 0 012-2h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5z M3 10h18 M10 3v18",
+  // Form fields (lucide ListTodo-ish) — a document filled from a template.
+  templateFields:
+    "M4 5h16M4 5v4h16V5M4 13h16M4 13v4h16v-4M8 7h.01M8 15h.01",
 };
 
 /** Tab titles keyed by tabKey */
@@ -64,6 +68,7 @@ const TAB_TITLES: Record<string, string> = {
   studio: "Studio",
   context: "Context",
   database: "Database",
+  templateFields: "Template Fields",
 };
 
 interface RightSidebarHeaderProps {
@@ -104,6 +109,9 @@ export function RightSidebarHeader({
   const selectedContentType = useContentStore((state) => state.selectedContentType);
   const selectedContentId = useContentStore((state) => state.selectedContentId);
   const claimedPanel = useClaimedContentSidebarPanel(selectedContentId);
+  const isTemplateFill = useDocxFillStore((s) =>
+    Boolean(selectedContentId && s.filled[selectedContentId]),
+  );
   const selectedBlockId = useBlockStore((s) => s.selectedBlockId);
   const activeView = useLeftPanelViewStore((state) => state.activeView);
   const extensionManifest = getExtensionManifestForView(activeView);
@@ -142,6 +150,14 @@ export function RightSidebarHeader({
       id: "properties-tab",
       label: "Block Properties",
       tabKey: "properties",
+    } as ToolDefinition);
+  }
+
+  if (isTemplateFill) {
+    tabs.push({
+      id: "template-fields-tab",
+      label: "Template Fields",
+      tabKey: "templateFields",
     } as ToolDefinition);
   }
 

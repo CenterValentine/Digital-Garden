@@ -17,7 +17,7 @@ export const TOOL_APPROVAL_ROWS: ReadonlyArray<{ id: AutoApprovableTool; label: 
   {
     id: "create_docx",
     label: "Auto-approve documents",
-    hint: "Create Word documents without asking. Rewriting a document this chat made also skips the card; overwriting any file that existed before the chat still asks.",
+    hint: "Create Word documents — from markdown or from one of your document templates — without asking. Rewriting a document this chat made also skips the card; overwriting any file that existed before the chat still asks.",
   },
   {
     id: "create_note",

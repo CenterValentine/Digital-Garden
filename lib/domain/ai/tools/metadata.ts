@@ -51,6 +51,8 @@ export const BASE_TOOL_IDS = [
   "create_shortcut",
   "read_folder_context",
   "create_docx",
+  "read_docx_template",
+  "fill_docx_template",
   "search_content",
   "search_charters",
   "read_content",
@@ -119,6 +121,16 @@ export const BASE_TOOL_METADATA: Record<BaseToolId, BaseToolMeta> = {
     name: "Create Word Document",
     description:
       "Generate a .docx from markdown and file it in the target folder (approval-gated)",
+  },
+  read_docx_template: {
+    name: "Read Document Template",
+    description:
+      "List the user's document templates (their own .docx files marked as templates) or read one template's field contract",
+  },
+  fill_docx_template: {
+    name: "Fill Document Template",
+    description:
+      "Fill a marked .docx template with keyed values, preserving its layout, and file the result (approval-gated like Create Word Document)",
   },
   search_content: {
     name: "Search Content",

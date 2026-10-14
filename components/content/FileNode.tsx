@@ -846,6 +846,7 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
           nestedShortcutsHidden,
           externalUrl: data.external?.url, // Phase 2: External link URL
           file: data.file || null, // For supportsCustomIcon check
+          isDocxTemplate: data.file?.isDocxTemplate === true,
           // Dual-key read (P0a): new stamp `charter`, legacy `playbook`.
           isCharter:
             data.note?.charter === true || data.note?.playbook === true,

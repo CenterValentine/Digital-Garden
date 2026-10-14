@@ -9,6 +9,31 @@ last_updated: 2026-10-13
 
 # Current Sprint Addendum
 
+## October 12, 2026 — The AI fills your own Word template (`fill_docx_template` + the docx-renderer service)
+
+**Tree**: worktree `.claude/worktrees/docx-template`, branch `feat/docx-template-renderer` (off `origin/main` at `dc44cef9`)
+**Plan**: `work-tracking/DOCX-TEMPLATE-RENDERER-PLAN.md`
+**Status**: typecheck / lint 151 (0 errors, none new) / `ai:drift:check` (74 tools) / run-harness / proposal shape / output-target / context-diet green; `server/docx-renderer/scripts/smoke.py` 40/40; `pnpm docx:renderer:smoke` green; **renderer not deployed** (owner-run, plan §7); browser smoke pending.
+
+### Shipped
+
+- **`server/docx-renderer/`** — FastAPI + docxtpl 0.20.2 (sandboxed Jinja). `/inspect` derives the contract from the AST (body + headers + footers; `rich`, `required`, nested sections; `template_syntax` errors name the paragraph). `/render` fills, reads the text back, reports `unresolved` / `missing` / `unused`, refuses a stale checksum. `cloudbuild.docx-renderer.yaml`: separate Cloud Run service, us-west1, min 0, concurrency 1, IAM-gated.
+- **`lib/domain/ai/docx-templates/`** — renderer client (Vercel OIDC → WIF → impersonated ID token; shared-token second factor), template record on `storageMetadata.custom.docxTemplate` (no schema change; re-inspects after an overwrite), `judge.ts` (`requiredGaps` to the list item; **policy TODO(owner)**).
+- **Tools** `read_docx_template` / `fill_docx_template` — explicit, never a reinterpretation of `create_docx`; same auto-approve setting and overwrite rule; charter output directives + placement as `create_docx`; compact results.
+- **`storeDocxDocument`** — one storage path for finished `.docx` bytes; `createDocxDocument` delegates.
+- **Marking** — tree context-menu toggle on `.docx` rows (`isDocxTemplate` on the tree payload), `/api/content/docx-templates`, Settings → Templates "Document Templates" card with per-field notes; approval card previews the values.
+- **2026-10-13 refinement (charter prompt):** judge policy decided and built (refuse tag / unknown key with nearest-field hint / empty required slot; positive report); `provenance` verified before render; `docxFill` on the output + **Template Fields** right-sidebar rail + `POST /api/content/docx-templates/rerender` (no model turn, same id); charter wiring (`CHARTER_TURN_TOOLS`, `CHARTER_TAIL_EXTRA`, `deliverables: ["template"]`, prompt line, recipe §3); viewer refresh after in-place overwrite; `docx:templates:check` gate (build + `ai-drift.yml`, 8/8 mutants killed); telemetry event `docx_templates:fill`.
+
+### Smoke (pending — dev stack with `DOCX_RENDERER_URL=http://localhost:8081`)
+
+- Chat with a charter whose Materials phase names the template and cites claim rows: `fill_docx_template` is called with `provenance` → the result reports `provenance: { verified: n }`; a deliberately wrong row id → refusal "cited source rows do not exist".
+- Open the filled `.docx` → the right sidebar offers **Template Fields** → edit one bullet → **Re-render document** → toast with the report, the viewer shows the new text, the node id is unchanged (Materials cell still resolves). Clear a required field → Re-render → refusal lists the path, file unchanged.
+- From chat, "update it" → `overwriteContentId` → the open viewer refreshes without reopening.
+
+- Upload `server/docx-renderer/fixtures/resume-template.docx` → right-click → Mark as Document Template → toast "5 fields, 3 repeating sections"; the Settings → Templates card lists it; expanding shows the fields; a note saved on `summary` appears in `read_docx_template`'s contract.
+- Upload `resume-template-malformed.docx` → Mark → error toast names the paragraph ("Near: {{ summary").
+- Chat: "Fill my resume template with …" → `read_docx_template` then `fill_docx_template` → approval card shows the values with empties as "—" → Approve → the `.docx` opens; "update it" → `overwriteContentId` → same node id.
+- Unmark from the tree → the Settings card no longer lists it; `read_docx_template` lists none.
 ## October 13, 2026 — The garden is an MCP server (`/api/mcp`, 17 tools + 2 aliases, 5 resources, 2 prompts, Settings → MCP)
 
 **Tree**: worktree `.claude/worktrees/mcp-server`, branch `feat/mcp-server` (off `origin/main` at `a7b89ad2`)

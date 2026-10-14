@@ -199,6 +199,16 @@ function maybeDispatchArtifactRefresh(part: unknown, seen: Set<string>): void {
         }),
       );
     }
+    for (const contentId of refreshTargets.overwrittenFileContentIds) {
+      // A file overwritten in place has new bytes under the same id; only a
+      // full refetch remounts the viewer (MainPanelContent treats any
+      // non-title update as "refetch").
+      window.dispatchEvent(
+        new CustomEvent("content-updated", {
+          detail: { contentId, updates: { overwritten: true } },
+        }),
+      );
+    }
     maybeWakeCollaborators(p.output);
     return;
   }

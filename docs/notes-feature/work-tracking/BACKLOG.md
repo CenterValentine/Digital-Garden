@@ -10,6 +10,18 @@ last_updated: 2026-10-12
 
 ---
 
+## DOCX template renderer — follow-ups (2026-10-12, from `DOCX-TEMPLATE-RENDERER-PLAN.md`)
+
+- ✅ Judge policy decided + built 2026-10-13 (refuse a bad write; positive report).
+- ✅ Rerender without an AI call (Template Fields rail + `/rerender`) and the Stage 2 recipe §3 — 2026-10-13.
+- ⚪ **Deploy the renderer** (owner-run, after merge): WIF pool + provider for Vercel OIDC, invoker SA, Secret Manager token, `gcloud builds submit --config cloudbuild.docx-renderer.yaml .`, Vercel env (plan §7). Then the production smoke + the templated-vs-markdown token/latency comparison.
+- ⚪ Convert the owner's resume template from 17 numbered slots to loops (plan §6.5) — needs the `.docx`.
+- ⚪ Values from a note (`valuesFromContentId`: heading → field, bullets → list) — plan §6.4.
+- ⚪ PDF preview image (LibreOffice; measured < 1 s per conversion) — step 4, only once the DOCX path is live in prod.
+- ⚪ Templates whose tags Word split beyond docxtpl's repair: an "Open in Word and retype the tag" affordance from the error toast.
+- ⚪ Own auto-approve toggle for template fills, if sharing "Auto-approve documents" proves confusing (plan §6.3).
+
+## MCP server — prep PR and follow-ups (2026-10-12, from `MCP-DATABASE-REACH-PLAN.md`)
 ## MCP server — follow-ups (2026-10-13, from `feat/mcp-server`)
 
 - ⚪ **M3 — OAuth for hosted clients** (claude.ai, ChatGPT, Gemini CLI with OAuth): the garden as its own authorization server. Note the 2026-07-28 spec the handler now serves deprecates dynamic client registration for **client-ID metadata documents** (CIMD); plan §8.1 needs that revision before building. `protectedResourceHandler` + `/.well-known/oauth-protected-resource` come with it.
