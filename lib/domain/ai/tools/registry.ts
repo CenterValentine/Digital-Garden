@@ -89,6 +89,18 @@ import {
 } from "@/lib/domain/ai/docx-templates/templates";
 import { judgeRender } from "@/lib/domain/ai/docx-templates/judge";
 import { compactReport, verifyProvenance, writeFillRecord } from "@/lib/domain/ai/docx-templates/fills";
+
+/**
+ * What the user does to make a .docx a template — returned by every
+ * read_docx_template result so the model can direct them whether or not
+ * a template already exists. The model cannot mark or edit the file.
+ */
+const DOCX_TEMPLATE_MARKING_STEPS =
+  "To make or change a template (the user does this; you cannot): 1) upload the .docx to the garden (drag it into the file tree or use the + menu), " +
+  "2) right-click it in the file tree → Mark as Document Template — the file stays where it is and its fields are read once; a tag that does not parse is refused with the paragraph to fix in Word, " +
+  "3) Settings → Templates → Document Templates: add a note per field (what it should hold, max length) — you read these beside the contract, " +
+  "4) to update the layout, edit the same file in Word and save over it (overwrite keeps the mark; the contract refreshes), " +
+  "5) right-click → Unmark Document Template to retire one. Tag grammar: docs/notes-feature/guides/ai/DOCX-TEMPLATE-AUTHORING.md.";
 import {
   isDocxRendererConfigured,
   renderDocxTemplate,
@@ -2704,7 +2716,8 @@ export function createBaseTools(ctx: ToolExecuteContext) {
     // feature exists for. read = list/contract; fill = render + file.
     read_docx_template: tool({
       description:
-        "Read a document template's field contract, or list the user's document templates (their own .docx files marked as templates) when templateId is omitted. The contract names every field and repeating section the template fills, the user's notes on them, and the checksum to pass to fill_docx_template. Call it before fill_docx_template — the contract is small; the file itself is never sent to you.",
+        "Read a document template's field contract, or list the user's document templates (their own .docx files marked as templates) when templateId is omitted. The contract names every field and repeating section the template fills, the user's notes on them, and the checksum to pass to fill_docx_template. Call it before fill_docx_template — the contract is small; the file itself is never sent to you. " +
+        "Also the tool to call when the user asks how to make or change a template: the result carries the marking steps (the user does them in the app; you cannot mark or edit the file) and, when no template exists, the tagging grammar to coach them with.",
       inputSchema: z.object({
         templateId: z
           .string()
@@ -2729,9 +2742,10 @@ export function createBaseTools(ctx: ToolExecuteContext) {
               fields: t.fieldCount,
               sections: t.sectionCount,
             })),
+            howToMark: DOCX_TEMPLATE_MARKING_STEPS,
             ...(templates.length === 0
               ? {
-                  note: "No document templates are marked yet. The user marks one by right-clicking a .docx in the file tree → Mark as Document Template.",
+                  note: "No document templates are marked yet.",
                   authoring:
                     "If the user wants to make one, coach them to tag their own Word file (you cannot author its layout): {{ name }} for one value; {% for c in list %}{{ c }}{% if not loop.last %} • {% endif %}{% endfor %} for an inline list; a paragraph {%p for b in bullets %}, one bullet {{ b }}, a paragraph {%p endfor %} for a bullet list of any length; nest the same for positions → bullets; {% if x %}…{% endif %} for optional text. Each {%p %} tag alone in its own paragraph; never format mid-tag; dynamic counts are loops, not numbered slots. Guide: docs/notes-feature/guides/ai/DOCX-TEMPLATE-AUTHORING.md.",
                 }
@@ -2749,6 +2763,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           title: loaded.title,
           checksum: record.checksum,
           contract: describeTemplateForModel(record),
+          howToMark: DOCX_TEMPLATE_MARKING_STEPS,
           valuesShape:
             "A JSON object. Top-level keys are the field roots and the sections; a dotted field nests (header.name → { header: { name } }); a section is an array (of objects, or of strings when marked list of strings); a rich field takes { text, url }. Titles follow the contract: ONE title field gets \"Title — Employer\" combined; split fields (title, company) stay split; titles, employers and dates are copied from the source of record exactly. Never invent a fact: a required field you cannot fill from the evidence is a question for the user, not a blank. Cite sources in `provenance` (field path → row ids).",
           ...(record.warnings.length > 0 ? { warnings: record.warnings } : {}),
