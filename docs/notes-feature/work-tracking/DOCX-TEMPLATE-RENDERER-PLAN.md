@@ -129,44 +129,74 @@ Templates), keyed by path so they survive a re-inspect.
 
 ## 7. Deploy runbook (owner-run; not yet executed)
 
-Prerequisites once per project (verify every flag against current gcloud/Vercel docs — written from memory, not run):
+Checked against the project on 2026-10-14: project number `288450375932`;
+`run`, `cloudbuild`, `artifactregistry`, `iamcredentials`, `secretmanager`
+enabled, **`sts` not yet**; Artifact Registry repo
+`digital-garden-containers` exists (Hocuspocus uses it); no WIF pool; no
+renderer secret or service accounts. Hocuspocus runs as its own SA
+(`dg-hocuspocus`) with accessor rights on only its secrets — the renderer
+follows that precedent (`--service-account` in the Cloud Build config).
+Values from the Vercel dashboard: `TEAM` = the team slug in
+`vercel.com/<slug>`, `PRJ` = the project id (Settings → General, `prj_…`).
+
+**1. API, secret, identities.** The secret must exist before the deploy
+(the Cloud Build config mounts it).
 
 ```bash
-PROJECT=digital-garden-482805
-PROJECT_NUMBER=$(gcloud projects describe $PROJECT --format='value(projectNumber)')
-TEAM=<vercel-team-slug>          # issuer https://oidc.vercel.com/<team-slug> (Vercel → Settings → Security → OIDC, issuer mode "Team")
-
-gcloud iam workload-identity-pools create vercel --project=$PROJECT --location=global --display-name="Vercel"
-gcloud iam workload-identity-pools providers create-oidc vercel --project=$PROJECT --location=global \
-  --workload-identity-pool=vercel --issuer-uri="https://oidc.vercel.com/$TEAM" \
-  --allowed-audiences="https://vercel.com/$TEAM" \
-  --attribute-mapping="google.subject=assertion.sub,attribute.project=assertion.project,attribute.environment=assertion.environment"
-
-gcloud iam service-accounts create docx-renderer-invoker --project=$PROJECT
-SA=docx-renderer-invoker@$PROJECT.iam.gserviceaccount.com
-# Let the Vercel project's identity mint tokens AS the invoker SA (token creator ⊇ OpenID token creator).
-gcloud iam service-accounts add-iam-policy-binding $SA --role=roles/iam.serviceAccountTokenCreator \
-  --member="principalSet://iam.googleapis.com/projects/$PROJECT_NUMBER/locations/global/workloadIdentityPools/vercel/attribute.project/<vercel-project-id>"
-
-printf '%s' "$(openssl rand -hex 32)" | gcloud secrets create digital-garden-docx-renderer-token --data-file=- --project=$PROJECT
+gcloud services enable sts.googleapis.com --project=digital-garden-482805
+gcloud iam service-accounts create dg-docx-renderer --project=digital-garden-482805 --display-name="DOCX renderer (Cloud Run runtime)"
+gcloud iam service-accounts create dg-docx-invoker --project=digital-garden-482805 --display-name="DOCX renderer invoker (Vercel via WIF)"
+openssl rand -hex 32 | tr -d '\n' | gcloud secrets create digital-garden-docx-renderer-token --project=digital-garden-482805 --data-file=-
+gcloud secrets add-iam-policy-binding digital-garden-docx-renderer-token --project=digital-garden-482805 --member="serviceAccount:dg-docx-renderer@digital-garden-482805.iam.gserviceaccount.com" --role=roles/secretmanager.secretAccessor
 ```
 
-Deploy (from a tree matching `origin/main` after merge, like Hocuspocus):
+**2. Build + deploy** from a tree matching `origin/main`
+(`git diff origin/main --quiet` exits 0).
 
 ```bash
-gcloud builds submit --config cloudbuild.docx-renderer.yaml .
-gcloud run services add-iam-policy-binding digital-garden-docx-renderer --region=us-west1 --member="serviceAccount:$SA" --role=roles/run.invoker
-gcloud run services describe digital-garden-docx-renderer --region=us-west1 --format='value(status.url)'
+gcloud builds submit --config cloudbuild.docx-renderer.yaml . --project=digital-garden-482805
+URL=$(gcloud run services describe digital-garden-docx-renderer --project=digital-garden-482805 --region=us-west1 --format='value(status.url)')
+curl -s -o /dev/null -w '%{http_code}\n' "$URL/healthz"
+curl -s -H "Authorization: Bearer $(gcloud auth print-identity-token --audiences=$URL)" "$URL/healthz"
 ```
 
-Vercel env (production): `DOCX_RENDERER_URL=<service url>`,
-`DOCX_RENDERER_SHARED_TOKEN=<the secret>`,
-`GCP_WIF_AUDIENCE=//iam.googleapis.com/projects/$PROJECT_NUMBER/locations/global/workloadIdentityPools/vercel/providers/vercel`,
-`GCP_RENDERER_INVOKER_SA=$SA`.
+Expected `403` then `{"ok":true,"service":"docx-renderer"}`. A `200` on the
+bare call means the IAM gate did not take (Hocuspocus once had exactly
+this) — remove the `allUsers` invoker binding before going on.
 
-Verify: `curl -H "Authorization: Bearer $(gcloud auth print-identity-token --audiences=<service url>)" <service url>/healthz`
-(an unauthenticated curl must get 403), then mark a template in prod and run
-one fill from chat (the production smoke below).
+**3. Invoker may call the service.**
+
+```bash
+gcloud run services add-iam-policy-binding digital-garden-docx-renderer --project=digital-garden-482805 --region=us-west1 --member="serviceAccount:dg-docx-invoker@digital-garden-482805.iam.gserviceaccount.com" --role=roles/run.invoker
+```
+
+**4. Workload Identity Federation.** First in Vercel: Project → Settings →
+Security → *Secure Backend Access with OIDC Federation* → enable, issuer
+mode **Team**. Then (tokens from this team, for this project only, may mint
+ID tokens as the invoker — no key file anywhere):
+
+```bash
+gcloud iam workload-identity-pools create vercel --project=digital-garden-482805 --location=global --display-name="Vercel"
+gcloud iam workload-identity-pools providers create-oidc vercel --project=digital-garden-482805 --location=global --workload-identity-pool=vercel --issuer-uri="https://oidc.vercel.com/$TEAM" --allowed-audiences="https://vercel.com/$TEAM" --attribute-mapping="google.subject=assertion.sub,attribute.project_id=assertion.project_id,attribute.environment=assertion.environment" --attribute-condition="assertion.project_id=='$PRJ'"
+gcloud iam service-accounts add-iam-policy-binding dg-docx-invoker@digital-garden-482805.iam.gserviceaccount.com --project=digital-garden-482805 --role=roles/iam.serviceAccountTokenCreator --member="principalSet://iam.googleapis.com/projects/288450375932/locations/global/workloadIdentityPools/vercel/attribute.project_id/$PRJ"
+gcloud iam workload-identity-pools providers describe vercel --project=digital-garden-482805 --location=global --workload-identity-pool=vercel --format='value(state,oidc.issuerUri)'
+```
+
+**5. Vercel env (Production; Preview too if wanted), then redeploy** —
+env changes do not reach the running deployment.
+
+| Variable | Value |
+|---|---|
+| `DOCX_RENDERER_URL` | the Cloud Run URL from step 2 |
+| `DOCX_RENDERER_SHARED_TOKEN` | `gcloud secrets versions access latest --secret=digital-garden-docx-renderer-token --project=digital-garden-482805` |
+| `GCP_WIF_AUDIENCE` | `//iam.googleapis.com/projects/288450375932/locations/global/workloadIdentityPools/vercel/providers/vercel` |
+| `GCP_RENDERER_INVOKER_SA` | `dg-docx-invoker@digital-garden-482805.iam.gserviceaccount.com` |
+
+**6. First prod request = the whole chain.** Mark the `(loops)` template in
+prod. The toast names the failing layer if any: *"requires authentication
+but GCP_WIF_AUDIENCE…"* = env; `unauthorized` on a 403 = IAM/audience;
+`unauthorized` on a 401 = shared token mismatch. Then the production smoke
+(§8).
 
 Local dev: `cd server/docx-renderer && .venv/bin/uvicorn app:app --port 8081`,
 `DOCX_RENDERER_URL=http://localhost:8081` in `.env.local`.

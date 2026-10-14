@@ -43,6 +43,10 @@ steps:
       - --cpu=1
       - --memory=512Mi
       - --no-allow-unauthenticated
+      # Runs as its own least-privilege identity (dg-hocuspocus is the
+      # precedent): accessor on its one secret, nothing else. The default
+      # compute SA would carry far broader project rights into the container.
+      - --service-account=dg-docx-renderer@digital-garden-482805.iam.gserviceaccount.com
       - --update-secrets=RENDERER_SHARED_TOKEN=digital-garden-docx-renderer-token:latest
 
 images:
