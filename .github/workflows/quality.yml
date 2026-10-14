@@ -93,6 +93,16 @@ jobs:
       - name: MCP preparatory layer checks
         run: pnpm mcp:prep:check
 
+      # The MCP server's contract: flat schemas, annotations, capability
+      # checks on every write, one write path, one read seam, bearer auth.
+      - name: MCP server surface checks
+        run: pnpm mcp:surface:check
+
+      # Sleeping tabs wake on an outside write (the stamp on the presence
+      # poll) and a merge with their own edits is reported, never dialogued.
+      - name: Remote-write wake and merge notice
+        run: pnpm remote-write:wake:check
+
   markdown-safety:
     name: Markdown block-safety
     runs-on: ubuntu-latest

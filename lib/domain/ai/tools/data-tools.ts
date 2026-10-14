@@ -545,7 +545,7 @@ async function deletePolicyFor(
 /** Cells one row may change in a single update. */
 const UPDATE_CELL_CAP = 10;
 
-interface RowUpdateInput {
+export interface RowUpdateInput {
   rowId: string;
   cells: Record<string, string | number | boolean | string[] | null>;
   expect?: Record<string, string | number | boolean | string[] | null>;
@@ -572,7 +572,7 @@ interface RowUpdateInput {
  * cell REPLACES that column's links for its row, and links are only touched
  * once every cell write has landed.
  */
-async function applyRowUpdates(
+export async function applyRowUpdates(
   ctx: ToolExecuteContext,
   databaseId: string,
   table: DataTable,
@@ -740,6 +740,175 @@ async function applyRowUpdates(
   const normalizedPart =
     normalizations.length > 0 ? ` (normalized: ${normalizations.join("; ")})` : "";
   return `${cellPart}${normalizedPart}${linkPart}${questPart} The user sees the change in the grid and can undo it there.`;
+}
+
+/**
+ * Append rows to a table — ONE write path for chat's `insert_rows` and the
+ * MCP server's `garden_insert_rows` (MCP-DATABASE-REACH-PLAN §2.3). Every
+ * cell is translated and validated before anything is created, relation
+ * cells are linked after the rows exist, and master-ledger rows mint their
+ * quest ledgers. Returns the prose receipt chat shows; callers that need
+ * structure parse the leading "Inserted N" line.
+ */
+export async function applyRowInserts(
+  ctx: ToolExecuteContext,
+  databaseId: string,
+  table: DataTable,
+  rows: Array<Record<string, unknown>>,
+  dedupeBy: string | undefined
+): Promise<string> {
+  const live = table.columns.filter((c) => !c.deletedAt);
+
+  // Dedupe against existing values of one column (co-browse
+  // idempotency). Design scale (plan D1) makes a full scan fine.
+  const seen = new Set<string>();
+  let dedupeColumn: DataColumn | undefined;
+  if (dedupeBy) {
+    dedupeColumn = findColumn(live, dedupeBy);
+    if (!dedupeColumn) {
+      // Name the choices (prod 36237eb8: a bare refusal cost a
+      // guessed retry — "Name" was "Gap Name"). Nothing inserted.
+      return `Nothing inserted — no column named "${dedupeBy}" to dedupe by. Columns here: ${live.map((c) => c.name).join(", ")}.`;
+    }
+    const existing = await prisma.dataRow.findMany({
+      where: { tableId: databaseId, deletedAt: null },
+      select: { data: true },
+    });
+    for (const r of existing) {
+      const v = ((r.data ?? {}) as Record<string, unknown>)[
+        dedupeColumn.key
+      ];
+      if (typeof v === "string" && v) seen.add(v.trim().toLowerCase());
+    }
+  }
+
+  // Translate + validate every row BEFORE creating anything, so a
+  // bad batch fails whole instead of half-landing.
+  const prepared: Array<Record<string, unknown>> = [];
+  // Relation cells are resolved per row but written AFTER the row
+  // exists — a link needs both ends (plan P4).
+  const preparedLinks: Array<
+    Array<{ columnId: string; rowIds: string[] }>
+  > = [];
+  const skipped: string[] = [];
+  const errors: string[] = [];
+  // One read per target table for the whole batch, not per cell.
+  const relationCache = createRelationTargetCache();
+  for (let i = 0; i < rows.length; i++) {
+    const rowInput = rows[i];
+    const cells: Record<string, unknown> = {};
+    const links: Array<{ columnId: string; rowIds: string[] }> = [];
+    for (const [ref, raw] of Object.entries(rowInput)) {
+      const column = findColumn(live, ref);
+      if (!column) {
+        errors.push(`Row ${i + 1}: no column named "${ref}".`);
+        continue;
+      }
+      if (column.type === "relation") {
+        const resolved = await resolveRelationCell(
+          column,
+          raw,
+          ctx.userId,
+          relationCache
+        );
+        if ("error" in resolved) {
+          errors.push(`Row ${i + 1}: ${resolved.error}`);
+          continue;
+        }
+        if (resolved.rowIds.length > 0) {
+          links.push({ columnId: column.id, rowIds: resolved.rowIds });
+        }
+        continue;
+      }
+      const blocked = writeBlockReason(column);
+      if (blocked) {
+        errors.push(`Row ${i + 1}: ${blocked}`);
+        continue;
+      }
+      cells[column.key] = normalizeCellInput(column, raw);
+    }
+    if (dedupeColumn) {
+      const v = cells[dedupeColumn.key];
+      if (
+        typeof v === "string" &&
+        seen.has(v.trim().toLowerCase())
+      ) {
+        skipped.push(
+          `Row ${i + 1} (${String(v).slice(0, 60)}) — already present`
+        );
+        continue;
+      }
+      if (typeof v === "string" && v) seen.add(v.trim().toLowerCase());
+    }
+    prepared.push(cells);
+    preparedLinks.push(links);
+  }
+  if (errors.length > 0) {
+    return `Nothing inserted — fix these first:\n${errors.join("\n")}\nColumns here: ${live.map((c) => c.name).join(", ")}.`;
+  }
+  if (prepared.length === 0) {
+    return `Nothing to insert — all ${rows.length} rows were duplicates by ${dedupeColumn?.name}.${skipped.length ? `\nSkipped:\n${skipped.join("\n")}` : ""}`;
+  }
+
+  const rowIds = await createRows(
+    databaseId,
+    live,
+    prepared.length,
+    ctx.userId
+  );
+  const writes: CellWrite[] = [];
+  rowIds.forEach((rowId, i) => {
+    for (const [key, value] of Object.entries(prepared[i])) {
+      writes.push({ rowId, columnKey: key, value });
+    }
+  });
+  const result = await writeCells(databaseId, live, writes);
+  const failed = result.results.filter((r) => r.status === "error");
+
+  // Links last: the rows they point FROM had to exist first.
+  let linksWritten = 0;
+  for (const [i, rowId] of rowIds.entries()) {
+    for (const link of preparedLinks[i] ?? []) {
+      const { added } = await writeRelationLinks(
+        link.columnId,
+        rowId,
+        link.rowIds
+      );
+      linksWritten += added;
+    }
+  }
+  // Hard rule (quests): named rows inserted into a charter's master
+  // ledger are quests the moment they exist — each gets its ledger.
+  const questLedgers = await ensureLedgersForMasterRows(
+    ctx.userId,
+    databaseId,
+    rowIds,
+  ).catch(() => 0);
+
+  const parts = [
+    `Inserted ${rowIds.length} row${rowIds.length === 1 ? "" : "s"}${
+      linksWritten > 0
+        ? ` and ${linksWritten} link${linksWritten === 1 ? "" : "s"}`
+        : ""
+    }.`,
+  ];
+  if (questLedgers > 0) {
+    parts.push(
+      `${questLedgers} quest ledger${questLedgers === 1 ? "" : "s"} minted under the charter — these rows are quests now; a run proposed with that quest name continues them.`,
+    );
+  }
+  if (skipped.length > 0) {
+    parts.push(`Skipped ${skipped.length} duplicate${skipped.length === 1 ? "" : "s"}:\n${skipped.join("\n")}`);
+  }
+  if (failed.length > 0) {
+    parts.push(
+      `${failed.length} cell${failed.length === 1 ? "" : "s"} rejected by validation (rows created without them) — fix with update_rows:\n${summarizeRejections(failed.map((f) => f.message))}`
+    );
+  }
+  parts.push(
+    "The user can review them in the database grid and delete or edit any of them."
+  );
+  return parts.join("\n");
 }
 
 export function createDataTools(ctx: ToolExecuteContext) {
@@ -1364,158 +1533,7 @@ export function createDataTools(ctx: ToolExecuteContext) {
             return `Batches over ${CONFIRM_THRESHOLD} rows need explicit user approval first. Show the user what you're about to add, get their yes, then retry with confirmedByUser: true.`;
           }
 
-          const live = table.columns.filter((c) => !c.deletedAt);
-
-          // Dedupe against existing values of one column (co-browse
-          // idempotency). Design scale (plan D1) makes a full scan fine.
-          const seen = new Set<string>();
-          let dedupeColumn: DataColumn | undefined;
-          if (input.dedupeBy) {
-            dedupeColumn = findColumn(live, input.dedupeBy);
-            if (!dedupeColumn) {
-              // Name the choices (prod 36237eb8: a bare refusal cost a
-              // guessed retry — "Name" was "Gap Name"). Nothing inserted.
-              return `Nothing inserted — no column named "${input.dedupeBy}" to dedupe by. Columns here: ${live.map((c) => c.name).join(", ")}.`;
-            }
-            const existing = await prisma.dataRow.findMany({
-              where: { tableId: databaseId, deletedAt: null },
-              select: { data: true },
-            });
-            for (const r of existing) {
-              const v = ((r.data ?? {}) as Record<string, unknown>)[
-                dedupeColumn.key
-              ];
-              if (typeof v === "string" && v) seen.add(v.trim().toLowerCase());
-            }
-          }
-
-          // Translate + validate every row BEFORE creating anything, so a
-          // bad batch fails whole instead of half-landing.
-          const prepared: Array<Record<string, unknown>> = [];
-          // Relation cells are resolved per row but written AFTER the row
-          // exists — a link needs both ends (plan P4).
-          const preparedLinks: Array<
-            Array<{ columnId: string; rowIds: string[] }>
-          > = [];
-          const skipped: string[] = [];
-          const errors: string[] = [];
-          // One read per target table for the whole batch, not per cell.
-          const relationCache = createRelationTargetCache();
-          for (let i = 0; i < input.rows.length; i++) {
-            const rowInput = input.rows[i];
-            const cells: Record<string, unknown> = {};
-            const links: Array<{ columnId: string; rowIds: string[] }> = [];
-            for (const [ref, raw] of Object.entries(rowInput)) {
-              const column = findColumn(live, ref);
-              if (!column) {
-                errors.push(`Row ${i + 1}: no column named "${ref}".`);
-                continue;
-              }
-              if (column.type === "relation") {
-                const resolved = await resolveRelationCell(
-                  column,
-                  raw,
-                  ctx.userId,
-                  relationCache
-                );
-                if ("error" in resolved) {
-                  errors.push(`Row ${i + 1}: ${resolved.error}`);
-                  continue;
-                }
-                if (resolved.rowIds.length > 0) {
-                  links.push({ columnId: column.id, rowIds: resolved.rowIds });
-                }
-                continue;
-              }
-              const blocked = writeBlockReason(column);
-              if (blocked) {
-                errors.push(`Row ${i + 1}: ${blocked}`);
-                continue;
-              }
-              cells[column.key] = normalizeCellInput(column, raw);
-            }
-            if (dedupeColumn) {
-              const v = cells[dedupeColumn.key];
-              if (
-                typeof v === "string" &&
-                seen.has(v.trim().toLowerCase())
-              ) {
-                skipped.push(
-                  `Row ${i + 1} (${String(v).slice(0, 60)}) — already present`
-                );
-                continue;
-              }
-              if (typeof v === "string" && v) seen.add(v.trim().toLowerCase());
-            }
-            prepared.push(cells);
-            preparedLinks.push(links);
-          }
-          if (errors.length > 0) {
-            return `Nothing inserted — fix these first:\n${errors.join("\n")}\nColumns here: ${live.map((c) => c.name).join(", ")}.`;
-          }
-          if (prepared.length === 0) {
-            return `Nothing to insert — all ${input.rows.length} rows were duplicates by ${dedupeColumn?.name}.${skipped.length ? `\nSkipped:\n${skipped.join("\n")}` : ""}`;
-          }
-
-          const rowIds = await createRows(
-            databaseId,
-            live,
-            prepared.length,
-            ctx.userId
-          );
-          const writes: CellWrite[] = [];
-          rowIds.forEach((rowId, i) => {
-            for (const [key, value] of Object.entries(prepared[i])) {
-              writes.push({ rowId, columnKey: key, value });
-            }
-          });
-          const result = await writeCells(databaseId, live, writes);
-          const failed = result.results.filter((r) => r.status === "error");
-
-          // Links last: the rows they point FROM had to exist first.
-          let linksWritten = 0;
-          for (const [i, rowId] of rowIds.entries()) {
-            for (const link of preparedLinks[i] ?? []) {
-              const { added } = await writeRelationLinks(
-                link.columnId,
-                rowId,
-                link.rowIds
-              );
-              linksWritten += added;
-            }
-          }
-          // Hard rule (quests): named rows inserted into a charter's master
-          // ledger are quests the moment they exist — each gets its ledger.
-          const questLedgers = await ensureLedgersForMasterRows(
-            ctx.userId,
-            databaseId,
-            rowIds,
-          ).catch(() => 0);
-
-          const parts = [
-            `Inserted ${rowIds.length} row${rowIds.length === 1 ? "" : "s"}${
-              linksWritten > 0
-                ? ` and ${linksWritten} link${linksWritten === 1 ? "" : "s"}`
-                : ""
-            }.`,
-          ];
-          if (questLedgers > 0) {
-            parts.push(
-              `${questLedgers} quest ledger${questLedgers === 1 ? "" : "s"} minted under the charter — these rows are quests now; a run proposed with that quest name continues them.`,
-            );
-          }
-          if (skipped.length > 0) {
-            parts.push(`Skipped ${skipped.length} duplicate${skipped.length === 1 ? "" : "s"}:\n${skipped.join("\n")}`);
-          }
-          if (failed.length > 0) {
-            parts.push(
-              `${failed.length} cell${failed.length === 1 ? "" : "s"} rejected by validation (rows created without them) — fix with update_rows:\n${summarizeRejections(failed.map((f) => f.message))}`
-            );
-          }
-          parts.push(
-            "The user can review them in the database grid and delete or edit any of them."
-          );
-          return parts.join("\n");
+          return await applyRowInserts(ctx, databaseId, table, input.rows, input.dedupeBy);
         } catch (error) {
           logger.warn({
             layer: "ai",

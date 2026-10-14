@@ -39,7 +39,12 @@ const SUB_TABS: Array<{
 
 /** Content types whose backlinks panel is meaningful (old Links tab scope). */
 const LINKS_CONTENT_TYPES = new Set(["note", "external"]);
-/** Content types with an agentic metadata doc (Phase 2 scope). */
+/**
+ * Content types with an agentic metadata doc (Phase 2 scope). "data" was
+ * missing although the source resolver, the engine and the MCP write tool
+ * all handle databases — the owner's first MCP smoke wrote a database
+ * summary that the rail then had no place to show (2026-10-13).
+ */
 const AI_CONTENT_TYPES = new Set([
   "folder",
   "note",
@@ -47,6 +52,7 @@ const AI_CONTENT_TYPES = new Set([
   "html",
   "code",
   "external",
+  "data",
 ]);
 
 export function ContextTab() {

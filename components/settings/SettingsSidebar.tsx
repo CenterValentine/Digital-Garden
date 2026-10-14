@@ -77,7 +77,7 @@ const CORE_GROUPS: NavGroup[] = [
         href: "/settings/mcp",
         label: "MCP",
         icon: <Sparkles size={16} />,
-        badge: "Soon",
+        badge: "New",
       },
     ],
   },
