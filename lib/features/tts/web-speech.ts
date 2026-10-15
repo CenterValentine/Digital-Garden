@@ -38,6 +38,20 @@ export interface WebSpeechHandlers {
   onStart?: () => void;
   onEnd?: () => void;
   onError?: (message: string) => void;
+  /**
+   * Fired as the engine crosses word boundaries, with the index INTO THE TEXT
+   * PASSED TO THIS CALL (not into the original document — the caller owns that
+   * offset arithmetic when resuming mid-read).
+   *
+   * This is the only position signal Web Speech offers: there is no duration,
+   * no currentTime, no seeking. Character progress is what makes a progress bar
+   * and resume-at-position possible on the fallback engine.
+   *
+   * Support is good on Chrome and Firefox; Safari has historically fired it
+   * sparsely or not at all, so treat a silent boundary stream as "progress
+   * unknown" rather than "stuck at zero".
+   */
+  onBoundary?: (charIndex: number) => void;
 }
 
 /**
@@ -62,9 +76,17 @@ export function speakWithWebSpeech(
   }
   if (handlers.onStart) utterance.onstart = () => handlers.onStart?.();
   if (handlers.onEnd) utterance.onend = () => handlers.onEnd?.();
+  if (handlers.onBoundary) {
+    utterance.onboundary = (e) => handlers.onBoundary?.(e.charIndex);
+  }
   if (handlers.onError) {
-    utterance.onerror = (e) =>
+    utterance.onerror = (e) => {
+      // "interrupted"/"canceled" are what `synth.cancel()` produces during a
+      // deliberate stop, rate change, or seek — they are control flow, not
+      // faults, and must not paint an error over a healthy player.
+      if (e.error === "interrupted" || e.error === "canceled") return;
       handlers.onError?.(e.error ?? "Web Speech playback failed");
+    };
   }
 
   synth.speak(utterance);
