@@ -23,6 +23,15 @@ import "server-only";
 import type { JSONContent } from "@tiptap/core";
 import { prisma } from "@/lib/database/client";
 import { parseCharter } from "./parse";
+import {
+  CHARTER_STARTER_PHASE_TITLES,
+  countStarterPlaceholderPhases,
+} from "./starter";
+
+/** The scaffold's own phase headings, for the "nothing but the template" test. */
+const STARTER_PHASE_TITLES = new Set<string>(
+  CHARTER_STARTER_PHASE_TITLES.map((t) => t.trim().toLowerCase()),
+);
 
 export const CHARTER_FLAG_KEY = "charter";
 export const CHARTER_DESCRIPTION_KEY = "charterDescription";
@@ -46,6 +55,22 @@ export interface CharterListItem {
    * exactly the moment the user chose to attach it.
    */
   hasBody: boolean;
+  /**
+   * Phase headings still reading "[name the … phase]" — the starter
+   * scaffold's own, unedited.
+   */
+  templatePhases: number;
+  /**
+   * Nothing but the starter scaffold: it has placeholder phases and NO
+   * phase of its own.
+   *
+   * `hasBody` cannot answer this — the scaffold IS a body, so a charter
+   * that was marked, scaffolded and never written reported `hasBody: true`
+   * and sat in the picker looking exactly like a finished one. Attaching it
+   * loads "[What this charter commissions: …]" as its standing rules and
+   * starts the run on "[name the first phase]".
+   */
+  templateOnly: boolean;
 }
 
 /**
@@ -138,6 +163,7 @@ export async function listCharters(userId: string): Promise<CharterListItem[]> {
     );
     const json = row.notePayload?.tiptapJson as JSONContent | undefined;
     const parsed = json ? parseCharter(json) : null;
+    const templatePhases = parsed ? countStarterPlaceholderPhases(parsed) : 0;
     return {
       id: row.id,
       title: row.title,
@@ -146,6 +172,12 @@ export async function listCharters(userId: string): Promise<CharterListItem[]> {
       hasBody:
         parsed !== null &&
         (parsed.phases.length > 0 || parsed.standingRules.content.length > 0),
+      templatePhases,
+      templateOnly:
+        templatePhases > 0 &&
+        (parsed?.phases ?? []).every((p) =>
+          STARTER_PHASE_TITLES.has(p.title.trim().toLowerCase()),
+        ),
     };
   });
 }
