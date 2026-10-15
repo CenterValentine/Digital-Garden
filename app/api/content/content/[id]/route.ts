@@ -28,10 +28,7 @@ import {
 import { normalizeUrl } from "@/lib/domain/content/external-validation";
 import { syncContentTags } from "@/lib/domain/content/tag-sync";
 import { recordNoteHistory } from "@/lib/domain/content/note-history";
-import {
-  syncImageReferences,
-  softDeleteIfOrphaned,
-} from "@/lib/domain/content/image-refs";
+import { syncImageReferences } from "@/lib/domain/content/image-refs";
 import { syncWindowReferences } from "@/lib/domain/content/window-refs";
 import { mergeSoloCollaborationCopy } from "@/lib/domain/collaboration/documents";
 import { syncPersonMentions } from "@/lib/domain/content/person-mention-sync";
@@ -103,7 +100,7 @@ import type {
   UpdateContentRequest,
 } from "@/lib/domain/content/api-types";
 import type { StoredChatMessage } from "@/lib/domain/ai/types";
-import { softDeleteConversation } from "@/lib/features/conversations";
+import { trashContentNode } from "@/lib/domain/content/trash-content";
 import { publishConversationEvent } from "@/lib/features/conversations/events";
 
 type Params = Promise<{ id: string }>;
@@ -1580,257 +1577,33 @@ export async function DELETE(
         async () => requireAuth(),
       );
 
-      const existing = await withSpan(
-        { layer: "content", name: "payload" },
-        { attrs: { content_id: id }, summary: id },
-        async (span) => {
-          const result = await prisma.contentNode.findUnique({
-            where: { id },
-            include: {
-              children: {
-                select: { id: true },
-              },
-            },
-          });
-          if (result) {
-            span
-              .attr("kind", result.contentType)
-              .attr("has_children", result.children.length > 0)
-              .summary(`${id} ${result.contentType}`);
-          } else {
-            span.attr("found", false).summary(`${id} not found`);
-          }
-          return result;
-        },
+      // One trash path for every caller (route, MCP garden_delete_content):
+      // lib/domain/content/trash-content.ts.
+      const outcome = await withSpan(
+        { layer: "content", name: "soft_delete" },
+        { attrs: { content_id: id }, summary: "trash + 30d schedule" },
+        async () => trashContentNode(session.user.id, id),
       );
 
-      if (!existing) {
+      if (outcome.error === "not_found") {
         return NextResponse.json(
-          {
-            success: false,
-            error: {
-              code: "NOT_FOUND",
-              message: "Content not found",
-            },
-          },
+          { success: false, error: { code: "NOT_FOUND", message: "Content not found" } },
           { status: 404 }
         );
       }
-
-      // Check ownership
-      if (existing.ownerId !== session.user.id) {
+      if (outcome.error === "forbidden") {
         return NextResponse.json(
-          {
-            success: false,
-            error: {
-              code: "FORBIDDEN",
-              message: "Access denied",
-            },
-          },
+          { success: false, error: { code: "FORBIDDEN", message: "Access denied" } },
           { status: 403 }
         );
-      }
-
-      // Soft delete (move to trash)
-      const now = new Date();
-      const scheduledDeletion = new Date(
-        now.getTime() + 30 * 24 * 60 * 60 * 1000
-      ); // 30 days
-
-      await withSpan(
-        { layer: "content", name: "soft_delete" },
-        { attrs: { content_id: id }, summary: "trash + 30d schedule" },
-        async () => {
-          await prisma.$transaction([
-            // Mark as deleted
-            prisma.contentNode.update({
-              where: { id },
-              data: {
-                deletedAt: now,
-                deletedBy: session.user.id,
-              },
-            }),
-
-            // Trash bin entry — upsert, not create: contentId is unique and a
-            // delete→restore→delete cycle used to leave the old row behind,
-            // making every re-delete 500 on the constraint ("undeletable"
-            // content whose delete silently did nothing).
-            prisma.trashBin.upsert({
-              where: { contentId: id },
-              create: {
-                contentId: id,
-                deletedBy: session.user.id,
-                scheduledDeletion,
-                contentSnapshot: {
-                  title: existing.title,
-                  slug: existing.slug,
-                  parentId: existing.parentId,
-                  hasChildren: existing.children.length > 0,
-                },
-              },
-              update: {
-                deletedBy: session.user.id,
-                deletedAt: now,
-                scheduledDeletion,
-                contentSnapshot: {
-                  title: existing.title,
-                  slug: existing.slug,
-                  parentId: existing.parentId,
-                  hasChildren: existing.children.length > 0,
-                },
-              },
-            }),
-          ]);
-        },
-      );
-
-      // Drop the cache entry so the next GET observes the soft-delete
-      // instead of returning a stale cached copy. The setCachedContent
-      // guard for deletedAt prevents re-population from in-flight reads.
-      invalidateCachedContent(id);
-
-      // WS6 (Chat Outputs & References): cascade the delete down the ownership
-      // chain — a deleted node's owned side chats (and the outputs those chats
-      // generated) go with it, and each chat's Conversation is soft-deleted
-      // too. Realizes "deleting the content deletes the side chat, and
-      // deleting the side chat removes its referenced content." Best-effort —
-      // a cascade hiccup must never fail the primary delete.
-      try {
-        await cascadeOwnedDeletes(id, session.user.id, now);
-        if (existing.contentType === "chat") {
-          const conv = await prisma.conversation.findFirst({
-            where: {
-              archivedToContentNodeId: id,
-              ownerId: session.user.id,
-              deletedAt: null,
-            },
-            select: { id: true },
-          });
-          if (conv) {
-            await softDeleteConversation(session.user.id, conv.id).catch(
-              () => null,
-            );
-          }
-        }
-      } catch (error) {
-        logger.warn({
-          layer: "route",
-          event: "content.delete.cascade_failed",
-          summary: `WS6 owned-delete cascade failed for ${id}`,
-          error,
-        });
-      }
-
-      // Folder Studio auto-context: removal changes the parent's roll-up
-      // inputs. The deleted node's own metadata row is ignored by the
-      // refresh engine (scope queries filter deletedAt).
-      after(() => markContextDirty([existing.parentId]));
-
-      // Scrub the node from every workspace's saved pane state + assignments.
-      // Stored paneState isn't touched by the soft delete, so without this the
-      // workspace snapshot restore resurrects the deleted node's tab in the
-      // main panel (and the tab renders as if the content were never deleted).
-      try {
-        const { removeContentFromWorkspaces } = await import(
-          "@/extensions/workplaces/server/service"
-        );
-        await removeContentFromWorkspaces(session.user.id, id);
-      } catch (error) {
-        logger.warn({
-          layer: "route",
-          event: "content.delete.workspace_scrub_failed",
-          summary: `failed to scrub ${id} from workspaces`,
-          attrs: { content_id: id },
-          error,
-        });
-      }
-
-      // n8n Flows own an engine-side workflow whose production webhook stays
-      // live otherwise. Trash = deactivate (restore reactivates; purge tears
-      // down fully in lib/features/trash). Best-effort — n8n being down must
-      // not block the delete.
-      if (existing.contentType === "workflow") {
-        try {
-          const { deactivateN8nFlowForContent } = await import(
-            "@/extensions/workflows/server/engines/n8n/teardown"
-          );
-          await deactivateN8nFlowForContent(id);
-        } catch (error) {
-          logger.warn({
-            layer: "route",
-            event: "content.delete.n8n_deactivate_failed",
-            summary: `failed to deactivate n8n workflow for ${id}`,
-            attrs: { content_id: id },
-            error,
-          });
-        }
-      }
-
-      // Chat nodes are Conversation-backed (ContentNode = shell,
-      // Conversation = live data). Deleting the node deletes the chat, so
-      // cascade the soft-delete to the backing Conversation — otherwise it
-      // lingers in sidebar tabs and the picker. softDeleteConversation also
-      // publishes the `conversation.deleted` SSE so open surfaces drop it
-      // live.
-      if (existing.contentType === "chat") {
-        const backing = await prisma.conversation.findFirst({
-          where: {
-            archivedToContentNodeId: id,
-            ownerId: session.user.id,
-            deletedAt: null,
-          },
-          select: { id: true },
-        });
-        if (backing) {
-          await softDeleteConversation(session.user.id, backing.id).catch(
-            () => {
-              /* best-effort cascade — node delete already succeeded */
-            },
-          );
-        }
-      }
-
-      // Cascade generated/referenced media. When a source node is trashed,
-      // soft-delete the referenced media it OWNED (generated from it) or
-      // EMBEDDED — but only when that media has no other LIVE reference, so a
-      // generated image/clip reused in another note or card survives. The
-      // source was soft-deleted above, so its own edges no longer count.
-      try {
-        const [ownedEmbeds, embeddedLinks] = await Promise.all([
-          prisma.contentNode.findMany({
-            where: { ownedByNoteId: id, role: "referenced", deletedAt: null },
-            select: { id: true },
-          }),
-          prisma.contentLink.findMany({
-            where: {
-              sourceId: id,
-              linkType: { in: ["image-ref", "audio-ref"] },
-            },
-            select: { targetId: true },
-          }),
-        ]);
-        const candidateIds = new Set<string>([
-          ...ownedEmbeds.map((n) => n.id),
-          ...embeddedLinks.map((l) => l.targetId),
-        ]);
-        for (const targetId of candidateIds) {
-          await softDeleteIfOrphaned(targetId, session.user.id);
-        }
-      } catch (cascadeError) {
-        logger.warn({
-          event: "content.delete.media_cascade_failed",
-          summary:
-            "generated-media cascade failed (node soft-delete already done)",
-          error: cascadeError,
-        });
       }
 
       return NextResponse.json({
         success: true,
         data: {
           id,
-          deletedAt: now,
-          scheduledDeletion,
+          deletedAt: outcome.deletedAt,
+          scheduledDeletion: outcome.scheduledDeletion,
           message:
             "Content moved to trash. Will be permanently deleted in 30 days.",
         },
@@ -1853,64 +1626,6 @@ export async function DELETE(
       );
     }
   });
-}
-
-/**
- * WS6 (Chat Outputs & References) owned-delete cascade.
- *
- * Breadth-first soft-delete down the `ownedByNoteId` ownership chain from a
- * just-deleted root: its owned side chats, then those chats' generated
- * outputs, etc. Each `chat` node's linked Conversation is soft-deleted too.
- * Depth is shallow in practice (content → side chat → outputs) and bounded to
- * guard against pathological cycles. Only touches EXPLICITLY-owned content
- * (`ownedByNoteId` set) — embedded media (owned via the ContentLink embed
- * graph, no `ownedByNoteId`) is out of scope and handled by its own lifecycle.
- */
-async function cascadeOwnedDeletes(
-  rootId: string,
-  userId: string,
-  now: Date,
-): Promise<void> {
-  let frontier = [rootId];
-  const seen = new Set<string>([rootId]);
-  for (let depth = 0; depth < 5 && frontier.length > 0; depth++) {
-    const owned = await prisma.contentNode.findMany({
-      where: {
-        ownedByNoteId: { in: frontier },
-        ownerId: userId,
-        deletedAt: null,
-      },
-      select: { id: true, contentType: true },
-    });
-    const fresh = owned.filter((o) => !seen.has(o.id));
-    if (fresh.length === 0) break;
-    const ids = fresh.map((o) => o.id);
-    for (const id of ids) seen.add(id);
-
-    await prisma.contentNode.updateMany({
-      where: { id: { in: ids } },
-      data: { deletedAt: now, deletedBy: userId },
-    });
-
-    const chatIds = fresh
-      .filter((o) => o.contentType === "chat")
-      .map((o) => o.id);
-    if (chatIds.length > 0) {
-      const convs = await prisma.conversation.findMany({
-        where: {
-          archivedToContentNodeId: { in: chatIds },
-          ownerId: userId,
-          deletedAt: null,
-        },
-        select: { id: true },
-      });
-      for (const conv of convs) {
-        await softDeleteConversation(userId, conv.id).catch(() => null);
-      }
-    }
-
-    frontier = ids;
-  }
 }
 
 // syncContentTags extracted to lib/domain/content/tag-sync.ts for reuse by import service
