@@ -22,9 +22,9 @@ Several of those guard exactly the silent-failure classes they were written for 
 
 Root cause is structural, not neglect: a new gate needs **two** registrations — the `build` chain and a workflow step — and nothing fails if you skip the second. That is the same double-registration shape as the extension registry (`installed.ts` + `manifests.ts`), except that one has `extensions:check` enforcing the pair and this one has nothing.
 
-- [ ] Add a `gates` job to `quality.yml` running the 11 unenforced scripts (all green today, so expect a green first run — then mutation-test one to prove the job actually fails the build).
-- [ ] Prefer making the job derive its list from `package.json`'s `build` script over hand-listing, so a future gate is enforced by existing, not by remembering. If it must be hand-listed, add a check that asserts every `:check` in `build` appears in some workflow — the gate-for-the-gates.
-- [ ] Note in CLAUDE.md's "CI gates" section which gates are CI-enforced vs build-chain-only, so "verified in CI" in a PR body stops being guesswork. (Two merged PRs, #244 and #292, claimed CI coverage for `handles:check` that did not exist.)
+**✅ RESOLVED 2026-10-15 (`feat/ci-gate-coverage`)** — `quality.yml` gained a `gates` job running `pnpm ci:gates` (`scripts/run-build-gates.ts`), which **derives** the list from the `build` script instead of repeating it, so the two-registration trap is gone: a gate added to `build` is CI-enforced by existing. All 41 gates pass in ~26s, so it runs unfiltered. Mutation-tested ×3 — a failing gate stops the job (exit 1), a reshaped `build` that parses to zero gates fails loudly rather than passing vacuously, and **a brand-new gate added to `build` with no workflow edit was picked up automatically ("Running 42 gates") and failed CI**, which is the actual fix demonstrated. CLAUDE.md's CI-gates section now documents the job and says not to reintroduce a hand-maintained list.
+
+- [ ] Remaining, optional: `ocr:assets` is in the derived set because it sits in the `build` chain, and it *writes* files (asset copy) rather than asserting anything. Harmless and ephemeral in CI, and later gates may depend on the assets existing — but if that dependency is confirmed absent, add it to `SKIP` in `run-build-gates.ts` so the job stays read-only.
 
 ## DOCX template renderer — follow-ups (2026-10-12, from `DOCX-TEMPLATE-RENDERER-PLAN.md`)
 
