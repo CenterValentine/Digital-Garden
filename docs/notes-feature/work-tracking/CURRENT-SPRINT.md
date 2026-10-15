@@ -516,6 +516,23 @@ Drag a tab over the workplaces selector → the panel opens beneath it listing o
 Right-click a tab → "Move tab to" lists the other workplaces, each with its workbenches indented; the current workplace shows as "current" with only its benches clickable → pick a sibling workplace → the tab closes here and a toast says "Moved … to X" with "Go there" → Go there → the tab is open in X, titled, in the top-left pane → from a view workplace, move a tab into a subfolder that has NEVER been opened as a bench → the bench materializes (it now appears in the selector's dwell submenu) and holds the tab → from that bench, move the tab back to the parent workplace → with a second browser window sitting on the target workplace, move a tab into it → the tab appears there within the background refresh cadence and neither window shows a conflict dialog → move a tab from a two-pane layout's right pane → it lands per the target's own layout (top-left when the target has no right ordinal) → right-click on a workplace with no other workplaces and no benches → "Create another workplace first."
 
 
+## September 17 & 16, 2026 — Relational reach, bulk row edits, list-cell legibility
+
+*(Backfilled 2026-10-15 — both merged a month earlier and were never recorded here; the deferral said "bundle into the next PR" and the next PR belonged to someone else.)*
+
+**Tree**: branches `feat/relational-reach-for-ai` (**PR #243 MERGED 2026-09-17**, `65d068a8`) and `feat/data-grid-list-cell-legibility` (**PR #242 MERGED 2026-09-16**, `6d537731`)
+**Status**: typecheck / lint 151 (0 errors) / `ai:drift:check` / full build green on both. No migration, no TipTap schema change → no Hocuspocus redeploy. **#243 production smoke never run** (9 lines, incl. the negative case); #242 was smoked by the owner on Vercel previews round by round.
+
+### Shipped — #243
+- **Relation reach**: `resolveJurisdiction` gained a fourth path (`relationGraphAuthorizes` → `relationReachableTableIds`, 4 hops / 64 tables) beside bound, associated and charter-registry. The schema digest already printed `relation → Experiences`; refusing the edge it had just shown was a contradiction, and pushed the model toward hand-typed ids.
+- **Databases created under a chat** (`ownedByNoteId`, no `ConversationAssociation`) became jurisdiction roots — the model could not read back the table the user had just approved it creating.
+- **`update_rows`**: `writeCells` was always multi-row and all-or-nothing; only the tool was narrow. One call = one transaction and one undo entry. `update_row` delegates to the same `applyRowUpdates`; `openForWrite` shares the four-question preamble so they cannot drift.
+
+### Shipped — #242
+- **Chip-list cells**: `truncate` sets `overflow: hidden`, so a flex child's automatic minimum resolves to 0 and list cells *compressed* rather than overflowing. Chips pin `shrink-0`; a per-label budget decides how many fit; overflow is a `+N` pill into the cell's own expand path. Chip-list columns floor at 140px.
+- **Free-form multi-select** as a *setting*, not a column type — a "Tags" pseudo-type shipped to preview first and was indistinguishable, because the difference is how the cell is **edited**. Comma / Enter / Tab complete; backticks fence a comma; case is significant; Title Case and Allow repeats are opt-in.
+- **Proposal-card lifecycle**: Modify (reversible withdraw + composer pre-fill), supersede-by-order (demote, never auto-destroy), retire-on-applied, and a server existence check — the applied flag is `localStorage`, so it says nothing on another browser or origin.
+
 ## August 14, 2026 — Note Window block + clipboard round-trip fixes
 
 **Tree**: main working tree (no branch yet — owner decides branch/PR)
