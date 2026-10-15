@@ -236,7 +236,8 @@ export async function createDocxDocument(
   input: CreateDocxInput,
 ): Promise<{ contentNodeId: string; fileName: string }> {
   const tiptap = markdownToTiptap(input.markdown);
-  const converter = new DOCXConverter();
+  // Compact layout: AI documents are resumes, letters, briefs (§10 round 5).
+  const converter = new DOCXConverter({ compact: true });
   const result = await converter.convert(tiptap, {
     format: "docx",
     settings: DEFAULT_EXPORT_BACKUP_SETTINGS,
@@ -258,6 +259,41 @@ export async function createDocxDocument(
     extractSearchTextFromTipTap(tiptap),
   );
 
+  return storeDocxDocument(ownerId, {
+    title: input.title,
+    buffer,
+    searchText,
+    parentFolderId: input.parentFolderId,
+    overwriteContentId: input.overwriteContentId,
+    role: input.role,
+    ownedByNoteId: input.ownedByNoteId,
+  });
+}
+
+export interface StoreDocxInput {
+  title: string;
+  /** Finished .docx bytes — from the markdown converter or the template renderer. */
+  buffer: Buffer;
+  /** Text as a parser reads the file (see extractDocxText) — becomes searchText. */
+  searchText: string;
+  parentFolderId?: string;
+  overwriteContentId?: string;
+  role?: "referenced";
+  ownedByNoteId?: string;
+}
+
+/**
+ * File finished .docx bytes as a ContentNode — the one storage path for
+ * every producer of Word documents (markdown via createDocxDocument, a
+ * filled template via fill_docx_template), so overwrite-in-place, output
+ * placement, search text and write receipts behave identically whichever
+ * made the bytes.
+ */
+export async function storeDocxDocument(
+  ownerId: string,
+  input: StoreDocxInput,
+): Promise<{ contentNodeId: string; fileName: string }> {
+  const { buffer, searchText } = input;
   const safeTitle =
     input.title.replace(/[^a-zA-Z0-9\s-]/g, "").trim() || "Document";
   const fileName = `${safeTitle}.docx`;

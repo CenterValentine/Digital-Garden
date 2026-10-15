@@ -16,6 +16,7 @@
 
 import type { JSONContent } from "@tiptap/core";
 import { PRIVATE_TEXT_MARK } from "@/lib/domain/content/private-content";
+import { columnLinkSyntax, parseColumnAnchor } from "@/lib/domain/data/column-anchor";
 
 export interface CharterReference {
   /** The linked note's title (wikiLink `targetTitle`). */
@@ -29,6 +30,13 @@ export interface CharterReference {
    * a charter-named database id-first (ITERATION-RUN-HARNESS-FIXES P1).
    */
   targetId?: string;
+  /**
+   * The ONE column a `[[Database#Column]]` link points at
+   * (lib/domain/data/column-anchor.ts). Picker-made links carry the column's
+   * id; a hand-typed one only its name, resolved within the database. The
+   * manifest gives the model the column's header and description.
+   */
+  column?: { id?: string; name: string };
 }
 
 export interface CharterSection {
@@ -63,6 +71,14 @@ export interface ParsedCharter {
    * rides here so the context can say so (silent correctness reads as a bug).
    */
   duplicatePhasesCollapsed?: number;
+  /**
+   * Databases the charter asks to be INGESTED IN FULL — every row, every
+   * column, plus the tables they link to — from an `Ingest in full: [[…]]`
+   * line anywhere in the charter (owner, 2026-09-30: "I'd prefer AI just
+   * ingested the whole database"; a run that chose what to read missed the
+   * strongest support metric in the profile). Absent when none.
+   */
+  ingest?: CharterReference[];
 }
 
 function headingText(node: JSONContent): string {
@@ -82,18 +98,35 @@ function headingText(node: JSONContent): string {
 export function collectReferences(nodes: JSONContent[]): CharterReference[] {
   const refs: CharterReference[] = [];
   const seen = new Set<string>();
-  const addReference = (target: string, display?: string, id?: string) => {
-    const targetTitle = target.trim();
+  const addReference = (
+    target: string,
+    display?: string,
+    id?: string,
+    linkedColumn?: { id?: string; name: string },
+  ) => {
+    let targetTitle = target.trim();
+    let column = linkedColumn;
+    // Hand-typed `[[Jobs#Status]]` — the title ends at the `#`. (`#^` is the
+    // serializer's raw-anchor form, never a column name.)
+    const hashAt = targetTitle.indexOf("#");
+    if (!column && hashAt > 0 && targetTitle[hashAt + 1] !== "^") {
+      const name = targetTitle.slice(hashAt + 1).trim();
+      targetTitle = targetTitle.slice(0, hashAt).trim();
+      if (name) column = { name };
+    }
     const displayText = display?.trim() || undefined;
     const targetId = id?.trim() || undefined;
     if (!targetTitle) return;
-    const key = `${targetTitle}|${displayText ?? ""}`;
+    const key = `${targetTitle}#${column?.id ?? column?.name ?? ""}|${displayText ?? ""}`;
     if (seen.has(key)) {
       // A later occurrence may carry the id the first one lacked (the
       // picker sets it; a hand-typed link does not) — keep the strongest.
       if (targetId) {
         const prior = refs.find(
-          (r) => r.targetTitle === targetTitle && (r.displayText ?? "") === (displayText ?? ""),
+          (r) =>
+            r.targetTitle === targetTitle &&
+            (r.displayText ?? "") === (displayText ?? "") &&
+            (r.column?.id ?? r.column?.name ?? "") === (column?.id ?? column?.name ?? ""),
         );
         if (prior && !prior.targetId) prior.targetId = targetId;
       }
@@ -104,6 +137,7 @@ export function collectReferences(nodes: JSONContent[]): CharterReference[] {
       targetTitle,
       ...(displayText ? { displayText } : {}),
       ...(targetId ? { targetId } : {}),
+      ...(column ? { column } : {}),
     });
   };
   const walk = (node: JSONContent) => {
@@ -115,6 +149,7 @@ export function collectReferences(nodes: JSONContent[]): CharterReference[] {
             ? node.attrs.displayText
             : undefined,
           typeof node.attrs?.targetId === "string" ? node.attrs.targetId : undefined,
+          columnOfLink(node),
         );
       }
     }
@@ -134,8 +169,17 @@ export function collectReferences(nodes: JSONContent[]): CharterReference[] {
   return refs;
 }
 
+/** The column a picker-made `[[Database#Column]]` link points at, if any. */
+function columnOfLink(node: JSONContent): { id: string; name: string } | undefined {
+  const id = parseColumnAnchor(node.attrs?.anchor as string | undefined);
+  const name = typeof node.attrs?.anchorLabel === "string" ? node.attrs.anchorLabel : "";
+  return id ? { id, name } : undefined;
+}
+
 function nodeText(node: JSONContent): string {
   if (node.type === "wikiLink") {
+    const column = columnLinkSyntax(node.attrs ?? {});
+    if (column) return `[[${column}]]`;
     const target =
       typeof node.attrs?.targetTitle === "string" ? node.attrs.targetTitle : "";
     const display =
@@ -343,11 +387,60 @@ export function collapseRepeatedPhases(phases: CharterSection[]): {
 export function parseCharter(doc: JSONContent): ParsedCharter {
   const parsed = parseCharterSections(doc);
   const { phases, collapsed } = collapseRepeatedPhases(parsed.phases);
+  const ingest = extractIngestReferences([
+    ...parsed.standingRules.content,
+    ...phases.flatMap((p) => p.content),
+  ]);
   return {
     ...parsed,
     phases,
     ...(collapsed > 0 ? { duplicatePhasesCollapsed: collapsed } : {}),
+    ...(ingest.length > 0 ? { ingest } : {}),
   };
+}
+
+const INGEST_LINE = /^\s*ingest in full\s*:/i;
+
+/**
+ * `Ingest in full: [[Table]], [[Other]]` lines, anywhere in the charter.
+ * LINE-START contract, like the `model:` directive: only a line that begins
+ * with the phrase counts, so prose that merely mentions ingesting cannot
+ * load a database; code blocks and quotes never count. A one-line
+ * paragraph keeps its links' ids (the TipTap path); a multi-line paragraph
+ * (markdown-like source) is read line by line. Pure; exported for the gate.
+ */
+export function extractIngestReferences(nodes: JSONContent[]): CharterReference[] {
+  const found: CharterReference[] = [];
+  const seen = new Set<string>();
+  const add = (refs: CharterReference[]) => {
+    for (const r of refs) {
+      const key = r.targetId ?? r.targetTitle.trim().toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      found.push(r);
+    }
+  };
+  const visit = (node: JSONContent) => {
+    if (node.type === "codeBlock" || node.type === "blockquote") return;
+    if (node.type === "paragraph" || node.type === "heading") {
+      const text = nodeText(node);
+      const lines = text.split("\n");
+      if (lines.length <= 1) {
+        if (INGEST_LINE.test(text)) add(collectReferences([node]));
+        return;
+      }
+      for (const line of lines) {
+        if (!INGEST_LINE.test(line)) continue;
+        add(
+          collectReferences([{ type: "paragraph", content: [{ type: "text", text: line }] }]),
+        );
+      }
+      return;
+    }
+    for (const child of node.content ?? []) visit(child);
+  };
+  for (const node of nodes) visit(node);
+  return found;
 }
 
 function parseCharterSections(doc: JSONContent): ParsedCharter {

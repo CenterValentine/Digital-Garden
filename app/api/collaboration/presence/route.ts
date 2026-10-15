@@ -59,6 +59,20 @@ export async function GET(request: NextRequest) {
     )
       .flat()
       .filter((record) => !excludeSessionId || record.sessionId !== excludeSessionId);
+    // The server document's stamp per note. A sleeping tab (sleep disconnects
+    // idle editors on purpose) cannot hear the broadcast of a write that
+    // reached the live document from outside the browser — an MCP agent, a
+    // script, another device. This poll already runs for the tab strip, so the
+    // stamp rides on it: a tab that sees it move past what it last saw wakes
+    // and catches up. Only Y.js stores move this stamp; a payload-only write
+    // does not, and must not wake anyone (see runtime.wakeForRemoteWrite).
+    const stamps = await prisma.collaborationDocument.findMany({
+      where: { contentId: { in: accessibleContentIds } },
+      select: { contentId: true, updatedAt: true },
+    });
+    const documentStampByContentId: Record<string, number> = {};
+    for (const stamp of stamps) documentStampByContentId[stamp.contentId] = stamp.updatedAt.getTime();
+
     const userIds = Array.from(new Set(records.map((record) => record.userId))).filter(isUuid);
     const users = await prisma.user.findMany({
       where: { id: { in: userIds } },
@@ -106,6 +120,7 @@ export async function GET(request: NextRequest) {
       success: true,
       data: {
         presenceByContentId,
+        documentStampByContentId,
       },
     });
   } catch (error) {

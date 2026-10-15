@@ -81,7 +81,7 @@
  * See: docs/notes-feature/TIPTAP-SCHEMA-EVOLUTION-GUIDE.md
  */
 
-export const TIPTAP_SCHEMA_VERSION = "1.19.0";
+export const TIPTAP_SCHEMA_VERSION = "1.21.0";
 
 export interface SchemaVersion {
   version: string;
@@ -109,6 +109,47 @@ export interface SchemaChange {
  * 4. Run tests: pnpm test lib/domain/export
  */
 export const SCHEMA_HISTORY: SchemaVersion[] = [
+  {
+    version: "1.21.0",
+    date: "2026-10-08",
+    changes: [
+      {
+        type: "remove",
+        target: "node",
+        name: "dailySummary / weeklySummary",
+        description:
+          "Removed `autoBorrowDurationMinutes` (data-auto-borrow-duration-minutes): Workplaces no longer gates opens, so there is nothing to borrow. MINOR, not MAJOR: ProseMirror builds attrs from the spec only, so documents and Y.Docs that still carry the attr load unchanged and simply drop it; no migration. ⚠ Hocuspocus redeploy after merge so the server schema stops declaring it.",
+        breaking: false,
+        migrationsAvailable: [],
+      },
+    ],
+    migrationsRequired: false,
+  },
+  {
+    version: "1.20.0",
+    date: "2026-10-03",
+    changes: [
+      {
+        type: "modify",
+        target: "node",
+        name: "wikiLink",
+        description:
+          "Optional `view` (data-view): how the link is displayed — \"chip\" (icon + title pill) or \"card\" (title + excerpt); absent = the plain text link, so existing links serialize byte-identically. The fourth display, the windowed note, is the `noteWindow` block; the hover chooser converts between the two (lib/domain/editor/link-views.ts). Attrs now come from one shared spec (wiki-link-attrs.ts) for the client and server nodes. ⚠ Hocuspocus redeploy required after merge (an old server schema drops the attr from live documents).",
+        breaking: false,
+        migrationsAvailable: [],
+      },
+      {
+        type: "modify",
+        target: "node",
+        name: "noteWindow",
+        description:
+          "ServerNoteWindow.renderHTML now emits every attr as data-* (renderHTML ↔ parseHTML symmetric) so the window gets a pretty markdown form, `![[Title]]{#id …}`; the public renderer strips all but the title at its seam (`publicSafeNoteWindows`). No stored-attr change.",
+        breaking: false,
+        migrationsAvailable: [],
+      },
+    ],
+    migrationsRequired: false,
+  },
   {
     version: "1.19.0",
     date: "2026-09-30",

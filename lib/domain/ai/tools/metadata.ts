@@ -51,9 +51,14 @@ export const BASE_TOOL_IDS = [
   "create_shortcut",
   "read_folder_context",
   "create_docx",
+  "read_docx_template",
+  "fill_docx_template",
   "search_content",
   "search_charters",
   "read_content",
+  "read_image_text",
+  "view_screen",
+  "view_image",
   "create_note",
   "update_note",
   "rename_note",
@@ -117,6 +122,16 @@ export const BASE_TOOL_METADATA: Record<BaseToolId, BaseToolMeta> = {
     description:
       "Generate a .docx from markdown and file it in the target folder (approval-gated)",
   },
+  read_docx_template: {
+    name: "Read Document Template",
+    description:
+      "List the user's document templates (their own .docx files marked as templates) or read one template's field contract",
+  },
+  fill_docx_template: {
+    name: "Fill Document Template",
+    description:
+      "Fill a marked .docx template with keyed values, preserving its layout, and file the result (approval-gated like Create Word Document)",
+  },
   search_content: {
     name: "Search Content",
     description:
@@ -130,6 +145,21 @@ export const BASE_TOOL_METADATA: Record<BaseToolId, BaseToolMeta> = {
     name: "Read Content",
     description:
       "Read any item by id — a note, a folder's own notes, a database (schema plus a row preview), a file's extracted text, a saved link, code or a page",
+  },
+  read_image_text: {
+    name: "Read Image Text",
+    description:
+      "Read the words in an image — a screenshot, a photo of a page, a receipt — on your device, so the assistant can use what an image says. Reads text only; it does not describe pictures",
+  },
+  view_image: {
+    name: "View Image",
+    description:
+      "Let the assistant look at an image file in your garden — a photo, a screenshot, a cover — and describe it. Vision models only",
+  },
+  view_screen: {
+    name: "View Screen",
+    description:
+      "Let the assistant take a screenshot and look at it: the web page in your active tab (browser side panel) or the pane you have open in Digital Garden. Vision models only; commented-out text is blanked out",
   },
   create_note: {
     name: "Create Note",

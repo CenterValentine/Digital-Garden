@@ -33,7 +33,7 @@
  * when the host has no ydoc (plain/fallback modes).
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { Editor } from "@tiptap/core";
 import type { JSONContent } from "@tiptap/core";
@@ -44,6 +44,7 @@ import {
   ExternalLink,
   FolderSearch,
   History,
+  LayoutTemplate,
   RefreshCw,
   ChevronRight,
   ChevronDown,
@@ -56,8 +57,11 @@ import {
   NoteWindowPicker,
   type PickerTarget,
 } from "@/components/content/editor/NoteWindowPicker";
-import { contentDeepLink } from "@/lib/features/content/tree-clipboard";
+import { LinkViewChooser } from "@/components/content/editor/LinkViewChooser";
+import { applyLinkView, type LinkView } from "@/lib/domain/editor/link-views";
+import { resolveWikiLinkTarget } from "@/lib/domain/editor/wiki-link-resolve";
 import { calculateMenuPosition } from "@/lib/core/menu-positioning";
+import { resolveOpenDestinationPane, useContentStore } from "@/state/content-store";
 import {
   noteWindowSubMapKey,
   type NoteWindowAttrs,
@@ -71,6 +75,14 @@ import {
   useContentPresence,
   isActiveTransport,
 } from "@/lib/domain/collaboration/presence-poll";
+import { noteSaveBody, type SaveMeta } from "@/lib/domain/content/save-meta";
+import {
+  noteBodyHash,
+  noteLoaded,
+  noteSaved,
+  noteSaveGeneration,
+  runNoteSave,
+} from "@/lib/domain/content/note-save-coordinator";
 
 /** Depth at and beyond which nested windows render as inert chips. */
 const NESTED_CHIP_DEPTH = 3;
@@ -163,6 +175,8 @@ const EMPTY_DOC: JSONContent = {
 function GhostIconButton({
   label,
   onClick,
+  onMouseEnter,
+  onMouseLeave,
   className,
   buttonRef,
   disabled,
@@ -170,6 +184,8 @@ function GhostIconButton({
 }: {
   label: string;
   onClick?: () => void;
+  onMouseEnter?: () => void;
+  onMouseLeave?: () => void;
   className?: string;
   buttonRef?: React.Ref<HTMLButtonElement>;
   disabled?: boolean;
@@ -186,6 +202,8 @@ function GhostIconButton({
       // from stealing focus when a header control is clicked — the same
       // rule every BubbleMenu button follows.
       onMouseDown={(e) => e.preventDefault()}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
       onClick={onClick}
       className={`inline-flex h-6 w-6 items-center justify-center rounded text-gray-500 dark:text-gray-400 ${
         disabled
@@ -195,6 +213,80 @@ function GhostIconButton({
     >
       {children}
     </button>
+  );
+}
+
+/**
+ * Portal popover holding the shared display chooser, hanging off its header
+ * button: right edge aligned to the button (the header sits at the right
+ * side of the window, close to the viewport wall, so a left-anchored menu
+ * used to be pushed far away by the boundary clamp), measured after the
+ * first paint so the real width is used, flipped above when there is no
+ * room below. Opens on hover (and click) and closes when the pointer
+ * leaves both the button and the popover.
+ */
+function ViewChooserPopover({
+  anchorEl,
+  onChange,
+  onClose,
+  onPointerEnter,
+  onPointerLeave,
+}: {
+  anchorEl: HTMLElement;
+  onChange: (view: LinkView) => void;
+  onClose: () => void;
+  onPointerEnter: () => void;
+  onPointerLeave: () => void;
+}) {
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
+
+  useLayoutEffect(() => {
+    const menu = menuRef.current;
+    if (!menu) return;
+    const rect = anchorEl.getBoundingClientRect();
+    const { width, height } = menu.getBoundingClientRect();
+    const margin = 8;
+    const gap = 6;
+    const x = Math.min(Math.max(margin, rect.right - width), window.innerWidth - width - margin);
+    const below = rect.bottom + gap;
+    const y = below + height + margin <= window.innerHeight ? below : Math.max(margin, rect.top - gap - height);
+    setPos({ x, y });
+  }, [anchorEl]);
+
+  useEffect(() => {
+    const onDown = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (menuRef.current?.contains(t) || anchorEl.contains(t)) return;
+      onClose();
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [anchorEl, onClose]);
+
+  return createPortal(
+    <div
+      ref={menuRef}
+      style={{
+        position: "fixed",
+        left: pos?.x ?? 0,
+        top: pos?.y ?? 0,
+        visibility: pos ? "visible" : "hidden",
+      }}
+      className="z-[130]"
+      onMouseEnter={onPointerEnter}
+      onMouseLeave={onPointerLeave}
+    >
+      <LinkViewChooser value="window" onChange={onChange} />
+    </div>,
+    document.body,
   );
 }
 
@@ -314,7 +406,6 @@ export function NoteWindowNodeView({
   // the PATCH round-trip.
   const [titleDraft, setTitleDraft] = useState<string | null>(null);
   const [optimisticTitle, setOptimisticTitle] = useState<string | null>(null);
-  const bodyHashRef = useRef<string | null>(null);
   const retargetBtnRef = useRef<HTMLButtonElement | null>(null);
   const historyBtnRef = useRef<HTMLButtonElement | null>(null);
   const titleInputRef = useRef<HTMLInputElement | null>(null);
@@ -355,6 +446,8 @@ export function NoteWindowNodeView({
     const commit = (state: FetchResult) => {
       if (!cancelled) setFetchResult({ key: fetchKey, state });
     };
+    // Saves of the note that start after this make this load's stamp stale.
+    const loadGeneration = noteSaveGeneration(targetContentId);
     (async () => {
       try {
         const res = await fetch(
@@ -391,7 +484,9 @@ export function NoteWindowNodeView({
           commit({ phase: "not-found" });
           return;
         }
-        bodyHashRef.current = result.data.note?.bodyHash ?? null;
+        // The stamp is per NOTE, shared with the main pane and any other
+        // window of it (lib/domain/content/note-save-coordinator.ts).
+        noteLoaded(targetContentId, result.data.note?.bodyHash ?? null, loadGeneration);
         commit({
           phase: "ready",
           target: {
@@ -567,68 +662,120 @@ export function NoteWindowNodeView({
     }
   }, [fetchState, targetTitle, hostEditable, updateAttrs]);
 
+  // ── Title-only resolution: a window typed as `![[Title]]` in the source
+  // view (or pasted from markdown) knows its title but not its id. Resolve
+  // it the way a link click does — exact title — and stamp the id. ──
+  const [titleLookupFailed, setTitleLookupFailed] = useState(false);
+  useEffect(() => {
+    if (targetContentId || !targetTitle || !hostEditable) return;
+    let cancelled = false;
+    void resolveWikiLinkTarget({ targetId: null, targetTitle }).then((resolved) => {
+      if (cancelled) return;
+      if (!resolved) {
+        setTitleLookupFailed(true);
+        return;
+      }
+      updateAttrs({ targetContentId: resolved.id, targetTitle: resolved.title });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [targetContentId, targetTitle, hostEditable, updateAttrs]);
+
+  // ── Display as: link / chip / card convert this block back into an
+  // inline link (lib/domain/editor/link-views.ts — the same conversion the
+  // hover chooser runs in the other direction). ──
+  const [viewChooserOpen, setViewChooserOpen] = useState(false);
+  const viewChooserBtnRef = useRef<HTMLButtonElement | null>(null);
+  // Hover opens the chooser after a short dwell; leaving both the button
+  // and the popover closes it after a grace period (so the pointer can
+  // cross the gap between them). Click still toggles.
+  const viewChooserTimer = useRef<number | null>(null);
+  const clearViewChooserTimer = useCallback(() => {
+    if (viewChooserTimer.current !== null) window.clearTimeout(viewChooserTimer.current);
+    viewChooserTimer.current = null;
+  }, []);
+  const viewChooserHoverIn = useCallback(() => {
+    clearViewChooserTimer();
+    viewChooserTimer.current = window.setTimeout(() => setViewChooserOpen(true), 400);
+  }, [clearViewChooserTimer]);
+  const viewChooserHoverOut = useCallback(() => {
+    clearViewChooserTimer();
+    viewChooserTimer.current = window.setTimeout(() => setViewChooserOpen(false), 250);
+  }, [clearViewChooserTimer]);
+  useEffect(() => clearViewChooserTimer, [clearViewChooserTimer]);
+  const changeView = useCallback(
+    (view: LinkView) => {
+      clearViewChooserTimer();
+      setViewChooserOpen(false);
+      const pos = getPos();
+      if (typeof pos !== "number") return;
+      applyLinkView(editor, pos, view);
+    },
+    [editor, getPos, clearViewChooserTimer],
+  );
+
   // ── editable-plain save path: the main editor's exact REST contract
   // (MainPanelContent.handleSave, simplified). X-Body-Hash is the
   // optimistic-concurrency precondition — a custom header on purpose;
   // Vercel's edge eats standard If-Match with a 412 before the function
   // runs. On 409 the window NEVER overwrites: banner + refresh is the
   // v1 resolution (no conflict-store port).
+  // Saves go through the per-NOTE coordinator — one at a time across the
+  // main pane and every window of this note, each sent with the stamp the
+  // previous one brought back (an overlapping save used to 409 against its
+  // own write).
   const handlePlainSave = useCallback(
-    async (
-      json: JSONContent,
-      meta?: { userInitiated?: boolean; secondsSinceInput?: number },
-    ) => {
+    async (json: JSONContent, meta?: SaveMeta) => {
       if (!targetContentId) return;
-      try {
-        const res = await fetch(
-          `/api/content/content/${encodeURIComponent(targetContentId)}`,
-          {
-            method: "PATCH",
-            credentials: "include",
-            headers: {
-              "Content-Type": "application/json",
-              ...(bodyHashRef.current
-                ? { "X-Body-Hash": bodyHashRef.current }
-                : {}),
+      const noteId = targetContentId;
+      const send = async (): Promise<void> => {
+        try {
+          const res = await fetch(
+            `/api/content/content/${encodeURIComponent(noteId)}`,
+            {
+              method: "PATCH",
+              credentials: "include",
+              headers: {
+                "Content-Type": "application/json",
+                ...(noteBodyHash(noteId)
+                  ? { "X-Body-Hash": noteBodyHash(noteId)! }
+                  : {}),
+              },
+              body: noteSaveBody(json, meta),
             },
-            body: JSON.stringify({
-              tiptapJson: json,
-              ...(meta?.userInitiated === true && { userInitiated: true }),
-              ...(typeof meta?.secondsSinceInput === "number" && {
-                secondsSinceInput: meta.secondsSinceInput,
-              }),
-            }),
-          },
-        );
-        if (res.status === 409) {
-          setConflict(true);
-          return;
-        }
-        if (res.status === 404 || res.status === 403) {
-          // Target vanished mid-session — swap the body for the same
-          // placeholder the initial load would show.
-          if (fetchKey) {
-            setFetchResult({
-              key: fetchKey,
-              state:
-                res.status === 404
-                  ? { phase: "not-found" }
-                  : { phase: "forbidden" },
-            });
+          );
+          if (res.status === 409) {
+            setConflict(true);
+            return;
           }
-          return;
+          if (res.status === 404 || res.status === 403) {
+            // Target vanished mid-session — swap the body for the same
+            // placeholder the initial load would show.
+            if (fetchKey) {
+              setFetchResult({
+                key: fetchKey,
+                state:
+                  res.status === 404
+                    ? { phase: "not-found" }
+                    : { phase: "forbidden" },
+              });
+            }
+            return;
+          }
+          const result = (await res.json().catch(() => null)) as {
+            success?: boolean;
+            data?: { note?: { bodyHash?: string } };
+          } | null;
+          if (!res.ok || !result?.success) return; // stay dirty; next debounce retries
+          const freshHash = result.data?.note?.bodyHash;
+          noteSaved(noteId, freshHash);
+          setDirty(false);
+        } catch {
+          // network hiccup — stay dirty; the editor's debounce will retry
         }
-        const result = (await res.json().catch(() => null)) as {
-          success?: boolean;
-          data?: { note?: { bodyHash?: string } };
-        } | null;
-        if (!res.ok || !result?.success) return; // stay dirty; next debounce retries
-        const freshHash = result.data?.note?.bodyHash;
-        if (freshHash) bodyHashRef.current = freshHash;
-        setDirty(false);
-      } catch {
-        // network hiccup — stay dirty; the editor's debounce will retry
-      }
+      };
+      return runNoteSave(noteId, send, { keepalive: meta?.keepalive });
     },
     [targetContentId, fetchKey],
   );
@@ -652,17 +799,6 @@ export function NoteWindowNodeView({
     },
     [hostEditable, targetContentId, getHostContentId, updateAttrs, recordHistory],
   );
-
-  const openFullPage = useCallback(() => {
-    if (!targetContentId) return;
-    // PWA note: in a standalone PWA this may open inside the app window —
-    // no platform escape hatch exists; best-effort per the plan.
-    window.open(
-      contentDeepLink(targetContentId),
-      "_blank",
-      "noopener,noreferrer",
-    );
-  }, [targetContentId]);
 
   const refresh = useCallback(() => {
     setConflict(false);
@@ -702,6 +838,29 @@ export function NoteWindowNodeView({
   const displayTitle =
     optimisticTitle || readyTitle || targetTitle || "Untitled";
 
+  // Open the windowed note as a workspace TAB (not a browser tab): beside
+  // the host by the same rule the file tree uses — the opposite pane in a
+  // split, the user's `openDestination` preference honoured, the only pane
+  // when there is one. Pinned, so it is a real tab rather than a preview
+  // the next open would replace; focus stays on the host so the next open
+  // still computes "beside" from here.
+  const openFullPage = useCallback(() => {
+    if (!targetContentId) return;
+    const { layoutMode, activePaneId, panes, openContentInPane } = useContentStore.getState();
+    const destination = resolveOpenDestinationPane(
+      layoutMode,
+      activePaneId,
+      (paneId) => (panes[paneId]?.tabIds.length ?? 0) === 0,
+      useSettingsStore.getState().ui?.openDestination,
+    );
+    openContentInPane(targetContentId, destination, {
+      title: displayTitle,
+      contentType: fetchState.phase === "ready" ? fetchState.target.contentType : "note",
+      pin: true,
+      focusPane: destination === activePaneId,
+    });
+  }, [targetContentId, displayTitle, fetchState]);
+
   // ── Header rename: renames the ACTUAL target file. The recipe is
   // MainPanelContent.handleTitleCommit: optimistic + revert, PATCH
   // {title}, check success flag, then broadcast `content-updated` so the
@@ -721,7 +880,18 @@ export function NoteWindowNodeView({
     const newTitle = raw.trim();
     if (!newTitle || newTitle === displayTitle || !targetContentId) return;
     const previous = optimisticTitle;
+    const shownBefore = displayTitle;
     setOptimisticTitle(newTitle);
+    const broadcast = (title: string) =>
+      window.dispatchEvent(
+        new CustomEvent("content-updated", {
+          detail: { contentId: targetContentId, updates: { title } },
+        }),
+      );
+    // The file tree, tabs and breadcrumbs take the new name at once (owner,
+    // 2026-10-06) — not after the save, which on a slow database left them
+    // stale for seconds. A failed save puts the old name back everywhere.
+    broadcast(newTitle);
     try {
       const res = await fetch(
         `/api/content/content/${encodeURIComponent(targetContentId)}`,
@@ -738,13 +908,9 @@ export function NoteWindowNodeView({
       // The API can return 200 with success:false — check both.
       if (!res.ok || !result?.success) throw new Error("rename failed");
       if (hostEditable) updateAttrs({ targetTitle: newTitle });
-      window.dispatchEvent(
-        new CustomEvent("content-updated", {
-          detail: { contentId: targetContentId, updates: { title: newTitle } },
-        }),
-      );
     } catch {
       setOptimisticTitle(previous);
+      broadcast(shownBefore);
       toast.error("Failed to rename");
     }
   }, [titleDraft, displayTitle, targetContentId, optimisticTitle, hostEditable, updateAttrs]);
@@ -774,7 +940,13 @@ export function NoteWindowNodeView({
     return (
       <div className="nw-placeholder">
         <AppWindow className="h-4 w-4 shrink-0" />
-        <span>Choose a note to window — or create one.</span>
+        <span>
+          {targetTitle && !titleLookupFailed
+            ? `Finding “${targetTitle}”…`
+            : targetTitle
+              ? `“${targetTitle}” wasn't found — choose a note to window.`
+              : "Choose a note to window — or create one."}
+        </span>
         <GhostIconButton
           label="Choose a note"
           buttonRef={retargetBtnRef}
@@ -913,11 +1085,35 @@ export function NoteWindowNodeView({
           >
             <History className="h-3.5 w-3.5" />
           </GhostIconButton>
+          {hostEditable ? (
+            <GhostIconButton
+              label="Display as…"
+              buttonRef={viewChooserBtnRef}
+              onMouseEnter={viewChooserHoverIn}
+              onMouseLeave={viewChooserHoverOut}
+              onClick={() => {
+                clearViewChooserTimer();
+                setViewChooserOpen((v) => !v);
+              }}
+            >
+              <LayoutTemplate className="h-3.5 w-3.5" />
+            </GhostIconButton>
+          ) : null}
           <GhostIconButton label="Open full page" onClick={openFullPage}>
             <ExternalLink className="h-3.5 w-3.5" />
           </GhostIconButton>
         </div>
       </div>
+
+      {viewChooserOpen && viewChooserBtnRef.current ? (
+        <ViewChooserPopover
+          anchorEl={viewChooserBtnRef.current}
+          onChange={changeView}
+          onClose={() => setViewChooserOpen(false)}
+          onPointerEnter={clearViewChooserTimer}
+          onPointerLeave={viewChooserHoverOut}
+        />
+      ) : null}
 
       {pickerOpen && retargetBtnRef.current ? (
         <NoteWindowPicker

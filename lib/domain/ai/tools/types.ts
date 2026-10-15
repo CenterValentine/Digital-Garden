@@ -33,6 +33,26 @@ export interface ToolExecuteContext {
    */
   activeCharter?: { contentId: string; title: string };
   /**
+   * Tool ids the user set to run without an approval card
+   * (`ai.toolConfig[id].autoApprove`), and whether the charter's current
+   * phase is its last — read by the approval predicates in
+   * tools/approval-policy.ts.
+   */
+  autoApprovedTools?: ReadonlySet<string>;
+  charterFinalPhase?: boolean;
+  /**
+   * Set by the chat route AFTER tool filtering: true when the client-executed
+   * `read_image_text` is registered and enabled this turn. read_content uses it
+   * to point at images' text only when something can actually read it.
+   */
+  imageTextReadable?: boolean;
+  /**
+   * Set with imageTextReadable: true when `view_image` is registered and
+   * enabled (a vision model). Image hints then point at SEEING the image,
+   * with read_image_text as the words-only fallback (AI-VIEW-SCREEN-PLAN D14).
+   */
+  imageViewable?: boolean;
+  /**
    * The bound Conversation entity id (sidebar multi-conv / full-page chat).
    * AI v3 core S3: lets tools associate created/read content with the
    * conversation (dual association — node + target folder).

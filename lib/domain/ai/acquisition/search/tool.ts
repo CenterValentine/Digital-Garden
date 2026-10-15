@@ -37,17 +37,21 @@ export function createAppWebSearchTool(userId: string) {
         return "Web search isn't configured. Ask the user to add a search API key in Settings → AI → Search.";
       }
       try {
-        const { results, provider } = await appWebSearch(query, {
+        const { results, provider, answer, costUsd } = await appWebSearch(query, {
           providerId: backend.provider,
           apiKey: backend.apiKey,
           maxResults: MAX_RESULTS,
         });
-        if (results.length === 0) {
+        if (results.length === 0 && !answer) {
           return `No web results for "${query}". Try different keywords, or state the limitation plainly.`;
         }
         return {
           query,
           searchProvider: provider,
+          // A search model's cited answer (OpenAI backend) — the sources
+          // below are what it cites. Untrusted like the results.
+          ...(answer ? { untrustedAnswer: answer } : {}),
+          ...(typeof costUsd === "number" ? { searchCostUsd: Number(costUsd.toFixed(5)) } : {}),
           untrustedWebResults: results.map((r) => ({
             title: r.title,
             url: r.url,

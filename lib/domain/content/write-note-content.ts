@@ -37,6 +37,7 @@ import { prisma } from "@/lib/database/client";
 import type { Prisma } from "@/lib/database/generated/prisma";
 import { logger } from "@/lib/core/logger";
 import { extractSearchTextFromTipTap } from "@/lib/domain/content/search-text";
+import { recordNoteHistory } from "@/lib/domain/content/note-history";
 import {
   buildNoteEditTarget,
   NoteEditRefused,
@@ -189,6 +190,17 @@ export async function writeNoteContent(
             blocks_before: applied.blocksBefore,
             blocks_after: applied.blocksAfter,
           },
+        });
+        // Conversion backup (owner, 2026-10-12): the live document only yields
+        // its pre-write state after the apply, so the snapshot lands after the
+        // write here. It still precedes anything the user could do next.
+        await recordNoteHistory({
+          contentId,
+          changedBy: ownerId,
+          snapshot: applied.before ?? null,
+          source: "write-note-content",
+          mode,
+          route: "collaboration",
         });
         return {
           route: "collaboration",
@@ -353,6 +365,18 @@ async function writeNotePayload({
         `Send the full intended content, or ask the user to confirm a rewrite.`,
     );
   }
+
+  // Conversion backup (owner, 2026-10-12): keep the document BEFORE the
+  // upsert, so a bad round trip is recoverable even if the write itself
+  // succeeds. Never throws; a failed backup does not block the edit.
+  await recordNoteHistory({
+    contentId,
+    changedBy: ownerId,
+    snapshot: before,
+    source: "write-note-content",
+    mode,
+    route: "payload",
+  });
 
   const wordCount = searchText.split(/\s+/).filter(Boolean).length;
   // MERGE, never replace (prod bug 2026-09-11). This path owns only the

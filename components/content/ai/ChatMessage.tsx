@@ -82,6 +82,7 @@ import { FlashcardCardProposalList } from "./FlashcardCardProposalList";
 import { cn } from "@/lib/core/utils";
 import { calculateMenuPosition, type CalculatedPosition } from "@/lib/core/menu-positioning";
 import { useContentStore } from "@/state/content-store";
+import { parseColumnAnchor } from "@/lib/domain/data/column-anchor";
 import { ArtifactContextMenu, openArtifactInSplitPane } from "./artifact-open";
 import { useSettingsStore } from "@/state/settings-store";
 import { useNotesPanelStore } from "@/state/notes-panel-store";
@@ -163,7 +164,9 @@ import {
   type OutputTarget,
 } from "@/lib/domain/ai/output-target";
 import { inferReplyExportTitle } from "@/lib/domain/ai/reply-export";
+import { screenImageOf } from "@/lib/domain/ai/tools/view-screen";
 import { toast } from "sonner";
+import { MENTION_RE as MENTION_PATTERN } from "@/lib/domain/ai/mention-markup";
 
 /**
  * Detect tool parts in AI SDK v6 UIMessage.
@@ -658,7 +661,7 @@ export const ChatMessage = memo(function ChatMessage({
     // user sees readable text; we restore the canonical form on save.
     const map: Array<{ label: string; id: string }> = [];
     const cleaned = messageText.replace(
-      /@\[([^\]]+)\]\(([^)]+)\)/g,
+      new RegExp(MENTION_PATTERN.source, "g"),
       (_, label, id) => {
         map.push({ label, id });
         return `@${label}`;
@@ -1981,7 +1984,6 @@ function MessageActionButton({
 
 // ─── Markdown Renderer ───────────────────────────────────────
 
-const MENTION_PATTERN = /@\[([^\]]+)\]\(([^)]+)\)/g;
 
 /**
  * `[[Title]]` / `[[Title|Display]]` as the model writes it — copied from the
@@ -3019,12 +3021,17 @@ function AssistantAvatar({
 
 /** Clickable mention pill — navigates to the referenced content */
 function MentionPill({ title, contentId }: { title: string; contentId: string }) {
+  // A column mention (`column:<id>`) names part of a table, not a content
+  // node — it has nothing of its own to open.
+  const isColumn = parseColumnAnchor(contentId) !== null;
   return (
     <button
       type="button"
       onClick={() => {
+        if (isColumn) return;
         useContentStore.getState().setSelectedContentId(contentId);
       }}
+      title={isColumn ? "Database column — the AI reads its description" : undefined}
       // Same data contract as the composer's pills, so a copy from a bubble
       // serializes to `@[Title](id)` (serializeSelectionForCopy).
       data-mention="true"
@@ -3544,7 +3551,8 @@ function ApprovalPreview({
     toolName === "create_note" ||
     toolName === "update_note" ||
     toolName === "rename_note" ||
-    toolName === "create_docx"
+    toolName === "create_docx" ||
+    toolName === "fill_docx_template"
   ) {
     return <DocumentApprovalPreview toolName={toolName} args={args} str={str} />;
   }
@@ -3601,23 +3609,38 @@ function DocumentApprovalPreview({
   str: (key: string) => string | undefined;
 }) {
   {
-    const title = str("title") ?? str("fileName") ?? "(untitled)";
+    const isTemplateFill = toolName === "fill_docx_template";
+    const title =
+      str("title") ?? str("fileName") ?? (isTemplateFill ? "(template's title)" : "(untitled)");
     const abstract = str("abstract");
     const content = str("content") ?? str("markdown");
+    const templateValues =
+      isTemplateFill &&
+      args &&
+      typeof args === "object" &&
+      typeof (args as { values?: unknown }).values === "object" &&
+      (args as { values?: unknown }).values !== null
+        ? ((args as { values: Record<string, unknown> }).values)
+        : null;
     return (
       <>
         <div className="mx-3 mb-1.5 rounded-md border border-black/10 dark:border-white/10 bg-white/70 dark:bg-black/25 px-3 py-2">
           <div className="text-[12.5px] font-semibold text-gray-800 dark:text-gray-200">
             {title}
-            {toolName === "create_docx" && (
+            {(toolName === "create_docx" || isTemplateFill) && (
               <span className="ml-1.5 text-[10px] font-normal text-gray-500">
-                .docx
+                {isTemplateFill ? ".docx · from your template" : ".docx"}
               </span>
             )}
           </div>
           {abstract && (
             <div className="mt-0.5 text-[11px] italic text-gray-500 dark:text-gray-400">
               {abstract}
+            </div>
+          )}
+          {templateValues && (
+            <div className="mt-1.5 max-h-52 overflow-auto border-t border-black/[0.06] dark:border-white/[0.08] pt-1.5 text-[11px] leading-snug text-gray-700 dark:text-gray-300">
+              <TemplateValuesPreview values={templateValues} />
             </div>
           )}
           {content && (
@@ -3636,6 +3659,58 @@ function DocumentApprovalPreview({
     );
   }
 
+}
+
+/**
+ * The values a template fill will pour into the user's layout, as a
+ * field list — what the approval decides on. Empty required fields are
+ * the thing to look for, so empties render as a visible "—" rather than
+ * vanishing. Depth-limited: a resume is header/experience[]/bullets[].
+ */
+function TemplateValuesPreview({ values }: { values: Record<string, unknown> }) {
+  const renderScalar = (v: unknown): string => {
+    if (v === null || v === undefined || v === "") return "—";
+    if (typeof v === "object" && v !== null && "url" in (v as Record<string, unknown>)) {
+      const link = v as { text?: unknown; url?: unknown };
+      return `${typeof link.text === "string" && link.text ? link.text : String(link.url)} ↗`;
+    }
+    const s = String(v);
+    return s.length > 160 ? `${s.slice(0, 157)}…` : s;
+  };
+  const isLink = (v: unknown): boolean =>
+    typeof v === "object" && v !== null && !Array.isArray(v) && "url" in (v as Record<string, unknown>);
+  const renderEntries = (obj: Record<string, unknown>, depth: number, prefix: string): React.ReactNode[] =>
+    Object.entries(obj).flatMap<React.ReactNode>(([key, v]) => {
+      const label = prefix ? `${prefix}.${key}` : key;
+      if (Array.isArray(v)) {
+        return [
+          <div key={label} className="mt-1 font-medium text-gray-800 dark:text-gray-200">
+            {label} <span className="font-normal text-gray-500">({v.length})</span>
+          </div>,
+          ...v.slice(0, 12).map((item, i) =>
+            item && typeof item === "object" && !Array.isArray(item) && !isLink(item) && depth < 3 ? (
+              <div key={`${label}[${i}]`} className="ml-3 border-l border-black/[0.08] dark:border-white/10 pl-2">
+                {renderEntries(item as Record<string, unknown>, depth + 1, "")}
+              </div>
+            ) : (
+              <div key={`${label}[${i}]`} className="ml-3">
+                • {renderScalar(item)}
+              </div>
+            ),
+          ),
+          ...(v.length > 12 ? [<div key={`${label}-more`} className="ml-3 text-gray-500">…{v.length - 12} more</div>] : []),
+        ];
+      }
+      if (v && typeof v === "object" && !isLink(v) && depth < 3) {
+        return renderEntries(v as Record<string, unknown>, depth + 1, label);
+      }
+      return [
+        <div key={label}>
+          <span className="text-gray-500">{label}:</span> {renderScalar(v)}
+        </div>,
+      ];
+    });
+  return <>{renderEntries(values, 0, "")}</>;
 }
 
 function ApprovalPreviewRest({
@@ -3729,7 +3804,9 @@ function ApprovalPreviewRest({
     const objective = str("objective");
     if (objective) fields.push(["Objective", objective]);
     const quest = str("quest");
-    if (quest) fields.push(["Quest", quest]);
+    // Quests are reused by default; a new one is the user's explicit call,
+    // so the card says so where they approve it.
+    if (quest) fields.push(["Quest", a.newQuest === true ? `${quest} — NEW quest` : quest]);
     fields.push([
       "Source",
       rowsPass
@@ -4068,6 +4145,8 @@ function ToolCallBubble({
     return "ok";
   }, [isRunning, wasStopped, hasError, hasResult, result, toolName, pinState]);
 
+  const screenImage = (toolName === "view_screen" || toolName === "view_image") && hasResult ? screenImageOf(result) : null;
+
   // Human action phrase — describes what the tool is *doing* (present
   // tense while running, past tense when done) rather than echoing the
   // raw tool identifier.
@@ -4152,6 +4231,42 @@ function ToolCallBubble({
         }
         const suffix = host ? `: ${host}` : "";
         return `${isRunning ? "Reading" : "Read"} the page you're on${suffix}`;
+      }
+      // read_image_text — local OCR. The chip says what came back, so "no text"
+      // and a failure read differently from a successful read.
+      if (toolName === "read_image_text") {
+        if (isRunning) return "Reading text in an image";
+        const r = result as { ok?: boolean; untrustedImageText?: string } | null;
+        if (r?.ok === false) return "Couldn't read the image";
+        const chars = r?.untrustedImageText?.length ?? 0;
+        return chars > 0 ? `Read text in an image (${chars.toLocaleString("en-US")} characters)` : "No text found in the image";
+      }
+      // view_image (D14): name the image looked at.
+      if (toolName === "view_image") {
+        if (isRunning) return "Looking at an image";
+        const r = result as { ok?: boolean; title?: string } | null;
+        if (!r || r.ok === false) return `Couldn't look at the image${r?.title ? `: ${r.title}` : ""}`;
+        return `Looked at image${r.title ? `: ${r.title}` : ""}`;
+      }
+      // view_screen (AI-VIEW-SCREEN-PLAN D10): say WHAT was looked at.
+      if (toolName === "view_screen") {
+        if (isRunning) return "Looking at the screen";
+        const r = result as { ok?: boolean; via?: string; area?: string; url?: string; title?: string } | null;
+        if (!r || r.ok === false) return "Couldn't capture the screen";
+        if (r.via === "active-tab") {
+          let host = "";
+          try {
+            if (r.url) host = new URL(r.url).hostname.replace(/^www\./, "");
+          } catch {
+            // best-effort host label
+          }
+          return `Looked at the page${host ? `: ${host}` : ""}`;
+        }
+        if (r.area === "window") return "Looked at the app window";
+        if (r.area === "all-panes") return "Looked at all open panes";
+        if (r.area === "left-sidebar") return "Looked at the file tree";
+        if (r.area === "right-sidebar") return "Looked at the right sidebar";
+        return `Looked at the app${r.title ? `: ${r.title}` : ""}`;
       }
       if (toolName === "co_browse_open") {
         const host = hostFromToolArgs(args);
@@ -4283,6 +4398,24 @@ function ToolCallBubble({
           />
         )}
       </button>
+      {screenImage && (
+        // What the model saw — exactly the uploaded image (D10).
+        <a
+          href={screenImage.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block border-t border-black/[0.06] dark:border-white/[0.06] px-3 py-2"
+          title="Open the screenshot the assistant received"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element -- presigned storage URL, not a static asset */}
+          <img
+            src={screenImage.url}
+            alt="Screenshot the assistant looked at"
+            className="max-h-40 w-auto max-w-full rounded border border-black/10 dark:border-white/10"
+            loading="lazy"
+          />
+        </a>
+      )}
       {hasDetails && expanded && resultString && (
         <div className="border-t border-black/[0.06] dark:border-white/[0.06] bg-black/[0.02] dark:bg-black/20">
           <div className="flex items-center justify-between px-3 py-1 text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-500">

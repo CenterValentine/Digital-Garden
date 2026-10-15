@@ -1,7 +1,6 @@
 import type { ContentWorkspaceResponse } from "@/extensions/workplaces/server";
 import { useWorkspaceStore, registerMutationBroadcast } from "./workspace-store";
 import { configurePendingIntentBackstop } from "@/state/content-store";
-import { warmContentSummaryCache } from "@/lib/domain/content/content-summary-cache";
 import { registerPollingTask } from "@/lib/core/polling/scheduler";
 
 const SYNC_CHANNEL_NAME = "dg-workspace-sync";
@@ -24,9 +23,6 @@ async function fetchAndApply(): Promise<void> {
     };
     if (!result.success || !result.data) return;
     useWorkspaceStore.getState().receiveRefreshedWorkspaces(result.data);
-    warmContentSummaryCache(
-      result.data.flatMap((ws) => ws.items.map((item) => item.content))
-    );
   } catch {
     // silent — background poll; network errors are expected
   }

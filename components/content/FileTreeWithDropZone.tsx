@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { FileTree } from "./FileTree";
 import { useTreeDragStore } from "@/state/tree-drag-store";
 import { useTreeStateStore } from "@/state/tree-state-store";
+import type { TreeRevealRequest } from "@/state/tree-reveal-store";
 import { useContentStore } from "@/state/content-store";
 import {
   ROOT_DROP_TARGET,
@@ -14,13 +15,22 @@ import {
   type UploadDropTarget,
 } from "@/lib/domain/content/tree-drop-target";
 import type { TreeNode } from "@/lib/domain/content/types";
+import type { KeptSort } from "@/lib/domain/content/sibling-order";
 
 interface FileTreeWithDropZoneProps {
   data: TreeNode[];
+  /** Passed through to FileTree — see its prop of the same name. */
+  shortcutTargets?: TreeNode[];
+  /** Passed through to FileTree — see its prop of the same name. */
+  rootTreeSort?: KeptSort | null;
+  /** Passed through to FileTree — see its prop of the same name. */
+  rootAncestry?: string[];
   onMove?: (args: {
     dragIds: string[];
     parentId: string | null;
     index: number;
+    afterId?: string | null;
+    forwardTo?: string | null;
   }) => Promise<void>;
   onSelect?: (nodes: TreeNode[]) => void;
   onRename?: (id: string, name: string) => Promise<void>;
@@ -42,7 +52,7 @@ interface FileTreeWithDropZoneProps {
   editingNodeId?: string;
   expandNodeId?: string | null;
   onExpandComplete?: () => void;
-  revealNodeId?: string | null;
+  revealRequest?: TreeRevealRequest | null;
   onRevealComplete?: () => void;
   /**
    * Called with the validated files and the folder they were dropped into

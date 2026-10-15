@@ -93,6 +93,8 @@ import { SlashCommandsList, type SlashCommandsListRef } from "./slash-commands-m
 import { getExtensionSlashCommands } from "@/lib/extensions/editor-client-registry";
 import { useTimestampFormatStore } from "@/state/timestamp-format-store";
 import { useSettingsStore } from "@/state/settings-store";
+import { openFeedbackDialog } from "@/state/feedback-dialog-store";
+import { FEEDBACK_REPO_DEFAULT } from "@/lib/domain/feedback/issue-templates";
 import { getDefaultPeriodicSummaryDate } from "@/lib/domain/periodic-summary";
 import { createDefaultStopwatchAttrs } from "@/lib/domain/stopwatch";
 import { createDefaultHabitTrackerAttrs } from "../extensions/blocks/habit-tracker";
@@ -1023,7 +1025,6 @@ export function getSlashCommands(): SlashCommand[] {
             blockType: "dailySummary",
             summaryDate: getDefaultPeriodicSummaryDate("daily"),
             workdayCutoffHour: 0,
-            autoBorrowDurationMinutes: 60,
             pathOrder: "Root > File",
             showBackground: true,
             showBorder: true,
@@ -1045,7 +1046,6 @@ export function getSlashCommands(): SlashCommand[] {
             blockType: "weeklySummary",
             weekStartDate: getDefaultPeriodicSummaryDate("weekly"),
             workdayCutoffHour: 0,
-            autoBorrowDurationMinutes: 60,
             pathOrder: "Root > File",
             showBackground: true,
             showBorder: true,
@@ -1095,7 +1095,7 @@ export function getSlashCommands(): SlashCommand[] {
       icon: FileText,
       command: ({ editor, range }) => {
         editor.chain().focus().deleteRange(range).run();
-        window.dispatchEvent(new CustomEvent("open-template-picker"));
+        window.dispatchEvent(new CustomEvent("open-template-picker", { detail: { editor } }));
       },
       aliases: ["tpl", "templates"],
     },
@@ -1105,7 +1105,7 @@ export function getSlashCommands(): SlashCommand[] {
       icon: Scissors,
       command: ({ editor, range }) => {
         editor.chain().focus().deleteRange(range).run();
-        window.dispatchEvent(new CustomEvent("open-snippet-picker"));
+        window.dispatchEvent(new CustomEvent("open-snippet-picker", { detail: { editor } }));
       },
       aliases: ["snip", "snippets", "reusable"],
     },
@@ -1173,8 +1173,15 @@ export function getSlashCommands(): SlashCommand[] {
       command: ({ editor, range }) => {
         // Delete the slash command text
         editor.chain().focus().deleteRange(range).run();
-        // Open GitHub issues in a new tab
-        window.open("https://github.com/CenterValentine/Digital-Garden/issues/new", "_blank", "noopener,noreferrer");
+        // The in-app form (mounted with the nav bar); an editor with no nav
+        // bar (embeds) has no dialog host, so it opens GitHub instead.
+        if (!openFeedbackDialog("bug")) {
+          window.open(
+            `https://github.com/${FEEDBACK_REPO_DEFAULT}/issues/new`,
+            "_blank",
+            "noopener,noreferrer",
+          );
+        }
       },
       aliases: ["bug", "issue", "feedback", "report"],
     },

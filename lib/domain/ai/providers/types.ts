@@ -38,6 +38,13 @@ export interface ModelMeta {
    * explicit budget (Anthropic extended thinking). Ignored otherwise.
    */
   thinkingBudgetTokens?: number;
+  /**
+   * False when the model rejects its vendor's hosted web-search tool (owner
+   * smoke 2026-10-09: OpenAI "Tool 'web_search_preview' is not supported with
+   * gpt-4" failed the whole turn). The route then uses the app's own search
+   * connection, as for vendors without native search. Absent = supported.
+   */
+  nativeWebSearch?: boolean;
 }
 
 /** Static metadata about a provider and its models */

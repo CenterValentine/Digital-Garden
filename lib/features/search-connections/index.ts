@@ -7,6 +7,7 @@
  */
 
 export {
+  listReusableSearchKeys,
   listSearchConnections,
   upsertSearchConnection,
   setDefaultSearchConnection,

@@ -20,7 +20,7 @@
  */
 
 import { useEffect } from "react";
-import { ChevronDown, ChevronUp, NotebookPen, X } from "lucide-react";
+import { ChevronDown, ChevronUp, NotebookPen, Pin, X } from "lucide-react";
 import { cn } from "@/lib/core/utils";
 import {
   cellToText,
@@ -57,6 +57,8 @@ interface DataRowPeekProps {
   onNavigate: (dir: 1 | -1) => void;
   /** "overlay" (default) floats over the grid; "inline" fills a split pane. */
   variant?: "overlay" | "inline";
+  /** Opened by click-and-hold: clicking away leaves it open (shown with a pin). */
+  pinned?: boolean;
   onClose: () => void;
 }
 
@@ -76,6 +78,7 @@ export function DataRowPeek({
   onRefresh,
   onNavigate,
   variant = "overlay",
+  pinned = false,
   onClose,
 }: DataRowPeekProps) {
   useEffect(() => {
@@ -151,6 +154,15 @@ export function DataRowPeek({
           >
             <ChevronDown className="h-3.5 w-3.5" />
           </button>
+          {pinned && (
+            <span
+              className="p-1 text-primary/80"
+              title="Pinned — opened by holding the row, so it stays open until you close it"
+              aria-label="Pinned"
+            >
+              <Pin className="h-3.5 w-3.5" />
+            </span>
+          )}
           <button
             type="button"
             onClick={onClose}

@@ -20,6 +20,7 @@
 
 import { diffLines, diffWords, type Change } from "diff";
 import type { JSONContent } from "@tiptap/core";
+import { stableStringify } from "@/lib/core/stable-stringify";
 
 /** Heading prefixes by level, so a diff line reads the way the doc looks. */
 const HEADING_PREFIX = ["", "# ", "## ", "### ", "#### ", "##### ", "###### "];
@@ -80,6 +81,33 @@ export function toComparableLines(doc: JSONContent | null | undefined): string[]
   return (doc.content ?? []).flatMap((n) => blockLines(n));
 }
 
+/**
+ * Do these two documents READ the same?
+ *
+ * The cheap half of `compareVersions` — no diffing, no word spans — for callers
+ * that only need the verdict. Deliberately the SAME projection the resolver
+ * shows, so a caller can never decide "nothing to resolve" on a basis the user
+ * is shown contradicting.
+ */
+export function sameProjectedText(
+  a: JSONContent | null | undefined,
+  b: JSONContent | null | undefined,
+): boolean {
+  return toComparableLines(a).join("\n") === toComparableLines(b).join("\n");
+}
+
+/**
+ * Are these two documents the same JSON? Canonical (key-sorted) form, matching
+ * what the server hashes into `bodyHash` — so this answers the question the
+ * 409 actually asked, as opposed to the question the diff answers.
+ */
+export function sameCanonicalJson(
+  a: JSONContent | null | undefined,
+  b: JSONContent | null | undefined,
+): boolean {
+  return stableStringify(a ?? null) === stableStringify(b ?? null);
+}
+
 export interface DiffRow {
   kind: "same" | "added" | "removed";
   text: string;
@@ -104,7 +132,24 @@ export interface ConflictComparison {
    * any word count.
    */
   changedSections: string[];
-  identical: boolean;
+  /**
+   * The two documents READ the same — the projection above found no difference.
+   *
+   * NOT the same question the 409 asked. A save is refused on a hash over the
+   * whole node tree (`hashTiptap`), which sees attributes, marks and block ids
+   * that this projection deliberately discards. Naming this `identical` once
+   * let the resolver announce "the two versions are identical" over a conflict
+   * that was, at the JSON level, entirely real — the app contradicting its own
+   * block, which reads to a user as a broken app rather than a blind spot.
+   */
+  textIdentical: boolean;
+  /**
+   * The two documents are the same JSON, canonically. This is the one that
+   * agrees with `bodyHash`: false here with `textIdentical` true means the
+   * difference is structural — formatting, alignment, block metadata — and the
+   * diff above cannot show it.
+   */
+  structurallyIdentical: boolean;
 }
 
 function countWords(lines: string[]): number {
@@ -208,6 +253,7 @@ export function compareVersions(
     mine: { words: countWords(mineLines), lines: mineLines.length },
     theirs: { words: countWords(theirLines), lines: theirLines.length },
     changedSections,
-    identical: added === 0 && removed === 0,
+    textIdentical: added === 0 && removed === 0,
+    structurallyIdentical: sameCanonicalJson(mine, theirs),
   };
 }

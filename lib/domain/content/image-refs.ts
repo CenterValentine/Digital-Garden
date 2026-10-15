@@ -118,6 +118,7 @@ async function syncOneLinkType(
   userId: string,
   linkType: MediaLinkType,
   currentIds: string[],
+  trashOrphans: boolean,
 ): Promise<{ added: number; removed: number }> {
   const existingLinks = await prisma.contentLink.findMany({
     where: { sourceId: noteId, linkType },
@@ -136,8 +137,10 @@ async function syncOneLinkType(
     });
     // Ref-count-gated cleanup: only remove media no longer used ANYWHERE.
     // We delete this note's edges first (above) so the count reflects reality.
-    for (const targetId of orphanedLinks.map((l) => l.targetId)) {
-      await softDeleteIfOrphaned(targetId, userId);
+    if (trashOrphans) {
+      for (const targetId of orphanedLinks.map((l) => l.targetId)) {
+        await softDeleteIfOrphaned(targetId, userId);
+      }
     }
   }
 
@@ -165,7 +168,18 @@ export async function syncImageReferences(
   noteId: string,
   tiptapJson: JSONContent,
   userId: string,
+  options: {
+    /**
+     * Trash media whose last link this save removed (default true — the REST
+     * save path). The collaborative save passes false: it fires every few
+     * seconds mid-edit, so cutting an image and pasting it back across one
+     * save would trash it in between. Links are still kept exact there; the
+     * media lives on until a save that does clean up.
+     */
+    trashOrphans?: boolean;
+  } = {},
 ): Promise<void> {
+  const trashOrphans = options.trashOrphans ?? true;
   try {
     const refsByType = extractMediaRefs(tiptapJson);
     let added = 0;
@@ -176,6 +190,7 @@ export async function syncImageReferences(
         userId,
         linkType,
         refsByType[linkType],
+        trashOrphans,
       );
       added += r.added;
       removed += r.removed;

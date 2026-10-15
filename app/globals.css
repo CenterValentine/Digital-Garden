@@ -539,8 +539,23 @@ nav[class*="fixed"] {
   -webkit-touch-callout: none;
 }
 
+/* A quad pane is a small pane: its note title header goes compact — the
+ * same type size and padding the touch-device rule below uses (owner ask,
+ * 2026-10-08: "give the user room in a tighter space"). Set by MainPanelContent
+ * from the PROJECTED layout. Size only: the no-wrap + swipe treatment below is
+ * for phones, where a tap on the title would start a rename. */
+.doc-title-header[data-compact] {
+  padding-top: 0.25rem;
+  padding-bottom: 0.375rem;
+}
+.doc-title-header[data-compact] .doc-title-text,
+.doc-title-header[data-compact] input {
+  font-size: 1.375rem;
+  line-height: 1.25;
+}
+
 /* Reclaim vertical space on touch devices: the note title header ships desktop
- * padding (pt-6 pb-4 ≈ 40px) + a drop shadow that eats precious space above the
+ * padding (pt-2 pb-4 ≈ 24px) + a drop shadow that eats precious space above the
  * fold on phones. Shrink it on coarse pointers; the title itself is unchanged. */
 @media (pointer: coarse) {
   .doc-title-header {
@@ -566,6 +581,8 @@ nav[class*="fixed"] {
     line-height: 1.25;
     white-space: nowrap;
     overflow-x: auto;
+    /* Desktop truncates with "…"; here the title SCROLLS instead. */
+    text-overflow: clip;
     scrollbar-width: none;
     -webkit-mask-image: linear-gradient(
       to right,
@@ -973,6 +990,312 @@ nav[class*="fixed"] {
 
 .dark .ProseMirror .wiki-link {
   color: #FFD700;
+}
+
+/* Link views (lib/domain/editor/link-views.ts). The plain link above is the
+   default; chip and card decorate the same span (chrome lives in the
+   NodeView, never in renderHTML). Both themes via color-mix on the gold
+   token — no white-ish / dark-ish extremes. */
+.ProseMirror .wiki-link--chip,
+.public-prose .wiki-link--chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+  padding: 0.05em 0.5em 0.05em 0.4em;
+  border-radius: 9999px;
+  border: 1px solid color-mix(in srgb, var(--gold-primary) 35%, transparent);
+  background: color-mix(in srgb, var(--gold-primary) 10%, transparent);
+  font-size: 0.92em;
+  line-height: 1.5;
+  vertical-align: baseline;
+  text-decoration: none;
+}
+.ProseMirror .wiki-link--chip:hover {
+  opacity: 1;
+  text-decoration: none;
+  background: color-mix(in srgb, var(--gold-primary) 18%, transparent);
+}
+.ProseMirror .wiki-link-icon,
+.public-prose .wiki-link-icon {
+  width: 1em;
+  height: 1em;
+  flex-shrink: 0;
+}
+
+.ProseMirror .wiki-link--card,
+.public-prose .wiki-link--card {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  width: min(100%, 36rem);
+  max-width: 100%;
+  margin: 0.15rem 0;
+  padding: 0.6rem 0.8rem;
+  border-radius: 10px;
+  border: 1px solid var(--border-secondary);
+  background: color-mix(in srgb, var(--gold-primary) 4%, transparent);
+  vertical-align: top;
+  text-decoration: none;
+  font-weight: 400;
+}
+.ProseMirror .wiki-link--card:hover {
+  opacity: 1;
+  text-decoration: none;
+  border-color: color-mix(in srgb, var(--gold-primary) 45%, transparent);
+}
+.ProseMirror .wiki-link--card .wiki-link-icon,
+.public-prose .wiki-link--card .wiki-link-icon {
+  width: 1.1rem;
+  height: 1.1rem;
+  margin-top: 0.15rem;
+}
+.wiki-link-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+.wiki-link-card-title {
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wiki-link-card-excerpt {
+  font-size: 0.8rem;
+  line-height: 1.35;
+  color: var(--text-secondary);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.ProseMirror .wiki-link.ProseMirror-selectednode {
+  outline: 2px solid color-mix(in srgb, var(--gold-primary) 60%, transparent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* The compact "display as" chooser — hover popover, window header, both
+   themes through the HistoryMenu palette. */
+.tippy-box[data-theme~="link-view-chooser"] {
+  background: transparent;
+  box-shadow: none;
+}
+.tippy-box[data-theme~="link-view-chooser"] .tippy-content {
+  padding: 0;
+}
+.link-view-chooser {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+.dark .link-view-chooser {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: #1a1a1a;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+.link-view-chooser-title {
+  min-width: 3rem;
+  max-width: 11rem;
+  padding: 0 0.4rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+  color: var(--text-primary);
+  box-sizing: border-box;
+}
+/* Click-to-edit label: the same slot as the title, a dotted hint on hover,
+   then a bare input in its place (no chrome — it is the title, editable). */
+.link-view-chooser-title-edit {
+  cursor: text;
+  border-radius: 4px;
+  text-decoration: underline dotted transparent;
+  text-underline-offset: 3px;
+}
+.link-view-chooser-title-edit:hover {
+  text-decoration-color: color-mix(in srgb, currentColor 50%, transparent);
+}
+/* Same box as the title it replaces (width set inline from the measured
+   title); overflowing text scrolls inside the field, the bar never grows. */
+.link-view-chooser-title-input {
+  width: 6rem;
+  min-width: 3rem;
+  max-width: 11rem;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--gold-primary);
+  border-radius: 0;
+  outline: none;
+  font: inherit;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+.link-view-chooser-group {
+  display: flex;
+  gap: 2px;
+  padding: 0 2px;
+}
+.link-view-chooser-title + .link-view-chooser-group {
+  border-left: 1px solid rgba(0, 0, 0, 0.08);
+  padding-left: 0.3rem;
+}
+.dark .link-view-chooser-title + .link-view-chooser-group {
+  border-left-color: rgba(255, 255, 255, 0.1);
+}
+.link-view-chooser-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.2rem 0.45rem;
+  border-radius: 6px;
+  color: inherit;
+  line-height: 1;
+}
+.link-view-chooser-button:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.05);
+}
+.dark .link-view-chooser-button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+}
+.link-view-chooser-button[data-active="true"] {
+  background: color-mix(in srgb, var(--gold-primary) 18%, transparent);
+  color: var(--gold-primary);
+}
+.link-view-chooser-button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.link-view-chooser-open {
+  border-left: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 0 6px 6px 0;
+}
+.dark .link-view-chooser-open {
+  border-left-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Skeleton tiles: a thumbnail of each display instead of an icon + word.
+   Grey bars are text, gold is the link; the active tile gets a gold ring. */
+.link-view-chooser-tile {
+  display: inline-flex;
+  padding: 2px;
+  border-radius: 5px;
+  border: 1px solid transparent;
+  color: var(--text-secondary);
+  line-height: 0;
+}
+.link-view-chooser-tile:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.05);
+}
+.dark .link-view-chooser-tile:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+}
+.link-view-chooser-tile[data-active="true"] {
+  border-color: color-mix(in srgb, var(--gold-primary) 70%, transparent);
+  background: color-mix(in srgb, var(--gold-primary) 12%, transparent);
+}
+.link-view-chooser-tile:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.lvs {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  width: 42px;
+  height: 26px;
+  padding: 2px 3px;
+  box-sizing: border-box;
+}
+.lvs-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 3px;
+}
+.lvs-bar {
+  display: block;
+  height: 2px;
+  border-radius: 1px;
+  background: color-mix(in srgb, currentColor 28%, transparent);
+  flex-shrink: 0;
+}
+.lvs-bar--link {
+  background: var(--gold-primary);
+  box-shadow: 0 2px 0 -1px var(--gold-primary);
+}
+.lvs-bar--gold {
+  background: var(--gold-primary);
+}
+.lvs-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 6px;
+  padding: 0 2px;
+  border-radius: 9999px;
+  border: 1px solid color-mix(in srgb, var(--gold-primary) 60%, transparent);
+  background: color-mix(in srgb, var(--gold-primary) 14%, transparent);
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+.lvs-pill-dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 9999px;
+  background: var(--gold-primary);
+}
+.lvs-pill-bar {
+  flex: 1;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--gold-primary);
+}
+.lvs-frame {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 100%;
+  padding: 3px 4px;
+  border-radius: 3px;
+  border: 1px solid color-mix(in srgb, currentColor 35%, transparent);
+  background: color-mix(in srgb, var(--gold-primary) 5%, transparent);
+  box-sizing: border-box;
+}
+.lvs-frame--card {
+  height: 19px;
+  justify-content: center;
+}
+.lvs-frame--window {
+  height: 23px;
+  padding-top: 0;
+  gap: 2px;
+}
+.lvs-window-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 7px;
+  margin: 0 -4px 1px;
+  padding: 0 4px;
+  border-bottom: 1px solid color-mix(in srgb, currentColor 30%, transparent);
+  background: color-mix(in srgb, var(--gold-primary) 12%, transparent);
+}
+.lvs-window-dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 9999px;
+  background: color-mix(in srgb, currentColor 45%, transparent);
 }
 
 /* Unresolvable wiki-link. Applied to the DOM only (never written into the
@@ -1700,6 +2023,25 @@ body.flashcard-select-cursor * {
 }
 .chat-outline-flash {
   animation: chat-outline-flash 1.5s ease-out;
+}
+
+/* File tree "show in file tree" reveal: a gold inset ring + wash that fades,
+   so the eye lands on the row after it scrolls into view. */
+@keyframes tree-reveal-flash {
+  0% {
+    box-shadow: inset 0 0 0 2px var(--gold-primary);
+    background-color: rgba(201, 168, 108, 0.35);
+  }
+  60% {
+    box-shadow: inset 0 0 0 2px var(--gold-primary);
+  }
+  100% {
+    box-shadow: inset 0 0 0 2px transparent;
+    background-color: transparent;
+  }
+}
+.dg-tree-reveal-flash {
+  animation: tree-reveal-flash 1.6s ease-out;
 }
 
 /* M6: Search Match Highlighting */

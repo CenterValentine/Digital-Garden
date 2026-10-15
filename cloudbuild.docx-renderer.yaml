@@ -1,0 +1,58 @@
+# Deploys the DOCX template renderer (server/docx-renderer) to Cloud Run.
+#
+#   gcloud builds submit --config cloudbuild.docx-renderer.yaml .
+#
+# A SEPARATE service from Hocuspocus: different image, different scaling
+# shape (short CPU-bound requests, no WebSockets, no DB), and it must not
+# share Hocuspocus's 3600 s timeout or its secrets. Same project, same
+# Artifact Registry repo, same region — the app that calls it runs on
+# Vercel, so the region matters only for latency and for not repeating the
+# two-regions mistake recorded in cloudbuild.hocuspocus.yaml.
+steps:
+  - name: gcr.io/cloud-builders/docker
+    dir: server/docx-renderer
+    args: [build, -t, $_IMAGE, .]
+
+  - name: gcr.io/cloud-builders/docker
+    args: [push, $_IMAGE]
+
+  # Request-based billing + min-instances=0: idle costs nothing; a cold
+  # start is ~1–2 s for this image. concurrency=1 because a render pegs one
+  # CPU for its whole duration; max-instances=1 until measured usage says
+  # otherwise. timeout covers a slow template with headroom, nothing more —
+  # a render that needs a minute is a bug, not a workload.
+  #
+  # --no-allow-unauthenticated: the invoker is the Vercel app, via Vercel's
+  # OIDC federation into GCP (a service account with roles/run.invoker),
+  # so no long-lived key leaves GCP. RENDERER_SHARED_TOKEN is a second
+  # factor, supplied from Secret Manager once the secret exists.
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - $_SERVICE_NAME
+      - --image=$_IMAGE
+      - --region=$_REGION
+      - --platform=managed
+      - --port=8080
+      - --min-instances=0
+      - --max-instances=1
+      - --concurrency=1
+      - --timeout=60s
+      - --cpu=1
+      - --memory=512Mi
+      - --no-allow-unauthenticated
+      # Runs as its own least-privilege identity (dg-hocuspocus is the
+      # precedent): accessor on its one secret, nothing else. The default
+      # compute SA would carry far broader project rights into the container.
+      - --service-account=dg-docx-renderer@digital-garden-482805.iam.gserviceaccount.com
+      - --update-secrets=RENDERER_SHARED_TOKEN=digital-garden-docx-renderer-token:latest
+
+images:
+  - $_IMAGE
+
+substitutions:
+  _SERVICE_NAME: digital-garden-docx-renderer
+  _REGION: us-west1
+  _IMAGE: us-west1-docker.pkg.dev/digital-garden-482805/digital-garden-containers/digital-garden-docx-renderer

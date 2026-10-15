@@ -85,6 +85,7 @@ export const PROPOSAL_BOUNDS = {
  */
 export const DELIVERABLE_TOOLS = [
   "create_docx",
+  "fill_docx_template",
   "create_note",
   "update_note",
   "append_to_document",
@@ -107,6 +108,11 @@ const DELIVERABLE_ALIASES: Record<string, DeliverableTool> = {
   document: "create_docx",
   resume: "create_docx",
   word: "create_docx",
+  // A charter that names the user's template: "deliverables: template".
+  template: "fill_docx_template",
+  "docx-template": "fill_docx_template",
+  "templated-docx": "fill_docx_template",
+  "fill-template": "fill_docx_template",
   note: "create_note",
   "roll-up": "create_note",
   rollup: "create_note",
@@ -267,8 +273,14 @@ export const CHARTER_TURN_DELIVERABLES: readonly DeliverableTool[] = [
   "insert_rows",
 ];
 
-/** Tools a charter turn's tail keeps beside the deliverables (its close). */
-export const CHARTER_TAIL_EXTRA = ["phase_checkpoint"] as const;
+/**
+ * Tools a charter turn's tail keeps beside the deliverables (its close).
+ * `fill_docx_template` rides here, not in the deliverables: a turn produces
+ * ONE document, by whichever document tool the charter named, so the
+ * template path must be allowed in the reserved tail without adding a
+ * step to every charter turn (the measured budget stays 16 / tail 6).
+ */
+export const CHARTER_TAIL_EXTRA = ["phase_checkpoint", "fill_docx_template"] as const;
 
 /**
  * ONE PROMPT PER TURN (ITERATION-RUN-HARNESS-FIXES §10 L2): a charter turn
@@ -289,6 +301,11 @@ export const CHARTER_TURN_TOOLS: readonly string[] = [
   "record_item_result",
   "record_iteration_findings",
   "create_docx",
+  // The template path (STAGE2-CHARTER-RECIPE §3): the contract read and
+  // the fill ride the same turn as create_docx, so a Materials phase that
+  // names a template never needs a summon.
+  "read_docx_template",
+  "fill_docx_template",
   "create_note",
   "update_note",
   "update_row",
@@ -352,10 +369,21 @@ export function reservedTailTools(
     ...new Set([
       ...deliverables,
       ...(record ? TAIL_ALWAYS : ["summon"]),
+      ...TAIL_VERIFY,
       ...(options.extra ?? []),
     ]),
   ];
 }
+
+/**
+ * Checking a deliverable is part of producing it: `read_content` on a
+ * document just written returns its text as read from the file, which is how
+ * the model verifies a resume the way a parser will read it. The deliverable
+ * is written inside the tail, so the check must be callable there — before
+ * this the tail refused it (plan §10 round 4, prod 36237eb8: "I could not …
+ * test its text extraction").
+ */
+export const TAIL_VERIFY = ["read_content"] as const;
 
 /** How many of the turn's last steps are held for the tail: deliverables + record + close. */
 export function reservedTailSize(deliverables: readonly string[]): number {
@@ -545,7 +573,13 @@ export const ITERATION_PROPOSAL_INPUT = z.object({
     .string()
     .optional()
     .describe(
-      'The ongoing MATTER this run belongs to (continue-or-create): pass the quest\'s name when the user mentions a past matter to continue ("my job hunt") — the same quest across sittings shares one ledger and skips already-scored items. Omit for a brand-new matter (a quest is then created from the run\'s label).',
+      'The ongoing MATTER this run belongs to. Quests are REUSED BY DEFAULT: pass the EXACT name of the existing quest this run continues (the charter context lists them) — the same quest across sittings shares one ledger and skips already-scored items. One job, one company, one URL is an ITEM of a quest, never a quest of its own. A name that matches no existing quest is refused unless newQuest is true. The charter\'s first quest is created from this name (or the run\'s label).',
+    ),
+  newQuest: z
+    .boolean()
+    .optional()
+    .describe(
+      "true ONLY when the user explicitly asked for a separate, new quest (a new matter) although the charter already has quests. Never set it to file one item under its own quest.",
     ),
   questColumns: z
     .array(

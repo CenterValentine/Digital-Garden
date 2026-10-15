@@ -6,6 +6,7 @@
  */
 
 import type { JSONContent } from "@tiptap/core";
+import { columnLinkSyntax } from "@/lib/domain/data/column-anchor";
 import { stripPrivateContent } from "./private-content";
 
 // ============================================================
@@ -77,6 +78,10 @@ function atomicInlineText(json: JSONContent): string {
     case "wikiLink": {
       const title = str(attrs.targetTitle);
       if (!title) return "";
+      // A column link reads `[[Jobs#Status]]` (lib/domain/data/column-anchor.ts)
+      // — the AI readers that serve this text add the column's description.
+      const column = columnLinkSyntax(attrs);
+      if (column) return `[[${column}]]`;
       const display = str(attrs.displayText);
       return display && display !== title
         ? `[[${title}|${display}]]`

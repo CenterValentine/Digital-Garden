@@ -65,7 +65,7 @@ export function AdaptiveFlashcardEditor({
   // the hook's handlers read from editorRef.current at event time, so
   // by the time a paste fires, the ref points at the real editor.
   const editorRef = useRef<Editor | null>(null);
-  const { handlePaste, handleDrop, insertImageFromFile } = useImagePasteHandler({
+  const { handlePaste, handleDrop, handleKeyDown, insertImageFromFile } = useImagePasteHandler({
     editorRef,
     parentId: null, // flashcards live outside the file-tree folder
   });
@@ -99,7 +99,7 @@ export function AdaptiveFlashcardEditor({
       // In rich mode only: wire the paste/drop handlers. Plain mode
       // doesn't include the image extension, so a pasted image would
       // be silently dropped — better to skip the handler entirely.
-      ...(mode === "rich" ? { handlePaste, handleDrop } : {}),
+      ...(mode === "rich" ? { handlePaste, handleDrop, handleKeyDown } : {}),
     },
     onUpdate: ({ editor }) => {
       const json = normalizeTiptapDoc(editor.getJSON());

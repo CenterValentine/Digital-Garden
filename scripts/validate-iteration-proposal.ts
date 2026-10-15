@@ -213,7 +213,7 @@ for (const { name, payload } of attempts) {
   const early = stepsRemainingNotice({ stepNumber: 2, stepCap: 14, deliverables: fulfil.deliverables });
   assert(/12 of 14 remaining/.test(early) && /last 4 are reserved/.test(early) && /create_docx/.test(early), "early notice: remaining count and the reserved tail");
   const late = stepsRemainingNotice({ stepNumber: 11, stepCap: 14, deliverables: fulfil.deliverables });
-  assert(/3 of 14 remaining/.test(late) && /RESERVED/.test(late) && /only create_docx, update_row, record_item_result, record_iteration_findings are available/.test(late), "in-tail notice: research is over, only the tail tools remain");
+  assert(/3 of 14 remaining/.test(late) && /RESERVED/.test(late) && /only create_docx, update_row, record_item_result, record_iteration_findings, read_content are available/.test(late), "in-tail notice: research is over, only the tail tools remain — plus read_content to check what was written (§10 round 4)");
 
   // captureTo.mergeColumns resolves and is folded into columns.
   const merge = resolveCaptureTarget({ database: DB, columns: ["Role Title"], mergeColumns: "Aliases and Job Wording" });

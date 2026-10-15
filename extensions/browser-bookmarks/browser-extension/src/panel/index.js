@@ -301,6 +301,62 @@ window.addEventListener("message", (event) => {
     return;
   }
 
+  // view_screen (AI-VIEW-SCREEN-PLAN D3): the AI asks to SEE the active tab.
+  // Its own id-correlated reply — not `screenshot`, which the panel shell
+  // attaches to the composer. Refuses the app's own tab (D6: a tab capture
+  // can't blank commented-out text; the app's chat captures itself instead)
+  // and browser pages Chrome won't capture.
+  if (data.type === "capture-visible-tab") {
+    const id = data.payload?.id;
+    void (async () => {
+      try {
+        const [tab] = await chrome.tabs.query({
+          active: true,
+          lastFocusedWindow: true,
+        });
+        if (tab?.windowId == null) throw new Error("No active tab");
+        let origin = "";
+        try {
+          origin = new URL(tab.url || "").origin;
+        } catch {
+          // no readable URL — captureVisibleTab decides below
+        }
+        if (origin && origin === appOrigin) {
+          postToEmbed("visible-tab-capture-error", {
+            id,
+            code: "app-tab",
+            message:
+              "The active tab is Digital Garden itself. Screenshots of the app are taken from the app's own chat, which keeps commented-out text hidden.",
+          });
+          return;
+        }
+        if (/^(chrome|edge|brave|about|chrome-extension|devtools|view-source):/i.test(tab.url || "") ||
+          /^https:\/\/(chromewebstore\.google\.com|chrome\.google\.com\/webstore)/i.test(tab.url || "")) {
+          postToEmbed("visible-tab-capture-error", {
+            id,
+            code: "restricted",
+            message: "The browser does not allow extensions to capture this page (a browser settings or store page).",
+          });
+          return;
+        }
+        // Higher quality than the composer's q70: the app downscales and
+        // re-encodes before upload, so this is the source, not the payload.
+        const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, {
+          format: "jpeg",
+          quality: 85,
+        });
+        postToEmbed("visible-tab-capture", { id, dataUrl, url: tab.url ?? null, title: tab.title ?? null });
+      } catch (error) {
+        const raw = error instanceof Error ? error.message : "";
+        const message = /permission|all_urls|activeTab/i.test(raw)
+          ? "Screenshots need updated permissions. Open chrome://extensions, reload this extension, and accept the access prompt — then try again."
+          : raw || "Couldn't capture this page";
+        postToEmbed("visible-tab-capture-error", { id, code: "failed", message });
+      }
+    })();
+    return;
+  }
+
   // Associated content (Quick access): the embed asks for the resource context
   // of a page URL. Only the background holds the bearer token, so relay there.
   if (data.type === "fetch-resource-context" && data.payload?.url) {

@@ -28,6 +28,7 @@ import { resolveChatModelFromConnection } from "@/lib/domain/ai/providers/regist
 import { addAutoAssociation } from "@/lib/features/conversations";
 import {
   createDocxDocument,
+  storeDocxDocument,
   findOrCreateFolder,
   findOrCreateShortcut,
 } from "@/lib/domain/ai/documents";
@@ -65,9 +66,11 @@ import {
 import {
   closeSitting,
   ensureMasterLedger,
+  ensureOutputQuestColumn,
   ensureOutputRelation,
   ensureQuest,
   ledgerOutputRelations,
+  listQuestLabels,
   parseQuestInfo,
   questSeenKeys,
   recordQuestItem,
@@ -78,7 +81,36 @@ import {
 } from "@/lib/domain/ai/quests";
 import { computeTurnCost } from "@/lib/features/ai-connections/usage/pricing";
 import { resolveDocumentArgs } from "./write-args";
+import {
+  getDocxTemplateRecord,
+  listDocxTemplates,
+  loadDocxTemplate,
+  describeTemplateForModel,
+} from "@/lib/domain/ai/docx-templates/templates";
+import { judgeRender } from "@/lib/domain/ai/docx-templates/judge";
+import { compactReport, verifyProvenance, writeFillRecord } from "@/lib/domain/ai/docx-templates/fills";
+
+/**
+ * What the user does to make a .docx a template — returned by every
+ * read_docx_template result so the model can direct them whether or not
+ * a template already exists. The model cannot mark or edit the file.
+ */
+const DOCX_TEMPLATE_MARKING_STEPS =
+  "To make or change a template (the user does this; you cannot): 1) upload the .docx to the garden (drag it into the file tree or use the + menu), " +
+  "2) right-click it in the file tree → Mark as Document Template — the file stays where it is and its fields are read once; a tag that does not parse is refused with the paragraph to fix in Word, " +
+  "3) Settings → Templates → Document Templates: add a note per field (what it should hold, max length) — you read these beside the contract, " +
+  "4) to update the layout, edit the same file in Word and save over it (overwrite keeps the mark; the contract refreshes), " +
+  "5) right-click → Unmark Document Template to retire one. Tag grammar: docs/notes-feature/guides/ai/DOCX-TEMPLATE-AUTHORING.md.";
+import {
+  isDocxRendererConfigured,
+  renderDocxTemplate,
+  type TemplateValue,
+} from "@/lib/domain/ai/docx-templates/renderer-client";
 import type { JSONContent } from "@tiptap/core";
+import { stripPrivateContent } from "@/lib/domain/content/private-content";
+import { ALL_SEARCH_FIELDS, buildSearchWhere } from "@/lib/domain/content/search-service";
+import { collectColumnLinkIds } from "@/lib/domain/data/column-anchor";
+import { describeLinkedColumns } from "@/lib/domain/data/server/column-links";
 import { listCharters, isCharterMetadata } from "@/lib/domain/ai/charters/registry";
 import {
   generateUniqueSlug,
@@ -121,6 +153,10 @@ import { logger } from "@/lib/core/logger";
 import { ensureFolderContextFresh } from "@/lib/domain/ai-context/gate";
 import { assembleFolderCapsule } from "@/lib/domain/ai-context/capsule";
 import {
+  AUTO_CLOSED_CHECKPOINT_NEXT,
+  toolAutoApproves,
+} from "./approval-policy";
+import {
   READ_PAGE_HEADLESS_OR_BROWSER_DESCRIPTION,
   readPageInBrowserInputSchema,
 } from "./read-page-in-browser";
@@ -138,6 +174,18 @@ import {
   LIST_TABS_DESCRIPTION,
   listTabsInputSchema,
 } from "./co-browse-tools";
+import {
+  READ_IMAGE_TEXT_DESCRIPTION,
+  readImageTextInputSchema,
+} from "./read-image-text";
+import { VIEW_SCREEN_DESCRIPTION, viewScreenInputSchema, type ViewScreenResult } from "./view-screen";
+import {
+  VIEW_IMAGE_DESCRIPTION,
+  VIEW_IMAGE_MAX_BYTES,
+  VIEW_IMAGE_MEDIA_TYPES,
+  viewImageInputSchema,
+} from "./view-image";
+import { describeNoteImages, listNoteImages } from "@/lib/domain/content/note-images";
 
 /**
  * `read_page_in_browser` — CLIENT-EXECUTED (no server `execute`). The chat route
@@ -202,6 +250,83 @@ export const listTabsTool = tool({
   description: LIST_TABS_DESCRIPTION,
   inputSchema: listTabsInputSchema,
 });
+
+/**
+ * `read_image_text` — CLIENT-EXECUTED (no server `execute`). OCR-PASTE-PLAN.md
+ * D8. Registered only when the client reports it can run local OCR; the
+ * engine's onToolCall downloads the image and reads it with the shared engine
+ * in lib/features/ocr, on the user's device.
+ */
+export const readImageTextTool = tool({
+  description: READ_IMAGE_TEXT_DESCRIPTION,
+  inputSchema: readImageTextInputSchema,
+});
+
+/**
+ * `view_screen` — CLIENT-EXECUTED (no server `execute`). AI-VIEW-SCREEN-PLAN.md.
+ * Registered only for a vision model on a surface that can capture (the side
+ * panel → the active web page; the app → itself). The engine's onToolCall
+ * captures, uploads, and returns the image URL; `deliverScreenCaptures` hands
+ * the image to the model on the next request.
+ */
+export const viewScreenTool = tool({
+  description: VIEW_SCREEN_DESCRIPTION,
+  inputSchema: viewScreenInputSchema,
+});
+
+/** How long a view_image link lives — the turn that uses it, and the chip's thumbnail after. */
+const VIEW_IMAGE_URL_TTL_S = 7 * 24 * 3600;
+
+/**
+ * `view_image` — SERVER-executed. AI-VIEW-SCREEN-PLAN.md D14. Registered only
+ * for a vision model. Returns the image-bearing result shape view_screen uses,
+ * so `deliverScreenCaptures` (request start AND prepareStep) hands the picture
+ * to the model. Every refusal says what to do instead.
+ */
+export function createViewImageTool(ctx: Pick<ToolExecuteContext, "userId">) {
+  return tool({
+    description: VIEW_IMAGE_DESCRIPTION,
+    inputSchema: viewImageInputSchema,
+    execute: async ({ contentId }): Promise<ViewScreenResult> => {
+      const node = await prisma.contentNode.findFirst({
+        where: { id: contentId, ownerId: ctx.userId, deletedAt: null },
+        select: {
+          title: true,
+          filePayload: {
+            select: { mimeType: true, fileSize: true, storageKey: true, storageProvider: true, uploadStatus: true },
+          },
+        },
+      });
+      const file = node?.filePayload;
+      if (!node || !file) {
+        return { ok: false, contentId, error: "No image file with that content id. Find it with search_content, or read_content for what the item is." };
+      }
+      if (!VIEW_IMAGE_MEDIA_TYPES.has(file.mimeType)) {
+        return {
+          ok: false,
+          contentId,
+          title: node.title,
+          error: `"${node.title}" is ${file.mimeType}, which vision models cannot take${file.mimeType.startsWith("image/") ? "; read_image_text can still read its text" : ""}.`,
+        };
+      }
+      if (Number(file.fileSize) > VIEW_IMAGE_MAX_BYTES) {
+        return {
+          ok: false,
+          contentId,
+          title: node.title,
+          error: `"${node.title}" is ${(Number(file.fileSize) / 1024 / 1024).toFixed(1)} MB, over the 5 MB a vision model accepts; read_image_text can still read its text.`,
+        };
+      }
+      if (file.uploadStatus !== "ready") {
+        return { ok: false, contentId, title: node.title, error: `"${node.title}" has not finished uploading.` };
+      }
+      const { getUserStorageProvider } = await import("@/lib/infrastructure/storage");
+      const storage = await getUserStorageProvider(ctx.userId, file.storageProvider as "r2" | "s3" | "vercel");
+      const imageUrl = await storage.generateDownloadUrl(file.storageKey, VIEW_IMAGE_URL_TTL_S);
+      return { ok: true, via: "file", contentId, title: node.title, imageUrl, mediaType: file.mimeType };
+    },
+  });
+}
 
 /**
  * Price the run's accumulated tokens against the executed model for
@@ -305,6 +430,47 @@ async function renderHtmlPayload(
   if (!h) return `${header}\n\n(page record missing)`;
   const text = h.searchText.trim() || h.html;
   return `${header}${h.isTemplate ? "\nTemplate: yes" : ""}\n\n${text}`;
+}
+
+
+/** `{ text, url }` values in a template fill — the hyperlinks the render emits. */
+function countHyperlinkValues(value: unknown): number {
+  if (!value || typeof value !== "object") return 0;
+  if (!Array.isArray(value) && "url" in (value as Record<string, unknown>)) return 1;
+  return Object.values(value as Record<string, unknown>).reduce<number>((n, v) => n + countHyperlinkValues(v), 0);
+}
+
+/**
+ * True when `contentId` is a file THIS chat created: associated with the
+ * conversation and created after the conversation began. The association
+ * alone is not enough — an @-mentioned file of the user's is associated
+ * too, and must never be overwritten without asking (§10 round 6).
+ */
+async function contentCreatedInThisChat(
+  ctx: ToolExecuteContext,
+  contentId: string,
+): Promise<boolean> {
+  if (!ctx.conversationId) return false;
+  const [conversation, association, node] = await Promise.all([
+    prisma.conversation.findFirst({
+      where: { id: ctx.conversationId, ownerId: ctx.userId },
+      select: { createdAt: true },
+    }),
+    prisma.conversationAssociation.findUnique({
+      where: {
+        conversationId_contentNodeId: {
+          conversationId: ctx.conversationId,
+          contentNodeId: contentId,
+        },
+      },
+      select: { conversationId: true },
+    }),
+    prisma.contentNode.findFirst({
+      where: { id: contentId, ownerId: ctx.userId, deletedAt: null },
+      select: { createdAt: true },
+    }),
+  ]).catch(() => [null, null, null] as const);
+  return !!(conversation && association && node && node.createdAt >= conversation.createdAt);
 }
 
 export function createBaseTools(ctx: ToolExecuteContext) {
@@ -626,7 +792,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
       // types — is made below, and a miss comes back as a RESULT the model
       // fixes in one step instead of a rejection that ends the call.
       inputSchema: ITERATION_PROPOSAL_INPUT,
-      execute: async ({ objective: objectiveArg, source: sourceArg, items: itemsArg, rowIds: rowIdsArg, itemCap: itemCapArg, budget: budgetArg, batchSize: batchSizeArg, ledgerLabel: ledgerLabelArg, captureTo: captureToArg, quest: questArg, questColumns: questColumnsArg, deliverables: deliverablesArg, stepsPerItem: stepsPerItemArg }) => {
+      execute: async ({ objective: objectiveArg, source: sourceArg, items: itemsArg, rowIds: rowIdsArg, itemCap: itemCapArg, budget: budgetArg, batchSize: batchSizeArg, ledgerLabel: ledgerLabelArg, captureTo: captureToArg, quest: questArg, newQuest: newQuestArg, questColumns: questColumnsArg, deliverables: deliverablesArg, stepsPerItem: stepsPerItemArg }) => {
         // ── Shape → meaning (iteration-proposal.ts resolvers) ────────────
         const objective = clipText(objectiveArg, 400) ?? "";
         if (!objective) {
@@ -968,6 +1134,27 @@ export function createBaseTools(ctx: ToolExecuteContext) {
               // policy 2026-09-02).
               questHomeFolderId = master.questHomeFolderId;
               const questLabel = (questArg ?? label).trim().slice(0, 120);
+              // REUSE BY DEFAULT (owner rule 2026-10-09). A charter's quests
+              // are its ongoing matters; the "Apply for a job" runs minted
+              // one per job ("Apply for a job — SeatGeek …"), and every new
+              // quest grew a column on the shared output table. A name that
+              // matches no existing quest is refused unless the model says
+              // the user asked for a separate one (`newQuest`). The first
+              // quest of a charter is always free to mint.
+              const existingQuests = await listQuestLabels(master.masterId, master.masterCols);
+              const continuesExisting = existingQuests.some(
+                (existing) => existing.toLowerCase() === questLabel.toLowerCase(),
+              );
+              if (existingQuests.length > 0 && !continuesExisting && newQuestArg !== true) {
+                const shown = existingQuests.slice(0, 12).map((q) => `"${q}"`).join(", ");
+                return {
+                  ok: false,
+                  refusal:
+                    `${questArg ? `No quest named "${questLabel}" exists` : "No quest was named"} — and this charter's quests are reused by default. Existing quests: ${shown}${existingQuests.length > 12 ? ", …" : ""}. ` +
+                    "Re-propose with `quest` set to the existing one this run belongs to (an item such as one job is an ITEM of a quest, not a quest of its own). Only if the user explicitly asked for a separate quest, re-propose with `newQuest: true`; if it is unclear, ask them.",
+                  nextAction: "Re-propose with an existing quest name (or newQuest: true only on the user's explicit request). Do NOT start processing items.",
+                };
+              }
               const ensured = await ensureQuest({
                 userId: ctx.userId,
                 charterTitle: ctx.activeCharter.title,
@@ -999,11 +1186,14 @@ export function createBaseTools(ctx: ToolExecuteContext) {
                 // sitting gets its relation column on the ledger; the map is
                 // recomputed from the ledger so earlier sittings' tables stay
                 // linkable (a quest may capture into several tables).
+                // The user's table gets ONE shared "Quest" column for every
+                // quest (find-or-create by target), never one per quest.
+                const outputQuestColumns: Record<string, string> = {};
                 if (captureCfg) {
-                  await ensureOutputRelation(
-                    ensured.questLedgerId,
+                  await ensureOutputRelation(ensured.questLedgerId, captureCfg.tableId);
+                  outputQuestColumns[captureCfg.tableId] = await ensureOutputQuestColumn(
                     captureCfg.tableId,
-                    questLabel,
+                    master.masterId,
                   );
                 }
                 const outputRelations = await ledgerOutputRelations(
@@ -1035,6 +1225,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
                   ledgerCols: await tableColumnKeys(ensured.questLedgerId),
                   questRelationColumnId: ensured.questRelationColumnId,
                   outputRelations,
+                  outputQuestColumns,
                 };
                 // Quest memory (rejects INCLUDED): items this quest already
                 // scored in ANY earlier sitting — the recurring token saver
@@ -2083,8 +2274,14 @@ export function createBaseTools(ctx: ToolExecuteContext) {
       // is not ready, execute immediately and return a corrective tool result
       // so the model can continue working instead of surfacing a false
       // approval card.
+      // The final phase's checkpoint closes without a pause when the user
+      // set it to (§10 round 6c); checkpoints between phases always ask.
       needsApproval: () =>
-        getPhaseCheckpointGateStatus(ctx.phaseCheckpointGate).ready,
+        getPhaseCheckpointGateStatus(ctx.phaseCheckpointGate).ready &&
+        !toolAutoApproves(ctx.autoApprovedTools, {
+          tool: "phase_checkpoint",
+          finalPhase: ctx.charterFinalPhase === true,
+        }),
       description:
         "Call at EVERY phase boundary of a multi-phase procedure/charter. Pauses for the user's verdict (approve / revise / approve-with-tweaks) and records the phase in the Run Ledger note. " +
         "This is a completion signal, never a planning shortcut: do not call it until the phase's required research, linked-note reads, analysis, and outputs have actually been completed. The runtime rejects checkpoints that lack verifiable required tool activity. " +
@@ -2202,8 +2399,12 @@ export function createBaseTools(ctx: ToolExecuteContext) {
               ledger.created ? "created" : "updated",
               "run ledger",
             )),
-            nextAction:
-              "APPROVED. Continue IMMEDIATELY with the next phase in this same response — announce it in one line, then proceed. If this was the FINAL phase, give a short completion summary instead (artifacts + where they were saved).",
+            nextAction: toolAutoApproves(ctx.autoApprovedTools, {
+              tool: "phase_checkpoint",
+              finalPhase: ctx.charterFinalPhase === true,
+            })
+              ? AUTO_CLOSED_CHECKPOINT_NEXT
+              : "APPROVED. Continue IMMEDIATELY with the next phase in this same response — announce it in one line, then proceed. If this was the FINAL phase, give a short completion summary instead (artifacts + where they were saved).",
           };
         } catch (error) {
           return {
@@ -2324,8 +2525,22 @@ export function createBaseTools(ctx: ToolExecuteContext) {
     }),
     create_docx: tool({
       // Document creation is a mutating action — same HITL gate as
-      // create_note (AI v3 core S4b / A4).
-      needsApproval: true,
+      // create_note (AI v3 core S4b / A4) — unless the user set this tool to
+      // run without a card (§10 round 6c). An overwrite skips the card only
+      // for a document this chat created (tools/approval-policy.ts).
+      needsApproval: async (rawArgs) => {
+        const overwriteId =
+          typeof (rawArgs as { overwriteContentId?: unknown }).overwriteContentId === "string"
+            ? ((rawArgs as { overwriteContentId: string }).overwriteContentId.trim() || null)
+            : null;
+        if (!ctx.autoApprovedTools?.has("create_docx")) return true;
+        return !toolAutoApproves(ctx.autoApprovedTools, {
+          tool: "create_docx",
+          ...(overwriteId
+            ? { overwrite: { targetCreatedInThisChat: await contentCreatedInThisChat(ctx, overwriteId) } }
+            : {}),
+        });
+      },
       description:
         "Create a Word (.docx) document from markdown content and file it in the user's garden. " +
         "Use when the user asks for a Word/docx deliverable (e.g. a resume). Headings, lists, bold/italic and links from the markdown are preserved. Do NOT create output on your own initiative — only when the user asks for it. " +
@@ -2495,6 +2710,284 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         }
       },
     }),
+    // Document templates: the user's own .docx, marked in place, filled from
+    // keyed values by the renderer service (server/docx-renderer). The model
+    // reads a small CONTRACT, never the file — that is the token economy the
+    // feature exists for. read = list/contract; fill = render + file.
+    read_docx_template: tool({
+      description:
+        "Read a document template's field contract, or list the user's document templates (their own .docx files marked as templates) when templateId is omitted. The contract names every field and repeating section the template fills, the user's notes on them, and the checksum to pass to fill_docx_template. Call it before fill_docx_template — the contract is small; the file itself is never sent to you. " +
+        "Also the tool to call when the user asks how to make or change a template: the result carries the marking steps (the user does them in the app; you cannot mark or edit the file) and, when no template exists, the tagging grammar to coach them with.",
+      inputSchema: z.object({
+        templateId: z
+          .string()
+          .optional()
+          .describe("Content id of the template file. Omit to list every marked template with its id."),
+      }),
+      execute: async ({ templateId }) => {
+        if (!isDocxRendererConfigured()) {
+          return {
+            ok: false,
+            refusal: "Document templates are not available here: the renderer is not configured. Use create_docx for a Word document.",
+          };
+        }
+        if (!templateId) {
+          const templates = await listDocxTemplates(ctx.userId);
+          return {
+            ok: true,
+            templates: templates.map((t) => ({
+              templateId: t.contentId,
+              title: t.title,
+              fileName: t.fileName,
+              fields: t.fieldCount,
+              sections: t.sectionCount,
+            })),
+            howToMark: DOCX_TEMPLATE_MARKING_STEPS,
+            ...(templates.length === 0
+              ? {
+                  note: "No document templates are marked yet.",
+                  authoring:
+                    "If the user wants to make one, coach them to tag their own Word file (you cannot author its layout): {{ name }} for one value; {% for c in list %}{{ c }}{% if not loop.last %} • {% endif %}{% endfor %} for an inline list; a paragraph {%p for b in bullets %}, one bullet {{ b }}, a paragraph {%p endfor %} for a bullet list of any length; nest the same for positions → bullets; {% if x %}…{% endif %} for optional text. Each {%p %} tag alone in its own paragraph; never format mid-tag; dynamic counts are loops, not numbered slots. Guide: docs/notes-feature/guides/ai/DOCX-TEMPLATE-AUTHORING.md.",
+                }
+              : {}),
+          };
+        }
+        const loaded = await getDocxTemplateRecord(ctx.userId, templateId);
+        const record = loaded.record;
+        if (!loaded.ok || !record) {
+          return { ok: false, refusal: loaded.error ?? "Could not read the template.", ...(loaded.errors ? { templateErrors: loaded.errors } : {}) };
+        }
+        return {
+          ok: true,
+          templateId,
+          title: loaded.title,
+          checksum: record.checksum,
+          contract: describeTemplateForModel(record),
+          howToMark: DOCX_TEMPLATE_MARKING_STEPS,
+          valuesShape:
+            "A JSON object. Top-level keys are the field roots and the sections; a dotted field nests (header.name → { header: { name } }); a section is an array (of objects, or of strings when marked list of strings); a rich field takes { text, url }. Titles follow the contract: ONE title field gets \"Title — Employer\" combined; split fields (title, company) stay split; titles, employers and dates are copied from the source of record exactly. Never invent a fact: a required field you cannot fill from the evidence is a question for the user, not a blank. Cite sources in `provenance` (field path → row ids).",
+          ...(record.warnings.length > 0 ? { warnings: record.warnings } : {}),
+          ...(loaded.refreshed ? { note: "The template file changed since it was marked; this contract was refreshed from the current file." } : {}),
+        };
+      },
+    }),
+    fill_docx_template: tool({
+      // Same HITL gate as create_docx, and the SAME user setting: a filled
+      // template is a Word document the chat is creating; a fourth toggle
+      // would ask the user to decide the same thing twice.
+      needsApproval: async (rawArgs) => {
+        const overwriteId =
+          typeof (rawArgs as { overwriteContentId?: unknown }).overwriteContentId === "string"
+            ? ((rawArgs as { overwriteContentId: string }).overwriteContentId.trim() || null)
+            : null;
+        if (!ctx.autoApprovedTools?.has("create_docx")) return true;
+        return !toolAutoApproves(ctx.autoApprovedTools, {
+          tool: "create_docx",
+          ...(overwriteId
+            ? { overwrite: { targetCreatedInThisChat: await contentCreatedInThisChat(ctx, overwriteId) } }
+            : {}),
+        });
+      },
+      description:
+        "Fill one of the user's document templates — a .docx they marked as a template — with keyed values, and file the result as a Word document that keeps the template's layout. Use ONLY when the user chose a template (by name, by @mention, or through a charter that names one); otherwise use create_docx. Call read_docx_template first and make `values` follow its contract exactly. Never invent a fact: leave the field empty and tell the user which fields you left empty. " +
+        "Targeting works as in create_docx: omit placement fields to use the configured output-target preset; pass outputLocation when the user or active charter routes this document; parentId only for a resolved folder id; overwriteContentId to regenerate an existing document in place (same id, so every File cell and shortcut keeps pointing at it — never create a second copy for an update).",
+      inputSchema: z.object({
+        templateId: z.string().describe("Content id of the template file, from read_docx_template."),
+        values: z
+          .record(z.string(), z.unknown())
+          .describe("The filled contract — field roots and sections as keys, exactly as read_docx_template described them."),
+        title: z
+          .string()
+          .optional()
+          .describe("Title for the document (also its file name); defaults to the template's title."),
+        expectedChecksum: z
+          .string()
+          .optional()
+          .describe("The checksum read_docx_template returned. The fill is refused if the template changed since, so values are never poured into a layout you did not read."),
+        provenance: z
+          .record(z.string(), z.array(z.string()))
+          .optional()
+          .describe(
+            "Where each factual value came from: field path (summary, experience_bullets[2], experience[0].title) → the source row ids it was taken from (the evidence database's claim rows, as query_database returned them). Cite bullets, figures, titles and dates. A cited id that does not exist is a refusal; uncited bullets are reported to the user.",
+          ),
+        parentId: z.string().optional().describe("Destination folder id — only when the user explicitly named a folder."),
+        outputLocation: z
+          .string()
+          .optional()
+          .describe('Per-document relative destination: "under_chat", "under_content" or "beside_content" — only when the user or charter routes this document differently from the preset.'),
+        alsoShortcutTo: z.string().optional().describe("Folder id to ALSO mirror the document into via a shortcut."),
+        overwriteContentId: z
+          .string()
+          .optional()
+          .describe("Id of an EXISTING document to overwrite in place. Placement fields are ignored in overwrite mode."),
+      }),
+      execute: async (rawArgs) => {
+        const { templateId, values, expectedChecksum, provenance, parentId, outputLocation, alsoShortcutTo, overwriteContentId } = rawArgs;
+        if (!isDocxRendererConfigured()) {
+          return { ok: false, refusal: "Document templates are not available here: the renderer is not configured. Use create_docx instead." };
+        }
+        if (!values || typeof values !== "object" || Array.isArray(values)) {
+          return {
+            ok: false,
+            refusal: "fill_docx_template needs `values` as a JSON object.",
+            nextAction: "Call read_docx_template for the contract, then call fill_docx_template again with `values` set.",
+          };
+        }
+        const loaded = await loadDocxTemplate(ctx.userId, templateId);
+        const template = loaded.template;
+        if (!loaded.ok || !template) {
+          return { ok: false, refusal: loaded.error ?? "Could not load the template.", ...(loaded.errors ? { templateErrors: loaded.errors } : {}) };
+        }
+        if (expectedChecksum && expectedChecksum.trim() && expectedChecksum.trim() !== template.record.checksum) {
+          return {
+            ok: false,
+            refusal: "The template file changed since you read its contract.",
+            checksum: template.record.checksum,
+            contract: describeTemplateForModel(template.record),
+            nextAction: "Check your values against this contract and call fill_docx_template again with the new checksum.",
+          };
+        }
+        const typedValues = values as Record<string, TemplateValue>;
+        // Provenance is checked BEFORE rendering: a citation that does not
+        // resolve to one of the user's rows means the model cited something
+        // it never read, and no document should be produced from it.
+        const citations = await verifyProvenance(ctx.userId, provenance ?? {});
+        if (citations.notFound.length > 0) {
+          return {
+            ok: false,
+            refusal: `Refused: cited source rows do not exist — ${citations.notFound.slice(0, 5).join(", ")}. Cite only row ids you read with query_database in this conversation.`,
+            nextAction: "Re-read the evidence rows, correct the provenance, and call fill_docx_template again.",
+          };
+        }
+        const rendered = await renderDocxTemplate(template.bytes, typedValues, {
+          expectedChecksum: template.record.checksum,
+          fileName: template.node.filePayload.fileName,
+        });
+        const docx = rendered.docx;
+        const diagnostics = rendered.diagnostics;
+        if (!rendered.ok || !docx || !diagnostics) {
+          const failure = rendered.error ?? { code: "renderer_failed", message: "no document came back" };
+          return {
+            ok: false,
+            refusal: `The renderer could not fill the template: ${failure.message}`,
+            code: failure.code,
+            ...(failure.details ? { templateErrors: failure.details } : {}),
+          };
+        }
+        // The renderer reported; the product judges (docx-templates/judge.ts):
+        // a bad write is refused with a reason the model can act on.
+        const verdict = judgeRender(template.record, typedValues, diagnostics, {
+          links: countHyperlinkValues(typedValues),
+          provenance,
+        });
+        if (!verdict.accept) {
+          return {
+            ok: false,
+            refusal: verdict.refusal ?? "The filled document was not accepted.",
+            problems: verdict.gaps,
+            nextAction: "Do not write the document anywhere else. Fix the values (or ask the user) and call fill_docx_template again.",
+          };
+        }
+        const title = (rawArgs.title?.trim() || template.node.title.replace(/\.docx$/i, "")).trim();
+        const stored = { title, buffer: docx, searchText: rendered.text ?? "" };
+        // Compact on purpose: the tool result re-enters the model's context.
+        // No values echo, no text — the positive report and what changes
+        // the model's next sentence to the user.
+        const report = compactReport(verdict);
+        const compact = {
+          templateId,
+          templateTitle: template.node.title,
+          ...(report ? { report } : {}),
+          ...(citations.total > 0
+            ? { provenance: { verified: citations.verified, unverified: citations.unverified.length } }
+            : {}),
+          renderMs: diagnostics.durationMs,
+          ...(template.refreshed
+            ? { note: "The template file had changed since it was marked; its contract was refreshed before filling." }
+            : {}),
+        };
+        // The output remembers its values and provenance (record.ts
+        // docxFill) — what the Template Fields sidebar edits and re-renders
+        // without a model turn.
+        const recordFill = (contentNodeId: string, overwritten: boolean) =>
+          writeFillRecord(
+            contentNodeId,
+            {
+              version: 1,
+              templateId,
+              templateChecksum: template.record.checksum,
+              values: typedValues,
+              ...(provenance ? { provenance } : {}),
+              renderedAt: new Date().toISOString(),
+              ...(report ? { report } : {}),
+            },
+            { overwritten, renderMs: diagnostics.durationMs, bytes: diagnostics.bytes, provenance: citations, via: "tool" },
+          );
+        const effectiveOutputLocation =
+          (outputLocation as ToolOutputLocation | undefined) ??
+          resolveCharterOutputLocation(ctx.charterOutputDirectives, title);
+
+        if (overwriteContentId) {
+          try {
+            const result = await storeDocxDocument(ctx.userId, { ...stored, overwriteContentId });
+            await recordFill(result.contentNodeId, true);
+            return {
+              __docPayload: true,
+              contentNodeId: result.contentNodeId,
+              fileName: result.fileName,
+              overwritten: true,
+              ...compact,
+              ...(await getContentWriteReceiptEnvelope(ctx.userId, result.contentNodeId, "updated", "Word document")),
+            };
+          } catch (error) {
+            return `Could not overwrite the document: ${error instanceof Error ? error.message : "unknown error"}.`;
+          }
+        }
+
+        const placement = resolveToolOutputPlacement(ctx, parentId, effectiveOutputLocation);
+        if (placement.error) return placement.error;
+        const destination = placement.parentId;
+        if (!destination) {
+          return "No destination folder: this chat has no target folder set. Ask the user to pick a target (the folder chip in the header) or to name a folder, then use create_folder.";
+        }
+        const owned = await prisma.contentNode.findFirst({
+          where: { id: destination, ownerId: ctx.userId, contentType: "folder", deletedAt: null },
+          select: { id: true },
+        });
+        if (!owned) return `Destination folder ${destination} was not found or is not a folder.`;
+        try {
+          const result = await storeDocxDocument(ctx.userId, {
+            ...stored,
+            parentFolderId: destination,
+            ...(placement.ownedByNoteId
+              ? { role: "referenced" as const, ownedByNoteId: placement.ownedByNoteId }
+              : {}),
+          });
+          await recordFill(result.contentNodeId, false);
+          if (ctx.conversationId) {
+            void addAutoAssociation(ctx.userId, ctx.conversationId, result.contentNodeId, "tool-call").catch(() => null);
+          }
+          let mirror: Record<string, unknown> = {};
+          if (alsoShortcutTo) {
+            const s = await findOrCreateShortcut(ctx.userId, result.contentNodeId, alsoShortcutTo);
+            mirror = s.contentNodeId
+              ? { shortcutId: s.contentNodeId, shortcutParentId: alsoShortcutTo }
+              : { shortcutError: s.error ?? "could not create the shortcut" };
+          }
+          return {
+            __docPayload: true,
+            contentNodeId: result.contentNodeId,
+            fileName: result.fileName,
+            parentFolderId: destination,
+            ...mirror,
+            ...compact,
+            ...(await getContentWriteReceiptEnvelope(ctx.userId, result.contentNodeId, "created", "Word document")),
+          };
+        } catch (error) {
+          return `Could not create the document: ${error instanceof Error ? error.message : "unknown error"}.`;
+        }
+      },
+    }),
     // The GARDEN-WIDE finder (D2, owner report 2026-09-10). Replaces the old
     // `searchNotes`, which was hard-scoped to `contentType: "note"` and so
     // could not see databases, folders, files, or anything else. That blind
@@ -2552,31 +3045,19 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         // a time until the step cap cut it off. Listing is the answer to
         // "which ones are there?"; matching can't be.
         const term = query.trim();
+        // ONE query builder with the search route (lib/domain/content/
+        // search-service.ts, 2026-10-12). The tool used to match only the
+        // title, note text and a database's schema text; it now matches
+        // every indexed payload the route does — including database ROWS,
+        // which roll up to their table — so "find the job at Acme" lands on
+        // the table that holds that row.
         const results = await prisma.contentNode.findMany({
-          where: {
+          where: buildSearchWhere({
             ownerId: ctx.userId,
-            deletedAt: null,
-            contentType: { in: scope },
-            ...(term
-              ? {
-                  OR: [
-                    { title: { contains: term, mode: "insensitive" } },
-                    {
-                      notePayload: {
-                        searchText: { contains: term, mode: "insensitive" },
-                      },
-                    },
-                    // Databases index title + column names here (schema B2),
-                    // so a table is findable by a FIELD the user names.
-                    {
-                      dataPayload: {
-                        searchText: { contains: term, mode: "insensitive" },
-                      },
-                    },
-                  ],
-                }
-              : {}),
-          },
+            query: term,
+            types: scope,
+            fields: ALL_SEARCH_FIELDS,
+          }),
           select: {
             id: true,
             title: true,
@@ -2757,7 +3238,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
 
         // Notes and folders: the folder "Notes" editor writes a notePayload
         // too, so both render the same way.
-        const renderNoteText = (): string => {
+        const renderNoteText = async (): Promise<string> => {
           if (!content.notePayload) {
             return content.contentType === "folder"
               ? `${header}\n\nThis folder has no notes content of its own. Its sources and children are read with read_folder_context.`
@@ -2775,7 +3256,28 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             : "";
           const text =
             liveText || content.notePayload.searchText || "(empty note)";
-          return `${header}\nContent:\n${text}`;
+          // The text extractor drops image nodes, so without this the model
+          // cannot tell a note holds a screenshot at all. Private content is
+          // stripped inside listNoteImages (a registered egress seam).
+          const images = content.notePayload.tiptapJson
+            ? describeNoteImages(
+                listNoteImages(content.notePayload.tiptapJson as JSONContent),
+                ctx.imageTextReadable === true,
+                ctx.imageViewable === true,
+              )
+            : null;
+          // `[[Database#Column]]` links: the column's header + description
+          // (lib/domain/data/server/column-links.ts). Collected after the
+          // private strip, so a commented-out link describes nothing.
+          const columns = content.notePayload.tiptapJson
+            ? await describeLinkedColumns(
+                ctx.userId,
+                collectColumnLinkIds(
+                  stripPrivateContent(content.notePayload.tiptapJson as JSONContent),
+                ),
+              )
+            : "";
+          return `${header}\nContent:\n${text}${images ? `\n\n${images}` : ""}${columns ? `\n\n${columns}` : ""}`;
         };
 
         /**
@@ -2789,8 +3291,8 @@ export function createBaseTools(ctx: ToolExecuteContext) {
          * refusal (the `default:`-hides-gaps lesson).
          */
         const renderers: Record<ContentType, () => Promise<string>> = {
-          note: async () => renderNoteText(),
-          folder: async () => renderNoteText(),
+          note: renderNoteText,
+          folder: renderNoteText,
 
           data: async () => {
             const preview = await renderDataNodePreview(contentId, {
@@ -2846,9 +3348,16 @@ export function createBaseTools(ctx: ToolExecuteContext) {
                 : "\n\nNo extracted text is held for this book.";
               return `${header}\n\n${facts}${capsule ? `\n\n${capsule}` : ""}${excerpt}`;
             }
+            const isImage = f.mimeType.startsWith("image/");
+            const noText =
+              isImage && ctx.imageViewable === true
+                ? "\n\nThis is an image. To see what it shows, call view_image with this content id."
+                : isImage && ctx.imageTextReadable === true
+                  ? "\n\nNo extracted text is held for this image. Read its text with read_image_text (this content id)."
+                  : "\n\nNo extracted text is held for this file. Attach it to the conversation if its contents are needed.";
             const body = f.searchText.trim()
               ? `\n\nExtracted text:\n${f.searchText.trim()}`
-              : "\n\nNo extracted text is held for this file. Attach it to the conversation if its contents are needed.";
+              : noText;
             return `${header}\n\n${facts}${body}`;
           },
 
@@ -2924,8 +3433,10 @@ export function createBaseTools(ctx: ToolExecuteContext) {
       // File creation is a mutating action: pause the tool loop for user
       // approval before executing (AI SDK v6 native HITL). The chat surface
       // renders the approval card; execution resumes via
-      // addToolApprovalResponse.
-      needsApproval: true,
+      // addToolApprovalResponse — unless the user set this tool to run
+      // without a card (§10 round 6c).
+      needsApproval: () =>
+        !toolAutoApproves(ctx.autoApprovedTools, { tool: "create_note" }),
       description:
         "Create a NEW note in the user's Digital Garden. Use this only when the user EXPLICITLY asks for a new file. " +
         "Ambiguous phrasings to watch for: 'update the note in this chat', 'add to this conversation's notes', 'put X in the note' — these do NOT mean 'create a new note'. They typically refer to an existing note. When the phrasing is ambiguous, ASK the user whether to create a new note or update an existing one before calling this tool. " +

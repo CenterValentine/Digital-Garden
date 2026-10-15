@@ -26,6 +26,20 @@ const TOOL_REGISTRY: ToolDefinition[] = [
     isToggle: true,
   },
   {
+    // "Show in file tree": opens the item's ancestors (adding to the tree's
+    // expansion, never collapsing), scrolls it into view if it is out of
+    // view, selects it and pulses the row. Every content type — the tree
+    // holds them all. Handler: MainPanelContent → state/tree-reveal-store.
+    id: "reveal-in-tree",
+    label: "Show in file tree",
+    iconName: "FolderTree",
+    surfaces: ["toolbar"],
+    contentTypes: "all",
+    order: 20,
+    group: "view",
+    iconOnly: true,
+  },
+  {
     id: "copy-link",
     label: "Copy Link",
     iconName: "Link2",

@@ -26,7 +26,8 @@ import {
   type KeyboardEvent,
   type FormEvent,
 } from "react";
-import { ArrowUp, Square, Mic, Paperclip, X, FileText, Loader2, ScrollText, ListChecks } from "lucide-react";
+import { ArrowUp, Square, Mic, Paperclip, X, FileText, Loader2, ScrollText, ListChecks, ScanText } from "lucide-react";
+import { imageTextHint } from "@/lib/features/ocr/attachment-hint";
 import { useDrop } from "react-dnd";
 import { cn } from "@/lib/core/utils";
 import {
@@ -44,6 +45,9 @@ import { useImagePreviewStore } from "@/state/image-preview-store";
 import { useContentStore } from "@/state/content-store";
 import { PanelPageContextBar } from "./PanelPageContextBar";
 import { isPanelEmbedSurface } from "@/lib/domain/browser-extension/panel-bridge";
+import { MENTION_RE } from "@/lib/domain/ai/mention-markup";
+import { parseColumnAnchor } from "@/lib/domain/data/column-anchor";
+import { listDatabaseColumnAnchors } from "@/lib/domain/data/column-link-anchors";
 
 // react-arborist's drag source type. Must match `type: "NODE"` in
 // node_modules/react-arborist/dist/main/dnd/drag-hook.js so the composer
@@ -57,8 +61,6 @@ interface ArboristDragItem {
   dragIds: string[];
 }
 
-/** Mention syntax: `@[Title](id)`. Used in serializer + parser + send-side. */
-const MENTION_RE = /@\[([^\]]+)\]\(([^)]+)\)/g;
 
 /** Platform-appropriate modifier name for the mention-pill open hint. */
 const OPEN_MODIFIER_LABEL =
@@ -227,10 +229,21 @@ export function ChatInput({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only; value read once to gate initial focus
   }, []);
 
+  // Tab on a database in the @ menu lists its COLUMNS (`@Jobs#`), filtered
+  // locally as the user types — a column mention carries that column's
+  // header + description to the AI (lib/domain/data/server/column-links.ts).
+  // The same drill as the editor's `[[Jobs#` step, sharing its lister.
+  const [columnDrill, setColumnDrill] = useState<{
+    title: string;
+    columns: SuggestionItem[];
+    query: string;
+  } | null>(null);
+
   const closeSuggestions = useCallback(() => {
     setSuggestionMode(null);
     setSelectedIndex(0);
     setFilteredCommands([]);
+    setColumnDrill(null);
     triggerRangeRef.current = null;
   }, []);
 
@@ -307,6 +320,17 @@ export function ChatInput({
       return;
     }
     triggerRangeRef.current = trig.range;
+    if (trig.kind === "mention" && columnDrill) {
+      // Still inside `@Title#…`: narrow the columns, never search content.
+      const prefix = `${columnDrill.title}#`;
+      if (trig.query.startsWith(prefix)) {
+        setColumnDrill({ ...columnDrill, query: trig.query.slice(prefix.length) });
+        setSuggestionMode("mention");
+        setSelectedIndex(0);
+        return;
+      }
+      setColumnDrill(null);
+    }
     if (trig.kind === "mention") {
       // A dead mention (spaced query that returned nothing, or Escaped)
       // stays closed while the user keeps extending the same text; editing
@@ -340,6 +364,7 @@ export function ChatInput({
     }
   }, [
     closeSuggestions,
+    columnDrill,
     commandItems,
     detectActiveTrigger,
     emit,
@@ -349,8 +374,20 @@ export function ChatInput({
 
   // ── suggestion menu plumbing ──
 
+  const drillQuery = columnDrill?.query.trim().toLowerCase() ?? "";
   const suggestionItems =
-    suggestionMode === "mention" ? mentionResults : filteredCommands;
+    suggestionMode === "mention"
+      ? columnDrill
+        ? columnDrill.columns.filter(
+            (column) =>
+              !drillQuery ||
+              column.label.slice(columnDrill.title.length + 1).toLowerCase().includes(drillQuery),
+          )
+        : mentionResults
+      : filteredCommands;
+  const highlighted = suggestionItems[selectedIndex];
+  const highlightedIsDatabase =
+    suggestionMode === "mention" && !columnDrill && highlighted?.contentType === "data" && !highlighted.row;
   const showMenu = suggestionMode !== null && suggestionItems.length > 0;
 
   useEffect(() => {
@@ -456,6 +493,54 @@ export function ChatInput({
     [closeSuggestions, emit, onAttachCharter, onMentionInserted, onResolveMention, suggestionMode],
   );
 
+  // Tab on a database: rewrite the typed `@query` to `@Title#` and list the
+  // table's columns.
+  const drillIntoColumns = useCallback(
+    (item: SuggestionItem) => {
+      const root = editorRef.current;
+      const triggerRange = triggerRangeRef.current;
+      if (!root || !triggerRange) return;
+      const sel = window.getSelection();
+      const caretRange = sel && sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
+      const replaceRange = document.createRange();
+      replaceRange.setStart(triggerRange.startContainer, triggerRange.startOffset);
+      if (caretRange && caretRange.collapsed && root.contains(caretRange.startContainer)) {
+        replaceRange.setEnd(caretRange.startContainer, caretRange.startOffset);
+      } else {
+        replaceRange.setEnd(triggerRange.endContainer, triggerRange.endOffset);
+      }
+      replaceRange.deleteContents();
+      const typed = document.createTextNode(`@${item.label}#`);
+      replaceRange.insertNode(typed);
+      placeCaretAfter(typed);
+      const nextTrigger = document.createRange();
+      nextTrigger.setStart(typed, 0);
+      nextTrigger.setEnd(typed, typed.data.length);
+      triggerRangeRef.current = nextTrigger;
+      setColumnDrill({ title: item.label, columns: [], query: "" });
+      setSelectedIndex(0);
+      emit();
+      void listDatabaseColumnAnchors({ id: item.id, title: item.label, contentType: "data" }, "")
+        .then((anchors) =>
+          setColumnDrill((current) =>
+            current && current.title === item.label
+              ? {
+                  ...current,
+                  columns: (anchors ?? []).map((anchor) => ({
+                    id: anchor.anchor,
+                    label: `${item.label}#${anchor.label}`,
+                    description: anchor.detail,
+                    contentType: "data-column",
+                  })),
+                }
+              : current,
+          ),
+        )
+        .catch(() => setColumnDrill(null));
+    },
+    [emit],
+  );
+
   // ── submit / keyboard ──
 
   const handleSubmit = useCallback(
@@ -484,6 +569,11 @@ export function ChatInput({
           setSelectedIndex((prev) =>
             prev > 0 ? prev - 1 : suggestionItems.length - 1,
           );
+          return;
+        }
+        if (e.key === "Tab" && !e.shiftKey && highlightedIsDatabase && highlighted) {
+          e.preventDefault();
+          drillIntoColumns(highlighted);
           return;
         }
         if (e.key === "Enter" || e.key === "Tab") {
@@ -528,6 +618,9 @@ export function ChatInput({
       closeSuggestions,
       handleSubmit,
       emit,
+      highlighted,
+      highlightedIsDatabase,
+      drillIntoColumns,
     ],
   );
 
@@ -544,7 +637,8 @@ export function ChatInput({
       const pill = target?.closest?.("[data-mention]") as HTMLElement | null;
       if (!pill || !editorRef.current?.contains(pill)) return;
       const id = pill.dataset.id;
-      if (!id) return;
+      // A column mention names part of a table, not a content node.
+      if (!id || parseColumnAnchor(id)) return;
       e.preventDefault();
       useContentStore
         .getState()
@@ -722,6 +816,14 @@ export function ChatInput({
             selectedIndex={selectedIndex}
             onSelect={handleSelect}
             mode={suggestionMode!}
+            header={columnDrill ? `Columns of ${columnDrill.title}` : undefined}
+            footer={
+              columnDrill
+                ? "AI reads the mentioned column's description"
+                : highlightedIsDatabase
+                  ? "Tab — mention a column · AI reads its description"
+                  : undefined
+            }
           />
         )}
 
@@ -813,6 +915,7 @@ export function ChatInput({
               <AttachmentChip
                 key={a.id}
                 attachment={a}
+                modelCanSee={supportsImages}
                 onRemove={() => onRemoveAttachment?.(a.id)}
               />
             ))}
@@ -877,7 +980,7 @@ export function ChatInput({
                 title={
                   supportsImages
                     ? "Attach images or text files"
-                    : "Attach text files (active model can't read images)"
+                    : "Attach files — this model can't see images, so their text is read on your device and sent instead"
                 }
                 aria-label="Attach files"
                 className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-black/[0.06] dark:hover:bg-white/10 transition-colors"
@@ -1112,13 +1215,17 @@ function insertPlainTextAtCaret(text: string) {
 
 function AttachmentChip({
   attachment,
+  modelCanSee,
   onRemove,
 }: {
   attachment: ChatAttachment;
+  /** False when the selected model can't see images (D18). */
+  modelCanSee: boolean;
   onRemove: () => void;
 }) {
   const { name, kind, status, url, error } = attachment;
   const isImage = kind === "image";
+  const textHint = isImage && !modelCanSee && status === "ready" ? imageTextHint(attachment) : null;
   return (
     <div
       className={cn(
@@ -1168,6 +1275,22 @@ function AttachmentChip({
         </button>
       ) : (
         <span className="truncate">{name}</span>
+      )}
+      {textHint && (
+        // D18: this model can't see the image — the hover says what it gets instead.
+        <span
+          title={textHint.title}
+          aria-label={textHint.title}
+          data-image-text-hint={attachment.ocrStatus ?? "pending"}
+          className="flex shrink-0 cursor-help items-center gap-0.5 rounded bg-amber-500/15 px-1 py-px text-[10px] font-medium text-amber-700 dark:text-amber-300"
+        >
+          {attachment.ocrStatus === "done" || attachment.ocrStatus === "failed" ? (
+            <ScanText className="h-3 w-3" />
+          ) : (
+            <Loader2 className="h-3 w-3 animate-spin" />
+          )}
+          {textHint.label}
+        </span>
       )}
       <button
         type="button"

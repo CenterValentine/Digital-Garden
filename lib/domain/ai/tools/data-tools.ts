@@ -76,9 +76,12 @@ import {
 import { NEW_TABLE_REF_PREFIX } from "@/lib/domain/data/server/linked-schema";
 import {
   createRows,
+  softDeleteRows,
   writeCells,
   type CellWrite,
 } from "@/lib/domain/data/server/mutations";
+import { readAiPolicy, type AiDeletePolicy } from "@/lib/domain/data/ai-policy";
+import { publishEvent } from "@/lib/domain/notifications/service";
 import { ensureLedgersForMasterRows } from "@/lib/domain/ai/quests";
 import {
   AI_PROPOSABLE_COLUMN_TYPES,
@@ -96,6 +99,10 @@ import {
 } from "@/lib/domain/data";
 import type { ToolExecuteContext } from "./types";
 import { summarizeRejections } from "@/lib/domain/data/cells";
+import {
+  BULK_READ_DEFAULT_TOKENS,
+  effectiveBulkReadThreshold,
+} from "@/lib/features/settings/validation";
 
 
 const DEFAULT_LIMIT = 100;
@@ -105,8 +112,8 @@ const MAX_LIMIT = 1000;
 const BULK_CLIP_CHARS = 120;
 /** Index-tier relation rendering: one short linked title, then "+N more". */
 const INDEX_RELATION_RENDER = { maxLinkedTitles: 1, linkedTitleClip: 40 } as const;
-/** Default threshold when the user has not set one (plan D3). */
-export const DEFAULT_BULK_READ_THRESHOLD = 6_000;
+/** Default threshold when the user has not set one (plan D3; 25k since 2026-09-30). */
+export const DEFAULT_BULK_READ_THRESHOLD = BULK_READ_DEFAULT_TOKENS;
 /**
  * Bulk reads up to this many tokens need no approval inside a charter turn
  * (the attachment is the consent). Above it the user's threshold applies.
@@ -141,10 +148,7 @@ function numberOf(v: unknown): number | null {
 
 export async function bulkReadThresholdFor(userId: string): Promise<number> {
   const settings = await getUserSettings(userId).catch(() => null);
-  const n = settings?.ai?.bulkReadTokenThreshold;
-  return typeof n === "number" && Number.isFinite(n) && n > 0
-    ? n
-    : DEFAULT_BULK_READ_THRESHOLD;
+  return effectiveBulkReadThreshold(settings?.ai?.bulkReadTokenThreshold);
 }
 
 export function bulkReadCeilingFor(modelId: string | undefined): number {
@@ -513,10 +517,35 @@ async function openForWrite(
 
 /** Cap on rows a single bulk update may touch. Mirrors INSERT_CAP. */
 const UPDATE_ROW_CAP = 25;
+/** Cap on rows a single delete may touch. Mirrors UPDATE_ROW_CAP. */
+const DELETE_ROW_CAP = 25;
+
+/**
+ * The table's delete policy for `needsApproval`, which runs BEFORE execute
+ * and cannot refuse — it can only decide whether to pause. Anything that
+ * fails to resolve reads as "confirm": the card then shows a request the
+ * user can reject, and execute reports the real problem if they approve.
+ */
+async function deletePolicyFor(
+  ctx: ToolExecuteContext,
+  databaseId: string | undefined
+): Promise<AiDeletePolicy> {
+  try {
+    const dbRef = await resolveDatabaseRef(ctx, databaseId);
+    if ("refusal" in dbRef) return "confirm";
+    const payload = await prisma.dataPayload.findUnique({
+      where: { contentId: dbRef.id },
+      select: { aiPolicy: true },
+    });
+    return readAiPolicy(payload?.aiPolicy).delete;
+  } catch {
+    return "confirm";
+  }
+}
 /** Cells one row may change in a single update. */
 const UPDATE_CELL_CAP = 10;
 
-interface RowUpdateInput {
+export interface RowUpdateInput {
   rowId: string;
   cells: Record<string, string | number | boolean | string[] | null>;
   expect?: Record<string, string | number | boolean | string[] | null>;
@@ -543,7 +572,7 @@ interface RowUpdateInput {
  * cell REPLACES that column's links for its row, and links are only touched
  * once every cell write has landed.
  */
-async function applyRowUpdates(
+export async function applyRowUpdates(
   ctx: ToolExecuteContext,
   databaseId: string,
   table: DataTable,
@@ -711,6 +740,175 @@ async function applyRowUpdates(
   const normalizedPart =
     normalizations.length > 0 ? ` (normalized: ${normalizations.join("; ")})` : "";
   return `${cellPart}${normalizedPart}${linkPart}${questPart} The user sees the change in the grid and can undo it there.`;
+}
+
+/**
+ * Append rows to a table — ONE write path for chat's `insert_rows` and the
+ * MCP server's `garden_insert_rows` (MCP-DATABASE-REACH-PLAN §2.3). Every
+ * cell is translated and validated before anything is created, relation
+ * cells are linked after the rows exist, and master-ledger rows mint their
+ * quest ledgers. Returns the prose receipt chat shows; callers that need
+ * structure parse the leading "Inserted N" line.
+ */
+export async function applyRowInserts(
+  ctx: ToolExecuteContext,
+  databaseId: string,
+  table: DataTable,
+  rows: Array<Record<string, unknown>>,
+  dedupeBy: string | undefined
+): Promise<string> {
+  const live = table.columns.filter((c) => !c.deletedAt);
+
+  // Dedupe against existing values of one column (co-browse
+  // idempotency). Design scale (plan D1) makes a full scan fine.
+  const seen = new Set<string>();
+  let dedupeColumn: DataColumn | undefined;
+  if (dedupeBy) {
+    dedupeColumn = findColumn(live, dedupeBy);
+    if (!dedupeColumn) {
+      // Name the choices (prod 36237eb8: a bare refusal cost a
+      // guessed retry — "Name" was "Gap Name"). Nothing inserted.
+      return `Nothing inserted — no column named "${dedupeBy}" to dedupe by. Columns here: ${live.map((c) => c.name).join(", ")}.`;
+    }
+    const existing = await prisma.dataRow.findMany({
+      where: { tableId: databaseId, deletedAt: null },
+      select: { data: true },
+    });
+    for (const r of existing) {
+      const v = ((r.data ?? {}) as Record<string, unknown>)[
+        dedupeColumn.key
+      ];
+      if (typeof v === "string" && v) seen.add(v.trim().toLowerCase());
+    }
+  }
+
+  // Translate + validate every row BEFORE creating anything, so a
+  // bad batch fails whole instead of half-landing.
+  const prepared: Array<Record<string, unknown>> = [];
+  // Relation cells are resolved per row but written AFTER the row
+  // exists — a link needs both ends (plan P4).
+  const preparedLinks: Array<
+    Array<{ columnId: string; rowIds: string[] }>
+  > = [];
+  const skipped: string[] = [];
+  const errors: string[] = [];
+  // One read per target table for the whole batch, not per cell.
+  const relationCache = createRelationTargetCache();
+  for (let i = 0; i < rows.length; i++) {
+    const rowInput = rows[i];
+    const cells: Record<string, unknown> = {};
+    const links: Array<{ columnId: string; rowIds: string[] }> = [];
+    for (const [ref, raw] of Object.entries(rowInput)) {
+      const column = findColumn(live, ref);
+      if (!column) {
+        errors.push(`Row ${i + 1}: no column named "${ref}".`);
+        continue;
+      }
+      if (column.type === "relation") {
+        const resolved = await resolveRelationCell(
+          column,
+          raw,
+          ctx.userId,
+          relationCache
+        );
+        if ("error" in resolved) {
+          errors.push(`Row ${i + 1}: ${resolved.error}`);
+          continue;
+        }
+        if (resolved.rowIds.length > 0) {
+          links.push({ columnId: column.id, rowIds: resolved.rowIds });
+        }
+        continue;
+      }
+      const blocked = writeBlockReason(column);
+      if (blocked) {
+        errors.push(`Row ${i + 1}: ${blocked}`);
+        continue;
+      }
+      cells[column.key] = normalizeCellInput(column, raw);
+    }
+    if (dedupeColumn) {
+      const v = cells[dedupeColumn.key];
+      if (
+        typeof v === "string" &&
+        seen.has(v.trim().toLowerCase())
+      ) {
+        skipped.push(
+          `Row ${i + 1} (${String(v).slice(0, 60)}) — already present`
+        );
+        continue;
+      }
+      if (typeof v === "string" && v) seen.add(v.trim().toLowerCase());
+    }
+    prepared.push(cells);
+    preparedLinks.push(links);
+  }
+  if (errors.length > 0) {
+    return `Nothing inserted — fix these first:\n${errors.join("\n")}\nColumns here: ${live.map((c) => c.name).join(", ")}.`;
+  }
+  if (prepared.length === 0) {
+    return `Nothing to insert — all ${rows.length} rows were duplicates by ${dedupeColumn?.name}.${skipped.length ? `\nSkipped:\n${skipped.join("\n")}` : ""}`;
+  }
+
+  const rowIds = await createRows(
+    databaseId,
+    live,
+    prepared.length,
+    ctx.userId
+  );
+  const writes: CellWrite[] = [];
+  rowIds.forEach((rowId, i) => {
+    for (const [key, value] of Object.entries(prepared[i])) {
+      writes.push({ rowId, columnKey: key, value });
+    }
+  });
+  const result = await writeCells(databaseId, live, writes);
+  const failed = result.results.filter((r) => r.status === "error");
+
+  // Links last: the rows they point FROM had to exist first.
+  let linksWritten = 0;
+  for (const [i, rowId] of rowIds.entries()) {
+    for (const link of preparedLinks[i] ?? []) {
+      const { added } = await writeRelationLinks(
+        link.columnId,
+        rowId,
+        link.rowIds
+      );
+      linksWritten += added;
+    }
+  }
+  // Hard rule (quests): named rows inserted into a charter's master
+  // ledger are quests the moment they exist — each gets its ledger.
+  const questLedgers = await ensureLedgersForMasterRows(
+    ctx.userId,
+    databaseId,
+    rowIds,
+  ).catch(() => 0);
+
+  const parts = [
+    `Inserted ${rowIds.length} row${rowIds.length === 1 ? "" : "s"}${
+      linksWritten > 0
+        ? ` and ${linksWritten} link${linksWritten === 1 ? "" : "s"}`
+        : ""
+    }.`,
+  ];
+  if (questLedgers > 0) {
+    parts.push(
+      `${questLedgers} quest ledger${questLedgers === 1 ? "" : "s"} minted under the charter — these rows are quests now; a run proposed with that quest name continues them.`,
+    );
+  }
+  if (skipped.length > 0) {
+    parts.push(`Skipped ${skipped.length} duplicate${skipped.length === 1 ? "" : "s"}:\n${skipped.join("\n")}`);
+  }
+  if (failed.length > 0) {
+    parts.push(
+      `${failed.length} cell${failed.length === 1 ? "" : "s"} rejected by validation (rows created without them) — fix with update_rows:\n${summarizeRejections(failed.map((f) => f.message))}`
+    );
+  }
+  parts.push(
+    "The user can review them in the database grid and delete or edit any of them."
+  );
+  return parts.join("\n");
 }
 
 export function createDataTools(ctx: ToolExecuteContext) {
@@ -1335,156 +1533,7 @@ export function createDataTools(ctx: ToolExecuteContext) {
             return `Batches over ${CONFIRM_THRESHOLD} rows need explicit user approval first. Show the user what you're about to add, get their yes, then retry with confirmedByUser: true.`;
           }
 
-          const live = table.columns.filter((c) => !c.deletedAt);
-
-          // Dedupe against existing values of one column (co-browse
-          // idempotency). Design scale (plan D1) makes a full scan fine.
-          const seen = new Set<string>();
-          let dedupeColumn: DataColumn | undefined;
-          if (input.dedupeBy) {
-            dedupeColumn = findColumn(live, input.dedupeBy);
-            if (!dedupeColumn) {
-              return `No column named "${input.dedupeBy}" to dedupe by.`;
-            }
-            const existing = await prisma.dataRow.findMany({
-              where: { tableId: databaseId, deletedAt: null },
-              select: { data: true },
-            });
-            for (const r of existing) {
-              const v = ((r.data ?? {}) as Record<string, unknown>)[
-                dedupeColumn.key
-              ];
-              if (typeof v === "string" && v) seen.add(v.trim().toLowerCase());
-            }
-          }
-
-          // Translate + validate every row BEFORE creating anything, so a
-          // bad batch fails whole instead of half-landing.
-          const prepared: Array<Record<string, unknown>> = [];
-          // Relation cells are resolved per row but written AFTER the row
-          // exists — a link needs both ends (plan P4).
-          const preparedLinks: Array<
-            Array<{ columnId: string; rowIds: string[] }>
-          > = [];
-          const skipped: string[] = [];
-          const errors: string[] = [];
-          // One read per target table for the whole batch, not per cell.
-          const relationCache = createRelationTargetCache();
-          for (let i = 0; i < input.rows.length; i++) {
-            const rowInput = input.rows[i];
-            const cells: Record<string, unknown> = {};
-            const links: Array<{ columnId: string; rowIds: string[] }> = [];
-            for (const [ref, raw] of Object.entries(rowInput)) {
-              const column = findColumn(live, ref);
-              if (!column) {
-                errors.push(`Row ${i + 1}: no column named "${ref}".`);
-                continue;
-              }
-              if (column.type === "relation") {
-                const resolved = await resolveRelationCell(
-                  column,
-                  raw,
-                  ctx.userId,
-                  relationCache
-                );
-                if ("error" in resolved) {
-                  errors.push(`Row ${i + 1}: ${resolved.error}`);
-                  continue;
-                }
-                if (resolved.rowIds.length > 0) {
-                  links.push({ columnId: column.id, rowIds: resolved.rowIds });
-                }
-                continue;
-              }
-              const blocked = writeBlockReason(column);
-              if (blocked) {
-                errors.push(`Row ${i + 1}: ${blocked}`);
-                continue;
-              }
-              cells[column.key] = normalizeCellInput(column, raw);
-            }
-            if (dedupeColumn) {
-              const v = cells[dedupeColumn.key];
-              if (
-                typeof v === "string" &&
-                seen.has(v.trim().toLowerCase())
-              ) {
-                skipped.push(
-                  `Row ${i + 1} (${String(v).slice(0, 60)}) — already present`
-                );
-                continue;
-              }
-              if (typeof v === "string" && v) seen.add(v.trim().toLowerCase());
-            }
-            prepared.push(cells);
-            preparedLinks.push(links);
-          }
-          if (errors.length > 0) {
-            return `Nothing inserted — fix these first:\n${errors.join("\n")}\nColumns here: ${live.map((c) => c.name).join(", ")}.`;
-          }
-          if (prepared.length === 0) {
-            return `Nothing to insert — all ${input.rows.length} rows were duplicates by ${dedupeColumn?.name}.${skipped.length ? `\nSkipped:\n${skipped.join("\n")}` : ""}`;
-          }
-
-          const rowIds = await createRows(
-            databaseId,
-            live,
-            prepared.length,
-            ctx.userId
-          );
-          const writes: CellWrite[] = [];
-          rowIds.forEach((rowId, i) => {
-            for (const [key, value] of Object.entries(prepared[i])) {
-              writes.push({ rowId, columnKey: key, value });
-            }
-          });
-          const result = await writeCells(databaseId, live, writes);
-          const failed = result.results.filter((r) => r.status === "error");
-
-          // Links last: the rows they point FROM had to exist first.
-          let linksWritten = 0;
-          for (const [i, rowId] of rowIds.entries()) {
-            for (const link of preparedLinks[i] ?? []) {
-              const { added } = await writeRelationLinks(
-                link.columnId,
-                rowId,
-                link.rowIds
-              );
-              linksWritten += added;
-            }
-          }
-          // Hard rule (quests): named rows inserted into a charter's master
-          // ledger are quests the moment they exist — each gets its ledger.
-          const questLedgers = await ensureLedgersForMasterRows(
-            ctx.userId,
-            databaseId,
-            rowIds,
-          ).catch(() => 0);
-
-          const parts = [
-            `Inserted ${rowIds.length} row${rowIds.length === 1 ? "" : "s"}${
-              linksWritten > 0
-                ? ` and ${linksWritten} link${linksWritten === 1 ? "" : "s"}`
-                : ""
-            }.`,
-          ];
-          if (questLedgers > 0) {
-            parts.push(
-              `${questLedgers} quest ledger${questLedgers === 1 ? "" : "s"} minted under the charter — these rows are quests now; a run proposed with that quest name continues them.`,
-            );
-          }
-          if (skipped.length > 0) {
-            parts.push(`Skipped ${skipped.length} duplicate${skipped.length === 1 ? "" : "s"}:\n${skipped.join("\n")}`);
-          }
-          if (failed.length > 0) {
-            parts.push(
-              `${failed.length} cell${failed.length === 1 ? "" : "s"} rejected by validation (rows created without them) — fix with update_rows:\n${summarizeRejections(failed.map((f) => f.message))}`
-            );
-          }
-          parts.push(
-            "The user can review them in the database grid and delete or edit any of them."
-          );
-          return parts.join("\n");
+          return await applyRowInserts(ctx, databaseId, table, input.rows, input.dedupeBy);
         } catch (error) {
           logger.warn({
             layer: "ai",
@@ -1642,6 +1691,113 @@ export function createDataTools(ctx: ToolExecuteContext) {
             error,
           });
           return "Updating the rows failed with an internal error — nothing may have been written; tell the user.";
+        }
+      },
+    }),
+
+    // ─── delete_rows ─────────────────────────────────────────
+    // Consent is the whole design (MCP-DATABASE-REACH-PLAN §2.8, owner
+    // 2026-10-12). The TABLE's policy decides: "confirm" (default) parks the
+    // loop on an approval card the USER answers — never a model-set flag,
+    // which is attestation, not consent; "allow" deletes and posts an inbox
+    // notice with the undo hint; "deny" refuses and names the setting.
+    // Deletes are soft (restoreRows is the inverse; the grid's Undo knows
+    // it), so a wrong approval costs a restore, not a loss.
+    delete_rows: tool({
+      description:
+        "Soft-delete rows from a reachable database. rowIds are the [handles] (or ids) from a query_database result; max 25 per call. The database's owner sets its AI deletion policy in the schema rail: 'confirm' (the default) pauses this call on an approval card the user answers; 'allow' deletes at once and posts a notice to the user's inbox; 'deny' refuses. Give `reason` in the user's own words — it appears on the card and in the notice. Deleted rows can be restored from the grid's Undo. Never delete rows the user did not name or clearly describe, and never retry a request the user rejected.",
+      inputSchema: z.object({
+        databaseId: z
+          .string()
+          .optional()
+          .describe(
+            "The database's id or exact name; omit in a chat open on the database"
+          ),
+        rowIds: z
+          .array(z.string())
+          .describe("The [handles] or ids of the rows to delete, from a query_database result"),
+        reason: z
+          .string()
+          .describe(
+            "Why these rows are being deleted, in the user's words (≤280 chars)"
+          ),
+      }),
+      // The card is the consent. Resolution failures read as "confirm" so
+      // an unresolvable table can never slip through as "allow"; execute
+      // then refuses with the real reason.
+      needsApproval: async (input) => {
+        const policy = await deletePolicyFor(ctx, input.databaseId);
+        return policy === "confirm";
+      },
+      execute: async (input) => {
+        try {
+          const refs = (input.rowIds ?? []).map((r) => r.trim()).filter(Boolean);
+          if (refs.length === 0) return "No rows given — nothing to delete.";
+          if (refs.length > DELETE_ROW_CAP) {
+            return `At most ${DELETE_ROW_CAP} rows per call — narrow the set with a filter first, or delete in batches the user approves one at a time.`;
+          }
+          const reason = (input.reason ?? "").trim().slice(0, 280);
+          if (reason.length === 0) {
+            return "Say why these rows go (reason) — the user sees it on the card and in the notice.";
+          }
+          const gate = await openForWrite(ctx, input.databaseId);
+          if ("refusal" in gate) return gate.refusal;
+          const { databaseId, table } = gate;
+          const policy = table.aiPolicy.delete;
+          if (policy === "deny") {
+            return `Deleting rows in "${table.title}" is turned off for the assistant (schema rail → "AI deletes rows": Never). Tell the user; they can delete in the grid or change that setting.`;
+          }
+
+          const resolved = await resolveRowRefs(databaseId, refs);
+          const ids: string[] = [];
+          const refusals: string[] = [];
+          resolved.forEach((r, i) => {
+            if ("refusal" in r) refusals.push(`${refs[i]}: ${r.refusal}`);
+            else ids.push(r.id);
+          });
+          if (refusals.length > 0) {
+            // All-or-nothing on the reference set: a request naming a row
+            // that does not exist is a request the user did not read back.
+            return `Nothing deleted — ${refusals.length} reference(s) did not resolve:\n${refusals.slice(0, 8).join("\n")}\nRe-read the rows with query_database and try again with handles from that result.`;
+          }
+
+          const deleted = await softDeleteRows(databaseId, ids, ctx.userId);
+          const handles = ids.map((id) => `[${id.slice(0, 8)}]`).join(" ");
+
+          if (policy === "allow") {
+            try {
+              await publishEvent(prisma, {
+                kind: "ai.notify",
+                actorType: "ai",
+                actorLabel: "Assistant",
+                payload: {
+                  title: `Assistant deleted ${deleted} row${deleted === 1 ? "" : "s"} from ${table.title}`,
+                  body: `${reason}\nRows: ${handles}\nIf this was wrong, open the table and use Undo to restore them. Change what the assistant may delete in the schema rail ("AI deletes rows").`,
+                  ...(ctx.conversationId ? { conversationId: ctx.conversationId } : {}),
+                },
+                subjectType: "content",
+                subjectId: databaseId,
+                recipients: [{ userId: ctx.userId }],
+              });
+            } catch (error) {
+              logger.warn({
+                layer: "ai",
+                event: "data_tools:delete_rows_notice_failed",
+                summary: "delete_rows could not post the inbox notice",
+                error,
+              });
+            }
+          }
+
+          return `Deleted ${deleted} of ${ids.length} row${ids.length === 1 ? "" : "s"} from "${table.title}": ${handles}. Policy: ${policy}${policy === "allow" ? " (an inbox notice was posted)" : " (the user approved this on the card)"}. The user can restore them from the grid's Undo.`;
+        } catch (error) {
+          logger.warn({
+            layer: "ai",
+            event: "data_tools:delete_rows_caught",
+            summary: "delete_rows failed",
+            error,
+          });
+          return "Deleting the rows failed with an internal error — nothing may have changed; tell the user.";
         }
       },
     }),

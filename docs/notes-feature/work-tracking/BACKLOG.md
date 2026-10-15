@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-09-29
+last_updated: 2026-10-12
 ---
 
 # Sprint Backlog
@@ -9,6 +9,201 @@ last_updated: 2026-09-29
 **Sprint Execution Protocol**: Before commencing any sprint, always ask the user for input before planning and executing — there may be additions or modifications.
 
 ---
+
+## DOCX template renderer — follow-ups (2026-10-12, from `DOCX-TEMPLATE-RENDERER-PLAN.md`)
+
+- ✅ Judge policy decided + built 2026-10-13 (refuse a bad write; positive report).
+- ✅ Rerender without an AI call (Template Fields rail + `/rerender`) and the Stage 2 recipe §3 — 2026-10-13.
+- ⚪ **Deploy the renderer** (owner-run, after merge): WIF pool + provider for Vercel OIDC, invoker SA, Secret Manager token, `gcloud builds submit --config cloudbuild.docx-renderer.yaml .`, Vercel env (plan §7). Then the production smoke + the templated-vs-markdown token/latency comparison.
+- ⚪ Convert the owner's resume template from 17 numbered slots to loops (plan §6.5) — needs the `.docx`.
+- ⚪ Values from a note (`valuesFromContentId`: heading → field, bullets → list) — plan §6.4.
+- ⚪ PDF preview image (LibreOffice; measured < 1 s per conversion) — step 4, only once the DOCX path is live in prod.
+- ⚪ Templates whose tags Word split beyond docxtpl's repair: an "Open in Word and retype the tag" affordance from the error toast.
+- ⚪ Own auto-approve toggle for template fills, if sharing "Auto-approve documents" proves confusing (plan §6.3).
+
+## MCP server — prep PR and follow-ups (2026-10-12, from `MCP-DATABASE-REACH-PLAN.md`)
+## MCP server — follow-ups (2026-10-13, from `feat/mcp-server`)
+
+- ⚪ **M3 — OAuth for hosted clients** (claude.ai, ChatGPT, Gemini CLI with OAuth): the garden as its own authorization server. Note the 2026-07-28 spec the handler now serves deprecates dynamic client registration for **client-ID metadata documents** (CIMD); plan §8.1 needs that revision before building. `protectedResourceHandler` + `/.well-known/oauth-protected-resource` come with it.
+- ⚪ **M4 — MCP client in chat** (external servers, namespacing, approval gates; MCP-PLAN §4).
+- ⚪ Image OCR over MCP: `readImageTextForModel` is client-only; wire the server-side engine so `garden_read` on an image returns recognised text for text-only models (vision models already get the pixels as an `image` block), and page PDFs through `createPDFProcessor`.
+- ⚪ Presigned links in MCP reads are 15-minute storage URLs; a long-lived public link would need the public-file-link machinery from #227 (opt-in per file), not a longer presign.
+- ⚪ `garden_insert_block` content for columns/tabs (today only stacking containers accept markdown children).
+- ⚪ Chat's inline `create_note` should call `createNoteFromMarkdown` (extracted for MCP) so there is one create path.
+- ⚪ A token's daily call cap (`dailyCallCap`) is stored but not enforced yet; wire it through the verifier with the context-spend pattern.
+- ⚪ Audit view on Settings → MCP (recent calls per token) — needs call logging on the route.
+
+## MCP server — prep PR (2026-10-12, from `MCP-DATABASE-REACH-PLAN.md`)
+
+Prep PR (`feat/mcp-prep`, MERGED 2026-10-13 as #297 — each item stands alone without MCP; plan §6.8):
+
+- ✅ `recordNoteHistory` → `ContentHistory` at every serializer-driven write (write service both routes, run ledger, content PATCH markdown body, source-view toggle), gate `mcp:prep:check`.
+- ⚪ **Restore affordance** over `GET /api/content/content/[id]/history`: a "Previous versions" view in the right sidebar (content-driven claim) that reads a snapshot and writes it back through `writeNoteContent`.
+- ✅ One search query builder (`lib/domain/content/search-service.ts`); route and `search_content` call it; the tool matches rows now.
+- ✅ Chat body search via `listConversations({ query })` over per-message `textCache` — no column, no migration. Revisit with a denormalised column only if the subquery proves slow.
+- ✅ MCP read seam registered in `validate-private-content.ts`.
+- ✅ `McpToken` model + helpers + `/api/mcp/tokens` routes; migration owner-run (script in the PR body). Settings page = M1.
+- ⚪ `AI-AUTHORSHIP-SIGNAL-PLAN.md` build (its own PR; MCP writes carry the stamp from day one).
+- ✅ `garden_report_issue`'s dependency, PR #211 (`POST /api/feedback`), merged 2026-10-12; the tool can ship with M1.
+
+Keyboard shortcuts (found 2026-10-12 while moving search off Cmd+/):
+
+- ⚪ `callout.ts` and `cloze-deletion.ts` both bind `Mod-Shift-c`; TipTap resolves by extension order, so one never fires. Decide which keeps it (callout is the older, Obsidian-shaped binding; cloze is a flashcards affordance that could take `Mod-Shift-k` or live on the bubble menu only).
+
+Deletion follow-ups (from `feat/ai-row-deletion-policy`):
+
+- ⚪ Control-panel section under AI context listing every database's AI policy (today only the schema rail sets it).
+- ✅ MCP `garden_delete_rows`: `confirm` via elicitation where the client declares it, refusal otherwise (plan §2.8) — shipped in `feat/mcp-server`.
+- ⚪ "Reason" on the approval card: the generic card shows the tool input; a dedicated card for `delete_rows` that leads with the reason and the row titles would read better.
+
+## Note saves take 2.5–5.5 s on production (2026-10-09, found diagnosing 409s)
+
+- ⚪ Vercel logs show content PATCHes of a 33 KB note taking 2.5–5.5 s; most of that is server time. Likely candidates:
+  - the solo Y-copy merge (advisory lock + two Y transforms + upsert);
+  - the sanitize round-trip;
+  - the image and window-reference syncs.
+
+  Per-step span timings are already in the trace logs (`withSpan`), so measure those first. Single-flight saves (PR #295) remove the 409s this caused, but slow saves still delay the "saved" state.
+
+## Database column links — follow-ups (2026-10-09, from `feat/database-column-links`)
+
+- ⚪ Clicking a `[[Jobs#Status]]` link opens the database but does not scroll to or highlight the column. The database viewer should take the `column:` anchor from `state/content-anchor-store.ts`.
+- ⚪ Query-mode tables list no columns. Their projection columns are synthesized and have no `DataColumn` id to anchor on.
+- ⚪ Folder context capsules summarize notes without the column block. The summarizer reads through `ai-context/source-resolver.ts`, which is not a describer seam yet.
+
+## Collaboration lineage — follow-ups (2026-10-08, from `fix/join-dup-nested-shortcuts`)
+
+The join duplication is fixed at its three sources (`lib/domain/collaboration/lineage.ts`,
+`CONTENT-LOAD-CASCADE.md §9.4`). What is deliberately left:
+
+- **Diverged rival copies still union.** When a browser's rival copy and the
+  server's each hold blocks the other lacks, `planAlignment` returns
+  `"diverged"` and the browser connects as before (the note doubles, nothing is
+  lost), logging `collab:lineage_rival`. The cure is a resolution step — offer
+  the browser's version through the save-conflict banner ("Keep mine / Take
+  theirs") instead of letting the union stand. Watch the log event first: if it
+  never fires, this stays parked.
+- **Notes already doubled in production** are not repaired by the fix. A
+  one-off script could find candidates (snapshotJson whose block list is two
+  identical halves) for the owner to review; never auto-dedupe.
+- **Solo saves send the whole Y state.** Cheap for ordinary notes; for very
+  large ones a diff since the last acknowledged state vector would do (the
+  route merges either). Only if save latency or body size shows up.
+- **Keepalive flushes over 64 KiB carry no Y copy** (the browser refuses the
+  request). The last edits before closing the tab then reach the stored copy
+  only through the payload catch-up — the editor's own items for them can meet
+  the server's later (a few words doubled). Same diff-since-last-ack idea fixes it.
+
+---
+
+## AI view_screen — follow-ups (2026-10-09, branch `feat/ai-view-screen`; plan `AI-VIEW-SCREEN-PLAN.md`)
+
+- [ ] **Co-browse bound tab (HELD — co-browse postponement, owner 2026-10-06)** — plan D11: when a co-browse session is bound, the panel's `view_screen` captures THAT tab with CDP `Page.captureScreenshot` through a validated `cobrowse-screenshot` handler (never a generic CDP message); works backgrounded, supports an element clip. Supersedes the OCR plan's `read_screen` below.
+- [ ] **Gateway tool-result images** — `vercel-gateway` is on the user-part path because tool-result images through the gateway are unverified. Smoke a gateway Claude model with the native shape; promote it in `NATIVE_ADAPTERS` (screen-delivery.ts) and flip the mode table in `view-screen:check` if it holds.
+- [ ] **`ai-screenshots/` lifecycle** — screenshots are stored without a ContentNode (D7), so nothing deletes them. Delete with the conversation, or age out after the 7-day URL life.
+- [ ] **Images without a content id** — D13 loads uploads through the download route by `data-content-id`; other cross-origin images (external URLs in notes, link-preview thumbnails) still rasterize blank and are reported in `notes`. A server-side image proxy would close it.
+- [ ] **Full-page / element captures** — v1 is the visible area only.
+
+## OCR paste — follow-ups (2026-10-06, branch `feat/ocr-paste`; plan `OCR-PASTE-PLAN.md`)
+
+Merged in PR #291 (2026-10-09, `0967297d`). Remaining:
+
+- [ ] **Co-browse `read_screen` (POSTPONED 2026-10-06, owner; superseded in design by `view_screen` D11 above — the picture, with OCR still callable on it)** — waits on a prerequisite feature the owner named; not built in this run because that feature was not. Design in the plan D5: a `co_browse_act` action that screenshots the BOUND tab via `Page.captureScreenshot` on the debugger session (not `captureVisibleTab`), OCRs it app-side after the bridge returns, answers as `untrustedWebContent`. Extension 5.5.0. Smoke on a backgrounded bound tab.
+- [ ] **Safari ⇧⌘V** — record whether Safari fires a paste event for the chord (smoke item). If not, the context-menu item is the Safari path; do not add a second chord.
+- [ ] **`ai` OCR engine** behind an `editor.ocrEngine` setting — the user's vision connection as the second `OcrEngine` member (precedent: the flashcards media route); needs a vision-capability check and client-side downscale for the 4.5 MB body limit.
+- [x] **Mentioned images seen by vision models** — done as `view_image` (AI-VIEW-SCREEN-PLAN D14): a vision model is pointed at it for any mentioned, bound or listed image and sees the file on demand. Attaching up front instead stays possible if one call proves too slow.
+- [x] **Pasted / attached images for text-only models** — done as AI-VIEW-SCREEN-PLAN D18 (read on attach, hover badge, labelled OCR block with an extraction profile).
+- [ ] **External-URL images for the AI** — `read_content` lists them, but `read_image_text` takes a content id only (a cross-origin fetch usually cannot read the pixels). A server-side fetch-and-hand-off would close it.
+- Also deferred in the plan §4: full-page co-browse strips, OCR as an automatic read-ladder rung, multimodal tool output, self-hosting the language pack.
+
+## Split Pane Placement — behaviour as a setting (2026-10-02, from `feat/open-into-opposite-pane`)
+
+Where content opened from the file tree lands in a split workspace is a
+preference, and some of it is already built. The **seam exists and is
+covered**; what is missing is the control that reaches it.
+
+**Already shipped on that branch** — nothing below needs re-deriving:
+
+- `settings.ui.openDestination` in the Zod schema, with `"fill"` in
+  `DEFAULT_SETTINGS` (`lib/features/settings/validation.ts`). It sits under
+  `ui` on purpose: `saveToBackend` sends `ui` wholesale and `setUISettings`
+  already patches it, so registrations 3 and 4 of the four-registration rule
+  are satisfied by construction and the "saves, then silently reverts" trap
+  cannot apply.
+- `resolveOpenDestinationPane(layoutMode, activePaneId, isPaneEmpty, mode)`
+  in `state/content-store.ts` takes the mode and honours all three values.
+- The tree's open path reads the preference through the real store, so the
+  default is exercised end-to-end rather than hardcoded.
+- All three modes are pinned in `pnpm workspace:pane-placement:smoke`,
+  including the two nothing can select yet — an unreachable branch rots
+  before the control that exposes it lands, and then the settings PR gets
+  blamed for behaviour it did not write.
+
+**What is left: the UI only.**
+
+- A control in the appearance/workspace settings area with the three values:
+  - **Beside your work** (`fill`, default) — the opposite pane first, then any
+    empty pane, then back to the opposite. In a quad this fills the room
+    before stacking.
+  - **Always opposite** (`opposite`) — never spreads into the other panes.
+  - **In the active pane** (`active`) — how this behaved before the rule, for
+    anyone who wants it back.
+- Write through `setUISettings({ openDestination })`; do NOT add a new setter
+  or a new `saveToBackend` line.
+- Settings-page conventions apply: `"use client"`, Glass-0 `SettingSection`
+  cards, sonner toast on save.
+- Copy should say what each does to the pane you are reading in, since that is
+  the thing the default protects.
+
+**Worth deciding at the same time:** a tree click is a *preview* open, so a
+second one replaces the first in the destination pane rather than stacking.
+That is pinned as current behaviour, not asserted as correct. If "accumulate
+while browsing beside my work" is wanted, it is a `pin: true` on that call
+path and probably belongs to the same control.
+
+---
+## Wiki-link views — follow-ups (2026-10-03, plan `WIKILINK-VIEWS-PLAN.md`)
+
+- [ ] **Hocuspocus redeploy** after `feat/wikilink-views` merges (schema 1.20.0, `wikiLink.view`).
+- [ ] **Card preview for non-note targets** — folders, databases and files show the type word as the excerpt; a per-type summary (row count, file size, child count) is the nicety.
+- [ ] **Window → link drops `targetViewId` / `targetRowId`** (database windows); re-windowing picks the default view. Revisit with DATABASE Phase 2.
+- [ ] **"Send to…" destination picker** — `Send to New Note` creates beside the host; a `ContentTreePicker` flavor could offer a folder. Not built: the sibling placement is the structurally sound default.
+- [ ] **Typed input rule for the braced form** — typing `[[Title]]{#id}` by hand goes through the bare rule; the brace stays as text. Paste-as-markdown handles it.
+- [ ] **Hover chooser on touch** — no hover on touch devices; the context menu "Display as" is the reachable copy today.
+
+## One tree-browse menu — proposed (2026-10-02, owner; PR #277 context)
+
+`ContentTreePicker` (pane "+", Note Window retarget, databases rail, shortcut target) is the canonical tree-browse surface: opens at the file tree's perspective, recent destinations, header-styled scope row, the tree's row tones (deep gold = active, light gold = open elsewhere, grey = selected). The owner wants the OTHER file-tree-shaped menus united into it; PR #277 only gave them the "current" tone.
+
+- [ ] **AI target-folder pickers → `ContentTreePicker`** — `components/content/ai/TargetFolderChip.tsx` and `OutputTargetChip.tsx` ("Somewhere else…") each flatten the tree endpoint into their own folder list. Both are containers-only picks: `eligibleTypes` folders + `quickCreate` off (or `pickCreatesInside` for "new folder here"). Keep their chip-specific footers (mismatch warning, relative options).
+- [ ] **Move → Folder search → `ContentTreePicker` search mode** — `components/content/context-menu/FolderSearchFlyout.tsx` is a typeable folder search with recents (`folder-move-store`). The picker's search + a `recents` prop cover it; the flyout positioning (submenu math) is the part to keep.
+- [ ] **Folder assistant candidates** — `FolderAssistantDialog.tsx` lists candidate folders to confirm; tone only (no browse).
+- [ ] **Flashcard deck tree / People panel** — their own trees for their own data; align tones, do not migrate.
+- [ ] Once migrated, `folder-move-store` recents and `create-destination-store` recents should become one "recent folders" source with a `kind` (moved into / created into).
+- [ ] **Four private copies of the UUID regex** (`relation-cells.ts`, `linked-schema.ts`, `resolve.ts`, `read-format.ts`) could adopt `isUuid` from `lib/domain/content/uuid.ts`. (The single-tab workplace routes' guard — the other half of this item — shipped after PR #277.)
+- [ ] **The remembered workspace is per-browser** (found with the cold-load fix, 2026-10-04) — "where you were last" is `localStorage["workspace-active-id"]`, so a new device, a cleared profile or a private window still opens Main. A server-side last-active-workspace would fix it, but it is the one "active view" R3 says never syncs, so it needs a decision before it is built (and a column or a user-settings key — migration/four-registrations).
+- [ ] **Picker polish to revisit only if reported** — the Active pill's folder name truncates hard at the picker's 300px (`MENU_WIDTH`; widening ~20px is one constant); `deriveDestinations` ignores `createdAt` ties; `jumpToDestination` forgets a folder absent at Root without telling the user.
+
+---
+
+## File-tree order — remaining ties (2026-10-05, from `fix/smooth-delete`)
+
+The order audit fixed the causes that moved rows between refreshes (anchored drops, owner-scoped moves, one total comparator, stale refreshes dropped, new rows shown where they land). What's left can't reorder rows on its own any more — `compareSiblings` makes every order deterministic — but a few writes still pick a position that may not be the one the user expects:
+
+- [ ] **Duplicate lands tied with its original** (`duplicate/route.ts` copies `displayOrder`), so the copy sits above or below the original by title, then id. Placing it directly after the original needs a renumber, like the move route does.
+- [ ] **Restore from trash keeps the old `displayOrder`**; siblings renumbered since then can put it beside different neighbours. Restore could re-anchor after its old previous sibling if that still exists.
+- [ ] **People mounts keep their own order space** (`/api/people/mounts`, still index-based); a content row and a mount row can't be anchored to each other — anchors skip mount rows.
+- [x] **Re-parenting without a position landed mid-list** — Folder assistant (with Undo restoring position) and Studio outputs now place deliberately (2026-10-06, `sibling-slot.ts`); bookmark dedupe, the third writer, was removed the same day.
+- [ ] **Spring-opened tabs add back/forward history entries.** Resting a drag on a tab activates it through `activateContentTab`, and releasing switches back the same way; `MainPanelNavigation` records each change, so a drag through tabs leaves entries behind. Suppressing history for spring switches needs a flag the navigation recorder honours (`use-spring-tabs.ts`).
+- [ ] **A move out of a note saved over REST could trash the image.** Live collaborative saves never trash media, but a note saved through the REST path (only when live collaboration is unavailable) runs `syncImageReferences` with clean-up on: if the source note saves before the receiving note has saved its `image-ref` link, the moved image has no live link at that moment and is soft-deleted (recoverable from the trash). A short grace period before trashing, or a hint from the client that the media moved, would close it.
+- [ ] **Media deleted from a live note's text is never cleaned up.** Collaborative saves keep links exact but never trash (`trashOrphans: false` — a cut-then-paste across one save would trash the image in between), so an image deleted from a live note's text stays as content in its folder's referenced items. A deferred clean-up — trash referenced media with no live link after a grace period (a cron beside `app/api/cron/`), or on the note's next REST save — would close it. Deliberately not done in `fix/smooth-delete`.
+- [ ] **Main-panel List/Gallery views don't apply a folder's kept sort.** They read stored order (manual mode), so an item that arrives in a sorted folder after its last sort shows sorted in the tree but at the top there until the folder is sorted again. Fix: have the folder-children endpoint return the folder's `treeSort` with nested flags, and order by `applyKeptSort` there too.
+- [ ] **Creates that store displayOrder 0 still tie with the first row** — uploads are fixed (2026-10-06); still on 0: AI documents/images/speech (`lib/domain/ai/documents.ts`, `image/generate-and-store.ts`, `speech/generate-and-store.ts`), workflows (`extensions/workflows/server/documents.ts`, `dispatch.ts`), reader library/shelf, flashcards media, data promotion. Each needs only `claimSiblingSlot` (top for user-facing outputs, bottom for appended records) in its create transaction.
+- [ ] **The inline-create placeholder can be wiped** by a refresh that starts while the name is being typed (the stale-response guard brackets moves and deletes only; a create would need an end that runs on submit, cancel AND unmount — a missed end drops every later refresh).
+
+## File-tree shortcuts — decided (2026-10-05, from `fix/smooth-delete`)
+
+- [x] **Opening through a shortcut in a view raised the out-of-view warning.** Owner: "count view from a shortcut as in scope for any check related to the view targeting." Built on the same branch — `viewReachRoots` in the open guard's view-scope check; locked-workspace overlap checks unchanged.
 
 ## E-reader — proposed (2026-09-29, plan `EREADER-PLAN.md`)
 
@@ -95,6 +290,9 @@ LDS standard works as a shared read-only corpus (seeded from the public-domain `
 - [ ] **Run cost levers (plan §10) — remaining.**
   - L1, L2, L3a and L4a are built (#270, #271). L3b was superseded by L2. Round 3 is on `fix/docx-cache-volley`: budget on tool results, DOCX hyperlinks and file-extracted check text, GPT-5.6+ write pricing, gpt-6 cache key, Anthropic breakpoints, and the approval volley.
   - **Verify on the next run:** `cachedInputTokens` climbs inside a request now that the trailing notice is gone. If it still freezes, export `ai:prompt_wire` again.
+  - **Prefix diagnostic → per-conversation owner toggle** that writes the divergence summary into the turn's metadata (readable with pg-read), replacing the env var and the Vercel log export. Keep the env var until then (unset).
+  - **Search delegation trial:** the OpenAI search backend is built (#273). Run one charter job with Chat controls → Web search set to `gpt-5-search-api`, then compare against `36237eb8` (native: 12 searches, $0.12 in fees). Compare `searchCostUsd` summed from the transcript plus the chat meter, and research quality. The per-search fee question ("search actions incur a tool call cost") is settled by the first OpenAI bill.
+  - **Fold backend search cost into the chat meter:** `searchCostUsd` rides the tool result but isn't added to the turn's cost.
   - **DOCX layout render (optional):** a DOCX → PDF tool (OnlyOffice conversion) returning the page count and an image of page one, for a true layout check. Until then the charter hands visual review to the owner.
   - Open decision **D8 (revised):** should charter turns on OpenAI use the app-run search backend instead of native search, so search is refusable, repeat-guarded and budgetable, at the cost of OpenAI's integrated citations?
   - **Model watch:** a weekly routine reporting gaps between new model releases and our catalog, pricing, constraints, adapter and gateway rows to a GitHub Issue. Waits on the owner: provider keys as repo secrets, and Issue versus Wiki.
@@ -186,7 +384,7 @@ Principle: `core/PRODUCT-PRINCIPLES.md` §2. Each item below serves the general 
 - [ ] **Mention pill character-count tooltip.** The `@mention` pill's `title` (`makeMentionPill`, `ChatInput.tsx`) should show the note's length and what the capsule will inject: e.g. `28,103 chars — first 2,000 injected`. Needs the count on the suggestion payload (`/api/content/content?search=` → add `charCount` from `searchText`, and the data/row suggest route) or a lazy fetch on hover. Small; intended to ship in the same session as the brainstorm if time allows.
 - [ ] **Model-aware mention budget** — replace the flat `slice(0, 2000)` (`app/api/ai/chat/route.ts`) with a budget derived from the model's `contextWindow` + cost tier (`PROVIDER_CATALOG`), a global default in `settings.ai` (compact / standard / full or an explicit number), a per-model override, and a per-turn chip override ("Full text"). Budget in tokens, allocated across mentions rather than per note; outline-first when truncating (headings + accordion `headerText`s via `outline-extractor.ts`); and *say* it's truncated (`showing 2,000 of 28,103 — read_content_chunk to continue`).
 - [ ] **Note character limit at the 1M-token equivalent.** Hard cap so a single note can never exceed ~1M tokens (≈ 3.5–4M characters; pick the constant from the catalog's largest context window and document the tokens-per-char assumption). Enforce in the editor — `CharacterCount` is already loaded in both extension sets; check TipTap's built-in `limit` option first — so typing/pasting past the cap is refused, with a sonner toast each time the user tries. Also enforce server-side on the note write path (REST + `write-note-content.ts`) so imports and scripts can't exceed it either. Prevention, not truncation: never drop content silently.
-- [ ] **Accordion markdown codec** — `accordion` has no codec in `markdown-block-codecs.ts`, so chunk reads / source view emit it as a Tier-2 HTML div. A `<details><summary>headerText</summary>` (or heading) codec makes accordion-heavy notes legible to the model and to humans in source view. Guarded by `markdown:blocks:check`.
+- [x] **Accordion markdown codec** — *Shipped 2026-09-26* (`feat/accordion-markdown-codec`). Accordions were falling to the **Tier-3 opaque fence** (not the Tier-2 HTML div the original note assumed): six attrs plus a blockId with no markdown form. They now serialize as `<details data-*>` + `<summary>` with the body as real markdown after a blank line (CommonMark type-6 HTML block), and `reTag` folds marked's output back into `div[data-block-type="accordion"]`. Nested accordions resolve innermost-first; a newline in the header declines to the fence. The gate asserts pretty, nested, and the decline; mutation-tested. Guide §5a records the tempered-regex lesson.
 - [ ] **Deliberate-gap semantics for cells** (raw). A row can be "incomplete on purpose" (the source was never captured) vs "not yet processed". Today only conventions distinguish them (placeholder rows, `Readiness: Needs detail`, `Evidence strength: Needs verification`, column descriptions saying blanks may be deliberate). Consider a first-class marker — a per-cell *unknown* sentinel or a table-level "gaps are deliberate" description the schema digest surfaces — so DG's AI neither fills gaps with invention nor treats them as work to redo.
 - [ ] **Flashcards → database schema (cleanup, very raw).** Flashcards carry their own Prisma models (`FlashcardDeck`, `Flashcard`, `FlashcardReviewAttempt`) beside the general `DataPayload` / `DataColumn` / `DataRow` schema that arrived later. Explore reducing flashcards to a *database with a review runtime*: a deck = a table with a locked system column set (front/back/media/FSRS state), the player and scheduler read rows, and `propose_cards_from_media` becomes an instance of note → rows. Data II already proved the Database → deck direction (PR #195). Owner intends to expand this later; record only the basis for now.
 
@@ -264,10 +462,14 @@ The `/f/<token>` capability link (FilePayload.publicToken → 302 to a presigned
 
 ## Workspace layout: multi-tab last-writer-wins reverts D+D (2026-09-04; owner repro; lands with layout-intent "P4 live fan-in")
 
+**PARTIAL FIX SHIPPED (PR #210, merged 2026-09-04):** the null-base write path now returns `conflict` instead of blind-overwriting (a writer with no compare base never loaded what it overwrites) — the adopt-and-retry loop converges in one round. The remaining items below (writer recency for PRIMED-but-stale writers, URL-re-projection question) still ride the fan-in phase.
+
+**Since then (2026-10-04 review):** two later PRs fixed writers that produce this exact symptom, so the "Writer UNIDENTIFIED" item below may already be closed. Confirm on dev before ticking it. **PR #278** (merged 2026-10-03): concurrent `persistActiveWorkspace` calls shared one `baseUpdatedAt`. The server 409'd all but one, and the 409 branch adopted the stale row in **open** mode, re-applying the old arrangement. That is a revert *with* writes, i.e. a surface racing itself. Now there is one write in flight per workspace, and 409 adoption uses reconcile mode. **PR #282** (merged 2026-10-04): cold-load restore kept another workspace's tabs and fell back to Main. The settling diagnostic is now the tracer, not a DB diff: `localStorage.setItem("dg:trace:workspace", "1")`, drag, wait 30 s, `copy(window.__dgWorkspaceTrace)`. A `restoreContentWorkspace` with no `commit ← <user action>` before it names the writer.
+
 Owner report during the Release-4 smoke: split-pane tab D+D "repeatedly regressed/ignored" on dev; prod unaffected; hard refresh helps. Diagnosed, not fixed (the fix IS the planned live fan-in phase, not a drive-by):
 
-- [ ] **Null-base saves are unconditional overwrites** (`saveWorkspaceState` — no `expectedUpdatedAt` → plain update). Legitimate for first-save/layout-authority, but it lets any client whose `lastAppliedUpdatedAt` map is unprimed clobber newer state. Revisit the semantics with fan-in (e.g., server distinguishes "create/first write" from "stale blind write").
-- [ ] **Writer UNIDENTIFIED (2026-09-04; two theories eliminated).** Eliminated: multi-tab live writers — owner's only other 3015 tabs were weeks-unviewed across several browser restarts, i.e. lazy-loaded/discarded, running no JS. Surviving single-client hypotheses: (a) **restore-from-URL re-projection** — the URL query is a full layout snapshot (`tabs_top_left=…`) that predates the drag; any cold-load/refresh path honoring the URL tiebreaker re-applies the stale arrangement with NO server write (fits: hard refresh recovers, prod has no HMR-driven re-runs); (b) **active-tab Fast Refresh** re-arming the shell's debounced persist against a stale snapshot or wiping the module-scope `lastAppliedUpdatedAt`/`lastAppliedSnapshotJson` maps (null base → unconditional overwrite); (c) the browser-extension side-panel embed as an invisible second client (unconfirmed). **Settling diagnostic on next repro:** drag once, note the time, then diff `ContentWorkspace.updatedAt`/`paneState` — a revert WITHOUT a new server write convicts (a); with writes, attribute the writer. Fan-in work should also add a writer recency/liveness signal regardless.
+- [x] **FIXED (PR #210):** null-base saves now return `conflict` with the current row instead of blind-overwriting — the adopt-and-retry loop converges in one round. (Original: `saveWorkspaceState` with no `expectedUpdatedAt` did a plain update, letting unprimed clients clobber newer state.)
+- [x] **CLOSED 2026-10-04:** the owner verified on dev with the tracer on (PR #211 checklist) that a split-pane drag stays put and no unprompted `restoreContentWorkspace` fires. That is consistent with #278/#282 having removed the writer. Original entry: **Writer UNIDENTIFIED (2026-09-04; two theories eliminated).** Eliminated: multi-tab live writers — owner's only other 3015 tabs were weeks-unviewed across several browser restarts, i.e. lazy-loaded/discarded, running no JS. Surviving single-client hypotheses: (a) **restore-from-URL re-projection** — the URL query is a full layout snapshot (`tabs_top_left=…`) that predates the drag; any cold-load/refresh path honoring the URL tiebreaker re-applies the stale arrangement with NO server write (fits: hard refresh recovers, prod has no HMR-driven re-runs); (b) **active-tab Fast Refresh** re-arming the shell's debounced persist against a stale snapshot or wiping the module-scope `lastAppliedUpdatedAt`/`lastAppliedSnapshotJson` maps (null base → unconditional overwrite); (c) the browser-extension side-panel embed as an invisible second client (unconfirmed). **Settling diagnostic on next repro:** drag once, note the time, then diff `ContentWorkspace.updatedAt`/`paneState` — a revert WITHOUT a new server write convicts (a); with writes, attribute the writer. Fan-in work should also add a writer recency/liveness signal regardless.
 
 ## Deferred batch execution for row-driven AI runs (2026-08-29; plan: EXTRACTION-TO-DATABASE-PLAN.md §3.3/§6, decision D4)
 
@@ -312,7 +514,6 @@ true async-batch substrate.
 Built and committed: workbench rows (`parentWorkspaceId` + `dormantAt`), dwell submenu nestable to 3 layers, hide/reorder per layer, lifecycle hooks (archive on delete, purge on hard delete, dormant-clearout cron), tab counts, tri-state tree scope, and the redundant view-root row fix. Remaining:
 
 - [ ] **`vercel.json` cron entry for `/api/cron/dormant-workbenches`** — the route exists and is CRON_SECRET-guarded, but nothing invokes it in production yet, so dormant benches accumulate silently. Daily is the intended cadence (matches `purge-trash`).
-- [ ] **Claims: inherit vs independent** (the plan's one open question). Workbenches currently claim content independently, like any workspace — zero special cases, but two benches under one parent can each borrow the same note and conflict with each other. Revisit only if that actually bites; the alternative (inheriting the parent's claims) makes open-intent resolution depth-aware.
 - [ ] **Server list endpoint is root-only.** `listWorkbenchFolders` serves layer 1; nested layers derive client-side from the one scoped-tree fetch. Fine while the submenu is the only consumer — if a second surface (mobile, extension panel) ever needs workbenches, it needs a depth parameter rather than a second tree walk.
 - [ ] **Dormant sweep is per-row.** `sweepDormantWorkbenches` does a hop-walk per workbench (≤3 point reads each). Correct and cheap at personal-vault scale; if a tenant ever holds hundreds of benches, batch the ancestor resolution.
 - [ ] **`membershipContentIds` union for tab counts** is computed client-side per row. If the count ever needs to appear somewhere without the full workspace payload, push it into `ContentWorkspaceResponse` as a scalar.
@@ -1059,18 +1260,17 @@ The following sprints were originally 38-42 in Epoch 9 but are deferred to Epoch
 
 ## Epoch 14: Saved Content Workspaces
 
-**Goal**: Persist named tab/pane workspaces with locked claims, temporary borrowing, permanent sharing, and expiration cleanup.
+**Goal**: Persist named tab/pane workspaces with expiration cleanup.
 **Detailed plan**: [epoch-14-saved-content-workspaces.md](epochs/epoch-14-saved-content-workspaces.md)
+**2026-10-08:** the claims / borrow / share half of this epoch was removed by owner decision — views and shortcuts govern what a workplace shows, nothing gates what it opens ([WORKPLACE-RESTRICTIONS-REMOVAL-PLAN.md](WORKPLACE-RESTRICTIONS-REMOVAL-PLAN.md)). The claim items below are withdrawn, not pending.
 
-### Sprint 65: Workspace Persistence + Claims
-- [ ] DB-backed `ContentWorkspace` and `ContentWorkspaceItem` models
+### Sprint 65: Workspace Persistence
+- [ ] DB-backed `ContentWorkspace` model
 - [ ] Main Workspace fallback for unassigned/catchall tabs
 - [ ] Workspace selector and settings popup in the main-panel navigation chrome
 - [ ] Per-workspace tab/pane layout persistence and restoration
-- [ ] Locked recursive folder/content claims with conflict reminder
-- [ ] Temporary borrowing with auto-release and permanent sharing
-- [ ] Tab context menu actions to move or share tabs across workspaces
-- [ ] Workspace expiration archive/release flow
+- [ ] Tab context menu action to move tabs across workspaces
+- [ ] Workspace expiration archive flow
 - [ ] Build + smoke gate on port `3014`
 
 ---

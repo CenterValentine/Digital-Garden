@@ -45,7 +45,11 @@ RUN pnpm exec prisma generate
 # Same heap cap as the vercel-build script. The default ~4GB V8 heap aborts on
 # this module graph; 5120 MB fits inside an 8 GB container with room to spare.
 ENV NODE_OPTIONS=--max-old-space-size=5120
+# OCR worker + WASM cores into public/ocr (scripts/copy-ocr-assets.mjs) — the
+# runtime stage copies public/ below. Not in postinstall: install runs before
+# `COPY . .`, when scripts/ is not in the image yet.
 RUN pnpm build:tokens \
+  && pnpm ocr:assets \
   && pnpm exec next build --turbopack
 
 # ── Runtime stage ───────────────────────────────────────────────────────────

@@ -51,6 +51,9 @@ export const TOOL_MENU: Readonly<Record<string, ToolMenuEntry>> = {
   read_content: { family: "reading", selectWhen: "Read any item by id — note, folder notes, database (schema + row preview), file text, link, code, page" },
   search_content: { family: "reading", selectWhen: "Find items by text when you do not have an id" },
   read_folder_context: { family: "reading", selectWhen: "Read a folder's selected sources and children" },
+  read_image_text: { family: "reading", selectWhen: "Read the text in an image (screenshot, photo of a page) by its content id" },
+  view_image: { family: "reading", selectWhen: "SEE an image file by its content id — describe it, read it" },
+  view_screen: { family: "reading", selectWhen: "Take a screenshot and SEE what the user is looking at — the page or the open pane" },
   search_charters: { family: "reading", selectWhen: "Find a charter/playbook note by name when none is loaded" },
 
   // ── writing ────────────────────────────────────────────────────────────
@@ -60,6 +63,8 @@ export const TOOL_MENU: Readonly<Record<string, ToolMenuEntry>> = {
   create_folder: { family: "writing", selectWhen: "Create a folder to hold new items" },
   create_shortcut: { family: "writing", selectWhen: "Place an alias to an existing item somewhere else in the tree" },
   create_docx: { family: "writing", selectWhen: "Produce a .docx file the user can download" },
+  read_docx_template: { family: "writing", selectWhen: "See which document templates exist, or the fields one of them needs" },
+  fill_docx_template: { family: "writing", selectWhen: "Produce a .docx from one of the user's own templates, keeping its layout" },
 
   // ── databases ──────────────────────────────────────────────────────────
   query_database: { family: "databases", selectWhen: "Read rows — filtered, searched, sorted, counted, or deduped against" },
@@ -67,6 +72,7 @@ export const TOOL_MENU: Readonly<Record<string, ToolMenuEntry>> = {
   insert_rows: { family: "databases", selectWhen: "Append new rows to a database" },
   update_row: { family: "databases", selectWhen: "Change cells in ONE row" },
   update_rows: { family: "databases", selectWhen: "Change cells across SEVERAL rows in one transaction — sweep a column, backfill a field" },
+  delete_rows: { family: "databases", selectWhen: "Remove rows the user named — pauses for their approval unless the table allows it" },
   propose_output_database: { family: "databases", selectWhen: "Propose ONE new table for the user to approve" },
   propose_linked_databases: { family: "databases", selectWhen: "Propose SEVERAL tables that reference each other, in one card" },
   propose_database_columns: { family: "databases", selectWhen: "Propose new columns on a table the user already has" },
@@ -183,7 +189,7 @@ export const MODE_TOOL_IDS: Readonly<Record<string, readonly string[]>> = {
     "ask_user",
     "finish_with_summary",
   ],
-  browser: ["co_browse_open", "co_browse_act", "read_current_page", "list_tabs"],
+  browser: ["co_browse_open", "co_browse_act", "read_current_page", "list_tabs", "view_screen"],
   runs: [
     "propose_item_iteration",
     "record_item_result",

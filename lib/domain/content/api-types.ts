@@ -51,6 +51,8 @@ export interface ContentListItem {
     thumbnailUrl?: string | null;
     width?: number | null;
     height?: number | null;
+    /** A .docx marked as a document template (storageMetadata.custom.docxTemplate). */
+    isDocxTemplate?: boolean;
   };
   html?: {
     isTemplate: boolean;
@@ -221,6 +223,13 @@ export interface ContentDetailResponse {
 export interface CreateContentRequest {
   title: string;
   parentId?: string | null;
+  /**
+   * "top" = first among its siblings. Sent by the file tree's inline create,
+   * whose placeholder row is at the top. Absent = the default displayOrder
+   * (0), so other callers — imports, AI tools, the extension — keep the order
+   * they had (a bulk import placed "top" would reverse itself).
+   */
+  position?: "top";
   categoryId?: string | null;
   peopleGroupId?: string | null;
   personId?: string | null;
@@ -323,7 +332,13 @@ export interface UpdateContentRequest {
 export interface MoveContentRequest {
   contentId: string;
   targetParentId?: string | null;
+  /** Legacy position: an index into the caller's view. Fallback only. */
   newDisplayOrder?: number;
+  /**
+   * The sibling the item goes immediately after (null = first). Preferred:
+   * it means the same thing in the client's list and the server's.
+   */
+  afterId?: string | null;
 }
 
 export interface InitiateUploadRequest {

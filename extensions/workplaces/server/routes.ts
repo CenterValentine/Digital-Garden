@@ -1,14 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import {
-  ContentWorkspaceItemAssignmentType,
-  ContentWorkspaceItemScope,
-} from "@/lib/database/generated/prisma";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import { logger } from "@/lib/core/logger";
 import { withRouteTrace } from "@/lib/core/logger/route-trace";
 import {
   archiveWorkspace,
-  assignContentToWorkspace,
   createWorkbench,
   createWorkspace,
   listWorkbenchFolders,
@@ -16,9 +11,7 @@ import {
   getWorkspace,
   listWorkspaces,
   resetWorkspaces,
-  resolveOpenIntent,
   saveWorkspaceState,
-  unassignContentFromWorkspace,
   updateWorkspace,
 } from "./service";
 import {
@@ -30,10 +23,6 @@ import {
 import { upsertLayoutRecord, listLayoutRecords } from "./layout-records";
 
 type WorkspaceParams = Promise<{ id: string }>;
-type WorkspaceAssignmentParams = Promise<{ id: string; contentId: string }>;
-
-const ASSIGNMENT_TYPES = new Set(["primary", "shared", "borrowed"]);
-const SCOPES = new Set(["item", "recursive"]);
 
 function errorResponse(error: unknown, fallback: string) {
   const message = error instanceof Error ? error.message : fallback;
@@ -200,38 +189,6 @@ export async function handleResetWorkplaces(request: NextRequest) {
   });
 }
 
-export async function handleResolveWorkplaceOpenIntent(request: NextRequest) {
-  return withRouteTrace(request, { route: "/api/content/workspaces/open-intent" }, async () => {
-    try {
-      const session = await requireAuth();
-      const body = await request.json();
-      if (typeof body.workspaceId !== "string" || typeof body.contentId !== "string") {
-        return NextResponse.json(
-          {
-            success: false,
-            error: {
-              code: "INVALID_REQUEST",
-              message: "workspaceId and contentId are required",
-            },
-          },
-          { status: 400 }
-        );
-      }
-
-      const data = await resolveOpenIntent(
-        session.user.id,
-        body.workspaceId,
-        body.contentId
-      );
-
-      return NextResponse.json({ success: true, data });
-    } catch (error) {
-      logger.error({ layer: "content", event: "workspaces_open_intent:caught", summary: "POST caught", error });
-      return errorResponse(error, "Failed to resolve workplace open intent");
-    }
-  });
-}
-
 export async function handleGetWorkplace(
   request: NextRequest,
   { params }: { params: WorkspaceParams }
@@ -269,7 +226,6 @@ export async function handleUpdateWorkplace(
       const body = await request.json();
       const data = await updateWorkspace(session.user.id, id, {
         name: typeof body.name === "string" ? body.name : undefined,
-        isLocked: typeof body.isLocked === "boolean" ? body.isLocked : undefined,
         expiresAt:
           body.expiresAt === null || typeof body.expiresAt === "string"
             ? body.expiresAt
@@ -694,81 +650,6 @@ export async function handleListWorkspaceLayoutRecords(
     } catch (error) {
       logger.error({ layer: "content", event: "workspaces_layout_records_list:caught", summary: "GET caught", error });
       return errorResponse(error, "Failed to list layout records");
-    }
-  });
-}
-
-export async function handleAssignContentToWorkplace(
-  request: NextRequest,
-  { params }: { params: WorkspaceParams }
-) {
-  return withRouteTrace(request, { route: "/api/content/workspaces/[id]/assignments" }, async () => {
-    try {
-      const session = await requireAuth();
-      const { id } = await params;
-      const body = await request.json();
-
-      if (typeof body.contentId !== "string") {
-        return NextResponse.json(
-          {
-            success: false,
-            error: { code: "INVALID_REQUEST", message: "contentId is required" },
-          },
-          { status: 400 }
-        );
-      }
-
-      const assignmentType = ASSIGNMENT_TYPES.has(body.assignmentType)
-        ? (body.assignmentType as ContentWorkspaceItemAssignmentType)
-        : "primary";
-      const scope = SCOPES.has(body.scope)
-        ? (body.scope as ContentWorkspaceItemScope)
-        : "item";
-
-      const data = await assignContentToWorkspace(session.user.id, id, body.contentId, {
-        assignmentType,
-        scope,
-        expiresAt:
-          body.expiresAt === null || typeof body.expiresAt === "string"
-            ? body.expiresAt
-            : undefined,
-        moveFromWorkspaceId:
-          typeof body.moveFromWorkspaceId === "string"
-            ? body.moveFromWorkspaceId
-            : null,
-      });
-
-      if (!data) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: { code: "NOT_FOUND", message: "Workspace or content not found" },
-          },
-          { status: 404 }
-        );
-      }
-
-      return NextResponse.json({ success: true, data });
-    } catch (error) {
-      logger.error({ layer: "content", event: "workspaces_assign:caught", summary: "POST caught", error });
-      return errorResponse(error, "Failed to assign content to workspace");
-    }
-  });
-}
-
-export async function handleUnassignContentFromWorkplace(
-  request: NextRequest,
-  { params }: { params: WorkspaceAssignmentParams }
-) {
-  return withRouteTrace(request, { route: "/api/content/workspaces/[id]/assignments/[contentId]" }, async () => {
-    try {
-      const session = await requireAuth();
-      const { id, contentId } = await params;
-      const data = await unassignContentFromWorkspace(session.user.id, id, contentId);
-      return NextResponse.json({ success: true, data });
-    } catch (error) {
-      logger.error({ layer: "content", event: "workspaces_unassign:caught", summary: "DELETE caught", error });
-      return errorResponse(error, "Failed to remove content from workspace");
     }
   });
 }

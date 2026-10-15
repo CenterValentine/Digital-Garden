@@ -45,17 +45,6 @@ enum ContentWorkspaceStatus {
   archived
 }
 
-enum ContentWorkspaceItemAssignmentType {
-  primary
-  shared
-  borrowed
-}
-
-enum ContentWorkspaceItemScope {
-  item
-  recursive
-}
-
 enum FlashcardReviewOutcome {
   review
   mastered
@@ -180,7 +169,6 @@ model ContentNode {
   trashBinEntry                TrashBin?
   viewGrants                   ViewGrant[]
   calendarEvents               CalendarEvent[]
-  workspaceItems               ContentWorkspaceItem[]
   workspaceTabs                ContentWorkspaceTab[]
   viewWorkspaces               ContentWorkspace[]        @relation("WorkspaceViewRoot")
   periodicNoteIndexes          PeriodicNoteIndex[]
@@ -580,6 +568,7 @@ model User {
 
   series                   Series[]
   serviceTokens            ServiceToken[]
+  mcpTokens                McpToken[]
   browserExtensionTokens   BrowserExtensionToken[]
   browserExtensionInstalls BrowserExtensionInstall[]
   bookmarkSyncConnections  BookmarkSyncConnection[]
@@ -620,7 +609,6 @@ model ContentWorkspace {
   name              String                 @db.VarChar(120)
   slug              String                 @db.VarChar(120)
   isMain            Boolean                @default(false)
-  isLocked          Boolean                @default(false)
   status            ContentWorkspaceStatus @default(active)
   expiresAt         DateTime?              @db.Timestamptz(6)
   archivedAt        DateTime?              @db.Timestamptz(6)
@@ -636,7 +624,6 @@ model ContentWorkspace {
 
   owner           User                           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   viewRoot        ContentNode?                   @relation("WorkspaceViewRoot", fields: [viewRootContentId], references: [id], onDelete: SetNull)
-  items           ContentWorkspaceItem[]
   tabs            ContentWorkspaceTab[]
   layoutRecords   ContentWorkspaceLayoutRecord[]
   parentWorkspace ContentWorkspace?              @relation("WorkspaceWorkbenches", fields: [parentWorkspaceId], references: [id], onDelete: Cascade)
@@ -648,25 +635,6 @@ model ContentWorkspace {
   @@index([ownerId, isMain])
   @@index([expiresAt])
   @@index([parentWorkspaceId])
-}
-
-model ContentWorkspaceItem {
-  id             String                             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  workspaceId    String                             @db.Uuid
-  contentId      String                             @db.Uuid
-  assignmentType ContentWorkspaceItemAssignmentType @default(primary)
-  scope          ContentWorkspaceItemScope          @default(item)
-  expiresAt      DateTime?                          @db.Timestamptz(6)
-  createdAt      DateTime                           @default(now()) @db.Timestamptz(6)
-  updatedAt      DateTime                           @updatedAt @db.Timestamptz(6)
-
-  workspace ContentWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  content   ContentNode      @relation(fields: [contentId], references: [id], onDelete: Cascade)
-
-  @@unique([workspaceId, contentId])
-  @@index([contentId, assignmentType, expiresAt])
-  @@index([workspaceId, assignmentType])
-  @@index([expiresAt])
 }
 
 /// R1 (layout-intent spec): workspace-scoped tab MEMBERSHIP - the always-synced
@@ -930,6 +898,43 @@ model ServiceToken {
   createdAt   DateTime  @default(now()) @db.Timestamptz(6)
   updatedAt   DateTime  @updatedAt @db.Timestamptz(6)
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@index([tokenPrefix])
+}
+
+/// Personal access token for the garden's MCP server (MCP-DATABASE-REACH-PLAN
+/// §4). Same shape as ServiceToken / BrowserExtensionToken — sha256 at rest,
+/// a display prefix, revocable, optional expiry — plus what MCP needs that
+/// those lack: capabilities (`garden:read`, `garden:read-chats`,
+/// `garden:write-rows`, `garden:delete-rows`, `garden:write-files`,
+/// `garden:report-issues`), the folder/database ids that scope it, and the
+/// per-token read and call caps. One row whether minted by hand on the
+/// settings page or issued through the OAuth flow a hosted client runs.
+model McpToken {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId       String    @db.Uuid
+  name         String    @db.VarChar(120)
+  tokenHash    String    @unique @db.Char(64)
+  tokenPrefix  String    @db.VarChar(16)
+  capabilities String[]  @default(["garden:read"])
+  /// ContentNode ids (folders or databases) the token may reach, plus what
+  /// relation-reach adds from database roots. Empty = nothing.
+  rootIds      String[]  @default([])
+  /// Widens `garden:read-chats` from chats about in-scope content to every chat.
+  allChats     Boolean   @default(false)
+  /// Per-call token budget for reads; null = the plan's default.
+  readTokenCap Int?
+  /// Calls per UTC day; null = the plan's default.
+  dailyCallCap Int?
+  /// "pat" (settings page) or "oauth" (dynamic client registration flow).
+  issuedVia    String    @default("pat") @db.VarChar(16)
+  lastUsedAt   DateTime? @db.Timestamptz(6)
+  expiresAt    DateTime? @db.Timestamptz(6)
+  revokedAt    DateTime? @db.Timestamptz(6)
+  createdAt    DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime  @updatedAt @db.Timestamptz(6)
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, revokedAt])
   @@index([tokenPrefix])
@@ -1533,6 +1538,12 @@ model DataPayload {
   /// AI row digests opt-in (AI-BULK-ROW-READING-PLAN §5): one AI-written
   /// line per row, refreshed in the background, read by query_database.
   rowDigests    Boolean @default(false)
+  /// What the assistant may do beyond cells (MCP-DATABASE-REACH-PLAN §2.8).
+  /// A bag, not columns, so later rules join without a migration (Database
+  /// II D11). Today: { delete: "confirm" | "allow" | "deny" }, default
+  /// confirm. Read through readAiPolicy (tolerant), written through
+  /// parseAiPolicyPatch (strict).
+  aiPolicy      Json    @default("{}")
 
   createdAt DateTime @default(now()) @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @db.Timestamptz(6)

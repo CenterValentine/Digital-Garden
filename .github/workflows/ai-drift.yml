@@ -18,7 +18,16 @@ on:
       - "lib/features/settings/validation.ts"
       - "scripts/validate-ai-drift.ts"
       - "scripts/validate-context-diet.ts"
+      - "scripts/validate-view-screen.ts"
+      - "lib/features/screen-capture/**"
+      - "lib/domain/browser-extension/panel-bridge.ts"
+      - "app/api/ai/attachments/upload/**"
+      - "extensions/browser-bookmarks/browser-extension/src/panel/**"
       - "scripts/validate-iteration-proposal.ts"
+      - "scripts/validate-ai-delete-policy.ts"
+      - "lib/domain/data/ai-policy.ts"
+      - "components/content/data/DataSchemaRail.tsx"
+      - "app/api/content/data/[id]/route.ts"
       - "scripts/generate-ai-capability-matrix.ts"
       - "docs/notes-feature/core/AI-CAPABILITY-MATRIX.md"
       - "package.json"
@@ -56,8 +65,17 @@ jobs:
       - name: Validate context-diet transforms
         run: pnpm context:diet:check
 
+      - name: Validate view_screen delivery and wiring
+        run: pnpm view-screen:check
+
       - name: Validate proposal shapes reach execute
         run: pnpm proposal:shape:check
+
+      - name: Validate AI row deletion is consent-gated
+        run: pnpm data:delete-policy:check
+
+      - name: Document templates (judge rules, renderer client auth, charter wiring)
+        run: pnpm docx:templates:check
 
       - name: Validate capability matrix freshness
         run: pnpm ai:matrix:check

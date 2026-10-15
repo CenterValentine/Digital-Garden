@@ -305,7 +305,8 @@ export function LeftSidebar() {
       {/* min-h-0: allow this flex column to shrink below its content so a
           bounded height cascades to the virtualized tree (otherwise it sizes
           to the tree and the tree can't scroll — the side-panel scroll bug). */}
-      <div className="flex h-full min-h-0 flex-col">
+      {/* data-capture-region: view_screen's "left-sidebar" area (AI-VIEW-SCREEN-PLAN D12). */}
+      <div className="flex h-full min-h-0 flex-col" data-capture-region="left-sidebar">
         {/* Header with create actions */}
         <LeftSidebarHeader
           onCreateFolder={activeView === PEOPLE_VIEW_KEY ? handleCreatePeopleFolder : handleCreateFolder}

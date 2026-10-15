@@ -6,6 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { displayOrderForTop } from "@/lib/domain/content/sibling-order";
 import { after } from "next/server";
 import { markContextDirty } from "@/lib/domain/ai-context/context-dirty";
 import { prisma } from "@/lib/database/client";
@@ -499,6 +500,7 @@ export async function POST(request: NextRequest) {
       chatMetadata,
       fromTemplateId,
       shortcutTargetId,
+      position,
     } = body;
 
     let title = rawTitle;
@@ -1109,6 +1111,24 @@ export async function POST(request: NextRequest) {
     // creates with the same title can both resolve to the same slug and then
     // race on INSERT. Rapid NodeView re-mounts of embedded drawings tripped
     // this. We retry with a short random suffix on P2002 against (ownerId, slug).
+    // "top": first among the siblings the tree will show it with (same parent
+    // and, for people-mounted content, the same mount) — see displayOrderForTop.
+    let displayOrder: number | undefined;
+    if (position === "top") {
+      const firstSibling = await prisma.contentNode.findFirst({
+        where: {
+          ownerId: session.user.id,
+          parentId: parentId || null,
+          peopleGroupId: resolvedPeopleGroupId,
+          personId: resolvedPersonId,
+          deletedAt: null,
+        },
+        orderBy: { displayOrder: "asc" },
+        select: { displayOrder: true },
+      });
+      displayOrder = displayOrderForTop(firstSibling?.displayOrder ?? null);
+    }
+
     const createWithSlug = (attemptSlug: string) =>
       prisma.contentNode.create({
         data: {
@@ -1116,6 +1136,7 @@ export async function POST(request: NextRequest) {
           title,
           slug: attemptSlug,
           contentType,
+          ...(displayOrder !== undefined ? { displayOrder } : {}),
           parentId: parentId || null,
           categoryId: categoryId || null,
           peopleGroupId: resolvedPeopleGroupId,

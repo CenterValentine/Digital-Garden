@@ -620,6 +620,8 @@ export const DEFAULT_CONTENT_QUERY: ContentQuery = {
   contentTypes: ["note"],
 };
 
+import type { DataAiPolicy } from "./ai-policy";
+
 export interface DataTable {
   contentId: string;
   title: string;
@@ -631,6 +633,12 @@ export interface DataTable {
   rowCount: number;
   /** AI row digests opt-in (plan §5); owner-controlled in the schema rail. */
   rowDigests: boolean;
+  /**
+   * What the assistant may do beyond cells (MCP-DATABASE-REACH-PLAN §2.8):
+   * today the deletion policy; owner-controlled in the schema rail. Read
+   * tolerantly from the stored bag, so always present and always valid.
+   */
+  aiPolicy: DataAiPolicy;
   columns: DataColumn[];
   views: DataView[];
 }
