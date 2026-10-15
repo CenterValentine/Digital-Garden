@@ -162,6 +162,47 @@ that is neither fails the build.
 continuation is the client predicate described in §2 step 6. If a turn ends at the
 step cap with a *server* tool resolved, that is a deliberate stop, not a bug.
 
+### Tool input contracts — the principles (2026-09-21)
+
+The AI SDK validates a tool's Zod schema **before** `execute`. A miss at that layer
+is fatal to the whole call and returns a raw issue list that echoes the entire
+input — it never reaches code that could have understood it. Prod `fa475acc`:
+four `propose_item_iteration` calls in a row died on four *shape* misses (a string
+where an object was expected; `databaseId` for `database`; `columns: []`; 21
+columns against `.max(20)`) while every payload named the right database, items
+and columns. Half the turn's step budget, and "nothing recorded". These principles
+exist so that class cannot recur; drift **gate 7** enforces the first one.
+
+1. **Schemas describe shape; execute judges.** A run-loop tool's `inputSchema`
+   carries field names, primitive types, `.optional()`, `.describe()`, and unions
+   of shapes the model has actually sent — never `.enum()`, `.min()`, `.max()`,
+   `.int()`, `.regex()`, `.refine()`, or required keys inside a nested object.
+   Vocabularies resolve, bounds clamp, nested objects normalize — in execute.
+   Gate 7 checks both halves: refinements, and any `z.object(` nested inside a
+   run-loop schema (prod `23fd28d6`, 2026-09-27: `capture: z.object({ cells })`
+   rejected a flat `{ Column: value }` map that was semantically complete; it is
+   now a `z.record` read by `normalizeCaptureArg` either way —
+   `ITERATION-RUN-HARNESS-FIXES-PLAN.md` P4).
+2. **A miss costs one step, never the enumeration.** When execute genuinely cannot
+   proceed it returns a *result* — `ok: false`, a `refusal` saying what was received
+   and what is accepted, a `nextAction` — that the model fixes in one call. It never
+   throws, and it never asks the model to re-do the expensive part.
+3. **Same concept, same key, everywhere.** The sibling tools say `databaseId`; a
+   nested `database` was the harness's inconsistency, and the model's "wrong" guess
+   was the consistent one. Accept every key the model has used for a concept, and
+   mint new ones to match their siblings.
+4. **Bounds live where the limit lives.** "≤ 20 columns" was arbitrary from the
+   model's side; the *table* knows which names are columns, so the preflight
+   answers "these four aren't" — a real fact instead of a number.
+5. **A refusal teaches.** Received value, accepted values, the fix. A raw Zod dump
+   is none of those.
+
+The rule is stated in full at the top of `lib/domain/ai/tools/iteration-proposal.ts`
+(the proposal's pure contract, also loaded by `pnpm proposal:shape:check`, whose
+fixtures are the four production payloads). Companion doctrine for read tools:
+`data-tools.ts` ("validation lives in execute, where every miss returns a teaching
+message"); for `record_item_result`, the status-resolution comment in the registry.
+
 **Two agentic harnesses** compose over these tools, both using the **run ledger**
 (a markdown note, `run-ledger.ts` — loop state lives in the ledger + message parts,
 never in model memory):
@@ -188,11 +229,21 @@ never in model memory):
 | Plain chat | 7 | Default bound on tool loops |
 | Editable document open | 8 | One extra step for the edit round-trip |
 | Approved research run | `pageBudget × 2 + 4` (budget ≤ 40) | Read + extract per page + overhead |
-| Approved item iteration | `itemBudget × 4 + 8` (budget ≤ 200) | Read + record (+ re-read) per item + proposal/roll-up overhead; the client item budget is the true limiter — this ceiling must not cut off before it |
+| Approved item iteration | `itemBudget × (3 + deliverables + 1) + 8` (budget ≤ 200; `stepsPerItem` may override, 2–20) | Three research steps, one per declared **deliverable** (`create_docx`, `update_row`, …), one `record_item_result` per item, plus proposal/close overhead. With no deliverables this is the old `× 4 + 8`. `computeIterationStepCap` in `iteration-proposal.ts` |
 
 Budgets are recomputed server-side each request by rescanning `body.messages` for
 approved proposal parts (and reset when the closing record appears) — the server
 never trusts a client-claimed number.
+
+**The reserved tail (2026-09-22, prod `5e5b739d`).** A one-item *fulfilment* run
+(research → resume → `create_docx` → `update_row` → record → close) under the
+screening cap spent all 12 steps on reads and closed with a report. Two rules now
+hold inside an item run: `prepareStep` narrows `activeTools` to the run's
+deliverables + `record_item_result` + `record_iteration_findings` for the turn's
+last `deliverables + 2` steps (the final-step text reservation generalised — research
+cannot consume the writes), and every step appends a one-line harness notice with
+the steps remaining and what the tail is for. The model never again learns the
+budget at the step it runs out.
 
 ---
 
@@ -225,11 +276,26 @@ requested.
 (`supportsOpenAIPromptCaching` per model). The cache key is
 `digest(userId, playbookId, playbookContext, tool set)` — insensitive to tool
 *order*, rotated by playbook edits and phase advances, isolated per user.
-Anthropic is deliberately NOT opted into paid cache writes (policy decision recorded
-in `validate-prompt-cache.ts`). DeepSeek caches automatically server-side — its hit
+Anthropic is cached through a moving breakpoint: `withAnthropicCacheBreakpoint`
+marks the last message of every step (ephemeral, 5-minute lifetime; writes 1.25×,
+reads 0.1×). This reverses the 3.2.2 "no paid cache writes" policy (2026-09-30):
+an agentic turn re-reads its prefix every step, so the read discount dominates.
+While an approval is pending, the chat engine sends ONE cache volley shortly before
+a short-lived cache would lapse (`cache-volley.ts`: Anthropic and pre-5.6 OpenAI;
+GPT-5.6+ caches live 30 minutes and need none). The route builds the volley through
+its normal path, with the transcript cut at the approval step (`warmOnly`), so its
+prefix is the one the continuation extends. DeepSeek caches automatically server-side — its hit
 rate is visible only via `cachedInputTokens` in persisted usage (#156). The system
 prompt is ordered cache-friendly: stable playbook context precedes run-specific
 sections (`buildSystemPrompt` section ordering).
+
+### Provider seam principles (2026-09-30)
+
+Owner-endorsed after the gpt-6 cache freeze (ITERATION-RUN-HARNESS-FIXES §10). They are absolutes, not heuristics:
+
+- **One prompt per turn.** The system prompt and the tool list are fixed at a turn's first request; the requests of one turn differ by appended history only. A charter's turn-scoped data (the current phase, the item's rows) may differ between turns, never between the requests of one. Anything that would change the prompt mid-turn is present from the first request or waits for the next turn. In code: system-prompt flags read `isOffered` (base policy + charter binding, never a summon); a bound charter advertises `CHARTER_TURN_TOOLS` from its first request; the reserved tail is enforced when a tool runs (`tailGate` → `tailRefusalNotice`), never by narrowing `activeTools`. A request that departs from this is a full cache miss.
+- **Provider state in the transcript is not ours to diet.** Parts a provider authored for its own round-trip — Anthropic's signed thinking, OpenAI's encrypted reasoning under `store: false` — are carried back whatever their size. Context diet removes only content we generated or fetched. (`stripReasoningForResend` keeps both; the cache freeze was this rule broken.)
+- **A model we allow is a model we own.** An id that can reach a provider has our own capability row driving the adapter (`openaiModelReasons` → `forceReasoning`, `resolveModelTemperature`, the pricing row); the adapter's built-in model list is never the source of truth. New releases are watched against these rows rather than discovered in production.
 
 ---
 
@@ -248,6 +314,13 @@ shows a **MISSING** marker if the scan disagrees.
 settings metadata or `HARNESS_INTERNAL_TOOL_IDS`. Gate 3 fails until you decide.
 If prompt text or another tool's description references it by name, gate 4 keeps
 those references honest — and catches the rename-but-forgot-the-prose case.
+
+**Add or change a run-loop tool's input schema** → keep it describe-only (§5 "Tool
+input contracts"); put vocabularies, bounds and nested-shape normalization in
+execute, answering a miss with a teaching result. Gate 7 fails the build on any
+`.enum()` / `.min()` / `.max()` / refinement in `propose_item_iteration`,
+`record_*` or `add_quest_ledger_column`; `proposal:shape:check` proves the
+production payloads still reach execute.
 
 **Change the system prompt** → `prompt-cache:check` pins cache-key behavior;
 gate 4 re-validates tool-name references; remember section order is part of the

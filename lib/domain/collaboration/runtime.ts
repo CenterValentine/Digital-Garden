@@ -13,6 +13,12 @@ import {
   ydocUpdateHasMeaningfulDefaultContent,
 } from "@/lib/domain/collaboration/content-safety";
 import { getCollaborationServerExtensions } from "@/lib/domain/collaboration/extensions";
+import {
+  alignOntoServerCopy,
+  planAlignment,
+  planLocalCatchUp,
+  sharesLineage,
+} from "@/lib/domain/collaboration/lineage";
 import { sanitizeTipTapJsonWithExtensions } from "@/lib/domain/editor/unsupported-content";
 import { onNativeMessage } from "@/lib/mobile-bridge/client";
 import { clientLogger } from "@/lib/core/logger/client";
@@ -21,6 +27,15 @@ import {
   type PresenceRecord,
 } from "@/lib/domain/collaboration/presence-poll";
 import { resolvePresenceHeartbeatDelay } from "@/lib/domain/collaboration/presence-cadence";
+
+/** How long the "merged with an outside change" notice stays after a sync. */
+const REMOTE_WRITE_NOTICE_MS = 12_000;
+/** How long the "reconnected" notice stays after recovering from offline. */
+const RECOVERED_NOTICE_MS = 4_000;
+/** D17: how long opening a cached copy waits for the server's before editing opens anyway. */
+const LOCAL_CATCH_UP_TIMEOUT_MS = 4_000;
+/** D17: how often this browser's last-edit time reaches the manifest while typing. */
+const LOCAL_EDIT_PERSIST_EVERY_MS = 5_000;
 
 // Initial-promote deferral.
 //
@@ -188,6 +203,20 @@ export interface CollaborationRuntimeState {
   reconnectIntent: boolean;
   readOnly: boolean;
   warning: string | null;
+  /**
+   * When the document came back to synced after being offline or degraded —
+   * set for RECOVERED_NOTICE_MS so the editor can say so, then cleared.
+   */
+  recoveredAt: number | null;
+  /**
+   * When a sync merged this tab's own unsynced edits with a change the server
+   * document received while the tab was detached (asleep or offline) — an
+   * outside write by an agent, a script or another device. The merge is the
+   * resolution (Y.js keeps both sides); this only tells the user it happened.
+   * Set for REMOTE_WRITE_NOTICE_MS, then cleared. Owner decision 2026-10-13:
+   * resolve by merge, notify only when the tab had edits of its own.
+   */
+  remoteWriteMergedAt: number | null;
   editPolicy: CollaborationEditPolicy;
 }
 
@@ -230,6 +259,10 @@ interface CollaborationStateResponse {
     documentName: string;
     readOnly: boolean;
     update: string | null;
+    /** When the stored note last changed (ISO) — D17's staleness test. */
+    payloadUpdatedAt?: string | null;
+    /** The stored document's stamp (ms): the wake-on-write baseline for a tab that takes this state. */
+    documentStampMs?: number | null;
   };
   error?: { message?: string };
 }
@@ -273,6 +306,7 @@ interface DocumentRuntimeEntry {
   user: CollaborationUser | null;
   listeners: Set<() => void>;
   cooldownTimer: ReturnType<typeof setTimeout> | null;
+  recoveredNoticeTimer: ReturnType<typeof setTimeout> | null;
   idleEvictionTimer: ReturnType<typeof setTimeout> | null;
   visibilitySleepTimer: ReturnType<typeof setTimeout> | null;
   inactivitySleepTimer: ReturnType<typeof setTimeout> | null;
@@ -291,6 +325,26 @@ interface DocumentRuntimeEntry {
   presenceReleased: boolean;
   /** Unsubscribe from the shared presence poller; null when not subscribed. */
   presencePollUnsubscribe: (() => void) | null;
+  /**
+   * The server document's stamp the presence poll last reported (ms). While
+   * detached, a stamp past this one means the live document changed without
+   * us — the wake-on-write signal for an outside write.
+   */
+  lastSeenDocumentStampMs: number | null;
+  /**
+   * The open-time comparison with the server's copy did not bring this copy
+   * up to date (fetch failed, or the planner kept the cached copy). The first
+   * document stamp the poll reports then wakes the document instead of
+   * becoming its baseline, so a tab that opened behind does not stay behind.
+   */
+  catchUpIncomplete: boolean;
+  /**
+   * Remote updates applied to the Y.Doc while this tab was detached WITH
+   * unsynced edits of its own. Non-zero at `markSynced` means the sync was a
+   * merge, which is what `remoteWriteMergedAt` reports.
+   */
+  remoteUpdatesWhileDetached: number;
+  remoteWriteNoticeTimer: ReturnType<typeof setTimeout> | null;
   // True once the tab has been hidden past VISIBILITY_SLEEP_DELAY_MS. Blocks
   // the presence subscription from (re)opening and selects the deep-dormant
   // heartbeat cadence. Cleared when the tab becomes visible again.
@@ -300,6 +354,23 @@ interface DocumentRuntimeEntry {
   pendingInitialContent: JSONContent | null;
   hasSeededInitialContent: boolean;
   isBootstrappingInitialContent: boolean;
+  /**
+   * True once this copy was compared with the server's before its first
+   * connect (`alignLineageBeforeFirstConnect`). Every copy is compared — one
+   * filled from the canonical state too: a solo session can stay local for
+   * hours, and the server's copy can be replaced meanwhile (a Hocuspocus not
+   * yet redeployed with the lineage fix, the manual reseed). Verified in a
+   * two-browser smoke: skipping such a copy doubled the note.
+   */
+  lineageChecked: boolean;
+  /**
+   * The manifest entry the PREVIOUS session left (read before this session
+   * overwrites it): did it leave offline edits behind? D17.
+   */
+  priorCacheEntry: LocalCacheManifestEntry | null;
+  /** When this browser last edited its copy (ms); carried across sessions. D17. */
+  lastLocalEditAt: number | null;
+  lastLocalEditPersistedAt: number;
   promotionPromise: Promise<void> | null;
   authVerificationPromise: Promise<void> | null;
   ydocUpdateHandler:
@@ -374,6 +445,12 @@ interface LocalCacheManifestEntry {
   lastAccessedAt: number;
   dirty: boolean;
   unsyncedUpdateCount: number;
+  /**
+   * When this browser last edited its copy (ms). Absent on entries written
+   * before it was tracked. AI-VIEW-SCREEN-PLAN D17: a stored note changed
+   * after this moment was changed elsewhere, so a clean copy defers to it.
+   */
+  lastLocalEditAt?: number;
 }
 
 type LocalCacheManifest = Record<string, LocalCacheManifestEntry>;
@@ -421,6 +498,7 @@ function updateLocalCacheManifest(entry: DocumentRuntimeEntry) {
     lastAccessedAt: Date.now(),
     dirty: entry.state.localDirty,
     unsyncedUpdateCount: entry.state.unsyncedUpdateCount,
+    ...(entry.lastLocalEditAt !== null ? { lastLocalEditAt: entry.lastLocalEditAt } : {}),
   };
   writeLocalCacheManifest(manifest);
 }
@@ -722,6 +800,7 @@ class CollaborationRuntimeManager {
       listeners: new Set(),
       consumers: new Map(),
       cooldownTimer: null,
+      recoveredNoticeTimer: null,
       idleEvictionTimer: null,
       visibilitySleepTimer: null,
       inactivitySleepTimer: null,
@@ -734,12 +813,20 @@ class CollaborationRuntimeManager {
       presenceHeartbeatInFlight: false,
       presenceReleased: false,
       presencePollUnsubscribe: null,
+      lastSeenDocumentStampMs: null,
+      catchUpIncomplete: false,
+      remoteUpdatesWhileDetached: 0,
+      remoteWriteNoticeTimer: null,
       presenceSuspended: false,
       broadcastChannel: null,
       knownBrowserSessions: new Map(),
       pendingInitialContent: null,
       hasSeededInitialContent: false,
       isBootstrappingInitialContent: false,
+      lineageChecked: false,
+      priorCacheEntry: readLocalCacheManifest()[contentId] ?? null,
+      lastLocalEditAt: readLocalCacheManifest()[contentId]?.lastLocalEditAt ?? null,
+      lastLocalEditPersistedAt: 0,
       promotionPromise: null,
       authVerificationPromise: null,
       ydocUpdateHandler: null,
@@ -779,6 +866,8 @@ class CollaborationRuntimeManager {
         reconnectIntent: false,
         readOnly: false,
         warning: null,
+        recoveredAt: null,
+        remoteWriteMergedAt: null,
         editPolicy: {
           editable: false,
           reason: "booting-local-state",
@@ -787,11 +876,35 @@ class CollaborationRuntimeManager {
       },
     };
 
-    entry.ydocUpdateHandler = (_update, _origin, _doc, transaction) => {
-      if (!transaction.local || entry.isBootstrappingInitialContent) return;
+    entry.ydocUpdateHandler = (_update, origin, _doc, transaction) => {
+      if (!transaction.local) {
+        // A remote update (origin = the provider) landing while this tab is
+        // detached with unsynced edits of its own means the coming sync is a
+        // MERGE, not a plain catch-up. Count it so markSynced can say so.
+        // Y.js emits no update for an empty diff, so a reconnect that brings
+        // nothing new never counts.
+        if (
+          entry.hocuspocusProvider !== null &&
+          origin === entry.hocuspocusProvider &&
+          entry.state.connectionState !== "synced" &&
+          (entry.state.localDirty || entry.state.unsyncedUpdateCount > 0)
+        ) {
+          entry.remoteUpdatesWhileDetached += 1;
+        }
+        return;
+      }
+      if (entry.isBootstrappingInitialContent) return;
       if (entry.state.persistenceState !== "localReady") return;
 
       this.noteLocalActivity(entry);
+
+      // D17: remember when this browser last edited its copy, across sessions
+      // (throttled — a localStorage write per keystroke is not free).
+      entry.lastLocalEditAt = Date.now();
+      if (entry.lastLocalEditAt - entry.lastLocalEditPersistedAt > LOCAL_EDIT_PERSIST_EVERY_MS) {
+        entry.lastLocalEditPersistedAt = entry.lastLocalEditAt;
+        updateLocalCacheManifest(entry);
+      }
 
       // Cancel any pending sleep timers — the user is actively editing.
       if (entry.inactivitySleepTimer) {
@@ -957,12 +1070,36 @@ class CollaborationRuntimeManager {
       localYdocIsMeaningful ||
       (entry.ydoc.getXmlFragment("default").length > 0 && !pendingContentIsMeaningful)
     ) {
+      // D17: a cached copy is compared with the server's before editing opens
+      // — the stored note may have moved past it (an AI write to a note with
+      // no server copy yet, another device). Editing stays locked for this one
+      // round trip; on any failure the cached copy opens exactly as before.
+      if (localYdocIsMeaningful) {
+        entry.isBootstrappingInitialContent = true;
+        try {
+          await this.catchUpLocalCopy(entry);
+        } catch (error) {
+          clientLogger.warn({
+            layer: "editor",
+            event: "collab:local_catch_up_failed",
+            summary: "could not compare the cached copy with the server's — opening it as before",
+            attrs: { content_id: entry.contentId },
+            error,
+          });
+        } finally {
+          entry.isBootstrappingInitialContent = false;
+        }
+        if (entry.hasSeededInitialContent || this.entries.get(entry.contentId) !== entry) return;
+      }
       this.clearBootstrapWatch(entry);
       entry.hasSeededInitialContent = true;
       entry.state.bootstrapState = "ready";
       entry.state.availabilityState = "canonical";
       entry.state.localFallbackReason = null;
       entry.state.warning = null;
+      // Awaited above, so the caller's emit has already run with the state
+      // still pending — announce readiness here or the editor stays locked.
+      this.emit(entry);
       return;
     }
 
@@ -1001,6 +1138,8 @@ class CollaborationRuntimeManager {
           return;
         }
         Y.applyUpdate(entry.ydoc, canonicalState.update);
+        // Seeded from the server's document as of this stamp: the wake-on-write baseline.
+        entry.lastSeenDocumentStampMs = canonicalState.documentStampMs;
       } else if (pendingContentIsMeaningful) {
         this.markBootstrapFailed(
           entry,
@@ -1204,6 +1343,140 @@ class CollaborationRuntimeManager {
     this.emit(entry);
   }
 
+  /**
+   * AI-VIEW-SCREEN-PLAN D17 — bring a cached copy up to the server's before
+   * editing opens. The decision is `planLocalCatchUp` (lineage.ts, pinned by
+   * collab:lineage:check); this applies it. Never throws past the caller's
+   * catch, never blocks longer than LOCAL_CATCH_UP_TIMEOUT_MS, and never
+   * discards offline edits.
+   *
+   * Asking for the canonical state also MINTS the server copy of a note that
+   * had none (the load path seeds it from the payload), so from here on an AI
+   * write to it goes through Y.js — on the lineage this browser now shares.
+   */
+  private async catchUpLocalCopy(entry: DocumentRuntimeEntry) {
+    const abortController = typeof AbortController === "undefined" ? null : new AbortController();
+    const timer = abortController ? setTimeout(() => abortController.abort(), LOCAL_CATCH_UP_TIMEOUT_MS) : null;
+    let canonical: Awaited<ReturnType<CollaborationRuntimeManager["fetchCanonicalYDocState"]>>;
+    try {
+      canonical = await this.fetchCanonicalYDocState(entry.contentId, abortController?.signal);
+    } catch {
+      // Offline, slow, or refused — the cached copy opens as before, and the
+      // first document stamp the presence poll reports wakes it instead of
+      // becoming its baseline (applyDocumentStamp).
+      entry.catchUpIncomplete = true;
+      return;
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+    if (!canonical.update || this.entries.get(entry.contentId) !== entry) return;
+    const serverUpdate = canonical.update;
+
+    const local = TiptapTransformer.fromYdoc(entry.ydoc, "default") as JSONContent;
+    const serverDoc = new Y.Doc();
+    Y.applyUpdate(serverDoc, serverUpdate);
+    const server = TiptapTransformer.fromYdoc(serverDoc, "default") as JSONContent;
+    serverDoc.destroy();
+    const shares = sharesLineage(Y.encodeStateVector(entry.ydoc), Y.encodeStateVectorFromUpdate(serverUpdate));
+    let unionMatchesServer = false;
+    if (shares) {
+      const union = new Y.Doc();
+      Y.applyUpdate(union, Y.encodeStateAsUpdate(entry.ydoc));
+      Y.applyUpdate(union, serverUpdate);
+      unionMatchesServer =
+        JSON.stringify(TiptapTransformer.fromYdoc(union, "default")) === JSON.stringify(server);
+      union.destroy();
+      // Already the same document — nothing to carry.
+      if (unionMatchesServer && JSON.stringify(local) === JSON.stringify(server)) {
+        entry.lastSeenDocumentStampMs = canonical.documentStampMs;
+        return;
+      }
+    }
+
+    const prior = entry.priorCacheEntry;
+    const plan = planLocalCatchUp({
+      sharesLineage: shares,
+      unionMatchesServer,
+      alignment: planAlignment(local, server),
+      localClean: !prior || (!prior.dirty && prior.unsyncedUpdateCount === 0),
+      lastLocalEditAt: entry.lastLocalEditAt,
+      payloadUpdatedAt: canonical.payloadUpdatedAt,
+    });
+    // "keep" is the one outcome that leaves the tab behind the server; it is
+    // logged at warn so the beacon forwards it and the decision is visible
+    // server-side (2026-10-13: a whole afternoon of guessing from the server).
+    clientLogger[plan === "keep" ? "warn" : "info"]({
+      layer: "editor",
+      event: "collab:local_catch_up",
+      summary: `cached copy compared with the server's — ${plan}`,
+      attrs: { content_id: entry.contentId, plan, shares_lineage: shares, union_matches_server: unionMatchesServer },
+    });
+    if (plan === "keep") {
+      // Connecting later behaves as before this check existed; let the first
+      // document stamp the poll reports trigger that instead of being a baseline.
+      entry.catchUpIncomplete = true;
+      return;
+    }
+    if (plan === "merge") {
+      Y.applyUpdate(entry.ydoc, serverUpdate, "local-catch-up");
+    } else {
+      alignOntoServerCopy(entry.ydoc, serverUpdate, plan === "adopt-and-reapply" ? local : null, "local-catch-up");
+    }
+    // The copy now reflects the server's document as of this stamp: the
+    // wake-on-write baseline (a poll stamp past it means a later write).
+    entry.lastSeenDocumentStampMs = canonical.documentStampMs;
+    // `lineageChecked` stays false on purpose: the first connect compares again
+    // (#287) — a solo session can wait for hours while the server's copy moves.
+  }
+
+  /**
+   * Before this copy first meets the server, make sure the meeting cannot
+   * double the note. A copy seeded independently from the same JSON shares no
+   * item with the server's, and Y.js's union then shows everything twice —
+   * and persists it (owner report 2026-10-08: a collaborator joining
+   * duplicated the note). Such copies sit in IndexedDB from server rebuilds
+   * before the lineage fix, come from the local seed fallback when the
+   * canonical fetch failed, or turn rival while a solo session waits (the
+   * server's copy replaced by a Hocuspocus without the fix, or a reseed).
+   *
+   * Moves onto the server's lineage only when content-wise nothing is lost
+   * (`planAlignment`); when both sides hold blocks the other lacks there is
+   * no safe choice, so it connects as before and says so in the log.
+   */
+  private async alignLineageBeforeFirstConnect(entry: DocumentRuntimeEntry) {
+    if (!ydocHasMeaningfulDefaultContent(entry.ydoc)) return;
+    let serverUpdate: Uint8Array | null;
+    try {
+      serverUpdate = (await this.fetchCanonicalYDocState(entry.contentId)).update;
+    } catch {
+      return; // can't tell — connect as before
+    }
+    if (!serverUpdate || this.entries.get(entry.contentId) !== entry) return;
+    if (sharesLineage(Y.encodeStateVector(entry.ydoc), Y.encodeStateVectorFromUpdate(serverUpdate))) {
+      return;
+    }
+
+    const local = TiptapTransformer.fromYdoc(entry.ydoc, "default") as JSONContent;
+    const serverDoc = new Y.Doc();
+    Y.applyUpdate(serverDoc, serverUpdate);
+    const server = TiptapTransformer.fromYdoc(serverDoc, "default") as JSONContent;
+    serverDoc.destroy();
+    const plan = planAlignment(local, server);
+    clientLogger.warn({
+      layer: "editor",
+      event: "collab:lineage_rival",
+      summary: `this browser's copy shares no history with the server's — ${plan}`,
+      attrs: { content_id: entry.contentId, plan },
+    });
+    if (plan === "diverged") return;
+    alignOntoServerCopy(
+      entry.ydoc,
+      serverUpdate,
+      plan === "adopt-and-reapply" ? local : null,
+      "lineage-align"
+    );
+  }
+
   private async fetchCanonicalYDocState(contentId: string, signal?: AbortSignal) {
     const response = await fetch("/api/collaboration/state", {
       method: "POST",
@@ -1216,10 +1489,13 @@ class CollaborationRuntimeManager {
     if (!response.ok || !result.success || !result.data) {
       throw new Error(result.error?.message || "Failed to load collaboration state");
     }
+    const payloadUpdatedAt = result.data.payloadUpdatedAt ? Date.parse(result.data.payloadUpdatedAt) : NaN;
     return {
       documentName: result.data.documentName,
       readOnly: result.data.readOnly,
       update: result.data.update ? base64ToUint8Array(result.data.update) : null,
+      payloadUpdatedAt: Number.isFinite(payloadUpdatedAt) ? payloadUpdatedAt : null,
+      documentStampMs: typeof result.data.documentStampMs === "number" ? result.data.documentStampMs : null,
     };
   }
 
@@ -1342,8 +1618,8 @@ class CollaborationRuntimeManager {
     // Deep-hidden tabs don't need live badge updates; resubscribes on
     // tab-visible.
     if (entry.presenceSuspended) return;
-    entry.presencePollUnsubscribe = subscribeContentPresence(entry.contentId, (sessions) => {
-      this.handleRemotePresence(entry, sessions);
+    entry.presencePollUnsubscribe = subscribeContentPresence(entry.contentId, (sessions, documentStampMs) => {
+      this.handleRemotePresence(entry, sessions, documentStampMs);
     });
   }
 
@@ -1530,27 +1806,58 @@ class CollaborationRuntimeManager {
     });
   }
 
-  private handleRemotePresence(entry: DocumentRuntimeEntry, sessions: PresenceRecord[]) {
+  private handleRemotePresence(
+    entry: DocumentRuntimeEntry,
+    sessions: PresenceRecord[],
+    documentStampMs: number | null = null
+  ) {
     this.applyRemotePresenceSessions(entry, sessions);
+    this.applyDocumentStamp(entry, documentStampMs);
     // Fan out to the other tabs of this browser so only the leader subscribes.
     // Kept from the SSE design: the poller is shared per-tab, not cross-tab.
     entry.broadcastChannel?.postMessage({
       type: "remote-presence-snapshot",
       contentId: entry.contentId,
       sessions,
+      documentStampMs,
       timestamp: Date.now(),
     });
+  }
+
+  /**
+   * Wake-on-write for a tab that cannot hear the broadcast. The presence poll
+   * reports the server document's stamp; while this tab is detached, a stamp
+   * past the one it last saw means the live document changed without it, so
+   * it reconnects through the same path the in-app chat uses after its own
+   * writes. The first stamp seen is only a baseline. Connected tabs received
+   * the change already and are skipped by `wakeForRemoteWrite`.
+   */
+  private applyDocumentStamp(entry: DocumentRuntimeEntry, documentStampMs: number | null) {
+    if (documentStampMs === null) return;
+    const previous = entry.lastSeenDocumentStampMs;
+    if (previous !== null && documentStampMs <= previous) return;
+    entry.lastSeenDocumentStampMs = documentStampMs;
+    if (previous === null) {
+      // No baseline: the open-time comparison set one when it brought the
+      // copy up to date. Without it the copy may be behind — wake only then.
+      if (!entry.catchUpIncomplete) return;
+      entry.catchUpIncomplete = false;
+    }
+    const { connectionState } = entry.state;
+    if (connectionState === "connected" || connectionState === "synced") return;
+    this.wakeForRemoteWrite(entry.contentId);
   }
 
   private handleBroadcastMessage(entry: DocumentRuntimeEntry, payload: unknown) {
     if (!payload || typeof payload !== "object") return;
     const message = payload as { type?: string; contentId?: string };
     if (message.type === "remote-presence-snapshot" && message.contentId === entry.contentId) {
-      this.applyRemotePresenceSessions(
-        entry,
-        (payload as { sessions?: Array<{ sessionId?: string; surfaceCount?: number }> }).sessions ??
-          []
-      );
+      const snapshot = payload as {
+        sessions?: Array<{ sessionId?: string; surfaceCount?: number }>;
+        documentStampMs?: number | null;
+      };
+      this.applyRemotePresenceSessions(entry, snapshot.sessions ?? []);
+      this.applyDocumentStamp(entry, typeof snapshot.documentStampMs === "number" ? snapshot.documentStampMs : null);
       return;
     }
 
@@ -1768,6 +2075,7 @@ class CollaborationRuntimeManager {
         entry.state.connectionState = "connecting";
         entry.hocuspocusProvider.connect();
         this.emit(entry);
+        this.restoreIfStillSynced(entry);
       }
       return entry.promotionPromise ?? Promise.resolve();
     }
@@ -1823,7 +2131,15 @@ class CollaborationRuntimeManager {
 
     if (entry.hocuspocusProvider) {
       entry.hocuspocusProvider.connect();
+      this.restoreIfStillSynced(entry);
       return;
+    }
+
+    if (!entry.lineageChecked) {
+      entry.lineageChecked = true;
+      await this.alignLineageBeforeFirstConnect(entry);
+      // Released while we compared — nothing left to connect.
+      if (this.entries.get(entry.contentId) !== entry || entry.hocuspocusProvider) return;
     }
 
     entry.hocuspocusProvider = new HocuspocusProvider({
@@ -1843,26 +2159,15 @@ class CollaborationRuntimeManager {
       },
       onSynced: ({ state }) => {
         if (!state) return;
-        this.clearProviderReconnect(entry);
-        entry.state.connectionState = "synced";
-        entry.state.bootstrapState = "ready";
-        entry.state.availabilityState = "canonical";
-        entry.state.localFallbackReason = null;
-        entry.state.warning = null;
-        entry.state.reconnectIntent = false;
-        entry.state.localDirty = false;
-        entry.state.unsyncedUpdateCount = 0;
-        this.emit(entry);
-        // Start inactivity countdown after every successful sync.
-        this.scheduleInactivitySleep(entry);
-        // Announce "synced" immediately so other sessions' badges flip from
-        // grey to live without waiting out a dormant heartbeat interval.
-        this.schedulePresenceHeartbeat(entry, 0);
+        this.markSynced(entry);
       },
       onUnsyncedChanges: ({ number }) => {
         entry.state.unsyncedUpdateCount = number;
         entry.state.localDirty = number > 0;
         this.emit(entry);
+        // Changes made while "offline" over a socket that never closed drain
+        // here; the provider was already synced, so `onSynced` stays silent.
+        if (number === 0) this.restoreIfStillSynced(entry);
       },
       onAwarenessChange: () => this.updateProviderPresence(entry),
       onAwarenessUpdate: () => this.updateProviderPresence(entry),
@@ -1875,6 +2180,99 @@ class CollaborationRuntimeManager {
       entry.consumers.size
     );
     this.emit(entry);
+  }
+
+  /**
+   * The document is in sync with the server: clear every degraded marker.
+   * The ONE place this happens — `onSynced`, and the reconnect paths below
+   * when the provider never stopped being synced.
+   *
+   * A notice says so when it recovers from a degraded state (owner smoke
+   * 2026-10-09: after going offline and back, the offline warning and
+   * "Connecting collaborative editor…" stayed up although the edit had synced).
+   */
+  private markSynced(entry: DocumentRuntimeEntry) {
+    const recovering =
+      entry.state.reconnectIntent ||
+      entry.state.warning !== null ||
+      entry.state.connectionState === "disconnectedButDirty" ||
+      entry.state.availabilityState === "localFallback";
+    const merged = this.consumeDetachedMerge(entry);
+    this.clearProviderReconnect(entry);
+    entry.state.connectionState = "synced";
+    entry.state.bootstrapState = "ready";
+    entry.state.availabilityState = "canonical";
+    entry.state.localFallbackReason = null;
+    entry.state.warning = null;
+    entry.state.reconnectIntent = false;
+    entry.state.localDirty = false;
+    entry.state.unsyncedUpdateCount = 0;
+    if (recovering) {
+      entry.state.recoveredAt = Date.now();
+      if (entry.recoveredNoticeTimer) clearTimeout(entry.recoveredNoticeTimer);
+      entry.recoveredNoticeTimer = setTimeout(() => {
+        entry.recoveredNoticeTimer = null;
+        entry.state.recoveredAt = null;
+        this.emit(entry);
+      }, RECOVERED_NOTICE_MS);
+    }
+    // The merge itself is the resolution (both sides kept); the notice is so a
+    // rewrite by an agent never silently reshapes text the user was editing.
+    // A plain catch-up (no local edits) says nothing.
+    if (merged) {
+      entry.state.remoteWriteMergedAt = Date.now();
+      if (entry.remoteWriteNoticeTimer) clearTimeout(entry.remoteWriteNoticeTimer);
+      entry.remoteWriteNoticeTimer = setTimeout(() => {
+        entry.remoteWriteNoticeTimer = null;
+        entry.state.remoteWriteMergedAt = null;
+        this.emit(entry);
+      }, REMOTE_WRITE_NOTICE_MS);
+    }
+    this.emit(entry);
+    // Start inactivity countdown after every successful sync.
+    this.scheduleInactivitySleep(entry);
+    // Announce "synced" immediately so other sessions' badges flip from
+    // grey to live without waiting out a dormant heartbeat interval.
+    this.schedulePresenceHeartbeat(entry, 0);
+  }
+
+  /**
+   * Was the sync that just completed a MERGE: this tab had unsynced edits of
+   * its own AND the server sent changes it did not have (counted by the update
+   * handler while detached)? Read before markSynced clears the dirty markers;
+   * resets the count either way.
+   */
+  private consumeDetachedMerge(entry: DocumentRuntimeEntry): boolean {
+    const merged =
+      entry.remoteUpdatesWhileDetached > 0 &&
+      (entry.state.localDirty ||
+        entry.state.unsyncedUpdateCount > 0 ||
+        entry.state.connectionState === "disconnectedButDirty");
+    entry.remoteUpdatesWhileDetached = 0;
+    return merged;
+  }
+
+  /**
+   * After asking an EXISTING provider to connect: when its socket never
+   * closed, it is still synced, `connect()` is a no-op and `onSynced` never
+   * fires again (the provider emits `synced` only on a change). The browser's
+   * `offline` event does not close an open WebSocket — DevTools' offline mode,
+   * a captive portal, a flaky Wi-Fi blip — so the runtime marked itself
+   * disconnected while every edit kept syncing, then waited for a sync event
+   * that could not come. Same state change a fresh sync makes, nothing else.
+   */
+  private restoreIfStillSynced(entry: DocumentRuntimeEntry) {
+    const provider = entry.hocuspocusProvider;
+    if (
+      provider?.synced &&
+      !provider.hasUnsyncedChanges &&
+      entry.state.networkState === "online" &&
+      // Only out of a degraded state: in normal operation this is a no-op, so
+      // an acknowledged keystroke never re-emits state or sends a heartbeat.
+      entry.state.connectionState !== "synced"
+    ) {
+      this.markSynced(entry);
+    }
   }
 
   private async fetchCollaborationToken(entry: DocumentRuntimeEntry) {
@@ -2418,6 +2816,8 @@ class CollaborationRuntimeManager {
     document.removeEventListener("visibilitychange", entry.visibilityChangeHandler);
     window.removeEventListener("pagehide", entry.pageHideHandler);
     if (entry.cooldownTimer) clearTimeout(entry.cooldownTimer);
+    if (entry.remoteWriteNoticeTimer) clearTimeout(entry.remoteWriteNoticeTimer);
+    if (entry.recoveredNoticeTimer) clearTimeout(entry.recoveredNoticeTimer);
     if (entry.visibilitySleepTimer) clearTimeout(entry.visibilitySleepTimer);
     if (entry.inactivitySleepTimer) clearTimeout(entry.inactivitySleepTimer);
     // Abort any pending deferred initial promote so its callback doesn't

@@ -63,6 +63,9 @@ export function MarkdownSourceView({
           }
         }}
         placeholder="# Start writing markdown…"
+        // view_screen leaves this out when it shows `%%` commented-out text
+        // (AI-VIEW-SCREEN-PLAN D5 — the source view must show private text).
+        data-markdown-source=""
         className="flex-1 w-full resize-none bg-transparent px-6 pb-6 text-sm leading-relaxed text-foreground outline-none placeholder:text-muted-foreground/60"
         style={{
           fontFamily:

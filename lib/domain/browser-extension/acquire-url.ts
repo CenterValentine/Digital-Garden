@@ -44,8 +44,13 @@ interface AcquireApiResponse {
   error?: { code?: string; message?: string };
 }
 
-function isThin(content: string | undefined): boolean {
-  return !content || content.trim().length < THIN_CONTENT_CHARS;
+function isThin(content: AcquiredContent | undefined): boolean {
+  // Navigation chrome is thin however long it is (P7): a 4 KB "Similar
+  // jobs" sidebar is not the posting, and a credentialed rung may get the
+  // real body.
+  if (content?.contentNote) return true;
+  const text = content?.content;
+  return !text || text.trim().length < THIN_CONTENT_CHARS;
 }
 
 async function callAcquireApi(
@@ -104,7 +109,7 @@ async function extensionRung(
 export async function acquireUrlWithFallback(url: string): Promise<AcquireOutcome> {
   // Rung 1 — server-fetch.
   const p1 = await callAcquireApi({ url });
-  if (p1.ok && !isThin(p1.content?.content)) {
+  if (p1.ok && !isThin(p1.content)) {
     return { ok: true, content: p1.content, via: "server-fetch", usedExtension: false };
   }
   const p1Reason = p1.ok ? "the site returned little readable content" : p1.reason;
@@ -122,7 +127,7 @@ export async function acquireUrlWithFallback(url: string): Promise<AcquireOutcom
 
   // Rung 2 — sw-fetch (credentialed static). Cheap; may clear a cookie wall.
   const p2 = await extensionRung(url, "sw-fetch");
-  if (p2.ok && !isThin(p2.content?.content)) {
+  if (p2.ok && !isThin(p2.content)) {
     return { ok: true, content: p2.content, via: "sw-fetch", usedExtension: true };
   }
 

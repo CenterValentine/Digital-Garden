@@ -19,12 +19,16 @@ import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
 import { queryTools } from "@/lib/domain/tools";
 import type { ToolDefinition, ContentType } from "@/lib/domain/tools";
 import { getExtensionManifestForView } from "@/lib/extensions";
-import { useIsExtensionEnabled } from "@/lib/extensions/client-registry";
+import {
+  useClaimedContentSidebarPanel,
+  useIsExtensionEnabled,
+} from "@/lib/extensions/client-registry";
 import {
   STUDIO_EXTENSION_ID,
   STUDIO_TAB_KEY,
 } from "@/extensions/studio/manifest";
 import type { RightSidebarTab } from "@/state/right-sidebar-state-store";
+import { useDocxFillStore } from "@/state/docx-fill-store";
 
 /** Inline SVG paths keyed by tabKey (project pattern: inline SVG in headers) */
 const TAB_SVG_PATHS: Record<string, string> = {
@@ -47,6 +51,9 @@ const TAB_SVG_PATHS: Record<string, string> = {
   // Table (lucide Table) — the database context rail's schema identity.
   database:
     "M3 5a2 2 0 012-2h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5z M3 10h18 M10 3v18",
+  // Form fields (lucide ListTodo-ish) — a document filled from a template.
+  templateFields:
+    "M4 5h16M4 5v4h16V5M4 13h16M4 13v4h16v-4M8 7h.01M8 15h.01",
 };
 
 /** Tab titles keyed by tabKey */
@@ -61,10 +68,16 @@ const TAB_TITLES: Record<string, string> = {
   studio: "Studio",
   context: "Context",
   database: "Database",
+  templateFields: "Template Fields",
 };
 
 interface RightSidebarHeaderProps {
   activeTab: RightSidebarTab;
+  /**
+   * The tabs RightSidebar resolved (claimed extension panel, virtual content
+   * rules). When given, the header renders exactly these.
+   */
+  availableTabs?: RightSidebarTab[];
   onTabChange: (tab: RightSidebarTab) => void;
   /**
    * Sideview tabs are non-interactive until the active sidepanel has loaded
@@ -85,6 +98,7 @@ interface RightSidebarHeaderProps {
 
 export function RightSidebarHeader({
   activeTab,
+  availableTabs,
   onTabChange,
   disabled = false,
   disabledTabs,
@@ -93,11 +107,22 @@ export function RightSidebarHeader({
   const { toggleCollapsed } = useRightPanelCollapseStore();
   const handleCollapseToggle = onToggleCollapse ?? toggleCollapsed;
   const selectedContentType = useContentStore((state) => state.selectedContentType);
+  const selectedContentId = useContentStore((state) => state.selectedContentId);
+  const claimedPanel = useClaimedContentSidebarPanel(selectedContentId);
+  const isTemplateFill = useDocxFillStore((s) =>
+    Boolean(selectedContentId && s.filled[selectedContentId]),
+  );
   const selectedBlockId = useBlockStore((s) => s.selectedBlockId);
   const activeView = useLeftPanelViewStore((state) => state.activeView);
   const extensionManifest = getExtensionManifestForView(activeView);
 
-  const extensionTool = extensionManifest?.surfaces.includes("right-sidebar")
+  const extensionTool = claimedPanel
+    ? ({
+        id: "claimed-content-sidebar",
+        label: claimedPanel.label,
+        tabKey: "extension",
+      } as ToolDefinition)
+    : extensionManifest?.surfaces.includes("right-sidebar")
     ? ({
         id: `${extensionManifest.id}-right-sidebar`,
         label: extensionManifest.label,
@@ -128,9 +153,27 @@ export function RightSidebarHeader({
     } as ToolDefinition);
   }
 
+  if (isTemplateFill) {
+    tabs.push({
+      id: "template-fields-tab",
+      label: "Template Fields",
+      tabKey: "templateFields",
+    } as ToolDefinition);
+  }
+
+  if (claimedPanel && extensionTool) {
+    // A claimed content panel leads the rail.
+    tabs.splice(tabs.indexOf(extensionTool), 1);
+    tabs.unshift(extensionTool);
+  }
+
   const uniqueTabs = tabs.filter((tool, index, list) => {
     const tabKey = tool.tabKey as RightSidebarTab | undefined;
-    return Boolean(tabKey) && list.findIndex((candidate) => candidate.tabKey === tabKey) === index;
+    return (
+      Boolean(tabKey) &&
+      list.findIndex((candidate) => candidate.tabKey === tabKey) === index &&
+      (!availableTabs || availableTabs.includes(tabKey as RightSidebarTab))
+    );
   });
 
   return (
@@ -140,7 +183,8 @@ export function RightSidebarHeader({
           const tabKey = tool.tabKey as RightSidebarTab | undefined;
           if (!tabKey) return null;
 
-          const svgPath = TAB_SVG_PATHS[tabKey];
+          const claimed = tabKey === "extension" && claimedPanel;
+          const svgPath = claimed ? claimedPanel.svgPath : TAB_SVG_PATHS[tabKey];
           if (!svgPath) return null;
 
           const tabDisabled = disabled || (disabledTabs?.includes(tabKey) ?? false);
@@ -157,7 +201,7 @@ export function RightSidebarHeader({
                   ? "border-b-2 border-gold-primary text-gold-primary"
                   : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
               }`}
-              title={TAB_TITLES[tabKey] ?? tool.label}
+              title={claimed ? claimedPanel.label : TAB_TITLES[tabKey] ?? tool.label}
               type="button"
             >
               <svg

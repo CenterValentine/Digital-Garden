@@ -101,7 +101,24 @@ export async function attach(tabId) {
     void showBanner(tabId); // idempotent refresh (a reload may have dropped it)
     return { tabId, alreadyAttached: true };
   }
-  await attachDebugger({ tabId }, PROTOCOL_VERSION);
+  try {
+    await attachDebugger({ tabId }, PROTOCOL_VERSION);
+  } catch (error) {
+    // RECLAIM OUR OWN LEAK (owner report 2026-09-18). An MV3 service-worker
+    // eviction, or a session that ended without detaching, leaves the tab
+    // attached while our in-memory `session` is gone — and Chrome then refuses
+    // every future attach with "Another debugger is already attached to the
+    // tab with id: N". A production charter run hit that on eight consecutive
+    // attempts against the same tab id and never recovered.
+    //
+    // `chrome.debugger.detach` can only detach OUR OWN attachment, so this is
+    // safe by construction: it clears a leak we caused, and cannot steal the
+    // tab from real DevTools. If the holder is DevTools, the retry fails the
+    // same way it did before and the error stands — which is honest.
+    if (!/already attached/i.test(error?.message ?? "")) throw error;
+    await detachDebugger({ tabId });
+    await attachDebugger({ tabId }, PROTOCOL_VERSION);
+  }
   session = { tabId, startedAt: Date.now() };
   childSessions.clear();
   persistSessionTab(tabId); // survive MV3 SW eviction / app reload (see ensureSession)
@@ -167,16 +184,83 @@ export async function detach() {
 // it" cases; anything else (the tab is still open) stays recoverable however long
 // ago, because a session IS its tab.
 const SESSION_KEY = "dgCoBrowseTabId";
+const ACTIVITY_KEY = "dgCoBrowseLastActivity";
+
+/**
+ * Release an attachment nobody is using after this long (ms).
+ *
+ * This does NOT contradict the "natural boundary, not a timer" rule above — it
+ * releases the ATTACHMENT without ending the SESSION. The tab id stays
+ * persisted, so `ensureSession()` silently re-attaches on the next operation
+ * and a session still IS its tab, however long ago it ran.
+ *
+ * What it ends is the leak: an abandoned run left the debugger attached, so
+ * Chrome kept showing the user "…is debugging this browser" and refused every
+ * later attach to that tab with "another debugger is already attached" (owner
+ * report 2026-09-18). Fifteen minutes is longer than any gap inside a live run
+ * — items are seconds apart — and shorter than a user will sit staring at a
+ * debugger banner nothing is using.
+ */
+const IDLE_RELEASE_MS = 15 * 60 * 1000;
+
 function persistSessionTab(tabId) {
   try {
-    chrome.storage.session.set({ [SESSION_KEY]: tabId });
+    chrome.storage.session.set({ [SESSION_KEY]: tabId, [ACTIVITY_KEY]: Date.now() });
   } catch {
     // storage.session unavailable (older Chromium) — recovery is best-effort.
   }
 }
+
+/**
+ * Stamp liveness. Written to STORAGE rather than a module variable on purpose:
+ * the case this guards is a service-worker eviction, which wipes module state
+ * while leaving the attachment in place — so a memory-only stamp would be gone
+ * exactly when the sweep needs it.
+ */
+function touchSessionActivity() {
+  try {
+    chrome.storage.session.set({ [ACTIVITY_KEY]: Date.now() });
+  } catch {
+    /* best-effort */
+  }
+}
+
+/**
+ * Detach an attachment left idle, keeping the session recoverable.
+ *
+ * Reads persisted state, never `session`: after an eviction the module variable
+ * is null while the debugger is still attached, which is precisely the leak.
+ * Exported for the background alarm.
+ */
+export async function releaseIdleSession(now = Date.now()) {
+  let stored;
+  try {
+    stored = await chrome.storage.session.get([SESSION_KEY, ACTIVITY_KEY]);
+  } catch {
+    return { released: false };
+  }
+  const tabId = stored?.[SESSION_KEY];
+  const last = stored?.[ACTIVITY_KEY];
+  if (typeof tabId !== "number") return { released: false };
+  if (typeof last === "number" && now - last < IDLE_RELEASE_MS) {
+    return { released: false };
+  }
+  // In-memory state goes too when it belongs to this tab, so a later op takes
+  // the ensureSession path rather than sending into a dead attachment.
+  if (session && session.tabId === tabId) {
+    session = null;
+    childSessions.clear();
+  }
+  await hideBanner(tabId).catch(() => {});
+  await detachDebugger({ tabId });
+  // The tab id SURVIVES: releasing is not ending. ensureSession re-attaches on
+  // the next operation, and a tab that has since closed fails chrome.tabs.get
+  // there and clears itself — the existing natural boundary, untouched.
+  return { released: true, tabId };
+}
 function clearSessionTab() {
   try {
-    chrome.storage.session.remove(SESSION_KEY);
+    chrome.storage.session.remove([SESSION_KEY, ACTIVITY_KEY]);
   } catch {
     /* best-effort */
   }
@@ -230,6 +314,9 @@ export async function send(method, params, sessionId) {
     await ensureSession();
     if (!session) throw new Error(NO_SESSION_MESSAGE);
   }
+  // Every CDP operation is proof the session is alive; the idle sweep reads
+  // this stamp to tell an active run from an abandoned attachment.
+  touchSessionActivity();
   return sendCommand(targetOf(sessionId), method, params);
 }
 

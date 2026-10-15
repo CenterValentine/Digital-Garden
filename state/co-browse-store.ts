@@ -49,6 +49,16 @@ export function markCoBrowseInactive(): void {
   useCoBrowseStore.getState().stop();
 }
 
+/**
+ * Non-hook read: is a session driving right now?
+ *
+ * Used by teardown paths (the engine's Stop, the panel's page-hide) so they
+ * can skip the detach round trip when nothing is attached.
+ */
+export function isCoBrowseActive(): boolean {
+  return useCoBrowseStore.getState().active;
+}
+
 export function beginCoBrowseWait(seconds: number, label: string | null): void {
   useCoBrowseStore.getState().beginWait(seconds, label);
 }

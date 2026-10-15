@@ -144,13 +144,62 @@ function encodeNumber(raw: unknown, precision?: number): EncodeResult {
 
 // ── Option handling ──────────────────────────────────────────────────────
 
+/** Most choices a rejection lists before summarizing the rest. */
+const REJECTION_OPTION_LIST_MAX = 12;
+
+/**
+ * A rejection that teaches: the column, the value that missed, the choices
+ * it could have been, and the closest one when there is an obvious
+ * candidate. The bare "Unknown option for this column" cost a production run
+ * six steps (ITERATION-RUN-HARNESS-FIXES §10 L3a): five identical messages
+ * named no column, no value and no choice, so the model re-read the schema,
+ * summoned a tool and rewrote 27 cells to recover. Exported for the gate.
+ */
+export function unknownOptionError(column: DataColumn, value: string): string {
+  const options = column.config.options ?? [];
+  if (options.length === 0) {
+    return `"${column.name}" has no options yet, so "${value}" cannot be stored — add the option to the column first.`;
+  }
+  const labels = options.map((o) => o.label);
+  const shown = labels.slice(0, REJECTION_OPTION_LIST_MAX).join(", ");
+  const more =
+    labels.length > REJECTION_OPTION_LIST_MAX
+      ? ` (+${labels.length - REJECTION_OPTION_LIST_MAX} more)`
+      : "";
+  const needle = value.trim().toLowerCase();
+  // Containment either way, only when it picks exactly one label: a guess
+  // between two is not a suggestion.
+  const near = needle
+    ? labels.filter((l) => {
+        const hay = l.toLowerCase();
+        return hay.includes(needle) || needle.includes(hay);
+      })
+    : [];
+  const hint = near.length === 1 ? ` Closest: "${near[0]}".` : "";
+  return `"${value}" is not an option of "${column.name}". Choices: ${shown}${more}.${hint}`;
+}
+
+/**
+ * One line per distinct rejection, with how many cells it covers. Six cells
+ * failing for two reasons read as two lines, not five copies of one message
+ * with the sixth cut off (ITERATION-RUN-HARNESS-FIXES §10 L3a). Exported
+ * for the gate.
+ */
+export function summarizeRejections(messages: string[], max = 8): string {
+  const counts = new Map<string, number>();
+  for (const m of messages) counts.set(m, (counts.get(m) ?? 0) + 1);
+  const lines = [...counts].map(([m, n]) => `- ${m}${n > 1 ? ` (×${n})` : ""}`);
+  const extra = lines.length - max;
+  return (extra > 0 ? [...lines.slice(0, max), `- …and ${extra} more`] : lines).join("\n");
+}
+
 function encodeOptionId(raw: unknown, column: DataColumn): EncodeResult {
   if (typeof raw !== "string") return fail("Expected an option");
   const options = column.config.options ?? [];
   if (!options.some((o) => o.id === raw)) {
     // Guarding here is what makes "the cell stores ids" true rather than
     // aspirational — a label sneaking in would render fine and filter wrong.
-    return fail("Unknown option for this column");
+    return fail(unknownOptionError(column, raw));
   }
   return ok(raw);
 }
@@ -163,7 +212,7 @@ function encodeOptionIds(raw: unknown, column: DataColumn): EncodeResult {
   for (const entry of raw) {
     if (typeof entry !== "string") return fail("Expected option ids");
     if (!options.some((o) => o.id === entry)) {
-      return fail("Unknown option for this column");
+      return fail(unknownOptionError(column, entry));
     }
     // Order is significant (it is the display order). Duplicates normally
     // are not — a controlled vocabulary cannot be picked twice — but a

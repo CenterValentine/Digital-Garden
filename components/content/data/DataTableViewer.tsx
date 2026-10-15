@@ -19,7 +19,8 @@
  */
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
-import { Plus, Trash2, Undo2, Redo2, Layers } from "lucide-react";
+import { Plus, Trash2, Undo2, Redo2, Layers, Copy } from "lucide-react";
+import { cellDisplayValue } from "@/lib/domain/data/read-format";
 import {
   registerPollingTask,
   runPollingTaskNow,
@@ -36,6 +37,7 @@ import {
 import { cn } from "@/lib/core/utils";
 import {
   cellToText,
+  NON_STORING_COLUMN_TYPES,
   COLUMN_WIDTH_MAX,
   COLUMN_WIDTH_MIN,
   columnWidthMin,
@@ -45,6 +47,7 @@ import {
   deriveRowTitle,
   describeOp,
   diffRow,
+  keyBetween,
   keyForMove,
   pushOp,
   generateColumnKey,
@@ -65,8 +68,13 @@ import {
   type UndoOp,
   type UndoStackState,
 } from "@/lib/domain/data";
-import { DataGridRow, INLINE_EDITABLE_TYPES } from "./DataGridRow";
+import {
+  DataGridRow,
+  INLINE_EDITABLE_TYPES,
+  type CellSelectMods,
+} from "./DataGridRow";
 import { DataColumnHeader, DEFAULT_COLUMN_WIDTH } from "./DataColumnHeader";
+import { usePressHold } from "./use-press-hold";
 import { ContentPathBreadcrumb } from "../content/ContentPathBreadcrumb";
 import {
   DATA_SCHEMA_CHANGED_EVENT,
@@ -74,7 +82,9 @@ import {
   type DataSchemaChangedDetail,
 } from "./events";
 import { overwriteFileViaUpload, uploadFilesToTable } from "./file-upload";
-import { AddColumnButton, ColumnMenu } from "./DataColumnMenu";
+import { AddColumnButton, AddColumnPanel, ColumnMenu } from "./DataColumnMenu";
+import { DataColumnContextMenu, type ColumnContextMenuState } from "./DataColumnContextMenu";
+import { HiddenColumnsButton } from "./HiddenColumnsButton";
 import { DataViewBar, type ViewPatch } from "./DataViewBar";
 import { CHECKED_GROUP, DataBoardView } from "./DataBoardView";
 import { DataListView } from "./DataListView";
@@ -122,11 +132,27 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
     error: null,
   });
   const [stack, setStack] = useState<UndoStackState>(createUndoStack);
-  const [notice, setNotice] = useState<string | null>(null);
+  /**
+   * The grid's ONE status surface (the banner under the header): saves that
+   * failed, "⌘Z to undo" confirmations, copies — and, with an `action`, an
+   * inline Undo for what ⌘Z doesn't cover (column deletes). Owner,
+   * 2026-10-09: a toast for column deletes beside this banner for everything
+   * else was two surfaces for one job.
+   */
+  const [notice, setNotice] = useState<
+    string | { text: string; action?: { label: string; run: () => void } } | null
+  >(null);
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [scrollTop, setScrollTop] = useState(0);
   const [viewportHeight, setViewportHeight] = useState(600);
   const [openColumnId, setOpenColumnId] = useState<string | null>(null);
+  /** Right-click menu on a column (header or any cell). */
+  const [columnMenu, setColumnMenu] = useState<ColumnContextMenuState | null>(null);
+  /** "Insert column left/right": the add form, open on that column's header. */
+  const [insertAt, setInsertAt] = useState<{
+    columnId: string;
+    side: "left" | "right";
+  } | null>(null);
   const [dragColumnId, setDragColumnId] = useState<string | null>(null);
   const [editTarget, setEditTarget] = useState<{
     rowId: string;
@@ -136,8 +162,57 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
     rowId: string;
     columnKey: string;
   } | null>(null);
+  /**
+   * Multi-cell selection (owner ask, 2026-09-28): `selectedCell` is the
+   * ANCHOR; a ⇧-click or a drag sets the focus corner of a rectangle;
+   * ⌘/Ctrl-click toggles single cells in `extraCells` (keyed rowId␀colKey).
+   * ⌘C copies the block as tab-separated text.
+   */
+  const [rangeFocus, setRangeFocus] = useState<{
+    rowId: string;
+    columnKey: string;
+  } | null>(null);
+  const [extraCells, setExtraCells] = useState<Set<string>>(new Set());
+  /** True between a cell mousedown and the next mouseup — text selection is
+   * suppressed on the grid while a drag-select is in flight. */
+  const [isDragSelecting, setIsDragSelecting] = useState(false);
+  const dragSelectingRef = useRef(false);
+  /** Last checkbox toggled — the far end of a ⇧-click row range. */
+  const lastToggledRowRef = useRef<string | null>(null);
   const [peekRowId, setPeekRowId] = useState<string | null>(null);
   const [peekFocusColumnId, setPeekFocusColumnId] = useState<string | null>(null);
+  /**
+   * A peek opened by click-and-HOLD on a row stays put (owner, 2026-10-09);
+   * one opened by a click or double-click is dismissed by clicking away.
+   */
+  const [peekPinned, setPeekPinned] = useState(false);
+  /**
+   * One-click editing (owner, 2026-10-09): the first cell edit takes a
+   * double-click; after that a single click edits, until Esc or a click
+   * outside the grid's cells (header, toolbar, another pane).
+   */
+  const [clickEditArmed, setClickEditArmed] = useState(false);
+  const armClickEdit = useCallback(() => setClickEditArmed(true), []);
+  useEffect(() => {
+    if (!clickEditArmed) return;
+    const onDown = (e: PointerEvent) => {
+      const target = e.target as Element | null;
+      if (!target) return;
+      if (target.closest("[data-db-panel]")) return; // working in an editor
+      const cell = target.closest("[data-column-key]");
+      if (cell && rootRef.current?.contains(cell)) return;
+      setClickEditArmed(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setClickEditArmed(false);
+    };
+    document.addEventListener("pointerdown", onDown, true);
+    document.addEventListener("keydown", onKey, true);
+    return () => {
+      document.removeEventListener("pointerdown", onDown, true);
+      document.removeEventListener("keydown", onKey, true);
+    };
+  }, [clickEditArmed]);
   /** Bumped on every grid-"+" click so a field's auto-open can re-fire even
    * when the peek (and the target column's focus) is already in place —
    * an initializer-only read misses that case entirely. */
@@ -212,9 +287,27 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
     viewRef.current = state.view;
   }, [state.view]);
 
-  const columns = useMemo(
+  /** Every live column — filters, sorts, the peek and the other views. */
+  const allColumns = useMemo(
     () => state.table?.columns.filter((c) => !c.deletedAt) ?? [],
     [state.table]
+  );
+  /**
+   * The columns the GRID shows: hiding is a per-VIEW choice (owner,
+   * 2026-10-09 — `columnPrefs[id].hidden`), never a schema change. Other
+   * views and the row peek keep every field.
+   */
+  const gridMode = !state.view || state.view.mode === "grid" || state.view.mode === "split";
+  const columns = useMemo(
+    () =>
+      gridMode
+        ? allColumns.filter((c) => !state.view?.columnPrefs?.[c.id]?.hidden)
+        : allColumns,
+    [allColumns, gridMode, state.view]
+  );
+  const hiddenColumns = useMemo(
+    () => allColumns.filter((c) => state.view?.columnPrefs?.[c.id]?.hidden),
+    [allColumns, state.view]
   );
 
   // Effective widths: the view's stored prefs overlaid with live drag
@@ -281,6 +374,65 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
         });
         setNotice(json?.error?.message ?? "Could not save the column width");
       }
+    },
+    [contentId]
+  );
+
+  /**
+   * Hide / show columns IN THIS VIEW (owner, 2026-10-09). Stored on the
+   * view's columnPrefs, so another view of the same table is untouched, and
+   * nothing about the schema or the data changes. Optimistic; a refused save
+   * (locked view, lost access) reverts and says so.
+   */
+  const setColumnsHidden = useCallback(
+    async (ids: string[], hidden: boolean, opts?: { quiet?: boolean }) => {
+      const view = viewRef.current;
+      if (!view || ids.length === 0) return;
+      const before = view.columnPrefs ?? {};
+      const merged: Record<string, ColumnPref> = { ...before };
+      for (const id of ids) {
+        const next: ColumnPref = { ...before[id] };
+        if (hidden) next.hidden = true;
+        else delete next.hidden;
+        merged[id] = next;
+      }
+      const apply = (prefs: Record<string, ColumnPref>) =>
+        setState((cur) =>
+          cur.view && cur.view.id === view.id
+            ? { ...cur, view: { ...cur.view, columnPrefs: prefs } }
+            : cur
+        );
+      apply(merged);
+      setSelectedCell(null);
+      setRangeFocus(null);
+      setColumnMenu(null);
+      const res = await fetch(`/api/content/data/${contentId}/views`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ viewId: view.id, columnPrefs: merged }),
+      }).catch(() => null);
+      const json = res ? await res.json().catch(() => null) : null;
+      if (!res?.ok || !json?.success) {
+        apply(before);
+        setNotice(json?.error?.message ?? "Could not change which columns this view shows");
+        return;
+      }
+      if (opts?.quiet) return;
+      const n = ids.length;
+      const what = n === 1 ? "1 column" : `${n} columns`;
+      setNotice({
+        text: hidden
+          ? `Hid ${what} in the “${view.name}” view — other views still show ${n === 1 ? "it" : "them"}.`
+          : `Showing ${what} again.`,
+        action: {
+          label: "Undo",
+          run: () => {
+            setNotice(null);
+            void setColumnsHidden(ids, !hidden, { quiet: true });
+          },
+        },
+      });
     },
     [contentId]
   );
@@ -837,6 +989,46 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
     await load(state.view?.id ?? null);
   }, [contentId, selectedRows, load, clientId, state.view, state.rows, refreshTree]);
 
+  /**
+   * Duplicate the checked rows in place (owner ask, 2026-09-28). The server
+   * lands each copy directly below its source with every stored cell and
+   * its forward relation links; the copies become the selection so a
+   * follow-up action (edit, delete, duplicate again) targets them, and one
+   * undo removes them all.
+   */
+  const duplicateSelected = useCallback(async () => {
+    if (selectedRows.size === 0) return;
+    // Display order, so the copies interleave the way the grid shows them.
+    const sourceIds = state.rows
+      .filter((r) => selectedRows.has(r.id))
+      .map((r) => r.id);
+    const res = await fetch(`/api/content/data/${contentId}/rows`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ duplicateRowIds: sourceIds }),
+    });
+    const json = (await res.json()) as {
+      success?: boolean;
+      data?: { rowIds?: string[] };
+    };
+    const rowIds = json.data?.rowIds ?? [];
+    if (!res.ok || !json.success || rowIds.length === 0) {
+      setNotice("Could not duplicate");
+      return;
+    }
+    const n = rowIds.length;
+    const op: UndoOp = {
+      kind: "addRows",
+      rowIds,
+      label: n === 1 ? "duplicated row" : `${n} duplicated rows`,
+    };
+    setStack((s) => pushOp(s, op, clientId, Date.now()));
+    setSelectedRows(new Set(rowIds));
+    setNotice(`Duplicated ${n} row${n === 1 ? "" : "s"} · ⌘Z to undo`);
+    await load(state.view?.id ?? null);
+  }, [contentId, selectedRows, state.rows, load, clientId, state.view]);
+
   // Form view submission (plan O13): one fresh row, its cells written in a
   // single unconditional batch (no CAS — nothing existed before), then a
   // reload so the new row appears when the user switches back to the grid.
@@ -944,18 +1136,6 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
     [columnRequest]
   );
 
-  const deleteColumn = useCallback(
-    async (columnId: string) => {
-      const done = await columnRequest("DELETE", { columnId });
-      if (done) {
-        setOpenColumnId(null);
-        // Cell data survives a column delete — that is what makes restoring
-        // one a metadata flip rather than a recovery job (plan B4).
-        setNotice("Column removed. Its values are kept.");
-      }
-    },
-    [columnRequest]
-  );
 
   // ── Column drag reorder ────────────────────────────────────────────────
   //
@@ -1391,10 +1571,252 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
 
   // ── Cell keyboard model (owner friction, 2026-08-24) ───────────────────
 
-  const selectCell = useCallback((rowId: string, columnKey: string) => {
-    setSelectedCell({ rowId, columnKey });
-    setEditTarget(null);
+  const cellKey = (rowId: string, columnKey: string) => `${rowId}\u0000${columnKey}`;
+
+  const selectCell = useCallback(
+    (rowId: string, columnKey: string, mods?: CellSelectMods) => {
+      setEditTarget(null);
+      if (mods?.shift && selectedCell) {
+        // Extend the rectangle from the anchor; adds stay.
+        setRangeFocus({ rowId, columnKey });
+        return;
+      }
+      if (mods?.meta && selectedCell) {
+        // Toggle one cell; the anchor joins the set the first time so the
+        // block the user sees is the block ⌘C copies.
+        setExtraCells((prev) => {
+          const next = new Set(prev);
+          next.add(cellKey(selectedCell.rowId, selectedCell.columnKey));
+          const k = cellKey(rowId, columnKey);
+          if (next.has(k)) next.delete(k);
+          else next.add(k);
+          return next;
+        });
+        return;
+      }
+      setSelectedCell({ rowId, columnKey });
+      setRangeFocus(null);
+      setExtraCells(new Set());
+      // A plain mousedown may become a drag: cells entered until mouseup
+      // extend the rectangle from this anchor.
+      dragSelectingRef.current = true;
+      setIsDragSelecting(true);
+    },
+    [selectedCell]
+  );
+
+  /**
+   * Header click (owner, 2026-10-09): the whole column, as the same
+   * rectangle a drag would make — so ⌘C, Delete and the highlight all work
+   * unchanged. Spans the LOADED rows (the grid pages in as it scrolls).
+   */
+  /**
+   * The columns a column selection covers (header click, ⇧-click another
+   * header to span) — a rectangle running the full loaded height. Empty when
+   * the selection is anything else (a cell, a partial block).
+   */
+  const selectedColumnIds = useMemo(() => {
+    if (!selectedCell || state.rows.length === 0) return [] as string[];
+    const firstId = state.rows[0].id;
+    const lastId = state.rows[state.rows.length - 1].id;
+    const focus = rangeFocus ?? selectedCell;
+    const fullHeight =
+      (selectedCell.rowId === firstId && focus.rowId === lastId) ||
+      (selectedCell.rowId === lastId && focus.rowId === firstId);
+    if (!fullHeight || extraCells.size > 0) return [];
+    const a = columns.findIndex((c) => c.key === selectedCell.columnKey);
+    const b = columns.findIndex((c) => c.key === focus.columnKey);
+    if (a < 0 || b < 0) return [];
+    return columns.slice(Math.min(a, b), Math.max(a, b) + 1).map((c) => c.id);
+  }, [selectedCell, rangeFocus, extraCells, columns, state.rows]);
+
+  const selectColumn = useCallback(
+    (columnId: string, mods?: { shift?: boolean }) => {
+      const column = columns.find((c) => c.id === columnId);
+      const first = state.rows[0];
+      const last = state.rows[state.rows.length - 1];
+      setOpenColumnId(null);
+      if (!column || !first || !last) return;
+      setEditTarget(null);
+      setExtraCells(new Set());
+      // ⇧-click a second header: span from the selected column(s) to here.
+      const anchorKey =
+        mods?.shift && selectedCell && selectedColumnIds.length > 0
+          ? selectedCell.columnKey
+          : column.key;
+      setSelectedCell({ rowId: first.id, columnKey: anchorKey });
+      setRangeFocus(
+        last.id === first.id && anchorKey === column.key
+          ? null
+          : { rowId: last.id, columnKey: column.key }
+      );
+    },
+    [columns, state.rows, selectedCell, selectedColumnIds]
+  );
+
+  // ── Column context menu (owner, 2026-10-09) ────────────────────────────
+
+  /** Right-click on a header or cell. Editors only; others get the browser's menu. */
+  const openColumnMenu = useCallback(
+    (e: React.MouseEvent, columnId: string) => {
+      if (!canEditData) return;
+      e.preventDefault();
+      // A click outside the current column selection acts on that column:
+      // select it, so what the menu deletes is what the user sees.
+      if (!selectedColumnIds.includes(columnId)) selectColumn(columnId);
+      setOpenColumnId(null);
+      setColumnMenu({ columnId, x: e.clientX, y: e.clientY });
+    },
+    [canEditData, selectedColumnIds, selectColumn]
+  );
+
+  /** What the menu's Delete acts on: the selection, or the clicked column. */
+  const menuDeleteIds = useMemo(() => {
+    if (!columnMenu) return [] as string[];
+    return selectedColumnIds.includes(columnMenu.columnId)
+      ? selectedColumnIds
+      : [columnMenu.columnId];
+  }, [columnMenu, selectedColumnIds]);
+
+  const menuDeleteBlocked = useMemo(() => {
+    const targets = columns.filter((c) => menuDeleteIds.includes(c.id));
+    if (targets.some((c) => c.isPrimary)) return "The title column can't be deleted";
+    if (targets.some((c) => c.config?.system === true))
+      return "System columns are locked — part of the charter's ledger machinery";
+    return null;
+  }, [columns, menuDeleteIds]);
+
+  /** The new column's key: right beside the clicked one, on the chosen side. */
+  const insertPosition = useCallback(
+    (columnId: string, side: "left" | "right") => {
+      const i = columns.findIndex((c) => c.id === columnId);
+      if (i < 0) return undefined;
+      return side === "left"
+        ? keyBetween(columns[i - 1]?.position ?? null, columns[i].position)
+        : keyBetween(columns[i].position, columns[i + 1]?.position ?? null);
+    },
+    [columns]
+  );
+
+  /**
+   * Delete one or several columns — soft deletes, so values survive and the
+   * toast's Undo is a metadata flip (DELETE {restore}). One reload at the end,
+   * not one per column.
+   */
+  const deleteColumns = useCallback(
+    async (ids: string[]) => {
+      const names = columns.filter((c) => ids.includes(c.id)).map((c) => c.name);
+      const send = (columnId: string, restore = false) =>
+        fetch(`/api/content/data/${contentId}/columns`, {
+          method: "DELETE",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(restore ? { columnId, restore: true } : { columnId }),
+        })
+          .then(async (res) => ({ ok: res.ok && (await res.json())?.success === true }))
+          .catch(() => ({ ok: false }));
+      const deleted: string[] = [];
+      for (const id of ids) {
+        if ((await send(id)).ok) deleted.push(id);
+      }
+      setOpenColumnId(null);
+      setSelectedCell(null);
+      setRangeFocus(null);
+      await load(state.view?.id ?? null);
+      dispatchDataSchemaChanged(contentId, "grid");
+      if (deleted.length === 0) {
+        setNotice(ids.length === 1 ? "That column could not be deleted." : "Those columns could not be deleted.");
+        return;
+      }
+      const what =
+        deleted.length === 1
+          ? `Column "${names[ids.indexOf(deleted[0])] ?? ""}"`
+          : `${deleted.length} columns`;
+      setNotice({
+        text:
+          `${what} deleted — values are kept.` +
+          (deleted.length < ids.length
+            ? ` ${ids.length - deleted.length} could not be deleted.`
+            : ""),
+        action: {
+          label: "Undo",
+          run: () => {
+            setNotice(null);
+            void (async () => {
+              for (const id of deleted) await send(id, true);
+              await load(viewRef.current?.id ?? null);
+              dispatchDataSchemaChanged(contentId, "grid");
+              setNotice(`${what} restored.`);
+            })();
+          },
+        },
+      });
+    },
+    [columns, contentId, load, state.view]
+  );
+
+
+  const hoverCell = useCallback((rowId: string, columnKey: string) => {
+    if (!dragSelectingRef.current) return;
+    setRangeFocus((prev) =>
+      prev?.rowId === rowId && prev.columnKey === columnKey
+        ? prev
+        : { rowId, columnKey }
+    );
   }, []);
+
+  useEffect(() => {
+    const end = () => {
+      if (!dragSelectingRef.current) return;
+      dragSelectingRef.current = false;
+      setIsDragSelecting(false);
+      // A drag that never left its cell is a click — no rectangle.
+      setRangeFocus((prev) =>
+        prev && selectedCell && prev.rowId === selectedCell.rowId && prev.columnKey === selectedCell.columnKey
+          ? null
+          : prev
+      );
+    };
+    window.addEventListener("mouseup", end);
+    return () => window.removeEventListener("mouseup", end);
+  }, [selectedCell]);
+
+  /**
+   * Row id → column keys inside the selection, display order. Null when
+   * only the anchor is selected (single-cell behaviour is untouched). A row
+   * outside the block gets null, so memo'd rows re-render only on change.
+   */
+  const rangeByRow = useMemo(() => {
+    if (!selectedCell) return null;
+    const rowIndex = new Map(state.rows.map((r, i) => [r.id, i] as const));
+    const colIndex = new Map(columns.map((c, i) => [c.key, i] as const));
+    const cells = new Map<string, Set<string>>();
+    const add = (rowId: string, key: string) => {
+      const set = cells.get(rowId) ?? new Set<string>();
+      set.add(key);
+      cells.set(rowId, set);
+    };
+    if (rangeFocus) {
+      const r1 = rowIndex.get(selectedCell.rowId);
+      const r2 = rowIndex.get(rangeFocus.rowId);
+      const c1 = colIndex.get(selectedCell.columnKey);
+      const c2 = colIndex.get(rangeFocus.columnKey);
+      if (r1 !== undefined && r2 !== undefined && c1 !== undefined && c2 !== undefined) {
+        for (let r = Math.min(r1, r2); r <= Math.max(r1, r2); r++) {
+          for (let c = Math.min(c1, c2); c <= Math.max(c1, c2); c++) {
+            add(state.rows[r].id, columns[c].key);
+          }
+        }
+      }
+    }
+    for (const k of extraCells) {
+      const [rowId, key] = k.split("\u0000");
+      if (rowIndex.has(rowId) && colIndex.has(key)) add(rowId, key);
+    }
+    let count = 0;
+    for (const set of cells.values()) count += set.size;
+    return count > 1 ? cells : null;
+  }, [selectedCell, rangeFocus, extraCells, state.rows, columns]);
 
   const clearEditTarget = useCallback(() => setEditTarget(null), []);
 
@@ -1499,11 +1921,72 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
         }
       } else if (e.key === "Escape") {
         setSelectedCell(null);
+        setRangeFocus(null);
+        setExtraCells(new Set());
+      } else if ((e.key === "Delete" || e.key === "Backspace") && canEditData) {
+        // Clear the selected cell or block (owner ask, 2026-09-28) — one
+        // batched CAS write, one undo entry. Computed and derived columns
+        // have nothing to clear; already-empty cells are skipped so the
+        // op (and its undo) is exactly the cells that changed.
+        e.preventDefault();
+        const targets: Array<{ rowId: string; columnKey: string }> = rangeByRow
+          ? [...rangeByRow.entries()].flatMap(([rowId, keys]) =>
+              [...keys].map((columnKey) => ({ rowId, columnKey }))
+            )
+          : [selectedCell];
+        const edits: CellEdit[] = [];
+        for (const t of targets) {
+          const column = columns.find((c) => c.key === t.columnKey);
+          const row = state.rows.find((r) => r.id === t.rowId);
+          if (!column || !row) continue;
+          if (NON_STORING_COLUMN_TYPES.includes(column.type)) continue;
+          const before = row.data[column.key];
+          if (before === undefined || before === "" || (Array.isArray(before) && before.length === 0)) continue;
+          edits.push({ rowId: row.id, columnKey: column.key, before, after: undefined });
+        }
+        if (edits.length === 0) {
+          setNotice("Nothing to clear");
+          return;
+        }
+        void (async () => {
+          const result = await sendWrites(edits, true);
+          if (!result.ok) {
+            setNotice(result.stale ? "Not cleared — a cell changed since you read it" : (result.message ?? "Could not clear"));
+            return;
+          }
+          const op: UndoOp = { kind: "setCells", edits, label: "" };
+          setStack((s) => pushOp(s, { ...op, label: `cleared ${edits.length} cell${edits.length === 1 ? "" : "s"}` }, clientId, Date.now()));
+          setNotice(`Cleared ${edits.length} cell${edits.length === 1 ? "" : "s"} · ⌘Z to undo`);
+          await load(state.view?.id ?? null);
+        })();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [selectedCell, editTarget, columns, state.rows, canEditData, commitCell]);
+  }, [selectedCell, editTarget, columns, state.rows, canEditData, commitCell, rangeByRow, sendWrites, load, clientId, state.view]);
+
+  // Delete / Backspace with rows CHECKED and no cell selected deletes the
+  // rows — the keyboard's "Delete N" button, undoable the same way.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Delete" && e.key !== "Backspace") return;
+      if (selectedCell || editTarget || selectedRows.size === 0) return;
+      const t = e.target as HTMLElement | null;
+      if (
+        t &&
+        (t.tagName === "INPUT" ||
+          t.tagName === "TEXTAREA" ||
+          t.tagName === "SELECT" ||
+          t.isContentEditable)
+      ) {
+        return;
+      }
+      e.preventDefault();
+      void deleteSelected();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selectedCell, editTarget, selectedRows, deleteSelected]);
 
   // ⌘C on a selected cell copies its display text — labels for selects,
   // never option ids. Skipped inside inputs and when the browser has a real
@@ -1522,6 +2005,41 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
       }
       if (window.getSelection()?.toString()) return;
       if (!selectedCell) return;
+      // A multi-cell selection copies as a tab-separated block over its
+      // bounding rectangle (cells outside the selection stay blank), so it
+      // pastes straight into a spreadsheet. Relations and derived columns
+      // copy as their display text — a title list, a computed value.
+      if (rangeByRow) {
+        e.preventDefault();
+        const rowIdx = state.rows
+          .map((r, i) => (rangeByRow.has(r.id) ? i : -1))
+          .filter((i) => i >= 0);
+        const colIdx = columns
+          .map((c, i) => ([...rangeByRow.values()].some((s) => s.has(c.key)) ? i : -1))
+          .filter((i) => i >= 0);
+        const tsvCell = (text: string) =>
+          /[\t\n"]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+        const lines: string[] = [];
+        let count = 0;
+        for (let r = Math.min(...rowIdx); r <= Math.max(...rowIdx); r++) {
+          const row = state.rows[r];
+          const members = rangeByRow.get(row.id);
+          const cells: string[] = [];
+          for (let c = Math.min(...colIdx); c <= Math.max(...colIdx); c++) {
+            const column = columns[c];
+            if (members?.has(column.key)) {
+              count++;
+              cells.push(tsvCell(cellDisplayValue(row, column)));
+            } else {
+              cells.push("");
+            }
+          }
+          lines.push(cells.join("\t"));
+        }
+        void navigator.clipboard.writeText(lines.join("\n"));
+        setNotice(`Copied ${count} cell${count === 1 ? "" : "s"} (${lines.length} row${lines.length === 1 ? "" : "s"})`);
+        return;
+      }
       const column = columns.find((c) => c.key === selectedCell.columnKey);
       const row = state.rows.find((r) => r.id === selectedCell.rowId);
       if (!column || !row) return;
@@ -1532,7 +2050,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [selectedCell, columns, state.rows]);
+  }, [selectedCell, rangeByRow, columns, state.rows]);
 
   /** contentLink chip → the real node, in a workspace tab (plan Phase 4). */
   const openContent = useCallback(
@@ -1583,7 +2101,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
   );
 
   const openRow = useCallback(
-    (rowId: string, focusColumnId?: string) => {
+    (rowId: string, focusColumnId?: string, options?: { pinned?: boolean }) => {
       if (isQuery) {
         // The row IS a note/file — open the real thing, never a row page.
         const row = state.rows.find((r) => r.id === rowId);
@@ -1596,11 +2114,14 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
       }
       setPeekRowId(rowId);
       setPeekFocusColumnId(focusColumnId ?? null);
+      setPeekPinned(options?.pinned === true);
       if (focusColumnId) setPeekFocusToken((t) => t + 1);
       setEditTarget(null);
     },
     [isQuery, state.rows, selectNode, clearRowParam]
   );
+
+  const rowHold = usePressHold<string>((rowId) => openRow(rowId, undefined, { pinned: true }));
 
   /**
    * Click-away dismissal for the OVERLAY peek — reaching for the ✕ every
@@ -1612,7 +2133,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
    * The split variant is a pane, not an overlay — it never dismisses.
    */
   const overlayPeekOpen =
-    peekRowId !== null && state.view?.mode !== "split" && !isQuery;
+    peekRowId !== null && state.view?.mode !== "split" && !isQuery && !peekPinned;
   useEffect(() => {
     if (!overlayPeekOpen) return;
     const onDown = (e: MouseEvent) => {
@@ -1638,14 +2159,32 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
     [state.rows]
   );
 
-  const toggleRow = useCallback((rowId: string) => {
-    setSelectedRows((prev) => {
-      const next = new Set(prev);
-      if (next.has(rowId)) next.delete(rowId);
-      else next.add(rowId);
-      return next;
-    });
-  }, []);
+  const toggleRow = useCallback(
+    (rowId: string, shiftKey?: boolean) => {
+      const last = lastToggledRowRef.current;
+      lastToggledRowRef.current = rowId;
+      setSelectedRows((prev) => {
+        const next = new Set(prev);
+        // ⇧-click selects every row between the last toggled row and this
+        // one (display order), like a file list — the range is ADDED, so a
+        // second ⇧-click elsewhere grows the selection.
+        if (shiftKey && last && last !== rowId) {
+          const a = state.rows.findIndex((r) => r.id === last);
+          const b = state.rows.findIndex((r) => r.id === rowId);
+          if (a >= 0 && b >= 0) {
+            for (let i = Math.min(a, b); i <= Math.max(a, b); i++) {
+              next.add(state.rows[i].id);
+            }
+            return next;
+          }
+        }
+        if (next.has(rowId)) next.delete(rowId);
+        else next.add(rowId);
+        return next;
+      });
+    },
+    [state.rows]
+  );
 
   // ── Render ─────────────────────────────────────────────────────────────
 
@@ -1764,6 +2303,17 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
           >
             <Redo2 className="h-4 w-4" />
           </button>
+          {selectedRows.size > 0 && canEditData && (
+            <button
+              type="button"
+              onClick={duplicateSelected}
+              title="Duplicate the selected rows below their originals"
+              className="flex items-center gap-1.5 rounded px-2 py-1 text-xs text-muted-foreground hover:bg-muted"
+            >
+              <Copy className="h-3.5 w-3.5" />
+              Duplicate {selectedRows.size}
+            </button>
+          )}
           {selectedRows.size > 0 && (
             <button
               type="button"
@@ -1779,7 +2329,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
 
       <DataViewBar
         views={state.table.views}
-        columns={columns}
+        columns={allColumns}
         activeViewId={state.view?.id ?? null}
         defaultViewId={state.table.defaultViewId}
         canWrite={state.canWrite}
@@ -1792,7 +2342,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
       {state.view && !isQuery && (
         <DataFilterBar
           view={state.view}
-          columns={columns}
+          columns={allColumns}
           canWrite={state.canWrite}
           onSave={(filters) => updateView(state.view!.id, { filters })}
           onSaveSorts={(sorts) => updateView(state.view!.id, { sorts })}
@@ -1829,7 +2379,16 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
           // the muted grey that reads as a status line.
           className="border-b border-amber-300/60 bg-amber-500/10 px-4 py-1.5 text-xs text-amber-900 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-200"
         >
-          {notice}
+          {typeof notice === "string" ? notice : notice.text}
+          {typeof notice !== "string" && notice.action && (
+            <button
+              type="button"
+              onClick={notice.action.run}
+              className="ml-2 font-medium underline"
+            >
+              {notice.action.label}
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setNotice(null)}
@@ -1844,7 +2403,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
         <div className="min-h-0 flex-1">
           <DataBoardView
             view={state.view}
-            columns={columns}
+            columns={allColumns}
             rows={state.rows}
             editable={canEditData}
             onCommitCell={commitCell}
@@ -1856,14 +2415,14 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
         <div className="min-h-0 flex-1 overflow-y-auto">
           <DataListView
             rows={state.rows}
-            columns={columns}
+            columns={allColumns}
             onOpenRow={openRow}
           />
         </div>
       ) : state.view?.mode === "form" ? (
         <div className="min-h-0 flex-1 overflow-y-auto">
           <DataFormView
-            columns={columns}
+            columns={allColumns}
             view={state.view}
             canWrite={canEditData}
             onSubmit={submitFormRow}
@@ -1873,7 +2432,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
         <div className="min-h-0 flex-1 overflow-y-auto">
           <DataGalleryView
             rows={state.rows}
-            columns={columns}
+            columns={allColumns}
             view={state.view}
             onOpenRow={openRow}
           />
@@ -1883,7 +2442,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
           <div className="w-72 shrink-0 overflow-y-auto border-r border-border">
             <DataListView
               rows={state.rows}
-              columns={columns}
+              columns={allColumns}
               onOpenRow={openRow}
             />
           </div>
@@ -1893,7 +2452,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
                 variant="inline"
                 tableId={contentId}
                 row={peekRow}
-                columns={columns}
+                columns={allColumns}
                 editable={canEditData}
                 index={peekIndex}
                 total={state.rows.length}
@@ -1918,7 +2477,8 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
       <div
         ref={scrollRef}
         onScroll={(e) => setScrollTop(e.currentTarget.scrollTop)}
-        className="flex-1 overflow-auto"
+        // No native text selection while a drag-select is in flight.
+        className={cn("flex-1 overflow-auto", isDragSelecting && "select-none")}
       >
         <div className="min-w-max">
           <div className="sticky top-0 z-10 flex border-b border-border bg-muted/60 backdrop-blur">
@@ -1941,11 +2501,9 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
                 width={columnWidths[column.id]}
                 editable={canEditData}
                 menuOpen={openColumnId === column.id}
-                onToggleMenu={(columnId) =>
-                  setOpenColumnId((current) =>
-                    current === columnId ? null : columnId
-                  )
-                }
+                onSelectColumn={selectColumn}
+                onOpenMenu={setOpenColumnId}
+                onContextMenu={openColumnMenu}
                 isDragSource={dragColumnId === column.id}
                 dropIndicator={
                   dropTarget?.columnId === column.id ? dropTarget.side : null
@@ -1972,24 +2530,67 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
                   <ColumnMenu
                     column={column}
                     onSave={(patch) => saveColumn(column.id, patch)}
-                    onDelete={() => deleteColumn(column.id)}
+                    onDelete={() => deleteColumns([column.id])}
                     onClose={() => setOpenColumnId(null)}
+                  />
+                )}
+                {insertAt?.columnId === column.id && (
+                  <AddColumnPanel
+                    tableId={contentId}
+                    columns={allColumns}
+                    open
+                    heading={`Insert column ${insertAt.side === "left" ? "left" : "right"} of “${column.name}”`}
+                    onClose={() => setInsertAt(null)}
+                    onAdd={(input) =>
+                      columnRequest("POST", {
+                        ...input,
+                        position: insertPosition(column.id, insertAt.side),
+                      }).then(() => undefined)
+                    }
                   />
                 )}
               </DataColumnHeader>
               );
             })}
+            {hiddenColumns.length > 0 && (
+              <HiddenColumnsButton
+                hidden={hiddenColumns}
+                viewName={state.view?.name}
+                onShow={(ids) => void setColumnsHidden(ids, false)}
+              />
+            )}
             {canEditData && (
               <AddColumnButton
                 tableId={contentId}
-                columns={columns}
+                columns={allColumns}
                 onAdd={addColumn}
               />
             )}
           </div>
 
-          {/* Spacer preserves true scroll height while only a slice renders. */}
-          <div style={{ height: totalHeight, position: "relative" }}>
+          {/* Spacer preserves true scroll height while only a slice renders.
+              Click-and-HOLD anywhere on a row (not on its controls) opens
+              the row as a PINNED peek — it stays until closed (owner,
+              2026-10-09). Moving cancels it: that is a drag-select. */}
+          <div
+            style={{ height: totalHeight, position: "relative" }}
+            onPointerDown={(e) => {
+              if (isQuery) return;
+              const target = e.target as HTMLElement | null;
+              if (!target || target.closest("input, textarea, select, button, a, [contenteditable=true]")) return;
+              const rowId = target.closest<HTMLElement>("[data-row-id]")?.dataset.rowId;
+              if (rowId) rowHold.start(e, rowId);
+            }}
+            onPointerMove={rowHold.move}
+            onPointerUp={rowHold.cancel}
+            onPointerLeave={rowHold.cancel}
+            onContextMenu={(e) => {
+              const key = (e.target as HTMLElement | null)
+                ?.closest<HTMLElement>("[data-column-key]")?.dataset.columnKey;
+              const column = key ? columns.find((c) => c.key === key) : undefined;
+              if (column) openColumnMenu(e, column.id);
+            }}
+          >
             <div
               style={{
                 transform: `translateY(${firstVisible * ROW_HEIGHT}px)`,
@@ -2018,11 +2619,15 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
                       ? selectedCell.columnKey
                       : null
                   }
+                  rangeColumnKeys={rangeByRow?.get(row.id) ?? null}
                   onToggleSelect={toggleRow}
                   onCommitCell={commitCell}
                   onSelectCell={selectCell}
+                  onHoverCell={hoverCell}
                   onOpenRow={openRow}
                   onOpenContent={openContent}
+                  clickToEdit={clickEditArmed}
+                  onArmClickEdit={armClickEdit}
                   onAdvance={advanceEdit}
                   onEditEnd={clearEditTarget}
                 />
@@ -2047,11 +2652,38 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
       </div>
       )}
 
+      {columnMenu && (
+        <DataColumnContextMenu
+          menu={columnMenu}
+          deleteCount={menuDeleteIds.length}
+          deleteBlockedReason={menuDeleteBlocked}
+          onClose={() => setColumnMenu(null)}
+          onInsert={(side) => {
+            setInsertAt({ columnId: columnMenu.columnId, side });
+            setColumnMenu(null);
+          }}
+          onDelete={() => {
+            const ids = menuDeleteIds;
+            setColumnMenu(null);
+            void deleteColumns(ids);
+          }}
+          onHide={() => void setColumnsHidden(menuDeleteIds, true)}
+          hideBlockedReason={
+            columns.length - menuDeleteIds.length < 1
+              ? "A view needs at least one visible column"
+              : null
+          }
+          hiddenCount={hiddenColumns.length}
+          onShowHidden={() => void setColumnsHidden(hiddenColumns.map((c) => c.id), false)}
+          viewName={state.view?.name}
+        />
+      )}
+
       {peekRow && state.view?.mode !== "split" && (
         <DataRowPeek
           tableId={contentId}
           row={peekRow}
-          columns={columns}
+          columns={allColumns}
           editable={canEditData}
           index={peekIndex}
           total={state.rows.length}
@@ -2063,6 +2695,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
           onCommitCell={commitCell}
           onRefresh={() => void load(state.view?.id ?? null)}
           onNavigate={navigatePeek}
+          pinned={peekPinned}
           onClose={() => {
             setPeekRowId(null);
             setPeekFocusColumnId(null);

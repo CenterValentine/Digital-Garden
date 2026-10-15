@@ -29,10 +29,20 @@ import {
   buildTreeIndex,
   shortcutMirrorId,
   resolveDropForwardTarget,
+  contentIdOfRowId,
+  shortcutIdOfMirrorRowId,
+  deleteTargetsOfRowIds,
+  targetRowOfSelection,
   SHORTCUT_MIRROR_PREFIX,
   MAX_MIRROR_DEPTH,
 } from "@/lib/features/content/shortcut-mirror";
+import { windowReferenceRowId } from "@/lib/features/content/window-reference";
+import { expansionsFor, resolveTreeRow } from "@/lib/features/content/tree-stand-in";
 import type { TreeNode } from "@/lib/domain/content/types";
+import {
+  outOfScopeShortcutTargets,
+  type ScopedNodeLite,
+} from "@/lib/domain/content/shortcut-targets";
 
 let failures = 0;
 
@@ -322,6 +332,57 @@ function findRow(nodes: TreeNode[], id: string): TreeNode | null {
       node("m2", { isShortcutMirror: true, mirrorOf: "note-a" }),
     ) === null,
   );
+  // Owner report, 2026-10-06: a shortcut seen inside another shortcut
+  // forwarded nowhere, so drops on it were refused.
+  check(
+    "a shortcut seen inside a shortcut forwards to ITS target folder",
+    resolveDropForwardTarget({
+      ...shortcutTo("inner-sc", "beta"),
+      id: "smirror:sc/inner-sc",
+      isShortcutMirror: true,
+      mirrorOf: "inner-sc",
+    }) === "beta",
+  );
+  check(
+    "a broken shortcut seen inside a shortcut forwards nowhere",
+    resolveDropForwardTarget({
+      ...shortcutTo("inner-bad", "beta", { targetDeleted: true }),
+      id: "smirror:sc/inner-bad",
+      isShortcutMirror: true,
+      mirrorOf: "inner-bad",
+    }) === null,
+  );
+}
+
+// --- 6b. A shortcut inside a shortcut opens onto its folder ----------------
+//
+// Owner report, 2026-10-06: it showed as open with nothing under it — the
+// mirror only descended into folders.
+{
+  const data: TreeNode[] = [
+    node("alpha", { contentType: "folder", children: [node("a-note"), shortcutTo("to-beta", "beta")] }),
+    node("beta", { contentType: "folder", children: [node("b-note")] }),
+    shortcutTo("sc", "alpha"),
+  ];
+  const nestedRow = shortcutMirrorId("sc", "to-beta");
+  const closed = findRow(run(data, ["sc"]), nestedRow);
+  check("a nested shortcut is mirrored but NOT descended into until opened", closed !== null && closed.children.length === 0);
+  const open = findRow(run(data, ["sc", nestedRow]), nestedRow);
+  check(
+    "opened, it shows its target folder's contents",
+    open?.children.map((child) => child.mirrorOf).join(",") === "b-note",
+    open?.children.map((child) => child.mirrorOf).join(","),
+  );
+  check(
+    "those rows are path-scoped under it (unique, and a drop among them forwards to the real folder)",
+    open?.children[0]?.id === shortcutMirrorId(nestedRow, "b-note") && resolveDropForwardTarget(open!) === "beta",
+  );
+  const broken: TreeNode[] = [
+    node("alpha", { contentType: "folder", children: [shortcutTo("to-gone", "gone", { targetDeleted: true })] }),
+    shortcutTo("sc", "alpha"),
+  ];
+  const brokenRow = shortcutMirrorId("sc", "to-gone");
+  check("a broken nested shortcut opens onto nothing", findRow(run(broken, ["sc", brokenRow]), brokenRow)?.children.length === 0);
 }
 
 // --- 7. Hiding nested shortcuts ------------------------------------------
@@ -362,11 +423,302 @@ function findRow(nodes: TreeNode[], id: string): TreeNode | null {
   );
 }
 
+// --- Out-of-view targets (view-scoped trees) ----------------------------
+// Owner report 2026-10-05: a shortcut in the Career Hunt VIEW to a folder
+// under Career Pathways (outside the view) expanded to nothing. The client
+// looks a shortcut's target up in the tree it has; the view filter had left
+// the target out. The tree API now returns such targets beside the tree.
+{
+  // What a view-scoped tree delivers: the shortcut row, but not its target.
+  const view = [shortcutTo("sc", "pathways-dev")];
+  const carried = [
+    node("pathways-dev", {
+      contentType: "folder",
+      children: [node("resume-tips"), node("interview-prep")],
+    }),
+  ];
+  const before = expandShortcutMirrors(view, new Set(["sc"]), buildTreeIndex(view), new Set());
+  check(
+    "THE BUG: without the carried target, an out-of-view shortcut mirrors nothing",
+    (findRow(before, "sc")?.children.length ?? -1) === 0,
+  );
+  const after = expandShortcutMirrors(view, new Set(["sc"]), buildTreeIndex(view, carried), new Set());
+  check(
+    "with the carried target, it mirrors the folder's contents",
+    (findRow(after, "sc")?.children ?? []).map((c) => c.mirrorOf).join() === "resume-tips,interview-prep",
+    (findRow(after, "sc")?.children ?? []).map((c) => c.mirrorOf).join(),
+  );
+  check(
+    "carried targets never become rows of the tree",
+    !allIds(after).includes("pathways-dev"),
+  );
+
+  // On-screen rows win an id collision with a carried copy.
+  const onScreen = [node("dup", { title: "on screen" })];
+  const index = buildTreeIndex(onScreen, [node("dup", { title: "carried" })]);
+  check("an id on screen beats a carried copy", index.get("dup")?.title === "on screen");
+
+  // Which targets the route carries.
+  const lite = (id: string, parentId: string | null, contentType: string, shortcutTargetId?: string | null): ScopedNodeLite =>
+    ({ id, parentId, contentType, shortcutTargetId });
+  const all = new Map(
+    [
+      lite("view", null, "folder"),
+      lite("sc-out", "view", "shortcut", "out"),
+      lite("sc-in", "view", "shortcut", "inner"),
+      lite("sc-note", "view", "shortcut", "a-note"),
+      lite("sc-broken", "view", "shortcut", null),
+      lite("sc-out-again", "view", "shortcut", "out"),
+      lite("inner", "view", "folder"),
+      lite("out-parent", null, "folder"),
+      lite("out", "out-parent", "folder"),
+      lite("out-child", "out", "note"),
+      lite("out-sub", "out", "folder"),
+      lite("out-grandchild", "out-sub", "note"),
+      lite("a-note", null, "note"),
+      lite("unrelated", null, "folder"),
+    ].map((n) => [n.id, n]),
+  );
+  const included = new Set(["view", "sc-out", "sc-in", "sc-note", "sc-broken", "sc-out-again", "inner"]);
+  const picked = outOfScopeShortcutTargets(all, included);
+  check("carries a folder target outside the view", picked.targetIds.join() === "out", picked.targetIds.join());
+  check(
+    "…with its whole subtree, and nothing else",
+    [...picked.carriedIds].sort().join() === "out,out-child,out-grandchild,out-sub",
+    [...picked.carriedIds].sort().join(),
+  );
+  check("a target already in the view isn't carried", !picked.carriedIds.has("inner"));
+  check("a non-folder target isn't carried (nothing to mirror)", !picked.carriedIds.has("a-note"));
+  check("two shortcuts to one folder carry it once", picked.targetIds.filter((t) => t === "out").length === 1);
+  check("the target's own parent isn't carried", !picked.carriedIds.has("out-parent"));
+
+  // A shortcut to an ANCESTOR of the view root must not re-ship the view.
+  const ancestorCase = new Map(
+    [
+      lite("top", null, "folder"),
+      lite("view", "top", "folder"),
+      lite("sc-up", "view", "shortcut", "top"),
+      lite("sibling", "top", "note"),
+    ].map((n) => [n.id, n]),
+  );
+  const up = outOfScopeShortcutTargets(ancestorCase, new Set(["view", "sc-up"]));
+  check(
+    "a shortcut to the view root's ancestor carries it minus the view itself",
+    [...up.carriedIds].sort().join() === "sibling,top",
+    [...up.carriedIds].sort().join(),
+  );
+}
+
+// --- Nested shortcuts in a view (workbench) ------------------------------
+// Owner report 2026-10-08: a shortcut nested in a shortcut showed nothing in a
+// workbench. Only shortcuts IN the view were looked at, so the inner one's
+// target was neither in the view nor carried.
+{
+  const lite = (id: string, parentId: string | null, contentType: string, shortcutTargetId?: string | null): ScopedNodeLite =>
+    ({ id, parentId, contentType, shortcutTargetId });
+  const mapOf = (rows: ScopedNodeLite[]) => new Map(rows.map((n) => [n.id, n]));
+  /** The forests the tree route ships: every carried node under its carried parent. */
+  const forests = (all: Map<string, ScopedNodeLite>, picked: ReturnType<typeof outOfScopeShortcutTargets>) => {
+    const built = new Map<string, TreeNode>();
+    for (const id of picked.carriedIds) {
+      const n = all.get(id)!;
+      built.set(
+        id,
+        n.contentType === "shortcut"
+          ? shortcutTo(id, n.shortcutTargetId ?? "", { targetDeleted: !n.shortcutTargetId })
+          : node(id, { contentType: n.contentType as TreeNode["contentType"], parentId: n.parentId }),
+      );
+    }
+    for (const id of picked.carriedIds) {
+      const parentId = all.get(id)!.parentId;
+      const parent = parentId ? built.get(parentId) : undefined;
+      if (parent) parent.children.push(built.get(id)!);
+    }
+    return picked.targetIds.map((id) => built.get(id)!);
+  };
+  /** Every carried node is reachable from exactly one shipped root. */
+  const shippedOnce = (picked: ReturnType<typeof outOfScopeShortcutTargets>, all: Map<string, ScopedNodeLite>) => {
+    const seen: string[] = [];
+    const walk = (n: TreeNode) => {
+      seen.push(n.id);
+      n.children.forEach(walk);
+    };
+    forests(all, picked).forEach(walk);
+    return seen.length === picked.carriedIds.size && new Set(seen).size === seen.length;
+  };
+
+  const chain = mapOf([
+    lite("view", null, "folder"),
+    lite("sc", "view", "shortcut", "out-a"),
+    lite("out-a", null, "folder"),
+    lite("a-note", "out-a", "note"),
+    lite("sc-b", "out-a", "shortcut", "out-b"),
+    lite("out-b", null, "folder"),
+    lite("b-note", "out-b", "note"),
+  ]);
+  const picked = outOfScopeShortcutTargets(chain, new Set(["view", "sc"]));
+  check(
+    "a shortcut inside a carried folder carries ITS target too",
+    picked.carriedIds.has("out-b") && picked.carriedIds.has("b-note"),
+    [...picked.carriedIds].sort().join(),
+  );
+  check("both targets ship as roots (neither sits inside the other)", picked.targetIds.join() === "out-a,out-b", picked.targetIds.join());
+
+  // End to end: the view shows `sc`; open it, then the nested shortcut.
+  const view = [shortcutTo("sc", "out-a")];
+  const nestedRow = shortcutMirrorId("sc", "sc-b");
+  const outerOnly = forests(chain, { targetIds: ["out-a"], carriedIds: new Set(["out-a", "a-note", "sc-b"]) });
+  check(
+    "THE BUG: carrying only the outer target, the nested shortcut opens onto nothing",
+    findRow(expandShortcutMirrors(view, new Set(["sc", nestedRow]), buildTreeIndex(view, outerOnly), new Set()), nestedRow)
+      ?.children.length === 0,
+  );
+  const opened = findRow(
+    expandShortcutMirrors(view, new Set(["sc", nestedRow]), buildTreeIndex(view, forests(chain, picked)), new Set()),
+    nestedRow,
+  );
+  check(
+    "carried transitively, the nested shortcut shows its folder's contents",
+    opened?.children.map((child) => child.mirrorOf).join() === "b-note",
+    opened?.children.map((child) => child.mirrorOf).join() ?? "no row",
+  );
+
+  // Cycles: B points back at A, and at the view root. Nothing more is carried.
+  const cyclic = mapOf([
+    ...chain.values(),
+    lite("sc-back", "out-b", "shortcut", "out-a"),
+    lite("sc-home", "out-b", "shortcut", "view"),
+  ]);
+  const looped = outOfScopeShortcutTargets(cyclic, new Set(["view", "sc"]));
+  check(
+    "a cycle back to a carried folder or the view stops at the first repeat",
+    looped.targetIds.join() === "out-a,out-b" && !looped.carriedIds.has("view"),
+    looped.targetIds.join(),
+  );
+
+  // A nested target that CONTAINS an already-carried one: sc → B, and inside B
+  // a shortcut to B's parent A. B must travel inside A, not beside it too.
+  const parentLater = mapOf([
+    lite("view", null, "folder"),
+    lite("sc", "view", "shortcut", "b"),
+    lite("a", null, "folder"),
+    lite("a-note", "a", "note"),
+    lite("b", "a", "folder"),
+    lite("b-note", "b", "note"),
+    lite("sc-up", "b", "shortcut", "a"),
+  ]);
+  const nested = outOfScopeShortcutTargets(parentLater, new Set(["view", "sc"]));
+  check("the outer folder is the only root", nested.targetIds.join() === "a", nested.targetIds.join());
+  check("…and every carried node ships exactly once", shippedOnce(nested, parentLater));
+  const viewB = [shortcutTo("sc", "b")];
+  check(
+    "the first shortcut still finds its folder inside the outer forest",
+    (findRow(expandShortcutMirrors(viewB, new Set(["sc"]), buildTreeIndex(viewB, forests(parentLater, nested)), new Set()), "sc")
+      ?.children ?? []).map((child) => child.mirrorOf).join() === "b-note,sc-up",
+  );
+
+  // The same shape from two shortcuts IN the view (sc → B, sc2 → A): the
+  // order they are met in must not leave B outside A.
+  const twoInView = mapOf([...parentLater.values(), lite("sc2", "view", "shortcut", "a")]);
+  const both = outOfScopeShortcutTargets(twoInView, new Set(["view", "sc", "sc2"]));
+  check("B carried before its parent A still ends up inside A", both.targetIds.join() === "a" && shippedOnce(both, twoInView), both.targetIds.join());
+}
+
+// ── What a row inside a shortcut acts on ────────────────────────────────────
+// Owner rule (2026-10-05): actions that only refer to content reach the
+// ORIGINAL; deleting removes the SHORTCUT, never the original. Ids built by
+// the real producers, so a format change on either side fails here.
+{
+  const top = shortcutMirrorId("sc", "folder-1");
+  const deep = shortcutMirrorId(top, "note-1");
+  const windowRow = windowReferenceRowId("host-note", "target-1");
+
+  check("a mirror row refers to its original", contentIdOfRowId(top) === "folder-1", contentIdOfRowId(top));
+  check("a nested mirror row refers to its own original", contentIdOfRowId(deep) === "note-1", contentIdOfRowId(deep));
+  check("a window row refers to the windowed note", contentIdOfRowId(windowRow) === "target-1", contentIdOfRowId(windowRow));
+  check("a real row refers to itself", contentIdOfRowId("plain-id") === "plain-id");
+
+  check("a mirror row is seen through its shortcut", shortcutIdOfMirrorRowId(deep) === "sc", String(shortcutIdOfMirrorRowId(deep)));
+  check("a real row is seen through no shortcut", shortcutIdOfMirrorRowId("plain-id") === null);
+  check("a window row is seen through no shortcut", shortcutIdOfMirrorRowId(windowRow) === null);
+
+  const targets = deleteTargetsOfRowIds(["plain-id", top, deep, windowRow]);
+  check(
+    "delete: a row inside a shortcut removes the shortcut; a window row removes nothing",
+    targets.join() === "plain-id,sc",
+    targets.join(),
+  );
+  check(
+    "delete never reaches an original through its mirror",
+    !targets.includes("folder-1") && !targets.includes("note-1") && !targets.includes("target-1"),
+  );
+  check("delete: the shortcut and its own mirror rows go once", deleteTargetsOfRowIds(["sc", top]).join() === "sc");
+  check("delete: only window rows → nothing to delete", deleteTargetsOfRowIds([windowRow]).length === 0);
+}
+
+// ── A shortcut's OWN sort (view-only; never the folder's) ───────────────────
+// Owner, 2026-10-06: a shortcut can keep its own sort, kept in user settings,
+// that changes only how the shortcut shows its folder.
+{
+  const folder = node("lib", {
+    contentType: "folder",
+    children: [node("zeta"), node("alpha"), node("sub", { contentType: "folder", children: [node("y"), node("x")] })],
+  });
+  const tree = [folder, node("home", { contentType: "folder", children: [shortcutTo("sc2", "lib")] })];
+  const index = buildTreeIndex(tree);
+  const mirrorOf = (sorts: Record<string, { name?: "asc" | "desc"; float?: "folders" | "nested" }>, expanded: string[]) => {
+    const out = expandShortcutMirrors(tree, new Set(expanded), index, new Set(), 0, sorts);
+    return findRow(out, "sc2")?.children ?? [];
+  };
+  const realIds = (rows: TreeNode[]) => rows.map((row) => row.mirrorOf).join(",");
+
+  check("without its own sort, a shortcut shows its folder's order", realIds(mirrorOf({}, ["sc2"])) === "zeta,alpha,sub", realIds(mirrorOf({}, ["sc2"])));
+  check("with its own sort, the shortcut shows it — the folder's data is untouched", realIds(mirrorOf({ sc2: { name: "asc" } }, ["sc2"])) === "alpha,sub,zeta" && folder.children.map((c) => c.id).join() === "zeta,alpha,sub", realIds(mirrorOf({ sc2: { name: "asc" } }, ["sc2"])));
+  check("a float works the same way", realIds(mirrorOf({ sc2: { float: "folders" } }, ["sc2"])) === "sub,zeta,alpha", realIds(mirrorOf({ sc2: { float: "folders" } }, ["sc2"])));
+  // A–Z, so a sort leaking into the sub-folder would turn its "y,x" into "x,y".
+  const subRow = mirrorOf({ sc2: { name: "asc" } }, ["sc2", shortcutMirrorId("sc2", "sub")]).find((row) => row.mirrorOf === "sub");
+  check("only the shortcut's own level: a mirrored sub-folder keeps its folder's order", realIds(subRow?.children ?? []) === "y,x", realIds(subRow?.children ?? []));
+
+  check("a selected row inside a shortcut stands for the shortcut", targetRowOfSelection(shortcutMirrorId(shortcutMirrorId("sc2", "sub"), "x")) === "sc2");
+  check("a selected window row stands for its note", targetRowOfSelection(windowReferenceRowId("host-note", "t")) === "host-note");
+  check("any other selection stands for itself", targetRowOfSelection("plain") === "plain");
+}
+
+// ── Which row stands for open content (tree-stand-in.ts) ─────────────────────
+// Owner, 2026-10-06: opened through a shortcut, the tree keeps pointing at the
+// shortcut (or the row inside it), not the original's row elsewhere.
+{
+  const docs = node("docs", { contentType: "folder", children: [node("note-a"), node("sub", { contentType: "folder", children: [node("deep")] })] });
+  const sc = shortcutTo("sc", "docs");
+  const scToNote = shortcutTo("sc-note", "note-a", { targetContentType: "note" });
+  const tree = [docs, node("projects", { contentType: "folder", children: [sc, scToNote] })];
+
+  const fromShortcut = resolveTreeRow("note-a", tree, [], "sc-note");
+  check("opened through a shortcut: that shortcut stands in, though the original is on screen", fromShortcut?.rowId === "sc-note", JSON.stringify(fromShortcut));
+  const mirrorRow = shortcutMirrorId("sc", "note-a");
+  const fromMirror = resolveTreeRow("note-a", tree, [], mirrorRow);
+  check("opened from a row inside a shortcut: that row stands in, with its shortcut expanded", fromMirror?.rowId === mirrorRow && fromMirror.expand.join() === "sc", JSON.stringify(fromMirror));
+  check("a remembered row that no longer leads there is ignored", resolveTreeRow("note-a", tree, [], "sc")?.rowId === "note-a");
+  check("otherwise its own row", resolveTreeRow("note-a", tree, [], null)?.rowId === "note-a");
+
+  // A view without the original: only the shortcuts are on screen; docs is carried.
+  const view = [node("projects", { contentType: "folder", children: [sc, scToNote] })];
+  check("not in the tree: a shortcut straight to it", resolveTreeRow("note-a", view, [docs], null)?.rowId === "sc-note");
+  const deep = resolveTreeRow("deep", view, [docs], null);
+  check(
+    "not in the tree, no direct shortcut: the row inside a shortcut's folder, folders on the way expanded",
+    deep?.rowId === shortcutMirrorId(shortcutMirrorId("sc", "sub"), "deep") && deep.expand.join() === `sc,${shortcutMirrorId("sc", "sub")}`,
+    JSON.stringify(deep),
+  );
+  check("nothing leads to it: null", resolveTreeRow("elsewhere", view, [docs], null) === null);
+  check("expansions for a row three deep", expansionsFor("smirror:S/a/b/X").join() === "S,smirror:S/a,smirror:S/a/b");
+}
+
 if (failures > 0) {
   console.error(`\nshortcut-mirror:check — ${failures} check(s) failed.\n`);
   process.exit(1);
 }
 
 console.log(
-  "shortcut-mirror:check — OK (identity, mirroring, broken targets, laziness, cycles, drop forwarding, nested-shortcut hiding)",
+  "shortcut-mirror:check — OK (identity, mirroring, broken targets, laziness, cycles, drop forwarding, nested-shortcut hiding, out-of-view targets, row actions, shortcut sorts, stand-in rows)",
 );

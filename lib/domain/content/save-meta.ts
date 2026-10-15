@@ -33,4 +33,56 @@ export interface SaveMeta {
    * Set with `flush` on `pagehide` / `visibilitychange → hidden`.
    */
   keepalive?: boolean;
+  /**
+   * The editor's Y state, when it is bound to a collaborative copy with no
+   * live connection (collaboration-local — a note open by one person). Its
+   * edits then reach the server only through this REST save; the route merges
+   * this copy into the stored one so the two never drift apart. Without it, a
+   * collaborator arriving later got the same edits twice (the server's own
+   * catch-up, then this editor's copy). See `collaboration/lineage.ts`.
+   */
+  collaborationUpdate?: Uint8Array;
+}
+
+/**
+ * Largest Y state a save carries, in base64 characters — leaves room for the
+ * document JSON beside it under the platform's 4.5 MB request limit. A larger
+ * copy is left out (the save itself must never fail for it); it reaches the
+ * server when the editor connects.
+ */
+export const COLLABORATION_UPDATE_MAX_CHARS = 2_500_000;
+
+/** Browsers refuse a keepalive request whose body is over 64 KiB. */
+const KEEPALIVE_BODY_MAX_CHARS = 60_000;
+
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = "";
+  const chunk = 0x8000;
+  for (let at = 0; at < bytes.length; at += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(at, at + chunk));
+  }
+  return btoa(binary);
+}
+
+/**
+ * The JSON body of a note save (`PATCH /api/content/content/[id]`): the
+ * document, the user-intent fields, and the editor's Y state when it fits.
+ * One builder so the main editor and Note Windows cannot drift.
+ */
+export function noteSaveBody(content: unknown, meta?: SaveMeta): string {
+  const body: Record<string, unknown> = {
+    tiptapJson: content,
+    ...(meta?.userInitiated === true && { userInitiated: true }),
+    ...(typeof meta?.secondsSinceInput === "number" && {
+      secondsSinceInput: meta.secondsSinceInput,
+    }),
+  };
+  const withoutUpdate = JSON.stringify(body);
+  if (!meta?.collaborationUpdate || meta.collaborationUpdate.length === 0) return withoutUpdate;
+
+  const encoded = bytesToBase64(meta.collaborationUpdate);
+  const fits = meta.keepalive
+    ? withoutUpdate.length + encoded.length + 32 <= KEEPALIVE_BODY_MAX_CHARS
+    : encoded.length <= COLLABORATION_UPDATE_MAX_CHARS;
+  return fits ? JSON.stringify({ ...body, collaborationUpdate: encoded }) : withoutUpdate;
 }

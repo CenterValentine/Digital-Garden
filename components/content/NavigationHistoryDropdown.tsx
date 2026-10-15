@@ -26,7 +26,7 @@ interface NavigationHistoryDropdownProps {
   isOpen: boolean;
   triggerPosition: { x: number; y: number };
   historyItems: NavigationHistoryItem[];
-  onSelectItem: (contentId: string | null) => void;
+  onSelectItem: (item: NavigationHistoryItem) => void;
   onClose: () => void;
 }
 
@@ -139,14 +139,17 @@ export function NavigationHistoryDropdown({
         ) : (
           <div className="py-1">
             {historyItems.map((item, index) => {
-              const title = item.title || null;
+              // A view inside content ("Alma 32") reads "Title › view".
+              const title = item.label
+                ? `${item.title ? `${item.title} › ` : ""}${item.label}`
+                : item.title || null;
               const snippet = item.contentId ? snippets.get(item.contentId) : null;
 
               return (
                 <button
                   key={`${item.contentId}-${item.timestamp}-${index}`}
                   onClick={() => {
-                    onSelectItem(item.contentId);
+                    onSelectItem(item);
                     onClose();
                   }}
                   className="w-full px-3 py-2 flex items-start gap-2 hover:bg-black/[0.03] dark:bg-white/5 transition-colors text-left"

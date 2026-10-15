@@ -24,6 +24,7 @@ import {
   Check,
   ClipboardPaste,
   Copy,
+  EyeOff,
   Italic,
   LayoutTemplate,
   Link2Off,
@@ -96,6 +97,8 @@ type SelectionFormattingState = {
   italic: boolean;
   strikethrough: boolean;
   code: boolean;
+  /** Private (commented-out) text or a private block in the selection. */
+  private: boolean;
   heading1: boolean;
   heading2: boolean;
   heading3: boolean;
@@ -114,6 +117,7 @@ const EMPTY_FORMATTING: SelectionFormattingState = {
   italic: false,
   strikethrough: false,
   code: false,
+  private: false,
   heading1: false,
   heading2: false,
   heading3: false,
@@ -143,6 +147,7 @@ function getSelectionFormattingState(editor: Editor): SelectionFormattingState {
       if (level === 2) summary.heading2 = true;
       if (level === 3) summary.heading3 = true;
     }
+    if (node.type.name === "privateBlock") summary.private = true;
 
     if (!node.isText) return;
 
@@ -151,6 +156,7 @@ function getSelectionFormattingState(editor: Editor): SelectionFormattingState {
       if (mark.type.name === "italic") summary.italic = true;
       if (mark.type.name === "strike") summary.strikethrough = true;
       if (mark.type.name === "code") summary.code = true;
+      if (mark.type.name === "privateText") summary.private = true;
       if (mark.type.name === "link") {
         const href = String(mark.attrs.href || "");
         if (lastLink && lastLink.href === href && lastLink.to === start) {
@@ -190,6 +196,7 @@ const TOOLBELT_ICONS: Record<string, ComponentType<{ className?: string }>> = {
   italic: Italic,
   strikethrough: Strikethrough,
   "code-inline": Code,
+  private: EyeOff,
   link: LinkIcon,
   "heading-1": Heading1,
   "heading-2": Heading2,
@@ -216,6 +223,9 @@ function getEditorCommand(
     italic: () => editor.chain().toggleItalic().run(),
     strikethrough: () => editor.chain().toggleStrike().run(),
     "code-inline": () => editor.chain().toggleCode().run(),
+    // Same decision the Cmd+/ chord makes: inline mark inside one paragraph,
+    // block wrapper across blocks, reversal when already private.
+    private: () => editor.chain().togglePrivate().run(),
     link: () => onLinkClick?.(),
     "heading-1": () => editor.chain().toggleHeading({ level: 1 }).run(),
     "heading-2": () => editor.chain().toggleHeading({ level: 2 }).run(),
@@ -231,6 +241,7 @@ function isToolActive(toolId: string, formatting: SelectionFormattingState): boo
     italic: formatting.italic,
     strikethrough: formatting.strikethrough,
     "code-inline": formatting.code,
+    private: formatting.private,
     link: formatting.links.length > 0,
     "heading-1": formatting.heading1,
     "heading-2": formatting.heading2,
@@ -246,6 +257,7 @@ function getToolTitle(toolId: string, editor: Editor, shortcut?: string): string
   }
   const label =
     toolId === "code-inline" ? "Inline Code" :
+    toolId === "private" ? "Private — hidden from AI, publishing and search" :
     toolId === "heading-1" ? "Heading 1" :
     toolId === "heading-2" ? "Heading 2" :
     toolId === "heading-3" ? "Heading 3" :

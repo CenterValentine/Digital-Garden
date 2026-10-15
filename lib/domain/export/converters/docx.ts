@@ -4,12 +4,21 @@
  * Covers the block/mark subset that text documents (notes, resumes,
  * dossiers) actually use: paragraphs, headings 1–6, bullet/ordered lists
  * (both render as bullets — Word numbering config is deferred), block
- * quotes, code blocks, and bold/italic/underline/strike/code marks.
+ * quotes, code blocks, bold/italic/underline/strike/code marks, and links
+ * (real hyperlinks — the URL used to be dropped and only the label kept,
+ * so a resume's "LinkedIn" went out pointing nowhere; plan §10 round 3).
  * Unknown nodes degrade to their extracted text instead of being dropped,
  * matching the editor's unsupported-content philosophy.
  */
 
-import { Document, HeadingLevel, Packer, Paragraph, TextRun } from "docx";
+import {
+  Document,
+  ExternalHyperlink,
+  HeadingLevel,
+  Packer,
+  Paragraph,
+  TextRun,
+} from "docx";
 import type {
   DocumentConverter,
   ConversionOptions,
@@ -46,27 +55,56 @@ function marksToState(node: JSONContent): MarkState {
   return state;
 }
 
-function inlineRuns(node: JSONContent): TextRun[] {
-  const runs: TextRun[] = [];
+/** The href of a text node's link mark, if it has one. */
+function linkHref(node: JSONContent): string | null {
+  const mark = node.marks?.find((m) => m.type === "link");
+  const href = mark?.attrs?.href;
+  return typeof href === "string" && href.trim() ? href.trim() : null;
+}
+
+type InlineChild = TextRun | ExternalHyperlink;
+
+function inlineRuns(node: JSONContent): InlineChild[] {
+  const runs: InlineChild[] = [];
+  // Consecutive text nodes under the SAME link (a label split by a bold
+  // mark, say) become one hyperlink, not several adjacent ones.
+  let pending: { href: string; runs: TextRun[] } | null = null;
+  const flush = () => {
+    if (pending) {
+      runs.push(new ExternalHyperlink({ link: pending.href, children: pending.runs }));
+      pending = null;
+    }
+  };
   for (const child of node.content ?? []) {
     if (child.type === "text") {
       const state = marksToState(child);
-      runs.push(
-        new TextRun({
-          text: child.text ?? "",
-          bold: state.bold,
-          italics: state.italics,
-          underline: state.underline ? {} : undefined,
-          strike: state.strike,
-          font: state.code ? "Courier New" : undefined,
-        })
-      );
+      const href = linkHref(child);
+      const run = new TextRun({
+        text: child.text ?? "",
+        bold: state.bold,
+        italics: state.italics,
+        underline: state.underline || href ? {} : undefined,
+        strike: state.strike,
+        font: state.code ? "Courier New" : undefined,
+        ...(href ? { style: "Hyperlink" } : {}),
+      });
+      if (href) {
+        if (pending && pending.href !== href) flush();
+        pending ??= { href, runs: [] };
+        pending.runs.push(run);
+        continue;
+      }
+      flush();
+      runs.push(run);
     } else if (child.type === "hardBreak") {
+      flush();
       runs.push(new TextRun({ text: "", break: 1 }));
     } else if (child.content) {
+      flush();
       runs.push(...inlineRuns(child));
     }
   }
+  flush();
   return runs;
 }
 
@@ -141,7 +179,53 @@ function blockToParagraphs(
   }
 }
 
+/**
+ * Professional document defaults (§10 round 5). The converter used to build
+ * a bare `Document`, so Word's built-in theme applied — blue, differently
+ * styled headings in Calibri Light, Word's default spacing — and an AI resume
+ * rendered in a look the owner's Resume Guidance rules out (one family,
+ * restrained styling, 10–11 pt body, 0.55–0.7 in margins). Every document now
+ * carries one font family, black headings and US Letter pages; `compact`
+ * (AI-written documents: resumes, letters) tightens to 10.5 pt and 0.6 in.
+ * Sizes are half-points; spacing and margins are twips (1 pt = 20).
+ */
+export interface DocxLayout {
+  compact?: boolean;
+}
+
+export function documentDefaults(layout: DocxLayout = {}) {
+  const font = "Calibri";
+  const body = layout.compact ? 21 : 22;
+  const margin = layout.compact ? 864 : 1440;
+  const heading = (size: number, before: number, after: number) => ({
+    run: { font, size, bold: true, color: "000000" },
+    paragraph: { spacing: { before, after }, keepNext: true },
+  });
+  return {
+    styles: {
+      default: {
+        document: {
+          run: { font, size: body, color: "000000" },
+          paragraph: { spacing: { after: layout.compact ? 60 : 120, line: 259 } },
+        },
+        heading1: heading(layout.compact ? 32 : 36, 0, 80),
+        heading2: heading(layout.compact ? 23 : 26, layout.compact ? 160 : 240, 60),
+        heading3: heading(layout.compact ? 21 : 24, layout.compact ? 120 : 200, 40),
+        heading4: heading(body, 120, 40),
+        heading5: heading(body, 120, 40),
+        heading6: heading(body, 120, 40),
+      },
+    },
+    page: {
+      size: { width: 12240, height: 15840 },
+      margin: { top: margin, right: margin, bottom: margin, left: margin },
+    },
+  };
+}
+
 export class DOCXConverter implements DocumentConverter {
+  constructor(private readonly layout: DocxLayout = {}) {}
+
   async convert(
     tiptapJson: JSONContent,
     options: ConversionOptions
@@ -157,7 +241,11 @@ export class DOCXConverter implements DocumentConverter {
       children.push(new Paragraph({ children: [new TextRun({ text: "" })] }));
     }
 
-    const document = new Document({ sections: [{ children }] });
+    const defaults = documentDefaults(this.layout);
+    const document = new Document({
+      styles: defaults.styles,
+      sections: [{ properties: { page: defaults.page }, children }],
+    });
     const buffer = await Packer.toBuffer(document);
 
     return {

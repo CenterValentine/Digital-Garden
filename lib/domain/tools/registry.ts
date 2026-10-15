@@ -26,6 +26,20 @@ const TOOL_REGISTRY: ToolDefinition[] = [
     isToggle: true,
   },
   {
+    // "Show in file tree": opens the item's ancestors (adding to the tree's
+    // expansion, never collapsing), scrolls it into view if it is out of
+    // view, selects it and pulses the row. Every content type — the tree
+    // holds them all. Handler: MainPanelContent → state/tree-reveal-store.
+    id: "reveal-in-tree",
+    label: "Show in file tree",
+    iconName: "FolderTree",
+    surfaces: ["toolbar"],
+    contentTypes: "all",
+    order: 20,
+    group: "view",
+    iconOnly: true,
+  },
+  {
     id: "copy-link",
     label: "Copy Link",
     iconName: "Link2",
@@ -132,6 +146,20 @@ const TOOL_REGISTRY: ToolDefinition[] = [
     order: 40,
     group: "text-format",
     shortcut: "Cmd+E",
+    isToggle: true,
+  },
+  {
+    // Comment out prose: the selection stays in the note for the author and
+    // is stripped from AI context, the public page and the search index.
+    // Cmd+/ is the universal "toggle comment" chord.
+    id: "private",
+    label: "Private",
+    iconName: "EyeOff",
+    surfaces: ["toolbelt"],
+    contentTypes: ["note"],
+    order: 45,
+    group: "text-format",
+    shortcut: "Cmd+/",
     isToggle: true,
   },
   {

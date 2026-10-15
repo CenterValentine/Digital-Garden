@@ -28,6 +28,7 @@ import { resolveChatModelFromConnection } from "@/lib/domain/ai/providers/regist
 import { addAutoAssociation } from "@/lib/features/conversations";
 import {
   createDocxDocument,
+  storeDocxDocument,
   findOrCreateFolder,
   findOrCreateShortcut,
 } from "@/lib/domain/ai/documents";
@@ -42,21 +43,74 @@ import {
   preflightCapture,
 } from "@/lib/domain/data/server/capture";
 import { createColumn } from "@/lib/domain/data/server/mutations";
+import { renderDataNodePreview } from "@/lib/domain/data/server/read-preview";
+import { resolveItemStatus, resolveIterationSource } from "./repair";
+import {
+  DELIVERABLE_TOOLS,
+  ITERATION_PROPOSAL_INPUT,
+  PROPOSAL_BOUNDS,
+  QUEST_COLUMN_TYPES,
+  RESEARCH_ALLOWANCE_PER_ITEM,
+  clampInt,
+  clipText,
+  normalizeProposalItems,
+  reservedTailSize,
+  resolveCaptureTarget,
+  normalizeCaptureArg,
+  resolveDeliverables,
+  stripCaptureDeliverables,
+  resolveQuestColumnType,
+  resolveQuestColumns,
+  stepsPerItemFor,
+} from "./iteration-proposal";
 import {
   closeSitting,
   ensureMasterLedger,
+  ensureOutputQuestColumn,
   ensureOutputRelation,
   ensureQuest,
   ledgerOutputRelations,
+  listQuestLabels,
   parseQuestInfo,
   questSeenKeys,
   recordQuestItem,
   setQuestLog,
+  sittingRecordedCount,
   tableColumnKeys,
   type QuestInfo,
 } from "@/lib/domain/ai/quests";
 import { computeTurnCost } from "@/lib/features/ai-connections/usage/pricing";
+import { resolveDocumentArgs } from "./write-args";
+import {
+  getDocxTemplateRecord,
+  listDocxTemplates,
+  loadDocxTemplate,
+  describeTemplateForModel,
+} from "@/lib/domain/ai/docx-templates/templates";
+import { judgeRender } from "@/lib/domain/ai/docx-templates/judge";
+import { compactReport, verifyProvenance, writeFillRecord } from "@/lib/domain/ai/docx-templates/fills";
+
+/**
+ * What the user does to make a .docx a template — returned by every
+ * read_docx_template result so the model can direct them whether or not
+ * a template already exists. The model cannot mark or edit the file.
+ */
+const DOCX_TEMPLATE_MARKING_STEPS =
+  "To make or change a template (the user does this; you cannot): 1) upload the .docx to the garden (drag it into the file tree or use the + menu), " +
+  "2) right-click it in the file tree → Mark as Document Template — the file stays where it is and its fields are read once; a tag that does not parse is refused with the paragraph to fix in Word, " +
+  "3) Settings → Templates → Document Templates: add a note per field (what it should hold, max length) — you read these beside the contract, " +
+  "4) to update the layout, edit the same file in Word and save over it (overwrite keeps the mark; the contract refreshes), " +
+  "5) right-click → Unmark Document Template to retire one. Tag grammar: docs/notes-feature/guides/ai/DOCX-TEMPLATE-AUTHORING.md.";
+import {
+  isDocxRendererConfigured,
+  renderDocxTemplate,
+  type TemplateValue,
+} from "@/lib/domain/ai/docx-templates/renderer-client";
 import type { JSONContent } from "@tiptap/core";
+import { stripPrivateContent } from "@/lib/domain/content/private-content";
+import { ALL_SEARCH_FIELDS, buildSearchWhere } from "@/lib/domain/content/search-service";
+import { collectColumnLinkIds } from "@/lib/domain/data/column-anchor";
+import { describeLinkedColumns } from "@/lib/domain/data/server/column-links";
 import { listCharters, isCharterMetadata } from "@/lib/domain/ai/charters/registry";
 import {
   generateUniqueSlug,
@@ -99,6 +153,10 @@ import { logger } from "@/lib/core/logger";
 import { ensureFolderContextFresh } from "@/lib/domain/ai-context/gate";
 import { assembleFolderCapsule } from "@/lib/domain/ai-context/capsule";
 import {
+  AUTO_CLOSED_CHECKPOINT_NEXT,
+  toolAutoApproves,
+} from "./approval-policy";
+import {
   READ_PAGE_HEADLESS_OR_BROWSER_DESCRIPTION,
   readPageInBrowserInputSchema,
 } from "./read-page-in-browser";
@@ -116,6 +174,18 @@ import {
   LIST_TABS_DESCRIPTION,
   listTabsInputSchema,
 } from "./co-browse-tools";
+import {
+  READ_IMAGE_TEXT_DESCRIPTION,
+  readImageTextInputSchema,
+} from "./read-image-text";
+import { VIEW_SCREEN_DESCRIPTION, viewScreenInputSchema, type ViewScreenResult } from "./view-screen";
+import {
+  VIEW_IMAGE_DESCRIPTION,
+  VIEW_IMAGE_MAX_BYTES,
+  VIEW_IMAGE_MEDIA_TYPES,
+  viewImageInputSchema,
+} from "./view-image";
+import { describeNoteImages, listNoteImages } from "@/lib/domain/content/note-images";
 
 /**
  * `read_page_in_browser` — CLIENT-EXECUTED (no server `execute`). The chat route
@@ -182,6 +252,83 @@ export const listTabsTool = tool({
 });
 
 /**
+ * `read_image_text` — CLIENT-EXECUTED (no server `execute`). OCR-PASTE-PLAN.md
+ * D8. Registered only when the client reports it can run local OCR; the
+ * engine's onToolCall downloads the image and reads it with the shared engine
+ * in lib/features/ocr, on the user's device.
+ */
+export const readImageTextTool = tool({
+  description: READ_IMAGE_TEXT_DESCRIPTION,
+  inputSchema: readImageTextInputSchema,
+});
+
+/**
+ * `view_screen` — CLIENT-EXECUTED (no server `execute`). AI-VIEW-SCREEN-PLAN.md.
+ * Registered only for a vision model on a surface that can capture (the side
+ * panel → the active web page; the app → itself). The engine's onToolCall
+ * captures, uploads, and returns the image URL; `deliverScreenCaptures` hands
+ * the image to the model on the next request.
+ */
+export const viewScreenTool = tool({
+  description: VIEW_SCREEN_DESCRIPTION,
+  inputSchema: viewScreenInputSchema,
+});
+
+/** How long a view_image link lives — the turn that uses it, and the chip's thumbnail after. */
+const VIEW_IMAGE_URL_TTL_S = 7 * 24 * 3600;
+
+/**
+ * `view_image` — SERVER-executed. AI-VIEW-SCREEN-PLAN.md D14. Registered only
+ * for a vision model. Returns the image-bearing result shape view_screen uses,
+ * so `deliverScreenCaptures` (request start AND prepareStep) hands the picture
+ * to the model. Every refusal says what to do instead.
+ */
+export function createViewImageTool(ctx: Pick<ToolExecuteContext, "userId">) {
+  return tool({
+    description: VIEW_IMAGE_DESCRIPTION,
+    inputSchema: viewImageInputSchema,
+    execute: async ({ contentId }): Promise<ViewScreenResult> => {
+      const node = await prisma.contentNode.findFirst({
+        where: { id: contentId, ownerId: ctx.userId, deletedAt: null },
+        select: {
+          title: true,
+          filePayload: {
+            select: { mimeType: true, fileSize: true, storageKey: true, storageProvider: true, uploadStatus: true },
+          },
+        },
+      });
+      const file = node?.filePayload;
+      if (!node || !file) {
+        return { ok: false, contentId, error: "No image file with that content id. Find it with search_content, or read_content for what the item is." };
+      }
+      if (!VIEW_IMAGE_MEDIA_TYPES.has(file.mimeType)) {
+        return {
+          ok: false,
+          contentId,
+          title: node.title,
+          error: `"${node.title}" is ${file.mimeType}, which vision models cannot take${file.mimeType.startsWith("image/") ? "; read_image_text can still read its text" : ""}.`,
+        };
+      }
+      if (Number(file.fileSize) > VIEW_IMAGE_MAX_BYTES) {
+        return {
+          ok: false,
+          contentId,
+          title: node.title,
+          error: `"${node.title}" is ${(Number(file.fileSize) / 1024 / 1024).toFixed(1)} MB, over the 5 MB a vision model accepts; read_image_text can still read its text.`,
+        };
+      }
+      if (file.uploadStatus !== "ready") {
+        return { ok: false, contentId, title: node.title, error: `"${node.title}" has not finished uploading.` };
+      }
+      const { getUserStorageProvider } = await import("@/lib/infrastructure/storage");
+      const storage = await getUserStorageProvider(ctx.userId, file.storageProvider as "r2" | "s3" | "vercel");
+      const imageUrl = await storage.generateDownloadUrl(file.storageKey, VIEW_IMAGE_URL_TTL_S);
+      return { ok: true, via: "file", contentId, title: node.title, imageUrl, mediaType: file.mimeType };
+    },
+  });
+}
+
+/**
  * Price the run's accumulated tokens against the executed model for
  * ledger stamps (cost metering). Coarse by design — run totals are
  * summed across steps, so long-context tier boundaries are approximate
@@ -210,7 +357,18 @@ function estimateRunCostUsd(ctx: ToolExecuteContext): number | undefined {
   const cachedInputTokens = (tokens?.cachedInput ?? 0) + (prior?.cachedInput ?? 0);
   if (!model || inputTokens + outputTokens <= 0) return undefined;
   const cost = computeTurnCost(
-    { inputTokens, outputTokens, cachedInputTokens },
+    {
+      inputTokens,
+      outputTokens,
+      cachedInputTokens,
+      // Tier per call, never per summed run (pricing.ts `maxStepInputTokens`).
+      ...(tokens?.maxStepInput
+        ? {
+            maxStepInputTokens: tokens.maxStepInput,
+            maxStepCachedInputTokens: tokens.maxStepCachedInput ?? 0,
+          }
+        : {}),
+    },
     model.modelId,
     model.vendorId,
   );
@@ -254,6 +412,65 @@ const AI_CONTENT_TYPE_NAMES: Record<ContentType, string> = {
 
 function describeContentType(type: ContentType): string {
   return AI_CONTENT_TYPE_NAMES[type];
+}
+
+/**
+ * HTML pages and templates share `HtmlPayload`. Prefer the extracted text —
+ * markup is mostly tokens the model does not need — and fall back to the raw
+ * HTML only when no text was extracted.
+ */
+async function renderHtmlPayload(
+  contentId: string,
+  header: string,
+): Promise<string> {
+  const h = await prisma.htmlPayload.findUnique({
+    where: { contentId },
+    select: { html: true, searchText: true, isTemplate: true },
+  });
+  if (!h) return `${header}\n\n(page record missing)`;
+  const text = h.searchText.trim() || h.html;
+  return `${header}${h.isTemplate ? "\nTemplate: yes" : ""}\n\n${text}`;
+}
+
+
+/** `{ text, url }` values in a template fill — the hyperlinks the render emits. */
+function countHyperlinkValues(value: unknown): number {
+  if (!value || typeof value !== "object") return 0;
+  if (!Array.isArray(value) && "url" in (value as Record<string, unknown>)) return 1;
+  return Object.values(value as Record<string, unknown>).reduce<number>((n, v) => n + countHyperlinkValues(v), 0);
+}
+
+/**
+ * True when `contentId` is a file THIS chat created: associated with the
+ * conversation and created after the conversation began. The association
+ * alone is not enough — an @-mentioned file of the user's is associated
+ * too, and must never be overwritten without asking (§10 round 6).
+ */
+async function contentCreatedInThisChat(
+  ctx: ToolExecuteContext,
+  contentId: string,
+): Promise<boolean> {
+  if (!ctx.conversationId) return false;
+  const [conversation, association, node] = await Promise.all([
+    prisma.conversation.findFirst({
+      where: { id: ctx.conversationId, ownerId: ctx.userId },
+      select: { createdAt: true },
+    }),
+    prisma.conversationAssociation.findUnique({
+      where: {
+        conversationId_contentNodeId: {
+          conversationId: ctx.conversationId,
+          contentNodeId: contentId,
+        },
+      },
+      select: { conversationId: true },
+    }),
+    prisma.contentNode.findFirst({
+      where: { id: contentId, ownerId: ctx.userId, deletedAt: null },
+      select: { createdAt: true },
+    }),
+  ]).catch(() => [null, null, null] as const);
+  return !!(conversation && association && node && node.createdAt >= conversation.createdAt);
 }
 
 export function createBaseTools(ctx: ToolExecuteContext) {
@@ -370,7 +587,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
       description:
         "Propose a BOUNDED multi-page research run for the user to approve BEFORE reading anything. " +
         "Use this when the user asks to research a topic across multiple pages/sources. The user approves the objective, sources, page budget, and follow depth up front. " +
-        "On approval you receive a per-run page budget (reads refuse once it is spent) and a ledger key. Then read sources, call extract_structured on each, and finish with a synthesis (createNote) + record_research_findings.",
+        "On approval you receive a per-run page budget (reads refuse once it is spent) and a ledger key. Then read sources, call extract_structured on each, and finish with a synthesis (create_note) + record_research_findings.",
       needsApproval: true,
       inputSchema: z.object({
         objective: z
@@ -456,16 +673,16 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           nextAction:
             `APPROVED. You have a per-run budget of ${pageBudget} pages — reads refuse once it is spent, so spend them well (breadth first, depth ${depth}). ` +
             `Read each source, call extract_structured on its content with columns (the user's if named, else inferred from the objective), and accumulate the rows. ` +
-            `When the objective is met OR the budget is spent, synthesize with createNote (a short prose summary + a markdown table of the rows) into the output target, then call record_research_findings with ledgerRunKey "${ledgerRunKey}".`,
+            `When the objective is met OR the budget is spent, synthesize with create_note (a short prose summary + a markdown table of the rows) into the output target, then call record_research_findings with ledgerRunKey "${ledgerRunKey}".`,
         };
       },
     }),
     // Append a research run's outcome to its objective ledger (audit trail).
     // Called AFTER the synthesis note is written. Not user-approved — it is a log
-    // write; the user already approved the synthesis via createNote.
+    // write; the user already approved the synthesis via create_note.
     record_research_findings: tool({
       description:
-        "Record the outcome of a research run in its objective ledger (audit trail). Call AFTER synthesizing (createNote), passing the ledgerRunKey from propose_research_run. " +
+        "Record the outcome of a research run in its objective ledger (audit trail). Call AFTER synthesizing (create_note), passing the ledgerRunKey from propose_research_run. " +
         "Include the pages you read and a short summary of findings so the ledger is a faithful record of the run.",
       inputSchema: z.object({
         ledgerRunKey: z
@@ -565,122 +782,144 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         "Enumerate FIRST, then propose with the item list. On approval you receive an item budget, a ledger checklist (one row per item), and stable item keys. Process items IN ORDER, one at a time, recording EVERY item with record_item_result; finish with record_iteration_findings (quest-less runs also write a roll-up note first — quest runs never do). " +
         "Skip this tool for a single item — just run the analysis directly.",
       needsApproval: true,
-      inputSchema: z.object({
-        objective: z
-          .string()
-          .min(1)
-          .max(400)
-          .describe("What each item gets, in one sentence (e.g. \"score fit with the Job Fit charter; document >75% matches\")."),
-        source: z
-          .enum(["list-page", "open-tabs", "urls", "database-rows"])
-          .describe(
-            "Where the items were enumerated from. \"database-rows\" = a stage-2 pass over an existing table: requires captureTo (the table is both source and stamp-back target); omit items — the server enumerates rows itself (optionally narrowed by rowIds).",
-          ),
-        items: z
-          .array(
-            z.object({
-              label: z.string().min(1).max(200).describe("Human label — title/company as shown."),
-              url: z.string().max(600).optional().describe("The item's own URL when known (tab URL, link href) — the strongest stable key."),
-            }),
-          )
-          .min(1)
-          .max(250)
-          .optional()
-          .describe("The enumerated items, in processing order. REQUIRED for every source except \"database-rows\" (where the server enumerates)."),
-        rowIds: z
-          .array(z.string().min(1).max(80))
-          .max(200)
-          .optional()
-          .describe(
-            "database-rows only: iterate exactly these rows, in this order ([handles] or ids from query_database). Omit to iterate the whole table in grid order (capped by itemCap).",
-          ),
-        itemCap: z
-          .number()
-          .int()
-          .min(1)
-          .max(200)
-          // The plan card is approve/reject only — do NOT promise editable
-          // fields here (an earlier description claimed the user could raise
-          // the cap in the card; they can't, and a denied proposal was the
-          // observable result).
-          .describe("Max items to process this run. PROPOSE a sensible default (~10-15, up to 200); raise it yourself ONLY when the user explicitly asked for more. If the user wants a different cap after seeing the plan, they will say so — re-propose with their number."),
-        batchSize: z
-          .number()
-          .int()
-          .min(2)
-          .max(50)
-          .optional()
-          .describe(
-            "Optional batch cadence: checkpoint the run every N items (dedupe the batch, record a batch checkpoint in the ledger) before starting the next batch. Omit when one batch covers the whole run. RECOMMEND 10 or fewer — larger batches raise drift and context risk; go higher only when the user asks for it.",
-          ),
-        ledgerLabel: z
-          .string()
-          .max(120)
-          .optional()
-          .describe("Short label for the run's ledger; omit to derive from the objective."),
-        captureTo: z
-          .object({
-            database: z
-              .string()
-              .min(1)
-              .max(200)
-              .describe(
-                "Target database — its id (from the mention capsule) or exact name.",
-              ),
-            admission: z
-              .enum(["all", "qualified", "custom"])
-              .describe(
-                "Which recorded items get rows: all done items, only qualified ones, or custom (the user's stated rule — pass cells only for items meeting it).",
-              ),
-            admissionNote: z
-              .string()
-              .max(300)
-              .optional()
-              .describe("One line stating a custom admission rule (shown on the card and in the ledger)."),
-            columns: z
-              .array(z.string().min(1).max(120))
-              .min(1)
-              .max(20)
-              .describe("Column NAMES this run will write per admitted item."),
-            dedupeColumn: z
-              .string()
-              .max(120)
-              .optional()
-              .describe(
-                "Column holding each item's stable identity; defaults to the table's first url column.",
-              ),
-          })
-          .optional()
-          .describe(
-            "Capture admitted items as DATABASE ROWS in addition to the ledger. Declare it when the user asked for results in a database — approving this card is the user's consent to write there, and each admitted item's record_item_result must then include capture.cells.",
-          ),
-        quest: z
-          .string()
-          .min(1)
-          .max(120)
-          .optional()
-          .describe(
-            "The ongoing MATTER this run belongs to (continue-or-create): pass the quest's name when the user mentions a past matter to continue (\"my job hunt\") — the same quest across sittings shares one ledger and skips already-scored items. Omit for a brand-new matter (a quest is then created from the run's label).",
-          ),
-        questColumns: z
-          .array(
-            z.object({
-              name: z.string().min(1).max(60),
-              type: z.enum(["text", "longText", "number", "url", "date", "checkbox"]),
-              description: z
-                .string()
-                .min(8)
-                .max(300)
-                .describe("What goes in it — same load-bearing context as every capture column."),
-            }),
-          )
-          .max(8)
-          .optional()
-          .describe(
-            "NEW quests only: extra ledger columns sculpted to this matter (a scoring task adds its criteria columns; a collection task adds none). The machinery core (Item/Status/Pass/Fit/Qualified/Verdict/…) always exists — never re-declare it. Write their values via questCells on record_item_result. Ignored when continuing an existing quest.",
-          ),
-      }),
-      execute: async ({ objective, source, items, rowIds, itemCap, batchSize, ledgerLabel, captureTo, quest: questArg, questColumns }) => {
+      // THE RULE — schemas describe shape; execute judges. The contract is
+      // the pure module (also loaded by `pnpm proposal:shape:check`, whose
+      // fixtures are the four payloads that died at this schema in prod
+      // fa475acc, 2026-09-21); drift gate 7 fails the build if a `.enum()` /
+      // `.min()` / `.max()` creeps back into any run-loop tool. Every
+      // judgement the old schema made — source vocabulary, item shape, caps,
+      // captureTo's keys and admission words, column count, quest column
+      // types — is made below, and a miss comes back as a RESULT the model
+      // fixes in one step instead of a rejection that ends the call.
+      inputSchema: ITERATION_PROPOSAL_INPUT,
+      execute: async ({ objective: objectiveArg, source: sourceArg, items: itemsArg, rowIds: rowIdsArg, itemCap: itemCapArg, budget: budgetArg, batchSize: batchSizeArg, ledgerLabel: ledgerLabelArg, captureTo: captureToArg, quest: questArg, newQuest: newQuestArg, questColumns: questColumnsArg, deliverables: deliverablesArg, stepsPerItem: stepsPerItemArg }) => {
+        // ── Shape → meaning (iteration-proposal.ts resolvers) ────────────
+        const objective = clipText(objectiveArg, 400) ?? "";
+        if (!objective) {
+          return {
+            ok: false,
+            refusal: "No objective given. Say in one sentence what each item gets (e.g. \"score fit with the Job Fit charter; document >75% matches\") and re-propose — keep the items you already enumerated.",
+            nextAction: "Re-propose with an objective. Do NOT start processing items.",
+          };
+        }
+        // Every item shape the model has sent → { label, url? }; over-long
+        // labels/urls are clipped, label-less entries skipped (reported below).
+        const itemsNorm = normalizeProposalItems(itemsArg);
+        const items = itemsNorm.items;
+        const rowIds = rowIdsArg
+          ?.map((r) => r.trim())
+          .filter((r) => r.length > 0)
+          .slice(0, PROPOSAL_BOUNDS.rowIds);
+        const ledgerLabel = clipText(ledgerLabelArg, 120);
+        // Resolve the two fields that used to reject the whole proposal
+        // (production, 2026-09-18). Both refusals below are ordinary tool
+        // RESULTS, so the model can re-propose in the same turn with the
+        // enumeration it already has — the expensive part of this call.
+        const source = resolveIterationSource(sourceArg);
+        if (!source) {
+          return {
+            ok: false,
+            refusal: `Could not tell where these items came from: source "${sourceArg ?? ""}". Re-propose with exactly one of "list-page", "open-tabs", "urls" or "database-rows" — keep the items you already enumerated.`,
+            nextAction: "Re-propose with a valid source. Do NOT start processing items.",
+          };
+        }
+        const itemCapRaw = itemCapArg ?? budgetArg;
+        if (itemCapRaw === undefined) {
+          return {
+            ok: false,
+            refusal:
+              "No item cap given. Re-propose with itemCap set (~10-15 is a sensible default, up to 200) — keep the items you already enumerated.",
+            nextAction: "Re-propose with itemCap. Do NOT start processing items.",
+          };
+        }
+        const itemCap = clampInt(itemCapRaw, PROPOSAL_BOUNDS.itemCap.min, PROPOSAL_BOUNDS.itemCap.max, PROPOSAL_BOUNDS.itemCap.max);
+        // A cadence below 2 is no cadence; above the bound is clamped.
+        const batchSize =
+          typeof batchSizeArg === "number" && Number.isFinite(batchSizeArg) && batchSizeArg >= PROPOSAL_BOUNDS.batchSize.min
+            ? clampInt(batchSizeArg, PROPOSAL_BOUNDS.batchSize.min, PROPOSAL_BOUNDS.batchSize.max, PROPOSAL_BOUNDS.batchSize.max)
+            : undefined;
+        // captureTo in every shape seen (bare id, databaseId, comma columns,
+        // admission by meaning) → one target, or a refusal naming the fix.
+        const captureRes = resolveCaptureTarget(captureToArg);
+        if (captureRes && !captureRes.ok) {
+          return {
+            ok: false,
+            refusal: captureRes.refusal ?? "captureTo could not be read.",
+            nextAction: "Re-propose with captureTo fixed as the refusal says. Do NOT start processing items.",
+          };
+        }
+        const captureTo = captureRes?.target;
+        const questRes = resolveQuestColumns(questColumnsArg);
+        if (!questRes.ok) {
+          return {
+            ok: false,
+            refusal: questRes.refusal ?? "questColumns could not be read.",
+            nextAction: "Re-propose with questColumns fixed as the refusal says. Do NOT start processing items.",
+          };
+        }
+        const questColumns = questRes.columns;
+        // Deliverables (plan §6b): the write tools each item ends with. The
+        // route sizes the step cap from them and reserves the turn's tail.
+        const deliverablesRes = resolveDeliverables(deliverablesArg);
+        // Narrowed again below once the capture target is known (P3): with
+        // capture on, the row write IS capture.cells.
+        let deliverables = deliverablesRes.deliverables;
+        const stepsPerItemFrom = (list: readonly string[]) =>
+          typeof stepsPerItemArg === "number" && Number.isFinite(stepsPerItemArg)
+            ? stepsPerItemFor(list, stepsPerItemArg)
+            : undefined;
+        let stepsPerItem = stepsPerItemFrom(deliverables);
+        // Everything the resolvers silently read differently from what was
+        // sent rides the result, so a normalization is never invisible.
+        const shapeNotes = [
+          ...(captureRes?.notes ?? []),
+          ...questRes.notes,
+          ...(deliverablesRes.unknown.length > 0
+            ? [`deliverables not recognized and dropped: ${deliverablesRes.unknown.join(", ")} (known: ${DELIVERABLE_TOOLS.join(", ")})`]
+            : []),
+          ...(itemsNorm.dropped > 0 ? [`${itemsNorm.dropped} item(s) had no label under any key and were skipped`] : []),
+          ...(itemsNorm.clipped ? [`items clipped to the first ${PROPOSAL_BOUNDS.items}`] : []),
+          ...(itemCap !== itemCapRaw ? [`itemCap ${itemCapRaw} clamped to ${itemCap}`] : []),
+        ];
+
+        // An enumeration that lost its URLs is a degraded run, not a failed
+        // one, and it degrades SILENTLY: the ledger cannot link to sources, a
+        // second sitting cannot revisit them, and URL dedupe against the
+        // capture table is impossible. Refuse where the URL is definitionally
+        // available — a tab HAS a url, and a "urls" source IS urls — and let a
+        // list-page pass, since an extractor that strips hrefs is a real
+        // condition the model cannot always defeat (production 2026-09-18).
+        const urlIsDefinitional = source === "open-tabs" || source === "urls";
+        if (urlIsDefinitional && items && !items.some((i) => i.url?.trim())) {
+          return {
+            ok: false,
+            refusal: `Every item in a "${source}" run needs its url, and none of these have one. Re-enumerate while the source is still open and include each item's url — without it the ledger cannot link to the source, a follow-up run cannot revisit it, and duplicate rows cannot be detected.`,
+            nextAction: "Re-propose with urls on the items. Do NOT start processing items.",
+          };
+        }
+
+        // A run whose objective says it will write somewhere, but which
+        // declares no capture target, cannot write anywhere: record_item_result
+        // answers `capture ignored — this run has no approved captureTo
+        // config`. In production the user named the destination database in
+        // their own message and the proposal still arrived without it, so the
+        // run would have screened 20 jobs and saved none of them.
+        // The object sits between the verb and the destination ("write ROLES
+        // SCORING 75+ to the Library"), so the gap is bounded rather than
+        // absent. Only "to"/"into" count: bare "in" turns "record the verdict
+        // in one sentence" into a false refusal, and blocking a legitimate
+        // report-only run costs more than missing one capture-less run, which
+        // the user still sees on the approval card.
+        const OBJECTIVE_WRITES_SOMEWHERE =
+          /\b(writ|captur|add|record|log|sav)\w*\b[^.;]{0,80}?\b(to|into)\b/i;
+        if (!captureTo && OBJECTIVE_WRITES_SOMEWHERE.test(objective)) {
+          return {
+            ok: false,
+            refusal:
+              "This objective says the run will write its results somewhere, but no captureTo was given — so nothing would be written. Name the destination database in captureTo and re-propose, or reword the objective if the run is only meant to report.",
+            nextAction: "Re-propose with captureTo. Do NOT start processing items.",
+          };
+        }
         const label = (ledgerLabel ?? objective).trim();
         let ledgerRunKey =
           "iterate:" +
@@ -730,8 +969,10 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             database: captureTo.database,
             admission: captureTo.admission,
             admissionNote: captureTo.admissionNote,
+            // Empty = every writable column (the preflight expands it).
             columnNames: captureTo.columns,
             dedupeColumnName: captureTo.dedupeColumn,
+            mergeColumnNames: captureTo.mergeColumns,
           });
           if (!capture.ok) {
             return {
@@ -754,11 +995,27 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         // config presence IS the "preflight passed" signal below. rowKeyed
         // rides the stamped config so record_item_result knows item keys
         // are row ids (P3 stamp-back).
+        // `approvedAt` (P3): the moment from which a same-sitting write on a
+        // captured row is protected from the closing capture.
+        const approvedAt = new Date().toISOString();
         const captureCfg = capture?.config
           ? rowSourced
-            ? { ...capture.config, rowKeyed: true }
-            : capture.config
+            ? { ...capture.config, rowKeyed: true, approvedAt }
+            : { ...capture.config, approvedAt }
           : null;
+        // P3: one write path. With capture on, update_row/update_rows are
+        // not deliverables — capture.cells on record_item_result lands the
+        // row, and a second write of the same cells would overwrite it.
+        if (captureCfg) {
+          const narrowed = stripCaptureDeliverables(deliverables, true);
+          if (narrowed.stripped.length > 0) {
+            deliverables = narrowed.deliverables;
+            stepsPerItem = stepsPerItemFrom(deliverables);
+            shapeNotes.push(
+              `${narrowed.stripped.join(", ")} dropped from deliverables — CAPTURE IS ON, so capture.cells on record_item_result IS the row write for the capture columns; do NOT also call ${narrowed.stripped.join("/")} for them (a second write of the same cells overwrites the first).`,
+            );
+          }
+        }
         const captureVocab = capture?.optionVocab ?? {};
         const captureDescMissing = capture?.descriptionsMissing ?? [];
         const captureEmptyVocab = capture?.emptyVocabColumns ?? [];
@@ -877,6 +1134,27 @@ export function createBaseTools(ctx: ToolExecuteContext) {
               // policy 2026-09-02).
               questHomeFolderId = master.questHomeFolderId;
               const questLabel = (questArg ?? label).trim().slice(0, 120);
+              // REUSE BY DEFAULT (owner rule 2026-10-09). A charter's quests
+              // are its ongoing matters; the "Apply for a job" runs minted
+              // one per job ("Apply for a job — SeatGeek …"), and every new
+              // quest grew a column on the shared output table. A name that
+              // matches no existing quest is refused unless the model says
+              // the user asked for a separate one (`newQuest`). The first
+              // quest of a charter is always free to mint.
+              const existingQuests = await listQuestLabels(master.masterId, master.masterCols);
+              const continuesExisting = existingQuests.some(
+                (existing) => existing.toLowerCase() === questLabel.toLowerCase(),
+              );
+              if (existingQuests.length > 0 && !continuesExisting && newQuestArg !== true) {
+                const shown = existingQuests.slice(0, 12).map((q) => `"${q}"`).join(", ");
+                return {
+                  ok: false,
+                  refusal:
+                    `${questArg ? `No quest named "${questLabel}" exists` : "No quest was named"} — and this charter's quests are reused by default. Existing quests: ${shown}${existingQuests.length > 12 ? ", …" : ""}. ` +
+                    "Re-propose with `quest` set to the existing one this run belongs to (an item such as one job is an ITEM of a quest, not a quest of its own). Only if the user explicitly asked for a separate quest, re-propose with `newQuest: true`; if it is unclear, ask them.",
+                  nextAction: "Re-propose with an existing quest name (or newQuest: true only on the user's explicit request). Do NOT start processing items.",
+                };
+              }
               const ensured = await ensureQuest({
                 userId: ctx.userId,
                 charterTitle: ctx.activeCharter.title,
@@ -908,11 +1186,14 @@ export function createBaseTools(ctx: ToolExecuteContext) {
                 // sitting gets its relation column on the ledger; the map is
                 // recomputed from the ledger so earlier sittings' tables stay
                 // linkable (a quest may capture into several tables).
+                // The user's table gets ONE shared "Quest" column for every
+                // quest (find-or-create by target), never one per quest.
+                const outputQuestColumns: Record<string, string> = {};
                 if (captureCfg) {
-                  await ensureOutputRelation(
-                    ensured.questLedgerId,
+                  await ensureOutputRelation(ensured.questLedgerId, captureCfg.tableId);
+                  outputQuestColumns[captureCfg.tableId] = await ensureOutputQuestColumn(
                     captureCfg.tableId,
-                    questLabel,
+                    master.masterId,
                   );
                 }
                 const outputRelations = await ledgerOutputRelations(
@@ -930,6 +1211,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
                 ).catch(() => []);
                 questInfo = {
                   sittingId: crypto.randomUUID(),
+                  openedAt: approvedAt,
                   masterId: master.masterId,
                   questRowId: ensured.questRowId,
                   questLedgerId: ensured.questLedgerId,
@@ -943,6 +1225,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
                   ledgerCols: await tableColumnKeys(ensured.questLedgerId),
                   questRelationColumnId: ensured.questRelationColumnId,
                   outputRelations,
+                  outputQuestColumns,
                 };
                 // Quest memory (rejects INCLUDED): items this quest already
                 // scored in ANY earlier sitting — the recurring token saver
@@ -977,6 +1260,43 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         // lookup in upsertRunLedger so every sitting adopts the same note.
         const ledgerParentId = questInfo ? questHomeFolderId : placement.parentId;
         const ledgerOwnerId = questInfo ? undefined : placement.ownedByNoteId;
+        // P11: a continued quest whose previous sitting never closed is
+        // said so — in the result and in the log — instead of being
+        // silently superseded (prod 2026-09-27: a 09-22 plan with no item
+        // and no reconciliation sat above the new plan, unremarked).
+        let priorSitting:
+          | { openedAt: string | null; itemsRecorded: number; closed: false }
+          | null = null;
+        if (questInfo && questContinued) {
+          try {
+            const priorState = await readRunLedgerCaptureConfig(
+              ctx.userId,
+              ledgerParentId,
+              { runKey: ledgerRunKey, ownerContentId: ledgerOwnerId },
+            );
+            const prior = parseQuestInfo(priorState?.questInfo);
+            if (prior && prior.sittingId !== questInfo.sittingId && !prior.sittingClosed) {
+              priorSitting = {
+                openedAt: prior.openedAt ?? null,
+                itemsRecorded: await sittingRecordedCount(prior).catch(() => 0),
+                closed: false,
+              };
+            }
+          } catch {
+            // Best-effort context; never blocks the proposal.
+          }
+        }
+        const priorSittingLine = priorSitting
+          ? `\n\n**Previous sitting** (opened ${priorSitting.openedAt ? priorSitting.openedAt.replace("T", " ").slice(0, 16) : "date unknown"}) recorded ${priorSitting.itemsRecorded} item${priorSitting.itemsRecorded === 1 ? "" : "s"} and never closed — superseded by this sitting.`
+          : "";
+        // Real titles for the closing references (P10): the quest ledger
+        // is renamable, and the log note is titled by buildRunLedgerTitle.
+        const questLedgerTitle = questInfo
+          ? ((await prisma.contentNode
+              .findFirst({ where: { id: questInfo.questLedgerId, deletedAt: null }, select: { title: true } })
+              .then((n) => n?.title)
+              .catch(() => undefined)) ?? `${questInfo.questLabel} — Quest Ledger`)
+          : null;
         if (questInfo || placement.parentId || placement.ownedByNoteId) {
           try {
             const ledger = await upsertRunLedger(
@@ -993,6 +1313,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
                   (questInfo
                     ? `\n\n**Quest:** ${questInfo.questLabel} (${questContinued ? "continued" : "new"} · sitting stamped)`
                     : "") +
+                  priorSittingLine +
                   (captureCfg
                     ? `\n\n**Capture:** → "${captureCfg.tableTitle}" · admission ${captureCfg.admission}` +
                       (captureCfg.admissionNote
@@ -1038,6 +1359,17 @@ export function createBaseTools(ctx: ToolExecuteContext) {
                 ledgerNodeId,
                 "tool-call",
               ).catch(() => null);
+              // The quest's row database attaches too — it is where the
+              // items land, and a later turn's reads reach it without a
+              // summon (owner, 2026-09-22: "that is what I want attaching").
+              if (questInfo) {
+                void addAutoAssociation(
+                  ctx.userId,
+                  ctx.conversationId,
+                  questInfo.questLedgerId,
+                  "tool-call",
+                ).catch(() => null);
+              }
             }
           } catch {
             // Ledger is best-effort — the run can still proceed without it.
@@ -1051,13 +1383,36 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           source,
           itemBudget,
           batchSize: effectiveBatchSize,
+          // The route reads these from history to size and reserve the
+          // step budget (plan §6b); the notice on every step names them.
+          deliverables,
+          ...(stepsPerItem != null ? { stepsPerItem } : {}),
+          stepBudget: {
+            perItem: stepsPerItemFor(deliverables, stepsPerItem),
+            reservedTail: reservedTailSize(deliverables),
+            note:
+              deliverables.length > 0
+                ? `Each item: ~${RESEARCH_ALLOWANCE_PER_ITEM} research steps, then ${deliverables.join(" → ")} → record_item_result. The harness reserves each turn's last ${reservedTailSize(deliverables)} steps for those tools.`
+                : "Screening budget: read → record per item. Declare `deliverables` if each item must end in artifacts (a document, a row update).",
+          },
           items: normalized,
           ...(questInfo
             ? {
+                // The quest's ROW database — the thing the user means by
+                // "the quest" (owner, 2026-09-22: the pin opened the long
+                // log note; the database never attached). The client pins
+                // and auto-associates from this id.
+                questLedgerNodeId: questInfo.questLedgerId,
                 quest: {
                   label: questInfo.questLabel,
                   continued: questContinued,
                   alreadyScoredKeys: [...alreadyScored],
+                  ...(priorSitting
+                    ? {
+                        priorSitting,
+                        priorSittingNote: `The previous sitting of this quest${priorSitting.openedAt ? ` (opened ${priorSitting.openedAt.slice(0, 10)})` : ""} recorded ${priorSitting.itemsRecorded} item${priorSitting.itemsRecorded === 1 ? "" : "s"} and was never closed; this sitting supersedes it. Mention that to the user in your closing summary.`,
+                      }
+                    : {}),
                 },
               }
             : {}),
@@ -1084,6 +1439,10 @@ export function createBaseTools(ctx: ToolExecuteContext) {
                   'BEFORE item 1, read each standingContext database ONCE with query_database (lifetime: "run"; tier index → default columns; "index with digests" → digests: true; "full" → columns: "all"; apply the listed columns/filter). Judge every item against those rows; write matches as relation cells with the [handles]. Do not re-read per item.',
               }
             : {}),
+          // What the resolvers read differently from what was sent — a
+          // normalization is never invisible (silent correctness reads as a
+          // bug), and the ledger line below quotes these too.
+          ...(shapeNotes.length > 0 ? { shapeNotes } : {}),
           ...(captureCfg
             ? {
                 capture: {
@@ -1136,7 +1495,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             (effectiveBatchSize
               ? `This run is BATCHED: after every ${effectiveBatchSize} recorded items, pause acquisition and call record_batch_checkpoint (dedupe the batch, note anomalies) BEFORE starting the next item — the harness holds new reads until the checkpoint is recorded. `
               : "") +
-            `The ledger is the checklist; never trust your memory for completeness. When every item is recorded OR the budget is reached, ${questInfo ? `do NOT create a roll-up note (the quest log + quest ledger ARE the record — reuse, never duplicate); close with record_iteration_findings, then link [[${questInfo.questLabel} — Quest Ledger]] in your closing message` : `write the roll-up (createNote: a short prose summary + a markdown table of items/verdicts) and close with record_iteration_findings`}. ` +
+            `The ledger is the checklist; never trust your memory for completeness. When every item is recorded OR the budget is reached, ${questInfo ? `do NOT create a roll-up note (the quest log + quest ledger ARE the record — reuse, never duplicate); close with record_iteration_findings, then link @[${questLedgerTitle}](${questInfo.questLedgerId}) in your closing message (that @[…](id) form renders as a pill; never write [[wiki-links]] in chat)` : `write the roll-up (create_note: a short prose summary + a markdown table of items/verdicts) and close with record_iteration_findings`}. ` +
             `If a captcha or session end interrupts, stop and tell the user — recorded progress is preserved and the run can resume from the first pending item.`,
         };
       },
@@ -1148,32 +1507,44 @@ export function createBaseTools(ctx: ToolExecuteContext) {
       description:
         "Record ONE item's outcome in the iteration ledger. Call after finishing EACH item of an approved propose_item_iteration run — including items you could NOT read (status unreadable/blocked). Never skip an item silently. ALWAYS pass the item's `url` so the ledger links to the source page (the user can click through, and a follow-up run can revisit it).",
       inputSchema: z.object({
-        ledgerRunKey: z.string().min(1).describe("The ledgerRunKey from propose_item_iteration."),
-        itemKey: z.string().min(1).max(600).describe("The item's key from the approved run's items list."),
-        itemLabel: z.string().max(200).optional().describe("The item's label (for the ledger line)."),
+        // Describe-only schema (drift gate 7; the rule in
+        // iteration-proposal.ts): bounds are clipped/clamped in execute.
+        ledgerRunKey: z.string().describe("The ledgerRunKey from propose_item_iteration."),
+        itemKey: z.string().describe("The item's key from the approved run's items list."),
+        itemLabel: z.string().optional().describe("The item's label (for the ledger line)."),
         url: z
           .string()
-          .max(600)
           .optional()
           .describe("The item's source URL (from the approved items list / the page you read). ALWAYS include it when known — the ledger renders it as a clickable link so the page can be revisited."),
+        // Deliberately a lenient string, not an enum (owner report
+        // 2026-09-17): a required enum rejected the WHOLE call before
+        // execute — verdict, score and nine captured cells with it — and the
+        // best-scoring item of a production run was lost to a missing word.
+        // Resolution lives in execute, where the rest of the call can inform
+        // it. Same doctrine as data-tools.ts's read schema.
         status: z
-          .enum(["done", "unreadable", "blocked"])
-          .describe("done = analyzed; unreadable = page could not be read; blocked = an obstacle (login/captcha) stopped this item."),
+          .string()
+          .optional()
+          .describe('"done" = analyzed; "unreadable" = page could not be read; "blocked" = an obstacle (login/captcha) stopped this item.'),
         qualified: z.boolean().optional().describe("Whether the item met the objective's bar (e.g. fit > 75%)."),
-        fitPercent: z.number().min(0).max(100).optional().describe("Numeric score when the objective scores items."),
-        verdict: z.string().max(1000).optional().describe("One-to-three sentence rationale for this item."),
-        artifactTitle: z.string().max(200).optional().describe("Title of any per-item note you created."),
+        fitPercent: z.number().optional().describe("Numeric score 0–100 when the objective scores items."),
+        // No `.max()` on the prose fields (production 2026-09-18): a verdict
+        // of 1,043 characters failed `max(1000)` and took the whole call with
+        // it — a correct item, scored 88/100 and qualified, plus its capture
+        // row carrying the full job description. Losing an analyzed item
+        // because its SUMMARY ran long is the worst trade in this tool. They
+        // are clipped in execute instead, where over-length is a formatting
+        // detail rather than a fatal one.
+        verdict: z.string().optional().describe("One-to-three sentence rationale for this item (clipped at 1000 characters)."),
+        artifactTitle: z.string().optional().describe("Title of any per-item note you created."),
+        // A plain record, not a nested object (gate 7's second half): the
+        // model has sent both `{ cells: { Column: value } }` and the flat
+        // `{ Column: value }`; `normalizeCaptureArg` reads either in execute.
         capture: z
-          .object({
-            cells: z
-              .record(z.string(), z.unknown())
-              .describe(
-                "Column NAME → value for THIS item's database row. Select/status accept option labels; dates ISO; numbers plain.",
-              ),
-          })
+          .record(z.string(), z.unknown())
           .optional()
           .describe(
-            "Land this item as a database row — ONLY when the approved run declared captureTo AND this item meets its admission rule. The row upserts by the item's identity: a re-run updates, never duplicates.",
+            "Land this item as a database row — ONLY when the approved run declared captureTo AND this item meets its admission rule. Shape: { cells: { \"Column NAME\": value } } (a flat { \"Column NAME\": value } map is read the same way). Select/status accept option labels; dates ISO; numbers plain. The row upserts by the item's identity: a re-run updates, never duplicates.",
           ),
         questCells: z
           .record(z.string(), z.unknown())
@@ -1181,8 +1552,68 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           .describe(
             "Quest runs with SCULPTED ledger columns: their values for this item (column name → value). Machinery fields (status/fit/qualified/verdict) are recorded automatically — never repeat them here.",
           ),
+        gaps: z
+          .array(z.string())
+          .optional()
+          .describe(
+            "GAPS ARE DATA: facts this item needed that ONE evidence search did not find (\"Education/degree — not in evidence\"). Put a placeholder in the artifact, list the gap here, and move on — never a second search, never an invented value. Recorded in the ledger so the user can fill them.",
+          ),
       }),
-      execute: async ({ ledgerRunKey, itemKey, itemLabel, url, status, qualified, fitPercent, verdict, artifactTitle, capture, questCells }) => {
+      execute: async ({ ledgerRunKey: ledgerRunKeyArg, itemKey: itemKeyArg, itemLabel: itemLabelArg, url: urlArg, status: statusArg, qualified, fitPercent: fitPercentArg, verdict: verdictArg, artifactTitle: artifactTitleArg, capture: captureArg, questCells, gaps: gapsArg }) => {
+        // P4: either nesting the model sends is read; a normalization is
+        // reported, never silent.
+        const captureNorm = normalizeCaptureArg(captureArg);
+        const capture = captureNorm.cells ? { cells: captureNorm.cells } : undefined;
+        const shapeNotes: string[] = captureNorm.note ? [captureNorm.note] : [];
+        // Gaps are data (plan §6b.3): clipped, bounded, recorded — never a
+        // reason to keep searching.
+        const gaps = (gapsArg ?? [])
+          .map((g) => (typeof g === "string" ? g.trim().slice(0, 200) : ""))
+          .filter((g) => g.length > 0)
+          .slice(0, 20);
+        // Clip the prose. These used to be `.max()` on the schema, where an
+        // over-long verdict rejected the entire call — see the schema comment.
+        const clip = (text: string | undefined, max: number) =>
+          text !== undefined && text.length > max
+            ? `${text.slice(0, max - 1).trimEnd()}…`
+            : text;
+        const verdict = clip(verdictArg, 1000);
+        const itemLabel = clip(itemLabelArg, 200);
+        const artifactTitle = clip(artifactTitleArg, 200);
+        // Bounds that were schema refinements (gate 7): keys must be present,
+        // the url is clipped, the score is clamped to 0–100.
+        const ledgerRunKey = ledgerRunKeyArg.trim();
+        const itemKey = clip(itemKeyArg.trim(), 600) ?? "";
+        if (!ledgerRunKey || !itemKey) {
+          return {
+            ok: false,
+            recorded: null,
+            note: "record_item_result needs both ledgerRunKey (from the approved proposal) and itemKey (from its items list). Re-record this item with both.",
+          };
+        }
+        const url = clip(urlArg, 600);
+        const fitPercent =
+          typeof fitPercentArg === "number" && Number.isFinite(fitPercentArg)
+            ? Math.min(100, Math.max(0, fitPercentArg))
+            : undefined;
+
+        // Resolve before anything is written: a recognized word is taken, a
+        // missing one is inferred from the evidence in the same call, and only
+        // a call with neither is sent back — as a RESULT the model can act on
+        // in the next step, never a validation error that ends the call.
+        const resolution = resolveItemStatus({
+          status: statusArg,
+          verdict,
+          fitPercent,
+          qualified,
+          hasCapture: Boolean(capture),
+        });
+        if ("needsStatus" in resolution) {
+          return { ok: false, recorded: null, note: resolution.needsStatus };
+        }
+        const status = resolution.status;
+        const statusNote = resolution.note;
+
         const placement = resolveToolOutputPlacement(ctx);
         // Quest logs are keyed globally (upsertRunLedger "quest:" keys), so a
         // sitting in a chat with no target folder still finds its log. Only
@@ -1239,6 +1670,9 @@ export function createBaseTools(ctx: ToolExecuteContext) {
               config,
               cells: capture.cells,
               ...(rowKeyedRun ? { rowId: itemKey } : { dedupeValue }),
+              // P3: a same-sitting write (update_row, the grid) is never
+              // clobbered by the closing capture.
+              ...(config.approvedAt ? { keepFilledSince: config.approvedAt } : {}),
             });
             if (res.status === "rejected") {
               captureErrors = res.errors;
@@ -1246,7 +1680,12 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             } else {
               capturedRowId = res.rowId;
               capturedRowStatus = res.status;
-              captureNote = `row ${res.status} in "${config.tableTitle}"`;
+              const kept = res.keptCells ?? [];
+              captureNote =
+                `row ${res.status} in "${config.tableTitle}"` +
+                (kept.length > 0
+                  ? ` (${kept.length} cell${kept.length === 1 ? "" : "s"} kept — ${kept.join(", ")} already written this sitting; capture fills only empty cells after a same-sitting write, so the fuller first write stands)`
+                  : "");
             }
           }
         }
@@ -1321,7 +1760,10 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           (qualified === true ? " · **qualified**" : qualified === false ? " · not qualified" : "") +
           (captureNote ? ` · ${captureNote}` : "") +
           (questWriteNote ? ` · ⚠ ${questWriteNote}` : "") +
-          (verdict ? `\n\n${verdict}` : "");
+          (verdict ? `\n\n${verdict}` : "") +
+          (gaps.length > 0
+            ? `\n\n**Gaps (not in evidence — confirm):**\n${gaps.map((g) => `- ${g}`).join("\n")}`
+            : "");
         try {
           const ledger = await upsertRunLedger(
             ctx.userId,
@@ -1338,9 +1780,19 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             ok: true,
             recorded: itemKey,
             status,
+            // An inferred status is reported, never applied silently — the
+            // model (and the transcript) should see that the harness filled
+            // something in, and what it filled in.
+            ...(statusNote ? { statusNote } : {}),
+            ...(shapeNotes.length > 0 ? { shapeNotes } : {}),
+            ...(gaps.length > 0 ? { gaps } : {}),
             ledgerNodeId: ledger.contentNodeId,
             ...(capturedRowId
-              ? { rowId: capturedRowId, rowStatus: capturedRowStatus }
+              ? {
+                  rowId: capturedRowId,
+                  rowStatus: capturedRowStatus,
+                  ...(captureNote.includes("kept") ? { captureNote } : {}),
+                }
               : {}),
             ...(captureErrors ? { captureErrors } : {}),
             ...(captureNote && !capturedRowId && !captureErrors
@@ -1364,7 +1816,11 @@ export function createBaseTools(ctx: ToolExecuteContext) {
               ? "The ledger line is recorded but the row was REJECTED whole (no partial rows). Fix exactly the cells named in captureErrors and call record_item_result AGAIN for this SAME itemKey with corrected capture.cells — then continue to the next item."
               : sittingClosed
                 ? "STOP recording against this closed run. If more items need processing, call propose_item_iteration again (same quest label) — a fresh sitting opens and already-scored items are skipped automatically."
-                : `Recorded. Do NOT stop or ask the user whether to continue — immediately move to the NEXT item now (open/read it, then record it). Only once EVERY item is recorded do you ${questState ? "call record_iteration_findings (NO roll-up note — the quest log + ledger are the record)" : "write the roll-up (createNote) and call record_iteration_findings"}.`,
+                : status === "blocked"
+                  // P2: a blocked item is the one place the loop may stop —
+                  // the old directive said "move on" even after a captcha.
+                  ? `Recorded as blocked. If the obstacle is a captcha, a login wall, a session end, or a charter-named INPUT the tools refused (a database or note to @-mention), STOP here and tell the user exactly what is needed — recorded progress is preserved and the run resumes from the first pending item. For any other obstacle, move to the NEXT item now. ${questState ? "Close with record_iteration_findings only once every item is recorded or the run is stopped." : ""}`
+                  : `Recorded. Do NOT stop or ask the user whether to continue — immediately move to the NEXT item now (open/read it, then record it). Only once EVERY item is recorded do you ${questState ? "call record_iteration_findings (NO roll-up note — the quest log + ledger are the record)" : "write the roll-up (create_note) and call record_iteration_findings"}.`,
           };
         } catch (error) {
           return { ok: false, note: `Ledger write failed (${error instanceof Error ? error.message : "unknown"}). Continue to the next item; reconcile in the roll-up.` };
@@ -1380,18 +1836,29 @@ export function createBaseTools(ctx: ToolExecuteContext) {
     record_batch_checkpoint: tool({
       description:
         "Record a BATCH checkpoint in the iteration ledger. Call it when an approved batched run (propose_item_iteration with batchSize) has recorded a full batch since the last checkpoint — the harness holds new item reads until this is written. Summarize the batch (counts, qualified so far, duplicates merged, anomalies), then continue IMMEDIATELY with the next item. Skip it after the FINAL batch — the roll-up + record_iteration_findings close the run.",
+      // Describe-only schema (drift gate 7): bounds clamp in execute.
       inputSchema: z.object({
-        ledgerRunKey: z.string().min(1).describe("The ledgerRunKey from propose_item_iteration."),
-        batchNumber: z.number().int().min(1).describe("1-based index of the batch just completed."),
-        itemsRecordedSoFar: z.number().int().min(1).describe("Total items recorded so far in this run (across all batches)."),
-        batchSummary: z.string().min(1).max(2000).describe("Short markdown reconciliation of THIS batch: what was covered, counts, qualified so far, anomalies."),
+        ledgerRunKey: z.string().describe("The ledgerRunKey from propose_item_iteration."),
+        batchNumber: z.number().describe("1-based index of the batch just completed."),
+        itemsRecordedSoFar: z.number().describe("Total items recorded so far in this run (across all batches)."),
+        batchSummary: z.string().describe("Short markdown reconciliation of THIS batch: what was covered, counts, qualified so far, anomalies (clipped at 2000 characters)."),
         duplicatesMerged: z
           .array(z.string())
-          .max(40)
           .optional()
           .describe("Labels/keys identified as duplicates (within this batch or against earlier batches)."),
       }),
-      execute: async ({ ledgerRunKey, batchNumber, itemsRecordedSoFar, batchSummary, duplicatesMerged }) => {
+      execute: async ({ ledgerRunKey: ledgerRunKeyArg, batchNumber: batchNumberArg, itemsRecordedSoFar: itemsRecordedSoFarArg, batchSummary: batchSummaryArg, duplicatesMerged: duplicatesMergedArg }) => {
+        const ledgerRunKey = ledgerRunKeyArg.trim();
+        const batchSummary = clipText(batchSummaryArg, 2000) ?? "";
+        if (!ledgerRunKey || !batchSummary) {
+          return {
+            ok: false,
+            note: "record_batch_checkpoint needs the ledgerRunKey and a batchSummary. Re-record the checkpoint with both, then continue with the next item.",
+          };
+        }
+        const batchNumber = clampInt(batchNumberArg, 1, 10_000, 1);
+        const itemsRecordedSoFar = clampInt(itemsRecordedSoFarArg, 0, 100_000, 0);
+        const duplicatesMerged = duplicatesMergedArg?.slice(0, 40);
         const placement = resolveToolOutputPlacement(ctx);
         if (!placement.parentId && !placement.ownedByNoteId) {
           // Still ok:true — this result is the client gate's re-open marker,
@@ -1443,18 +1910,32 @@ export function createBaseTools(ctx: ToolExecuteContext) {
     add_quest_ledger_column: tool({
       description:
         "Mid-run schema grace (quest LEDGER only): add ONE column to the active quest's ledger when the matter turns out to need a field it lacks (a criterion that emerged from the pages). Never for output/capture tables — those change via propose_column_options or the user. One column per call; the addition is logged in the quest log. After adding, write its value for later items via questCells on record_item_result.",
+      // Describe-only schema (drift gate 7): the type vocabulary resolves in
+      // execute by meaning, with a refusal that names the accepted words.
       inputSchema: z.object({
-        ledgerRunKey: z.string().min(1).describe("The ledgerRunKey of the ACTIVE quest run."),
-        name: z.string().min(1).max(60).describe("The new column's name."),
-        type: z.enum(["text", "longText", "number", "url", "date", "checkbox"]),
+        ledgerRunKey: z.string().describe("The ledgerRunKey of the ACTIVE quest run."),
+        name: z.string().describe("The new column's name."),
+        type: z.string().describe('One of "text", "longText", "number", "url", "date", "checkbox".'),
         description: z
           .string()
-          .min(8)
-          .max(300)
           .describe("What goes in it — same load-bearing context as every capture column."),
-        reason: z.string().min(1).max(200).describe("One line: why this emerged mid-run (logged in the quest log)."),
+        reason: z.string().describe("One line: why this emerged mid-run (logged in the quest log)."),
       }),
-      execute: async ({ ledgerRunKey, name, type, description, reason }) => {
+      execute: async ({ ledgerRunKey: ledgerRunKeyArg, name: nameArg, type: typeArg, description: descriptionArg, reason: reasonArg }) => {
+        const ledgerRunKey = ledgerRunKeyArg.trim();
+        const name = clipText(nameArg, 60) ?? "";
+        const description = clipText(descriptionArg, 300) ?? "";
+        const reason = clipText(reasonArg, 200) ?? "";
+        if (!ledgerRunKey || !name) {
+          return { ok: false, note: "add_quest_ledger_column needs the active run's ledgerRunKey and a column name." };
+        }
+        const type = resolveQuestColumnType(typeArg);
+        if (!type) {
+          return {
+            ok: false,
+            note: `Column type "${typeArg}" is not one I can map. Use one of ${QUEST_COLUMN_TYPES.map((t) => `"${t}"`).join(", ")}.`,
+          };
+        }
         const placement = resolveToolOutputPlacement(ctx);
         const runState = await readRunLedgerCaptureConfig(
           ctx.userId,
@@ -1518,19 +1999,34 @@ export function createBaseTools(ctx: ToolExecuteContext) {
     // item budget (the engine watches for this result, as with research runs).
     record_iteration_findings: tool({
       description:
-        "Close an iteration run: record the reconciliation (processed / qualified / unreadable counts + summary) in its ledger, passing the ledgerRunKey from propose_item_iteration. Quest-less runs call it AFTER the roll-up note (createNote); quest runs skip the roll-up note entirely (the quest log + ledger are the record).",
+        "Close an iteration run: record the reconciliation (processed / qualified / unreadable counts + summary) in its ledger, passing the ledgerRunKey from propose_item_iteration. Quest-less runs call it AFTER the roll-up note (create_note); quest runs skip the roll-up note entirely (the quest log + ledger are the record).",
+      // Describe-only schema (drift gate 7): bounds clamp in execute.
       inputSchema: z.object({
-        ledgerRunKey: z.string().min(1).describe("The ledgerRunKey from propose_item_iteration."),
-        resultSummary: z.string().min(1).max(4000).describe("Short markdown reconciliation: what was processed and what qualified."),
-        processedCount: z.number().int().min(0).describe("Items actually processed (recorded)."),
-        qualifiedCount: z.number().int().min(0).optional().describe("Items that met the bar."),
-        unreadableItems: z.array(z.string()).max(60).optional().describe("Keys/labels of items that could not be read or were blocked."),
-        rollupTitle: z.string().max(200).optional().describe("Title of the roll-up note, recorded as the run's artifact."),
-        rowsWritten: z.number().int().min(0).optional().describe("Capture runs: rows CREATED in the target database this run."),
-        rowsUpdated: z.number().int().min(0).optional().describe("Capture runs: existing rows UPDATED (re-encountered identities)."),
-        rowsFailed: z.number().int().min(0).optional().describe("Capture runs: items whose row was rejected and never landed."),
+        ledgerRunKey: z.string().describe("The ledgerRunKey from propose_item_iteration."),
+        resultSummary: z.string().describe("Short markdown reconciliation: what was processed and what qualified (clipped at 4000 characters)."),
+        processedCount: z.number().describe("Items actually processed (recorded)."),
+        qualifiedCount: z.number().optional().describe("Items that met the bar."),
+        unreadableItems: z.array(z.string()).optional().describe("Keys/labels of items that could not be read or were blocked."),
+        rollupTitle: z.string().optional().describe("Title of the roll-up note, recorded as the run's artifact."),
+        rowsWritten: z.number().optional().describe("Capture runs: rows CREATED in the target database this run."),
+        rowsUpdated: z.number().optional().describe("Capture runs: existing rows UPDATED (re-encountered identities)."),
+        rowsFailed: z.number().optional().describe("Capture runs: items whose row was rejected and never landed."),
       }),
-      execute: async ({ ledgerRunKey, resultSummary, processedCount, qualifiedCount, unreadableItems, rollupTitle, rowsWritten, rowsUpdated, rowsFailed }) => {
+      execute: async ({ ledgerRunKey: ledgerRunKeyArg, resultSummary: resultSummaryArg, processedCount: processedCountArg, qualifiedCount: qualifiedCountArg, unreadableItems: unreadableItemsArg, rollupTitle: rollupTitleArg, rowsWritten: rowsWrittenArg, rowsUpdated: rowsUpdatedArg, rowsFailed: rowsFailedArg }) => {
+        const ledgerRunKey = ledgerRunKeyArg.trim();
+        const resultSummary = clipText(resultSummaryArg, 4000) ?? "";
+        if (!ledgerRunKey || !resultSummary) {
+          return { ok: false, note: "record_iteration_findings needs the ledgerRunKey and a resultSummary. Re-record the close with both." };
+        }
+        const count = (v: number | undefined): number | undefined =>
+          typeof v === "number" && Number.isFinite(v) ? Math.max(0, Math.round(v)) : undefined;
+        const processedCount = count(processedCountArg) ?? 0;
+        const qualifiedCount = count(qualifiedCountArg);
+        const rowsWritten = count(rowsWrittenArg);
+        const rowsUpdated = count(rowsUpdatedArg);
+        const rowsFailed = count(rowsFailedArg);
+        const unreadableItems = unreadableItemsArg?.slice(0, 60);
+        const rollupTitle = clipText(rollupTitleArg, 200);
         const placement = resolveToolOutputPlacement(ctx);
         if (!placement.parentId && !placement.ownedByNoteId) {
           return { ok: false, note: "No target folder set, so no ledger was written. The roll-up note still landed." };
@@ -1596,6 +2092,27 @@ export function createBaseTools(ctx: ToolExecuteContext) {
               "tool-call",
             ).catch(() => null);
           }
+          // P10: the labels are the nodes' REAL titles (prod 2026-09-27:
+          // the model was handed "… — Quest Log" for a note titled "Run
+          // Ledger — … · Indigo Reef"; the id resolved, the label lied).
+          const titles = questState
+            ? await prisma.contentNode
+                .findMany({
+                  where: {
+                    id: { in: [questState.questLedgerId, ledger.contentNodeId] },
+                    deletedAt: null,
+                  },
+                  select: { id: true, title: true },
+                })
+                .then((rows) => new Map(rows.map((r) => [r.id, r.title])))
+                .catch(() => new Map<string, string>())
+            : new Map<string, string>();
+          const questLedgerLabel = questState
+            ? (titles.get(questState.questLedgerId) ?? `${questState.questLabel} — Quest Ledger`)
+            : "";
+          const questLogLabel = questState
+            ? (titles.get(ledger.contentNodeId) ?? `${questState.questLabel} — Quest Log`)
+            : "";
           return {
             ok: true,
             ledgerNodeId: ledger.contentNodeId,
@@ -1606,7 +2123,11 @@ export function createBaseTools(ctx: ToolExecuteContext) {
                   // the roll-up note and never mentioned where the ROWS
                   // live — users went looking for "the database" and found
                   // only notes. Name the ledger.
-                  next: `In your closing summary, tell the user the item rows live in the "${questState.questLabel} — Quest Ledger" database (every item, one row each) and the narrative lives in the quest log note — do NOT create any additional note.`,
+                  // Mention syntax, ids included (owner, 2026-09-22): the
+                  // model had been copying the ledger's [[wiki-link]] style
+                  // into chat, where nothing renders it. @[Title](id) is
+                  // the chat's pill, so hand it the exact string to use.
+                  next: `In your closing summary, tell the user the item rows live in @[${questLedgerLabel}](${questState.questLedgerId}) (every item, one row each) and the narrative lives in the quest log note @[${questLogLabel}](${ledger.contentNodeId}) — write those two references exactly as given (they render as links) and do NOT create any additional note.`,
                 }
               : {}),
           };
@@ -1753,8 +2274,14 @@ export function createBaseTools(ctx: ToolExecuteContext) {
       // is not ready, execute immediately and return a corrective tool result
       // so the model can continue working instead of surfacing a false
       // approval card.
+      // The final phase's checkpoint closes without a pause when the user
+      // set it to (§10 round 6c); checkpoints between phases always ask.
       needsApproval: () =>
-        getPhaseCheckpointGateStatus(ctx.phaseCheckpointGate).ready,
+        getPhaseCheckpointGateStatus(ctx.phaseCheckpointGate).ready &&
+        !toolAutoApproves(ctx.autoApprovedTools, {
+          tool: "phase_checkpoint",
+          finalPhase: ctx.charterFinalPhase === true,
+        }),
       description:
         "Call at EVERY phase boundary of a multi-phase procedure/charter. Pauses for the user's verdict (approve / revise / approve-with-tweaks) and records the phase in the Run Ledger note. " +
         "This is a completion signal, never a planning shortcut: do not call it until the phase's required research, linked-note reads, analysis, and outputs have actually been completed. The runtime rejects checkpoints that lack verifiable required tool activity. " +
@@ -1872,8 +2399,12 @@ export function createBaseTools(ctx: ToolExecuteContext) {
               ledger.created ? "created" : "updated",
               "run ledger",
             )),
-            nextAction:
-              "APPROVED. Continue IMMEDIATELY with the next phase in this same response — announce it in one line, then proceed. If this was the FINAL phase, give a short completion summary instead (artifacts + where they were saved).",
+            nextAction: toolAutoApproves(ctx.autoApprovedTools, {
+              tool: "phase_checkpoint",
+              finalPhase: ctx.charterFinalPhase === true,
+            })
+              ? AUTO_CLOSED_CHECKPOINT_NEXT
+              : "APPROVED. Continue IMMEDIATELY with the next phase in this same response — announce it in one line, then proceed. If this was the FINAL phase, give a short completion summary instead (artifacts + where they were saved).",
           };
         } catch (error) {
           return {
@@ -1888,7 +2419,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
     create_folder: tool({
       description:
         "Find or create a folder by name. Use for charter standing rules like 'place outputs in a folder named after the company under job-search/'. " +
-        "Pass parentId to nest; omit it to use this conversation's target folder. Returns the folder id for use as parentId in createNote/create_docx. " +
+        "Pass parentId to nest; omit it to use this conversation's target folder. Returns the folder id for use as parentId in create_note/create_docx. " +
         "Find-or-create: an existing folder with the same name under the same parent is reused, never duplicated.",
       inputSchema: z.object({
         name: z.string().min(1).max(255).describe("Folder name"),
@@ -1994,18 +2525,41 @@ export function createBaseTools(ctx: ToolExecuteContext) {
     }),
     create_docx: tool({
       // Document creation is a mutating action — same HITL gate as
-      // createNote (AI v3 core S4b / A4).
-      needsApproval: true,
+      // create_note (AI v3 core S4b / A4) — unless the user set this tool to
+      // run without a card (§10 round 6c). An overwrite skips the card only
+      // for a document this chat created (tools/approval-policy.ts).
+      needsApproval: async (rawArgs) => {
+        const overwriteId =
+          typeof (rawArgs as { overwriteContentId?: unknown }).overwriteContentId === "string"
+            ? ((rawArgs as { overwriteContentId: string }).overwriteContentId.trim() || null)
+            : null;
+        if (!ctx.autoApprovedTools?.has("create_docx")) return true;
+        return !toolAutoApproves(ctx.autoApprovedTools, {
+          tool: "create_docx",
+          ...(overwriteId
+            ? { overwrite: { targetCreatedInThisChat: await contentCreatedInThisChat(ctx, overwriteId) } }
+            : {}),
+        });
+      },
       description:
         "Create a Word (.docx) document from markdown content and file it in the user's garden. " +
         "Use when the user asks for a Word/docx deliverable (e.g. a resume). Headings, lists, bold/italic and links from the markdown are preserved. Do NOT create output on your own initiative — only when the user asks for it. " +
         "Targeting: omit placement fields to use the configured output-target preset. If the user or active charter gives THIS document a different relative destination, pass outputLocation (`under_chat`, `under_content`, or `beside_content`). Pass parentId only for a specifically resolved folder UUID. A per-document instruction always overrides the preset.",
+      // Describe-only schema (drift gate 7; the rule in
+      // iteration-proposal.ts): the body is read from `markdown` OR the
+      // sibling tools' `content`/`body`/`text`, the title falls back to the
+      // first heading, and placement resolves in execute — prod f51fa2d8
+      // (2026-09-29) lost a finished resume to `content` vs `markdown` on
+      // a turn with one step left. See write-args.ts.
       inputSchema: z.object({
-        title: z.string().min(1).max(200).describe("Document title (also the file name)"),
+        title: z.string().optional().describe("Document title (also the file name); defaults to the body's first heading"),
         markdown: z
           .string()
-          .min(1)
-          .describe("Full document body as markdown"),
+          .optional()
+          .describe("Full document body as markdown (also read from `content`, `body` or `text`)"),
+        content: z.string().optional().describe("Alias for markdown"),
+        body: z.string().optional().describe("Alias for markdown"),
+        text: z.string().optional().describe("Alias for markdown"),
         parentId: z
           .string()
           .optional()
@@ -2013,10 +2567,10 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             "Destination folder id. Pass ONLY when the user explicitly names a folder; otherwise omit it so the configured output-target preset is enforced.",
           ),
         outputLocation: z
-          .enum(["under_chat", "under_content", "beside_content"])
+          .string()
           .optional()
           .describe(
-            "Per-document relative destination. Pass when the user or active charter explicitly routes this document differently from the configured preset; otherwise omit.",
+            'Per-document relative destination: "under_chat", "under_content" or "beside_content". Pass when the user or active charter explicitly routes this document differently from the configured preset; otherwise omit.',
           ),
         alsoShortcutTo: z
           .string()
@@ -2031,16 +2585,24 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             "Id of an EXISTING file to overwrite in place with this document — same id, so every File cell and shortcut referencing it sees the new version. Use when the user asks to update/regenerate an attached or existing document; NEVER create a second copy for that. Placement fields are ignored in overwrite mode.",
           ),
       }),
-      execute: async ({
-        title,
-        markdown,
-        parentId,
-        outputLocation,
-        alsoShortcutTo,
-        overwriteContentId,
-      }) => {
+      execute: async (rawArgs) => {
+        const { parentId, alsoShortcutTo, overwriteContentId } = rawArgs;
+        const resolved = resolveDocumentArgs(rawArgs, {
+          toolName: "create_docx",
+          canonicalBodyKey: "markdown",
+        });
+        if (!resolved.ok || !resolved.body || !resolved.title) {
+          return {
+            ok: false,
+            refusal: resolved.refusal ?? "create_docx needs a markdown body.",
+            nextAction: "Call create_docx again with `markdown` set. Do not write the document anywhere else.",
+          };
+        }
+        const title = resolved.title;
+        const markdown = resolved.body;
+        const shapeNotes = resolved.shapeNotes;
         const effectiveOutputLocation =
-          (outputLocation as ToolOutputLocation | undefined) ??
+          (resolved.outputLocation as ToolOutputLocation | undefined) ??
           resolveCharterOutputLocation(
             ctx.charterOutputDirectives,
             title,
@@ -2060,6 +2622,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
               contentNodeId: result.contentNodeId,
               fileName: result.fileName,
               overwritten: true,
+              ...(shapeNotes.length > 0 ? { shapeNotes } : {}),
               ...(await getContentWriteReceiptEnvelope(
                 ctx.userId,
                 result.contentNodeId,
@@ -2134,12 +2697,291 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             fileName: result.fileName,
             parentFolderId: destination,
             ...mirror,
+            ...(shapeNotes.length > 0 ? { shapeNotes } : {}),
             ...(await getContentWriteReceiptEnvelope(
               ctx.userId,
               result.contentNodeId,
               "created",
               "Word document",
             )),
+          };
+        } catch (error) {
+          return `Could not create the document: ${error instanceof Error ? error.message : "unknown error"}.`;
+        }
+      },
+    }),
+    // Document templates: the user's own .docx, marked in place, filled from
+    // keyed values by the renderer service (server/docx-renderer). The model
+    // reads a small CONTRACT, never the file — that is the token economy the
+    // feature exists for. read = list/contract; fill = render + file.
+    read_docx_template: tool({
+      description:
+        "Read a document template's field contract, or list the user's document templates (their own .docx files marked as templates) when templateId is omitted. The contract names every field and repeating section the template fills, the user's notes on them, and the checksum to pass to fill_docx_template. Call it before fill_docx_template — the contract is small; the file itself is never sent to you. " +
+        "Also the tool to call when the user asks how to make or change a template: the result carries the marking steps (the user does them in the app; you cannot mark or edit the file) and, when no template exists, the tagging grammar to coach them with.",
+      inputSchema: z.object({
+        templateId: z
+          .string()
+          .optional()
+          .describe("Content id of the template file. Omit to list every marked template with its id."),
+      }),
+      execute: async ({ templateId }) => {
+        if (!isDocxRendererConfigured()) {
+          return {
+            ok: false,
+            refusal: "Document templates are not available here: the renderer is not configured. Use create_docx for a Word document.",
+          };
+        }
+        if (!templateId) {
+          const templates = await listDocxTemplates(ctx.userId);
+          return {
+            ok: true,
+            templates: templates.map((t) => ({
+              templateId: t.contentId,
+              title: t.title,
+              fileName: t.fileName,
+              fields: t.fieldCount,
+              sections: t.sectionCount,
+            })),
+            howToMark: DOCX_TEMPLATE_MARKING_STEPS,
+            ...(templates.length === 0
+              ? {
+                  note: "No document templates are marked yet.",
+                  authoring:
+                    "If the user wants to make one, coach them to tag their own Word file (you cannot author its layout): {{ name }} for one value; {% for c in list %}{{ c }}{% if not loop.last %} • {% endif %}{% endfor %} for an inline list; a paragraph {%p for b in bullets %}, one bullet {{ b }}, a paragraph {%p endfor %} for a bullet list of any length; nest the same for positions → bullets; {% if x %}…{% endif %} for optional text. Each {%p %} tag alone in its own paragraph; never format mid-tag; dynamic counts are loops, not numbered slots. Guide: docs/notes-feature/guides/ai/DOCX-TEMPLATE-AUTHORING.md.",
+                }
+              : {}),
+          };
+        }
+        const loaded = await getDocxTemplateRecord(ctx.userId, templateId);
+        const record = loaded.record;
+        if (!loaded.ok || !record) {
+          return { ok: false, refusal: loaded.error ?? "Could not read the template.", ...(loaded.errors ? { templateErrors: loaded.errors } : {}) };
+        }
+        return {
+          ok: true,
+          templateId,
+          title: loaded.title,
+          checksum: record.checksum,
+          contract: describeTemplateForModel(record),
+          howToMark: DOCX_TEMPLATE_MARKING_STEPS,
+          valuesShape:
+            "A JSON object. Top-level keys are the field roots and the sections; a dotted field nests (header.name → { header: { name } }); a section is an array (of objects, or of strings when marked list of strings); a rich field takes { text, url }. Titles follow the contract: ONE title field gets \"Title — Employer\" combined; split fields (title, company) stay split; titles, employers and dates are copied from the source of record exactly. Never invent a fact: a required field you cannot fill from the evidence is a question for the user, not a blank. Cite sources in `provenance` (field path → row ids).",
+          ...(record.warnings.length > 0 ? { warnings: record.warnings } : {}),
+          ...(loaded.refreshed ? { note: "The template file changed since it was marked; this contract was refreshed from the current file." } : {}),
+        };
+      },
+    }),
+    fill_docx_template: tool({
+      // Same HITL gate as create_docx, and the SAME user setting: a filled
+      // template is a Word document the chat is creating; a fourth toggle
+      // would ask the user to decide the same thing twice.
+      needsApproval: async (rawArgs) => {
+        const overwriteId =
+          typeof (rawArgs as { overwriteContentId?: unknown }).overwriteContentId === "string"
+            ? ((rawArgs as { overwriteContentId: string }).overwriteContentId.trim() || null)
+            : null;
+        if (!ctx.autoApprovedTools?.has("create_docx")) return true;
+        return !toolAutoApproves(ctx.autoApprovedTools, {
+          tool: "create_docx",
+          ...(overwriteId
+            ? { overwrite: { targetCreatedInThisChat: await contentCreatedInThisChat(ctx, overwriteId) } }
+            : {}),
+        });
+      },
+      description:
+        "Fill one of the user's document templates — a .docx they marked as a template — with keyed values, and file the result as a Word document that keeps the template's layout. Use ONLY when the user chose a template (by name, by @mention, or through a charter that names one); otherwise use create_docx. Call read_docx_template first and make `values` follow its contract exactly. Never invent a fact: leave the field empty and tell the user which fields you left empty. " +
+        "Targeting works as in create_docx: omit placement fields to use the configured output-target preset; pass outputLocation when the user or active charter routes this document; parentId only for a resolved folder id; overwriteContentId to regenerate an existing document in place (same id, so every File cell and shortcut keeps pointing at it — never create a second copy for an update).",
+      inputSchema: z.object({
+        templateId: z.string().describe("Content id of the template file, from read_docx_template."),
+        values: z
+          .record(z.string(), z.unknown())
+          .describe("The filled contract — field roots and sections as keys, exactly as read_docx_template described them."),
+        title: z
+          .string()
+          .optional()
+          .describe("Title for the document (also its file name); defaults to the template's title."),
+        expectedChecksum: z
+          .string()
+          .optional()
+          .describe("The checksum read_docx_template returned. The fill is refused if the template changed since, so values are never poured into a layout you did not read."),
+        provenance: z
+          .record(z.string(), z.array(z.string()))
+          .optional()
+          .describe(
+            "Where each factual value came from: field path (summary, experience_bullets[2], experience[0].title) → the source row ids it was taken from (the evidence database's claim rows, as query_database returned them). Cite bullets, figures, titles and dates. A cited id that does not exist is a refusal; uncited bullets are reported to the user.",
+          ),
+        parentId: z.string().optional().describe("Destination folder id — only when the user explicitly named a folder."),
+        outputLocation: z
+          .string()
+          .optional()
+          .describe('Per-document relative destination: "under_chat", "under_content" or "beside_content" — only when the user or charter routes this document differently from the preset.'),
+        alsoShortcutTo: z.string().optional().describe("Folder id to ALSO mirror the document into via a shortcut."),
+        overwriteContentId: z
+          .string()
+          .optional()
+          .describe("Id of an EXISTING document to overwrite in place. Placement fields are ignored in overwrite mode."),
+      }),
+      execute: async (rawArgs) => {
+        const { templateId, values, expectedChecksum, provenance, parentId, outputLocation, alsoShortcutTo, overwriteContentId } = rawArgs;
+        if (!isDocxRendererConfigured()) {
+          return { ok: false, refusal: "Document templates are not available here: the renderer is not configured. Use create_docx instead." };
+        }
+        if (!values || typeof values !== "object" || Array.isArray(values)) {
+          return {
+            ok: false,
+            refusal: "fill_docx_template needs `values` as a JSON object.",
+            nextAction: "Call read_docx_template for the contract, then call fill_docx_template again with `values` set.",
+          };
+        }
+        const loaded = await loadDocxTemplate(ctx.userId, templateId);
+        const template = loaded.template;
+        if (!loaded.ok || !template) {
+          return { ok: false, refusal: loaded.error ?? "Could not load the template.", ...(loaded.errors ? { templateErrors: loaded.errors } : {}) };
+        }
+        if (expectedChecksum && expectedChecksum.trim() && expectedChecksum.trim() !== template.record.checksum) {
+          return {
+            ok: false,
+            refusal: "The template file changed since you read its contract.",
+            checksum: template.record.checksum,
+            contract: describeTemplateForModel(template.record),
+            nextAction: "Check your values against this contract and call fill_docx_template again with the new checksum.",
+          };
+        }
+        const typedValues = values as Record<string, TemplateValue>;
+        // Provenance is checked BEFORE rendering: a citation that does not
+        // resolve to one of the user's rows means the model cited something
+        // it never read, and no document should be produced from it.
+        const citations = await verifyProvenance(ctx.userId, provenance ?? {});
+        if (citations.notFound.length > 0) {
+          return {
+            ok: false,
+            refusal: `Refused: cited source rows do not exist — ${citations.notFound.slice(0, 5).join(", ")}. Cite only row ids you read with query_database in this conversation.`,
+            nextAction: "Re-read the evidence rows, correct the provenance, and call fill_docx_template again.",
+          };
+        }
+        const rendered = await renderDocxTemplate(template.bytes, typedValues, {
+          expectedChecksum: template.record.checksum,
+          fileName: template.node.filePayload.fileName,
+        });
+        const docx = rendered.docx;
+        const diagnostics = rendered.diagnostics;
+        if (!rendered.ok || !docx || !diagnostics) {
+          const failure = rendered.error ?? { code: "renderer_failed", message: "no document came back" };
+          return {
+            ok: false,
+            refusal: `The renderer could not fill the template: ${failure.message}`,
+            code: failure.code,
+            ...(failure.details ? { templateErrors: failure.details } : {}),
+          };
+        }
+        // The renderer reported; the product judges (docx-templates/judge.ts):
+        // a bad write is refused with a reason the model can act on.
+        const verdict = judgeRender(template.record, typedValues, diagnostics, {
+          links: countHyperlinkValues(typedValues),
+          provenance,
+        });
+        if (!verdict.accept) {
+          return {
+            ok: false,
+            refusal: verdict.refusal ?? "The filled document was not accepted.",
+            problems: verdict.gaps,
+            nextAction: "Do not write the document anywhere else. Fix the values (or ask the user) and call fill_docx_template again.",
+          };
+        }
+        const title = (rawArgs.title?.trim() || template.node.title.replace(/\.docx$/i, "")).trim();
+        const stored = { title, buffer: docx, searchText: rendered.text ?? "" };
+        // Compact on purpose: the tool result re-enters the model's context.
+        // No values echo, no text — the positive report and what changes
+        // the model's next sentence to the user.
+        const report = compactReport(verdict);
+        const compact = {
+          templateId,
+          templateTitle: template.node.title,
+          ...(report ? { report } : {}),
+          ...(citations.total > 0
+            ? { provenance: { verified: citations.verified, unverified: citations.unverified.length } }
+            : {}),
+          renderMs: diagnostics.durationMs,
+          ...(template.refreshed
+            ? { note: "The template file had changed since it was marked; its contract was refreshed before filling." }
+            : {}),
+        };
+        // The output remembers its values and provenance (record.ts
+        // docxFill) — what the Template Fields sidebar edits and re-renders
+        // without a model turn.
+        const recordFill = (contentNodeId: string, overwritten: boolean) =>
+          writeFillRecord(
+            contentNodeId,
+            {
+              version: 1,
+              templateId,
+              templateChecksum: template.record.checksum,
+              values: typedValues,
+              ...(provenance ? { provenance } : {}),
+              renderedAt: new Date().toISOString(),
+              ...(report ? { report } : {}),
+            },
+            { overwritten, renderMs: diagnostics.durationMs, bytes: diagnostics.bytes, provenance: citations, via: "tool" },
+          );
+        const effectiveOutputLocation =
+          (outputLocation as ToolOutputLocation | undefined) ??
+          resolveCharterOutputLocation(ctx.charterOutputDirectives, title);
+
+        if (overwriteContentId) {
+          try {
+            const result = await storeDocxDocument(ctx.userId, { ...stored, overwriteContentId });
+            await recordFill(result.contentNodeId, true);
+            return {
+              __docPayload: true,
+              contentNodeId: result.contentNodeId,
+              fileName: result.fileName,
+              overwritten: true,
+              ...compact,
+              ...(await getContentWriteReceiptEnvelope(ctx.userId, result.contentNodeId, "updated", "Word document")),
+            };
+          } catch (error) {
+            return `Could not overwrite the document: ${error instanceof Error ? error.message : "unknown error"}.`;
+          }
+        }
+
+        const placement = resolveToolOutputPlacement(ctx, parentId, effectiveOutputLocation);
+        if (placement.error) return placement.error;
+        const destination = placement.parentId;
+        if (!destination) {
+          return "No destination folder: this chat has no target folder set. Ask the user to pick a target (the folder chip in the header) or to name a folder, then use create_folder.";
+        }
+        const owned = await prisma.contentNode.findFirst({
+          where: { id: destination, ownerId: ctx.userId, contentType: "folder", deletedAt: null },
+          select: { id: true },
+        });
+        if (!owned) return `Destination folder ${destination} was not found or is not a folder.`;
+        try {
+          const result = await storeDocxDocument(ctx.userId, {
+            ...stored,
+            parentFolderId: destination,
+            ...(placement.ownedByNoteId
+              ? { role: "referenced" as const, ownedByNoteId: placement.ownedByNoteId }
+              : {}),
+          });
+          await recordFill(result.contentNodeId, false);
+          if (ctx.conversationId) {
+            void addAutoAssociation(ctx.userId, ctx.conversationId, result.contentNodeId, "tool-call").catch(() => null);
+          }
+          let mirror: Record<string, unknown> = {};
+          if (alsoShortcutTo) {
+            const s = await findOrCreateShortcut(ctx.userId, result.contentNodeId, alsoShortcutTo);
+            mirror = s.contentNodeId
+              ? { shortcutId: s.contentNodeId, shortcutParentId: alsoShortcutTo }
+              : { shortcutError: s.error ?? "could not create the shortcut" };
+          }
+          return {
+            __docPayload: true,
+            contentNodeId: result.contentNodeId,
+            fileName: result.fileName,
+            parentFolderId: destination,
+            ...mirror,
+            ...compact,
+            ...(await getContentWriteReceiptEnvelope(ctx.userId, result.contentNodeId, "created", "Word document")),
           };
         } catch (error) {
           return `Could not create the document: ${error instanceof Error ? error.message : "unknown error"}.`;
@@ -2157,7 +2999,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
     // exactly this — the finder simply never read it.
     search_content: tool({
       description:
-        "Search everything the user owns — notes, folders, databases, files, and more — by title and indexed content. Returns each hit's TYPE, id, location, and a one-line excerpt, so you can pick the right follow-up tool (a [database] hit goes to describe_database, a [folder] hit to read_folder_context, a [note] hit to getCurrentNote). Search BEFORE guessing an id or a name: one call here beats a chain of failed lookups. Pass an EMPTY query with `types` to LIST what exists — `{query: \"\", types: [\"data\"]}` is how you see the user's databases when you don't know their names. Narrow with `types` only when you know the shape you want; the default covers notes, folders, and databases.",
+        "Search everything the user owns — notes, folders, databases, files, and more — by title and indexed content. Returns each hit's TYPE, id, location, and a one-line excerpt, so you can pick the right follow-up tool (a [database] hit goes to describe_database, a [folder] hit to read_folder_context, a [note] hit to read_content). Search BEFORE guessing an id or a name: one call here beats a chain of failed lookups. Pass an EMPTY query with `types` to LIST what exists — `{query: \"\", types: [\"data\"]}` is how you see the user's databases when you don't know their names. Narrow with `types` only when you know the shape you want; the default covers notes, folders, and databases.",
       inputSchema: z.object({
         query: z
           .string()
@@ -2203,31 +3045,19 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         // a time until the step cap cut it off. Listing is the answer to
         // "which ones are there?"; matching can't be.
         const term = query.trim();
+        // ONE query builder with the search route (lib/domain/content/
+        // search-service.ts, 2026-10-12). The tool used to match only the
+        // title, note text and a database's schema text; it now matches
+        // every indexed payload the route does — including database ROWS,
+        // which roll up to their table — so "find the job at Acme" lands on
+        // the table that holds that row.
         const results = await prisma.contentNode.findMany({
-          where: {
+          where: buildSearchWhere({
             ownerId: ctx.userId,
-            deletedAt: null,
-            contentType: { in: scope },
-            ...(term
-              ? {
-                  OR: [
-                    { title: { contains: term, mode: "insensitive" } },
-                    {
-                      notePayload: {
-                        searchText: { contains: term, mode: "insensitive" },
-                      },
-                    },
-                    // Databases index title + column names here (schema B2),
-                    // so a table is findable by a FIELD the user names.
-                    {
-                      dataPayload: {
-                        searchText: { contains: term, mode: "insensitive" },
-                      },
-                    },
-                  ],
-                }
-              : {}),
-          },
+            query: term,
+            types: scope,
+            fields: ALL_SEARCH_FIELDS,
+          }),
           select: {
             id: true,
             title: true,
@@ -2358,13 +3188,13 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           (p, i) =>
             `${i + 1}. "${p.title}" (id: ${p.id}, ${p.phaseCount} phase${p.phaseCount === 1 ? "" : "s"})${p.description ? `\n   ${p.description}` : ""}`,
         );
-        return `Found ${matches.length} charter${matches.length !== 1 ? "s" : ""}:\n\n${lines.join("\n\n")}\n\nRead the right one with getCurrentNote using its contentId.`;
+        return `Found ${matches.length} charter${matches.length !== 1 ? "s" : ""}:\n\n${lines.join("\n\n")}\n\nRead the right one with read_content using its contentId.`;
       },
     }),
 
-    getCurrentNote: tool({
+    read_content: tool({
       description:
-        "Get the full content of a specific note (or a folder's own notes content) by its ID. Useful for reading context about a note the user is viewing, or a folder's notes when the folder itself is referenced.",
+        "Read ANY content node by its ID — note, folder notes, database, file, link, code, page. Returns the content itself where it is text, and a database's schema plus a row preview where it is a database. Use it for any 'what is in this thing' question; it never refuses a content type, so you never need a specialist tool just to look.",
       inputSchema: z.object({
         contentId: z.string().uuid().describe("The content node ID to read"),
       }),
@@ -2390,54 +3220,227 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         });
 
         if (!content) {
-          return `Note with ID "${contentId}" not found or not accessible.`;
+          return `Content with ID "${contentId}" not found or not accessible.`;
         }
 
-        // Folders can carry a notePayload too (the folder "Notes" editor), so
-        // a folder WITH notes content is readable the same as a note — only a
-        // folder with no notePayload (or a genuinely non-text content type)
-        // is rejected.
-        const isTextBearing =
-          content.contentType === "note" || content.contentType === "folder";
-        if (!isTextBearing || !content.notePayload) {
-          return `Content "${content.title}" is a ${content.contentType}, not readable as text.`;
-        }
-
-        // Render live from tiptapJson — the materialized searchText column
-        // was written by the old extractor for existing notes, and that
-        // extractor dropped every atomic inline node ([[wiki-links]], #tags,
-        // @mentions). Live extraction fixes all notes without a reindex;
-        // searchText stays as the fallback for payloads with no JSON.
-        const liveText = content.notePayload.tiptapJson
-          ? extractSearchTextFromTipTap(
-              content.notePayload.tiptapJson as JSONContent,
-            ).trim()
-          : "";
-        const text =
-          liveText || content.notePayload.searchText || "(empty note)";
         // Summarize-on-write (S5): abstract first, so multi-phase runs can
         // often stop reading here instead of pulling full content into
         // context.
-        const meta = content.notePayload.metadata as
+        const meta = content.notePayload?.metadata as
           | { abstract?: string }
-          | null;
-        const abstractLine = meta?.abstract
-          ? `\nAbstract: ${meta.abstract}\n`
-          : "";
-        return `Title: ${content.title}\nType: ${content.contentType}\nUpdated: ${content.updatedAt.toISOString()}${abstractLine}\nContent:\n${text}`;
+          | null
+          | undefined;
+        const header =
+          `Title: ${content.title}\n` +
+          `Type: ${describeContentType(content.contentType)}\n` +
+          `Updated: ${content.updatedAt.toISOString()}` +
+          (meta?.abstract ? `\nAbstract: ${meta.abstract}` : "");
+
+        // Notes and folders: the folder "Notes" editor writes a notePayload
+        // too, so both render the same way.
+        const renderNoteText = async (): Promise<string> => {
+          if (!content.notePayload) {
+            return content.contentType === "folder"
+              ? `${header}\n\nThis folder has no notes content of its own. Its sources and children are read with read_folder_context.`
+              : `${header}\n\n(empty note)`;
+          }
+          // Render live from tiptapJson — the materialized searchText column
+          // was written by the old extractor for existing notes, and that
+          // extractor dropped every atomic inline node ([[wiki-links]], #tags,
+          // @mentions). Live extraction fixes all notes without a reindex;
+          // searchText stays as the fallback for payloads with no JSON.
+          const liveText = content.notePayload.tiptapJson
+            ? extractSearchTextFromTipTap(
+                content.notePayload.tiptapJson as JSONContent,
+              ).trim()
+            : "";
+          const text =
+            liveText || content.notePayload.searchText || "(empty note)";
+          // The text extractor drops image nodes, so without this the model
+          // cannot tell a note holds a screenshot at all. Private content is
+          // stripped inside listNoteImages (a registered egress seam).
+          const images = content.notePayload.tiptapJson
+            ? describeNoteImages(
+                listNoteImages(content.notePayload.tiptapJson as JSONContent),
+                ctx.imageTextReadable === true,
+                ctx.imageViewable === true,
+              )
+            : null;
+          // `[[Database#Column]]` links: the column's header + description
+          // (lib/domain/data/server/column-links.ts). Collected after the
+          // private strip, so a commented-out link describes nothing.
+          const columns = content.notePayload.tiptapJson
+            ? await describeLinkedColumns(
+                ctx.userId,
+                collectColumnLinkIds(
+                  stripPrivateContent(content.notePayload.tiptapJson as JSONContent),
+                ),
+              )
+            : "";
+          return `${header}\nContent:\n${text}${images ? `\n\n${images}` : ""}${columns ? `\n\n${columns}` : ""}`;
+        };
+
+        /**
+         * A read NEVER dead-ends (AI-TOOL-SUMMONER-PLAN §1.2, owner direction
+         * 2026-09-17: "every content type is a note technically"). Each branch
+         * either renders the thing or says what it is and names the way in —
+         * the old blanket refusal sent a charter run blind mid-task.
+         *
+         * Exhaustive `Record<ContentType, …>` on purpose: a new content type
+         * must fail the build here rather than silently falling back to a
+         * refusal (the `default:`-hides-gaps lesson).
+         */
+        const renderers: Record<ContentType, () => Promise<string>> = {
+          note: renderNoteText,
+          folder: renderNoteText,
+
+          data: async () => {
+            const preview = await renderDataNodePreview(contentId, {
+              viewerId: ctx.userId,
+            });
+            // Reading a database ATTACHES it (prod 6d0b0e30, 2026-09-29: the
+            // model read the Career Evidence Library here after
+            // describe_database had refused it, then concluded its linked
+            // tables were unreachable without trying — they were reachable
+            // from this moment on). Say so, in the result, every time.
+            let attachedNote = "";
+            if (ctx.conversationId) {
+              await addAutoAssociation(
+                ctx.userId,
+                ctx.conversationId,
+                contentId,
+                "tool-call",
+              ).catch(() => null);
+              attachedNote =
+                "\n\n[This database is now attached to this chat: describe_database and query_database reach it, and every table it links by relation column.]";
+            }
+            return preview
+              ? `${header}\n\n${preview}${attachedNote}`
+              : `${header}\n\nThis database has no schema yet.${attachedNote}`;
+          },
+
+          file: async () => {
+            const f = await prisma.filePayload.findUnique({
+              where: { contentId },
+              select: {
+                fileName: true,
+                mimeType: true,
+                fileSize: true,
+                uploadStatus: true,
+                searchText: true,
+              },
+            });
+            if (!f) return `${header}\n\n(file record missing)`;
+            const size = `${Math.round(Number(f.fileSize) / 1024).toLocaleString("en-US")} KB`;
+            const facts = `File: ${f.fileName} · ${f.mimeType} · ${size} · upload ${f.uploadStatus}`;
+            // E-books: the reader's capsule (metadata, position, highlights)
+            // plus a bounded excerpt — a whole novel's text would flood the
+            // context window.
+            const { buildBookCapsule, isBookMimeType } = await import(
+              "@/lib/domain/reader/server/ai-capsule"
+            );
+            if (isBookMimeType(f.mimeType)) {
+              const capsule = await buildBookCapsule(ctx.userId, contentId);
+              const text = f.searchText.trim();
+              const BOOK_EXCERPT_CHARS = 24_000;
+              const excerpt = text
+                ? `\n\nText excerpt (${Math.min(text.length, BOOK_EXCERPT_CHARS).toLocaleString("en-US")} of ${text.length.toLocaleString("en-US")} characters, from the start):\n${text.slice(0, BOOK_EXCERPT_CHARS)}`
+                : "\n\nNo extracted text is held for this book.";
+              return `${header}\n\n${facts}${capsule ? `\n\n${capsule}` : ""}${excerpt}`;
+            }
+            const isImage = f.mimeType.startsWith("image/");
+            const noText =
+              isImage && ctx.imageViewable === true
+                ? "\n\nThis is an image. To see what it shows, call view_image with this content id."
+                : isImage && ctx.imageTextReadable === true
+                  ? "\n\nNo extracted text is held for this image. Read its text with read_image_text (this content id)."
+                  : "\n\nNo extracted text is held for this file. Attach it to the conversation if its contents are needed.";
+            const body = f.searchText.trim()
+              ? `\n\nExtracted text:\n${f.searchText.trim()}`
+              : noText;
+            return `${header}\n\n${facts}${body}`;
+          },
+
+          external: async () => {
+            const e = await prisma.externalPayload.findUnique({
+              where: { contentId },
+              select: {
+                url: true,
+                description: true,
+                sourceDomain: true,
+                readingStatus: true,
+              },
+            });
+            if (!e) return `${header}\n\n(link record missing)`;
+            return (
+              `${header}\n\nURL: ${e.url}` +
+              (e.sourceDomain ? `\nDomain: ${e.sourceDomain}` : "") +
+              `\nReading status: ${e.readingStatus}` +
+              (e.description ? `\n\n${e.description}` : "") +
+              "\n\nThis is a saved link, not its page text. Read the page itself with a page-read tool if you need its contents."
+            );
+          },
+
+          code: async () => {
+            const c = await prisma.codePayload.findUnique({
+              where: { contentId },
+              select: { code: true, language: true },
+            });
+            if (!c) return `${header}\n\n(code record missing)`;
+            return `${header}\nLanguage: ${c.language}\n\n${c.code}`;
+          },
+
+          html: async () => renderHtmlPayload(contentId, header),
+          template: async () => renderHtmlPayload(contentId, header),
+
+          visualization: async () => {
+            const v = await prisma.visualizationPayload.findUnique({
+              where: { contentId },
+              select: { engine: true },
+            });
+            return v
+              ? `${header}\n\nDiagram rendered with ${v.engine}. Its source is edited in the diagram editor and is not readable as prose here.`
+              : `${header}\n\n(diagram record missing)`;
+          },
+
+          shortcut: async () => {
+            const s = await prisma.shortcutPayload.findUnique({
+              where: { contentId },
+              select: {
+                targetContentId: true,
+                target: { select: { title: true, contentType: true } },
+              },
+            });
+            if (!s?.targetContentId || !s.target) {
+              return `${header}\n\nThis shortcut points at nothing — its target was deleted.`;
+            }
+            return `${header}\n\nThis is a shortcut to the ${describeContentType(s.target.contentType)} "${s.target.title}". Read the real thing with read_content on ${s.targetContentId}.`;
+          },
+
+          chat: async () =>
+            `${header}\n\nThis is a saved chat. Its transcript is not readable through this tool.`,
+          hope: async () =>
+            `${header}\n\nThis is a goal. It carries no text body of its own.`,
+          workflow: async () =>
+            `${header}\n\nThis is a workflow. Read its definition with get_workflow.`,
+        };
+
+        return renderers[content.contentType]();
       },
     }),
 
-    createNote: tool({
+    create_note: tool({
       // File creation is a mutating action: pause the tool loop for user
       // approval before executing (AI SDK v6 native HITL). The chat surface
       // renders the approval card; execution resumes via
-      // addToolApprovalResponse.
-      needsApproval: true,
+      // addToolApprovalResponse — unless the user set this tool to run
+      // without a card (§10 round 6c).
+      needsApproval: () =>
+        !toolAutoApproves(ctx.autoApprovedTools, { tool: "create_note" }),
       description:
         "Create a NEW note in the user's Digital Garden. Use this only when the user EXPLICITLY asks for a new file. " +
         "Ambiguous phrasings to watch for: 'update the note in this chat', 'add to this conversation's notes', 'put X in the note' — these do NOT mean 'create a new note'. They typically refer to an existing note. When the phrasing is ambiguous, ASK the user whether to create a new note or update an existing one before calling this tool. " +
-        "If they confirm a new note, this is the right tool. If they name an existing note, use `search_content` to find its id then use `updateNote`. " +
+        "If they confirm a new note, this is the right tool. If they name an existing note, use `search_content` to find its id then use `update_note`. " +
         "Do NOT create output on your own initiative — only when the user asks for it. " +
         "Targeting: omit placement fields to use the configured output-target preset. If the user or active charter gives THIS note a different relative destination, pass `outputLocation` (`under_chat`, `under_content`, or `beside_content`). Pass `parentId` only for a specifically resolved folder UUID. A per-note instruction always overrides the preset. " +
         "HYPERLINKING: to link other garden content inline (notes OR folders), write wiki-links in the markdown — [[Exact Title]] or [[Exact Title|Shown Text]]. They become real clickable links, resolve by title, and a linked FOLDER also feeds its context to the AI when the note is used in chat or as a charter. Use the content's exact title; do not invent URL-style links for internal content.",
@@ -2450,7 +3453,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         abstract: z
           .string()
           // Truncate rather than reject: a slightly-too-long abstract used to
-          // hard-fail the WHOLE createNote call, discarding the note's entire
+          // hard-fail the WHOLE create_note call, discarding the note's entire
           // content (smoke finding). The abstract is a cosmetic summary, so
           // clip it to the limit and keep the note.
           .transform((s) =>
@@ -2464,8 +3467,13 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           .string()
           .optional()
           .describe(
-            "Markdown content for the note (optional). Use standard markdown: # headings, **bold**, *italic*, `code`, bulleted/numbered lists, tables, blockquotes, links, images. The system converts it to rich text.",
+            "Markdown content for the note (optional; also read from `markdown` or `body`). Use standard markdown: # headings, **bold**, *italic*, `code`, bulleted/numbered lists, tables, blockquotes, links, images. The system converts it to rich text.",
           ),
+        // Sibling keys (create_docx says `markdown`): same concept, same
+        // key, everywhere — a model that used one tool's word for the
+        // other's must not lose the note to it.
+        markdown: z.string().optional().describe("Alias for content"),
+        body: z.string().optional().describe("Alias for content"),
         parentId: z
           .string()
           .uuid()
@@ -2489,11 +3497,14 @@ export function createBaseTools(ctx: ToolExecuteContext) {
       execute: async ({
         title,
         abstract,
-        content = "",
+        content: contentArg,
+        markdown: markdownAlias,
+        body: bodyAlias,
         parentId,
         outputLocation,
         alsoShortcutTo,
       }) => {
+        const content = contentArg?.trim() ? contentArg : (markdownAlias?.trim() ? markdownAlias : bodyAlias) ?? "";
         // Resolve the parent folder. Priority:
         //   1. AI-supplied parentId (validated to exist + belong to user)
         //   2. Chat's own parent folder (when in a chat context)
@@ -2627,15 +3638,15 @@ export function createBaseTools(ctx: ToolExecuteContext) {
       },
     }),
 
-    updateNote: tool({
+    update_note: tool({
       description:
         "Update the markdown/TipTap notes attached to a content item. " +
         "WORKS ON ANY CONTENT TYPE: notes (full-page editor), chats (the 'Add notes' panel below the chat), folders, files, externals, etc. — every content type has an optional sidecar NotePayload keyed by its contentId. " +
         "Common phrasings: 'update this conversation's notes', 'add to my Sourdough note', 'put X in the notes for this chat'. " +
         "If the user is chatting in a full-page chat and asks to update 'the note in this chat' or 'this chat's notes', pass the CHAT's contentId here — that updates the notes panel attached to the chat itself, not a separate file. " +
-        "Do NOT use this to create new top-level notes — use `createNote` for that. " +
-        "Do NOT call this on your own initiative — only when the user asks you to write to a note. There is no default between writing-to-a-note and creating new output (createNote/create_docx); pick whichever the user's request actually asks for, and do neither unless they ask. " +
-        "This updates CONTENT ONLY — it never changes the title. Renaming is a separate, explicit action: if the user asks to rename/retitle, use `renameNote`. Do not rename as a side effect of a content update. " +
+        "Do NOT use this to create new top-level notes — use `create_note` for that. " +
+        "Do NOT call this on your own initiative — only when the user asks you to write to a note. There is no default between writing-to-a-note and creating new output (create_note/create_docx); pick whichever the user's request actually asks for, and do neither unless they ask. " +
+        "This updates CONTENT ONLY — it never changes the title. Renaming is a separate, explicit action: if the user asks to rename/retitle, use `rename_note`. Do not rename as a side effect of a content update. " +
         "HYPERLINKING: to link other garden content inline (notes OR folders), write wiki-links in the markdown — [[Exact Title]] or [[Exact Title|Shown Text]]. They become real clickable links, resolve by title, and a linked FOLDER also feeds its context to the AI when the note is used in chat or as a charter. Use the content's exact title; do not invent URL-style links for internal content.",
       inputSchema: z.object({
         contentId: z
@@ -2672,7 +3683,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
       needsApproval: async ({ contentId, mode, content }) =>
         isDestructiveRewrite({ contentId, mode, contentLength: content.length }),
       execute: async ({ contentId, mode, content }) => {
-        // Allow updateNote against ANY content type the user owns —
+        // Allow update_note against ANY content type the user owns —
         // notes, chats (their 'Add notes' sidecar), folders, files, etc.
         // The legacy filter of `contentType: "note"` was the cause of the
         // "you can't update this chat's notes" behavior the user reported.
@@ -2688,8 +3699,8 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           return `Content "${contentId}" not found or deleted. Use search_content to find the right id.`;
         }
 
-        // updateNote is CONTENT-ONLY — it structurally cannot rename. (Renaming
-        // lives in the separate `renameNote` tool.) The former `title` argument
+        // update_note is CONTENT-ONLY — it structurally cannot rename. (Renaming
+        // lives in the separate `rename_note` tool.) The former `title` argument
         // was removed after it caused a silent rename: the model serialized this
         // tool's own "do NOT … rename" guard text into the title field
         // ("/do-not-rename/"). No title param = nothing to bleed in.
@@ -2738,7 +3749,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           __notePayload: true,
           kind: "updated",
           contentId: existing.id,
-          title: existing.title, // unchanged — updateNote never renames
+          title: existing.title, // unchanged — update_note never renames
           wordCount,
           targetKind: existing.contentType,
           // Route + delta make the receipt self-diagnosing. The 2026-08-12 incident
@@ -2768,16 +3779,16 @@ export function createBaseTools(ctx: ToolExecuteContext) {
       },
     }),
 
-    // Explicit, standalone RENAME. Split out from updateNote (2026-08-05): a
+    // Explicit, standalone RENAME. Split out from update_note (2026-08-05): a
     // title argument on a content-update tool let the model rename as a side
-    // effect — and worse, it serialized updateNote's own "do NOT … rename" guard
+    // effect — and worse, it serialized update_note's own "do NOT … rename" guard
     // text into the title ("/do-not-rename/"). Renaming is now its own deliberate
     // action the user must ask for; content updates can't touch the title.
-    renameNote: tool({
+    rename_note: tool({
       description:
         "Rename (retitle) an existing note, chat, folder, or other content the user owns. " +
         "Use ONLY when the user EXPLICITLY asks to rename or retitle something (e.g. 'rename this to X', 'call this note Y'). " +
-        "This changes the TITLE ONLY and never touches content — do not use it as part of a content update (use updateNote for content). Mentioning a topic or theme is NOT a rename request.",
+        "This changes the TITLE ONLY and never touches content — do not use it as part of a content update (use update_note for content). Mentioning a topic or theme is NOT a rename request.",
       inputSchema: z.object({
         contentId: z
           .string()

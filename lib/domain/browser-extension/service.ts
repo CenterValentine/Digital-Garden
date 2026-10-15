@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/database/client";
+import { compareSiblings } from "@/lib/domain/content/sibling-order";
 import type { Prisma } from "@/lib/database/generated/prisma";
 import { generateUniqueSlug } from "@/lib/domain/content";
 import { normalizeUrl } from "@/lib/domain/content/external-validation";
@@ -11,6 +12,7 @@ import { getServerExtensions } from "@/lib/domain/editor/extensions-server";
 import { sanitizeTipTapJsonWithExtensions } from "@/lib/domain/editor/unsupported-content";
 import { writeNoteContent } from "@/lib/domain/content/write-note-content";
 import { generateJSON, type JSONContent } from "@tiptap/core";
+import { stripPrivateContent } from "@/lib/domain/content/private-content";
 
 function asIsoString(value: Date | null | undefined) {
   return value ? value.toISOString() : null;
@@ -520,12 +522,7 @@ export async function getExtensionContentPickerTree(
 
   const build = (parentId: string | null): TreeNode[] =>
     (byParent.get(parentId) ?? [])
-      .sort((a, b) => {
-        if (a.displayOrder !== b.displayOrder) {
-          return a.displayOrder - b.displayOrder;
-        }
-        return a.title.localeCompare(b.title);
-      })
+      .sort(compareSiblings) // the app tree's order, ties included
       .map((node) => ({
         id: node.id,
         title: getContentPickerTitle(node),
@@ -1161,7 +1158,10 @@ function formatExtensionNoteContent(
     contentType: content.contentType,
     note: {
       tiptapJson: json,
-      markdown: tiptapToMarkdown(json),
+      // The markdown flavour is what the extension hands to a model as page
+      // context; private (commented-out) content stays out of it. The JSON
+      // stays whole — it is the author's own editing copy.
+      markdown: tiptapToMarkdown(stripPrivateContent(json)),
       searchText: content.notePayload?.searchText ?? "",
       metadata: (content.notePayload?.metadata ?? {}) as Record<string, unknown>,
     },

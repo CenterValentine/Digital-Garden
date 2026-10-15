@@ -319,8 +319,9 @@ export function OutputTargetChip({
                     }
                     className={cn(
                       "flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs transition-colors",
+                      // The file tree's "current" tone (deep gold + gold rail).
                       value.mode === "folder" && value.folderId === f.id
-                        ? "bg-black/[0.06] text-gray-900 dark:bg-white/10 dark:text-white"
+                        ? "bg-gold-primary/[0.22] font-medium text-gold-primary shadow-[inset_2px_0_0_0_var(--gold-primary)] dark:bg-gold-primary/[0.28]"
                         : "text-gray-600 dark:text-gray-400 hover:bg-black/[0.04] dark:hover:bg-white/5",
                     )}
                     style={{ paddingLeft: `${12 + f.depth * 10}px` }}

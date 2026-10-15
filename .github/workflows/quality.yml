@@ -33,9 +33,9 @@ jobs:
       - name: Generate Prisma client
         run: pnpm exec prisma generate
 
-      # The lint script has `--max-warnings 175` as a ratchet so new code
-      # cannot drift past the current warning count. To lower the cap,
-      # reduce the number in package.json once warnings have been fixed.
+      # The lint script has a `--max-warnings` ratchet (the number lives in
+      # package.json) so new code cannot drift past the current warning count.
+      # To lower the cap, reduce that number once warnings have been fixed.
       - name: Lint
         run: pnpm lint
 
@@ -73,6 +73,42 @@ jobs:
       - name: Output-target checks
         run: pnpm output-targets:check
 
+      # The picker's row walk: eligibility decides what can be PICKED, folders
+      # are always browsed (a notes-only picker once listed only top-level notes).
+      - name: Picker tree checks
+        run: pnpm picker:tree:check
+
+      # The tree never flashes its skeleton after a mutation (it unmounted
+      # react-arborist and lost the user's place); delete is optimistic.
+      - name: Smooth tree checks
+        run: pnpm tree:smooth:check
+
+      # One REST save of a note at a time, per NOTE: an overlapping save used
+      # to carry a stale X-Body-Hash and 409 against the user's own write.
+      - name: Note save coordinator checks
+        run: pnpm note-save:check
+
+      # The Google Drive upload body is built from CRLF bytes: string-literal
+      # CRLFs were folded by the production minifier into bare LFs, and
+      # every Drive upload failed "Malformed multipart body." for months.
+      - name: Google Drive multipart body checks
+        run: pnpm google:multipart:check
+
+      # One search query builder, the conversion backup at every
+      # serializer-driven write, MCP capabilities and the MCP read seam.
+      - name: MCP preparatory layer checks
+        run: pnpm mcp:prep:check
+
+      # The MCP server's contract: flat schemas, annotations, capability
+      # checks on every write, one write path, one read seam, bearer auth.
+      - name: MCP server surface checks
+        run: pnpm mcp:surface:check
+
+      # Sleeping tabs wake on an outside write (the stamp on the presence
+      # poll) and a merge with their own edits is reported, never dialogued.
+      - name: Remote-write wake and merge notice
+        run: pnpm remote-write:wake:check
+
   markdown-safety:
     name: Markdown block-safety
     runs-on: ubuntu-latest
@@ -107,3 +143,9 @@ jobs:
 
       - name: Markdown round-trip smoke
         run: pnpm markdown:smoke
+
+      # OCR text → paste-ready blocks (lib/features/ocr/reflow.ts): which line
+      # ends are word-wraps and which are real breaks, and the hand-off to the
+      # markdown paste parser. Mutation-tested (13 mutants killed, 2026-10-06).
+      - name: OCR reflow gate
+        run: pnpm ocr:blocks:check

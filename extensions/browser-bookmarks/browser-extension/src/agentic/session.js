@@ -40,16 +40,71 @@ function isWebUrl(url) {
 // The active tab of the PANEL's window (windowId comes from the panel host — the
 // side panel is per-window, and the user's focus can be elsewhere mid-run). Falls
 // back to the last-focused window when no windowId was given.
+/**
+ * Is this tab the Digital Garden app itself?
+ *
+ * The app is never the page the user means by "the page I have open" — it is
+ * the thing they are asking FROM. When the app runs in its own window (rather
+ * than the side panel), focusing it to type a request makes it the
+ * last-focused window's active tab, so bind-first compared linkedin.com
+ * against the app's own origin, failed `sameSite`, and opened a new tab —
+ * exactly the duplicate-tab outcome bind-first exists to prevent (owner
+ * report, 2026-09-18).
+ *
+ * Mirrors the app-origin exclusion `get-recent-viewed-tabs` already applies in
+ * the background worker.
+ */
+// Same storage key the background worker's getConfig() reads; `appBaseUrl`
+// lives INSIDE that config blob, not at the top level.
+const CONFIG_STORAGE_KEY = "dgBrowserBookmarksConfig";
+
+async function appOrigin() {
+  try {
+    const stored = await chrome.storage.local.get(CONFIG_STORAGE_KEY);
+    const base = stored?.[CONFIG_STORAGE_KEY]?.appBaseUrl;
+    return base ? new URL(base).origin : null;
+  } catch {
+    return null;
+  }
+}
+
+async function isAppTab(tab, origin) {
+  if (!tab?.url || !origin) return false;
+  try {
+    return new URL(tab.url).origin === origin;
+  } catch {
+    return false;
+  }
+}
+
 export async function resolveActiveTab(windowId) {
+  const origin = await appOrigin();
   const query =
     typeof windowId === "number" ? { active: true, windowId } : { active: true, lastFocusedWindow: true };
   try {
     const [tab] = await chrome.tabs.query(query);
-    if (tab) return tab;
+    if (tab && !(await isAppTab(tab, origin))) return tab;
   } catch {
     // e.g. the window is gone — fall through to the broad query.
   }
+  // Either there was no tab, or the focused one is the app. Look across
+  // windows for the page the user actually has open, most recently accessed
+  // first — so "their page" means the one they were last looking at, not an
+  // arbitrary match.
   const tabs = await chrome.tabs.query({ active: true });
+  const candidates = [];
+  for (const t of tabs) {
+    if (!isWebUrl(t.url)) continue;
+    if (await isAppTab(t, origin)) continue;
+    candidates.push(t);
+  }
+  if (candidates.length > 0) {
+    candidates.sort((a, b) => (b.lastAccessed ?? 0) - (a.lastAccessed ?? 0));
+    return candidates[0];
+  }
+  // Nothing but the app is open. Return the plain active tab so the caller's
+  // own "that is not a web page — ask which page they mean" message fires,
+  // rather than silently opening one.
   return tabs.find((t) => isWebUrl(t.url)) || tabs[0] || null;
 }
 

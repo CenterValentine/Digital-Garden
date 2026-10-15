@@ -13,6 +13,9 @@
  */
 
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { noteNativeSearchRejection, supportsNativeWebSearch } from "../lib/domain/ai/acquisition/native-search";
+import { describeChatError, parseChatError } from "../lib/domain/ai/chat-errors";
 import {
   MODEL_ROLES,
   parseModelDirective,
@@ -341,6 +344,29 @@ for (const role of MODEL_ROLES) {
     template!.defaultModels.some((m) => m.id === suggestion.modelId),
     `role ${role}: suggestion ${suggestion.presetId}/${suggestion.modelId} is not in the template's defaultModels — it can never match a real connection`,
   );
+}
+
+// ── Hosted web search only for models that take it ─────────────────────────
+// Owner smoke 2026-10-09: "Tool 'web_search_preview' is not supported with
+// gpt-4." failed the whole turn — the route attached OpenAI's hosted search
+// to every OpenAI model.
+{
+  assert.equal(supportsNativeWebSearch("openai", "gpt-4"), false, "gpt-4 rejects OpenAI's hosted search (catalog nativeWebSearch: false)");
+  assert.equal(supportsNativeWebSearch("openai", "gpt-4o"), true, "gpt-4o keeps hosted search");
+  assert.equal(supportsNativeWebSearch("anthropic", "claude-sonnet-4"), true, "an unflagged model keeps hosted search");
+  assert.equal(supportsNativeWebSearch("openai", "gpt-hand-added-x"), true, "a model the catalog doesn't list keeps it until rejected");
+  const raw = "Tool 'web_search_preview' is not supported with gpt-hand-added-x.";
+  assert.equal(noteNativeSearchRejection("openai", raw), "gpt-hand-added-x", "the rejection names the model");
+  assert.equal(supportsNativeWebSearch("openai", "gpt-hand-added-x"), false, "…and that model is not offered hosted search again");
+  assert.equal(noteNativeSearchRejection("openai", "rate limit exceeded"), null, "other errors teach nothing");
+  const parsed = parseChatError("Tool 'web_search_preview' is not supported with gpt-4.");
+  assert.equal(parsed.code, "NATIVE_SEARCH_UNSUPPORTED", "the chat banner recognises the rejection");
+  assert.match(describeChatError(parsed), /switched off for it\. Send your message again/, "…and says what happened and what to do");
+  const route = readFileSync("app/api/ai/chat/route.ts", "utf8");
+  assert.match(route, /NATIVE_TOOL_VENDORS\.has\(executedProviderId\) &&\s*supportsNativeWebSearch\(executedProviderId, executedBareModelId\)/, "the route attaches hosted search only where supported");
+  assert.match(route, /const rejectedModel = noteNativeSearchRejection\(/, "the route learns a rejection from the stream's error");
+  const engine = readFileSync("lib/domain/ai/use-conversation-engine.ts", "utf8");
+  assert.match(engine, /toast\.error\(err\.message \? describeChatError\(parseChatError\(err\.message\)\)/, "the toast says the same as the banner");
 }
 
 console.log("model-routing checks passed");

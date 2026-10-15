@@ -36,6 +36,7 @@ import {
 } from "@/lib/domain/data/server/resolve";
 import {
   findColumn,
+  partitionCaptureWrites,
   prepareCaptureCells,
   writeBlockReason,
   type CaptureConfig,
@@ -67,6 +68,8 @@ export interface CapturePreflightInput {
   columnNames: string[];
   /** Optional dedupe column name; defaults to the first url-type column. */
   dedupeColumnName?: string;
+  /** Capture columns to MERGE into rather than replace (text / longText / list only). */
+  mergeColumnNames?: string[];
 }
 
 /**
@@ -132,7 +135,13 @@ export async function preflightCapture(
   const descriptionsMissing: string[] = [];
   const emptyVocabColumns: string[] = [];
 
-  for (const name of input.columnNames) {
+  // No names = every writable column (round 2, 2026-09-21: `columns: []`
+  // failed a `.min(1)` and cost a step). An auto-selected column that cannot
+  // be captured is simply skipped; a NAMED one that cannot is still refused,
+  // because the model asked for it by name and should hear why.
+  const autoSelected = input.columnNames.length === 0;
+  const requested = autoSelected ? live.map((c) => c.name) : input.columnNames;
+  for (const name of requested) {
     const column = findColumn(live, name);
     if (!column) {
       return refuse(
@@ -150,6 +159,7 @@ export async function preflightCapture(
         ? `${column.name} is a relation — a capture run cannot fill links. Capture the target's name into a text column, or link the rows afterwards with update_row.`
         : writeBlockReason(column);
     if (blocked) {
+      if (autoSelected) continue;
       return refuse(
         `${blocked} Remove "${column.name}" from captureTo and re-propose.`,
       );
@@ -171,6 +181,33 @@ export async function preflightCapture(
       }
     }
     if (!column.description) descriptionsMissing.push(column.name);
+  }
+  if (resolved.length === 0) {
+    return refuse(
+      `"${table.title}" has no column a capture run can write (every column is a relation or otherwise blocked). Add a text/url/number column to it, or capture elsewhere, and re-propose.`,
+    );
+  }
+
+  // Merge columns: each must be a resolved capture column of a mergeable type.
+  const mergeColumns: string[] = [];
+  for (const name of input.mergeColumnNames ?? []) {
+    const column = findColumn(live, name);
+    if (!column) {
+      return refuse(
+        `mergeColumns names "${name}", which is not a column of "${table.title}". Columns here: ${live.map((c) => c.name).join(", ")}.`,
+      );
+    }
+    if (!resolved.some((c) => c.key === column.key)) {
+      return refuse(
+        `mergeColumns names "${column.name}", but it is not one of the capture columns — add it to captureTo.columns as well.`,
+      );
+    }
+    if (column.type !== "text" && column.type !== "longText" && column.type !== "multiSelect") {
+      return refuse(
+        `"${column.name}" is a ${column.type} column — merge applies to text, longText and list columns only. Remove it from mergeColumns.`,
+      );
+    }
+    mergeColumns.push(column.name);
   }
 
   // Dedupe column: explicit name, else the first url column on the table.
@@ -212,6 +249,7 @@ export async function preflightCapture(
       ...(dedupeColumn
         ? { dedupeColumnKey: dedupeColumn.key, dedupeColumnName: dedupeColumn.name }
         : {}),
+      ...(mergeColumns.length > 0 ? { mergeColumns } : {}),
     },
     optionVocab,
     descriptionsMissing,
@@ -298,6 +336,11 @@ export interface CaptureUpsertResult {
   status: "created" | "updated" | "rejected";
   rowId?: string;
   errors?: string[];
+  /**
+   * Column NAMES kept because the row was already written this sitting
+   * (P3) — reported, never silent.
+   */
+  keptCells?: string[];
 }
 
 /**
@@ -318,6 +361,12 @@ export async function captureUpsertRow(input: {
    * (creating would fork the identity the run enumerated from).
    */
   rowId?: string;
+  /**
+   * P3: a row written at or after this moment (by update_row, or the user
+   * in the grid) keeps its non-empty cells; capture fills only the empty
+   * ones. The proposal's `approvedAt` is what callers pass.
+   */
+  keepFilledSince?: Date | string;
 }): Promise<CaptureUpsertResult> {
   const { userId, config } = input;
 
@@ -358,11 +407,12 @@ export async function captureUpsertRow(input: {
   }
 
   let existingRowId: string | undefined;
+  let existingRow: { data: unknown; updatedAt: Date } | null = null;
   if (input.rowId) {
     // Row-keyed: verify the row is still live, then update in place.
     const row = await prisma.dataRow.findFirst({
       where: { id: input.rowId, tableId: config.tableId, deletedAt: null },
-      select: { id: true },
+      select: { id: true, data: true, updatedAt: true },
     });
     if (!row) {
       return {
@@ -373,6 +423,7 @@ export async function captureUpsertRow(input: {
       };
     }
     existingRowId = row.id;
+    existingRow = row;
   } else if (config.dedupeColumnKey && dedupeValue) {
     // Dedupe lookup: exact JSON match on the stored (trimmed) value.
     const existing = await prisma.dataRow.findFirst({
@@ -381,16 +432,43 @@ export async function captureUpsertRow(input: {
         deletedAt: null,
         data: { path: [config.dedupeColumnKey], equals: dedupeValue },
       },
-      select: { id: true },
+      select: { id: true, data: true, updatedAt: true },
     });
     existingRowId = existing?.id;
+    existingRow = existing ?? null;
   }
 
+  // Merge columns accumulate across runs (cell-merge.ts) — only meaningful
+  // on an EXISTING row; a fresh row has nothing to merge into.
+  const mergeKeys = new Set(
+    (config.mergeColumns ?? [])
+      .map((name) => findColumn(live, name)?.key)
+      .filter((k): k is string => typeof k === "string"),
+  );
   if (existingRowId) {
-    const writes: CellWrite[] = prepared.writes.map((w) => ({
+    // P3: never clobber a same-sitting write. Merge columns are exempt —
+    // merging IS the accumulate-safe write.
+    const partition = partitionCaptureWrites({
+      writes: prepared.writes.filter((w) => !mergeKeys.has(w.columnKey)),
+      current: (existingRow?.data ?? {}) as Record<string, unknown>,
+      rowUpdatedAt: existingRow?.updatedAt,
+      keepFilledSince: input.keepFilledSince,
+    });
+    const landing = [
+      ...partition.writes,
+      ...prepared.writes.filter((w) => mergeKeys.has(w.columnKey)),
+    ];
+    const keptCells = partition.kept.map(
+      (key) => live.find((c) => c.key === key)?.name ?? key,
+    );
+    if (landing.length === 0) {
+      return { status: "updated", rowId: existingRowId, keptCells };
+    }
+    const writes: CellWrite[] = landing.map((w) => ({
       rowId: existingRowId,
       columnKey: w.columnKey,
       value: w.value as CellWrite["value"],
+      ...(mergeKeys.has(w.columnKey) ? { merge: true } : {}),
     }));
     const result = await writeCells(config.tableId, live, writes);
     if (!result.ok) {
@@ -401,7 +479,11 @@ export async function captureUpsertRow(input: {
           .map((r) => (r.status === "error" ? r.message : "")),
       };
     }
-    return { status: "updated", rowId: existingRowId };
+    return {
+      status: "updated",
+      rowId: existingRowId,
+      ...(keptCells.length > 0 ? { keptCells } : {}),
+    };
   }
 
   const [rowId] = await createRows(config.tableId, live, 1, userId);

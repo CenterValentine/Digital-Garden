@@ -125,7 +125,48 @@ export function columnTypeLabel(column: DataColumn): string {
 
 export function AddColumnButton({ tableId, columns, onAdd }: AddColumnButtonProps) {
   const [open, setOpen] = useState(false);
+  return (
+    <div className="shrink-0">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        title="Add column"
+        className="flex h-full w-10 items-center justify-center text-muted-foreground hover:bg-muted"
+      >
+        <Plus className="h-3.5 w-3.5" />
+      </button>
+      <AddColumnPanel
+        tableId={tableId}
+        columns={columns}
+        onAdd={onAdd}
+        open={open}
+        onClose={() => setOpen(false)}
+      />
+    </div>
+  );
+}
+
+/**
+ * The add-column form in its panel — ONE form for every way in: the header
+ * row's "+" and the column context menu's "Insert column left/right" (which
+ * mounts it on the clicked column's header, so it opens right there). The
+ * panel anchors to the element it is rendered inside.
+ */
+export function AddColumnPanel({
+  tableId,
+  columns,
+  onAdd,
+  open,
+  onClose,
+  heading,
+}: AddColumnButtonProps & {
+  open: boolean;
+  onClose: () => void;
+  /** e.g. "Insert column to the left of Stage" — absent for the "+" button. */
+  heading?: string;
+}) {
   const [name, setName] = useState("");
+
   const [type, setType] = useState<DataColumnType | typeof IMAGES_KIND>(
     "text"
   );
@@ -207,7 +248,7 @@ export function AddColumnButton({ tableId, columns, onAdd }: AddColumnButtonProp
   }, [type, open, databases.length, tableId]);
 
   const close = useCallback(() => {
-    setOpen(false);
+    onClose();
     setName("");
     setType("text");
     setTargetDbId("");
@@ -217,7 +258,7 @@ export function AddColumnButton({ tableId, columns, onAdd }: AddColumnButtonProp
     setPersonSource("person");
     setTargetColumns(null);
     setDefaultChecked(false);
-  }, []);
+  }, [onClose]);
 
   const submit = useCallback(async () => {
     const trimmed = name.trim();
@@ -285,17 +326,10 @@ export function AddColumnButton({ tableId, columns, onAdd }: AddColumnButtonProp
   ]);
 
   return (
-    <div className="shrink-0">
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        title="Add column"
-        className="flex h-full w-10 items-center justify-center text-muted-foreground hover:bg-muted"
-      >
-        <Plus className="h-3.5 w-3.5" />
-      </button>
-
       <PanelPortal open={open} onDismiss={close}>
+        {heading && (
+          <p className="mb-2 text-[11px] font-medium text-foreground/80">{heading}</p>
+        )}
         <label className="mb-1 block text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
           Name
         </label>
@@ -536,7 +570,6 @@ export function AddColumnButton({ tableId, columns, onAdd }: AddColumnButtonProp
           </button>
         </div>
       </PanelPortal>
-    </div>
   );
 }
 

@@ -79,6 +79,12 @@ function recordsEqual(a: PresenceRecord[], b: PresenceRecord[]): boolean {
 class PresencePoller {
   private subscribers = new Map<string, Set<() => void>>();
   private cache = new Map<string, PresenceRecord[]>();
+  /**
+   * The server document's stamp (ms) per content id, from the same response.
+   * The runtime compares it with what it last saw to wake a sleeping document
+   * after an outside write (an MCP agent, a script, another device).
+   */
+  private documentStamps = new Map<string, number>();
   private unregisterPoll: (() => void) | null = null;
   // Shared by the `focus` and `visibilitychange` listeners. The visibility
   // guard matters for the latter: visibilitychange fires on the hidden
@@ -109,6 +115,10 @@ class PresencePoller {
 
   getSnapshot(contentId: string): PresenceRecord[] {
     return this.cache.get(contentId) ?? EMPTY;
+  }
+
+  getDocumentStamp(contentId: string): number | null {
+    return this.documentStamps.get(contentId) ?? null;
   }
 
   private start() {
@@ -154,14 +164,21 @@ class PresencePoller {
         if (!res.ok) continue; // advisory — keep last known snapshot
         const result = (await res.json()) as {
           success?: boolean;
-          data?: { presenceByContentId?: Record<string, PresenceRecord[]> };
+          data?: {
+            presenceByContentId?: Record<string, PresenceRecord[]>;
+            documentStampByContentId?: Record<string, number>;
+          };
         };
         const byId = result.data?.presenceByContentId;
         if (!result.success || !byId) continue;
+        const stampsById = result.data?.documentStampByContentId ?? {};
         for (const id of chunk) {
           const fresh = byId[id] ?? EMPTY;
           const prev = this.cache.get(id) ?? EMPTY;
-          if (recordsEqual(prev, fresh)) continue;
+          const stamp = typeof stampsById[id] === "number" ? stampsById[id] : null;
+          const stampMoved = stamp !== null && stamp !== (this.documentStamps.get(id) ?? null);
+          if (stampMoved) this.documentStamps.set(id, stamp);
+          if (recordsEqual(prev, fresh) && !stampMoved) continue;
           this.cache.set(id, fresh);
           const subs = this.subscribers.get(id);
           if (subs) for (const cb of subs) cb();
@@ -188,10 +205,10 @@ const presencePoller = new PresencePoller();
  */
 export function subscribeContentPresence(
   contentId: string,
-  callback: (sessions: PresenceRecord[]) => void,
+  callback: (sessions: PresenceRecord[], documentStampMs: number | null) => void,
 ): () => void {
   return presencePoller.subscribe(contentId, () => {
-    callback(presencePoller.getSnapshot(contentId));
+    callback(presencePoller.getSnapshot(contentId), presencePoller.getDocumentStamp(contentId));
   });
 }
 

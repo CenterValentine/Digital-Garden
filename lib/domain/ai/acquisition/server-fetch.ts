@@ -104,5 +104,6 @@ export async function serverFetchAcquire(
     extraction: extracted.quality,
     tokenEstimate: Math.ceil(content.length / 4),
     truncated,
+    ...(extracted.contentNote ? { contentNote: extracted.contentNote } : {}),
   };
 }

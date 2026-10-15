@@ -36,10 +36,38 @@ export async function resolveDefaultSearchBackend(
   });
   const chosen = rows.find((r) => r.isDefault) ?? rows[0];
   if (!chosen) return null;
+  let payload: SearchKeyPayload;
   try {
-    const apiKey = (decrypt(chosen.encryptedKey) as { key: string }).key;
-    return { provider: chosen.provider, apiKey };
+    payload = decrypt(chosen.encryptedKey) as SearchKeyPayload;
   } catch {
     return null;
   }
+  if (payload.source === "ai-connection" && payload.connectionId) {
+    // Key reused from the user's AI connection (OpenAI search): read it at
+    // call time so a key rotated there is the key searched with here. A
+    // removed connection is an honest error, not a silent fallback.
+    const { getConnectionWithKey } = await import(
+      "@/lib/features/ai-connections/service"
+    );
+    try {
+      const connection = await getConnectionWithKey(userId, payload.connectionId);
+      return { provider: chosen.provider, apiKey: connection.apiKey };
+    } catch {
+      throw new Error(
+        "The AI connection this search backend reuses was removed — reconnect it, or paste a key in Settings → AI → Web Search.",
+      );
+    }
+  }
+  return { provider: chosen.provider, apiKey: payload.key };
+}
+
+/**
+ * What a search connection stores (encrypted): its own key, or a pointer to
+ * the AI connection whose key it reuses (owner-requested, 2026-09-30 — an
+ * OpenAI key already saved for chat need not be pasted twice).
+ */
+export interface SearchKeyPayload {
+  key: string;
+  source?: "own" | "ai-connection";
+  connectionId?: string;
 }

@@ -17,11 +17,15 @@ import { PropertiesPanel } from "../blocks/PropertiesPanel";
 import { useOutlineStore } from "@/state/outline-store";
 import { useContentStore } from "@/state/content-store";
 import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
-import { useExtensionRightSidebarPanel } from "@/lib/extensions/client-registry";
+import {
+  useClaimedContentSidebarPanel,
+  useExtensionRightSidebarPanel,
+} from "@/lib/extensions/client-registry";
 import { PublishTab } from "@/extensions/publishing/components/sidebar/PublishTab";
 import { StudioTab } from "@/extensions/studio/components/StudioTab";
 import { ContextTab } from "@/components/content/ai-context/ContextTab";
 import { DataSchemaRail } from "@/components/content/data/DataSchemaRail";
+import { TemplateFieldsPanel } from "@/components/content/docx-templates/TemplateFieldsPanel";
 import type { OutlineHeading } from "@/lib/domain/content/outline-extractor";
 import type { ChatOutlineEntry } from "@/lib/domain/ai/chat-outline";
 import type { RightSidebarTab } from "@/state/right-sidebar-state-store";
@@ -42,6 +46,7 @@ export function RightSidebarContent({ activeTab }: RightSidebarContentProps) {
   const selectedContentType = useContentStore((s) => s.selectedContentType);
   const activeView = useLeftPanelViewStore((state) => state.activeView);
   const ExtensionRightSidebarPanel = useExtensionRightSidebarPanel(activeView);
+  const claimedPanel = useClaimedContentSidebarPanel(selectedContentId);
 
   // Handle outline heading click — dispatches a CustomEvent that MarkdownEditor listens for
   const handleHeadingClick = (heading: OutlineHeading) => {
@@ -64,6 +69,14 @@ export function RightSidebarContent({ activeTab }: RightSidebarContentProps) {
   };
 
   const isChat = selectedContentType === "chat";
+
+  if (activeTab === "extension" && claimedPanel && selectedContentId) {
+    return (
+      <div className="flex-1 overflow-hidden">
+        {createElement(claimedPanel.component, { contentId: selectedContentId })}
+      </div>
+    );
+  }
 
   if (activeTab === "extension" && ExtensionRightSidebarPanel) {
     return (
@@ -98,6 +111,9 @@ export function RightSidebarContent({ activeTab }: RightSidebarContentProps) {
       {activeTab === "context" && <ContextTab />}
       {/* Keyed by content id: navigating between databases remounts the
           rail so its loaded schema and expansion state re-seed fresh. */}
+      {activeTab === "templateFields" && selectedContentId && (
+        <TemplateFieldsPanel contentId={selectedContentId} />
+      )}
       {activeTab === "database" && (
         <DataSchemaRail
           key={selectedContentId ?? "none"}

@@ -1,0 +1,144 @@
+// ═══════════════════════════════════════════════════════════════════════════
+// READER EXTENSION — schema (EREADER-PLAN.md, R0–R2 + R4 imports)
+//
+// APPLY BY HAND: `prisma/` is human-owned, so this block is surfaced rather
+// than written. The code in lib/domain/reader/ already targets these models
+// and answers 503 "reader tables not migrated" until they exist.
+//
+// 1. Append the five models below to the end of prisma/schema.prisma.
+// 2. Add the back-relations on OTHER models:
+//
+//      model ContentNode {
+//        …
+//        bookMeta BookMeta?
+//      }
+//
+//      model User {
+//        …
+//        bookMetas         BookMeta[]
+//        readingProgress   ReadingProgress[]
+//        readerAnnotations ReaderAnnotation[]
+//        readerCatalogs    ReaderCatalog[]
+//        readerConnections ReaderConnection[]
+//      }
+//
+// 3. Create the migration. Either let Prisma generate it:
+//
+//      SHADOW_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/shadow \
+//        npx prisma migrate dev --name reader_extension
+//
+//    …or copy docs/notes-feature/work-tracking/reader-migration.sql into
+//    prisma/migrations/20260929120000_reader_extension/migration.sql and run
+//    `npx prisma migrate dev` (it should report no drift; if Prisma's diff
+//    differs, prefer Prisma's generated SQL).
+// 4. `npx prisma generate`, then swap lib/domain/reader/db.ts to the generated
+//    delegates (see the TODO at the top of that file).
+//
+// Purely additive: five new tables, no changes to existing columns.
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Book metadata for a file node the reader opens. A book is an ordinary
+/// file in the user's library folder; this side table carries what the file
+/// row cannot (authors, identifiers, where it came from, its license).
+model BookMeta {
+  contentId       String   @id @db.Uuid
+  ownerId         String   @db.Uuid
+  title           String   @db.VarChar(500)
+  authors         String[]
+  language        String?  @db.VarChar(20)
+  description     String?
+  publisher       String?  @db.VarChar(255)
+  publishedYear   Int?
+  isbn            String?  @db.VarChar(20)
+  openLibraryId   String?  @db.VarChar(40)
+  coverUrl        String?
+  // Where the file came from: "upload" | "gutendex" | "openlibrary" | "opds:<catalog>" | …
+  sourceAdapter   String   @default("upload") @db.VarChar(80)
+  sourceUrl       String?
+  sourceEntryId   String?  @db.VarChar(255)
+  // "public-domain" | "creative-commons" | "owned" | "unknown" — gates publishing.
+  license         String   @default("unknown") @db.VarChar(40)
+  // "want" | "reading" | "finished" | null — mirrors Hardcover when connected.
+  readingStatus   String?  @db.VarChar(20)
+  hardcoverBookId String?  @db.VarChar(40)
+  createdAt       DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime @updatedAt @db.Timestamptz(6)
+
+  content ContentNode @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  owner   User        @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([ownerId])
+  @@index([ownerId, isbn])
+}
+
+/// Last reading position per (user, target). targetKey is "content:<id>" for
+/// a book file, or a corpus key (e.g. "scripture:lds-en") for virtual sources.
+model ReadingProgress {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId   String   @db.Uuid
+  targetKey String   @db.VarChar(255)
+  // Readium Locator JSON (href + locations{cfi,progression,…} + text quote).
+  locator   Json
+  percent   Float    @default(0)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@unique([ownerId, targetKey])
+}
+
+/// Highlights, notes and bookmarks anchored to text the user does not own
+/// (a book file, a corpus). Kept beside the text, never inside it. Imported
+/// highlights (Kindle clippings, Readwise) carry source + externalId so a
+/// re-import is idempotent.
+model ReaderAnnotation {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId       String   @db.Uuid
+  targetKey     String   @db.VarChar(255)
+  // "highlight" | "note" | "bookmark"
+  kind          String   @db.VarChar(16)
+  locator       Json
+  color         String?  @db.VarChar(20)
+  body          String?
+  // Set once the annotation was sent to a note ("has note" marker).
+  noteContentId String?  @db.Uuid
+  // "reader" | "kindle" | "readwise"
+  source        String   @default("reader") @db.VarChar(20)
+  externalId    String?  @db.VarChar(255)
+  createdAt     DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime @updatedAt @db.Timestamptz(6)
+  owner         User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@unique([ownerId, source, externalId])
+  @@index([ownerId, targetKey])
+}
+
+/// A user-added OPDS catalog (Calibre, Kavita, Komga, COPS, any OPDS feed).
+/// Preset public catalogs are code constants, not rows.
+model ReaderCatalog {
+  id                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId             String   @db.Uuid
+  name                String   @db.VarChar(120)
+  url                 String
+  // Encrypted "user:password" for HTTP Basic, when the catalog needs it.
+  credentialEncrypted String?
+  createdAt           DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt           DateTime @updatedAt @db.Timestamptz(6)
+  owner               User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([ownerId])
+}
+
+/// Bring-your-own-token connections to reading services
+/// ("readwise" | "hardcover" | "google-books").
+model ReaderConnection {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId        String    @db.Uuid
+  provider       String    @db.VarChar(40)
+  tokenEncrypted String
+  lastSyncedAt   DateTime? @db.Timestamptz(6)
+  createdAt      DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime  @updatedAt @db.Timestamptz(6)
+  owner          User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@unique([ownerId, provider])
+}

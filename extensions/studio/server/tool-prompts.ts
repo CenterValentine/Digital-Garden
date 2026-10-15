@@ -22,7 +22,7 @@ interface ToolPromptTemplate {
   title: string;
   /** The task body. */
   task: string;
-  /** Overrides the default createNote delivery instruction (flashcards). */
+  /** Overrides the default create_note delivery instruction (flashcards). */
   delivery?: string;
 }
 
@@ -164,7 +164,7 @@ export async function composeToolPrompt(
   const delivery =
     template.delivery ??
     [
-      `When the artifact is ready, create it as a new note with the createNote tool: parentId "${folder.id}", title "${suggestedTitle}" (adjust the title if you have a clearly better one).`,
+      `When the artifact is ready, create it as a new note with the create_note tool: parentId "${folder.id}", title "${suggestedTitle}" (adjust the title if you have a clearly better one).`,
       toolId === "mind-map"
         ? "Put the Mermaid diagram in a fenced ```mermaid code block inside the note, preceded by a 2-3 sentence orientation paragraph."
         : "",

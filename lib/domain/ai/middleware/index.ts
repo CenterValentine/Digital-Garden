@@ -13,6 +13,7 @@ import {
 
 export { defaultSettingsMiddleware } from "./default-settings";
 export { rateLimitRetryMiddleware } from "./rate-limit-retry";
+export { unsupportedParameterMiddleware } from "./unsupported-parameter";
 export type { RateLimitRetryOptions } from "./rate-limit-retry";
 
 /** The concrete model type that wrapLanguageModel accepts. */

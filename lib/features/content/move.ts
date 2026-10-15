@@ -71,13 +71,17 @@ export async function moveNodesToFolder(
   const moved: string[] = [];
   const failed: { id: string; message: string }[] = [];
 
+  // The group lands at the top of the folder in the order given: the first
+  // first, each next one after the one before. Every move used to go to the
+  // top on its own (no position = index 0), which reversed the group.
+  let afterId: string | null = null;
   for (const id of ids) {
     try {
       const res = await fetch("/api/content/content/move", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contentId: id, targetParentId }),
+        body: JSON.stringify({ contentId: id, targetParentId, afterId }),
       });
       const body = await res.json().catch(() => null);
       if (!res.ok || !body?.success) {
@@ -87,6 +91,7 @@ export async function moveNodesToFolder(
         });
       } else {
         moved.push(id);
+        afterId = id;
       }
     } catch (err) {
       failed.push({

@@ -24,6 +24,16 @@ import { loadTable } from "@/lib/domain/data/server/queries";
 import { matchRowRef, parseRowRef } from "@/lib/domain/data/read-format";
 import type { DataTable } from "@/lib/domain/data";
 import { Prisma } from "@/lib/database/generated/prisma";
+import {
+  parseCharter,
+  resolveCharterReferencedTables,
+  type CharterReference,
+} from "@/lib/domain/ai/charters/parse";
+import { collectWikiLinkRefs } from "@/lib/domain/editor/wiki-link-refs";
+import type { JSONContent } from "@tiptap/core";
+
+/** Notes whose wiki-links extend jurisdiction — most recent first. */
+const NOTE_LINK_ROOTS_MAX = 10;
 
 /** The context ids database resolution needs — a structural subset of ToolExecuteContext. */
 export interface DataToolContext {
@@ -116,6 +126,54 @@ export async function charterRegistryAuthorizes(
 }
 
 /**
+ * The databases the attached charter names in its body — its Inputs list,
+ * its process steps. Prod 23fd28d6 (2026-09-27): the *Apply for a job*
+ * charter says "Look at everything in the [[Career Evidence Library]]",
+ * the model asked for exactly that, and jurisdiction refused it — the link
+ * the user wrote into the rubric was printed in context and denied by the
+ * tools, the same contradiction the relation walk below closes for
+ * relation columns. The charter is the user's pointing; naming a database
+ * in it is consent to read it in the charter's runs. Same scope note as
+ * `charterRegistryAuthorizes`: the user's own data, behind the usual
+ * access checks. One note load + one title lookup, refusal path only.
+ */
+export async function charterReferencedTableIds(
+  ctx: DataToolContext,
+): Promise<string[]> {
+  const charter = ctx.activeCharter;
+  if (!charter) return [];
+  const note = await prisma.contentNode.findFirst({
+    where: { id: charter.contentId, ownerId: ctx.userId, deletedAt: null },
+    select: { notePayload: { select: { tiptapJson: true } } },
+  });
+  const doc = note?.notePayload?.tiptapJson as JSONContent | null | undefined;
+  if (!doc || typeof doc !== "object") return [];
+  const parsed = parseCharter(doc);
+  const references = [
+    ...parsed.standingRules.references,
+    ...parsed.phases.flatMap((p) => p.references),
+  ];
+  if (references.length === 0) return [];
+  const ids = references
+    .map((r) => r.targetId)
+    .filter((id): id is string => typeof id === "string" && id.length > 0);
+  const titles = [...new Set(references.map((r) => r.targetTitle.trim()))];
+  const dataNodes = await prisma.contentNode.findMany({
+    where: {
+      ownerId: ctx.userId,
+      contentType: "data",
+      deletedAt: null,
+      OR: [
+        ...(ids.length > 0 ? [{ id: { in: ids } }] : []),
+        { title: { in: titles, mode: "insensitive" as const } },
+      ],
+    },
+    select: { id: true, title: true },
+  });
+  return resolveCharterReferencedTables(references, dataNodes);
+}
+
+/**
  * Databases reachable by following RELATION columns out of the ones this
  * chat can already see.
  *
@@ -179,8 +237,11 @@ export async function relationReachableTableIds(
 
 /**
  * The tables this chat can see WITHOUT following any relation — the roots
- * of the walk above: the bound table, every @-mentioned one, and the
- * charter's master ledger.
+ * of the walk above: the bound table, every @-mentioned one, the charter's
+ * master ledger, and every database the charter's body names (P1). The
+ * master used to be claimed here and reached only through
+ * `charterRegistryAuthorizes`; now it is a root too, so its neighbours are
+ * one hop away like everything else's.
  */
 async function jurisdictionRoots(ctx: DataToolContext): Promise<string[]> {
   const roots = new Set<string>();
@@ -188,6 +249,75 @@ async function jurisdictionRoots(ctx: DataToolContext): Promise<string[]> {
   if (bound) roots.add(bound);
   if (ctx.boundContentId) roots.add(ctx.boundContentId);
   if (ctx.contentId) roots.add(ctx.contentId);
+  if (ctx.activeCharter) {
+    const charterNote = await prisma.contentNode.findFirst({
+      where: { id: ctx.activeCharter.contentId, ownerId: ctx.userId, deletedAt: null },
+      select: { notePayload: { select: { metadata: true } } },
+    });
+    const meta =
+      charterNote?.notePayload?.metadata &&
+      typeof charterNote.notePayload.metadata === "object"
+        ? (charterNote.notePayload.metadata as Record<string, unknown>)
+        : undefined;
+    if (typeof meta?.masterLedgerId === "string") roots.add(meta.masterLedgerId);
+    for (const id of await charterReferencedTableIds(ctx)) roots.add(id);
+  }
+
+  // Databases wiki-linked from NOTES already in this conversation — the
+  // @-mentioned ones and the ones the model read. Their bodies are printed
+  // in context with those links; refusing the link the model can read is
+  // the contradiction the relation walk closed for columns (prod 6d0b0e30,
+  // 2026-09-29: the charter was @-mentioned as a note, its
+  // [[Career Evidence Library]] link was in context, and query_database
+  // refused it). Bounded: the most recent notes only, one load.
+  const noteRoots = [...roots].filter(
+    (id) => id !== ctx.boundContentId && id !== ctx.contentId,
+  );
+  if (noteRoots.length > 0) {
+    const notes = await prisma.contentNode.findMany({
+      where: {
+        id: { in: noteRoots },
+        ownerId: ctx.userId,
+        contentType: "note",
+        deletedAt: null,
+      },
+      orderBy: { updatedAt: "desc" },
+      take: NOTE_LINK_ROOTS_MAX,
+      select: { notePayload: { select: { tiptapJson: true } } },
+    });
+    const references: CharterReference[] = [];
+    for (const note of notes) {
+      const doc = note.notePayload?.tiptapJson as JSONContent | null | undefined;
+      if (!doc || typeof doc !== "object") continue;
+      for (const ref of collectWikiLinkRefs(doc)) {
+        references.push({
+          targetTitle: ref.targetTitle,
+          ...(ref.targetId ? { targetId: ref.targetId } : {}),
+        });
+      }
+    }
+    if (references.length > 0) {
+      const ids = references
+        .map((r) => r.targetId)
+        .filter((id): id is string => typeof id === "string" && id.length > 0);
+      const titles = [...new Set(references.map((r) => r.targetTitle.trim()))];
+      const dataNodes = await prisma.contentNode.findMany({
+        where: {
+          ownerId: ctx.userId,
+          contentType: "data",
+          deletedAt: null,
+          OR: [
+            ...(ids.length > 0 ? [{ id: { in: ids } }] : []),
+            { title: { in: titles, mode: "insensitive" as const } },
+          ],
+        },
+        select: { id: true, title: true },
+      });
+      for (const id of resolveCharterReferencedTables(references, dataNodes)) {
+        roots.add(id);
+      }
+    }
+  }
   if (ctx.conversationId) {
     const assocs = await prisma.conversationAssociation.findMany({
       where: { conversationId: ctx.conversationId },
@@ -266,7 +396,13 @@ export async function resolveJurisdiction(
     ) {
       return {
         refusal:
-          "That database is not associated with this conversation — tools reach only associated databases and the ones they link to. Ask the user to @-mention it (or open the chat from the database) first.",
+          "That database is not associated with this conversation — tools reach only associated databases, the ones they link to (by relation column or by a [[wiki-link]] in a note that is here), and the ones the attached charter names. Call read_content on it once — that attaches it to this chat, after which describe_database / query_database reach it and the tables it links — or ask the user to @-mention it." +
+          // P2: a charter run must not "work around" a missing input. The
+          // loop's never-stop rule has exactly this exception, and the
+          // refusal is where the model reads it.
+          (ctx.activeCharter
+            ? " If the charter lists this database as an INPUT, do NOT substitute, infer, or draft without it — stop the run here, tell the user which database to @-mention, and end the turn. Recorded progress is preserved; the run resumes from the first pending item."
+            : ""),
       };
     }
   }

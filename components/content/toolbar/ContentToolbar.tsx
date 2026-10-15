@@ -7,7 +7,7 @@
  * Returns null when no toolbar tools are available.
  */
 
-import { BookmarkPlus, Code2, Download, Layers, Link2, Share2, Upload, Zap } from "lucide-react";
+import { BookmarkPlus, Code2, Download, FolderTree, Layers, Link2, Maximize2, Minimize2, Share2, Upload, Zap } from "lucide-react";
 import { useToolSurface } from "@/lib/domain/tools";
 import { useCallback, useEffect, useState, type ComponentType } from "react";
 import {
@@ -36,6 +36,7 @@ import { STUDIO_EXTENSION_ID } from "@/extensions/studio/manifest";
 import { AiContextToggleButton } from "@/extensions/studio/components/AiContextToggleButton";
 import { useRightPanelCollapseStore } from "@/state/right-panel-collapse-store";
 import { useRightSidebarStateStore } from "@/state/right-sidebar-state-store";
+import { useContentFullscreenStore } from "@/state/content-fullscreen-store";
 
 /** Content types whose own text the toolbar "Listen" can narrate. */
 const READ_ALOUD_CONTENT_TYPES = new Set(["note", "file", "html", "code"]);
@@ -47,6 +48,7 @@ const ICON_MAP: Record<string, ComponentType<{ className?: string }>> = {
   BookmarkPlus,
   Code2,
   Download,
+  FolderTree,
   Layers,
   Link2,
   Share2,
@@ -62,9 +64,16 @@ interface ContentToolbarProps {
    * pane's activity from reflowing this toolbar (flashcard/publish width churn).
    */
   contentId?: string | null;
+  /**
+   * Rendered INSIDE another row (a quad pane's note title row) instead of as
+   * its own: no row padding or min height, and it shrinks — scrolling
+   * sideways, scrollbar hidden — so the title keeps its room. Same tools,
+   * same component: placement changes, the toolbar does not.
+   */
+  inline?: boolean;
 }
 
-export function ContentToolbar({ contentId: contentIdProp }: ContentToolbarProps = {}) {
+export function ContentToolbar({ contentId: contentIdProp, inline = false }: ContentToolbarProps = {}) {
   const toolSurface = useToolSurface();
   const globalSelectedContentId = useContentStore((state) => state.selectedContentId);
   const selectedContentId =
@@ -170,6 +179,14 @@ export function ContentToolbar({ contentId: contentIdProp }: ContentToolbarProps
     setRightSidebarTab(sourceContentId, "studio");
   }, [sourceContentId, setRightPanelCollapsed, setRightSidebarTab]);
 
+  // Full screen: every content type (the main panel fills the window).
+  const fullscreen = useContentFullscreenStore(
+    (s) => s.active && s.contentId === sourceContentId
+  );
+  const enterFullscreen = useContentFullscreenStore((s) => s.enter);
+  const exitFullscreen = useContentFullscreenStore((s) => s.exit);
+  const showFullscreen = !!sourceContentId;
+
   const openSpeedReader = useCallback(() => {
     if (!sourceContentId) return;
     window.dispatchEvent(
@@ -186,14 +203,22 @@ export function ContentToolbar({ contentId: contentIdProp }: ContentToolbarProps
     !canReadAloud &&
     !showSpeedRead &&
     !showSendToTab &&
-    !showStudio
+    !showStudio &&
+    !showFullscreen
   ) {
     return null;
   }
 
   return (
+    // Scrolls sideways in a narrow pane, but with the scrollbar hidden (as
+    // the tab strip above does): a visible bar sat under the icons as a strip
+    // of dead space (owner, 2026-10-08). Trackpad / wheel still scroll it.
     <div
-      className="flex min-h-11 shrink-0 items-center gap-1 overflow-x-auto px-3 py-1.5"
+      className={
+        inline
+          ? "flex min-w-0 shrink items-center gap-0.5 overflow-x-auto scrollbar-hide"
+          : "flex min-h-10 shrink-0 items-center gap-1 overflow-x-auto scrollbar-hide px-3 py-1"
+      }
       role="toolbar"
       aria-label="Content actions"
     >
@@ -266,6 +291,17 @@ export function ContentToolbar({ contentId: contentIdProp }: ContentToolbarProps
           type="button"
         >
           <Zap className="h-4 w-4" />
+        </button>
+      )}
+      {showFullscreen && (
+        <button
+          onClick={() => (fullscreen ? exitFullscreen() : sourceContentId && enterFullscreen(sourceContentId))}
+          className="flex shrink-0 items-center gap-1.5 rounded-md px-1.5 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          title={fullscreen ? "Exit full screen (Esc)" : "Full screen"}
+          aria-pressed={fullscreen}
+          type="button"
+        >
+          {fullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
         </button>
       )}
       {showSendToTab && (

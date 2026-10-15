@@ -61,6 +61,18 @@ The CI gate (`markdown:blocks:check`) is the same check applied to a battery of
 constructs + every registered block + a schema-driven attribute sweep, run in
 CI. It is the durable proof.
 
+**The seam the per-block check does not cover: the join.** Self-verify runs
+on each block's segment *alone*; the document is those segments joined with a
+blank line, and that join is not re-verified. It matters in exactly one place
+markdown gives no escape from: **two adjacent lists**. `1. a` / blank / `2. b`
+is one list to marked, as is `- a` / `- b`, or a bullet list followed by a
+task list (same marker) — each list round-trips alone and they merge on the
+way back. `tiptapToMarkdownRich` therefore writes an HTML comment (`<!-- -->`,
+a CommonMark type-2 block the DOM parser drops) between adjacent list blocks.
+The gate's *whole-document* `lossless()` fixtures are what catch join-level
+loss; if you find another construct that merges across a blank line, add a
+fixture there, not an exemption here.
+
 ### 2a. The one exemption: presentational attributes
 
 `withoutPresentationalAttrs()` in `markdown-serialize.ts` normalises a short list
@@ -94,7 +106,7 @@ dropped and that *nothing else* is — so a widened list shows up as a failing
 
 | Tier | Representation | For | Example |
 |---|---|---|---|
-| **Codec** | per-block markdown syntax | custom blocks that opt in | callout → `> [!note]` |
+| **Codec** | per-block markdown syntax | custom blocks that opt in | callout → `> [!note]`, accordion → `<details>` |
 | **1** | pretty markdown (turndown) | anything markdown expresses | heading, list, code, link |
 | **2** | the node's **own HTML** | config markdown can't express | `<img width>`, `<u>`, `<p style="text-align">` |
 | **3** | **base64 `dg-block` fence** | everything else | Excalidraw/Mermaid, publishing blocks |
@@ -170,6 +182,46 @@ they're *derived* from heading text (`lib/domain/content/heading-ids.ts`), so
 they never appear in markdown at all — a round-trip regenerates them.
 Derivable state needs no syntax; only stored state does.
 
+**Variant — an inline MARK with its own syntax (the private-text lesson):** the
+codec registry is consulted per top-level *block*, so a mark cannot own a
+`toMarkdown`. Serialize it with a turndown rule keyed on the mark's rendered
+element (`dgPrivateText`: `span[data-private=text]` → `%%content%%`) and
+register a codec whose `toMarkdown` returns `null` and whose `reTag` rewrites
+the literal syntax back into that element — applied to the whole HTML, so keep
+it out of `<pre>`/`<code>` (see `outsideCode`) where the same characters are
+content. Literal syntax in ordinary prose re-parses as the mark, fails
+self-verify, and fences: lossless, just opaque, and the gate asserts it. A
+block that must ALSO work when nested inside another container needs the same
+turndown rule (`dgPrivateBlock`) beside its codec, since only top-level blocks
+reach the codec path; its `reTag` must be unanchored.
+
+**Variant — a container block whose attrs markdown can't carry (the accordion
+lesson):** when the block holds *block content* plus attributes that have no
+markdown form, emit the HTML element the block already means — `<details>`
+for the accordion — with the attrs as `data-*` on the tag under the **same
+names the block's `parseHTML` reads**, and put the body after a **blank line**.
+That blank line is doing the work: `<details>` is a CommonMark type-6 HTML
+block, which ends at the first blank line, so marked passes the tag through
+verbatim and then parses the body as real markdown (lists, marks, nested
+blocks) instead of escaped text. `reTag` then only has to add the one attr
+that lived in child markup (`data-header` from `<summary>`) and wrap the body
+in the shape `parseHTML` expects. Two rules that came out of building it:
+
+- **Temper every free group in the `reTag` regex, not just the body.** A lazy
+  `<summary>([\s\S]*?)</summary>` looks safe, but when the body group fails
+  to reach `</details>` without crossing a *nested* `<details>`, the engine
+  backtracks into the lazy summary and grows it until it has swallowed the
+  inner opening tag — the outer header became `Outer</summary>…<summary>Inner`.
+  Lazy limits preference, not expansion; a tempered group
+  (`(?:(?!</summary>|<details\b)[\s\S])*`) cannot grow past the delimiters.
+  With both groups tempered, rewrite innermost-first in a loop and nesting of
+  any depth resolves in as many passes as there are levels.
+- **Decline what the syntax cannot hold.** A header containing a newline is
+  not a valid `<summary>`; `toMarkdown` returns `null` for it and the block
+  fences. The gate asserts the decline as well as the pretty cases, because
+  a codec that emits something the parser mangles is exactly what the
+  self-verify exists to stop.
+
 ### 5b. The extension-symmetry prerequisite (the callout lesson)
 
 A codec (or Tier-2 HTML) can only round-trip if the block's **own
@@ -212,6 +264,47 @@ authoritative, so the edit is written **through the live editor instance**
 a REST PATCH of `NotePayload`, which would diverge the two stores. Plain notes
 use REST. See `MainPanelContent`'s `applySourceMode`.
 
+### 5e. Inline nodes with attributes markdown can't say (the wiki-link lesson)
+
+A `[[link]]` is an inline atom whose attrs are the whole point — the
+rename-durable target id, the alias, the chosen display. Turndown's default
+emitted its text, that re-parsed as plain text, and every paragraph holding a
+link fell to the HTML tier (`<p>see <span data-type="wiki-link" …>`).
+
+The shape that works is **one pure grammar module used by both halves**:
+`lib/domain/content/wiki-link-markdown.ts` serializes (`wikiLinkToMarkdown`,
+`noteWindowToMarkdown`) and parses (`parseWikiLinkMarkdown`,
+`parseNoteWindowMarkdown`), and the turndown rules (`dgWikiLink`,
+`dgNoteWindow`) and codec reTags (`wikiLinkCodec`, `noteWindowCodec`) are
+thin wrappers over it, so write and read cannot disagree. Attributes markdown
+has no syntax for ride in a pandoc-style brace after the link — the same
+grammar as `{.collapsed}`:
+
+```
+[[Title|alias]]{#<targetId> .card .no-context label="…" slug=…}
+![[Title]]{#<targetId> block=<blockId> height=300 .no-border}
+```
+
+Three rules this adds to the recipe:
+
+- **Decline, don't approximate.** A title the grammar can't carry (`[ ] { } |`
+  newline) returns `null` from the serializer, so turndown keeps its default
+  and the paragraph takes the HTML tier. Half-pretty output would be rejected
+  by the self-verify anyway; declining is just faster and clearer.
+- **Rewrite only text.** The reTag runs `outsideCode` AND `outsideTags`, so
+  `[[…]]` inside a `<code>` run or inside another block's attribute value (an
+  accordion `data-header`) is left alone.
+- **Make the block's HTML symmetric first, then move any public-safety
+  stripping to the public seam.** `ServerNoteWindow.renderHTML` used to emit a
+  title-only placeholder (no UUID in published HTML), which made
+  `generateJSON(generateHTML(window)) ≠ window` and barred any pretty form. It
+  now renders every attr, and `components/public/TipTapContent.tsx` strips all
+  but the title before serialising (`publicSafeNoteWindows`) — exactly how
+  private content is handled. One explicit seam, not a lossy renderer.
+
+The gate asserts the shapes (`wiki-link markdown — …`), the declines, and the
+inline-attr sweep covers every attr on the node automatically.
+
 ---
 
 ## 6. Running the gate
@@ -225,8 +318,8 @@ pnpm markdown:blocks:check   # 5 layers: construct battery, escaping battery,
 It runs in `pnpm build` and in CI (`.github/workflows/quality.yml`,
 `markdown-safety` job). A new block auto-appears in the registry enumeration, so
 it can't regress silently. If you add a codec, add a one-line assertion that the
-block serializes to your syntax (not a fence) — see the callout example in the
-gate.
+block serializes to your syntax (not a fence) — see the callout and accordion
+examples in the gate.
 
 ---
 

@@ -12,9 +12,11 @@
  * every write so the rendered note always matches.
  */
 
+import type { JSONContent } from "@tiptap/core";
 import { prisma } from "@/lib/database/client";
 import type { Prisma } from "@/lib/database/generated/prisma";
 import { logger } from "@/lib/core/logger";
+import { recordNoteHistory } from "@/lib/domain/content/note-history";
 import {
   generateUniqueSlug,
   markdownToTiptap,
@@ -123,7 +125,7 @@ export async function upsertRunLedger(
     select: {
       id: true,
       title: true,
-      notePayload: { select: { metadata: true } },
+      notePayload: { select: { metadata: true, tiptapJson: true } },
     },
   });
   // Quest logs never adopt via the legacy exact-title fallback: a stale
@@ -145,7 +147,7 @@ export async function upsertRunLedger(
           select: {
             id: true,
             title: true,
-            notePayload: { select: { metadata: true } },
+            notePayload: { select: { metadata: true, tiptapJson: true } },
           },
         }));
   const ledgerTitle = existing?.title.startsWith(`${LEDGER_TITLE} —`)
@@ -190,6 +192,16 @@ export async function upsertRunLedger(
         data: { title: ledgerTitle },
       });
     }
+    // Conversion backup (owner, 2026-10-12): this is a whole-document
+    // replace rebuilt from markdown, so keep what it overwrites.
+    await recordNoteHistory({
+      contentId: existing.id,
+      changedBy: userId,
+      snapshot: (existing.notePayload?.tiptapJson as JSONContent | undefined) ?? null,
+      source: "run-ledger",
+      mode: "replace",
+      route: "payload",
+    });
     await prisma.notePayload.upsert({
       where: { contentId: existing.id },
       update: payloadData,

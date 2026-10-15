@@ -7,6 +7,7 @@
  */
 
 import { createHash } from "node:crypto";
+import type { ModelMessage } from "ai";
 
 export type PromptCacheJSONValue =
   | string
@@ -83,8 +84,37 @@ export function supportsOpenAIPromptCaching(modelId: string): boolean {
     /^chatgpt-4o(?:$|-)/.test(id) ||
     /^gpt-4\.1(?:$|-)/.test(id) ||
     /^gpt-5(?:$|[.-])/.test(id) ||
+    // gpt-6 (2026-09-30): the list stopped at gpt-5, so gpt-6 was never
+    // sent a routing key — "a model we allow is a model we own".
+    /^gpt-6(?:$|[.-])/.test(id) ||
     /^o[134](?:$|-)/.test(id)
   );
+}
+
+/**
+ * Mark the LAST message as an Anthropic cache breakpoint (ephemeral, 5-minute
+ * lifetime, refreshed on every hit). Anthropic caches only up to a marked
+ * block; one moving breakpoint on the newest message caches the whole
+ * prompt — tools, system, history — and the provider's lookback finds the
+ * previous step's entry. Writes bill at 1.25× input, reads at 0.1×; a
+ * multi-step turn re-reads its prefix every step, so the read discount
+ * dominates (§10 round 3, reversing the 3.2.2 no-writes policy for agentic
+ * turns). Other providers ignore the `anthropic` namespace. Pure.
+ */
+export function withAnthropicCacheBreakpoint(messages: ModelMessage[]): ModelMessage[] {
+  if (messages.length === 0) return messages;
+  const last = messages[messages.length - 1];
+  const marked = {
+    ...last,
+    providerOptions: {
+      ...last.providerOptions,
+      anthropic: {
+        ...(last.providerOptions?.anthropic ?? {}),
+        cacheControl: { type: "ephemeral" },
+      },
+    },
+  } as ModelMessage;
+  return [...messages.slice(0, -1), marked];
 }
 
 /**

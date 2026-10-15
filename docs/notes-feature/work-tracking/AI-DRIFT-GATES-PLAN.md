@@ -78,6 +78,25 @@ Every distinct `adapterKind` used by a template has a `case "<kind>"` in
 `resolveChatModelFromConnection` (source-scan providers/registry.ts). A template whose
 adapter has no branch can render in settings but never instantiate a model.
 
+### Gate 6 — Database column types agree everywhere (added 2026-09-12, PR #231)
+`AI_PROPOSABLE_COLUMN_TYPES` ≡ implemented types minus `person`; no proposal tool or
+create route may re-declare the list (the `"longText"` literal is the tell); every
+`propose_*` tool that takes columns uses the shared `proposedColumn` schema.
+
+### Gate 7 — Run-loop tool schemas describe shape; execute judges (added 2026-09-21)
+Source-scan `registry.ts` for `propose_item_iteration`, `record_item_result`,
+`record_batch_checkpoint`, `record_iteration_findings` and `add_quest_ledger_column`:
+the block between each tool's definition and its `execute:` must contain no
+`.enum(`, `.min(`, `.max(`, `.int(`, `.regex(`, `.refine(`, `.length(`. The
+proposal must take `inputSchema: ITERATION_PROPOSAL_INPUT` from the pure module
+`lib/domain/ai/tools/iteration-proposal.ts`, whose schema block is held to the same
+rule. Why: the SDK validates the schema before execute, so any refinement there is a
+fatal rejection with a raw Zod dump — prod `fa475acc` lost four consecutive calls
+(half a turn's steps) to four shape misses on payloads that were semantically
+correct. Companion: `pnpm proposal:shape:check` runs those four payloads through the
+schema and the execute-side resolvers. Principles: AI-ARCHITECTURE.md §5 "Tool
+input contracts".
+
 ## Live drift this PR fixed to land green (33 findings on the gate's first run)
 
 | Drift | Fix |

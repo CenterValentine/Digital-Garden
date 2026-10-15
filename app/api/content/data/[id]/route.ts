@@ -29,6 +29,7 @@ import { after } from "next/server";
 import { markContextDirty } from "@/lib/domain/ai-context/context-dirty";
 import { canAlterSchema } from "@/lib/domain/data/server/access";
 import { Prisma } from "@/lib/database/generated/prisma";
+import { mergeAiPolicy, parseAiPolicyPatch } from "@/lib/domain/data/ai-policy";
 
 const ROUTE_PATH = "/api/content/data/[id]";
 
@@ -181,7 +182,11 @@ export async function PATCH(
           { status: 404 }
         );
       }
-      const body = (await request.json()) as { query?: unknown; rowDigests?: unknown };
+      const body = (await request.json()) as {
+        query?: unknown;
+        rowDigests?: unknown;
+        aiPolicy?: unknown;
+      };
       // AI row digests opt-in (AI-BULK-ROW-READING-PLAN §5): any table mode.
       if (typeof body.rowDigests === "boolean" && body.query === undefined) {
         await prisma.dataPayload.update({
@@ -189,6 +194,30 @@ export async function PATCH(
           data: { rowDigests: body.rowDigests },
         });
         return NextResponse.json({ success: true, data: { rowDigests: body.rowDigests } });
+      }
+      // AI policy bag (MCP-DATABASE-REACH-PLAN §2.8): strict on the way in,
+      // merged over the stored bag so one key never clobbers another.
+      if (body.aiPolicy !== undefined && body.query === undefined) {
+        const parsed = parseAiPolicyPatch(body.aiPolicy);
+        if (!parsed.ok || !parsed.patch) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: { code: "VALIDATION_ERROR", message: parsed.reason ?? "Invalid aiPolicy" },
+            },
+            { status: 400 }
+          );
+        }
+        const current = await prisma.dataPayload.findUnique({
+          where: { contentId: id },
+          select: { aiPolicy: true },
+        });
+        const next = mergeAiPolicy(current?.aiPolicy, parsed.patch);
+        await prisma.dataPayload.update({
+          where: { contentId: id },
+          data: { aiPolicy: next as unknown as Prisma.InputJsonValue },
+        });
+        return NextResponse.json({ success: true, data: { aiPolicy: next } });
       }
       if (payload.mode !== "query") {
         return NextResponse.json(

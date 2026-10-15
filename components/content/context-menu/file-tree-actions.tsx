@@ -8,10 +8,11 @@
  * M4: File Tree Completion - File Tree Context Menu
  */
 
-import type { ReactNode } from "react";
 import {
-  ArrowUpLeft,
-  ArrowUpRight,
+  PANE_HOTKEY_LEGEND,
+  PANE_HOTKEY_SINGLE,
+} from "@/lib/features/content/pane-hotkeys";
+import {
   Edit,
   Trash2,
   Unlink,
@@ -32,8 +33,6 @@ import {
   Eye,
   EyeOff,
   ExternalLink,
-  ArrowDownLeft,
-  ArrowDownRight,
   FolderInput,
   Captions,
   LampDesk,
@@ -44,6 +43,9 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useImportSkillStore } from "@/state/import-skill-store";
+
+const DOCX_MIME_TYPE =
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 import { useCharterDialogStore } from "@/state/charter-dialog-store";
 import { useDataFlashcardsDialogStore } from "@/state/data-flashcards-dialog-store";
 import {
@@ -58,17 +60,13 @@ import {
   type NewContentMenuItem,
   type PageTemplateMenuData,
 } from "@/components/content/menu-items/new-content-menu";
-import { supportsCustomIcon } from "@/lib/domain/content/file-extension-utils";
+import { getExtensionCreateMenuItems } from "@/lib/extensions/client-registry";
 import {
-  BOTTOM_LEFT_PANE_ID,
-  BOTTOM_RIGHT_PANE_ID,
-  TOP_LEFT_PANE_ID,
-  TOP_RIGHT_PANE_ID,
-  getPaneLabel,
-  getVisiblePaneIds,
-  useContentStore,
-  type WorkspacePaneId,
-} from "@/state/content-store";
+  contentIdOfRowId,
+  deleteTargetsOfRowIds,
+} from "@/lib/features/content/shortcut-mirror";
+import { supportsCustomIcon } from "@/lib/domain/content/file-extension-utils";
+import { useContentStore } from "@/state/content-store";
 import { usePageTemplateStore } from "@/state/page-template-store";
 import { useSettingsStore } from "@/state/settings-store";
 import { useExtensionActivationStore } from "@/state/extension-activation-store";
@@ -104,8 +102,12 @@ export interface FileTreeContext {
     isShortcut?: boolean;
     /** This row is a view-only projection inside an expanded folder-shortcut. */
     isShortcutMirror?: boolean;
+    /** A note's window row (also a mirror row): derived, nothing to delete. */
+    isWindowReference?: boolean;
     /** For a mirror row, the real ContentNode id it stands for. */
     mirrorOf?: string | null;
+    /** For a row inside a shortcut, that shortcut's title — what Delete removes. */
+    mirrorShortcutTitle?: string | null;
     shortcutTargetId?: string | null;
     shortcutTargetTitle?: string | null;
     shortcutTargetContentType?: string | null;
@@ -113,7 +115,9 @@ export interface FileTreeContext {
     /** Whether this shortcut's mirror is currently hiding nested shortcuts. */
     nestedShortcutsHidden?: boolean;
     externalUrl?: string; // Phase 2: External link URL
-    file?: { mimeType?: string } | null; // For supportsCustomIcon check
+    file?: { mimeType?: string; fileName?: string } | null; // For supportsCustomIcon check
+    /** A .docx already marked as a document template (fill_docx_template). */
+    isDocxTemplate?: boolean;
     isCharter?: boolean; // v3.6: note/folder already marked as a playbook
     charterDescription?: string; // v3.6: seeds the edit-description dialog
   };
@@ -226,21 +230,29 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
   const isPeopleMount = clickedNode?.treeNodeKind === "peopleGroup" || clickedNode?.treeNodeKind === "person";
   /**
    * A mirrored row is a VIEW of content that lives elsewhere, addressed by a
-   * synthetic path-scoped id. Every mutating action here would either miss
-   * (the id resolves to nothing — which is how "Delete 0 items (0 total)?"
-   * happened) or, worse, hit the real content from a place the user did not
-   * think they were editing. Read-only actions only.
+   * synthetic path-scoped id (inside a shortcut, or a note's window row).
+   * Owner rule (2026-10-05): every action that only REFERS to the content is
+   * offered and reaches the original — open, open in pane, copy, download,
+   * AI context, a deck from a table. Delete removes the shortcut the row is
+   * seen through, never the original (`deleteTargetsOfRowIds`). Other edits
+   * — rename, icon, add, paste, duplicate, move, view, charter — belong to the
+   * content's own row and stay off here: a synthetic id resolves to nothing
+   * (how "Delete 0 items (0 total)?" happened), and the real id would edit
+   * content from a place the user did not think they were editing.
    */
   const isMirrorRow = clickedNode?.isShortcutMirror === true;
-  const { layoutMode, openContentInPane } = useContentStore.getState();
-  const visiblePaneIds = new Set(getVisiblePaneIds(layoutMode));
+  const contentId = clickedId ? contentIdOfRowId(clickedId) : undefined;
+  const contentIds = [...new Set(selectedIds.map(contentIdOfRowId))];
+  const { openContentInPane } = useContentStore.getState();
 
   // Section 1: Create actions (always show for single selection or empty space)
   // Behavior:
   // - Right-click on folder → Create inside folder (as children)
   // - Right-click on file → Create as sibling (same parent as file)
   // - Right-click on empty space → Create at root level
-  if (isSingleSelection || !clickedId) {
+  // Not on a mirror row: creating there would add content to the source
+  // folder, an edit the row's own location should make.
+  if ((isSingleSelection || !clickedId) && !isMirrorRow) {
     // Determine target parent ID based on what was clicked
     let targetId: string | null;
 
@@ -323,7 +335,8 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
     const newMenuItems = getNewContentMenuItems(
       callbacks,
       targetId,
-      pageTemplateData
+      pageTemplateData,
+      getExtensionCreateMenuItems()
     );
 
     sections.push({
@@ -369,6 +382,7 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
       isSingleSelection &&
       clickedId &&
       clickedNode &&
+      !isMirrorRow &&
       (clickedNode.contentType === "note" || clickedNode.contentType === "folder")
     ) {
       const playbookTitle = clickedNode.title;
@@ -421,10 +435,86 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
       }
     }
 
+    // Document template toggle — a .docx the user already keeps becomes the
+    // layout fill_docx_template fills. Same shape as the charter toggle:
+    // the file stays where it is; the mark is a record on its payload.
+    if (
+      isSingleSelection &&
+      clickedId &&
+      clickedNode &&
+      !isMirrorRow &&
+      clickedNode.contentType === "file" &&
+      (clickedNode.file?.mimeType === DOCX_MIME_TYPE ||
+        clickedNode.file?.fileName?.toLowerCase().endsWith(".docx"))
+    ) {
+      const contentId = clickedId;
+      if (clickedNode.isDocxTemplate) {
+        playbookActions.push({
+          id: "unmark-docx-template",
+          label: "Unmark Document Template",
+          icon: <BookMinus className="h-4 w-4" />,
+          onClick: async () => {
+            try {
+              const res = await fetch(
+                `/api/content/docx-templates?contentId=${encodeURIComponent(contentId)}`,
+                { method: "DELETE", credentials: "include" },
+              );
+              if (!res.ok) throw new Error("request failed");
+              window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
+              toast.success("Unmarked — no longer offered as a document template");
+            } catch {
+              toast.error("Failed to unmark document template");
+            }
+          },
+        });
+      } else {
+        playbookActions.push({
+          id: "mark-docx-template",
+          label: "Mark as Document Template",
+          icon: <ScrollText className="h-4 w-4" />,
+          onClick: async () => {
+            const pending = toast.loading("Checking the template's fields…");
+            try {
+              const res = await fetch("/api/content/docx-templates", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                credentials: "include",
+                body: JSON.stringify({ contentId }),
+              });
+              const body = (await res.json().catch(() => ({}))) as {
+                success?: boolean;
+                data?: { summary?: { fieldCount?: number; sectionCount?: number } };
+                error?: { message?: string; details?: Array<{ near?: string; part?: string }> };
+              };
+              toast.dismiss(pending);
+              if (!res.ok || !body.success) {
+                const near = body.error?.details?.[0]?.near;
+                toast.error(body.error?.message ?? "Failed to mark document template", {
+                  description: near ? `Near: “${near}”` : undefined,
+                  duration: 8000,
+                });
+                return;
+              }
+              window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
+              const s = body.data?.summary;
+              toast.success("Marked as a document template", {
+                description: s
+                  ? `${s.fieldCount ?? 0} field${s.fieldCount === 1 ? "" : "s"}, ${s.sectionCount ?? 0} repeating section${s.sectionCount === 1 ? "" : "s"}`
+                  : undefined,
+              });
+            } catch {
+              toast.dismiss(pending);
+              toast.error("Failed to mark document template");
+            }
+          },
+        });
+      }
+    }
+
     // Import Skill — available wherever new content can be created (single
     // selection or empty space). Same target rule as the Add submenu:
     // folder → into it, file/note → sibling, empty → root.
-    if (isSingleSelection || !clickedId) {
+    if ((isSingleSelection || !clickedId) && !isMirrorRow) {
       const importTarget: string | null = !clickedId
         ? null
         : isFolder
@@ -454,12 +544,14 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
   if (
     flashcardsEnabled &&
     isSingleSelection &&
-    clickedId &&
+    contentId &&
     clickedNode &&
     clickedNode.contentType === "data"
   ) {
     const dataTitle = clickedNode.title;
-    const dataContentId = clickedId;
+    // Reads the table and builds the deck elsewhere — a reference action, so
+    // it runs from inside a shortcut too, against the original table.
+    const dataContentId = contentId;
     // Label tracks reality: a table already linked to a deck gets "Sync",
     // a fresh one gets "Create". The link cache loads lazily — first-ever
     // open may briefly show "Create" until the fetch lands.
@@ -553,8 +645,9 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
     });
   }
 
-  // Section 2: Folder view mode (folder only, single selection)
-  if (isSingleSelection && clickedId && isFolder && onSetFolderView) {
+  // Section 2: Folder view mode (folder only, single selection). Stored on the
+  // folder itself, so set from its own row.
+  if (isSingleSelection && clickedId && isFolder && onSetFolderView && !isMirrorRow) {
     sections.push({
       title: "View",
       actions: [
@@ -609,13 +702,13 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
           id: "edit-external",
           label: "Edit Link",
           icon: <Edit className="h-4 w-4" />,
-          shortcut: "R",
+          shortcut: "⌥R",
           onClick: async () => {
             if (onEditExternal) {
               await onEditExternal(clickedId);
             }
           },
-          disabled: !onEditExternal,
+          disabled: !onEditExternal || isMirrorRow,
         },
         {
           id: "copy-url",
@@ -634,35 +727,14 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
   }
 
   // Section 3: Edit actions (single selection only, exclude external links)
-  if (isSingleSelection && clickedId && clickedNode && clickedNode.contentType !== "external") {
+  if (
+    isSingleSelection &&
+    clickedId &&
+    contentId &&
+    clickedNode &&
+    clickedNode.contentType !== "external"
+  ) {
     const canCustomizeIcon = clickedNode && supportsCustomIcon(clickedNode);
-    const paneActions: Array<{
-      id: WorkspacePaneId;
-      label: string;
-      icon: ReactNode;
-    }> = [
-      {
-        id: TOP_LEFT_PANE_ID,
-        label: "Top Left Pane",
-        icon: <ArrowUpLeft className="h-4 w-4" />,
-      },
-      {
-        id: TOP_RIGHT_PANE_ID,
-        label: "Top Right Pane",
-        icon: <ArrowUpRight className="h-4 w-4" />,
-      },
-      {
-        id: BOTTOM_LEFT_PANE_ID,
-        label: "Bottom Left Pane",
-        icon: <ArrowDownLeft className="h-4 w-4" />,
-      },
-      {
-        id: BOTTOM_RIGHT_PANE_ID,
-        label: "Bottom Right Pane",
-        icon: <ArrowDownRight className="h-4 w-4" />,
-      },
-    ];
-
     const editActions: ContextMenuAction[] = [
       {
         // An explicit, discoverable "open" for every content type. Folders now
@@ -675,7 +747,7 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
         label: "Open",
         icon: <ExternalLink className="h-4 w-4" />,
         onClick: () =>
-          useContentStore.getState().setSelectedContentId(clickedId, {
+          useContentStore.getState().setSelectedContentId(contentId, {
             title: clickedNode.title,
             contentType: clickedNode.contentType,
           }),
@@ -684,25 +756,34 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
         id: "open-in-pane",
         label: "Open In Pane",
         icon: <ExternalLink className="h-4 w-4" />,
-        submenu: paneActions.map((pane) => ({
-          id: `open-${pane.id}`,
-          label: visiblePaneIds.has(pane.id)
-            ? getPaneLabel(layoutMode, pane.id)
-            : `${pane.label} (expand layout)`,
-          icon: pane.icon,
-          onClick: () =>
-            openContentInPane(clickedId, pane.id, {
+        tooltip: PANE_HOTKEY_LEGEND,
+        // The submenu IS the key map — Q W E / A S D / Z X C drawn as what
+        // each key means. A pane list gave the left pane three letters and the
+        // right pane two, which read as unequal reach; the grid reads as the
+        // keyboard. Picking a cell does what holding the key and clicking the
+        // file does, including S (collapse to one pane), which had no row.
+        customFlyout: {
+          kind: "pane-grid",
+          onPick: (target) => {
+            const meta = {
               title: clickedNode.title,
               contentType: clickedNode.contentType,
-              pin: true,
-            }),
-        })),
+            };
+            if (target === PANE_HOTKEY_SINGLE) {
+              useContentStore.getState().setLayoutMode("single");
+              useContentStore.getState().setSelectedContentId(contentId, meta);
+              return;
+            }
+            // A deliberate placement is pinned, as the held-key open is.
+            openContentInPane(contentId, target, { ...meta, pin: true });
+          },
+        },
       },
       {
         id: "rename",
         label: "Rename",
         icon: <Edit className="h-4 w-4" />,
-        shortcut: "R",
+        shortcut: "⌥R",
         onClick: () => onRename?.(clickedId),
         disabled: !onRename || isMirrorRow,
       },
@@ -736,6 +817,8 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
           label: `Copy ${itemLabel}`,
           icon: <Copy className="h-4 w-4" />,
           shortcut: "⌘C",
+          // Row ids: the clipboard builder needs them for titles, and copies
+          // each row's ORIGINAL (FileNode's clipboardItems).
           onClick: () => onCopy?.(selectedIds),
           disabled: !onCopy,
         },
@@ -783,7 +866,7 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
           id: "star",
           label: `Toggle Star`,
           icon: <Star className="h-4 w-4" />,
-          onClick: async () => await onToggleStar?.(selectedIds),
+          onClick: async () => await onToggleStar?.(contentIds),
           disabled: !onToggleStar,
           divider: true,
         },
@@ -794,7 +877,11 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
   // Section 5.5: Move (folder search now; AI folder assistant in Phase 2).
   // Excludes the items themselves and their current parent as obvious
   // non-targets; the move API is the hard guard against true cycles.
-  if (selectedIds.length > 0 && !isPeopleMount) {
+  // Not from a mirror row (dragging one still moves its original — that's
+  // the rearranging-in-place the owner asked for; filing it elsewhere is an
+  // edit for the content's own row). Hidden, not disabled: a flyout row
+  // opens whatever its disabled flag says.
+  if (selectedIds.length > 0 && !isPeopleMount && !isMirrorRow) {
     const excludeIds = [
       ...selectedIds,
       ...(clickedNode?.parentId ? [clickedNode.parentId] : []),
@@ -838,7 +925,7 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
           id: "download",
           label: `Download ${itemLabel}`,
           icon: <Download className="h-4 w-4" />,
-          onClick: async () => await onDownload?.(selectedIds),
+          onClick: async () => await onDownload?.(contentIds),
           disabled: !onDownload,
           divider: true,
         },
@@ -851,10 +938,12 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
 
   // Transcribe an audio file into a sibling note (Phase 5). Single audio
   // file only. Opt-in (explicit click); the speech-to-text route is
-  // auto-discovered server-side.
+  // auto-discovered server-side. Not from a mirror row: the transcript lands
+  // beside the original, in a folder the user is not looking at.
   if (
     isSingleSelection &&
     clickedId &&
+    !isMirrorRow &&
     clickedNode?.contentType === "file" &&
     clickedNode.file?.mimeType?.startsWith("audio/")
   ) {
@@ -899,8 +988,8 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
   // itself. Extension-gated via the activation store (manifest default on).
   const studioEnabled =
     useExtensionActivationStore.getState().overrides["studio"] ?? true;
-  if (isSingleSelection && clickedId && studioEnabled) {
-    const targetId = clickedId;
+  if (isSingleSelection && contentId && studioEnabled) {
+    const targetId = contentId;
     aiActions.push({
       id: "update-ai-context",
       label: "Update AI context",
@@ -941,25 +1030,44 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
   }
 
   // Section 7: Destructive actions
-  if (selectedIds.length > 0 && !isMirrorRow) {
-    const itemLabel = isMultiSelection ? `${selectedIds.length} items` : "item";
+  //
+  // What goes is decided per row by `deleteTargetsOfRowIds`, the same rule
+  // the sidebar applies to ⌥D: a row inside a shortcut removes the shortcut,
+  // a window row removes nothing. The menu only reads it to label the entry
+  // truthfully; it still hands over the row ids.
+  const deleteTargets = deleteTargetsOfRowIds(selectedIds);
+  if (deleteTargets.length > 0) {
+    const itemLabel = deleteTargets.length > 1 ? `${deleteTargets.length} items` : "item";
+    // From inside a shortcut, the row clicked is NOT what goes — name the
+    // shortcut that does, so nobody reads this as "trash the original".
+    const removesEnclosingShortcut =
+      !isMultiSelection && isMirrorRow && !clickedNode?.isWindowReference;
     // Removing a shortcut deletes a pointer, not content — the target is
     // untouched. Saying "Delete" beside the target's own name reads as an
     // offer to destroy that content, which is the opposite of what happens.
-    const removesOnlyAShortcut = !isMultiSelection && clickedNode?.isShortcut;
+    const removesOnlyAShortcut =
+      removesEnclosingShortcut || (!isMultiSelection && clickedNode?.isShortcut);
+    const enclosingTitle = clickedNode?.mirrorShortcutTitle;
     sections.push({
       actions: [
         {
           id: "delete",
-          label: removesOnlyAShortcut
-            ? "Remove Shortcut"
-            : `Delete ${itemLabel}`,
+          label: removesEnclosingShortcut
+            ? enclosingTitle
+              ? `Remove Shortcut “${enclosingTitle}”`
+              : "Remove Shortcut"
+            : removesOnlyAShortcut
+              ? "Remove Shortcut"
+              : `Delete ${itemLabel}`,
+          tooltip: removesEnclosingShortcut
+            ? "Removes the shortcut this row is shown through. The original stays where it is."
+            : undefined,
           icon: removesOnlyAShortcut ? (
             <Unlink className="h-4 w-4" />
           ) : (
             <Trash2 className="h-4 w-4" />
           ),
-          shortcut: "D",
+          shortcut: "⌥D",
           onClick: async () => await onDelete?.(selectedIds),
           disabled: !onDelete,
           // Not destructive styling: nothing is lost, and the red treatment is

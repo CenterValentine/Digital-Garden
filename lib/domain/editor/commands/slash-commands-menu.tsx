@@ -156,7 +156,13 @@ export const SlashCommandsList = forwardRef<SlashCommandsListRef, SlashCommandsL
               onClick={() => selectItem(index)}
               type="button"
             >
-              <span className="slash-command-icon">{item.icon}</span>
+              <span className="slash-command-icon" aria-hidden="true">
+                {typeof item.icon === "string" ? (
+                  item.icon
+                ) : (
+                  <item.icon size={18} strokeWidth={1.75} />
+                )}
+              </span>
               <div className="slash-command-text">
                 <div className="slash-command-title">{item.title}</div>
                 <div className="slash-command-description">{item.description}</div>

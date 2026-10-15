@@ -15,6 +15,7 @@ import { Plus, Trash2, GripVertical, Pencil, Check, X, FileText, ChevronDown, Ch
 import { toast } from "sonner";
 import { usePageTemplateStore } from "@/state/page-template-store";
 import { PageTemplateEditorDialog } from "@/components/content/dialogs/PageTemplateEditorDialog";
+import { DocxTemplateManager } from "./DocxTemplateManager";
 
 interface CategoryItem {
   id: string;
@@ -671,6 +672,8 @@ export default function TemplatesSettingsPage() {
       </div>
 
       <PageTemplateManager />
+
+      <DocxTemplateManager />
 
       <CategoryManager
         scope="content_template"

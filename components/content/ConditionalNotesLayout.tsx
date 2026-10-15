@@ -21,6 +21,7 @@ import NotesNavBar from "@/components/client/nav/NotesNavBar";
 import { ExtensionGlobalDialogs } from "@/lib/extensions/ExtensionGlobalDialogs";
 import { AuthSessionSync } from "./AuthSessionSync";
 import { useIsMobile } from "@/components/common/useIsMobile";
+import { useContentFullscreenStore } from "@/state/content-fullscreen-store";
 import { useIsPhone, useIsLandscape } from "@/components/common/useViewport";
 import { useMobileUiStore } from "@/state/mobile-ui-store";
 
@@ -65,7 +66,11 @@ export function ConditionalNotesLayout({
   const chromePeek = useMobileUiStore((s) => s.chromePeek);
   // The 56px top nav auto-hides on mobile in focus mode or when a phone is
   // landscape (reclaiming vertical space); the grab handle peeks it back.
-  const navHidden = isMobile && (focusMode || (isPhone && isLandscape)) && !chromePeek;
+  // Content full screen (content toolbar) hides the nav too — the content
+  // owns the whole window; the left rail stays (state/content-fullscreen-store.ts).
+  const contentFullscreen = useContentFullscreenStore((s) => s.active);
+  const navHidden =
+    contentFullscreen || (isMobile && (focusMode || (isPhone && isLandscape)) && !chromePeek);
   const isFullscreen = pathname?.includes("/fullscreen");
   const isFocusMode = pathname?.includes("/content/focus/");
 

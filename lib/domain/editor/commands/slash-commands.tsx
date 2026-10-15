@@ -9,6 +9,81 @@
  */
 
 import { Extension } from "@tiptap/core";
+import {
+  AppWindow,
+  Award,
+  BookOpen,
+  Bookmark,
+  Bug,
+  CalendarCheck,
+  CalendarDays,
+  CalendarRange,
+  CheckCheck,
+  ChevronDown,
+  ChevronsDownUp,
+  Clock,
+  Code,
+  Columns2,
+  Columns3,
+  DollarSign,
+  EyeOff,
+  FileText,
+  FolderKanban,
+  Footprints,
+  Gauge,
+  Hash,
+  Heading,
+  Heading1,
+  Heading2,
+  Heading3,
+  HelpCircle,
+  Highlighter,
+  Image,
+  Images,
+  Info,
+  Layers,
+  LayoutGrid,
+  LayoutPanelTop,
+  Lightbulb,
+  List,
+  ListChecks,
+  ListOrdered,
+  ListTree,
+  Mail,
+  Megaphone,
+  MessageSquareQuote,
+  Milestone,
+  Minus,
+  MoveVertical,
+  Newspaper,
+  OctagonAlert,
+  PenTool,
+  Quote,
+  RectangleHorizontal,
+  Rss,
+  Scissors,
+  SeparatorHorizontal,
+  Shapes,
+  Share2,
+  Sparkles,
+  SquareCheck,
+  Star,
+  Table,
+  Table2,
+  Tag,
+  Tags,
+  TextCursorInput,
+  TextQuote,
+  Timer,
+  TrendingUp,
+  TriangleAlert,
+  User,
+  Video,
+  Volume2,
+  WandSparkles,
+  Workflow,
+  type LucideIcon,
+} from "lucide-react";
 import type { Editor, Range } from "@tiptap/core";
 import { ReactRenderer } from "@tiptap/react";
 import Suggestion from "@tiptap/suggestion";
@@ -18,6 +93,8 @@ import { SlashCommandsList, type SlashCommandsListRef } from "./slash-commands-m
 import { getExtensionSlashCommands } from "@/lib/extensions/editor-client-registry";
 import { useTimestampFormatStore } from "@/state/timestamp-format-store";
 import { useSettingsStore } from "@/state/settings-store";
+import { openFeedbackDialog } from "@/state/feedback-dialog-store";
+import { FEEDBACK_REPO_DEFAULT } from "@/lib/domain/feedback/issue-templates";
 import { getDefaultPeriodicSummaryDate } from "@/lib/domain/periodic-summary";
 import { createDefaultStopwatchAttrs } from "@/lib/domain/stopwatch";
 import { createDefaultHabitTrackerAttrs } from "../extensions/blocks/habit-tracker";
@@ -32,7 +109,8 @@ export type SlashCommandKind = "editor" | "published";
 export interface SlashCommand {
   title: string;
   description: string;
-  icon: string;
+  /** A Lucide icon component (preferred) or a short glyph string. */
+  icon: LucideIcon | string;
   command: ({ editor, range }: { editor: Editor; range: Range }) => void;
   aliases?: string[];
   /**
@@ -76,7 +154,7 @@ export function getSlashCommands(): SlashCommand[] {
     {
       title: "Heading 1",
       description: "Large section heading",
-      icon: "H1",
+      icon: Heading1,
       command: ({ editor, range }) => {
         editor
           .chain()
@@ -90,7 +168,7 @@ export function getSlashCommands(): SlashCommand[] {
     {
       title: "Heading 2",
       description: "Medium section heading",
-      icon: "H2",
+      icon: Heading2,
       command: ({ editor, range }) => {
         editor
           .chain()
@@ -104,7 +182,7 @@ export function getSlashCommands(): SlashCommand[] {
     {
       title: "Heading 3",
       description: "Small section heading",
-      icon: "H3",
+      icon: Heading3,
       command: ({ editor, range }) => {
         editor
           .chain()
@@ -116,9 +194,18 @@ export function getSlashCommands(): SlashCommand[] {
       aliases: ["h3"],
     },
     {
+      title: "Private",
+      description: "Comment out this block — hidden from AI, publishing and search",
+      icon: EyeOff,
+      command: ({ editor, range }) => {
+        editor.chain().focus().deleteRange(range).setPrivateBlock().run();
+      },
+      aliases: ["comment", "hidden", "%%", "commented"],
+    },
+    {
       title: "Table",
       description: "Insert a 3×3 table with header row",
-      icon: "⊞",
+      icon: Table,
       command: ({ editor, range }) => {
         editor
           .chain()
@@ -132,7 +219,7 @@ export function getSlashCommands(): SlashCommand[] {
     {
       title: "Task List",
       description: "Create a checklist",
-      icon: "☑",
+      icon: ListChecks,
       command: ({ editor, range }) => {
         editor
           .chain()
@@ -146,7 +233,7 @@ export function getSlashCommands(): SlashCommand[] {
     {
       title: "Bullet List",
       description: "Create a bulleted list",
-      icon: "•",
+      icon: List,
       command: ({ editor, range }) => {
         editor
           .chain()
@@ -160,7 +247,7 @@ export function getSlashCommands(): SlashCommand[] {
     {
       title: "Numbered List",
       description: "Create a numbered list",
-      icon: "1.",
+      icon: ListOrdered,
       command: ({ editor, range }) => {
         editor
           .chain()
@@ -174,7 +261,7 @@ export function getSlashCommands(): SlashCommand[] {
     {
       title: "Quote",
       description: "Insert a blockquote",
-      icon: '"',
+      icon: TextQuote,
       command: ({ editor, range }) => {
         editor
           .chain()
@@ -188,7 +275,7 @@ export function getSlashCommands(): SlashCommand[] {
     {
       title: "Audio",
       description: "Embed an audio file — upload via inline player",
-      icon: "🔊",
+      icon: Volume2,
       command: ({ editor, range }) => {
         // Insert in empty-state (src=null); the NodeView's empty state
         // shows a file picker + drop zone until the user uploads.
@@ -214,7 +301,7 @@ export function getSlashCommands(): SlashCommand[] {
       title: "Flashcards",
       description:
         "Embed a flashcard deck — tap to flip, Play opens the FSRS review overlay",
-      icon: "🃏",
+      icon: Layers,
       command: ({ editor, range }) => {
         // Insert with deckId=null; the NodeView shows a "pick a deck"
         // affordance until the user attaches one via block properties
@@ -242,7 +329,7 @@ export function getSlashCommands(): SlashCommand[] {
       title: "Note Window",
       description:
         "Window another note's content in place — view, edit, retarget, or create a new note",
-      icon: "🪟",
+      icon: AppWindow,
       command: ({ editor, range }) => {
         // Insert with targetContentId=null; the NodeView shows the target
         // picker until the user aims the window at a note. Height honors
@@ -274,7 +361,7 @@ export function getSlashCommands(): SlashCommand[] {
       title: "Highlight to Flashcard",
       description:
         "Pick a deck, then highlight the FRONT and BACK passages — the highlights persist privately, never published",
-      icon: "✎",
+      icon: Highlighter,
       command: ({ editor, range }) => {
         // Remove the slash trigger so the user can immediately start
         // highlighting without leftover "/" characters in the doc.
@@ -296,7 +383,7 @@ export function getSlashCommands(): SlashCommand[] {
     {
       title: "Pull Quote",
       description: "Styled quote block — 7 visual variants (bordered, card, featured…)",
-      icon: "❝",
+      icon: Quote,
       command: ({ editor, range }) => {
         editor
           .chain()
@@ -311,7 +398,7 @@ export function getSlashCommands(): SlashCommand[] {
     {
       title: "Table of Contents",
       description: "Auto-generated outline of document headings",
-      icon: "≡",
+      icon: ListTree,
       command: ({ editor, range }) => {
         editor
           .chain()
@@ -326,7 +413,7 @@ export function getSlashCommands(): SlashCommand[] {
     {
       title: "Gallery",
       description: "Image gallery — grid, masonry, or carousel",
-      icon: "⊞",
+      icon: Images,
       command: ({ editor, range }) => {
         editor.chain().focus().deleteRange(range)
           .insertContent({ type: "gallery", attrs: {} }).run();
@@ -337,7 +424,7 @@ export function getSlashCommands(): SlashCommand[] {
     {
       title: "Hero Image",
       description: "Full-width banner with headline and optional CTA",
-      icon: "▬",
+      icon: Image,
       command: ({ editor, range }) => {
         editor.chain().focus().deleteRange(range)
           .insertContent({ type: "heroImage", attrs: {} }).run();
@@ -348,7 +435,7 @@ export function getSlashCommands(): SlashCommand[] {
     {
       title: "Post Card",
       description: "Blog post preview card with cover, title, and tags",
-      icon: "▭",
+      icon: Newspaper,
       command: ({ editor, range }) => {
         editor.chain().focus().deleteRange(range)
           .insertContent({ type: "postCard", attrs: {} }).run();
@@ -359,7 +446,7 @@ export function getSlashCommands(): SlashCommand[] {
     {
       title: "Project Card",
       description: "Project showcase card with tech stack and links",
-      icon: "◱",
+      icon: FolderKanban,
       command: ({ editor, range }) => {
         editor.chain().focus().deleteRange(range)
           .insertContent({ type: "projectCard", attrs: {} }).run();
@@ -370,7 +457,7 @@ export function getSlashCommands(): SlashCommand[] {
     {
       title: "Recent Posts",
       description: "Dynamic list of recent posts from a publishing path",
-      icon: "≋",
+      icon: Rss,
       command: ({ editor, range }) => {
         editor.chain().focus().deleteRange(range)
           .insertContent({ type: "recentPosts", attrs: {} }).run();
@@ -381,7 +468,7 @@ export function getSlashCommands(): SlashCommand[] {
     {
       title: "Timeline",
       description: "Ordered chronology of events — 10 visual variants",
-      icon: "⊢",
+      icon: Milestone,
       command: ({ editor, range }) => {
         editor.chain().focus().deleteRange(range)
           .insertContent({ type: "timeline", attrs: {} }).run();
@@ -392,7 +479,7 @@ export function getSlashCommands(): SlashCommand[] {
     {
       title: "Stat Block",
       description: "Single large metric display with optional animation",
-      icon: "#",
+      icon: TrendingUp,
       command: ({ editor, range }) => {
         editor.chain().focus().deleteRange(range)
           .insertContent({ type: "statBlock", attrs: {} }).run();
@@ -403,7 +490,7 @@ export function getSlashCommands(): SlashCommand[] {
     {
       title: "Metrics Strip",
       description: "Horizontal row of multiple metrics and KPIs",
-      icon: "≣",
+      icon: Gauge,
       command: ({ editor, range }) => {
         editor.chain().focus().deleteRange(range)
           .insertContent({ type: "metricsStrip", attrs: {} }).run();
@@ -414,7 +501,7 @@ export function getSlashCommands(): SlashCommand[] {
     {
       title: "Process Steps",
       description: "Step-by-step process or how-to list — 6 variants",
-      icon: "①",
+      icon: Footprints,
       command: ({ editor, range }) => {
         editor.chain().focus().deleteRange(range)
           .insertContent({ type: "processSteps", attrs: {} }).run();
@@ -426,7 +513,7 @@ export function getSlashCommands(): SlashCommand[] {
     {
       title: "Testimonial",
       description: "Quote from a person with avatar, name, title, and star rating",
-      icon: "❝",
+      icon: MessageSquareQuote,
       command: ({ editor, range }) => {
         editor.chain().focus().deleteRange(range)
           .insertContent({ type: "testimonialCard", attrs: {} }).run();
@@ -437,7 +524,7 @@ export function getSlashCommands(): SlashCommand[] {
     {
       title: "CTA Banner",
       description: "Call-to-action section with headline and buttons",
-      icon: "⚡",
+      icon: Megaphone,
       command: ({ editor, range }) => {
         editor.chain().focus().deleteRange(range)
           .insertContent({ type: "ctaBanner", attrs: {} }).run();
@@ -449,7 +536,7 @@ export function getSlashCommands(): SlashCommand[] {
     {
       title: "Video",
       description: "Embed a YouTube, Vimeo, or direct video URL",
-      icon: "▶",
+      icon: Video,
       command: ({ editor, range }) => {
         editor.chain().focus().deleteRange(range)
           .insertContent({ type: "videoEmbed", attrs: {} }).run();
@@ -461,7 +548,7 @@ export function getSlashCommands(): SlashCommand[] {
     {
       title: "FAQ",
       description: "Collapsible question/answer accordion",
-      icon: "?",
+      icon: HelpCircle,
       command: ({ editor, range }) => {
         editor.chain().focus().deleteRange(range)
           .insertContent({ type: "faqAccordion", attrs: {} }).run();
@@ -472,7 +559,7 @@ export function getSlashCommands(): SlashCommand[] {
     {
       title: "Feature List",
       description: "Grid of features/benefits with icon and description",
-      icon: "⊞",
+      icon: LayoutGrid,
       command: ({ editor, range }) => {
         editor.chain().focus().deleteRange(range)
           .insertContent({ type: "featureList", attrs: {} }).run();
@@ -484,7 +571,7 @@ export function getSlashCommands(): SlashCommand[] {
     {
       title: "Person Card",
       description: "Profile card with photo, name, bio, and social links",
-      icon: "👤",
+      icon: User,
       command: ({ editor, range }) => {
         editor.chain().focus().deleteRange(range)
           .insertContent({ type: "personCard", attrs: {} }).run();
@@ -495,7 +582,7 @@ export function getSlashCommands(): SlashCommand[] {
     {
       title: "Newsletter Signup",
       description: "Email capture form with configurable endpoint",
-      icon: "✉",
+      icon: Mail,
       command: ({ editor, range }) => {
         editor.chain().focus().deleteRange(range)
           .insertContent({ type: "newsletterSignup", attrs: {} }).run();
@@ -507,7 +594,7 @@ export function getSlashCommands(): SlashCommand[] {
     {
       title: "Logo Strip",
       description: "Horizontal row of partner or client logos",
-      icon: "◫",
+      icon: Shapes,
       command: ({ editor, range }) => {
         editor.chain().focus().deleteRange(range)
           .insertContent({ type: "logoStrip", attrs: {} }).run();
@@ -518,7 +605,7 @@ export function getSlashCommands(): SlashCommand[] {
     {
       title: "Social Links",
       description: "Row of social media profile links",
-      icon: "⇢",
+      icon: Share2,
       command: ({ editor, range }) => {
         editor.chain().focus().deleteRange(range)
           .insertContent({ type: "socialLinks", attrs: {} }).run();
@@ -529,7 +616,7 @@ export function getSlashCommands(): SlashCommand[] {
     {
       title: "Pricing Card",
       description: "Single pricing tier with features and CTA button",
-      icon: "$",
+      icon: DollarSign,
       command: ({ editor, range }) => {
         editor.chain().focus().deleteRange(range)
           .insertContent({ type: "pricingCard", attrs: {} }).run();
@@ -541,7 +628,7 @@ export function getSlashCommands(): SlashCommand[] {
     {
       title: "Spacer",
       description: "Invisible vertical space for layout control",
-      icon: "↕",
+      icon: MoveVertical,
       command: ({ editor, range }) => {
         editor.chain().focus().deleteRange(range)
           .insertContent({ type: "spacer", attrs: {} }).run();
@@ -552,7 +639,7 @@ export function getSlashCommands(): SlashCommand[] {
     {
       title: "Skill Badges",
       description: "Grid of technology/skill pill badges",
-      icon: "⬡",
+      icon: Award,
       command: ({ editor, range }) => {
         editor.chain().focus().deleteRange(range)
           .insertContent({ type: "skillBadges", attrs: {} }).run();
@@ -563,7 +650,7 @@ export function getSlashCommands(): SlashCommand[] {
     {
       title: "Bookmark Card",
       description: "Styled link card with title, description, and preview image",
-      icon: "⊡",
+      icon: Bookmark,
       command: ({ editor, range }) => {
         editor.chain().focus().deleteRange(range)
           .insertContent({ type: "bookmarkCard", attrs: {} }).run();
@@ -574,7 +661,7 @@ export function getSlashCommands(): SlashCommand[] {
     {
       title: "Tag Cloud",
       description: "Browsable topic tags with optional links and sizing",
-      icon: "#",
+      icon: Tags,
       command: ({ editor, range }) => {
         editor.chain().focus().deleteRange(range)
           .insertContent({ type: "tagCloud", attrs: {} }).run();
@@ -586,7 +673,7 @@ export function getSlashCommands(): SlashCommand[] {
     {
       title: "Stats Table",
       description: "Vertical key/value list for case study outcomes and mixed-unit metrics",
-      icon: "≡",
+      icon: Table2,
       command: ({ editor, range }) => {
         editor.chain().focus().deleteRange(range)
           .insertContent({ type: "statsTable", attrs: {} }).run();
@@ -597,7 +684,7 @@ export function getSlashCommands(): SlashCommand[] {
     {
       title: "Code Block",
       description: "Insert a code block",
-      icon: "</",
+      icon: Code,
       command: ({ editor, range }) => {
         editor
           .chain()
@@ -611,7 +698,7 @@ export function getSlashCommands(): SlashCommand[] {
     {
       title: "Divider",
       description: "Insert a horizontal rule",
-      icon: "―",
+      icon: Minus,
       command: ({ editor, range }) => {
         editor
           .chain()
@@ -626,7 +713,7 @@ export function getSlashCommands(): SlashCommand[] {
     {
       title: "Callout: Note",
       description: "Blue informational callout",
-      icon: "ℹ",
+      icon: Info,
       command: ({ editor, range }) => {
         editor
           .chain()
@@ -640,7 +727,7 @@ export function getSlashCommands(): SlashCommand[] {
     {
       title: "Callout: Tip",
       description: "Green helpful tip callout",
-      icon: "💡",
+      icon: Lightbulb,
       command: ({ editor, range }) => {
         editor
           .chain()
@@ -654,7 +741,7 @@ export function getSlashCommands(): SlashCommand[] {
     {
       title: "Callout: Warning",
       description: "Yellow warning callout",
-      icon: "⚠",
+      icon: TriangleAlert,
       command: ({ editor, range }) => {
         editor
           .chain()
@@ -668,7 +755,7 @@ export function getSlashCommands(): SlashCommand[] {
     {
       title: "Callout: Danger",
       description: "Red critical danger callout",
-      icon: "🔴",
+      icon: OctagonAlert,
       command: ({ editor, range }) => {
         editor
           .chain()
@@ -682,7 +769,7 @@ export function getSlashCommands(): SlashCommand[] {
     {
       title: "Callout: Info",
       description: "Purple informational callout",
-      icon: "📘",
+      icon: BookOpen,
       command: ({ editor, range }) => {
         editor
           .chain()
@@ -697,7 +784,7 @@ export function getSlashCommands(): SlashCommand[] {
     {
       title: "Image",
       description: "Upload or insert an image",
-      icon: "🖼",
+      icon: Image,
       command: ({ editor, range }) => {
         editor.chain().focus().deleteRange(range).run();
         window.dispatchEvent(new CustomEvent("editor-image-upload"));
@@ -711,7 +798,7 @@ export function getSlashCommands(): SlashCommand[] {
     {
       title: "AI Image",
       description: "Generate an image with AI and insert at cursor",
-      icon: "✨",
+      icon: Sparkles,
       command: ({ editor, range }) => {
         editor.chain().focus().deleteRange(range).run();
         window.dispatchEvent(new CustomEvent("editor-open-ai-image"));
@@ -722,7 +809,7 @@ export function getSlashCommands(): SlashCommand[] {
     {
       title: "Tag",
       description: "Insert a tag (or type # directly)",
-      icon: "#",
+      icon: Tag,
       command: ({ editor, range }) => {
         // Insert # character to trigger tag autocomplete
         editor
@@ -738,7 +825,7 @@ export function getSlashCommands(): SlashCommand[] {
     {
       title: "Text Columns",
       description: "Multi-column text layout (2-4 columns)",
-      icon: "▦",
+      icon: Columns3,
       command: ({ editor, range }) => {
         editor.chain().focus().deleteRange(range).insertContent({
           type: "columns",
@@ -754,7 +841,7 @@ export function getSlashCommands(): SlashCommand[] {
     {
       title: "Block Column",
       description: "Multi-column layout for inserting blocks",
-      icon: "⊞",
+      icon: Columns2,
       command: ({ editor, range }) => {
         editor.chain().focus().deleteRange(range).insertContent({
           type: "blockColumns",
@@ -770,7 +857,7 @@ export function getSlashCommands(): SlashCommand[] {
     {
       title: "Tabs",
       description: "Tabbed content panels",
-      icon: "⊟",
+      icon: LayoutPanelTop,
       command: ({ editor, range }) => {
         editor.chain().focus().deleteRange(range).insertContent({
           type: "tabs",
@@ -786,7 +873,7 @@ export function getSlashCommands(): SlashCommand[] {
     {
       title: "Accordion",
       description: "Collapsible content section",
-      icon: "▼",
+      icon: ChevronsDownUp,
       command: ({ editor, range }) => {
         editor.chain().focus().deleteRange(range).insertContent({
           type: "accordion",
@@ -806,7 +893,7 @@ export function getSlashCommands(): SlashCommand[] {
     {
       title: "Card",
       description: "Styled content card panel",
-      icon: "▭",
+      icon: RectangleHorizontal,
       command: ({ editor, range }) => {
         editor.chain().focus().deleteRange(range).insertContent({
           type: "cardPanel",
@@ -819,7 +906,7 @@ export function getSlashCommands(): SlashCommand[] {
     {
       title: "Section Header",
       description: "Section heading with divider",
-      icon: "§",
+      icon: Heading,
       command: ({ editor, range }) => {
         editor.chain().focus().deleteRange(range).insertContent({
           type: "sectionHeader",
@@ -831,7 +918,7 @@ export function getSlashCommands(): SlashCommand[] {
     {
       title: "Block Divider",
       description: "Decorative block separator",
-      icon: "—",
+      icon: SeparatorHorizontal,
       command: ({ editor, range }) => {
         editor.chain().focus().deleteRange(range).insertContent({
           type: "blockDivider",
@@ -844,7 +931,7 @@ export function getSlashCommands(): SlashCommand[] {
     {
       title: "Text Input",
       description: "Single-line or multi-line text field",
-      icon: "Aa",
+      icon: TextCursorInput,
       command: ({ editor, range }) => {
         editor.chain().focus().deleteRange(range).insertContent({
           type: "textInput",
@@ -856,7 +943,7 @@ export function getSlashCommands(): SlashCommand[] {
     {
       title: "Select / Dropdown",
       description: "Dropdown selection field",
-      icon: "▾",
+      icon: ChevronDown,
       command: ({ editor, range }) => {
         editor.chain().focus().deleteRange(range).insertContent({
           type: "selectInput",
@@ -868,7 +955,7 @@ export function getSlashCommands(): SlashCommand[] {
     {
       title: "Checkbox",
       description: "Checkbox or checkbox group",
-      icon: "☑",
+      icon: SquareCheck,
       command: ({ editor, range }) => {
         editor.chain().focus().deleteRange(range).insertContent({
           type: "checkboxInput",
@@ -880,7 +967,7 @@ export function getSlashCommands(): SlashCommand[] {
     {
       title: "Date Input",
       description: "Date or date-time field",
-      icon: "📅",
+      icon: CalendarDays,
       command: ({ editor, range }) => {
         editor.chain().focus().deleteRange(range).insertContent({
           type: "dateInput",
@@ -892,7 +979,7 @@ export function getSlashCommands(): SlashCommand[] {
     {
       title: "Number Input",
       description: "Numeric input field",
-      icon: "#",
+      icon: Hash,
       command: ({ editor, range }) => {
         editor.chain().focus().deleteRange(range).insertContent({
           type: "numberInput",
@@ -904,7 +991,7 @@ export function getSlashCommands(): SlashCommand[] {
     {
       title: "Rating",
       description: "Star rating or score field",
-      icon: "★",
+      icon: Star,
       command: ({ editor, range }) => {
         editor.chain().focus().deleteRange(range).insertContent({
           type: "ratingInput",
@@ -916,7 +1003,7 @@ export function getSlashCommands(): SlashCommand[] {
     {
       title: "Prompt / AI Prompt",
       description: "AI prompt or instruction block",
-      icon: "✦",
+      icon: WandSparkles,
       command: ({ editor, range }) => {
         editor.chain().focus().deleteRange(range).insertContent({
           type: "promptInput",
@@ -928,7 +1015,7 @@ export function getSlashCommands(): SlashCommand[] {
     {
       title: "Daily Summary",
       description: "Files created or edited during one workday",
-      icon: "☑",
+      icon: CalendarCheck,
       command: ({ editor, range }) => {
         const blockId = crypto.randomUUID();
         editor.chain().focus().deleteRange(range).insertContent({
@@ -938,7 +1025,6 @@ export function getSlashCommands(): SlashCommand[] {
             blockType: "dailySummary",
             summaryDate: getDefaultPeriodicSummaryDate("daily"),
             workdayCutoffHour: 0,
-            autoBorrowDurationMinutes: 60,
             pathOrder: "Root > File",
             showBackground: true,
             showBorder: true,
@@ -950,7 +1036,7 @@ export function getSlashCommands(): SlashCommand[] {
     {
       title: "Weekly Summary",
       description: "Files created or edited during one ISO week",
-      icon: "☑",
+      icon: CalendarRange,
       command: ({ editor, range }) => {
         const blockId = crypto.randomUUID();
         editor.chain().focus().deleteRange(range).insertContent({
@@ -960,7 +1046,6 @@ export function getSlashCommands(): SlashCommand[] {
             blockType: "weeklySummary",
             weekStartDate: getDefaultPeriodicSummaryDate("weekly"),
             workdayCutoffHour: 0,
-            autoBorrowDurationMinutes: 60,
             pathOrder: "Root > File",
             showBackground: true,
             showBorder: true,
@@ -972,7 +1057,7 @@ export function getSlashCommands(): SlashCommand[] {
     {
       title: "Habit Tracker",
       description: "Track habits in monthly, weekly, or streak layouts",
-      icon: "✓",
+      icon: CheckCheck,
       command: ({ editor, range }) => {
         editor
           .chain()
@@ -989,7 +1074,7 @@ export function getSlashCommands(): SlashCommand[] {
     {
       title: "Stopwatch",
       description: "Persisted stopwatch with laps and style variants",
-      icon: "⏱",
+      icon: Timer,
       command: ({ editor, range }) => {
         editor
           .chain()
@@ -1007,20 +1092,20 @@ export function getSlashCommands(): SlashCommand[] {
     {
       title: "Template",
       description: "Insert a saved content template",
-      icon: "📄",
+      icon: FileText,
       command: ({ editor, range }) => {
         editor.chain().focus().deleteRange(range).run();
-        window.dispatchEvent(new CustomEvent("open-template-picker"));
+        window.dispatchEvent(new CustomEvent("open-template-picker", { detail: { editor } }));
       },
       aliases: ["tpl", "templates"],
     },
     {
       title: "Snippet",
       description: "Insert a reusable text snippet",
-      icon: "✂",
+      icon: Scissors,
       command: ({ editor, range }) => {
         editor.chain().focus().deleteRange(range).run();
-        window.dispatchEvent(new CustomEvent("open-snippet-picker"));
+        window.dispatchEvent(new CustomEvent("open-snippet-picker", { detail: { editor } }));
       },
       aliases: ["snip", "snippets", "reusable"],
     },
@@ -1028,7 +1113,7 @@ export function getSlashCommands(): SlashCommand[] {
     {
       title: "Timestamp",
       description: "Insert today's date inline — click to set format & mode",
-      icon: "🕐",
+      icon: Clock,
       command: ({ editor, range }) => {
         const { defaultFormat, defaultMode } = useTimestampFormatStore.getState();
         const d = new Date();
@@ -1043,7 +1128,7 @@ export function getSlashCommands(): SlashCommand[] {
     {
       title: "Drawing",
       description: "Embed a hand-drawn whiteboard canvas",
-      icon: "✏️",
+      icon: PenTool,
       command: ({ editor, range }) => {
         // Create-then-insert pattern: dispatch an event to MarkdownEditor,
         // which has the note context (parentId, contentId) needed for the
@@ -1067,7 +1152,7 @@ export function getSlashCommands(): SlashCommand[] {
     {
       title: "Mermaid Diagram",
       description: "Embed a text-based flowchart or diagram",
-      icon: "📊",
+      icon: Workflow,
       command: ({ editor, range }) => {
         editor.chain().focus().deleteRange(range).run();
         window.dispatchEvent(
@@ -1084,12 +1169,19 @@ export function getSlashCommands(): SlashCommand[] {
     {
       title: "Report an Issue",
       description: "Report a bug or request a feature",
-      icon: "🐛",
+      icon: Bug,
       command: ({ editor, range }) => {
         // Delete the slash command text
         editor.chain().focus().deleteRange(range).run();
-        // Open GitHub issues in a new tab
-        window.open("https://github.com/CenterValentine/Digital-Garden/issues/new", "_blank", "noopener,noreferrer");
+        // The in-app form (mounted with the nav bar); an editor with no nav
+        // bar (embeds) has no dialog host, so it opens GitHub instead.
+        if (!openFeedbackDialog("bug")) {
+          window.open(
+            `https://github.com/${FEEDBACK_REPO_DEFAULT}/issues/new`,
+            "_blank",
+            "noopener,noreferrer",
+          );
+        }
       },
       aliases: ["bug", "issue", "feedback", "report"],
     },

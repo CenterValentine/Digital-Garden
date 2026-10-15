@@ -124,6 +124,27 @@ export const FEATURE_REGISTRY: FeatureSpec[] = [
     },
   },
   {
+    // Paste an image's text with AI (⌥⌘V / Ctrl+Alt+V) — OCR-PASTE-PLAN D13.
+    // The on-device engine stays the default (⇧⌘V); this is the opt-in path
+    // for what it cannot do: wrapped table cells, icons vs text, handwriting,
+    // stylised fonts. Unrouted = registry default, else the first
+    // vision-capable model the user has connected.
+    id: "image-text",
+    label: "Read Text in Images (AI)",
+    description:
+      "Model that reads an image's text when you paste with ⌥⌘V (Ctrl+Alt+V). Tables come back as tables and icons are ignored. The image is sent to this provider; ⇧⌘V stays on your device.",
+    requiredCapabilities: ["vision"],
+    preferredCapabilities: ["low-cost"],
+    defaultSuggestion: {
+      presetId: "anthropic",
+      modelId: "claude-haiku-4-5",
+    },
+    settingsHref: {
+      label: "Text recognition settings",
+      href: "/settings/files",
+    },
+  },
+  {
     // Extraction subagent (v3.1 R5, context discipline): condenses
     // oversized tool results (web page reads) with a cheap model BEFORE
     // they enter chat context. Unrouted = graceful skip (raw truncation,

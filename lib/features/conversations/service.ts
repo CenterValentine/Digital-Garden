@@ -73,6 +73,21 @@ export async function listConversations(
     where.targetFolderId = options.targetFolderId;
   }
 
+  const term = options.query?.trim();
+  if (term) {
+    where.OR = [
+      { title: { contains: term, mode: "insensitive" } },
+      {
+        messages: {
+          some: {
+            isHidden: false,
+            textCache: { contains: term, mode: "insensitive" },
+          },
+        },
+      },
+    ];
+  }
+
   if (options.forContentNodeIds && options.forContentNodeIds.length > 0) {
     where.associations = {
       some: { contentNodeId: { in: options.forContentNodeIds } },

@@ -49,6 +49,14 @@ export interface AcquiredContent {
   /** chars/4 heuristic — lets consumers budget before sending to a model. */
   tokenEstimate: number;
   truncated: boolean;
+  /**
+   * Set when the extracted body is navigation chrome rather than the page's
+   * main content (ITERATION-RUN-HARNESS-FIXES P7) — a list of short links
+   * such as LinkedIn's anonymous "Similar jobs" sidebar. Consumers treat the
+   * read as thin (escalate) and relay the note so the model never mistakes
+   * a menu for the article.
+   */
+  contentNote?: string;
 }
 
 /**

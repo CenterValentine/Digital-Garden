@@ -18,6 +18,40 @@ export interface ExtractedPage {
   excerpt: string | null;
   content: string;
   quality: ExtractionQuality;
+  /** See `AcquiredContent.contentNote` — set when the body is navigation chrome. */
+  contentNote?: string;
+}
+
+/** The note consumers relay when the body is chrome, not content. */
+export const CHROME_ONLY_NOTE =
+  "The fetched body is navigation chrome (lists of short links — menus, 'similar' items, footers), NOT the page's main content. Sites like LinkedIn serve the main text only to signed-in sessions. Treat this as NOT having read the page's main text.";
+
+/**
+ * Line-shape heuristic for a body that is a link list rather than prose
+ * (ITERATION-RUN-HARNESS-FIXES P7, prod 2026-09-27: LinkedIn's anonymous
+ * job page yielded 4 KB of "Similar jobs" titles that cleared every length
+ * gate and was read as the posting). Prose has sentences; chrome has many
+ * short lines and no long one. Deliberately not a site list — site lists
+ * rot, the shape of a link list does not. Pinned by the run-harness gate.
+ */
+export function looksLikeNavigationChrome(text: string): boolean {
+  const lines = text
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0);
+  if (lines.length < 15) return false;
+  const words = lines.map((l) => l.split(/\s+/).length);
+  const sorted = [...words].sort((a, b) => a - b);
+  const median = sorted[Math.floor(sorted.length / 2)] ?? 0;
+  const shortShare = words.filter((n) => n <= 6).length / lines.length;
+  const longest = Math.max(...lines.map((l) => l.length));
+  return median <= 4 && shortShare >= 0.75 && longest <= 120;
+}
+
+function withChromeNote(page: ExtractedPage): ExtractedPage {
+  if (!looksLikeNavigationChrome(page.content)) return page;
+  // Chrome is never a clean article, whatever Readability believed.
+  return { ...page, quality: "raw", contentNote: CHROME_ONLY_NOTE };
 }
 
 /** Collapse runs of blank lines / spaces while preserving paragraph breaks. */
@@ -60,7 +94,7 @@ export async function extractReadableContent(
     const article = new Readability(dom.window.document).parse();
     const text = article?.textContent ? normalizeText(article.textContent) : "";
     if (article && text.length > 0) {
-      return {
+      return withChromeNote({
         title: article.title ?? null,
         byline: article.byline ?? null,
         siteName: article.siteName ?? null,
@@ -68,13 +102,13 @@ export async function extractReadableContent(
         excerpt: article.excerpt ?? null,
         content: text,
         quality: "readable",
-      };
+      });
     }
   } catch {
     // jsdom can throw on hostile markup — fall through to the raw path.
   }
 
-  return {
+  return withChromeNote({
     title: null,
     byline: null,
     siteName: null,
@@ -82,5 +116,5 @@ export async function extractReadableContent(
     excerpt: null,
     content: stripTags(html),
     quality: "raw",
-  };
+  });
 }

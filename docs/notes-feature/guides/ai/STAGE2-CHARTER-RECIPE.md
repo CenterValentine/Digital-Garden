@@ -44,9 +44,24 @@ Typical stage-2 cells: advance `Stage` (Screened → Investigated), refresh `Fit
 
 Long-form materials (tailored resume, cover letter) never go in cells; cells hold **pointers**:
 
-1. First tailoring: `create_docx` produces the artifact; the lead row's **Materials (file) cell** references that node.
-2. Re-tailoring: `create_docx` with **`overwriteContentId`** — same node id, new bytes. Every File cell and shortcut referencing it sees the new version. Never a trail of copies.
+1. First tailoring: the artifact tool produces the file; the lead row's **Materials (file) cell** references that node.
+2. Re-tailoring: the same tool with **`overwriteContentId`** = the id in the Materials cell — same node id, new bytes. Every File cell and shortcut referencing it sees the new version. Never a trail of copies.
 3. Prose research that outgrows `Notes` lives under the **promoted row page** (row → page), not in a second table column.
+
+Two artifact tools, chosen once per charter — **the per-run instruction names only the lead rows, the template (if any), and the destination**; everything below is standing behaviour and need not be repeated in charter prose:
+
+| | `create_docx` (markdown) | `fill_docx_template` (the user's template) |
+|---|---|---|
+| When | no template for this document type | the charter names a template, or the user keeps one for this type (`read_docx_template` lists them) |
+| Layout | the app's generic Word styling | the user's own `.docx`, filled in place — layout preserved |
+| What the model writes | the whole document as markdown | **keyed values only**, against the contract `read_docx_template` returns (fields, repeating sections, the user's per-field notes). Never the file, never layout instructions. |
+| Provenance | prose cites inline | `provenance: { "<field path>": [row ids] }` — the evidence rows (claims) each bullet or figure came from. A cited id that does not exist is a refusal; uncited bullets are reported on the card. |
+| Gaps | `[Education — not in evidence; confirm]` placeholders | a required slot left empty is **refused** — fill it from the evidence or **ask the user**; never invent. Optional (`{% if %}`-guarded) fields may stay empty. |
+| Titles | — | the contract decides: a template with ONE title field gets "Title — Employer" combined; split fields (`title`, `company`) stay split. Dates and titles are copied from the source of record exactly. |
+| Review | approval card shows the markdown | approval card shows the values (empties as "—"); after acceptance the user can edit any field and **re-render without a model turn** (same node id) |
+| Budget | counts as a deliverable (`deliverables: ["docx"]`) | counts as a deliverable (`deliverables: ["template"]`); `read_docx_template` + `fill_docx_template` ride every charter turn — no summon needed |
+
+Both tools respect the charter's output routing and `alsoShortcutTo` (§4), and both fail **without** changing the existing artifact or the Materials reference. Full design: `work-tracking/DOCX-TEMPLATE-RENDERER-PLAN.md`.
 
 ## 4. Shortcut directives in charter prose
 
@@ -54,12 +69,26 @@ Charters maintain a **single source** — never copied per run, per company, or 
 
 > *"File the tailored resume under the lead's row; shortcut it into `job-search/{Company}`."*
 
-- `create_docx` respects the active charter's output routing (`outputLocation`) and takes `alsoShortcutTo` for the mirror in the same call.
+- `create_docx` and `fill_docx_template` respect the active charter's output routing (`outputLocation`) and take `alsoShortcutTo` for the mirror in the same call.
 - `create_shortcut` covers after-the-fact placement (no approval gate; find-or-create; chains collapse).
 
 Combined with `overwriteContentId`, the whole materials lifecycle is single-source: one artifact node, mirrored wherever useful, updated in place.
 
-## 5. Quests tie the stages together
+## 5. URL field guide — which links can actually be read
+
+Learned the expensive way (first production sittings, 2026-09: five of nine URLs were unreadable). What each URL shape does under the default headless tier — see `ACQUISITION-QUICK-REFERENCE.md` for the escalation ladder that changes some of these:
+
+| URL shape | Headless outcome | Guidance |
+|---|---|---|
+| `job-boards.greenhouse.io/<company>/jobs/<id>`, Lever/Ashby postings, company career pages | ✅ Reads fully | The canonical posting form — prefer these |
+| `linkedin.com/jobs/view/<id>` | ⚠ Partial — sidebar/summary only, often enough for an honest score | Fine for scan passes; use browser escalation for full text |
+| `indeed.com/…?vjk=<id>` | ❌ HTTP 403 (bot wall) | Needs the visible-tab tier, or find the employer's own posting |
+| Any search-results page (Indeed SERP, LinkedIn search) | ❌ Not a posting — nothing scoreable | Never feed a SERP as an item; extract the posting links first |
+| `my.greenhouse.io/applications/<id>` | ❌ HTTP 406 — your logged-in candidate PORTAL, structurally never a posting | No tier can turn this into a job description; find the public posting |
+
+Two rules of thumb: **a URL that shows YOUR data (portals, dashboards) is never an item**, and **a URL that lists many things is a source to extract from, not an item to score**. Unreadable items are recorded honestly (`unreadable` status with the HTTP reason) — never scored from guesswork.
+
+## 6. Quests tie the stages together
 
 With the charter attached, both stages run inside the same **quest**: one quest ledger remembers every item any sitting scored (rejects included — the cross-sitting dedup), one quest log holds the narrative, and the charter's master ledger links quest ledger + output table + quest log on the quest's row. A stage-2 run continues the quest by name; already-scored items skip automatically unless you ask for a refresh.
 

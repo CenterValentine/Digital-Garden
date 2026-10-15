@@ -101,7 +101,11 @@ export async function POST(request: NextRequest) {
       let dropped = 0;
 
       for (const ev of events) {
-        if (ev.level !== "error" && ev.level !== "fatal") {
+        // Collaboration decisions a browser makes alone (which copy to open,
+        // a rival lineage) are forwarded at warn too: without them a stale
+        // tab is undiagnosable from the server (2026-10-13).
+        const collabWarn = ev.level === "warn" && typeof ev.event === "string" && ev.event.startsWith("collab:");
+        if (ev.level !== "error" && ev.level !== "fatal" && !collabWarn) {
           dropped += 1;
           continue;
         }
@@ -121,7 +125,7 @@ export async function POST(request: NextRequest) {
           user_id: userId,
         };
 
-        const emitFn = ev.level === "fatal" ? logger.fatal : logger.error;
+        const emitFn = ev.level === "fatal" ? logger.fatal : ev.level === "warn" ? logger.warn : logger.error;
         emitFn({
           layer: ev.layer,
           event: ev.event,

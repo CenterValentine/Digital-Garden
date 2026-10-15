@@ -20,6 +20,8 @@ import { getActiveTrace, logger, withSpan } from "@/lib/core/logger";
 import { prisma } from "@/lib/database/client";
 import { sanitizeSvg } from "@/lib/domain/content/svg-sanitizer";
 import { createSlugAssigner } from "@/lib/domain/content/heading-ids";
+import { stripPrivateContent } from "@/lib/domain/content/private-content";
+import { publicSafeNoteWindows } from "@/lib/domain/editor/extensions/blocks/note-window";
 import type { JSONContent } from "@tiptap/core";
 
 interface TipTapContentProps {
@@ -353,7 +355,12 @@ function generateHTMLServer(
 }
 
 export async function TipTapContent({ bodyJson, className }: TipTapContentProps) {
-  const normalized = normalizeDoc(bodyJson);
+  // Private (commented-out) content never reaches a visitor: it is removed
+  // from the JSON before serialisation, so no CSS or DOM pass has to hide it.
+  // A Note Window keeps only its title the same way — its target/block ids
+  // are the author's (ServerNoteWindow renders every attr for round-trip
+  // symmetry, so the stripping has to happen here, at the seam).
+  const normalized = normalizeDoc(publicSafeNoteWindows(stripPrivateContent(bodyJson)));
   const visualizationSources = await fetchVisualizationSources(normalized);
   let html = "";
   try {

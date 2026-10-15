@@ -3,7 +3,12 @@
  *
  * Handles ONLY the resizing logic with Allotment.
  * Does not render content - that's done by the server layout.
- * M6: Added global Cmd+/ keyboard shortcut for search toggle.
+ * M6: Added a global keyboard shortcut for the search toggle. It was Cmd+/
+ * until 2026-10-12; that chord is the editor's "comment out prose" toggle
+ * (private content, the universal toggle-comment binding in every code
+ * editor), and the two fired together whenever the editor had focus. Search
+ * now lives on Cmd+Shift+F — Obsidian's "search in all files" and VS Code's
+ * "find in files" — which nothing else in the app or the browser claims.
  */
 
 "use client";
@@ -84,11 +89,12 @@ export function ResizablePanels({ children }: ResizablePanelsProps) {
     return () => clearTimeout(timer);
   }, []);
 
-  // Global keyboard shortcut: Cmd+/ to toggle search and expand panel
+  // Global keyboard shortcut: Cmd+Shift+F to toggle search and expand panel
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Check for Cmd+/ (Mac) or Ctrl+/ (Windows/Linux)
-      if ((e.metaKey || e.ctrlKey) && e.key === "/") {
+      // Cmd+Shift+F (Mac) or Ctrl+Shift+F (Windows/Linux). With Shift held,
+      // `key` arrives upper-cased on most layouts, so compare case-folded.
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "f") {
         e.preventDefault();
         // Ensure panel is expanded when toggling search
         if (panelMode === "hidden") {
@@ -103,7 +109,8 @@ export function ResizablePanels({ children }: ResizablePanelsProps) {
   }, [toggleSearch, panelMode, setPanelMode]);
 
   // Global keyboard shortcut: Cmd+Shift+L to toggle left panel collapse
-  // Avoids: Cmd+B (TipTap bold), Cmd+/ (search), Cmd+\ (search)
+  // Avoids: Cmd+B (TipTap bold), Cmd+/ (editor: comment out prose),
+  // Cmd+Shift+F (search), Cmd+K (editor: link dialog)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Check for Cmd+Shift+L (Mac) or Ctrl+Shift+L (Windows/Linux)

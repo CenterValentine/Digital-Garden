@@ -19,6 +19,7 @@ import {
   extractSearchTextFromTipTap,
 } from "@/lib/domain/content";
 import { DOCXConverter } from "@/lib/domain/export/converters/docx";
+import { docxHtmlToCheckText } from "./docx-check-text";
 import { DEFAULT_EXPORT_BACKUP_SETTINGS } from "@/lib/domain/export";
 
 const DOCX_MIME =
@@ -210,12 +211,33 @@ export interface CreateDocxInput {
   ownedByNoteId?: string;
 }
 
+/** `docxHtmlToCheckText` over the bytes; the source text if reading fails. */
+export async function extractDocxText(
+  buffer: Buffer,
+  fallback: () => string,
+): Promise<string> {
+  try {
+    const { default: mammoth } = await import("mammoth");
+    const { value } = await mammoth.convertToHtml({ buffer });
+    return docxHtmlToCheckText(value) || fallback();
+  } catch (error) {
+    logger.warn({
+      layer: "ai",
+      event: "ai_documents:docx_extract_failed",
+      summary: "docx text extraction failed — storing the source text",
+      error,
+    });
+    return fallback();
+  }
+}
+
 export async function createDocxDocument(
   ownerId: string,
   input: CreateDocxInput,
 ): Promise<{ contentNodeId: string; fileName: string }> {
   const tiptap = markdownToTiptap(input.markdown);
-  const converter = new DOCXConverter();
+  // Compact layout: AI documents are resumes, letters, briefs (§10 round 5).
+  const converter = new DOCXConverter({ compact: true });
   const result = await converter.convert(tiptap, {
     format: "docx",
     settings: DEFAULT_EXPORT_BACKUP_SETTINGS,
@@ -227,7 +249,51 @@ export async function createDocxDocument(
   const buffer = Buffer.isBuffer(file.content)
     ? file.content
     : Buffer.from(file.content);
+  // The stored text is extracted FROM THE FILE, not from the markdown it
+  // came from — read_content's "Extracted text" is how the model checks a
+  // document the way a parser (an ATS, a search index) will read it. The
+  // source-tree text hid real problems: line breaks read as spaces and
+  // link URLs as their labels (plan §10 round 3). Falls back to the source
+  // text if extraction fails, so a document is never stored textless.
+  const searchText = await extractDocxText(buffer, () =>
+    extractSearchTextFromTipTap(tiptap),
+  );
 
+  return storeDocxDocument(ownerId, {
+    title: input.title,
+    buffer,
+    searchText,
+    parentFolderId: input.parentFolderId,
+    overwriteContentId: input.overwriteContentId,
+    role: input.role,
+    ownedByNoteId: input.ownedByNoteId,
+  });
+}
+
+export interface StoreDocxInput {
+  title: string;
+  /** Finished .docx bytes — from the markdown converter or the template renderer. */
+  buffer: Buffer;
+  /** Text as a parser reads the file (see extractDocxText) — becomes searchText. */
+  searchText: string;
+  parentFolderId?: string;
+  overwriteContentId?: string;
+  role?: "referenced";
+  ownedByNoteId?: string;
+}
+
+/**
+ * File finished .docx bytes as a ContentNode — the one storage path for
+ * every producer of Word documents (markdown via createDocxDocument, a
+ * filled template via fill_docx_template), so overwrite-in-place, output
+ * placement, search text and write receipts behave identically whichever
+ * made the bytes.
+ */
+export async function storeDocxDocument(
+  ownerId: string,
+  input: StoreDocxInput,
+): Promise<{ contentNodeId: string; fileName: string }> {
+  const { buffer, searchText } = input;
   const safeTitle =
     input.title.replace(/[^a-zA-Z0-9\s-]/g, "").trim() || "Document";
   const fileName = `${safeTitle}.docx`;
@@ -242,7 +308,7 @@ export async function createDocxDocument(
       buffer,
       fileName,
       mimeType: DOCX_MIME,
-      searchText: extractSearchTextFromTipTap(tiptap),
+      searchText,
     });
     if (!result.contentNodeId) {
       throw new Error(result.error ?? "Could not overwrite the document.");
@@ -289,7 +355,7 @@ export async function createDocxDocument(
           checksum,
           storageProvider: "r2",
           storageKey,
-          searchText: extractSearchTextFromTipTap(tiptap),
+          searchText,
           uploadStatus: "ready",
           uploadedAt: new Date(),
           isProcessed: true,

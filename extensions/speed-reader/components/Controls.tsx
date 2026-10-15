@@ -6,6 +6,7 @@ import {
   Pause,
   Play,
   RotateCcw,
+  Square,
   Type,
   X,
 } from "lucide-react";
@@ -21,6 +22,11 @@ import { FONT_LABELS, type ResolvedTheme } from "../lib/theme";
 interface ControlsProps {
   playing: boolean;
   onTogglePlay: () => void;
+  /**
+   * Paged sources in "Keep reading" mode: stop rolling into the next
+   * page (turns the setting off; this page still finishes).
+   */
+  onStopAutoContinue?: () => void;
   onRestart: () => void;
   onStepBack: () => void;
   onStepForward: () => void;
@@ -90,6 +96,7 @@ const THEME_OPTIONS: Array<{ value: SpeedReaderTheme; label: string }> = [
 export function Controls({
   playing,
   onTogglePlay,
+  onStopAutoContinue,
   onRestart,
   onStepBack,
   onStepForward,
@@ -247,6 +254,18 @@ export function Controls({
           >
             <ChevronsRight className="h-5 w-5" />
           </button>
+          {onStopAutoContinue && (
+            <button
+              type="button"
+              onClick={onStopAutoContinue}
+              className="flex h-10 w-10 items-center justify-center rounded-md"
+              style={buttonStyle}
+              aria-label="Stop at the end of this page"
+              title="Stop at the end of this page (turns off “Keep reading”)"
+            >
+              <Square className="h-4 w-4" />
+            </button>
+          )}
         </div>
 
         {/* Close */}

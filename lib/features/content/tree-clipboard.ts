@@ -19,8 +19,8 @@
  * Tree paste MOVES the items for both modes (owner spec: paste "updates
  * dependencies … appears in the deposited place"; wiki-links are id-based,
  * so they survive moves with no rewriting). Folder target → child at the
- * BEGINNING (the move API defaults displayOrder to 0); item target →
- * sibling inserted right AFTER the clicked item. The entry is single-shot:
+ * BEGINNING, in the order copied; item target → sibling inserted right
+ * AFTER the clicked item. Both place by anchor ("after this row"). The entry is single-shot:
  * any paste clears it.
  */
 
@@ -132,7 +132,6 @@ export interface TreePasteTarget {
   id: string;
   parentId: string | null;
   isFolder: boolean;
-  displayOrder?: number;
 }
 
 /**
@@ -152,8 +151,13 @@ export async function pasteTreeClipboard(target: TreePasteTarget): Promise<void>
     movedCount = moved.length;
     failedCount = failed.length;
   } else {
-    // Sibling insert AFTER the clicked item, preserving the pasted order.
-    const baseOrder = (target.displayOrder ?? 0) + 1;
+    // Sibling insert AFTER the clicked item, preserving the pasted order:
+    // each item goes after the one before it. Anchors, not numbers — this
+    // used to send the clicked row's displayOrder + 1 as the move route's
+    // INDEX, which is only the same thing when a folder is numbered 0, 1, 2…
+    // with no gaps (deletes leave them), ties (uploads and imports store 0)
+    // or negatives (create-at-top). Otherwise the paste landed somewhere else.
+    let afterId = target.id;
     for (let i = 0; i < ids.length; i++) {
       try {
         const res = await fetch("/api/content/content/move", {
@@ -163,12 +167,14 @@ export async function pasteTreeClipboard(target: TreePasteTarget): Promise<void>
           body: JSON.stringify({
             contentId: ids[i],
             targetParentId: target.parentId,
-            newDisplayOrder: baseOrder + i,
+            afterId,
           }),
         });
         const body = await res.json().catch(() => null);
-        if (res.ok && body?.success) movedCount++;
-        else failedCount++;
+        if (res.ok && body?.success) {
+          movedCount++;
+          afterId = ids[i];
+        } else failedCount++;
       } catch {
         failedCount++;
       }

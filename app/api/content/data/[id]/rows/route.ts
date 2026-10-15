@@ -2,7 +2,7 @@
  * Database rows API.
  *
  * GET    /api/content/data/[id]/rows?view=&cursor=&since=  — page, or changes
- * POST   /api/content/data/[id]/rows                        — append rows
+ * POST   /api/content/data/[id]/rows                        — append rows, or duplicate (`duplicateRowIds`)
  * PATCH  /api/content/data/[id]/rows                        — write cells (CAS)
  * DELETE /api/content/data/[id]/rows                        — soft-delete / restore
  *
@@ -29,6 +29,7 @@ import {
 } from "@/lib/domain/data/server/queries";
 import {
   createRows,
+  duplicateRows,
   restoreRows,
   softDeleteRows,
   writeCells,
@@ -160,6 +161,8 @@ export async function POST(request: NextRequest, { params }: { params: Params })
       const body = (await request.json()) as {
         count?: number;
         afterSortKey?: string | null;
+        /** Duplicate these rows in place (each copy below its source). */
+        duplicateRowIds?: string[];
       };
       const count = Math.min(Math.max(body.count ?? 1, 1), 200);
 
@@ -167,6 +170,19 @@ export async function POST(request: NextRequest, { params }: { params: Params })
       if (!table) return notFound();
       if (table.mode === "query") {
         return badRequest("Query databases are read-only projections — create a note and it appears");
+      }
+
+      if (Array.isArray(body.duplicateRowIds)) {
+        const sourceIds = body.duplicateRowIds.filter(
+          (v): v is string => typeof v === "string" && v.length > 0
+        );
+        if (sourceIds.length === 0) return badRequest("duplicateRowIds is empty");
+        const result = await withSpan(
+          { layer: "content", name: "data_rows_duplicate" },
+          { attrs: { count: sourceIds.length } },
+          async () => duplicateRows(id, table.columns, sourceIds, session.user.id)
+        );
+        return NextResponse.json({ success: true, data: result });
       }
 
       const rowIds = await withSpan(

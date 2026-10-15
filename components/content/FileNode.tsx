@@ -14,7 +14,7 @@
 
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { type NodeRendererProps, type NodeApi } from "react-arborist";
 import * as LucideIcons from "lucide-react";
 import {
@@ -53,6 +53,7 @@ import { useContextMenuStore } from "@/state/context-menu-store";
 import { useContentStore } from "@/state/content-store";
 import { useTreeStateStore } from "@/state/tree-state-store";
 import { useTreeDragStore } from "@/state/tree-drag-store";
+import { useTreeRevealStore } from "@/state/tree-reveal-store";
 import { referenceGroupKey } from "@/lib/features/content/reference-group";
 import { useFileTreeEditStore } from "@/state/file-tree-edit-store";
 import { toast } from "sonner";
@@ -68,6 +69,17 @@ import {
   hasTreeClipboard,
   ensureAltTracker,
 } from "@/lib/features/content/tree-clipboard";
+import {
+  contentIdOfRowId,
+  shortcutIdOfMirrorRowId,
+} from "@/lib/features/content/shortcut-mirror";
+import {
+  acceptsDropInto,
+  dropEdgeAt,
+  type DropEdge,
+} from "@/lib/features/content/drop-rules";
+import { noteDropEdge } from "@/lib/features/content/drop-edge";
+import { useTreeStandInStore } from "@/state/tree-stand-in-store";
 
 /**
  * Row hover tooltip: modified + created, Obsidian-style. Answers "which of
@@ -141,6 +153,10 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
   const referencesAtStart = useTreeStateStore((state) =>
     state.referencesAtStartIds.has(data.id),
   );
+  // The block is flagged open, but it is only VISIBLE while the row is open
+  // too — a row collapsed by its chevron hides it. The chip's look and its
+  // placement arrow follow what is on screen, not the flag.
+  const referencesOnScreen = referencesExpanded && isOpen;
   /**
    * Whether this row has any content of its own to order the reference block
    * against. Reads the post-transform children: when the block is open its
@@ -248,15 +264,35 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
   // 1. Active: This file is open in the editor (brightest)
   // 2. Selected: This file is selected in tree (medium)
   // 3. Multi-selected: Part of multi-selection (subtle)
-  const isActive = data.id === selectedContentId;
-  const isOpenInTab = openContentIds.includes(data.id);
+  // The gold tones follow the row that STANDS FOR the content (tree-stand-in.ts):
+  // opened through a shortcut, the shortcut row is lit — not the original's
+  // row elsewhere — so the tree never shows you in two places at once.
+  const activeRowId = useTreeStandInStore((state) => state.activeRowId);
+  const isActive = (activeRowId ?? selectedContentId) === data.id;
+  const isOpenInTab = useTreeStandInStore((state) =>
+    openContentIds.some((contentId) => (state.standIns[contentId] ?? contentId) === data.id),
+  );
   // External (OS file) drag destination — selector returns a boolean so only
   // the rows whose target status flips re-render as the pointer moves.
   const isExternalDropTarget = useTreeDragStore(
     (state) => state.externalDropTargetId === data.id,
   );
+  // "Show in file tree" pulse (state/tree-reveal-store.ts) — boolean
+  // selector so only the revealed row re-renders.
+  const isRevealHighlighted = useTreeRevealStore(
+    (state) => state.highlightId === data.id,
+  );
   const isSelected = node.isSelected;
   const tree = node.tree;
+  // Drop feedback. react-arborist reports the middle of ANY row as "drop
+  // inside it"; a row that takes the drag there (drop-rules.ts) highlights,
+  // one that can't shows a line on the half the pointer is in — where
+  // FileTree will place the drop, beside this row.
+  const [dropEdge, setDropEdge] = useState<DropEdge>("below");
+  const willReceiveDrop = node.state.willReceiveDrop;
+  const takesDropInside =
+    willReceiveDrop && acceptsDropInto(data, tree.dragNodes.map((dragNode) => dragNode.data));
+  const dropBesideEdge: DropEdge | null = willReceiveDrop && !takesDropInside ? dropEdge : null;
   const isMultiSelected = isSelected && tree.selectedNodes && tree.selectedNodes.length > 1;
 
   // Get display extension for orthodox files
@@ -592,6 +628,19 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
     // twice and land back where it started — the row would appear to stay shut
     // while its content opened.
     if (e.detail > 1) return;
+
+    // A single click on a nesting row also SELECTS it (grey), as well as
+    // toggling it. The tree's selection is the target for the header "+" and
+    // for drops (`resolveCreateParent` reads `selectedIds`), and the owner's
+    // rule is "grey = what is selected; gold = what is open" (2026-10-02).
+    // Before this the click only toggled, so a clicked folder never became
+    // the create target. Selection-only routing (the shift/cmd-click path)
+    // keeps it from opening in the main panel — that stays the double-click
+    // and press-and-hold gesture.
+    if (!node.isSelected) {
+      onSelectionOnly?.();
+      node.select();
+    }
     toggleNesting();
   };
 
@@ -730,21 +779,35 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
 
     // Tree clipboard (owner spec 2026-08-10): resolve ids to {id,title,type}
     // for the clipboard payload — titles come from the live selection, with
-    // the clicked node as fallback.
+    // the clicked node as fallback. A row inside a shortcut (or a window row)
+    // copies the ORIGINAL: its link and paste must reach real content, not a
+    // projection id that resolves to nothing.
     ensureAltTracker(); // Alt at Copy-click = strictly the URL
     const clipboardItems = (ids: string[]) => {
       const byId = new Map(
         (tree.selectedNodes ?? []).map((n: NodeApi<TreeNode>) => [n.id, n.data]),
       );
-      return ids.map((id) => {
+      const seen = new Set<string>();
+      return ids.flatMap((id) => {
+        const contentId = contentIdOfRowId(id);
+        if (seen.has(contentId)) return [];
+        seen.add(contentId);
         const d = id === data.id ? data : byId.get(id);
-        return {
-          id,
+        return [{
+          id: contentId,
           title: d?.title ?? "Untitled",
           contentType: d?.contentType ?? "note",
-        };
+        }];
       });
     };
+
+    // The shortcut a mirror row is seen through — what deleting the row
+    // removes, so the menu can name it. Its row is an open ancestor of this
+    // one, so the tree has it.
+    const mirrorShortcutId = shortcutIdOfMirrorRowId(data.id);
+    const mirrorShortcutTitle = mirrorShortcutId
+      ? (tree.get(mirrorShortcutId)?.data.title ?? null)
+      : null;
 
     openMenu(
       "file-tree",
@@ -773,7 +836,9 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
           // deletion, and can withhold destructive actions from projections.
           isShortcut,
           isShortcutMirror: isMirrorRow,
+          isWindowReference: Boolean(data.windowRef),
           mirrorOf: data.mirrorOf ?? null,
+          mirrorShortcutTitle,
           shortcutTargetId: shortcut?.targetId ?? null,
           shortcutTargetTitle: shortcut?.targetTitle ?? null,
           shortcutTargetContentType: shortcut?.targetContentType ?? null,
@@ -781,6 +846,7 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
           nestedShortcutsHidden,
           externalUrl: data.external?.url, // Phase 2: External link URL
           file: data.file || null, // For supportsCustomIcon check
+          isDocxTemplate: data.file?.isDocxTemplate === true,
           // Dual-key read (P0a): new stamp `charter`, legacy `playbook`.
           isCharter:
             data.note?.charter === true || data.note?.playbook === true,
@@ -816,7 +882,6 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
             id: data.id,
             parentId: data.parentId ?? null,
             isFolder,
-            displayOrder: (data as { displayOrder?: number }).displayOrder,
           });
         } : undefined,
         hasClipboard: hasTreeClipboard(),
@@ -984,23 +1049,25 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
 
   // Three-state visual styling
   const getBackgroundStyle = () => {
-    if (node.state.willReceiveDrop && isFolder) {
+    if (takesDropInside) {
       return "bg-primary/30 ring-1 ring-primary/50"; // Drop target
     }
     if (isExternalDropTarget) {
       return "bg-primary/30 ring-1 ring-primary/50"; // External file drop target
     }
+    // Gold = "open in the main panel", in two depths (owner, 2026-10-02):
+    // deep gold with a gold rail for the content ACTIVE in the pane (the
+    // workspace bar's active tone), light gold for content open in another
+    // tab. Grey = "selected in the tree" — single or multi, nested or not —
+    // a tree gesture, distinct from what the panel shows.
     if (isActive) {
-      return "bg-primary/20 text-primary font-medium"; // Active in panel (brightest)
+      return "bg-gold-primary/[0.22] text-gold-primary font-medium shadow-[inset_2px_0_0_0_var(--gold-primary)] dark:bg-gold-primary/[0.28]"; // Active in panel (deepest)
     }
     if (isOpenInTab) {
       return "bg-gold-primary/8 text-gold-primary"; // Open in another tab
     }
-    if (isMultiSelected) {
-      return "bg-white/8 text-gray-300"; // Multi-selected (subtle)
-    }
-    if (isSelected) {
-      return "bg-primary/10 text-primary"; // Selected but not active (medium)
+    if (isSelected || isMultiSelected) {
+      return "bg-black/[0.07] text-gray-800 dark:bg-white/[0.10] dark:text-gray-100"; // Selected in the tree (grey)
     }
     return "hover:bg-black/[0.03] dark:hover:bg-black/[0.03] dark:bg-white/5"; // Default hover
   };
@@ -1022,12 +1089,13 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
       // (playbook, upload-failed, draft) and win when hovered directly.
       title={formatNodeTimestamps(data)}
       className={`
-        touch-callout-none
+        touch-callout-none relative
         flex items-center gap-2 px-2 py-1 cursor-pointer
         transition-colors duration-150
         ${referenceBlockClasses()}
         ${getBackgroundStyle()}
         ${node.state.isDragging ? "opacity-50" : ""}
+        ${isRevealHighlighted ? "dg-tree-reveal-flash" : ""}
       `}
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
@@ -1038,8 +1106,10 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
         // composer, the workspace tab strips) can read them. People nodes are
         // synthetic and have no content id, so skip them.
         if (isPeopleNode) return;
+        // A row inside a shortcut hands over the ORIGINAL (a tab strip or
+        // the chat can't open a projection id).
         const primary = {
-          id: node.id,
+          id: contentIdOfRowId(node.id),
           title: data.title,
           contentType: data.contentType,
         };
@@ -1055,7 +1125,7 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
                     selected.data.treeNodeKind !== "person"
                 )
                 .map((selected: NodeApi<TreeNode>) => ({
-                  id: selected.id,
+                  id: contentIdOfRowId(selected.id),
                   title: selected.data.title,
                   contentType: selected.data.contentType,
                 }))
@@ -1063,6 +1133,14 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
         useTreeDragStore.getState().setDraggingNode(primary, draggedNodes);
       }}
       onDragEnd={() => useTreeDragStore.getState().setDraggingNode(null)}
+      onDragOver={(event) => {
+        // Which half of this row the pointer is in — where a drop beside it
+        // lands (FileTree reads the same value through noteDropEdge).
+        const rect = event.currentTarget.getBoundingClientRect();
+        const edge = dropEdgeAt(event.clientY, rect.top, rect.height);
+        noteDropEdge(data.id, edge);
+        if (edge !== dropEdge) setDropEdge(edge);
+      }}
       onPointerEnter={() => {
         // Best-effort prefetch — warms the server-side content cache so
         // the click that follows reads in <1ms. Skipped for synthetic
@@ -1071,9 +1149,17 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
         // soft-deleted rows where a fresh GET should hit the DB.
         if (isPeopleNode) return;
         if (data.deletedAt) return;
-        prefetchContent(node.id);
+        prefetchContent(contentIdOfRowId(node.id));
       }}
     >
+      {dropBesideEdge && (
+        <span
+          aria-hidden
+          className={`pointer-events-none absolute inset-x-1 h-0.5 rounded-full bg-primary ${
+            dropBesideEdge === "above" ? "top-0" : "bottom-0"
+          }`}
+        />
+      )}
       <div className="flex items-center gap-1">
         {/* Rail + half-step indent for reference-block rows. A half step (8px
             against the tree's 15px) separates the block without implying a
@@ -1120,11 +1206,25 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
         ) : data.role === "referenced" ? (
           <span data-file-icon className="relative inline-flex">
             {getIcon()}
+            {/* Why it sits under its note (tree API `reference`): IN the
+                note's text (¶ — it stays with that note) or filed under it
+                (link — it can move to another note). */}
             <span
               aria-hidden
+              title={
+                data.reference?.via === "text" && data.reference.inTextOf
+                  ? data.reference.inTextOf.id === data.parentId
+                    ? "In this note's text — it stays with this note"
+                    : `In “${data.reference.inTextOf.title}”'s text — it stays with that note`
+                  : "Filed under this note, not in its text — it can be moved to another note"
+              }
               className="absolute -bottom-0.5 -right-1 flex h-3 w-3 items-center justify-center rounded-full bg-white text-gray-500 shadow-sm ring-1 ring-black/10 dark:bg-gray-800 dark:text-gray-400 dark:ring-white/15"
             >
-              <LucideIcons.Link className="h-2 w-2" />
+              {data.reference?.via === "text" ? (
+                <LucideIcons.Pilcrow className="h-2 w-2" />
+              ) : (
+                <LucideIcons.Link className="h-2 w-2" />
+              )}
             </span>
           </span>
         ) : (
@@ -1178,7 +1278,7 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
             flex flex-none items-center rounded-full border
             text-[10px] leading-none tabular-nums transition-colors
             ${
-              referencesExpanded
+              referencesOnScreen
                 ? "border-gold-primary/40 bg-gold-primary/15 text-gold-primary"
                 : "border-black/10 bg-black/[0.04] text-gray-500 dark:border-white/10 dark:bg-white/[0.06] dark:text-gray-400"
             }
@@ -1192,9 +1292,9 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
             }}
             onDoubleClick={(e) => e.stopPropagation()}
             tabIndex={-1}
-            aria-expanded={referencesExpanded}
+            aria-expanded={referencesOnScreen}
             aria-label={
-              referencesExpanded
+              referencesOnScreen
                 ? `Hide ${referenceCount} referenced items`
                 : `Show ${referenceCount} referenced items`
             }
@@ -1205,11 +1305,13 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
             {referenceCount}
           </button>
 
-          {/* Placement toggle. Rendered only while the block is open AND this
-              row has primary children to order it against — on a collapsed
-              block, or a row that holds nothing but references, the control
-              offers a swap with no visible outcome. */}
-          {referencesExpanded && hasPrimaryChildren && (
+          {/* Placement toggle. Rendered only while the block is ON SCREEN —
+              its flag on AND the row open — and the row has primary children
+              to order it against. A block flagged on under a collapsed row
+              shows nothing, and the arrow used to stay there anyway (owner,
+              2026-10-06: "sorting isn't relevant when referenced content is
+              not expanded"). */}
+          {referencesOnScreen && hasPrimaryChildren && (
             <button
               type="button"
               onClick={(e) => {
@@ -1230,7 +1332,14 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
               }
               className="flex items-center rounded-full border-l border-gold-primary/30 px-1 py-px transition-opacity hover:opacity-100 opacity-70"
             >
-              <LucideIcons.ArrowUpDown className="h-2.5 w-2.5" />
+              {/* Where the block sits, not a sort (owner, 2026-10-06: the
+                  up-down arrow read as sorting): a list with its start or
+                  its end marked. */}
+              {referencesAtStart ? (
+                <LucideIcons.ListStart className="h-2.5 w-2.5" />
+              ) : (
+                <LucideIcons.ListEnd className="h-2.5 w-2.5" />
+              )}
             </button>
           )}
         </span>

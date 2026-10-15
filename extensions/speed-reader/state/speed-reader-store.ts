@@ -32,6 +32,11 @@ interface SpeedReaderState {
   orpColor: SpeedReaderOrpColor;
   /** Normalize PDF-extracted text: collapse whitespace fragments, strip soft hyphens. */
   pdfCompatMode: boolean;
+  /**
+   * Paged sources (the e-reader): roll straight into the next page instead of
+   * stopping at the end of each one.
+   */
+  autoContinuePages: boolean;
   polish: SpeedReaderPolishToggles;
   setWpm: (wpm: number) => void;
   setFont: (font: SpeedReaderFont) => void;
@@ -39,6 +44,7 @@ interface SpeedReaderState {
   setTheme: (theme: SpeedReaderTheme) => void;
   setOrpColor: (color: SpeedReaderOrpColor) => void;
   setPdfCompatMode: (on: boolean) => void;
+  setAutoContinuePages: (on: boolean) => void;
   togglePolish: (key: keyof SpeedReaderPolishToggles) => void;
 }
 
@@ -64,6 +70,7 @@ export const useSpeedReaderStore = create<SpeedReaderState>()(
       theme: "system",
       orpColor: "red",
       pdfCompatMode: false,
+      autoContinuePages: false,
       polish: DEFAULT_POLISH,
       setWpm: (wpm) =>
         set({ wpm: Math.min(MAX_WPM, Math.max(MIN_WPM, Math.round(wpm))) }),
@@ -73,6 +80,7 @@ export const useSpeedReaderStore = create<SpeedReaderState>()(
       setTheme: (theme) => set({ theme }),
       setOrpColor: (orpColor) => set({ orpColor }),
       setPdfCompatMode: (pdfCompatMode) => set({ pdfCompatMode }),
+      setAutoContinuePages: (autoContinuePages) => set({ autoContinuePages }),
       togglePolish: (key) =>
         set((state) => ({
           polish: { ...state.polish, [key]: !state.polish[key] },

@@ -102,7 +102,32 @@ const constructs: Array<{ name: string; doc: JSONContent }> = [
   { name: "literal {.collapsed} heading text", doc: doc(h(2, "tricky {.collapsed}")) },
   // In-document heading link (wikiLink.headingSlug) inside a paragraph.
   { name: "wikiLink + headingSlug", doc: doc(p([t("see "), { type: "wikiLink", attrs: { targetTitle: "Setup", headingSlug: "setup" } }])) },
+  // Anchored link (wikiLink.anchor + anchorLabel): a book highlight.
+  { name: "wikiLink + anchor", doc: doc(p([t("as "), { type: "wikiLink", attrs: { targetId: "book1", targetTitle: "Pride and Prejudice", anchor: "annotation:abc123", anchorLabel: "It is a truth universally acknowledged" } }])) },
+  // Link views + the window form (pretty shapes asserted separately below);
+  // titles the `[[…]]{…}` grammar cannot carry must stay lossless (HTML tier).
+  { name: "wikiLink view=card", doc: doc(p([{ type: "wikiLink", attrs: { targetId: "a0a0a0a0-0000-4000-8000-000000000001", targetTitle: "Roadmap", view: "card" } }])) },
+  { name: "wikiLink view=chip + alias + no-context", doc: doc(p([t("see "), { type: "wikiLink", attrs: { targetId: "a0a0a0a0-0000-4000-8000-000000000001", targetTitle: "Roadmap", displayText: "the plan", view: "chip", expand: false } }, t(" now")])) },
+  { name: "wikiLink title with brackets", doc: doc(p([{ type: "wikiLink", attrs: { targetTitle: "Weird ]] title" } }])) },
+  { name: "wikiLink title with pipe + braces", doc: doc(p([{ type: "wikiLink", attrs: { targetTitle: "a | b {c}" } }])) },
+  { name: "wikiLink title with markdown metachars", doc: doc(p([{ type: "wikiLink", attrs: { targetId: "a0a0a0a0-0000-4000-8000-000000000002", targetTitle: "C# *and* _under_ `code` ~x~" } }])) },
+  { name: "wikiLink title with quotes & ampersand", doc: doc(p([{ type: "wikiLink", attrs: { targetTitle: "Q \"quoted\" & <tagged>", anchor: "annotation:z9", anchorLabel: "say \"hi\" \\ bye" } }])) },
+  { name: "literal [[x]] text", doc: doc(p([t("a [[b]] c")])) },
+  { name: "literal ![[x]] text", doc: doc(p([t("![[b]]")])) },
+  { name: "noteWindow", doc: doc({ type: "noteWindow", attrs: { blockId: "blk-1", targetContentId: "a0a0a0a0-0000-4000-8000-000000000003", targetTitle: "Meeting notes" } }) },
+  { name: "noteWindow every attr", doc: doc({ type: "noteWindow", attrs: { blockId: "blk-2", targetContentId: "a0a0a0a0-0000-4000-8000-000000000003", targetTitle: "Meeting notes", targetViewId: "v1", targetRowId: "r1", height: 300, showBorder: false } }) },
+  { name: "noteWindow unassigned", doc: doc({ type: "noteWindow", attrs: { blockId: "blk-3" } }) },
+  { name: "noteWindow in callout", doc: doc({ type: "callout", attrs: { type: "note" }, content: [p([t("ctx")]), { type: "noteWindow", attrs: { blockId: "blk-4", targetContentId: "a0a0a0a0-0000-4000-8000-000000000003", targetTitle: "Meeting notes" } }] }) },
   { name: "table", doc: doc({ type: "table", content: [{ type: "tableRow", content: [tc("A"), tc("B")] }, { type: "tableRow", content: [tc("1"), tc("2")] }] }) },
+  // Private (commented-out) content: the inline mark alone, nested in other
+  // marks, a block, a block nested inside a blockquote, and the pathological
+  // literal `%%x%%` in ordinary prose (must stay lossless — it fences).
+  { name: "private text", doc: doc(p([t("keep "), tm("secret", ["privateText"]), t(" end")])) },
+  { name: "private text + bold", doc: doc(p([tm("both", ["bold", "privateText"])])) },
+  { name: "private block", doc: doc({ type: "privateBlock", content: [p([t("hidden")]), p([t("more")])] }) },
+  { name: "private block in blockquote", doc: doc({ type: "blockquote", content: [{ type: "privateBlock", content: [p([t("q-hidden")])] }] }) },
+  { name: "literal %%x%% text", doc: doc(p([t("a %%b%% c")])) },
+  { name: "literal %% in code block", doc: doc({ type: "codeBlock", content: [t("%%{init: {}}%%")] }) },
 ];
 for (const c of constructs) {
   try {
@@ -167,6 +192,112 @@ console.log("\n  ── custom-block codecs (pretty markdown, not base64) ──
   if (!r.ok) fail("callout codec — LOSSY");
   else if (r.md.includes("DGBLOCKv1:") || !r.md.includes("> [!")) fail(`callout codec — expected "> [!" markdown, got ${r.md.slice(0, 40)}`);
   else pass("callout → > [!warning] markdown");
+}
+{
+  // Accordion codec: pretty <details>/<summary>, not the fence. Lossless
+  // alone would stay green if the codec regressed to fencing, so assert
+  // the representation too. Three shapes: every attr non-default, nesting
+  // (the innermost-first reTag), and the one input that must decline.
+  const acc = (attrs: Record<string, unknown>, content: JSONContent[]): JSONContent => ({ type: "accordion", attrs, content });
+  const full = acc(
+    { blockId: "a0a0a0a0-0000-4000-8000-000000000001", headerText: "Q \"quoted\" & <tagged>", headerLevel: "3", openBehavior: "collapsed", openState: false, showContainer: true, showDivider: true },
+    [p([t("owned "), tm("data hygiene", ["bold"])]), list(["250K duplicates"], "bulletList")],
+  );
+  const r1 = lossless(doc(full));
+  if (!r1.ok) fail("accordion codec — LOSSY");
+  else if (r1.md.includes("DGBLOCKv1:") || !r1.md.includes("<details") || !r1.md.includes("<summary>Q &quot;quoted&quot; &amp; &lt;tagged&gt;</summary>".replace(/&quot;/g, '"')))
+    fail(`accordion codec — expected <details>/<summary> markdown, got ${r1.md.slice(0, 60)}`);
+  else pass("accordion → <details><summary> markdown, attrs on the tag");
+
+  const nested = acc({ headerText: "Outer" }, [p([t("before")]), acc({ headerText: "Inner", openState: false }, [p([t("deep")])]), p([t("after")])]);
+  const r2 = lossless(doc(nested));
+  if (!r2.ok) fail("nested accordion — LOSSY");
+  else if (r2.md.includes("DGBLOCKv1:")) fail("nested accordion — fenced; reTag must resolve innermost first");
+  else if ((r2.md.match(/<details/g) ?? []).length !== 2) fail(`nested accordion — expected two <details>, got ${r2.md.slice(0, 80)}`);
+  else pass("nested accordion → nested <details>, both pretty");
+
+  const multiline = acc({ headerText: "two\nlines" }, [p([t("x")])]);
+  const r3 = lossless(doc(multiline));
+  if (!r3.ok) fail("accordion with newline header — LOSSY");
+  else if (!r3.md.includes("DGBLOCKv1:")) fail("accordion with newline header — must DECLINE to the fence (a <summary> cannot span lines)");
+  else pass("accordion with newline header → declines to fence");
+}
+{
+  // Adjacent lists: each list round-trips alone, but markdown cannot end
+  // a list except with a non-list block, so two in a row merged on the way
+  // back. The serializer separates them with an HTML comment; assert both
+  // that the join is lossless and that the separator is what did it.
+  const ol = (start: number, ...items: string[]): JSONContent => ({ type: "orderedList", attrs: { start }, content: items.map((i) => ({ type: "listItem", content: [p([t(i)])] })) });
+  const task = (...items: string[]): JSONContent => ({ type: "taskList", content: items.map((i) => ({ type: "taskItem", attrs: { checked: false }, content: [p([t(i)])] })) });
+  const adjacent: Array<[string, JSONContent]> = [
+    ["two ordered lists (1, then start=2)", doc(ol(1, "a"), ol(2, "b"))],
+    ["two bullet lists", doc(list(["a"], "bulletList"), list(["b"], "bulletList"))],
+    ["bullet list then task list (same marker)", doc(list(["a"], "bulletList"), task("b"))],
+    ["two task lists", doc(task("a"), task("b"))],
+  ];
+  for (const [name, fixture] of adjacent) {
+    const r = lossless(fixture);
+    const before = norm(fixture).content?.length ?? 0;
+    if (!r.ok) fail(`adjacent lists — ${name}: LOSSY (merged into one list on the way back)`);
+    else if (!r.md.includes("<!-- -->")) fail(`adjacent lists — ${name}: round-tripped without the separator; something else is keeping them apart and it is not asserted`);
+    else pass(`adjacent lists — ${name} (${before} blocks stay ${before})`);
+  }
+  // A list with a non-list block between needs no separator — make sure
+  // the rule is not firing where it should not.
+  const r = lossless(doc(list(["a"], "bulletList"), p([t("between")]), list(["b"], "bulletList")));
+  if (!r.ok) fail("list / paragraph / list — LOSSY");
+  else if (r.md.includes("<!-- -->")) fail("list / paragraph / list — separator emitted where a paragraph already separates");
+  else pass("list / paragraph / list → no separator needed, none emitted");
+}
+// Wiki-links and windows: `[[Title]]{#id …}` / `![[Title]]{#id …}` on the way
+// out — a paragraph with a link used to fall to the HTML tier, so lossless
+// alone would not notice the pretty form regressing. Assert the shapes.
+{
+  const id = "a0a0a0a0-0000-4000-8000-000000000001";
+  const link = (attrs: Record<string, unknown>): JSONContent => ({ type: "wikiLink", attrs });
+  const shapes: Array<[string, JSONContent, string]> = [
+    ["plain link", doc(p([t("see "), link({ targetId: id, targetTitle: "Roadmap" })])), `see [[Roadmap]]{#${id}}`],
+    ["link without id", doc(p([link({ targetTitle: "Roadmap" })])), "[[Roadmap]]"],
+    ["alias", doc(p([link({ targetId: id, targetTitle: "Roadmap", displayText: "the plan" })])), `[[Roadmap|the plan]]{#${id}}`],
+    ["card view", doc(p([link({ targetId: id, targetTitle: "Roadmap", view: "card" })])), `[[Roadmap]]{#${id} .card}`],
+    ["chip + no-context", doc(p([link({ targetTitle: "Roadmap", view: "chip", expand: false })])), "[[Roadmap]]{.chip .no-context}"],
+    ["heading link", doc(p([link({ targetTitle: "Setup", headingSlug: "setup" })])), "[[#Setup]]"],
+    ["heading link, deduped slug", doc(p([link({ targetTitle: "Setup", headingSlug: "setup-2" })])), "[[#Setup]]{slug=setup-2}"],
+    ["anchored link + label", doc(p([link({ targetId: id, targetTitle: "Pride", anchor: "annotation:abc", anchorLabel: "a truth" })])), `[[Pride#^annotation:abc]]{#${id} label="a truth"}`],
+    ["window", doc({ type: "noteWindow", attrs: { blockId: "blk-1", targetContentId: id, targetTitle: "Meeting notes" } }), `![[Meeting notes]]{#${id} block=blk-1}`],
+    ["window, every attr", doc({ type: "noteWindow", attrs: { blockId: "blk-2", targetContentId: id, targetTitle: "Meeting notes", height: 300, showBorder: false, targetViewId: "v1", targetRowId: "r1" } }), `![[Meeting notes]]{#${id} .no-border block=blk-2 height=300 view=v1 row=r1}`],
+  ];
+  for (const [name, fixture, want] of shapes) {
+    const r = lossless(fixture);
+    if (!r.ok) fail(`wiki-link markdown — ${name}: LOSSY`);
+    else if (r.md.trim() !== want) fail(`wiki-link markdown — ${name}: expected ${JSON.stringify(want)}, got ${JSON.stringify(r.md.trim())}`);
+    else pass(`wiki-link markdown — ${name} → ${want}`);
+  }
+  // Inputs the grammar must DECLINE (lossless via the HTML tier / fence, never
+  // half-pretty): a title with brackets, an unassigned window.
+  const declined: Array<[string, JSONContent, (md: string) => boolean]> = [
+    ["title with ]]", doc(p([link({ targetTitle: "Weird ]] title" })])), (md) => md.startsWith("<p") && md.includes('data-type="wiki-link"')],
+    ["unassigned window", doc({ type: "noteWindow", attrs: { blockId: "blk-3" } }), (md) => md.includes("DGBLOCKv1:")],
+    ["literal [[x]] prose", doc(p([t("a [[b]] c")])), (md) => md.includes("DGBLOCKv1:")],
+  ];
+  for (const [name, fixture, declinedShape] of declined) {
+    const r = lossless(fixture);
+    if (!r.ok) fail(`wiki-link markdown — ${name}: LOSSY`);
+    else if (!declinedShape(r.md)) fail(`wiki-link markdown — ${name}: expected the grammar to decline, got ${JSON.stringify(r.md.slice(0, 60))}`);
+    else pass(`wiki-link markdown — ${name} declines (lossless, not pretty)`);
+  }
+}
+// Private content: Obsidian comment syntax on the way out, never a fence.
+{
+  const r = lossless(doc({ type: "privateBlock", content: [p([t("hidden")])] }));
+  if (!r.ok) fail("privateBlock codec — LOSSY");
+  else if (r.fenced || !/^%%\n\nhidden\n\n%%$/.test(r.md.trim())) fail(`privateBlock codec — expected %% fence lines, got ${JSON.stringify(r.md.slice(0, 40))}`);
+  else pass("privateBlock → %% … %% markdown");
+
+  const inline = lossless(doc(p([t("keep "), tm("secret", ["privateText"]), t(" end")])));
+  if (!inline.ok) fail("privateText mark — LOSSY");
+  else if (inline.fenced || !inline.md.includes("%%secret%%")) fail(`privateText mark — expected %%secret%%, got ${JSON.stringify(inline.md.slice(0, 40))}`);
+  else pass("privateText → %%secret%% markdown");
 }
 
 // ── 2d. Tables (regression: every TipTap table used to leak as raw HTML) ─────

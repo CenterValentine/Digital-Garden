@@ -17,16 +17,22 @@ import { queryTools } from "@/lib/domain/tools";
 import type { ContentType } from "@/lib/domain/tools";
 import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
 import { getExtensionManifestForView } from "@/lib/extensions";
-import { useIsExtensionEnabled } from "@/lib/extensions/client-registry";
+import {
+  resolveExtensionVirtualContentType,
+  useClaimedContentSidebarPanel,
+  useIsExtensionEnabled,
+} from "@/lib/extensions/client-registry";
 import {
   STUDIO_EXTENSION_ID,
   STUDIO_TAB_KEY,
 } from "@/extensions/studio/manifest";
 import {
+  defaultRightSidebarTab,
   resolveRightSidebarTab,
   useRightSidebarStateStore,
 } from "@/state/right-sidebar-state-store";
 import type { RightSidebarTab } from "@/state/right-sidebar-state-store";
+import { useDocxFillStore } from "@/state/docx-fill-store";
 
 interface RightSidebarProps {
   /**
@@ -71,10 +77,28 @@ export function RightSidebar({
       : null
   );
   const setActiveTab = useRightSidebarStateStore((state) => state.setActiveTab);
+  const lastEngagedTab = useRightSidebarStateStore((state) => state.lastEngagedTab);
+  const recordEngagedTab = useRightSidebarStateStore((state) => state.recordEngagedTab);
 
   const studioEnabled = useIsExtensionEnabled(STUDIO_EXTENSION_ID);
+  // An extension viewer (e.g. the reader) can claim the sidebar for the
+  // content it renders; its panel then leads the rail as the "extension" tab.
+  const claimedPanel = useClaimedContentSidebarPanel(selectedContentId);
+  // Synthetic extension content (reader:library) is not a ContentNode: the
+  // generic tabs (context, tags, chat…) would query ids that don't exist.
+  const isVirtualContent = Boolean(
+    selectedContentId && resolveExtensionVirtualContentType(selectedContentId)
+  );
+  // A file produced from a document template offers its fields for editing
+  // and re-rendering (per-node flag, set when the payload loads).
+  const isTemplateFill = useDocxFillStore((s) =>
+    Boolean(selectedContentId && s.filled[selectedContentId]),
+  );
 
   const availableTabs = useMemo(() => {
+    if (isVirtualContent) {
+      return (claimedPanel ? ["extension"] : []) as RightSidebarTab[];
+    }
     const tabs = queryTools({
       surface: "sidebar-tab",
       contentType: (selectedContentType as ContentType) ?? undefined,
@@ -91,9 +115,15 @@ export function RightSidebar({
     if (selectedBlockId && !tabs.includes("properties")) {
       tabs.push("properties");
     }
+    if (isTemplateFill && !tabs.includes("templateFields")) {
+      tabs.push("templateFields");
+    }
+    if (claimedPanel && !tabs.includes("extension")) {
+      tabs.unshift("extension");
+    }
 
     return tabs;
-  }, [selectedContentType, selectedBlockId, studioEnabled, excludeTabs]);
+  }, [selectedContentType, selectedBlockId, studioEnabled, excludeTabs, claimedPanel, isVirtualContent, isTemplateFill]);
 
   // The saved tab is sacred: it ONLY changes via an explicit user action
   // (handleTabChange). Selecting a block shows the Properties panel as a LIVE,
@@ -108,27 +138,34 @@ export function RightSidebar({
     ) {
       return "properties";
     }
-    if (!savedTab && extensionManifest?.surfaces.includes("right-sidebar")) {
+    if (!savedTab && (claimedPanel || extensionManifest?.surfaces.includes("right-sidebar"))) {
       return resolveRightSidebarTab("extension", availableTabs);
     }
-    return resolveRightSidebarTab(savedTab, availableTabs);
-  }, [availableTabs, dismissedBlockId, extensionManifest, savedTab, selectedBlockId]);
+    // Content the user hasn't picked a tab for opens on the rail they last
+    // engaged with (defaultRightSidebarTab), not on the first one.
+    return defaultRightSidebarTab(savedTab, lastEngagedTab, availableTabs);
+  }, [availableTabs, claimedPanel, dismissedBlockId, extensionManifest, lastEngagedTab, savedTab, selectedBlockId]);
 
   const handleTabChange = (tab: RightSidebarTab) => {
-    if (tab === "extension") return;
+    // The view-driven extension tab isn't a per-content choice; a claimed
+    // content panel is, so it persists like any other tab.
+    if (tab === "extension" && !claimedPanel) return;
     if (!selectedContentId) return;
     // If the user picks a tab while a block is selected, their choice wins over
     // the live Properties override (until they select a different block).
     if (selectedBlockId) setDismissedBlockId(selectedBlockId);
     setActiveTab(selectedContentId, tab);
+    recordEngagedTab(tab);
   };
 
   return (
-    <div className="flex h-full flex-col">
+    // view_screen's "right-sidebar" area (AI-VIEW-SCREEN-PLAN D12).
+    <div className="flex h-full flex-col" data-capture-region="right-sidebar">
       {/* Header with tab buttons — non-interactive until the panel is ready
           so the user never clicks a tab that resolves to the wrong view. */}
       <RightSidebarHeader
         activeTab={activeTab}
+        availableTabs={availableTabs}
         onTabChange={handleTabChange}
         disabled={!rightPanelReady}
         disabledTabs={disabledTabs}

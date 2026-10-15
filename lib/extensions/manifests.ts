@@ -23,6 +23,7 @@ import { speedReaderExtensionManifest } from "@/extensions/speed-reader/manifest
 import { studioExtensionManifest } from "@/extensions/studio/manifest";
 import { workflowsExtensionManifest } from "@/extensions/workflows/manifest";
 import { workplacesExtensionManifest } from "@/extensions/workplaces/manifest";
+import { readerExtensionManifest } from "@/extensions/reader/manifest";
 import type { ExtensionManifest } from "./types";
 
 export const ALL_EXTENSION_MANIFESTS: ExtensionManifest[] = [
@@ -36,6 +37,7 @@ export const ALL_EXTENSION_MANIFESTS: ExtensionManifest[] = [
   publishingExtensionManifest,
   speedReaderExtensionManifest,
   studioExtensionManifest,
+  readerExtensionManifest,
 ];
 
 export const EXTENSION_IDS: string[] = ALL_EXTENSION_MANIFESTS.map(

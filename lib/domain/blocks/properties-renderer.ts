@@ -107,7 +107,7 @@ function zodToField(
 
   // Prefer .meta({ tooltip }) over the legacy hardcoded key list
   const legacyTooltipKeys = new Set([
-    "openBehavior", "workdayCutoffHour", "autoBorrowDurationMinutes",
+    "openBehavior", "workdayCutoffHour",
     "pathOrder", "templateDateMode", "summaryDate", "weekStartDate",
   ]);
   const tooltip =
@@ -238,7 +238,6 @@ function humanize(key: string): string {
   if (key === "weekStartDate") return "Week Start";
   if (key === "templateDateMode") return "Template Date";
   if (key === "workdayCutoffHour") return "Day Cutoff";
-  if (key === "autoBorrowDurationMinutes") return "Auto-borrow Duration";
   if (key === "pathOrder") return "Path Order";
   if (key === "showBackground") return "Background";
   return key

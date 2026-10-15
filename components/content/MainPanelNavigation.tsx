@@ -27,7 +27,9 @@ import {
 import {
   EMPTY_PANE_HISTORY,
   useNavigationHistoryStore,
+  type NavigationHistoryItem,
 } from "@/state/navigation-history-store";
+import { useContentAnchorStore } from "@/state/content-anchor-store";
 import { NavigationHistoryDropdown } from "./NavigationHistoryDropdown";
 import { WorkspaceTabFilters } from "./WorkspaceTabFilters";
 import {
@@ -168,29 +170,38 @@ export function MainPanelNavigation({ paneId }: MainPanelNavigationProps) {
   const canGoBack = paneHistory.currentIndex > 0;
   const canGoForward = paneHistory.currentIndex < paneHistory.history.length - 1;
 
-  const goBack = useCallback(() => {
-    const contentId = historyGoBack(paneId);
-    if (contentId !== null) {
+  /**
+   * Go to a history step. A step inside the content already open (a
+   * viewer's own view — see recordLocation) only hands the viewer its
+   * anchor; a step to other content opens it, with its type and title so
+   * virtual and extension-owned content opens the same as from the tree.
+   */
+  const openHistoryItem = useCallback(
+    (item: NavigationHistoryItem | null) => {
+      if (!item?.contentId) return;
+      if (item.anchor) useContentAnchorStore.getState().request(item.contentId, item.anchor);
+      if (item.contentId === paneContentId) return;
       isNavigatingRef.current = true;
-      setSelectedContentId(contentId, { paneId });
-    }
-  }, [historyGoBack, paneId, setSelectedContentId]);
+      setSelectedContentId(item.contentId, {
+        paneId,
+        ...(item.title ? { title: item.title } : {}),
+        ...(item.contentType ? { contentType: item.contentType } : {}),
+      });
+    },
+    [paneContentId, paneId, setSelectedContentId]
+  );
+
+  const goBack = useCallback(() => {
+    openHistoryItem(historyGoBack(paneId));
+  }, [historyGoBack, openHistoryItem, paneId]);
 
   const goForward = useCallback(() => {
-    const contentId = historyGoForward(paneId);
-    if (contentId !== null) {
-      isNavigatingRef.current = true;
-      setSelectedContentId(contentId, { paneId });
-    }
-  }, [historyGoForward, paneId, setSelectedContentId]);
+    openHistoryItem(historyGoForward(paneId));
+  }, [historyGoForward, openHistoryItem, paneId]);
 
   const navigateToHistoryItem = useCallback(
-    (contentId: string | null) => {
-      if (!contentId) return;
-      isNavigatingRef.current = true;
-      setSelectedContentId(contentId, { paneId });
-    },
-    [paneId, setSelectedContentId]
+    (item: NavigationHistoryItem) => openHistoryItem(item),
+    [openHistoryItem]
   );
 
   const handleBackMouseDown = useCallback(() => {

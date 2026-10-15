@@ -27,7 +27,22 @@ import {
   type DataToolId as _DataToolId,
 } from "./data-metadata";
 
-/** Tool IDs for the base tools */
+/**
+ * Tool IDs for the base tools.
+ *
+ * MINTING A NEW ID — `snake_case`, `^[a-z][a-z0-9]*(_[a-z0-9]+)*$`, asserted by
+ * `pnpm ai:drift:check`. Write it **verb_noun** and imperative
+ * (`read_content`, `query_database`, `record_item_result`), name the widest
+ * thing the tool truly operates on, and match the family an adjacent tool
+ * already established (`read_*`, `search_*`, `propose_*`, `record_*`) so the
+ * model's selection generalizes.
+ *
+ * A name that undersells the tool teaches the model not to reach for it:
+ * `getCurrentNote` read every content type and took an explicit id, so it was
+ * wrong about both "current" and "note", and a model looking for a way to read
+ * a database walked past it. Renaming is not free — the full checklist and the
+ * old→new table live in `./repair.ts`.
+ */
 export const BASE_TOOL_IDS = [
   "search_web",
   "read_page",
@@ -36,12 +51,17 @@ export const BASE_TOOL_IDS = [
   "create_shortcut",
   "read_folder_context",
   "create_docx",
+  "read_docx_template",
+  "fill_docx_template",
   "search_content",
   "search_charters",
-  "getCurrentNote",
-  "createNote",
-  "updateNote",
-  "renameNote",
+  "read_content",
+  "read_image_text",
+  "view_screen",
+  "view_image",
+  "create_note",
+  "update_note",
+  "rename_note",
   "generate_image",
   "generate_speech",
   "notify_user",
@@ -102,6 +122,16 @@ export const BASE_TOOL_METADATA: Record<BaseToolId, BaseToolMeta> = {
     description:
       "Generate a .docx from markdown and file it in the target folder (approval-gated)",
   },
+  read_docx_template: {
+    name: "Read Document Template",
+    description:
+      "List the user's document templates (their own .docx files marked as templates) or read one template's field contract",
+  },
+  fill_docx_template: {
+    name: "Fill Document Template",
+    description:
+      "Fill a marked .docx template with keyed values, preserving its layout, and file the result (approval-gated like Create Word Document)",
+  },
   search_content: {
     name: "Search Content",
     description:
@@ -111,19 +141,35 @@ export const BASE_TOOL_METADATA: Record<BaseToolId, BaseToolMeta> = {
     name: "Search Charters",
     description: "List/search charters by name or topic (scoped, not generic note search)",
   },
-  getCurrentNote: {
-    name: "Read Note",
-    description: "Read the full content of a specific note",
+  read_content: {
+    name: "Read Content",
+    description:
+      "Read any item by id — a note, a folder's own notes, a database (schema plus a row preview), a file's extracted text, a saved link, code or a page",
   },
-  createNote: {
+  read_image_text: {
+    name: "Read Image Text",
+    description:
+      "Read the words in an image — a screenshot, a photo of a page, a receipt — on your device, so the assistant can use what an image says. Reads text only; it does not describe pictures",
+  },
+  view_image: {
+    name: "View Image",
+    description:
+      "Let the assistant look at an image file in your garden — a photo, a screenshot, a cover — and describe it. Vision models only",
+  },
+  view_screen: {
+    name: "View Screen",
+    description:
+      "Let the assistant take a screenshot and look at it: the web page in your active tab (browser side panel) or the pane you have open in Digital Garden. Vision models only; commented-out text is blanked out",
+  },
+  create_note: {
     name: "Create Note",
     description: "Create a new note with a title and optional content",
   },
-  updateNote: {
+  update_note: {
     name: "Update Note",
     description: "Update an existing note's content (content only — never the title)",
   },
-  renameNote: {
+  rename_note: {
     name: "Rename Note",
     description: "Rename (retitle) an existing note, chat, or folder — title only",
   },

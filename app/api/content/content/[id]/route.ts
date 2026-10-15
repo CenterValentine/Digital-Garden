@@ -27,11 +27,13 @@ import {
 } from "@/lib/domain/content";
 import { normalizeUrl } from "@/lib/domain/content/external-validation";
 import { syncContentTags } from "@/lib/domain/content/tag-sync";
+import { recordNoteHistory } from "@/lib/domain/content/note-history";
 import {
   syncImageReferences,
   softDeleteIfOrphaned,
 } from "@/lib/domain/content/image-refs";
 import { syncWindowReferences } from "@/lib/domain/content/window-refs";
+import { mergeSoloCollaborationCopy } from "@/lib/domain/collaboration/documents";
 import { syncPersonMentions } from "@/lib/domain/content/person-mention-sync";
 import {
   resolveContentAccess,
@@ -854,6 +856,19 @@ export async function PATCH(
               parsedJson,
               getServerExtensions()
             ).json;
+            // Conversion backup (owner, 2026-10-12): a markdown body is a
+            // serializer-driven replace of the stored document. Keep what it
+            // overwrites. JSON bodies are the editor's own saves — not kept.
+            if (markdown && existing.notePayload?.tiptapJson) {
+              await recordNoteHistory({
+                contentId: id,
+                changedBy: userId,
+                snapshot: existing.notePayload.tiptapJson as JSONContent,
+                source: "content-patch-markdown",
+                mode: "replace",
+                route: "payload",
+              });
+            }
 
             const searchText = extractSearchTextFromTipTap(json);
             const wordCount = searchText.split(/\s+/).filter(Boolean).length;
@@ -978,6 +993,45 @@ export async function PATCH(
             }
             // ────────────────────────────────────────────────────────────────
 
+            // A solo editor's Y state (SaveMeta.collaborationUpdate). Merged
+            // into the stored copy BEFORE the payload is written, and the
+            // payload stamped only when it merged: no load can then find the
+            // payload ahead of the stored copy in between, which is what made
+            // the server catch up with its own items and a joining
+            // collaborator see the edit twice (collaboration/lineage.ts).
+            // Never fails the save — at worst the copy reaches the server
+            // when the editor connects.
+            let mirrorStampedAt: string | null = null;
+            const pushedCopy = (body as { collaborationUpdate?: unknown }).collaborationUpdate;
+            if (existing.notePayload && typeof pushedCopy === "string" && pushedCopy.length > 0) {
+              try {
+                const outcome = await mergeSoloCollaborationCopy(
+                  prisma,
+                  id,
+                  Buffer.from(pushedCopy, "base64")
+                );
+                span.attr("collab_copy_merge", outcome);
+                if (outcome === "merged") {
+                  mirrorStampedAt = new Date().toISOString();
+                } else if (outcome === "rival") {
+                  logger.warn({
+                    layer: "content",
+                    event: "write:collab_copy_rival",
+                    summary: "solo editor's Y copy is of another lineage — not merged",
+                    attrs: { content_id: id },
+                  });
+                }
+              } catch (error) {
+                logger.warn({
+                  layer: "content",
+                  event: "write:collab_copy_merge_failed",
+                  summary: "could not merge the solo editor's Y copy — saving the payload anyway",
+                  attrs: { content_id: id },
+                  error,
+                });
+              }
+            }
+
             // MERGE over existing metadata — this path only owns the
             // derived-stats keys; replacing wholesale wiped charter marks
             // and other durable metadata (same bug family as the collab
@@ -1001,6 +1055,7 @@ export async function PATCH(
                   wordCount,
                   characterCount: searchText.length,
                   readingTime,
+                  ...(mirrorStampedAt && { collaborationSnapshotAt: mirrorStampedAt }),
                 },
               },
               create: {

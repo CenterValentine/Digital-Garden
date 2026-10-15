@@ -11,6 +11,8 @@ export const EDITOR_TOOL_IDS = [
   "read_next_chunk",
   "read_previous_chunk",
   "apply_diff",
+  "list_document_outline",
+  "append_to_document",
   "replace_document",
   "insert_image",
   "insert_block",
@@ -43,6 +45,14 @@ export const EDITOR_TOOL_METADATA: Record<
   apply_diff: {
     name: "Apply Edit",
     description: "Make targeted text replacements in the document",
+  },
+  list_document_outline: {
+    name: "List Blocks",
+    description: "List the document's blocks so an edit can name which one it means",
+  },
+  append_to_document: {
+    name: "Append",
+    description: "Add new content to the end of the document",
   },
   replace_document: {
     name: "Replace Document",

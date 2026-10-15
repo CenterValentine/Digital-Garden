@@ -23,8 +23,14 @@
 
 import type { Editor } from "@tiptap/react";
 import type { JSONContent } from "@tiptap/core";
-import { TextSelection } from "@tiptap/pm/state";
-import { findTextInDoc } from "./text-search";
+import { TextSelection, type Transaction } from "@tiptap/pm/state";
+import { findTextInDoc, type SearchRange } from "./text-search";
+import { handleMissMessage, resolveHandle } from "./block-handles";
+import {
+  mapRange,
+  rangeMatchesText,
+  type AnchoredRange,
+} from "./position-anchor";
 import { markdownToTiptap } from "@/lib/domain/content/markdown";
 import { useBlockStore } from "@/state/block-store";
 
@@ -35,6 +41,12 @@ export interface ApplyDiffPayload {
   type: "apply_diff";
   before: string;
   after: string;
+  /**
+   * Optional block handle from `list_document_outline`, restricting the search
+   * to that block. Resolved against the live document at apply time — a handle
+   * whose fingerprint no longer matches is refused rather than guessed at.
+   */
+  handle?: string;
   documentTitle: string;
   action: string;
   toolCallId?: string;
@@ -84,12 +96,23 @@ export interface UpdateBlockPayload {
   toolCallId?: string;
 }
 
+export interface AppendToDocumentPayload {
+  __editPayload: true;
+  type: "append_to_document";
+  /** Markdown to parse and append after the document's last block. */
+  markdown: string;
+  documentTitle: string;
+  action: string;
+  toolCallId?: string;
+}
+
 export type EditPayload =
   | ApplyDiffPayload
   | ReplaceDocumentPayload
   | InsertImagePayload
   | InsertBlockPayload
-  | UpdateBlockPayload;
+  | UpdateBlockPayload
+  | AppendToDocumentPayload;
 
 export interface EditResult {
   success: boolean;
@@ -193,11 +216,24 @@ const appliedToolCallIds = new Set<string>();
  * calls are genuinely separate. Dedupe by block content (node type + attrs, minus
  * the per-call `blockId`) within a short window, so a redundant duplicate is
  * dropped while a deliberate later re-insert of the same block still works.
+ *
+ * `append_to_document` is covered by the same guard for the same reason: it is
+ * non-idempotent and carries no address, so a duplicated parallel call appends
+ * the same paragraph twice with nothing to detect it downstream.
  */
 const recentBlockInserts = new Map<string, number>();
 const BLOCK_DEDUP_WINDOW_MS = 8000;
 
-function blockContentSignature(payload: InsertBlockPayload): string {
+type DedupablePayload = InsertBlockPayload | AppendToDocumentPayload;
+
+function isDedupable(payload: EditPayload): payload is DedupablePayload {
+  return payload.type === "insert_block" || payload.type === "append_to_document";
+}
+
+function contentSignature(payload: DedupablePayload): string {
+  if (payload.type === "append_to_document") {
+    return `append::${payload.markdown}`;
+  }
   const attrs = { ...((payload.node?.attrs as Record<string, unknown>) ?? {}) };
   delete attrs.blockId; // freshly generated per call — must be excluded
   const canonical = Object.keys(attrs)
@@ -281,8 +317,8 @@ export class AiEditOrchestrator {
     }
     // Content dedupe: drop a redundant identical block from parallel/repeat
     // model tool calls (distinct toolCallIds, same block content).
-    if (payload.type === "insert_block") {
-      const sig = blockContentSignature(payload);
+    if (isDedupable(payload)) {
+      const sig = contentSignature(payload);
       const now = Date.now();
       const last = recentBlockInserts.get(sig);
       if (last !== undefined && now - last < BLOCK_DEDUP_WINDOW_MS) return false;
@@ -384,6 +420,8 @@ export class AiEditOrchestrator {
       result = await this.executeInsertBlock(payload);
     } else if (payload.type === "update_block") {
       result = await this.executeUpdateBlock(payload);
+    } else if (payload.type === "append_to_document") {
+      result = await this.executeAppendToDocument(payload);
     } else {
       return { success: false, action: "Unknown edit type", error: "Unknown payload type" };
     }
@@ -401,14 +439,33 @@ export class AiEditOrchestrator {
       return { success: false, action: payload.action, error: "Editor not available" };
     }
 
+    // Resolve the optional block scope against the CURRENT document. A handle
+    // that no longer matches means the block moved or changed under us, which
+    // must fail loudly — silently falling back to a whole-document search would
+    // reintroduce exactly the wrong-target edit the handle exists to prevent.
+    let range: SearchRange | undefined;
+    if (payload.handle) {
+      const resolved = resolveHandle(editor.state.doc, payload.handle);
+      if (!resolved.ok) {
+        return {
+          success: false,
+          action: payload.action,
+          error: handleMissMessage(payload.handle, resolved.reason),
+        };
+      }
+      range = { from: resolved.entry.from, to: resolved.entry.to };
+    }
+
     // Find the text in the ProseMirror document
-    const searchResult = findTextInDoc(editor.state.doc, payload.before);
+    const searchResult = findTextInDoc(editor.state.doc, payload.before, range);
 
     if (!searchResult) {
       return {
         success: false,
         action: payload.action,
-        error: "Could not locate the text to edit.",
+        error: payload.handle
+          ? `That exact text does not appear in block ${payload.handle}.`
+          : "Could not locate the text to edit.",
       };
     }
 
@@ -420,17 +477,32 @@ export class AiEditOrchestrator {
       };
     }
 
-    const { from, to } = searchResult;
+    // The animation below spans ~1.2s during which the editor stays EDITABLE
+    // (lockEditor is Phase 3, deliberately — Phase 2 needs contenteditable=true
+    // for the browser to paint native selection). Track the range so anything
+    // typed above the target rebases it instead of silently offsetting it.
+    const anchor = this.trackRange(editor, searchResult);
+    const stale: EditResult = {
+      success: false,
+      action: payload.action,
+      error:
+        "The text moved or changed while this edit was being applied, so nothing was changed. Re-read the document and try again.",
+    };
 
     try {
       // Phase 1: Cursor arrival — scroll into view
-      editor.chain().setTextSelection(from).scrollIntoView().run();
+      editor.chain().setTextSelection(anchor.read().from).scrollIntoView().run();
       if (this.aborted) return { success: false, action: payload.action, error: "Aborted" };
       await sleep(CURSOR_ARRIVAL_DELAY);
 
-      // Phase 2: Selection highlight — select the target text
+      // Phase 2: Selection highlight — select the target text.
+      // Re-verified first: TextSelection.create throws RangeError on positions
+      // past the end of a shrunken document, and that surfaced as the useless
+      // "Unknown error during edit".
+      const selRange = anchor.read();
+      if (!rangeMatchesText(editor.state.doc, selRange, payload.before)) return stale;
       const selectionTr = editor.state.tr.setSelection(
-        TextSelection.create(editor.state.doc, from, to)
+        TextSelection.create(editor.state.doc, selRange.from, selRange.to)
       );
       editor.view.dispatch(selectionTr);
       if (this.aborted) return { success: false, action: payload.action, error: "Aborted" };
@@ -438,25 +510,37 @@ export class AiEditOrchestrator {
 
       // Phase 3: Lock editor + delete selected text + insert replacement
       if (this.aborted) return { success: false, action: payload.action, error: "Aborted" };
+
+      // Compare-and-swap. This is the load-bearing assertion: mapping keeps the
+      // range pointing at the right text in the ordinary case, and this is what
+      // turns the remaining cases into an honest refusal rather than deleting a
+      // span that is no longer what the model read.
+      const editRange = anchor.read();
+      if (!rangeMatchesText(editor.state.doc, editRange, payload.before)) return stale;
+
       this.lockEditor();
 
+      // Captured BEFORE mutating: the delete collapses the tracked range, so
+      // every later position derives from this one.
+      const insertAt = editRange.from;
+
       // Delete the selected text
-      const deleteTr = editor.state.tr.deleteRange(from, to);
+      const deleteTr = editor.state.tr.deleteRange(editRange.from, editRange.to);
       editor.view.dispatch(deleteTr);
 
       // Insert replacement — choose strategy based on content complexity
-      let insertEndPos = from;
+      let insertEndPos = insertAt;
       if (payload.after.length > 0) {
         if (needsStructuredInsert(payload.after)) {
-          insertEndPos = await this.insertStructuredContent(editor, from, payload.after);
+          insertEndPos = await this.insertStructuredContent(editor, insertAt, payload.after);
         } else {
-          insertEndPos = await this.typeText(editor, from, payload.after);
+          insertEndPos = await this.typeText(editor, insertAt, payload.after);
         }
       }
 
       // Apply AI highlight mark to the inserted range
-      if (insertEndPos > from) {
-        this.applyAiHighlight(editor, from, insertEndPos);
+      if (insertEndPos > insertAt) {
+        this.applyAiHighlight(editor, insertAt, insertEndPos);
       }
 
       // Phase 4: Settle — cursor at end of new content
@@ -474,6 +558,10 @@ export class AiEditOrchestrator {
         action: payload.action,
         error: err instanceof Error ? err.message : "Unknown error during edit",
       };
+    } finally {
+      // In a finally so an abort, a stale-range return, or a throw cannot leak
+      // the transaction listener onto a long-lived editor.
+      anchor.release();
     }
   }
 
@@ -518,13 +606,16 @@ export class AiEditOrchestrator {
       // Lock editor for image insertion
       this.lockEditor();
 
-      // Insert at end of document (before trailing doc boundary)
-      const insertPos = editor.state.doc.content.size - 1;
-
       // Scroll to end
-      editor.chain().setTextSelection(insertPos).scrollIntoView().run();
+      editor.chain().setTextSelection(editor.state.doc.content.size - 1).scrollIntoView().run();
       if (this.aborted) return { success: false, action: payload.action, error: "Aborted" };
       await sleep(CURSOR_ARRIVAL_DELAY);
+
+      // Re-derived AFTER the delay, not before. `lockEditor` stops the user
+      // typing but not a remote y-prosemirror update, and a stale
+      // "end of document" lands the image mid-document instead. The end of the
+      // document is derivable, so re-deriving beats tracking a position.
+      const insertPos = editor.state.doc.content.size - 1;
 
       // Insert image node with ai-generated source
       editor.commands.insertContentAt(insertPos, {
@@ -562,25 +653,23 @@ export class AiEditOrchestrator {
       this.lockEditor();
 
       // Insert right after a specific block if requested, else at the doc end.
-      let insertPos = editor.state.doc.content.size - 1;
-      if (payload.afterBlockId) {
-        let anchor: { pos: number; nodeSize: number } | null = null;
-        editor.state.doc.descendants((node, pos) => {
-          if (anchor) return false;
-          if ((node.attrs as Record<string, unknown> | undefined)?.blockId === payload.afterBlockId) {
-            anchor = { pos, nodeSize: node.nodeSize };
-            return false;
-          }
-          return true;
-        });
-        const a = anchor as { pos: number; nodeSize: number } | null;
-        if (a) insertPos = a.pos + a.nodeSize;
-      }
+      // Both are DERIVABLE, so resolve them in a closure and call it again after
+      // the delay rather than carrying a position across it.
+      const resolveInsertPos = (): number => {
+        if (payload.afterBlockId) {
+          const after = this.findBlockById(editor, payload.afterBlockId);
+          if (after) return after.pos + after.nodeSize;
+        }
+        return editor.state.doc.content.size - 1;
+      };
 
       // Scroll to the insertion point
-      editor.chain().setTextSelection(insertPos).scrollIntoView().run();
+      editor.chain().setTextSelection(resolveInsertPos()).scrollIntoView().run();
       if (this.aborted) return { success: false, action: payload.action, error: "Aborted" };
       await sleep(CURSOR_ARRIVAL_DELAY);
+
+      // Re-resolved AFTER the delay — see executeUpdateBlock.
+      const insertPos = resolveInsertPos();
 
       // Insert the pre-validated block node. `updateSelection: false` places the
       // block WITHOUT selecting it, so a bot insert doesn't fire the block's
@@ -626,6 +715,69 @@ export class AiEditOrchestrator {
     }
   }
 
+  /**
+   * Append markdown after the document's last block.
+   *
+   * The blind-safe edit: it carries no address, so there is nothing to resolve
+   * and nothing to go stale between the model's decision and the mutation. The
+   * insertion point is read from the live document at apply time, which is why
+   * this needs no read cycle beforehand.
+   */
+  private async executeAppendToDocument(
+    payload: AppendToDocumentPayload
+  ): Promise<EditResult> {
+    const editor = this.getEditor();
+    if (!editor) {
+      return { success: false, action: payload.action, error: "Editor not available" };
+    }
+
+    try {
+      this.lockEditor();
+
+      editor.chain().setTextSelection(editor.state.doc.content.size - 1).scrollIntoView().run();
+      if (this.aborted) return { success: false, action: payload.action, error: "Aborted" };
+      await sleep(CURSOR_ARRIVAL_DELAY);
+      if (this.aborted) return { success: false, action: payload.action, error: "Aborted" };
+
+      // Re-derived AFTER the delay. The end of the document is whatever it is at
+      // the moment we write, even if a collaborator just added to it — resolving
+      // it before the scroll animation would append into the middle instead.
+      const insertPos = editor.state.doc.content.size - 1;
+
+      const endPos = await this.insertStructuredContent(
+        editor,
+        insertPos,
+        payload.markdown
+      );
+
+      if (endPos > insertPos) {
+        this.applyAiHighlight(editor, insertPos, endPos);
+      }
+
+      // Same rationale as executeInsertBlock: an appended atom block would
+      // otherwise resolve to a NodeSelection and yank the right rail to the
+      // Properties panel, off the chat the user is reading.
+      try {
+        editor.commands.setTextSelection(
+          Math.min(endPos, editor.state.doc.content.size - 1)
+        );
+      } catch {
+        /* best-effort selection collapse */
+      }
+      useBlockStore.getState().clearSelection();
+
+      await sleep(SETTLE_DELAY);
+
+      return { success: true, action: payload.action };
+    } catch (err) {
+      return {
+        success: false,
+        action: payload.action,
+        error: err instanceof Error ? err.message : "Unknown error during append",
+      };
+    }
+  }
+
   private async executeUpdateBlock(payload: UpdateBlockPayload): Promise<EditResult> {
     const editor = this.getEditor();
     if (!editor) {
@@ -636,22 +788,8 @@ export class AiEditOrchestrator {
       this.lockEditor();
 
       // Locate the block node by its blockId.
-      let found: { pos: number; attrs: Record<string, unknown>; nodeSize: number } | null = null;
-      editor.state.doc.descendants((node, pos) => {
-        if (found) return false;
-        const bid = (node.attrs as Record<string, unknown> | undefined)?.blockId;
-        if (bid === payload.blockId) {
-          found = {
-            pos,
-            attrs: node.attrs as Record<string, unknown>,
-            nodeSize: node.nodeSize,
-          };
-          return false;
-        }
-        return true;
-      });
-      const target = found as { pos: number; attrs: Record<string, unknown>; nodeSize: number } | null;
-      if (!target) {
+      const located = this.findBlockById(editor, payload.blockId);
+      if (!located) {
         return {
           success: false,
           action: payload.action,
@@ -659,9 +797,21 @@ export class AiEditOrchestrator {
         };
       }
 
-      editor.chain().setTextSelection(target.pos).scrollIntoView().run();
+      editor.chain().setTextSelection(located.pos).scrollIntoView().run();
       if (this.aborted) return { success: false, action: payload.action, error: "Aborted" };
       await sleep(CURSOR_ARRIVAL_DELAY);
+
+      // Re-resolved AFTER the delay. A remote update is not blocked by
+      // setEditable(false), and setNodeMarkup against a stale position patches
+      // whatever node now sits there — the wrong block, silently.
+      const target = this.findBlockById(editor, payload.blockId);
+      if (!target) {
+        return {
+          success: false,
+          action: payload.action,
+          error: `Block "${payload.blockId}" was removed while this edit was being applied, so nothing was changed.`,
+        };
+      }
 
       // Merge the changed attrs into the live node's attrs.
       const tr = editor.state.tr.setNodeMarkup(target.pos, undefined, {
@@ -793,6 +943,64 @@ export class AiEditOrchestrator {
   }
 
   // ─── Lock / unlock editor ──────────────────────────────────
+
+  /**
+   * Locate a block node by its `blockId`.
+   *
+   * Always call this immediately before using the position. `blockId` is a
+   * stable identity, so re-resolving is authoritative where mapping a stale
+   * offset is only approximate — and the animation delays mean the document may
+   * have moved underneath since the block was first found.
+   */
+  private findBlockById(
+    editor: Editor,
+    blockId: string
+  ): { pos: number; attrs: Record<string, unknown>; nodeSize: number } | null {
+    let found: { pos: number; attrs: Record<string, unknown>; nodeSize: number } | null = null;
+    editor.state.doc.descendants((node, pos) => {
+      if (found) return false;
+      const bid = (node.attrs as Record<string, unknown> | undefined)?.blockId;
+      if (bid === blockId) {
+        found = { pos, attrs: node.attrs as Record<string, unknown>, nodeSize: node.nodeSize };
+        return false;
+      }
+      return true;
+    });
+    return found;
+  }
+
+  /**
+   * Follow a document range while the edit animates.
+   *
+   * The animation is deliberately slow — cursor arrival (400 ms) then selection
+   * sweep (800 ms) — and the editor is NOT locked until Phase 3, so for that
+   * whole window the user can still type and a remote y-prosemirror update can
+   * still land. ProseMirror positions are document-wide offsets, so anything
+   * inserted ABOVE the target shifts it; a `{from,to}` resolved before the
+   * animation points at the wrong text by the time we mutate.
+   *
+   * Subscribing to `transaction` rebases the range through every change,
+   * including our own. Callers must `release()` — in a `finally`, so an abort or
+   * a throw cannot leak the listener.
+   */
+  private trackRange(editor: Editor, initial: AnchoredRange) {
+    let current: AnchoredRange = { from: initial.from, to: initial.to };
+
+    const onTransaction = ({ transaction }: { transaction: Transaction }) => {
+      if (!transaction.docChanged) return;
+      current = mapRange(transaction.mapping, current);
+    };
+
+    editor.on("transaction", onTransaction);
+
+    return {
+      /** The range as of now, mapped through every change since tracking began. */
+      read: (): AnchoredRange => current,
+      release: (): void => {
+        editor.off("transaction", onTransaction);
+      },
+    };
+  }
 
   /**
    * Lock the editor (setEditable(false)) to prevent user input.

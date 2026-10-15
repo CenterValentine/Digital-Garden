@@ -26,6 +26,7 @@ import { resolvePrimaryRoute } from "@/lib/domain/ai/features/router";
 import { resolveChatModelFromConnection } from "@/lib/domain/ai/providers/registry";
 import { publishEvent } from "@/lib/domain/notifications/service";
 import { generateUniqueSlug } from "@/lib/domain/content/slug";
+import { placeExistingRow } from "@/lib/domain/content/sibling-slot";
 import { stableHash } from "@/lib/core/stable-hash";
 import { logger } from "@/lib/core/logger";
 import { getUserSettings } from "@/lib/features/settings";
@@ -422,6 +423,8 @@ const runInfographic: Executor = async (ctx) => {
     },
     select: { id: true },
   });
+  // Newest output first: at the top of Studio outputs, not tied at 0.
+  await placeExistingRow({ ownerId: ctx.userId, rowId: node.id, parentId: outputsFolderId, placement: "top" });
 
   return {
     nodeId: node.id,
@@ -514,6 +517,9 @@ const runAudioOverview: Executor = async (ctx) => {
       bodyHash,
     },
   });
+  // Moved in from where speech generation stored it: it kept that folder's
+  // number and landed anywhere. Newest output first, like the others.
+  await placeExistingRow({ ownerId: ctx.userId, rowId: speech.contentId, parentId: outputsFolderId, placement: "top" });
 
   return {
     nodeId: speech.contentId,
@@ -669,6 +675,7 @@ const runSlideDeck: Executor = async (ctx) => {
     },
     select: { id: true },
   });
+  await placeExistingRow({ ownerId: ctx.userId, rowId: node.id, parentId: outputsFolderId, placement: "top" });
 
   return {
     nodeId: node.id,
