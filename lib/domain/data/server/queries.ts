@@ -37,6 +37,7 @@ import {
   type FilterCondition,
   type ContentRef,
   type FilterNode,
+  type LedgerMarker,
   type PersonRef,
   type RelationLinkRef,
   type RelativeDateWindow,
@@ -124,6 +125,8 @@ export async function loadTable(
     position: v.position,
   }));
 
+  const ledgerMarker = parseLedgerMarker(payload.source);
+
   return {
     contentId: payload.contentId,
     title: payload.content.title,
@@ -139,9 +142,24 @@ export async function loadTable(
     rowCount: payload.rowCount,
     rowDigests: payload.rowDigests,
     aiPolicy: readAiPolicy(payload.aiPolicy),
+    // Charter/quest ledger marker (stamped into `source` at creation). Read
+    // tolerantly: an un-marked legacy ledger simply has none, and the quest
+    // machinery backfills it on that ledger's next sitting.
+    ...(ledgerMarker ? { ledger: ledgerMarker } : {}),
     columns,
     views,
   };
+}
+
+/** `DataPayload.source.ledger` → LedgerMarker, or null for a normal table. */
+export function parseLedgerMarker(source: unknown): LedgerMarker | null {
+  if (!source || typeof source !== "object") return null;
+  const raw = (source as { ledger?: unknown }).ledger;
+  if (!raw || typeof raw !== "object") return null;
+  const m = raw as { kind?: unknown; charterId?: unknown };
+  if (m.kind !== "master" && m.kind !== "quest") return null;
+  if (typeof m.charterId !== "string" || !m.charterId) return null;
+  return { kind: m.kind, charterId: m.charterId };
 }
 
 /**

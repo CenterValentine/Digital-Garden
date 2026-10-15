@@ -39,6 +39,7 @@ import {
 } from "@/lib/domain/data/server/mutations";
 import { keyAtEnd } from "@/lib/domain/data/ordering";
 import { generateUniqueSlug } from "@/lib/domain/content";
+import { parseLedgerMarker } from "@/lib/domain/data/server/queries";
 import type { DataColumn } from "@/lib/domain/data";
 
 /**
@@ -512,6 +513,13 @@ async function createSystemTable(input: {
   parentId: string | null;
   ownedByNoteId?: string;
   icon: string;
+  /**
+   * Stamped into `DataPayload.source` so every AI read of this table says
+   * what it is (the digest prints it). Until this existed the only marker
+   * was the D6 icon plus charter ownership — enough for this module to
+   * infer, invisible to the model.
+   */
+  ledger?: { kind: "master" | "quest"; charterId: string };
   columns: Array<{
     name: string;
     type: string;
@@ -544,7 +552,9 @@ async function createSystemTable(input: {
       dataPayload: {
         create: {
           mode: "inline",
-          source: {} as unknown as Prisma.InputJsonValue,
+          source: (input.ledger
+            ? { ledger: input.ledger }
+            : {}) as unknown as Prisma.InputJsonValue,
           searchText: input.title.toLowerCase(),
         },
       },
@@ -674,6 +684,7 @@ export async function ensureMasterLedger(
     parentId: questHomeFolderId,
     ownedByNoteId: charter.contentId,
     icon: "lucide:LibraryBig",
+    ledger: { kind: "master", charterId: charter.contentId },
     columns: MASTER_COLUMNS.map((c) => ({ ...c, system: true })),
   });
   await prisma.notePayload.update({
@@ -701,9 +712,17 @@ export async function ensureMasterLedger(
 
 // ── Hard rule: a quest row never exists without its ledger ───────────────
 
-/** Is this table a charter's master ledger? A cheap gate for the row and
- *  cell hooks: one PK lookup on the table (D6 icon + charter ownership are
- *  the marker), one on its charter (the stamp confirms it). */
+/**
+ * Is this table a charter's master ledger? A cheap gate for the row and cell
+ * hooks: one PK lookup on the table, one on its charter (the stamp confirms
+ * it).
+ *
+ * Two markers, in order. The stamped one (`DataPayload.source.ledger`) is
+ * authoritative and is what every AI read now names. The older heuristic —
+ * D6 icon plus charter ownership — remains the fallback for ledgers minted
+ * before the stamp existed, and finding one that way BACKFILLS the stamp, so
+ * a ledger upgrades itself the first time anything touches it.
+ */
 async function masterLedgerCharter(
   userId: string,
   tableId: string,
@@ -713,13 +732,24 @@ async function masterLedgerCharter(
       id: tableId,
       ownerId: userId,
       contentType: "data",
-      customIcon: "lucide:LibraryBig",
       deletedAt: null,
       ownedByNoteId: { not: null },
+      OR: [
+        { customIcon: "lucide:LibraryBig" },
+        { dataPayload: { source: { path: ["ledger", "kind"], equals: "master" } } },
+      ],
     },
-    select: { ownedByNoteId: true },
+    select: {
+      ownedByNoteId: true,
+      dataPayload: { select: { source: true } },
+    },
   });
   if (!table?.ownedByNoteId) return null;
+  const stamped = parseLedgerMarker(table.dataPayload?.source);
+  // A stamp that says "quest" is a definite NO — the icon query can only
+  // have matched a stale icon, and acting on it would mint quests inside an
+  // item ledger.
+  if (stamped && stamped.kind !== "master") return null;
   const charter = await prisma.contentNode.findFirst({
     where: { id: table.ownedByNoteId, ownerId: userId, deletedAt: null },
     select: {
@@ -732,6 +762,25 @@ async function masterLedgerCharter(
   if (!charter) return null;
   const meta = (charter.notePayload?.metadata ?? {}) as Record<string, unknown>;
   if (meta[MASTER_LEDGER_META_KEY] !== tableId) return null;
+  // Confirmed a master by the old heuristic — stamp it so the next read (and
+  // every AI read of the table) sees the marker instead of re-deriving it.
+  if (!stamped) {
+    const existingSource =
+      table.dataPayload?.source && typeof table.dataPayload.source === "object"
+        ? (table.dataPayload.source as Record<string, unknown>)
+        : {};
+    await prisma.dataPayload
+      .update({
+        where: { contentId: tableId },
+        data: {
+          source: {
+            ...existingSource,
+            ledger: { kind: "master", charterId: charter.id },
+          } as unknown as Prisma.InputJsonValue,
+        },
+      })
+      .catch(() => null);
+  }
   return {
     contentId: charter.id,
     questHomeFolderId:
@@ -802,6 +851,7 @@ export async function ensureLedgersForMasterRows(
         parentId: charter.questHomeFolderId,
         ownedByNoteId: charter.contentId,
         icon: "lucide:Map",
+        ledger: { kind: "quest", charterId: charter.contentId },
         columns: QUEST_LEDGER_COLUMNS.map((c) => ({ ...c, system: true })),
       }));
     await ensureQuestRelation(ledgerId, tableId);
@@ -883,6 +933,7 @@ export async function ensureQuest(input: {
       // reference chip is the one place every quest artifact is found.
       ownedByNoteId: input.charterId,
       icon: "lucide:Map",
+      ledger: { kind: "quest", charterId: input.charterId },
       columns: [
         ...QUEST_LEDGER_COLUMNS.map((c) => ({ ...c, system: true })),
         ...sculpted,

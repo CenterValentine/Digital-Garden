@@ -622,6 +622,26 @@ export const DEFAULT_CONTENT_QUERY: ContentQuery = {
 
 import type { DataAiPolicy } from "./ai-policy";
 
+/**
+ * A system table minted by the charter/quest machinery (lib/domain/ai/quests.ts),
+ * stamped into `DataPayload.source` at creation.
+ *
+ * Before this existed the only marker was the D6 icon plus charter ownership,
+ * which the machinery could infer but no AI read ever stated — so a model
+ * looking at a master ledger saw an ordinary table and treated its rows as
+ * ordinary rows. The digest now names it, which is what lets `insert_rows`
+ * and friends be told the table is special (owner follow-up, 2026-09-12).
+ *
+ * `source` is a Json column, so this cost no migration (plan D11 doctrine:
+ * config specialization over new enum members / schema changes).
+ */
+export interface LedgerMarker {
+  /** master = one row per quest; quest = one row per item of one quest. */
+  kind: "master" | "quest";
+  /** The charter this ledger serves. */
+  charterId: string;
+}
+
 export interface DataTable {
   contentId: string;
   title: string;
@@ -639,6 +659,8 @@ export interface DataTable {
    * tolerantly from the stored bag, so always present and always valid.
    */
   aiPolicy: DataAiPolicy;
+  /** Present when this table is a charter/quest ledger (see LedgerMarker). */
+  ledger?: LedgerMarker;
   columns: DataColumn[];
   views: DataView[];
 }
