@@ -58,6 +58,10 @@ import {
   type ColumnOptionsProposalPayload,
 } from "./ColumnOptionsProposalCard";
 import {
+  ColumnChangesProposalCard,
+  type ColumnChangesProposalPayload,
+} from "./ColumnChangesProposalCard";
+import {
   DatabaseColumnsProposalCard,
   type DatabaseColumnsProposalPayload,
 } from "./DatabaseColumnsProposalCard";
@@ -781,6 +785,7 @@ export const ChatMessage = memo(function ChatMessage({
     deckProposals,
     deckWithCardsProposals,
     columnOptionsProposals,
+    columnChangesProposals,
     databaseColumnsProposals,
     outputDatabaseProposals,
     linkedDatabasesProposals,
@@ -797,6 +802,7 @@ export const ChatMessage = memo(function ChatMessage({
     const deckProps: DeckProposalPayload[] = [];
     const deckWithCardsProps: DeckWithCardsProposalPayload[] = [];
     const columnOptionsProps: ColumnOptionsProposalPayload[] = [];
+    const columnChangesProps: ColumnChangesProposalPayload[] = [];
     const dbColumnsProps: DatabaseColumnsProposalPayload[] = [];
     const outputDbProps: OutputDatabaseProposalPayload[] = [];
     const linkedDbProps: LinkedDatabasesProposalPayload[] = [];
@@ -856,6 +862,11 @@ export const ChatMessage = memo(function ChatMessage({
           columnOptionsProps.push(columnOptions);
           continue;
         }
+        const columnChanges = parseColumnChangesProposal(tp.output);
+        if (columnChanges) {
+          columnChangesProps.push(columnChanges);
+          continue;
+        }
         const dbColumns = parseDatabaseColumnsProposal(tp.output);
         if (dbColumns) {
           dbColumnsProps.push(dbColumns);
@@ -888,6 +899,7 @@ export const ChatMessage = memo(function ChatMessage({
       deckProposals: deckProps,
       deckWithCardsProposals: deckWithCardsProps,
       columnOptionsProposals: columnOptionsProps,
+      columnChangesProposals: columnChangesProps,
       databaseColumnsProposals: dbColumnsProps,
       outputDatabaseProposals: outputDbProps,
       linkedDatabasesProposals: linkedDbProps,
@@ -1531,6 +1543,7 @@ export const ChatMessage = memo(function ChatMessage({
               if (parseDeckProposal(toolPart.output) !== null) return null;
               if (parseDeckWithCardsProposal(toolPart.output) !== null) return null;
               if (parseColumnOptionsProposal(toolPart.output) !== null) return null;
+              if (parseColumnChangesProposal(toolPart.output) !== null) return null;
               if (parseDatabaseColumnsProposal(toolPart.output) !== null) return null;
               if (parseOutputDatabaseProposal(toolPart.output) !== null) return null;
               if (parseLinkedDatabasesProposal(toolPart.output) !== null) return null;
@@ -1656,6 +1669,22 @@ export const ChatMessage = memo(function ChatMessage({
               messageIndex !== undefined &&
               latestProposalIndex?.columnOptions !== undefined &&
               messageIndex < latestProposalIndex.columnOptions
+            }
+          />
+        ))}
+
+        {/* Column-change proposals — the reshape counterpart to the
+            add-only card. Apply sends ONE request per checked change
+            (rename → PATCH, remove → DELETE), so a mid-way failure reports
+            what actually landed. Removals arrive unchecked. */}
+        {columnChangesProposals.map((payload, i) => (
+          <ColumnChangesProposalCard
+            key={`column-changes-${i}`}
+            payload={payload}
+            superseded={
+              messageIndex !== undefined &&
+              latestProposalIndex?.columnChanges !== undefined &&
+              messageIndex < latestProposalIndex.columnChanges
             }
           />
         ))}
@@ -3170,6 +3199,23 @@ function parseDatabaseColumnsProposal(
     const parsed = JSON.parse(str);
     if (parsed.__databaseColumnsProposal) {
       return parsed as DatabaseColumnsProposalPayload;
+    }
+  } catch {
+    /* not valid JSON */
+  }
+  return null;
+}
+
+function parseColumnChangesProposal(
+  result: unknown
+): ColumnChangesProposalPayload | null {
+  if (result === undefined) return null;
+  const str = typeof result === "string" ? result : JSON.stringify(result);
+  if (!str.includes('"__columnChangesProposal"')) return null;
+  try {
+    const parsed = JSON.parse(str);
+    if (parsed.__columnChangesProposal) {
+      return parsed as ColumnChangesProposalPayload;
     }
   } catch {
     /* not valid JSON */

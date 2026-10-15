@@ -138,6 +138,7 @@ export const PROPOSAL_SENTINELS = {
   linkedDatabases: '"__linkedDatabasesProposal"',
   outputDatabase: '"__outputDatabaseProposal"',
   databaseColumns: '"__databaseColumnsProposal"',
+  columnChanges: '"__columnChangesProposal"',
   columnOptions: '"__columnOptionsProposal"',
 } as const;
 

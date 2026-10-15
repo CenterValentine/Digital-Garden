@@ -15,6 +15,7 @@ export const DATA_TOOL_IDS = [
   "delete_rows",
   "propose_column_options",
   "propose_database_columns",
+  "propose_column_changes",
   "propose_output_database",
   "propose_linked_databases",
 ] as const;
@@ -63,7 +64,12 @@ export const DATA_TOOL_METADATA: Record<
   propose_database_columns: {
     name: "Propose Database Columns",
     description:
-      "Suggest NEW columns for an existing database as a review card — add-only (never renames, retypes, or deletes), and nothing is written until you click Apply",
+      "Suggest NEW columns for an existing database as a review card — add-only (renaming and removing is Propose Column Changes), and nothing is written until you click Apply",
+  },
+  propose_column_changes: {
+    name: "Propose Column Changes",
+    description:
+      "Suggest RENAMING or REMOVING existing columns as a review card — removals arrive unchecked and are restorable, system columns of a charter ledger are refused, and nothing changes until you click Apply",
   },
   propose_output_database: {
     name: "Propose Output Database",
