@@ -95,11 +95,53 @@ def _unresolved_in(text: str) -> list[str]:
     return seen
 
 
+# Word's File → Properties fields the caller may set, with length bounds.
+# Applied AFTER the template is filled, so an explicit value wins over a tag
+# in the template's own property box (docxtpl renders title/subject tags but
+# skips keywords entirely — the field an ATS reads).
+# python-docx (and the OOXML core-properties schema it enforces) caps every
+# one of these at 255 characters and raises above it.
+PROPERTY_LIMITS: dict[str, int] = {
+    "title": 255,
+    "subject": 255,
+    "keywords": 255,
+    "author": 255,
+    "comments": 255,
+    "category": 255,
+}
+
+
+def clean_properties(raw: Any) -> dict[str, str]:
+    """Keep known string fields, trimmed and bounded; drop the rest."""
+    if not isinstance(raw, dict):
+        return {}
+    out: dict[str, str] = {}
+    for key, limit in PROPERTY_LIMITS.items():
+        value = raw.get(key)
+        if isinstance(value, list):
+            value = ", ".join(str(v).strip() for v in value if str(v).strip())
+        if isinstance(value, str) and value.strip():
+            text = value.strip()
+            if len(text) > limit and key == "keywords":
+                # Cut at the last whole keyword — an ATS must never read a fragment.
+                cut = text[:limit]
+                text = cut[: cut.rfind(",")].rstrip(", ") if "," in cut else cut
+            out[key] = text[:limit]
+    return out
+
+
+def read_properties(data: bytes) -> dict[str, str]:
+    """The properties as Word will show them — read back from the output."""
+    props = Document(io.BytesIO(data)).core_properties
+    return {key: getattr(props, key) for key in PROPERTY_LIMITS if getattr(props, key, None)}
+
+
 def render_template(
     data: bytes,
     values: dict[str, Any],
     *,
     expected_checksum: str | None = None,
+    properties: dict[str, Any] | None = None,
 ) -> RenderResult:
     started = time.perf_counter()
     actual = checksum_of(data)
@@ -135,6 +177,10 @@ def render_template(
             diagnostics={"durationMs": round((time.perf_counter() - started) * 1000)},
         )
 
+    wanted = clean_properties(properties or {})
+    for key, value in wanted.items():
+        setattr(tpl.docx.core_properties, key, value)
+
     out = io.BytesIO()
     tpl.save(out)
     docx = out.getvalue()
@@ -150,7 +196,12 @@ def render_template(
 
     declared = contract.declared_names()
     provided = set(values)
+    try:
+        written = read_properties(docx)
+    except Exception:  # noqa: BLE001 — a property read must never fail a good render
+        written = {}
     diagnostics = {
+        "properties": written,
         "durationMs": round((time.perf_counter() - started) * 1000),
         "bytes": len(docx),
         "unresolved": _unresolved_in(text),

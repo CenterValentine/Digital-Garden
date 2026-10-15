@@ -100,8 +100,18 @@ async def render(
     template: UploadFile = File(...),
     values: str = Form(...),
     expectedChecksum: str | None = Form(default=None),
+    properties: str | None = Form(default=None),
 ) -> JSONResponse:
     data = await _read_template(template)
+    wanted_properties: dict[str, Any] = {}
+    if properties:
+        try:
+            parsed_properties = json.loads(properties)
+        except json.JSONDecodeError as error:
+            raise HTTPException(status_code=400, detail={"code": "properties_not_json", "message": str(error)}) from error
+        if not isinstance(parsed_properties, dict):
+            raise HTTPException(status_code=400, detail={"code": "properties_not_object"})
+        wanted_properties = parsed_properties
     if len(values.encode("utf-8")) > MAX_VALUES_BYTES:
         raise HTTPException(status_code=413, detail={"code": "values_too_large", "limitBytes": MAX_VALUES_BYTES})
     try:
@@ -111,7 +121,7 @@ async def render(
     if not isinstance(parsed, dict):
         raise HTTPException(status_code=400, detail={"code": "values_not_object"})
 
-    result = render_template(data, parsed, expected_checksum=expectedChecksum)
+    result = render_template(data, parsed, expected_checksum=expectedChecksum, properties=wanted_properties)
     body = result.to_dict()
     if result.ok and result.docx is not None:
         body["docxBase64"] = base64.b64encode(result.docx).decode("ascii")
@@ -122,7 +132,8 @@ async def render(
         ok=result.ok,
         templateBytes=len(data),
         error=(result.error or {}).get("code"),
-        **{k: v for k, v in result.diagnostics.items() if k != "unresolved"},
+        **{k: v for k, v in result.diagnostics.items() if k not in ("unresolved", "properties")},
+        propertiesSet=sorted(result.diagnostics.get("properties", {}).keys()),
         unresolvedCount=len(result.diagnostics.get("unresolved", [])),
     )
     return JSONResponse(body, status_code=200 if result.ok else 422)

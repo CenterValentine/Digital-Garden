@@ -130,6 +130,42 @@ def main() -> int:
     (FIXTURES / "out").mkdir(exist_ok=True)
     (FIXTURES / "out" / "resume-rendered.docx").write_bytes(docx)
 
+    print("document properties")
+    props = {
+        "title": "David Valentine - Acme - Analyst - 20261014",
+        "subject": "Analyst - Acme",
+        "keywords": ["Salesforce", "HubSpot", " ", "RevOps"],
+        "author": "David Valentine",
+        "comments": "x" * 5000,
+        "bogus": "dropped",
+    }
+    res = client.post(
+        "/render",
+        files={"template": ("t.docx", (FIXTURES / "resume-template.docx").read_bytes())},
+        data={"values": json.dumps(VALUES), "properties": json.dumps(props)},
+    )
+    body = res.json()
+    check(res.status_code == 200 and body["ok"], "render with properties ok", body.get("error"))
+    written = body["diagnostics"].get("properties", {})
+    check(written.get("title") == props["title"], "title set", written)
+    check(written.get("subject") == "Analyst - Acme", "subject set")
+    check(written.get("keywords") == "Salesforce, HubSpot, RevOps", "keyword list joined, blanks dropped", written.get("keywords"))
+    check(written.get("author") == "David Valentine", "author set")
+    check(len(written.get("comments", "")) == 255, "comments bounded to 255 (the OOXML limit)", len(written.get("comments", "")))
+    check("bogus" not in written, "unknown property dropped")
+    from render import clean_properties  # noqa: E402
+    long_kw = ", ".join(f"keyword{i:03d}" for i in range(60))
+    cut = clean_properties({"keywords": long_kw})["keywords"]
+    check(len(cut) <= 255 and not cut.endswith(",") and cut.split(", ")[-1].startswith("keyword") and len(cut.split(", ")[-1]) == 10, "long keywords cut at a whole keyword", cut[-30:])
+    core = Document(io.BytesIO(base64.b64decode(body["docxBase64"]))).core_properties
+    check(core.keywords == "Salesforce, HubSpot, RevOps" and core.title == props["title"], "properties are in the file itself, not only the report")
+    res = client.post(
+        "/render",
+        files={"template": ("t.docx", (FIXTURES / "resume-template.docx").read_bytes())},
+        data={"values": json.dumps(VALUES), "properties": "{nope"},
+    )
+    check(res.status_code == 400 and res.json()["detail"]["code"] == "properties_not_json", "malformed properties refused", res.json())
+
     print("render with a missing field and a typo'd key")
     partial = {**VALUES, "sumary": VALUES["summary"]}
     del partial["summary"]
