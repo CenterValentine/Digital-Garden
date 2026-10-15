@@ -14,6 +14,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { readFillRecord, type DocxFillRecord, type DocxTemplateRecord } from "@/lib/domain/ai/docx-templates/record";
 import type { TemplateField, TemplateSection } from "@/lib/domain/ai/docx-templates/renderer-client";
+import type { DocxProperties } from "@/lib/domain/export/docx-properties";
 
 type Values = Record<string, unknown>;
 
@@ -189,6 +190,7 @@ export function TemplateFieldsPanel({ contentId }: { contentId: string }) {
   const [fill, setFill] = useState<DocxFillRecord | null>(null);
   const [template, setTemplate] = useState<{ title: string; record: DocxTemplateRecord } | null>(null);
   const [values, setValues] = useState<Values>({});
+  const [properties, setProperties] = useState<DocxProperties>({});
   const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState(false);
   const [problems, setProblems] = useState<string[]>([]);
@@ -209,6 +211,7 @@ export function TemplateFieldsPanel({ contentId }: { contentId: string }) {
       }
       setFill(record);
       setValues(record.values);
+      setProperties(record.properties ?? {});
       setDirty(false);
       const tplRes = await fetch(`/api/content/docx-templates?contentId=${encodeURIComponent(record.templateId)}`, {
         credentials: "include",
@@ -248,7 +251,7 @@ export function TemplateFieldsPanel({ contentId }: { contentId: string }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ contentId, values, provenance: fill?.provenance }),
+        body: JSON.stringify({ contentId, values, provenance: fill?.provenance, properties }),
       });
       const body = (await res.json()) as {
         success?: boolean;
@@ -318,6 +321,26 @@ export function TemplateFieldsPanel({ contentId }: { contentId: string }) {
             onChange={(v) => update(s.path, v)}
           />
         ))}
+        <div className="pt-2 border-t border-black/[0.06] dark:border-white/[0.08] space-y-1.5">
+          <div className="text-[11px] font-medium text-gray-600 dark:text-gray-300">Document properties</div>
+          {(["title", "subject", "keywords", "author"] as const).map((key) => (
+            <label key={key} className="block">
+              <span className="text-[11px] text-gray-500 dark:text-gray-400">
+                {key === "keywords" ? "keywords · comma-separated, read by an ATS" : key}
+              </span>
+              <input
+                className={inputClass}
+                value={properties[key] ?? ""}
+                maxLength={255}
+                onChange={(e) => {
+                  setProperties((prev) => ({ ...prev, [key]: e.target.value }));
+                  setDirty(true);
+                  setProblems([]);
+                }}
+              />
+            </label>
+          ))}
+        </div>
         {fill.report?.uncited && fill.report.uncited.length > 0 && (
           <p className="text-[11px] text-yellow-600 dark:text-yellow-400">
             Uncited: {fill.report.uncited.join(", ")}
@@ -348,6 +371,7 @@ export function TemplateFieldsPanel({ contentId }: { contentId: string }) {
             type="button"
             onClick={() => {
               setValues(fill.values);
+              setProperties(fill.properties ?? {});
               setDirty(false);
               setProblems([]);
             }}

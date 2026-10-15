@@ -13,6 +13,7 @@ import { logger, withRouteTrace, withSpan } from "@/lib/core/logger";
 import { rerenderDocxFill } from "@/lib/domain/ai/docx-templates/fills";
 import { DocxRendererUnavailableError, type TemplateValue } from "@/lib/domain/ai/docx-templates/renderer-client";
 import type { FillProvenance } from "@/lib/domain/ai/docx-templates/record";
+import { normalizeDocxProperties } from "@/lib/domain/export/docx-properties";
 
 const ROUTE_PATH = "/api/content/docx-templates/rerender";
 
@@ -26,6 +27,7 @@ export async function POST(request: NextRequest) {
         contentId?: unknown;
         values?: unknown;
         provenance?: unknown;
+        properties?: unknown;
       };
       const contentId = typeof body.contentId === "string" ? body.contentId : null;
       if (!contentId) {
@@ -40,7 +42,12 @@ export async function POST(request: NextRequest) {
           ? (body.provenance as FillProvenance)
           : undefined;
 
-      const outcome = await rerenderDocxFill(session.user.id, contentId, { values, provenance });
+      const properties =
+        body.properties && typeof body.properties === "object" && !Array.isArray(body.properties)
+          ? normalizeDocxProperties(body.properties)
+          : undefined;
+
+      const outcome = await rerenderDocxFill(session.user.id, contentId, { values, provenance, properties });
       if (outcome.error) {
         return NextResponse.json({ success: false, error: { message: outcome.error } }, { status: 404 });
       }
@@ -56,6 +63,7 @@ export async function POST(request: NextRequest) {
           report: outcome.report,
           templateChanged: outcome.templateChanged === true,
           ...(outcome.droppedKeys ? { droppedKeys: outcome.droppedKeys } : {}),
+          ...(outcome.properties ? { properties: outcome.properties } : {}),
         },
       });
     } catch (error) {

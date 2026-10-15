@@ -5,6 +5,7 @@
  */
 
 import { getMetadata } from "@/lib/domain/content/metadata-types";
+import { normalizeDocxProperties, type DocxProperties } from "@/lib/domain/export/docx-properties";
 import type { TemplateField, TemplateSection, TemplateContract } from "./renderer-client";
 
 export const DOCX_TEMPLATE_RECORD_KEY = "docxTemplate";
@@ -91,6 +92,8 @@ export interface DocxFillRecord {
   templateChecksum: string;
   values: Record<string, unknown>;
   provenance?: FillProvenance;
+  /** Word properties the document was rendered with — kept for re-renders. */
+  properties?: DocxProperties;
   renderedAt: string;
   report?: DocxFillCompactReport;
 }
@@ -113,6 +116,7 @@ export function readFillRecord(storageMetadata: unknown): DocxFillRecord | null 
     templateChecksum: typeof record.templateChecksum === "string" ? record.templateChecksum : "",
     values: record.values as Record<string, unknown>,
     ...(record.provenance && typeof record.provenance === "object" ? { provenance: record.provenance } : {}),
+    ...(record.properties && typeof record.properties === "object" ? { properties: normalizeDocxProperties(record.properties) } : {}),
     renderedAt: typeof record.renderedAt === "string" ? record.renderedAt : "",
     ...(record.report ? { report: record.report } : {}),
   };

@@ -89,6 +89,7 @@ import {
 } from "@/lib/domain/ai/docx-templates/templates";
 import { judgeRender } from "@/lib/domain/ai/docx-templates/judge";
 import { compactReport, verifyProvenance, writeFillRecord } from "@/lib/domain/ai/docx-templates/fills";
+import { hasDocxProperties, normalizeDocxProperties } from "@/lib/domain/export/docx-properties";
 
 /**
  * What the user does to make a .docx a template — returned by every
@@ -2543,7 +2544,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
       },
       description:
         "Create a Word (.docx) document from markdown content and file it in the user's garden. " +
-        "Use when the user asks for a Word/docx deliverable (e.g. a resume). Headings, lists, bold/italic and links from the markdown are preserved. Do NOT create output on your own initiative — only when the user asks for it. " +
+        "Use when the user asks for a Word/docx deliverable (e.g. a resume). Headings, lists, bold/italic and links from the markdown are preserved. Set Word's document properties (title, subject, ATS keywords) with `properties`; the file name comes from `title`. Do NOT create output on your own initiative — only when the user asks for it. " +
         "Targeting: omit placement fields to use the configured output-target preset. If the user or active charter gives THIS document a different relative destination, pass outputLocation (`under_chat`, `under_content`, or `beside_content`). Pass parentId only for a specifically resolved folder UUID. A per-document instruction always overrides the preset.",
       // Describe-only schema (drift gate 7; the rule in
       // iteration-proposal.ts): the body is read from `markdown` OR the
@@ -2578,6 +2579,14 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           .describe(
             "Folder id to ALSO mirror the new document into, via a shortcut — one canonical home plus a pointer, never a duplicate. Use when the user wants the document visible in a second place.",
           ),
+        // A plain record, not a nested object (drift gate 7): the shape is
+        // judged in execute by normalizeDocxProperties (docx-properties.ts).
+        properties: z
+          .record(z.string(), z.unknown())
+          .optional()
+          .describe(
+            'Word document properties (File → Properties): { "title", "subject", "keywords", "author", "comments" }. keywords is a list or one comma-separated string — the field an ATS reads. Each is capped at 255 characters; keywords are cut at a whole keyword.',
+          ),
         overwriteContentId: z
           .string()
           .optional()
@@ -2587,6 +2596,8 @@ export function createBaseTools(ctx: ToolExecuteContext) {
       }),
       execute: async (rawArgs) => {
         const { parentId, alsoShortcutTo, overwriteContentId } = rawArgs;
+        const properties = normalizeDocxProperties(rawArgs.properties);
+        const withProperties = hasDocxProperties(properties) ? { properties } : {};
         const resolved = resolveDocumentArgs(rawArgs, {
           toolName: "create_docx",
           canonicalBodyKey: "markdown",
@@ -2616,12 +2627,14 @@ export function createBaseTools(ctx: ToolExecuteContext) {
               title,
               markdown,
               overwriteContentId,
+              ...withProperties,
             });
             return {
               __docPayload: true,
               contentNodeId: result.contentNodeId,
               fileName: result.fileName,
               overwritten: true,
+              ...(hasDocxProperties(properties) ? { properties } : {}),
               ...(shapeNotes.length > 0 ? { shapeNotes } : {}),
               ...(await getContentWriteReceiptEnvelope(
                 ctx.userId,
@@ -2662,6 +2675,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             title,
             markdown,
             parentFolderId: destination,
+            ...withProperties,
             ...(placement.ownedByNoteId
               ? {
                   role: "referenced" as const,
@@ -2696,6 +2710,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             contentNodeId: result.contentNodeId,
             fileName: result.fileName,
             parentFolderId: destination,
+            ...(hasDocxProperties(properties) ? { properties } : {}),
             ...mirror,
             ...(shapeNotes.length > 0 ? { shapeNotes } : {}),
             ...(await getContentWriteReceiptEnvelope(
@@ -2790,7 +2805,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
       },
       description:
         "Fill one of the user's document templates — a .docx they marked as a template — with keyed values, and file the result as a Word document that keeps the template's layout. Use ONLY when the user chose a template (by name, by @mention, or through a charter that names one); otherwise use create_docx. Call read_docx_template first and make `values` follow its contract exactly. Never invent a fact: leave the field empty and tell the user which fields you left empty. " +
-        "Targeting works as in create_docx: omit placement fields to use the configured output-target preset; pass outputLocation when the user or active charter routes this document; parentId only for a resolved folder id; overwriteContentId to regenerate an existing document in place (same id, so every File cell and shortcut keeps pointing at it — never create a second copy for an update).",
+        "Targeting works as in create_docx: omit placement fields to use the configured output-target preset; pass outputLocation when the user or active charter routes this document; parentId only for a resolved folder id; overwriteContentId to regenerate an existing document in place (same id, so every File cell and shortcut keeps pointing at it — never create a second copy for an update). The file name comes from `title`; Word's document properties (title, subject, ATS keywords) from `properties` — the result reports what the file actually carries.",
       inputSchema: z.object({
         templateId: z.string().describe("Content id of the template file, from read_docx_template."),
         values: z
@@ -2810,6 +2825,14 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           .describe(
             "Where each factual value came from: field path (summary, experience_bullets[2], experience[0].title) → the source row ids it was taken from (the evidence database's claim rows, as query_database returned them). Cite bullets, figures, titles and dates. A cited id that does not exist is a refusal; uncited bullets are reported to the user.",
           ),
+        // A plain record, not a nested object (drift gate 7): the shape is
+        // judged in execute by normalizeDocxProperties (docx-properties.ts).
+        properties: z
+          .record(z.string(), z.unknown())
+          .optional()
+          .describe(
+            'Word document properties (File → Properties): { "title", "subject", "keywords", "author", "comments" }. keywords is a list or one comma-separated string — the field an ATS reads. Each is capped at 255 characters; keywords are cut at a whole keyword.',
+          ),
         parentId: z.string().optional().describe("Destination folder id — only when the user explicitly named a folder."),
         outputLocation: z
           .string()
@@ -2823,6 +2846,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
       }),
       execute: async (rawArgs) => {
         const { templateId, values, expectedChecksum, provenance, parentId, outputLocation, alsoShortcutTo, overwriteContentId } = rawArgs;
+        const properties = normalizeDocxProperties(rawArgs.properties);
         if (!isDocxRendererConfigured()) {
           return { ok: false, refusal: "Document templates are not available here: the renderer is not configured. Use create_docx instead." };
         }
@@ -2862,6 +2886,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         const rendered = await renderDocxTemplate(template.bytes, typedValues, {
           expectedChecksum: template.record.checksum,
           fileName: template.node.filePayload.fileName,
+          ...(hasDocxProperties(properties) ? { properties } : {}),
         });
         const docx = rendered.docx;
         const diagnostics = rendered.diagnostics;
@@ -2898,6 +2923,9 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           templateId,
           templateTitle: template.node.title,
           ...(report ? { report } : {}),
+          ...(diagnostics.properties && Object.keys(diagnostics.properties).length > 0
+            ? { properties: diagnostics.properties }
+            : {}),
           ...(citations.total > 0
             ? { provenance: { verified: citations.verified, unverified: citations.unverified.length } }
             : {}),
@@ -2918,6 +2946,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
               templateChecksum: template.record.checksum,
               values: typedValues,
               ...(provenance ? { provenance } : {}),
+              ...(hasDocxProperties(properties) ? { properties } : {}),
               renderedAt: new Date().toISOString(),
               ...(report ? { report } : {}),
             },

@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-10-13
+last_updated: 2026-10-14
 status: built (steps 1–3 + charter refinement); renderer NOT deployed; browser smoke + PR pending
 branch: feat/docx-template-renderer
 worktree: .claude/worktrees/docx-template
@@ -57,6 +57,15 @@ no code. Everything below was built and gated in this worktree.
 | API | `app/api/content/docx-templates/route.ts` | GET (list / `?contentId=` record), POST mark, PATCH notes, DELETE unmark. 503 when the renderer is not configured. |
 | Approval card | `components/content/ai/ChatMessage.tsx` | `fill_docx_template` → `DocumentApprovalPreview` with `TemplateValuesPreview` (empties render as "—"). |
 | Node smoke | `scripts/docx-renderer-smoke.ts` (`pnpm docx:renderer:smoke`) | Client ↔ service over HTTP + judge. Not in `build` (needs Python). |
+
+## 2b. File names and Word document properties (2026-10-14)
+
+Frontmatter-style metadata is passed as tool arguments, never YAML or a path:
+
+- **`title` → file name**, through one rule (`docxFileName` in `lib/domain/export/docx-properties.ts`): keeps letters, digits, spaces and `- & . , ' ( )`; typographic dashes and quotes become plain ones; accents fold to ASCII; path/shell characters drop. ASCII so the name is valid in every HTTP header. Was: everything but `[A-Za-z0-9 -]` stripped ("AT&T" → "ATT").
+- **`properties` → Word's File → Properties** (`title`, `subject`, `keywords`, `author`, `comments`) on both `create_docx` (the docx converter writes them) and `fill_docx_template` (the renderer sets them AFTER filling, so an explicit value wins over a tag in the template's own property box — docxtpl skips Keywords entirely). Each is capped at 255 characters (the OOXML limit python-docx enforces); keywords accept a list, dedupe, and cut at a whole keyword. The renderer reads the file back and the tool result reports what it actually carries. The fill record keeps them, so a re-render preserves them; the Template Fields rail edits them.
+- **Downloads** (`/api/content/content/[id]/download`, note export) send RFC 6266 `Content-Disposition` (ASCII fallback + `filename*` UTF-8), via `contentDisposition()`. The raw name in the header threw for any character outside Latin-1 and broke on `"`.
+- Gate: `docx:templates:check` (+ properties rules, file-name rule, header shape, wiring, and a byte-level check that the converter writes Keywords into `docProps/core.xml`); 8/8 mutants killed. Renderer smoke 40 → 49 checks. **Requires a renderer redeploy after merge.**
 
 ## 3. The contract (what the model reads)
 

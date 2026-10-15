@@ -11,6 +11,7 @@
  * matching the editor's unsupported-content philosophy.
  */
 
+import type { DocxProperties } from "@/lib/domain/export/docx-properties";
 import {
   Document,
   ExternalHyperlink,
@@ -191,6 +192,8 @@ function blockToParagraphs(
  */
 export interface DocxLayout {
   compact?: boolean;
+  /** Word's File → Properties (title, subject, keywords…) — see docx-properties.ts. */
+  properties?: DocxProperties;
 }
 
 export function documentDefaults(layout: DocxLayout = {}) {
@@ -242,7 +245,13 @@ export class DOCXConverter implements DocumentConverter {
     }
 
     const defaults = documentDefaults(this.layout);
+    const props = this.layout.properties ?? {};
     const document = new Document({
+      ...(props.title ? { title: props.title } : {}),
+      ...(props.subject ? { subject: props.subject } : {}),
+      ...(props.keywords ? { keywords: props.keywords } : {}),
+      ...(props.author ? { creator: props.author } : {}),
+      ...(props.comments ? { description: props.comments } : {}),
       styles: defaults.styles,
       sections: [{ properties: { page: defaults.page }, children }],
     });

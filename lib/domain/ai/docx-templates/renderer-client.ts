@@ -29,6 +29,7 @@
  */
 
 import { logger } from "@/lib/core/logger";
+import { hasDocxProperties, type DocxProperties } from "@/lib/domain/export/docx-properties";
 
 // ---------------------------------------------------------------------------
 // Contract types — mirror server/docx-renderer/contract.py exactly.
@@ -81,6 +82,8 @@ export interface RenderDiagnostics {
   /** Keys in `values` the template never reads. */
   unused: string[];
   textChars: number;
+  /** Word properties the produced file actually carries (read back). */
+  properties?: Record<string, string>;
 }
 
 /**
@@ -261,12 +264,15 @@ export async function inspectDocxTemplate(
 export async function renderDocxTemplate(
   template: Buffer,
   values: Record<string, TemplateValue>,
-  options: { expectedChecksum?: string; fileName?: string } = {},
+  options: { expectedChecksum?: string; fileName?: string; properties?: DocxProperties } = {},
 ): Promise<RenderOutcome> {
   const form = new FormData();
   templatePart(form, template, options.fileName ?? "template.docx");
   form.set("values", JSON.stringify(values));
   if (options.expectedChecksum) form.set("expectedChecksum", options.expectedChecksum);
+  if (options.properties && hasDocxProperties(options.properties)) {
+    form.set("properties", JSON.stringify(options.properties));
+  }
   const { status, body } = await post("/render", form);
   const result = (body ?? {}) as {
     ok?: boolean;

@@ -16,6 +16,7 @@ import type { Prisma } from "@/lib/database/generated/prisma";
 import { getMetadata } from "@/lib/domain/content/metadata-types";
 import { storeDocxDocument } from "@/lib/domain/ai/documents";
 import { logger } from "@/lib/core/logger";
+import { hasDocxProperties, normalizeDocxProperties, type DocxProperties } from "@/lib/domain/export/docx-properties";
 import {
   DOCX_FILL_RECORD_KEY,
   readFillRecord,
@@ -132,6 +133,8 @@ export interface RerenderOutcome {
   templateChanged?: boolean;
   /** Stored values whose slot no longer exists in the changed template — pruned. */
   droppedKeys?: string[];
+  /** Word properties the re-rendered file carries. */
+  properties?: Record<string, string>;
   error?: string;
 }
 
@@ -142,7 +145,7 @@ export interface RerenderOutcome {
 export async function rerenderDocxFill(
   ownerId: string,
   contentId: string,
-  input: { values?: Record<string, TemplateValue>; provenance?: FillProvenance },
+  input: { values?: Record<string, TemplateValue>; provenance?: FillProvenance; properties?: DocxProperties },
 ): Promise<RerenderOutcome> {
   const node = await prisma.contentNode.findFirst({
     where: { id: contentId, ownerId, contentType: "file", deletedAt: null },
@@ -160,6 +163,7 @@ export async function rerenderDocxFill(
   const templateChanged = fill.templateChecksum !== "" && fill.templateChecksum !== template.record.checksum;
   const values = { ...((input.values ?? fill.values) as Record<string, TemplateValue>) };
   const provenance = input.provenance ?? fill.provenance;
+  const properties = input.properties ? normalizeDocxProperties(input.properties) : fill.properties;
 
   // The template lost a slot since this document was filled (the user
   // deleted `{{CAPABILITY_7}}` in Word): the stored value for it has no
@@ -180,6 +184,7 @@ export async function rerenderDocxFill(
   const rendered = await renderDocxTemplate(template.bytes, values, {
     expectedChecksum: template.record.checksum,
     fileName: template.node.filePayload.fileName,
+    ...(properties ? { properties } : {}),
   });
   const docx = rendered.docx;
   const diagnostics = rendered.diagnostics;
@@ -206,6 +211,7 @@ export async function rerenderDocxFill(
       templateChecksum: template.record.checksum,
       values,
       ...(provenance ? { provenance } : {}),
+      ...(properties && hasDocxProperties(properties) ? { properties } : {}),
       renderedAt: new Date().toISOString(),
       ...(report ? { report } : {}),
     },
@@ -214,6 +220,7 @@ export async function rerenderDocxFill(
   return {
     ok: true,
     report,
+    ...(diagnostics.properties && Object.keys(diagnostics.properties).length > 0 ? { properties: diagnostics.properties } : {}),
     templateChanged,
     ...(droppedKeys.length > 0 ? { droppedKeys } : {}),
   };

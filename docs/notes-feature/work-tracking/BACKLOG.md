@@ -12,6 +12,7 @@ last_updated: 2026-10-12
 
 ## DOCX template renderer — follow-ups (2026-10-12, from `DOCX-TEMPLATE-RENDERER-PLAN.md`)
 
+- 🟡 Word document properties + safe file names — built on `feat/docx-document-properties` (2026-10-14), not pushed; renderer redeploy after merge.
 - ✅ Judge policy decided + built 2026-10-13 (refuse a bad write; positive report).
 - ✅ Rerender without an AI call (Template Fields rail + `/rerender`) and the Stage 2 recipe §3 — 2026-10-13.
 - ⚪ **Deploy the renderer** (owner-run, after merge): WIF pool + provider for Vercel OIDC, invoker SA, Secret Manager token, `gcloud builds submit --config cloudbuild.docx-renderer.yaml .`, Vercel env (plan §7). Then the production smoke + the templated-vs-markdown token/latency comparison.

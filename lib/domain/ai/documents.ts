@@ -13,6 +13,7 @@
 import { createHash, randomBytes } from "crypto";
 import { prisma } from "@/lib/database/client";
 import { logger } from "@/lib/core/logger";
+import { docxFileName, type DocxProperties } from "@/lib/domain/export/docx-properties";
 import {
   generateUniqueSlug,
   markdownToTiptap,
@@ -209,6 +210,8 @@ export interface CreateDocxInput {
    */
   role?: "referenced";
   ownedByNoteId?: string;
+  /** Word's File → Properties: title, subject, keywords (ATS), author, comments. */
+  properties?: DocxProperties;
 }
 
 /** `docxHtmlToCheckText` over the bytes; the source text if reading fails. */
@@ -237,7 +240,7 @@ export async function createDocxDocument(
 ): Promise<{ contentNodeId: string; fileName: string }> {
   const tiptap = markdownToTiptap(input.markdown);
   // Compact layout: AI documents are resumes, letters, briefs (§10 round 5).
-  const converter = new DOCXConverter({ compact: true });
+  const converter = new DOCXConverter({ compact: true, properties: input.properties });
   const result = await converter.convert(tiptap, {
     format: "docx",
     settings: DEFAULT_EXPORT_BACKUP_SETTINGS,
@@ -294,9 +297,9 @@ export async function storeDocxDocument(
   input: StoreDocxInput,
 ): Promise<{ contentNodeId: string; fileName: string }> {
   const { buffer, searchText } = input;
-  const safeTitle =
-    input.title.replace(/[^a-zA-Z0-9\s-]/g, "").trim() || "Document";
-  const fileName = `${safeTitle}.docx`;
+  // Keeps `&`, `.`, `,`, `'`, `()` — "AT&T - Analyst" stays legible — and
+  // stays ASCII so the name is valid in every header (docx-properties.ts).
+  const fileName = docxFileName(input.title);
 
   // Overwrite mode: same node id, new bytes — the shared helper enforces
   // the invariants (fresh storage key, image guard, metadata reset).

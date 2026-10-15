@@ -93,6 +93,12 @@ async function main(): Promise<number> {
   const typoVerdict = judgeRender(record, typo as typeof complete, typoRender.diagnostics!);
   check(typoVerdict.accept === false && /sumary \(did you mean summary\?\)/.test(typoVerdict.refusal ?? ""), "typo'd key refused with the nearest field", typoVerdict.refusal);
 
+  console.log("properties");
+  const props = { title: "David Valentine - Acme - Analyst - 20261014", subject: "Analyst - Acme", keywords: "Salesforce, HubSpot, RevOps" };
+  const withProps = await renderDocxTemplate(template, complete, { expectedChecksum: contract.checksum, properties: props });
+  check(withProps.ok === true, "render with properties ok", withProps.error);
+  check(withProps.diagnostics?.properties?.keywords === props.keywords && withProps.diagnostics?.properties?.subject === props.subject, "renderer reports the properties the file carries", withProps.diagnostics?.properties);
+
   console.log("refusals");
   const stale = await renderDocxTemplate(template, VALUES, { expectedChecksum: "0".repeat(64) });
   check(!stale.ok && stale.error?.code === "template_checksum_mismatch", "stale checksum refused", stale.error);

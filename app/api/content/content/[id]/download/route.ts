@@ -7,6 +7,7 @@
  * For security, validates ownership before generating URL.
  */
 
+import { contentDisposition } from "@/lib/domain/export/docx-properties";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/database/client";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
@@ -158,9 +159,12 @@ export async function GET(
 
             const fileBlob = await fileResponse.blob();
 
-            const disposition = forceDownload
-              ? `attachment; filename="${content.filePayload!.fileName}"`
-              : `inline; filename="${content.filePayload!.fileName}"`;
+            // RFC 6266: ASCII fallback + the exact UTF-8 name. The raw name in
+            // the header threw for any character outside Latin-1.
+            const disposition = contentDisposition(
+              content.filePayload!.fileName,
+              forceDownload ? "attachment" : "inline",
+            );
 
             span.attr("served", true);
             return new NextResponse(fileBlob, {

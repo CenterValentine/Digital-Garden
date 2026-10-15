@@ -5,6 +5,7 @@
  * Export a single document to specified format
  */
 
+import { contentDisposition } from "@/lib/domain/export/docx-properties";
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import { getUserSettings } from "@/lib/features/settings";
@@ -108,7 +109,7 @@ export async function POST(
       return new Response(uint8Content, {
         headers: {
           "Content-Type": file.mimeType,
-          "Content-Disposition": `attachment; filename="${file.name}"`,
+          "Content-Disposition": contentDisposition(file.name, "attachment"),
           "Content-Length": file.size.toString(),
         },
       });

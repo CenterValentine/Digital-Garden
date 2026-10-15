@@ -59,7 +59,10 @@ Two artifact tools, chosen once per charter — **the per-run instruction names 
 | Gaps | `[Education — not in evidence; confirm]` placeholders | a required slot left empty is **refused** — fill it from the evidence or **ask the user**; never invent. Optional (`{% if %}`-guarded) fields may stay empty. |
 | Titles | — | the contract decides: a template with ONE title field gets "Title — Employer" combined; split fields (`title`, `company`) stay split. Dates and titles are copied from the source of record exactly. |
 | Review | approval card shows the markdown | approval card shows the values (empties as "—"); after acceptance the user can edit any field and **re-render without a model turn** (same node id) |
+| File name & properties | `title` → the file name; `properties` → Word's Title / Subject / Keywords / Author | the same two arguments; the result reports the properties the file actually carries, and a re-render keeps them |
 | Budget | counts as a deliverable (`deliverables: ["docx"]`) | counts as a deliverable (`deliverables: ["template"]`); `read_docx_template` + `fill_docx_template` ride every charter turn — no summon needed |
+
+**Naming and metadata are tool arguments, not frontmatter.** A resume run sets `title` to the agreed file name (e.g. `David Valentine - <Company> - <Role> - <YYYYMMDD>`; `&`, commas, dots and parentheses survive, dashes and quotes are normalized, the name stays ASCII) and `properties` from the lead: `subject` = "<Role> - <Company>", `keywords` = the posting's ATS terms (a list; cut at a whole keyword within Word's 255-character limit), `title` = the document's display title. A cover letter takes the same, without keywords. Destination is a folder id or the charter's output routing — never a path string.
 
 Both tools respect the charter's output routing and `alsoShortcutTo` (§4), and both fail **without** changing the existing artifact or the Materials reference. Full design: `work-tracking/DOCX-TEMPLATE-RENDERER-PLAN.md`.
 

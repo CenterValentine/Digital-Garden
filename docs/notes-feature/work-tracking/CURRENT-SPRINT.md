@@ -9,6 +9,21 @@ last_updated: 2026-10-13
 
 # Current Sprint Addendum
 
+## October 14, 2026 — Word document properties + safe file names (`feat/docx-document-properties`, not pushed)
+
+**Tree**: worktree `.claude/worktrees/docx-props`, off `origin/main` at `809f74a7`. Owner will add related items before the PR.
+
+### Shipped (locally)
+- `properties` on `create_docx` and `fill_docx_template` → Word Title/Subject/Keywords/Author/Comments; renderer applies after fill and reads back; converter writes them; fill record + rerender + Template Fields rail keep/edit them.
+- `docxFileName` (legible, ASCII) for every stored .docx; `contentDisposition` (RFC 6266) on file download + note export.
+- Gate extended (8/8 mutants); renderer smoke 49/49; Node↔Python round trip green.
+
+### Smoke (pending — after merge AND renderer redeploy)
+- Chat: fill the resume template with `properties` (subject "Analyst - Acme", keywords from a posting) → download → Word → File → Properties shows them; the tool result lists them.
+- `create_docx` with `properties` → same check.
+- Template Fields → edit keywords → Re-render → properties updated, same file id.
+- A file named with `&`, an en dash and an accent downloads with its exact name.
+
 ## October 12, 2026 — The AI fills your own Word template (`fill_docx_template` + the docx-renderer service)
 
 **Tree**: worktree `.claude/worktrees/docx-template`, branch `feat/docx-template-renderer` (off `origin/main` at `dc44cef9`)
