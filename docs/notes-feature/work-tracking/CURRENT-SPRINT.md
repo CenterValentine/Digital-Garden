@@ -18,6 +18,11 @@ last_updated: 2026-10-13
 - `docxFileName` (legible, ASCII) for every stored .docx; `contentDisposition` (RFC 6266) on file download + note export.
 - Gate extended (8/8 mutants); renderer smoke 49/49; Node↔Python round trip green.
 
+### Also on this branch — compact share menu (UI only, 2026-10-15)
+- The toolbar's separate Copy Link button is gone; the share button opens a compact menu anchored to it (PanelPortal: click-away, Esc, toggle): **Copy link** (app link), **Public link** switch + **Copy public link**, **More sharing options…** → the existing Share dialog. No API or data change.
+- Verified headless as a smoke user (18 checks: placement below the button, copy writes the right URLs, switch, click-away / toggle / Esc, dialog hand-off; light + dark screenshots).
+- Smoke (owner): open any note → share icon → the menu appears right under it; Copy link → paste; flip Public link → Copy public link → open it in a private window; More sharing options… → the full dialog.
+
 ### Also on this branch — content authorship + MCP content deletion
 - `ContentNode.draftedBy/draftedByRef/draftedAt` + migration `20261014230000_content_drafted_by` (owner-run, ahead of code); every chat/MCP create stamps; overwrites never do.
 - AI-drafted notes rewrite freely (`update_note`, `garden_write_note`), snapshot kept; the user's notes stay guarded.

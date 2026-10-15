@@ -39,19 +39,11 @@ const TOOL_REGISTRY: ToolDefinition[] = [
     group: "view",
     iconOnly: true,
   },
-  {
-    id: "copy-link",
-    label: "Copy Link",
-    iconName: "Link2",
-    surfaces: ["toolbar"],
-    contentTypes: "all",
-    order: 30,
-    group: "share",
-    iconOnly: true,
-  },
+  // Copy Link lives in the share button's compact menu (owner, 2026-10-15) —
+  // one share affordance, with copy as its first item.
   {
     id: "share",
-    label: "Share settings",
+    label: "Share",
     iconName: "Share2",
     surfaces: ["toolbar"],
     contentTypes: "all",

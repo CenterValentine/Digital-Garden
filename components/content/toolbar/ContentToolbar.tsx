@@ -7,6 +7,7 @@
  * Returns null when no toolbar tools are available.
  */
 
+import { PanelPortal } from "@/components/content/data/PanelPortal";
 import { BookmarkPlus, Code2, Download, FolderTree, Layers, Link2, Maximize2, Minimize2, Share2, Upload, Zap } from "lucide-react";
 import { useToolSurface } from "@/lib/domain/tools";
 import { useCallback, useEffect, useState, type ComponentType } from "react";
@@ -71,9 +72,17 @@ interface ContentToolbarProps {
    * same component: placement changes, the toolbar does not.
    */
   inline?: boolean;
+  /**
+   * The share button's first-click compact menu (copy link, public link, a
+   * way into the full Share dialog). Given → the share button toggles this,
+   * anchored to itself; omitted → the button opens the dialog as before.
+   */
+  shareMenu?: (close: () => void) => React.ReactNode;
 }
 
-export function ContentToolbar({ contentId: contentIdProp, inline = false }: ContentToolbarProps = {}) {
+export function ContentToolbar({ contentId: contentIdProp, inline = false, shareMenu }: ContentToolbarProps = {}) {
+  const [shareMenuOpen, setShareMenuOpen] = useState(false);
+  const closeShareMenu = useCallback(() => setShareMenuOpen(false), []);
   const toolSurface = useToolSurface();
   const globalSelectedContentId = useContentStore((state) => state.selectedContentId);
   const selectedContentId =
@@ -238,7 +247,7 @@ export function ContentToolbar({ contentId: contentIdProp, inline = false }: Con
           variant="icon"
         />
       )}
-      {/* Tools with order < 70: copy-link, share, save-as-template */}
+      {/* Tools with order < 70: share (compact menu), save-as-template */}
       {tools.filter((t) => t.definition.order < 70).map((tool) => {
         const Icon = ICON_MAP[tool.definition.iconName];
         const isIconOnly = tool.definition.iconOnly ?? false;
@@ -250,11 +259,14 @@ export function ContentToolbar({ contentId: contentIdProp, inline = false }: Con
           isToggle && tool.isActive
             ? tool.definition.activeLabel ?? tool.definition.label
             : tool.definition.label;
-        return (
+        const isShareMenu = tool.definition.id === "share" && !!shareMenu;
+        const button = (
           <button
             key={tool.definition.id}
-            onClick={tool.execute}
+            onClick={isShareMenu ? () => setShareMenuOpen((open) => !open) : tool.execute}
             disabled={tool.isDisabled}
+            aria-haspopup={isShareMenu ? "menu" : undefined}
+            aria-expanded={isShareMenu ? shareMenuOpen : undefined}
             aria-pressed={isToggle ? tool.isActive : undefined}
             className={`flex shrink-0 items-center gap-1.5 rounded-md ${
               isIconOnly ? "px-1.5 py-1.5" : "px-2.5 py-1.5"
@@ -269,6 +281,18 @@ export function ContentToolbar({ contentId: contentIdProp, inline = false }: Con
             {Icon && <Icon className="h-4 w-4" />}
             {!isIconOnly && <span className="whitespace-nowrap">{label}</span>}
           </button>
+        );
+        if (!isShareMenu) return button;
+        // The menu anchors to this wrapper (PanelPortal's marker parent): it
+        // opens right off the button, never covers it, and the button toggles
+        // it shut — same panel as the database surfaces, click-away and Esc.
+        return (
+          <span key={tool.definition.id} className="relative inline-flex shrink-0">
+            {button}
+            <PanelPortal open={shareMenuOpen} onDismiss={closeShareMenu} className="w-72 p-1.5">
+              {shareMenu?.(closeShareMenu)}
+            </PanelPortal>
+          </span>
         );
       })}
       {/* Folder Studio — folders only; opens the Studio sidebar tab */}

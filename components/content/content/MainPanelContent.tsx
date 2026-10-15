@@ -8,6 +8,7 @@
 
 "use client";
 
+import { ShareQuickMenu } from "@/components/content/toolbar/ShareQuickMenu";
 import { createElement, useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   sameProjectedText,
@@ -2649,16 +2650,44 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
     });
   }, [selectedContentId, setActiveView]);
 
+  // The share button's first-click compact menu (ShareQuickMenu): copy link,
+  // the public link switch + copy, and the way into the full dialog. Same
+  // handlers as the dialog — nothing new server-side.
+  const renderShareMenu = useCallback(
+    (close: () => void) => (
+      <ShareQuickMenu
+        title={noteTitle}
+        isPublished={contentIsPublished}
+        isSharing={isSharing}
+        publicUrl={getPublicShareUrl()}
+        onCopyAppLink={() => {
+          handleCopyLink();
+          close();
+        }}
+        onTogglePublic={(next) => void updatePublicShare(next)}
+        onCopyPublicLink={() => {
+          void copyPublicShareLink();
+          close();
+        }}
+        onMoreOptions={() => {
+          close();
+          handleShareOpen();
+        }}
+      />
+    ),
+    [noteTitle, contentIsPublished, isSharing, getPublicShareUrl, handleCopyLink, updatePublicShare, copyPublicShareLink, handleShareOpen],
+  );
+  const shareMenu = selectedContentId && !selectedContentId.startsWith("person:") ? renderShareMenu : undefined;
+
   const toolHandlers = useMemo(() => ({
     "reveal-in-tree": handleRevealInTree,
     "import-markdown": handleImportMarkdown,
     "export-markdown": handleExportMarkdown,
     "export-chat": handleExportChat,
-    "copy-link": handleCopyLink,
     "save-as-template": handleSaveAsTemplate,
     "share": handleShareOpen,
     "markdown-source": toggleSourceMode,
-  }), [handleRevealInTree, handleImportMarkdown, handleExportMarkdown, handleExportChat, handleCopyLink, handleSaveAsTemplate, handleShareOpen, toggleSourceMode]);
+  }), [handleRevealInTree, handleImportMarkdown, handleExportMarkdown, handleExportChat, handleSaveAsTemplate, handleShareOpen, toggleSourceMode]);
 
   // Toggle state for the toolbar. Unlike handlers (held in a ref), this must
   // flow as a prop so the pressed styling re-renders when the mode flips.
@@ -2930,7 +2959,7 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
     // title column) is what lets the breadcrumb below span the full width.
     const inlineToolbar = toolbarInTitleRow ? (
       <div className="ml-auto flex min-w-0 max-w-[55%] shrink-0 items-center pl-2">
-        <ContentToolbar contentId={selectedContentId} inline />
+        <ContentToolbar contentId={selectedContentId} inline shareMenu={shareMenu} />
       </div>
     ) : null;
 
@@ -3141,7 +3170,7 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
           !isVirtualExtensionContent &&
           contentType !== "page-template" &&
           !isEmbedMode &&
-          !toolbarInTitleRow && <ContentToolbar contentId={selectedContentId} />}
+          !toolbarInTitleRow && <ContentToolbar contentId={selectedContentId} shareMenu={shareMenu} />}
 
         {/* Save-conflict resolution (stale-tab / concurrent-edit overwrite).
             Mounted at the TOP LEVEL, above every layout branch, deliberately.
