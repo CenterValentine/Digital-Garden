@@ -42,6 +42,7 @@ const CAP_LABELS: Record<McpCapability, { label: string; hint: string }> = {
   "garden:read-chats": { label: "Read chats", hint: "Find and read past assistant chats about reachable content." },
   "garden:write-rows": { label: "Write rows", hint: "Insert and update database rows (compare-and-set on updates)." },
   "garden:delete-rows": { label: "Delete rows", hint: "Soft-delete rows, under each database's own AI deletion policy." },
+  "garden:delete-content": { label: "Delete its own content", hint: "Move notes, folders, files and code the MCP itself drafted to the trash (restorable 30 days). Never touches content you wrote." },
   "garden:write-files": { label: "Write files", hint: "Create and append to notes, write code files, upload files, create folders, insert blocks, update AI context." },
   "garden:report-issues": { label: "File issues", hint: "Report bugs and feature requests to the public repository." },
 };

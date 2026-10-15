@@ -122,6 +122,15 @@ model ContentNode {
   peopleGroupId String?     @db.Uuid
   personId      String?     @db.Uuid
   ownedByNoteId String?     @db.Uuid
+  /// Who DRAFTED this node when an AI did: "ai-chat" | "mcp". Null = the
+  /// user, or anything created before 2026-10-14. Set once by the AI create
+  /// paths; an overwrite never changes it. An AI may rewrite an AI-drafted
+  /// note without the destructive-rewrite guard (a history snapshot is kept
+  /// first), and MCP `garden_delete_content` may trash only "mcp" content.
+  draftedBy     String?     @db.VarChar(16)
+  /// The Conversation id (ai-chat) or McpToken id (mcp) that drafted it.
+  draftedByRef  String?     @db.VarChar(64)
+  draftedAt     DateTime?   @db.Timestamptz(6)
   auditLogs     AuditLog[]  @relation("AuditedContent")
 
   // Phase 1 payloads

@@ -1,3 +1,4 @@
+import { draftedFields, type ContentDrafter } from "@/lib/domain/content/authorship";
 import "server-only";
 
 /**
@@ -22,6 +23,8 @@ export interface CreateNoteInput {
   title: string;
   parentId: string | null;
   markdown: string;
+  /** An AI drafted it (chat or MCP) — see authorship.ts. */
+  drafter?: ContentDrafter;
 }
 
 export interface CreateNoteResult {
@@ -47,6 +50,7 @@ export async function createNoteFromMarkdown(input: CreateNoteInput): Promise<Cr
       slug,
       contentType: "note",
       parentId: input.parentId,
+      ...draftedFields(input.drafter),
       notePayload: {
         create: {
           tiptapJson: tiptapJson as unknown as Prisma.InputJsonValue,

@@ -11,6 +11,7 @@ export const MCP_CAPABILITIES = [
   "garden:read-chats",
   "garden:write-rows",
   "garden:delete-rows",
+  "garden:delete-content",
   "garden:write-files",
   "garden:report-issues",
 ] as const;

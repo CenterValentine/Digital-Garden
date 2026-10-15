@@ -94,6 +94,12 @@ jobs:
       - name: Google Drive multipart body checks
         run: pnpm google:multipart:check
 
+      # Who drafted a node (ContentNode.draftedBy): chat and MCP creates stamp
+      # it, overwrites never do; it lifts the rewrite guard for AI-drafted
+      # notes and scopes garden_delete_content to MCP-drafted content.
+      - name: Content authorship checks
+        run: pnpm content:authorship:check
+
       # One search query builder, the conversion backup at every
       # serializer-driven write, MCP capabilities and the MCP read seam.
       - name: MCP preparatory layer checks

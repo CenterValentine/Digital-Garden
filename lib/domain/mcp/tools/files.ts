@@ -15,6 +15,7 @@ import type { Prisma } from "@/lib/database/generated/prisma";
 import { logger } from "@/lib/core/logger";
 import { PAYLOAD_STAMP_SELECT, contentUpdatedAt } from "@/lib/domain/content/content-updated-at";
 import { createNoteFromMarkdown } from "@/lib/domain/content/create-note";
+import { draftedFields, isAiDrafted, type ContentDrafter } from "@/lib/domain/content/authorship";
 import { markdownToTiptapResult } from "@/lib/domain/content/markdown";
 import { extractSearchTextFromCode } from "@/lib/domain/content/search-text";
 import { generateUniqueSlug } from "@/lib/domain/content/slug";
@@ -38,7 +39,7 @@ async function ownedNode(scope: McpScope, id: string, types?: string[]) {
   if (!(await scope.nodeInScope(id))) return null;
   const node = await prisma.contentNode.findFirst({
     where: { id, ownerId: scope.userId, deletedAt: null, ...(types ? { contentType: { in: types as never[] } } : {}) },
-    select: { id: true, title: true, contentType: true, parentId: true, updatedAt: true, ...PAYLOAD_STAMP_SELECT },
+    select: { id: true, title: true, contentType: true, parentId: true, updatedAt: true, draftedBy: true, ...PAYLOAD_STAMP_SELECT },
   });
   // The compare-and-set stamp is the CONTENT stamp (payload rows included),
   // not the node row: a collaborative save never touches the node row, so a
@@ -69,7 +70,8 @@ async function resolveParentFolder(scope: McpScope, parentId: string | undefined
 
 export async function writeNote(
   scope: McpScope,
-  input: { id?: string; title?: string; parentId?: string; content: string; mode?: "append" | "replace"; expectUpdatedAt?: string }
+  input: { id?: string; title?: string; parentId?: string; content: string; mode?: "append" | "replace"; expectUpdatedAt?: string },
+  drafter?: ContentDrafter
 ): Promise<McpToolResult> {
   try {
     if (!input.id) {
@@ -77,7 +79,7 @@ export async function writeNote(
       if (!title) return refuse("title is required to create a note.");
       const parent = await resolveParentFolder(scope, input.parentId);
       if ("refusal" in parent) return refuse(parent.refusal);
-      const created = await createNoteFromMarkdown({ ownerId: scope.userId, title, parentId: parent.id, markdown: input.content });
+      const created = await createNoteFromMarkdown({ ownerId: scope.userId, title, parentId: parent.id, markdown: input.content, drafter });
       return ok(
         `Created "${title}" (${created.id}) in folder ${parent.id}.${created.degraded ? " Some markdown could not be parsed as rich text and was kept as plain paragraphs." : ""}`,
         { id: created.id, slug: created.slug, parentId: parent.id, created: true, degraded: created.degraded }
@@ -104,7 +106,10 @@ export async function writeNote(
     const conversion = markdownToTiptapResult(input.content);
     const json = linkifyWikiRefsInTiptap(conversion.json);
     try {
-      const result = await writeNoteContent({ contentId: node.id, ownerId: scope.userId, mode, content: json, destructiveApproved: false });
+      // An AI-drafted note (chat or MCP) may be rewritten freely — owner,
+      // 2026-10-14. writeNoteContent snapshots the pre-write document either
+      // way; the content-stamp check above still guards against a stale read.
+      const result = await writeNoteContent({ contentId: node.id, ownerId: scope.userId, mode, content: json, destructiveApproved: isAiDrafted(node) });
       const updatedAt = await stampAfter(node.id);
       return ok(
         `${mode === "append" ? "Appended to" : "Replaced"} "${node.title}"${slot} (${node.id}) via ${result.route}: ${result.blocksBefore} → ${result.blocksAfter} blocks, ${result.charsBefore} → ${result.charsAfter} chars. Now updatedAt ${updatedAt}.${result.mayBeMaskedInOpenEditor ? " The note is open in an editor that may not show this until it reloads." : ""}${conversion.degraded ? " Some markdown was kept as plain paragraphs." : ""}`,
@@ -112,7 +117,7 @@ export async function writeNote(
       );
     } catch (error) {
       if (error instanceof NoteEditRefused) {
-        return refuse(`${error.message} Over MCP a destructive rewrite is never approved automatically: append instead, or ask the user to make the change in the app.`, { refusedBy: "shrink-guard" });
+        return refuse(`${error.message} Over MCP a destructive rewrite is approved automatically only for a note an AI drafted; this one the user wrote. Append instead, or ask the user to make the change in the app.`, { refusedBy: "shrink-guard" });
       }
       throw error;
     }
@@ -126,7 +131,8 @@ export async function writeNote(
 
 export async function writeCode(
   scope: McpScope,
-  input: { id?: string; parentId?: string; title?: string; language?: string; code: string; expectUpdatedAt?: string }
+  input: { id?: string; parentId?: string; title?: string; language?: string; code: string; expectUpdatedAt?: string },
+  drafter?: ContentDrafter
 ): Promise<McpToolResult> {
   try {
     const language = (input.language ?? "plaintext").trim().slice(0, 50);
@@ -159,6 +165,7 @@ export async function writeCode(
         slug,
         contentType: "code",
         parentId: parent.id,
+        ...draftedFields(drafter),
         codePayload: { create: { code: input.code, language, searchText, metadata: {} as Prisma.InputJsonValue } },
       },
       select: { id: true },
@@ -172,11 +179,11 @@ export async function writeCode(
 
 // ── folders ─────────────────────────────────────────────────────────────
 
-export async function createFolder(scope: McpScope, input: { parentId: string; title: string }): Promise<McpToolResult> {
+export async function createFolder(scope: McpScope, input: { parentId: string; title: string }, drafter?: ContentDrafter): Promise<McpToolResult> {
   try {
     const parent = await ownedNode(scope, input.parentId, ["folder"]);
     if (!parent) return refuse("That parent folder is not reachable with this token, or is not a folder.");
-    const result = await findOrCreateFolder(scope.userId, input.title.trim(), parent.id);
+    const result = await findOrCreateFolder(scope.userId, input.title.trim(), parent.id, { drafter });
     return ok(`${result.created ? "Created" : "Found existing"} folder "${input.title.trim()}" (${result.contentNodeId}) in ${parent.title}.`, {
       id: result.contentNodeId,
       created: result.created,
@@ -224,7 +231,8 @@ async function fetchBytes(url: string): Promise<{ buffer: Buffer; mimeType: stri
 
 export async function uploadFile(
   scope: McpScope,
-  input: { parentId: string; filename: string; mimeType: string; base64?: string; sourceUrl?: string; overwriteContentId?: string }
+  input: { parentId: string; filename: string; mimeType: string; base64?: string; sourceUrl?: string; overwriteContentId?: string },
+  drafter?: ContentDrafter
 ): Promise<McpToolResult> {
   try {
     if (!input.base64 && !input.sourceUrl) return refuse("Give either base64 or sourceUrl.");
@@ -278,6 +286,7 @@ export async function uploadFile(
           contentType: "file",
           parentId: parent.id,
           displayOrder,
+          ...draftedFields(drafter),
           filePayload: {
             create: {
               fileName: input.filename,

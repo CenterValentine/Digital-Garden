@@ -141,6 +141,7 @@ function json(v: unknown): string {
 
 {
   check(MCP_CAPABILITIES.includes("garden:read") && MCP_CAPABILITIES.includes("garden:delete-rows"), "mcp: the capability set includes read and delete-rows");
+  check(MCP_CAPABILITIES.includes("garden:delete-content"), "mcp: deleting MCP-drafted content is its own grant");
   const d = parseMcpCapabilities(undefined);
   check(d.ok && d.capabilities.length === 1 && d.capabilities[0] === "garden:read", "mcp: default grant is read only");
   const w = parseMcpCapabilities(["garden:write-rows"]);

@@ -72,6 +72,7 @@ const WRITE_TOOLS: Record<string, string> = {
   garden_insert_rows: "garden:write-rows",
   garden_update_rows: "garden:write-rows",
   garden_delete_rows: "garden:delete-rows",
+  garden_delete_content: "garden:delete-content",
   garden_write_note: "garden:write-files",
   garden_write_code: "garden:write-files",
   garden_upload_file: "garden:write-files",
@@ -106,6 +107,7 @@ for (const [name, cap] of Object.entries(WRITE_TOOLS)) {
   check(!/annotations: READ/.test(block), `registration: ${name} is not marked read-only`);
 }
 check(/annotations: DESTRUCTIVE/.test(toolBlock("garden_delete_rows") ?? ""), "registration: garden_delete_rows is marked destructive");
+check(/annotations: DESTRUCTIVE/.test(toolBlock("garden_delete_content") ?? ""), "registration: garden_delete_content is marked destructive");
 for (const name of ["garden_chats_search", "garden_chat_read"]) {
   check(/requireCapability\(s, "garden:read-chats"/.test(toolBlock(name) ?? ""), `registration: ${name} checks garden:read-chats`);
 }
@@ -128,7 +130,29 @@ check(/softDeleteRows\(/.test(del), "delete: soft delete only");
 
 const files = src("lib/domain/mcp/tools/files.ts");
 const noteFn = files.slice(files.indexOf("export async function writeNote"), files.indexOf("export async function writeCode"));
-check(/writeNoteContent\(/.test(noteFn) && /destructiveApproved: false/.test(noteFn), "notes: writes go through writeNoteContent with the shrink guard on");
+// Owner rule (2026-10-14): an AI may rewrite a note an AI drafted without
+// the shrink guard; a note the user wrote keeps it. Never a blanket `true`.
+check(/writeNoteContent\(/.test(noteFn) && /destructiveApproved: isAiDrafted\(node\)/.test(noteFn), "notes: the shrink guard is lifted only for an AI-drafted note");
+check(!/destructiveApproved: true/.test(noteFn), "notes: garden_write_note never approves a destructive rewrite unconditionally");
+// Authorship: every MCP create stamps the token (authorship.ts) — the record
+// garden_delete_content and the rewrite rule both read.
+check(/createNoteFromMarkdown\(\{[^}]*drafter[^}]*\}\)/.test(noteFn), "authorship: a note the MCP creates is stamped MCP-drafted");
+const codeFn = files.slice(files.indexOf("export async function writeCode"), files.indexOf("export async function createFolder"));
+check(/\.\.\.draftedFields\(drafter\)/.test(codeFn), "authorship: code the MCP creates is stamped");
+const uploadFn = files.slice(files.indexOf("export async function uploadFile"));
+check(/\.\.\.draftedFields\(drafter\)/.test(uploadFn), "authorship: a file the MCP uploads is stamped");
+check(/findOrCreateFolder\(scope\.userId, input\.title\.trim\(\), parent\.id, \{ drafter \}\)/.test(files), "authorship: a folder the MCP creates is stamped");
+const serverSrc = src("lib/domain/mcp/server.ts");
+for (const fn of ["writeNote", "writeCode", "uploadFile", "createFolder"]) {
+  check(new RegExp(`${fn}\\(s\\.scope, args, mcpDrafter\\(s\\)\\)`).test(serverSrc), `authorship: the server passes the token as drafter to ${fn}`);
+}
+const contentTool = src("lib/domain/mcp/tools/content.ts");
+const delContent = contentTool.slice(contentTool.indexOf("export async function deleteContent"));
+check(/isMcpDrafted\(node\)/.test(delContent) && /refuse\(/.test(delContent), "delete content: anything the MCP did not draft is refused");
+check(/checkDescendants\(/.test(delContent), "delete content: a folder goes only if everything inside was MCP-drafted");
+check(/trashContentNode\(/.test(delContent) && !/prisma\.contentNode\.(update|updateMany|delete|deleteMany)\(/.test(contentTool), "delete content: the app's own trash path, never a direct Prisma delete");
+check(/nodeInScope\(/.test(delContent), "delete content: the token's reach applies");
+check(/publishEvent\(/.test(delContent), "delete content: the user gets an inbox notice");
 check(/createNoteFromMarkdown\(/.test(noteFn), "notes: creation goes through the shared service");
 check(!/prisma\.notePayload\.(update|upsert|create)\(/.test(files), "notes: the MCP files module never writes NotePayload directly");
 // Every item has a sidecar notes panel; a `["note"]` filter here was the

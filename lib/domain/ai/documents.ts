@@ -14,6 +14,7 @@ import { createHash, randomBytes } from "crypto";
 import { prisma } from "@/lib/database/client";
 import { logger } from "@/lib/core/logger";
 import { docxFileName, type DocxProperties } from "@/lib/domain/export/docx-properties";
+import { draftedFields, type ContentDrafter } from "@/lib/domain/content/authorship";
 import {
   generateUniqueSlug,
   markdownToTiptap,
@@ -35,7 +36,7 @@ export async function findOrCreateFolder(
   ownerId: string,
   title: string,
   parentId: string | null,
-  options: { ownerContentId?: string } = {},
+  options: { ownerContentId?: string; drafter?: ContentDrafter } = {},
 ): Promise<{ contentNodeId: string; created: boolean }> {
   const existing = await prisma.contentNode.findFirst({
     where: {
@@ -59,6 +60,7 @@ export async function findOrCreateFolder(
       title,
       slug,
       contentType: "folder",
+      ...draftedFields(options.drafter),
       parentId,
       displayOrder: 0,
       ...(options.ownerContentId
@@ -96,7 +98,7 @@ export async function findOrCreateShortcut(
   ownerId: string,
   targetContentId: string,
   parentId: string | null,
-  options: { title?: string; ownerContentId?: string } = {},
+  options: { title?: string; ownerContentId?: string; drafter?: ContentDrafter } = {},
 ): Promise<{
   contentNodeId?: string;
   created?: boolean;
@@ -170,6 +172,7 @@ export async function findOrCreateShortcut(
       title,
       slug,
       contentType: "shortcut",
+      ...draftedFields(options.drafter),
       parentId,
       displayOrder: 0,
       ...(options.ownerContentId
@@ -212,6 +215,8 @@ export interface CreateDocxInput {
   ownedByNoteId?: string;
   /** Word's File → Properties: title, subject, keywords (ATS), author, comments. */
   properties?: DocxProperties;
+  /** An AI drafted it — stamped on CREATE only, never on overwrite. */
+  drafter?: ContentDrafter;
 }
 
 /** `docxHtmlToCheckText` over the bytes; the source text if reading fails. */
@@ -270,6 +275,7 @@ export async function createDocxDocument(
     overwriteContentId: input.overwriteContentId,
     role: input.role,
     ownedByNoteId: input.ownedByNoteId,
+    drafter: input.drafter,
   });
 }
 
@@ -283,6 +289,8 @@ export interface StoreDocxInput {
   overwriteContentId?: string;
   role?: "referenced";
   ownedByNoteId?: string;
+  /** An AI drafted it — stamped on CREATE only, never on overwrite. */
+  drafter?: ContentDrafter;
 }
 
 /**
@@ -345,6 +353,7 @@ export async function storeDocxDocument(
       title: fileName,
       slug,
       contentType: "file",
+      ...draftedFields(input.drafter),
       parentId: input.parentFolderId,
       displayOrder: 0,
       ...(input.role ? { role: input.role } : {}),

@@ -18,6 +18,13 @@ last_updated: 2026-10-13
 - `docxFileName` (legible, ASCII) for every stored .docx; `contentDisposition` (RFC 6266) on file download + note export.
 - Gate extended (8/8 mutants); renderer smoke 49/49; Node↔Python round trip green.
 
+### Also on this branch — content authorship + MCP content deletion
+- `ContentNode.draftedBy/draftedByRef/draftedAt` + migration `20261014230000_content_drafted_by` (owner-run, ahead of code); every chat/MCP create stamps; overwrites never do.
+- AI-drafted notes rewrite freely (`update_note`, `garden_write_note`), snapshot kept; the user's notes stay guarded.
+- `garden_delete_content` + capability `garden:delete-content`; shared `trashContentNode` for the route and the tool.
+- Smoke (local, done): `pnpm mcp:authorship:smoke` 13/13 over MCP HTTP.
+- Smoke (production, after migration + deploy): mint a token with "Delete its own content" → the agent creates a note → deletes it → it's in the trash with an inbox notice; ask it to delete one of your notes → refused by name; ask the chat assistant to shorten a note it drafted to two lines → no approval card.
+
 ### Smoke (pending — after merge AND renderer redeploy)
 - Chat: fill the resume template with `properties` (subject "Analyst - Acme", keywords from a posting) → download → Word → File → Properties shows them; the tool result lists them.
 - `create_docx` with `properties` → same check.

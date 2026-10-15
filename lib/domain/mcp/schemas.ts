@@ -162,6 +162,11 @@ export const deleteRowsInput = z.object({
   reason: z.string().min(1).max(280).describe("Why these rows go, in the user's words. Shown when the user is asked to confirm."),
 });
 
+export const deleteContentInput = z.object({
+  id: z.string().describe("The note, folder, file or code item to move to the trash, by id. Only content an MCP token drafted is accepted."),
+  reason: z.string().min(1).max(280).describe("Why it goes, in the user's words. Shown in the user's inbox notice."),
+});
+
 export const writeNoteInput = z.object({
   id: z.string().optional().describe("The item to write to: a note (its body), or a database, folder, file or chat (its notes panel). Omit to CREATE a new note."),
   title: z.string().optional().describe("Title for a new note (required when id is omitted)."),

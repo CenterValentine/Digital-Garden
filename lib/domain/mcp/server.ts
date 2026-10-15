@@ -1,3 +1,5 @@
+import { deleteContent } from "./tools/content";
+import type { ContentDrafter } from "@/lib/domain/content/authorship";
 import "server-only";
 
 /**
@@ -30,6 +32,7 @@ import {
   chatgptSearchInput,
   createFolderInput,
   deleteRowsInput,
+  deleteContentInput,
   insertBlockInput,
   insertRowsInput,
   listTreeInput,
@@ -65,7 +68,7 @@ export const SERVER_INFO = { name: "digital-garden", version: "1.0.0" } as const
 
 export const SERVER_INSTRUCTIONS = `This is a user's Digital Garden: notes, folders, databases (tables with typed columns and rows), files and chats.
 Find before you guess: garden_search (empty query + types lists what exists), garden_list_tree, then garden_read for one item. Databases: garden_read gives the schema and a preview; garden_query_rows pages rows — start from the index tier, narrow with columns/filters/view, follow nextCursor until it is null before claiming completeness. Rows are addressed by [8-hex handles].
-Writes need the token's capability and are named for their consent model: garden_insert_rows (partial on bad cells), garden_update_rows (all-or-nothing, expect is required), garden_delete_rows (the table's own policy decides; you may be asked to confirm), garden_write_note (append by default; replace requires expectUpdatedAt and never approves a destructive rewrite), garden_write_code, garden_upload_file, garden_create_folder, garden_insert_block / garden_update_block (typed blocks by catalog), garden_update_ai_context (when a read says the context is stale).
+Writes need the token's capability and are named for their consent model: garden_insert_rows (partial on bad cells), garden_update_rows (all-or-nothing, expect is required), garden_delete_rows (the table's own policy decides; you may be asked to confirm), garden_write_note (append by default; replace requires expectUpdatedAt, and a destructive rewrite is approved only for a note an AI drafted), garden_write_code, garden_upload_file, garden_create_folder, garden_delete_content (trashes only content an MCP token drafted; the user's own content is refused), garden_insert_block / garden_update_block (typed blocks by catalog), garden_update_ai_context (when a read says the context is stale).
 Two writable text slots on every item: its NOTES (a note's body, or the notes panel of a database, folder, file or chat — garden_write_note with the item's id) and its AI CONTEXT (garden_update_ai_context). Notes are what the user reads; context is what agents read. A summary or write-up the user asks for goes in the notes unless they say "context" or "AI context"; then say in your reply that the context can be updated too. If the request names both, or you cannot tell which reader is meant, ask before writing.
 Leave any \`\`\`dg-block fences exactly as read. Never create at the garden root. Chats are a separate tool pair (garden_chats_search, garden_chat_read) and read-only.
 If a tool fails twice with the same internal error, or a result contradicts what you just read, file it with garden_report_issue (never paste note content), then continue on a safer path.`;
@@ -75,6 +78,12 @@ const WRITE = { readOnlyHint: false, destructiveHint: false, idempotentHint: fal
 const DESTRUCTIVE = { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false } as const;
 
 type Session = { principal: McpPrincipal; scope: McpScope };
+
+/** Content an MCP token creates is stamped as MCP-drafted (authorship.ts):
+ * it may later be rewritten freely and trashed by garden_delete_content. */
+function mcpDrafter(s: Session): ContentDrafter {
+  return { kind: "mcp", ref: s.principal.token.id };
+}
 
 function sessionFrom(ctx: ServerContext): Session | null {
   const principal = principalFrom(ctx.http?.authInfo);
@@ -184,6 +193,18 @@ export function createGardenMcpServer(server: McpServer): void {
     withSession(async (s, args, ctx) => requireCapability(s, "garden:delete-rows", "delete rows") ?? deleteRows(s.scope, s.principal, args, ctx))
   );
 
+  server.registerTool(
+    "garden_delete_content",
+    {
+      title: "Delete content the MCP drafted",
+      description:
+        "Move a note, folder, file or code item to the trash — only one an MCP token created (any of the user's tokens). Content the user wrote is refused; a folder is refused if anything inside it was not MCP-drafted. Restorable for 30 days; the user gets an inbox notice. Give the reason in the user's words.",
+      inputSchema: deleteContentInput,
+      annotations: DESTRUCTIVE,
+    },
+    withSession(async (s, args) => requireCapability(s, "garden:delete-content", "delete content") ?? deleteContent(s.scope, s.principal, args))
+  );
+
   // ── files ─────────────────────────────────────────────────────────────
   server.registerTool(
     "garden_write_note",
@@ -194,7 +215,7 @@ export function createGardenMcpServer(server: McpServer): void {
       inputSchema: writeNoteInput,
       annotations: WRITE,
     },
-    withSession(async (s, args) => requireCapability(s, "garden:write-files", "write notes") ?? writeNote(s.scope, args))
+    withSession(async (s, args) => requireCapability(s, "garden:write-files", "write notes") ?? writeNote(s.scope, args, mcpDrafter(s)))
   );
 
   server.registerTool(
@@ -205,7 +226,7 @@ export function createGardenMcpServer(server: McpServer): void {
       inputSchema: writeCodeInput,
       annotations: WRITE,
     },
-    withSession(async (s, args) => requireCapability(s, "garden:write-files", "write code") ?? writeCode(s.scope, args))
+    withSession(async (s, args) => requireCapability(s, "garden:write-files", "write code") ?? writeCode(s.scope, args, mcpDrafter(s)))
   );
 
   server.registerTool(
@@ -217,7 +238,7 @@ export function createGardenMcpServer(server: McpServer): void {
       inputSchema: uploadFileInput,
       annotations: WRITE,
     },
-    withSession(async (s, args) => requireCapability(s, "garden:write-files", "upload files") ?? uploadFile(s.scope, args))
+    withSession(async (s, args) => requireCapability(s, "garden:write-files", "upload files") ?? uploadFile(s.scope, args, mcpDrafter(s)))
   );
 
   server.registerTool(
@@ -228,7 +249,7 @@ export function createGardenMcpServer(server: McpServer): void {
       inputSchema: createFolderInput,
       annotations: WRITE,
     },
-    withSession(async (s, args) => requireCapability(s, "garden:write-files", "create folders") ?? createFolder(s.scope, args))
+    withSession(async (s, args) => requireCapability(s, "garden:write-files", "create folders") ?? createFolder(s.scope, args, mcpDrafter(s)))
   );
 
   server.registerTool(

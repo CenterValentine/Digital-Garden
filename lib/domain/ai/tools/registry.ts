@@ -90,6 +90,7 @@ import {
 import { judgeRender } from "@/lib/domain/ai/docx-templates/judge";
 import { compactReport, verifyProvenance, writeFillRecord } from "@/lib/domain/ai/docx-templates/fills";
 import { hasDocxProperties, normalizeDocxProperties } from "@/lib/domain/export/docx-properties";
+import { draftedFields, isAiDrafted } from "@/lib/domain/content/authorship";
 
 /**
  * What the user does to make a .docx a template — returned by every
@@ -439,6 +440,14 @@ function countHyperlinkValues(value: unknown): number {
   if (!value || typeof value !== "object") return 0;
   if (!Array.isArray(value) && "url" in (value as Record<string, unknown>)) return 1;
   return Object.values(value as Record<string, unknown>).reduce<number>((n, v) => n + countHyperlinkValues(v), 0);
+}
+
+/** True when an AI (chat or MCP) drafted this node — contentNode.draftedBy. */
+async function contentIsAiDrafted(userId: string, contentId: string): Promise<boolean> {
+  const node = await prisma.contentNode
+    .findFirst({ where: { id: contentId, ownerId: userId, deletedAt: null }, select: { draftedBy: true } })
+    .catch(() => null);
+  return isAiDrafted(node);
 }
 
 /**
@@ -2451,6 +2460,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         try {
           const folder = await findOrCreateFolder(ctx.userId, name, parent, {
             ownerContentId: placement.ownedByNoteId,
+            drafter: { kind: "ai-chat" as const, ref: ctx.conversationId ?? null },
           });
           return {
             folderId: folder.contentNodeId,
@@ -2500,7 +2510,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             ctx.userId,
             targetContentId,
             placement.parentId,
-            { title, ownerContentId: placement.ownedByNoteId },
+            { drafter: { kind: "ai-chat" as const, ref: ctx.conversationId ?? null }, title, ownerContentId: placement.ownedByNoteId },
           );
           if (!result.contentNodeId) {
             return `Could not create the shortcut: ${result.error ?? "unknown error"}`;
@@ -2676,6 +2686,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             markdown,
             parentFolderId: destination,
             ...withProperties,
+            drafter: { kind: "ai-chat" as const, ref: ctx.conversationId ?? null },
             ...(placement.ownedByNoteId
               ? {
                   role: "referenced" as const,
@@ -2699,8 +2710,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             const s = await findOrCreateShortcut(
               ctx.userId,
               result.contentNodeId,
-              alsoShortcutTo,
-            );
+              alsoShortcutTo, { drafter: { kind: "ai-chat" as const, ref: ctx.conversationId ?? null } });
             mirror = s.contentNodeId
               ? { shortcutId: s.contentNodeId, shortcutParentId: alsoShortcutTo }
               : { shortcutError: s.error ?? "could not create the shortcut" };
@@ -2988,6 +2998,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           const result = await storeDocxDocument(ctx.userId, {
             ...stored,
             parentFolderId: destination,
+            drafter: { kind: "ai-chat" as const, ref: ctx.conversationId ?? null },
             ...(placement.ownedByNoteId
               ? { role: "referenced" as const, ownedByNoteId: placement.ownedByNoteId }
               : {}),
@@ -2998,7 +3009,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           }
           let mirror: Record<string, unknown> = {};
           if (alsoShortcutTo) {
-            const s = await findOrCreateShortcut(ctx.userId, result.contentNodeId, alsoShortcutTo);
+            const s = await findOrCreateShortcut(ctx.userId, result.contentNodeId, alsoShortcutTo, { drafter: { kind: "ai-chat" as const, ref: ctx.conversationId ?? null } });
             mirror = s.contentNodeId
               ? { shortcutId: s.contentNodeId, shortcutParentId: alsoShortcutTo }
               : { shortcutError: s.error ?? "could not create the shortcut" };
@@ -3611,6 +3622,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             contentType: "note",
             parentId: resolvedParentId,
             ...ownedOutput,
+            ...draftedFields({ kind: "ai-chat" as const, ref: ctx.conversationId ?? null }),
             notePayload: {
               create: {
                 tiptapJson,
@@ -3639,8 +3651,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           const s = await findOrCreateShortcut(
             ctx.userId,
             node.id,
-            alsoShortcutTo,
-          );
+            alsoShortcutTo, { drafter: { kind: "ai-chat" as const, ref: ctx.conversationId ?? null } });
           mirror = s.contentNodeId
             ? { shortcutId: s.contentNodeId, shortcutParentId: alsoShortcutTo }
             : { shortcutError: s.error ?? "could not create the shortcut" };
@@ -3709,8 +3720,12 @@ export function createBaseTools(ctx: ToolExecuteContext) {
       // weak model resends a fragment. The in-transact guard is the hard backstop —
       // this only decides whether a card is shown (async predicates are supported:
       // `boolean | PromiseLike<boolean>`).
+      // An AI-drafted note may be rewritten freely (owner, 2026-10-14):
+      // no card, no backstop. writeNoteContent keeps a history snapshot of
+      // the pre-write document either way, so the rewrite stays undoable.
       needsApproval: async ({ contentId, mode, content }) =>
-        isDestructiveRewrite({ contentId, mode, contentLength: content.length }),
+        !(await contentIsAiDrafted(ctx.userId, contentId)) &&
+        (await isDestructiveRewrite({ contentId, mode, contentLength: content.length })),
       execute: async ({ contentId, mode, content }) => {
         // Allow update_note against ANY content type the user owns —
         // notes, chats (their 'Add notes' sidecar), folders, files, etc.
@@ -3722,7 +3737,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             ownerId: ctx.userId,
             deletedAt: null,
           },
-          select: { id: true, title: true, contentType: true },
+          select: { id: true, title: true, contentType: true, draftedBy: true },
         });
         if (!existing) {
           return `Content "${contentId}" not found or deleted. Use search_content to find the right id.`;
@@ -3757,11 +3772,14 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             // this is genuine authorization. `mode === "replace"` was WRONG: it
             // asserted approval for every replace, including ones that never
             // showed a card, which also disabled the in-transaction backstop.
-            destructiveApproved: await isDestructiveRewrite({
-              contentId,
-              mode,
-              contentLength: content.length,
-            }),
+            // …or the note is AI-drafted, which needs no card at all.
+            destructiveApproved:
+              isAiDrafted(existing) ||
+              (await isDestructiveRewrite({
+                contentId,
+                mode,
+                contentLength: content.length,
+              })),
           });
         } catch (error) {
           if (error instanceof NoteEditRefused) {

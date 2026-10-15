@@ -733,3 +733,13 @@ local garden; a token without `garden:write-rows` gets a clean refusal from both
 and one without `garden:write-files` from all four file-write tools; a note appended over MCP
 appears in an open collaborative editor without a reload (proof the write went through the
 Y.Doc); a `dg-block` fence survives a `replace` round trip unchanged.
+
+## Content authorship and MCP content deletion (built 2026-10-14, branch `feat/docx-document-properties`)
+
+Owner rules: (1) the MCP may delete content it authored, with any of the user's tokens, straight to the trash with an inbox notice and no confirmation; (2) an AI may rewrite any document an AI drafted without the destructive-rewrite guard; (3) LATER — the MCP may delete content the user names by title, and an ambiguous title must be settled by one more fact (folder, date, type) before the delete is authorized.
+
+- **Authorship record:** `ContentNode.draftedBy` (`ai-chat` | `mcp`), `draftedByRef` (Conversation id | McpToken id), `draftedAt` — migration `20261014230000_content_drafted_by`, additive, deploys ahead of code. Stamped once at creation by every chat and MCP create path; an overwrite never changes it. Rows before 2026-10-14 read as user-drafted (no honest backfill: conversation links cannot tell a creation from a mention).
+- **Rewrites:** `update_note` (no card, no backstop) and `garden_write_note` replace (`destructiveApproved: isAiDrafted(node)`, content-stamp CAS still required) for AI-drafted notes. `writeNoteContent` keeps the pre-write snapshot (24 h / 20 versions).
+- **`garden_delete_content`** (capability `garden:delete-content`, DESTRUCTIVE): refuses anything not `draftedBy = "mcp"`, refuses a folder holding any non-MCP descendant (names them), respects the token's reach, trashes via the shared `trashContentNode` (same cascades as a user delete), posts an `ai.notify` inbox notice.
+- **Next — delete by title:** resolve the title within the token's reach; exactly one match → elicit confirmation naming it (it is the user's content); several → refuse with the candidates and ask for the disambiguating fact; the user's own content always confirms. Not built.
+- Gates: `content:authorship:check` (new, build + quality.yml, mutation-tested), `mcp:surface:check` (+ delete tool, scoped rewrite lift, MCP stamping; mutation-tested). `pnpm mcp:authorship:smoke` — 13 checks over real MCP HTTP against a dev server, local DB only.

@@ -93,7 +93,14 @@ export async function trashContentNode(ownerId: string, id: string): Promise<Tra
   }
 
   // Folder Studio auto-context: removal changes the parent's roll-up inputs.
-  after(() => markContextDirty([existing.parentId]));
+  // `after()` throws outside a request scope (scripts, jobs) — and the
+  // delete has already happened here, so fall back to running it directly
+  // rather than reporting a failure for a delete that succeeded.
+  try {
+    after(() => markContextDirty([existing.parentId]));
+  } catch {
+    void Promise.resolve(markContextDirty([existing.parentId])).catch(() => null);
+  }
 
   // Scrub the node from every workspace's saved pane state, or a workspace
   // snapshot restore resurrects the deleted node's tab.
