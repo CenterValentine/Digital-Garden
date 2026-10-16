@@ -16,6 +16,7 @@ import {
   type AdapterContext,
   type ResearchAdapter,
 } from "../adapter";
+import { researchField } from "../fields";
 import { addIdentifier } from "../identifiers";
 import { researchSource } from "../sources";
 import type { CandidatePage, ResearchQuery, Work, WorkCandidate, WorkIdentifier, WorkType } from "../types";
@@ -166,10 +167,6 @@ function paperIdOf(work: Work): string | null {
   return null;
 }
 
-const FIELD_OF_STUDY: Record<string, string> = {
-  biomedicine: "Medicine,Biology",
-  "computer-science": "Computer Science",
-};
 
 export function s2SearchParams(input: ResearchQuery): Record<string, string | null> {
   const year =
@@ -178,8 +175,9 @@ export function s2SearchParams(input: ResearchQuery): Record<string, string | nu
     query: input.text,
     year,
     openAccessPdf: input.openAccess ? "" : null,
-    fieldsOfStudy: input.field ? FIELD_OF_STUDY[input.field] ?? null : null,
+    fieldsOfStudy: researchField(input.field)?.s2.join(",") ?? null,
     venue: input.venue ?? null,
+    minCitationCount: input.minCitations ? String(input.minCitations) : null,
   };
 }
 

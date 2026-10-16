@@ -2,29 +2,29 @@
  * Search scopes (client-safe).
  *
  * Users pick a scope, not a source (RESEARCH-READER-PLAN.md §2.2.2). A scope is
- * a named bundle of sources with default types; installing a domain pack
- * installs its scope. Sources inside a scope are a power-user disclosure.
+ * a named bundle of sources with default types and, for subject scopes, a
+ * field (`fields.ts`) each adapter maps to its own classification. Installing
+ * a domain pack refines a subject scope with its own sources (Biomedicine
+ * gains PubMed and trials; CS & ML gains arXiv and OpenReview); until then the
+ * subject scopes run on the core sources, which classify every work anyway.
  *
- * `status: "coming"` scopes show in the pack catalog but don't search yet —
- * Law (US) is stubbed in V1.0 (plan §7.1): its identifiers still resolve to
- * link nodes through the identifier box.
+ * `status: "coming"` scopes show in the picker but don't search yet — Law
+ * (US) is stubbed in V1.0 (plan §7.1): its identifiers still resolve to link
+ * nodes through the identifier box.
  */
 
+import { FIELD_GROUPS, RESEARCH_FIELDS, type ResearchFieldInfo } from "./fields";
 import type { WorkType } from "./types";
 
-export type ResearchScopeId =
-  | "scholarly"
-  | "preprints"
-  | "biomedicine"
-  | "cs-ml"
-  | "law-us"
-  | "library"
-  | "folder";
+export type { ResearchFieldInfo };
+export type ResearchField = string;
 
 export interface ResearchScope {
-  id: ResearchScopeId;
+  id: string;
   label: string;
   description: string;
+  /** Picker group. */
+  group: "Everything" | (typeof FIELD_GROUPS)[number] | "Packs" | "Yours";
   /** null = core (always installed); otherwise the domain pack that adds it. */
   pack: string | null;
   status: "available" | "coming";
@@ -32,70 +32,64 @@ export interface ResearchScope {
   sources: string[];
   /** Types the scope filters to by default; empty = all. */
   types: WorkType[];
-  /**
-   * Normalized field the scope narrows to; each adapter maps it to its own
-   * vocabulary (OpenAlex domains, S2 fieldsOfStudy) — `RESEARCH_FIELDS`.
-   */
+  /** Subject field id (`fields.ts`) each adapter maps to its own vocabulary. */
   field?: ResearchField;
   /** Scopes over the user's own nodes instead of remote sources. */
   local?: boolean;
 }
 
-export const RESEARCH_FIELDS = ["biomedicine", "computer-science"] as const;
-export type ResearchField = (typeof RESEARCH_FIELDS)[number];
+const CORE_SOURCES = ["openalex", "semantic-scholar", "crossref"];
+
+const subjectScopes: ResearchScope[] = RESEARCH_FIELDS.filter((field) => field.id !== "law").map((field) => ({
+  id: field.id,
+  label: field.label,
+  description: `Works the indexes classify under ${field.label.toLowerCase()}.`,
+  group: field.group,
+  pack: field.id === "biomedicine" ? "biomedicine" : field.id === "computer-science" ? "cs-ml" : null,
+  status: "available",
+  sources: CORE_SOURCES,
+  types: [],
+  field: field.id,
+}));
 
 export const RESEARCH_SCOPES: ResearchScope[] = [
   {
     id: "scholarly",
     label: "Everything scholarly",
     description: "Articles, preprints, books and data across the open scholarly indexes.",
+    group: "Everything",
     pack: null,
     status: "available",
-    sources: ["openalex", "semantic-scholar", "crossref"],
+    sources: CORE_SOURCES,
     types: [],
   },
   {
     id: "preprints",
     label: "Preprints",
     description: "Recent work before (or without) peer review.",
+    group: "Everything",
     pack: null,
     status: "available",
     sources: ["openalex", "semantic-scholar"],
     types: ["preprint"],
   },
-  {
-    id: "biomedicine",
-    label: "Biomedicine",
-    description: "PubMed, Europe PMC, clinical trials and bio/medRxiv preprints.",
-    pack: "biomedicine",
-    status: "available",
-    sources: ["openalex", "semantic-scholar"],
-    types: [],
-    field: "biomedicine",
-  },
-  {
-    id: "cs-ml",
-    label: "CS & ML",
-    description: "arXiv, OpenReview (with reviews), DBLP and Hugging Face Papers.",
-    pack: "cs-ml",
-    status: "available",
-    sources: ["openalex", "semantic-scholar"],
-    types: [],
-    field: "computer-science",
-  },
+  ...subjectScopes,
   {
     id: "law-us",
     label: "Law (US)",
     description: "Case law, the US Code and federal regulations. Coming in V1.1 — citations already open as links.",
+    group: "Packs",
     pack: "law-us",
     status: "coming",
     sources: [],
     types: ["case", "statute", "regulation"],
+    field: "law",
   },
   {
     id: "library",
     label: "My library",
     description: "Everything you've saved.",
+    group: "Yours",
     pack: null,
     status: "available",
     sources: [],
@@ -106,6 +100,7 @@ export const RESEARCH_SCOPES: ResearchScope[] = [
     id: "folder",
     label: "This folder",
     description: "Works saved in the folder you opened Research from.",
+    group: "Yours",
     pack: null,
     status: "available",
     sources: [],
@@ -113,6 +108,8 @@ export const RESEARCH_SCOPES: ResearchScope[] = [
     local: true,
   },
 ];
+
+export const SCOPE_GROUPS: ResearchScope["group"][] = ["Everything", ...FIELD_GROUPS, "Packs", "Yours"];
 
 export function researchScope(id: string): ResearchScope | undefined {
   return RESEARCH_SCOPES.find((scope) => scope.id === id);

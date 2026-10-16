@@ -165,6 +165,7 @@ export const RESEARCH_FACETS = [
   "field",
   "venue",
   "author",
+  "minCitations",
 ] as const;
 export type ResearchFacet = (typeof RESEARCH_FACETS)[number];
 
@@ -177,6 +178,8 @@ export interface ResearchQuery {
   field?: string;
   venue?: string;
   author?: string;
+  /** Only works cited at least this many times. */
+  minCitations?: number;
   sort?: "relevance" | "recent" | "cited";
 }
 

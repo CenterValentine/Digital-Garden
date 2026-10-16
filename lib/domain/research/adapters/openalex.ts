@@ -17,6 +17,7 @@ import {
   type AdapterContext,
   type ResearchAdapter,
 } from "../adapter";
+import { researchField } from "../fields";
 import { addIdentifier, normalizeOpenAlex } from "../identifiers";
 import { researchSource } from "../sources";
 import type { CandidatePage, ResearchQuery, Work, WorkCandidate, WorkCopy, WorkType } from "../types";
@@ -203,10 +204,11 @@ export function openAlexFilter(input: ResearchQuery): string | null {
   if (input.openAccess) parts.push("is_oa:true");
   const types = (input.types ?? []).flatMap((type) => TYPE_FILTER[type] ?? []);
   if (types.length) parts.push(`type:${[...new Set(types)].join("|")}`);
-  // Domains: 1 Life Sciences, 4 Health Sciences. Field 17: Computer Science.
-  if (input.field === "biomedicine") parts.push("primary_topic.domain.id:1|4");
-  if (input.field === "computer-science") parts.push("primary_topic.field.id:17");
+  const field = researchField(input.field);
+  if (field) parts.push(`primary_topic.field.id:${field.openalex.join("|")}`);
   if (input.author) parts.push(`raw_author_name.search:${input.author.replace(/[,|]/g, " ")}`);
+  if (input.venue) parts.push(`primary_location.source.display_name.search:${input.venue.replace(/[,|]/g, " ")}`);
+  if (input.minCitations) parts.push(`cited_by_count:>${input.minCitations - 1}`);
   return parts.length ? parts.join(",") : null;
 }
 

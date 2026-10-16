@@ -43,6 +43,8 @@ import {
   workKeyOf,
 } from "../lib/domain/research/identifiers";
 import { mergeCandidates } from "../lib/domain/research/merge";
+import { RESEARCH_FIELDS } from "../lib/domain/research/fields";
+import { activeFieldCount, applyFields, parseFieldedQuery, toResearchQuery } from "../lib/domain/research/query-syntax";
 import { RESEARCH_SCOPES } from "../lib/domain/research/scopes";
 import { RESEARCH_SOURCES } from "../lib/domain/research/sources";
 import type { WorkCandidate } from "../lib/domain/research/types";
@@ -304,7 +306,7 @@ async function main() {
   await check("OpenAlex: filters for years, OA, types and the pack fields", () => {
     assert.equal(
       openAlexFilter({ text: "x", yearFrom: 2018, openAccess: true, types: ["article", "preprint"], field: "biomedicine" }),
-      "publication_year:2018-,is_oa:true,type:article|review|letter|preprint,primary_topic.domain.id:1|4"
+      "publication_year:2018-,is_oa:true,type:article|review|letter|preprint,primary_topic.field.id:27|13|24|30|29|35|36"
     );
     assert.equal(openAlexFilter({ text: "x" }), null);
   });
@@ -323,6 +325,7 @@ async function main() {
       openAccessPdf: null,
       fieldsOfStudy: "Computer Science",
       venue: null,
+      minCitationCount: null,
     });
   });
 
@@ -482,6 +485,55 @@ async function main() {
     await crossrefAdapter.resolve!({ scheme: "pmid", value: "1" }, keyed); // not a DOI — no call
     await unpaywallAdapter.resolve!({ scheme: "doi", value: DOI }, keyed); // no email — no call
     assert.equal(keyed.calls.length, 1);
+  });
+
+  // ── fielded query syntax ──
+  await check("fielded query: tokens parse out of the box and serialize back in a stable order", () => {
+    const parsed = parseFieldedQuery('goat milk author:haenlein venue:"small ruminant" after:2015 cites>=50 type:article oa:yes sort:cited');
+    assert.equal(parsed.text, "goat milk");
+    assert.deepEqual(parsed.fields, {
+      author: "haenlein",
+      venue: "small ruminant",
+      yearFrom: 2015,
+      minCitations: 50,
+      types: ["article"],
+      openAccess: true,
+      sort: "cited",
+    });
+    assert.equal(parseFieldedQuery("year:2010-2020 x").fields.yearTo, 2020);
+    assert.equal(parseFieldedQuery("year:2010 x").fields.yearTo, 2010);
+    assert.equal(parseFieldedQuery("before:1999 x").fields.yearTo, 1999);
+    // A colon inside a title is not a token.
+    assert.equal(parseFieldedQuery("Attention: a review").text, "Attention: a review");
+    assert.equal(activeFieldCount(parsed.fields), 7);
+    const toQuery = toResearchQuery("goat milk after:2015 cites>=50");
+    assert.equal(toQuery.text, "goat milk");
+    assert.equal(toQuery.minCitations, 50);
+    assert.equal(toQuery.sort, "relevance");
+  });
+
+  await check("fielded query: the pane rewrites tokens in place; clearing a filter removes its token", () => {
+    const text = "goat milk after:2015 oa:yes";
+    const edited = applyFields(text, { yearTo: 2020, openAccess: undefined, author: "Haenlein G" });
+    assert.equal(edited, 'goat milk author:"Haenlein G" year:2015-2020');
+    assert.equal(applyFields(edited, { yearFrom: undefined, yearTo: undefined, author: undefined }), "goat milk");
+    assert.equal(applyFields("", { openAccess: true, minCitations: 10 }), "oa:yes cites>=10");
+  });
+
+  await check("fields: every subject maps to real OpenAlex field ids and S2 fields of study", () => {
+    for (const entry of RESEARCH_FIELDS) {
+      assert.ok(entry.openalex.length && entry.openalex.every((id) => id >= 11 && id <= 36), entry.id);
+      assert.ok(entry.s2.length, entry.id);
+    }
+    assert.equal(openAlexFilter({ text: "x", field: "physics" }), "primary_topic.field.id:31");
+    assert.ok(openAlexFilter({ text: "x", venue: "Nature" })?.includes("primary_location.source.display_name.search:Nature"));
+    assert.ok(openAlexFilter({ text: "x", minCitations: 50 })?.includes("cited_by_count:>49"));
+    assert.equal(s2SearchParams({ text: "q", field: "earth", minCitations: 5 }).fieldsOfStudy, "Geology,Environmental Science,Geography");
+    assert.equal(s2SearchParams({ text: "q", field: "earth", minCitations: 5 }).minCitationCount, "5");
+    // Every subject scope names a field that exists.
+    for (const scope of RESEARCH_SCOPES) {
+      if (scope.field) assert.ok(RESEARCH_FIELDS.some((entry) => entry.id === scope.field), `${scope.id}: unknown field ${scope.field}`);
+    }
   });
 
   // ── catalog consistency ──

@@ -1,17 +1,19 @@
 "use client";
 
 /**
- * The Research Find tab (RESEARCH-READER-PLAN.md §2.3): one box, a scope, a
- * row of facets, a source strip, and merged results streaming in. Selecting a
- * result shows it in the right sidebar's Work view — no preview pane here.
+ * The Research Find tab (RESEARCH-READER-PLAN.md §2.3): one box with a
+ * fielded query syntax, a grouped scope picker, a quick-pane for filters and
+ * sources, and merged results streaming in. Selecting a result shows it in
+ * the right sidebar's Work view — no preview pane here.
  *
- * Narrow-first: the tab lives in split panes (~470px), so the submit sits
- * inside the input (it can never wrap below), facets are compact chips, and
- * cards are built from the design system's glass surfaces with a type-toned
- * rail from the intent palette (`work-labels.ts`).
+ * Narrow-first: the tab lives in split panes (~470px). The submit sits inside
+ * the input (it can never wrap below); filters and the source strip are
+ * stowed in a quick-pane behind one button that wears the active-filter
+ * count; cards use the design system's glass surfaces with a type-toned rail
+ * from the intent palette (`work-labels.ts`).
  */
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import {
   AlertTriangle,
   ArrowRight,
@@ -25,12 +27,16 @@ import {
   Plus,
   Quote,
   Search,
+  SlidersHorizontal,
+  X,
 } from "lucide-react";
 import { getSurfaceStyles } from "@/lib/design/system";
+import { FIELD_GROUPS, RESEARCH_FIELDS } from "@/lib/domain/research/fields";
 import { parseIdentifierQuery } from "@/lib/domain/research/identifiers";
-import { RESEARCH_SCOPES, researchScope } from "@/lib/domain/research/scopes";
+import { activeFieldCount } from "@/lib/domain/research/query-syntax";
+import { RESEARCH_SCOPES, researchScope, SCOPE_GROUPS } from "@/lib/domain/research/scopes";
 import { RESEARCH_SOURCES, researchSource } from "@/lib/domain/research/sources";
-import type { Work } from "@/lib/domain/research/types";
+import { KNOWN_WORK_TYPES, type Work } from "@/lib/domain/research/types";
 import type { SourceReport } from "@/lib/domain/research/federate";
 import { READER_RESEARCH_CONTENT_ID } from "../../manifest";
 import { revealReaderSidebar } from "../../lib/sidebar";
@@ -40,8 +46,10 @@ import { accessBadge, authorLine, RETRACTION_LABELS, toneStyle, typeLabel, typeT
 
 const control =
   "h-9 rounded-md border border-black/10 bg-[var(--surface-input)] px-2 text-sm dark:border-white/10";
+const field =
+  "h-8 w-full rounded-md border border-black/10 bg-[var(--surface-input)] px-2 text-xs dark:border-white/10";
 const chip =
-  "inline-flex h-7 items-center gap-1 rounded-full border border-black/10 px-2.5 text-[11px] dark:border-white/10";
+  "inline-flex h-6 items-center gap-1 rounded-full border border-black/10 px-2 text-[11px] dark:border-white/10";
 
 const IDENTIFIER_NAMES: Record<string, string> = {
   doi: "a DOI",
@@ -68,20 +76,26 @@ const glass2 = getSurfaceStyles("glass-2");
 export function ResearchView() {
   const scopeId = useResearchStore((state) => state.scope);
   const text = useResearchStore((state) => state.text);
+  const fields = useResearchStore((state) => state.fields);
   const status = useResearchStore((state) => state.status);
   const error = useResearchStore((state) => state.error);
   const works = useResearchStore((state) => state.works);
   const link = useResearchStore((state) => state.link);
+  const reports = useResearchStore((state) => state.reports);
+  const paneOpen = useResearchStore((state) => state.paneOpen);
   const setScope = useResearchStore((state) => state.setScope);
   const setText = useResearchStore((state) => state.setText);
+  const setPaneOpen = useResearchStore((state) => state.setPaneOpen);
   const scope = researchScope(scopeId) ?? RESEARCH_SCOPES[0];
   const identifier = useMemo(() => parseIdentifierQuery(text), [text]);
   const searching = status === "searching";
   const comingSoon = scope.status !== "available" && !identifier;
+  const activeCount = activeFieldCount(fields);
+  const sourceTrouble = Object.values(reports).some((report) => report.status !== "ok" && report.status !== "skipped");
 
   return (
     <div className="@container flex h-full flex-col">
-      <div className="space-y-2.5 border-b border-black/10 px-3 pb-3 pt-3 dark:border-white/10">
+      <div className="space-y-2 border-b border-black/10 px-3 pb-2.5 pt-3 dark:border-white/10">
         <form
           className="flex flex-wrap gap-2"
           onSubmit={(event) => {
@@ -93,45 +107,74 @@ export function ResearchView() {
             aria-label="Scope"
             value={scope.id}
             onChange={(event) => setScope(event.target.value)}
-            className={`${control} grow @md:grow-0`}
+            className={`${control} grow @md:max-w-[46%] @md:grow-0`}
             title={scope.description}
           >
-            {PICKER_SCOPES.map((option) => (
-              <option key={option.id} value={option.id}>
-                {option.label}
-                {option.status === "coming" ? " (coming soon)" : ""}
-              </option>
-            ))}
+            {SCOPE_GROUPS.map((group) => {
+              const members = PICKER_SCOPES.filter((option) => option.group === group);
+              if (!members.length) return null;
+              return (
+                <optgroup key={group} label={group}>
+                  {members.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.label}
+                      {option.status === "coming" ? " (coming soon)" : ""}
+                    </option>
+                  ))}
+                </optgroup>
+              );
+            })}
           </select>
-          <div className="relative min-w-[200px] flex-1">
-            <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <input
-              value={text}
-              onChange={(event) => setText(event.target.value)}
-              placeholder="Words, a DOI, arXiv id, PMID, trial number, case citation or URL"
-              className={`${control} w-full pl-8 pr-10`}
-            />
+          <div className="flex min-w-[200px] flex-1 gap-1.5">
+            <div className="relative min-w-0 flex-1">
+              <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <input
+                value={text}
+                onChange={(event) => setText(event.target.value)}
+                placeholder="Words · a DOI or citation · author:… after:2015 oa:yes"
+                spellCheck={false}
+                className={`${control} w-full pl-8 pr-10`}
+              />
+              <button
+                type="submit"
+                aria-label={identifier ? "Look up" : "Search"}
+                title={identifier ? "Look up this identifier" : "Search"}
+                disabled={searching || !text.trim() || comingSoon}
+                className="absolute right-1 top-1 inline-flex h-7 w-7 items-center justify-center rounded bg-primary text-primary-foreground transition-opacity disabled:opacity-40"
+              >
+                {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}
+              </button>
+            </div>
             <button
-              type="submit"
-              aria-label={identifier ? "Look up" : "Search"}
-              title={identifier ? "Look up this identifier" : "Search"}
-              disabled={searching || !text.trim() || comingSoon}
-              className="absolute right-1 top-1 inline-flex h-7 w-7 items-center justify-center rounded bg-primary text-primary-foreground transition-opacity disabled:opacity-40"
+              type="button"
+              aria-label="Filters and sources"
+              aria-expanded={paneOpen}
+              title="Filters and sources"
+              onClick={() => setPaneOpen(!paneOpen)}
+              className={`relative inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border transition-colors ${
+                paneOpen
+                  ? "border-primary/50 bg-primary/10 text-primary"
+                  : "border-black/10 text-muted-foreground hover:text-foreground dark:border-white/10"
+              }`}
             >
-              {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}
+              <SlidersHorizontal className="h-4 w-4" />
+              {activeCount > 0 && (
+                <span className="absolute -right-1 -top-1 min-w-4 rounded-full bg-primary px-1 text-center text-[10px] font-semibold leading-4 text-primary-foreground">
+                  {activeCount}
+                </span>
+              )}
+              {sourceTrouble && activeCount === 0 && (
+                <span aria-hidden className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-amber-500" />
+              )}
             </button>
           </div>
         </form>
-        {identifier ? (
+        {identifier && (
           <p className="text-[11px] text-muted-foreground">
             Looks like {IDENTIFIER_NAMES[identifier[0].scheme] ?? "an identifier"} — goes straight to that work.
           </p>
-        ) : (
-          <>
-            <Facets />
-            <SourceStrip scopeSources={scope.sources} />
-          </>
         )}
+        {paneOpen && <QuickPane scopeSources={scope.sources} onClose={() => setPaneOpen(false)} />}
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto p-3">
@@ -168,59 +211,176 @@ function Empty({ icon, children }: { icon: React.ReactNode; children: React.Reac
   );
 }
 
-function Facets() {
-  const filters = useResearchStore((state) => state.filters);
-  const setFilters = useResearchStore((state) => state.setFilters);
+const TYPE_OPTIONS = KNOWN_WORK_TYPES.filter((type) => !["case", "statute", "regulation", "patent", "archival", "webpage", "other"].includes(type));
+
+/**
+ * Filters and sources, stowed. Every control writes a token into the box
+ * (`setFields` → `applyFields`), so the box always shows the whole query.
+ */
+function QuickPane({ scopeSources, onClose }: { scopeSources: string[]; onClose: () => void }) {
+  const fields = useResearchStore((state) => state.fields);
+  const setFields = useResearchStore((state) => state.setFields);
+  const paneRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
   const year = (value: string) => {
     const parsed = Number(value);
     return value && Number.isInteger(parsed) && parsed > 1000 ? parsed : undefined;
   };
-  const yearField = "h-7 w-12 rounded border border-black/10 bg-transparent px-1 text-center text-[11px] tabular-nums placeholder:text-muted-foreground/70 dark:border-white/10";
+  const number = (value: string) => {
+    const parsed = Number(value);
+    return value && Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
+  };
+
   return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      <label className={`${chip} gap-1.5 pl-2.5 pr-1`}>
-        <span className="text-muted-foreground">Years</span>
-        <input
-          inputMode="numeric"
-          placeholder="from"
-          defaultValue={filters.yearFrom ?? ""}
-          onBlur={(event) => setFilters({ yearFrom: year(event.target.value) })}
-          className={yearField}
-        />
-        <span className="text-muted-foreground">–</span>
-        <input
-          inputMode="numeric"
-          placeholder="to"
-          defaultValue={filters.yearTo ?? ""}
-          onBlur={(event) => setFilters({ yearTo: year(event.target.value) })}
-          className={yearField}
-        />
-      </label>
-      <label
-        className={`${chip} cursor-pointer select-none ${
-          filters.openAccess ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "text-muted-foreground"
-        }`}
-      >
-        <input
-          type="checkbox"
-          className="sr-only"
-          checked={Boolean(filters.openAccess)}
-          onChange={(event) => setFilters({ openAccess: event.target.checked })}
-        />
-        {filters.openAccess && <Check className="h-3 w-3" />}
-        Open access
-      </label>
-      <select
-        aria-label="Sort"
-        value={filters.sort}
-        onChange={(event) => setFilters({ sort: event.target.value as typeof filters.sort })}
-        className={`${chip} appearance-none bg-transparent pr-2 text-foreground`}
-      >
-        <option value="relevance">Best match</option>
-        <option value="recent">Newest</option>
-        <option value="cited">Most cited</option>
-      </select>
+    <div
+      ref={paneRef}
+      style={{ background: glass2.background, border: glass1.border, boxShadow: glass2.boxShadow }}
+      className="space-y-3 rounded-lg p-3"
+    >
+      <div className="flex items-center justify-between">
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Filters</span>
+        <div className="flex items-center gap-2">
+          {activeFieldCount(fields) > 0 && (
+            <button
+              type="button"
+              onClick={() =>
+                setFields({
+                  author: undefined,
+                  venue: undefined,
+                  types: undefined,
+                  field: undefined,
+                  yearFrom: undefined,
+                  yearTo: undefined,
+                  openAccess: undefined,
+                  minCitations: undefined,
+                  sort: undefined,
+                })
+              }
+              className="text-[11px] text-muted-foreground underline-offset-2 hover:underline"
+            >
+              Clear all
+            </button>
+          )}
+          <button type="button" aria-label="Close" onClick={onClose} className="text-muted-foreground hover:text-foreground">
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-x-3 gap-y-2 @md:grid-cols-3">
+        <Labeled label="Years">
+          <div className="flex items-center gap-1">
+            <input
+              inputMode="numeric"
+              placeholder="from"
+              value={fields.yearFrom ?? ""}
+              onChange={(event) => setFields({ yearFrom: year(event.target.value) })}
+              className={`${field} text-center tabular-nums`}
+            />
+            <span className="text-muted-foreground">–</span>
+            <input
+              inputMode="numeric"
+              placeholder="to"
+              value={fields.yearTo ?? ""}
+              onChange={(event) => setFields({ yearTo: year(event.target.value) })}
+              className={`${field} text-center tabular-nums`}
+            />
+          </div>
+        </Labeled>
+        <Labeled label="Sort">
+          <select value={fields.sort ?? "relevance"} onChange={(event) => setFields({ sort: event.target.value as typeof fields.sort })} className={field}>
+            <option value="relevance">Best match</option>
+            <option value="recent">Newest</option>
+            <option value="cited">Most cited</option>
+          </select>
+        </Labeled>
+        <Labeled label="Access">
+          <label className={`${field} flex cursor-pointer items-center gap-2`}>
+            <input
+              type="checkbox"
+              checked={Boolean(fields.openAccess)}
+              onChange={(event) => setFields({ openAccess: event.target.checked || undefined })}
+            />
+            Open access only
+          </label>
+        </Labeled>
+        <Labeled label="Type">
+          <select value={fields.types?.[0] ?? ""} onChange={(event) => setFields({ types: event.target.value ? [event.target.value] : undefined })} className={field}>
+            <option value="">Any</option>
+            {TYPE_OPTIONS.map((type) => (
+              <option key={type} value={type}>
+                {typeLabel(type)}
+              </option>
+            ))}
+          </select>
+        </Labeled>
+        <Labeled label="Field">
+          <select value={fields.field ?? ""} onChange={(event) => setFields({ field: event.target.value || undefined })} className={field}>
+            <option value="">Any</option>
+            {FIELD_GROUPS.map((group) => (
+              <optgroup key={group} label={group}>
+                {RESEARCH_FIELDS.filter((entry) => entry.group === group).map((entry) => (
+                  <option key={entry.id} value={entry.id}>
+                    {entry.label}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+        </Labeled>
+        <Labeled label="Cited at least">
+          <input
+            inputMode="numeric"
+            placeholder="e.g. 50"
+            value={fields.minCitations ?? ""}
+            onChange={(event) => setFields({ minCitations: number(event.target.value) })}
+            className={`${field} tabular-nums`}
+          />
+        </Labeled>
+        <Labeled label="Author">
+          <input
+            placeholder="name"
+            value={fields.author ?? ""}
+            onChange={(event) => setFields({ author: event.target.value || undefined })}
+            className={field}
+          />
+        </Labeled>
+        <Labeled label="Venue" className="col-span-2 @md:col-span-2">
+          <input
+            placeholder="journal or conference"
+            value={fields.venue ?? ""}
+            onChange={(event) => setFields({ venue: event.target.value || undefined })}
+            className={field}
+          />
+        </Labeled>
+      </div>
+      <p className="text-[10px] text-muted-foreground">
+        Everything here is also a word in the box: <code>author:haenlein venue:&quot;small ruminant&quot; after:2015 cites&gt;=50 type:article oa:yes</code>. A
+        source greys out a filter it can&apos;t honour.
+      </p>
+
+      <div className="space-y-1.5 border-t border-black/10 pt-2.5 dark:border-white/10">
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Sources</span>
+        <SourceStrip scopeSources={scopeSources} />
+      </div>
     </div>
+  );
+}
+
+function Labeled({ label, className = "", children }: { label: string; className?: string; children: React.ReactNode }) {
+  return (
+    <label className={`block space-y-1 ${className}`}>
+      <span className="block text-[10px] uppercase tracking-wide text-muted-foreground">{label}</span>
+      {children}
+    </label>
   );
 }
 
@@ -237,32 +397,50 @@ function SourceStrip({ scopeSources }: { scopeSources: string[] }) {
   const status = useResearchStore((state) => state.status);
   const include = useResearchStore((state) => state.include);
   const exclude = useResearchStore((state) => state.exclude);
+  const fields = useResearchStore((state) => state.fields);
   const toggle = useResearchStore((state) => state.toggleSource);
   const sources = RESEARCH_SOURCES.filter((source) => scopeSources.includes(source.id) && source.roles.includes("discover"));
+
+  // Facets set in the box that this source can't honour — shown in its tooltip.
+  const ignoredBy = (facets: string[]) =>
+    [
+      fields.author && !facets.includes("author") ? "author" : null,
+      fields.venue && !facets.includes("venue") ? "venue" : null,
+      fields.field && !facets.includes("field") ? "field" : null,
+      fields.minCitations && !facets.includes("minCitations") ? "min citations" : null,
+      fields.openAccess && !facets.includes("openAccess") ? "open access" : null,
+      fields.types?.length && !facets.includes("type") ? "type" : null,
+    ].filter(Boolean) as string[];
 
   return (
     <div className="flex flex-wrap items-center gap-1.5">
       {sources.map((source) => {
         const on = source.defaultOn ? !exclude.includes(source.id) : include.includes(source.id);
         const report = reports[source.id];
-        const detail = report
-          ? report.status === "ok"
-            ? `${report.count} results in ${(report.ms / 1000).toFixed(1)}s${report.total ? ` (of ${report.total.toLocaleString()})` : ""}`
-            : report.error ?? report.status
-          : on
-            ? status === "searching"
-              ? "Waiting…"
-              : source.description
-            : source.costNote
-              ? `Off — uses your key (${source.costNote})`
-              : "Off";
+        const ignored = ignoredBy(source.facets);
+        const detail = [
+          report
+            ? report.status === "ok"
+              ? `${report.count} results in ${(report.ms / 1000).toFixed(1)}s${report.total ? ` (of ${report.total.toLocaleString()})` : ""}`
+              : report.error ?? report.status
+            : on
+              ? status === "searching"
+                ? "Waiting…"
+                : source.description
+              : source.costNote
+                ? `Off — uses your key (${source.costNote})`
+                : "Off",
+          ignored.length ? `Ignores: ${ignored.join(", ")}` : null,
+        ]
+          .filter(Boolean)
+          .join("\n");
         return (
           <button
             key={source.id}
             type="button"
             title={detail}
             onClick={() => toggle(source.id, !on, source.defaultOn)}
-            className={`${chip} h-6 px-2 ${
+            className={`${chip} ${
               on
                 ? report?.status === "ok"
                   ? "border-emerald-500/30 bg-emerald-500/[0.07]"
@@ -277,6 +455,7 @@ function SourceStrip({ scopeSources }: { scopeSources: string[] }) {
               : on && status === "searching" && <Loader2 className="h-3 w-3 animate-spin" />}
             {source.label}
             {report?.status === "ok" && <span className="tabular-nums text-muted-foreground">{report.count}</span>}
+            {on && ignored.length > 0 && <span className="text-amber-600 dark:text-amber-400">·{ignored.length}</span>}
           </button>
         );
       })}
@@ -344,6 +523,7 @@ function WorkCard({
   const badge = accessBadge(work);
   const tone = work.retraction ? "danger" : typeTone(work.type);
   const summary = work.tldr ?? work.abstract;
+  const kind = work.retraction ? RETRACTION_LABELS[work.retraction.status] : typeLabel(work.type);
   return (
     <li>
       <div
@@ -361,53 +541,35 @@ function WorkCard({
           border: glass1.border,
           boxShadow: selected ? glass2.boxShadow : glass1.boxShadow,
         }}
-        className={`group relative overflow-hidden rounded-lg pl-4 pr-3 pt-3 pb-2.5 outline-none transition-[box-shadow,transform] hover:-translate-y-px focus-visible:ring-2 focus-visible:ring-[var(--work-tone)] ${
+        className={`group relative overflow-hidden rounded-lg py-3 pl-4 pr-3 outline-none transition-[box-shadow,transform] hover:-translate-y-px focus-visible:ring-2 focus-visible:ring-[var(--work-tone)] ${
           selected ? "ring-1 ring-[var(--work-tone)]" : ""
         }`}
       >
         {/* Type-toned rail */}
         <span aria-hidden className="absolute inset-y-0 left-0 w-[3px] bg-[var(--work-tone)]" />
 
-        <div className="flex items-start gap-2">
-          <div className="min-w-0 flex-1">
-            <div className="mb-1 flex flex-wrap items-center gap-1.5 text-[10px] font-medium uppercase tracking-wide">
-              <span
-                className="rounded px-1.5 py-0.5 text-[var(--work-tone)]"
-                style={{ background: "color-mix(in srgb, var(--work-tone) 16%, transparent)" }}
-              >
-                {work.retraction ? RETRACTION_LABELS[work.retraction.status] : typeLabel(work.type)}
-              </span>
-              {work.year !== null && <span className="tabular-nums text-muted-foreground">{work.year}</span>}
-            </div>
-            <h3 className="font-serif text-[15px] font-semibold leading-snug [overflow-wrap:anywhere] line-clamp-3">
-              {work.title}
-            </h3>
-            {(work.authors.length > 0 || work.venue) && (
-              <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                {[authorLine(work), work.venue].filter(Boolean).join(" · ")}
-              </p>
-            )}
-          </div>
-          <button
-            type="button"
-            title={savedId ? "In your library — open it" : "Add to the folder"}
-            aria-label={savedId ? "Open" : "Add to the folder"}
-            onClick={(event) => {
-              event.stopPropagation();
-              void addWorkToFolder(work, { open: Boolean(savedId) });
-            }}
-            style={{ background: glass2.background, border: glass1.border }}
-            className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors hover:border-[var(--work-tone)] ${
-              savedId ? "text-emerald-600 dark:text-emerald-400" : "text-foreground"
-            }`}
-          >
-            {savedId ? <Check className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-          </button>
-        </div>
+        {/* Header: the title leads; the type, year and venue read as one dateline under it. */}
+        <h3 className="font-serif text-[15px] font-semibold leading-snug [overflow-wrap:anywhere] line-clamp-3">{work.title}</h3>
+        <p className="mt-1 flex flex-wrap items-center gap-x-1.5 text-[11px] leading-tight">
+          <span className="font-semibold uppercase tracking-wide text-[var(--work-tone)]">{kind}</span>
+          {work.year !== null && (
+            <>
+              <span className="text-muted-foreground/60">·</span>
+              <span className="tabular-nums text-muted-foreground">{work.year}</span>
+            </>
+          )}
+          {work.venue && (
+            <>
+              <span className="text-muted-foreground/60">·</span>
+              <span className="min-w-0 truncate text-muted-foreground">{work.venue}</span>
+            </>
+          )}
+        </p>
+        {work.authors.length > 0 && <p className="mt-0.5 truncate text-xs text-muted-foreground">{authorLine(work)}</p>}
 
         {summary && <p className="mt-1.5 line-clamp-2 text-xs leading-relaxed text-muted-foreground">{summary}</p>}
 
-        <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px]">
+        <div className="mt-2 flex items-center gap-x-2 text-[10px]">
           <span
             title={badge.title}
             className={`rounded px-1.5 py-0.5 font-medium ${
@@ -421,12 +583,35 @@ function WorkCard({
             {badge.label}
           </span>
           {work.citedByCount !== null && work.citedByCount > 0 && (
-            <span className="inline-flex items-center gap-1 tabular-nums text-muted-foreground">
+            <span className="inline-flex items-center gap-1 tabular-nums text-muted-foreground" title="Times cited">
               <Quote className="h-2.5 w-2.5" />
               {work.citedByCount.toLocaleString()}
             </span>
           )}
-          <span className="ml-auto truncate text-muted-foreground/80">{sourceLabels(work.provenance)}</span>
+          <span className="min-w-0 flex-1 truncate text-muted-foreground/80">{sourceLabels(work.provenance)}</span>
+          <button
+            type="button"
+            title={savedId ? "In your library — open it" : "Add to the folder you opened Research from"}
+            onClick={(event) => {
+              event.stopPropagation();
+              void addWorkToFolder(work, { open: Boolean(savedId) });
+            }}
+            className={`inline-flex h-6 shrink-0 items-center gap-1 rounded-full border px-2 text-[11px] font-medium transition-colors ${
+              savedId
+                ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                : "border-black/10 text-foreground hover:border-[var(--work-tone)] hover:bg-[color-mix(in_srgb,var(--work-tone)_12%,transparent)] dark:border-white/15"
+            }`}
+          >
+            {savedId ? (
+              <>
+                <Check className="h-3 w-3" /> Open
+              </>
+            ) : (
+              <>
+                <Plus className="h-3 w-3" /> Add
+              </>
+            )}
+          </button>
         </div>
       </div>
     </li>
@@ -449,16 +634,23 @@ function LinkResult({ link }: { link: ResearchLinkResult }) {
           <a href={link.url} target="_blank" rel="noreferrer" className="underline">
             {new URL(link.url).hostname}
           </a>
-          . The Law pack (V1.1) will read it here.
+          . Saved as a link until the Law pack (V1.1) can read it here.
         </div>
       </div>
       <button
         type="button"
         onClick={() => void addWorkToFolder({ key: link.key, title: link.title }, { open: Boolean(saved[link.key]) })}
-        style={{ background: glass2.background, border: glass1.border }}
-        className="h-8 shrink-0 rounded-full px-3 text-xs hover:border-[var(--work-tone)]"
+        className="inline-flex h-7 shrink-0 items-center gap-1 rounded-full border border-black/10 px-2.5 text-[11px] font-medium hover:border-[var(--work-tone)] dark:border-white/15"
       >
-        {saved[link.key] ? "Open" : "Add as link"}
+        {saved[link.key] ? (
+          <>
+            <Check className="h-3 w-3" /> Open
+          </>
+        ) : (
+          <>
+            <Plus className="h-3 w-3" /> Add as link
+          </>
+        )}
       </button>
     </div>
   );

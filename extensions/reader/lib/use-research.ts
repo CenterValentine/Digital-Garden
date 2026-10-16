@@ -11,6 +11,7 @@
 
 import { toast } from "sonner";
 import { parseIdentifierQuery, identifierKey } from "@/lib/domain/research/identifiers";
+import { toResearchQuery } from "@/lib/domain/research/query-syntax";
 import { RESEARCH_SOURCES } from "@/lib/domain/research/sources";
 import type { Work, WorkIdentifier } from "@/lib/domain/research/types";
 import { useContentStore } from "@/state/content-store";
@@ -28,8 +29,8 @@ function identifierList(work: Work): WorkIdentifier[] {
 
 export async function runResearchSearch(options: { append?: boolean } = {}): Promise<void> {
   const store = useResearchStore.getState();
-  const text = store.text.trim();
-  if (!text) return;
+  const raw = store.text.trim();
+  if (!raw) return;
   const append = Boolean(options.append);
   const seq = ++sequence;
   inflight?.abort();
@@ -38,11 +39,11 @@ export async function runResearchSearch(options: { append?: boolean } = {}): Pro
 
   // A whole-query identifier jumps straight to the Work (§2.2.3).
   if (!append) {
-    const identifiers = parseIdentifierQuery(text);
+    const identifiers = parseIdentifierQuery(raw);
     if (identifiers) {
       store.startSearch(false);
       try {
-        const result = await researchApi.resolve(text);
+        const result = await researchApi.resolve(raw);
         if (seq !== sequence) return;
         if (result.kind === "link" && result.link) {
           store.showSingle(null, { key: identifierKey(result.identifier), ...result.link });
@@ -59,24 +60,18 @@ export async function runResearchSearch(options: { append?: boolean } = {}): Pro
     }
   }
 
+  const query = toResearchQuery(raw);
+  if (!query.text) {
+    // Only tokens — a filter alone isn't a search; keep the box's hint visible.
+    store.finish("Add a few words to search for, beside the filters");
+    return;
+  }
   const previous = append ? store.works : [];
   const cursors = append ? store.cursors : undefined;
   store.startSearch(append);
   try {
     await streamResearchSearch(
-      {
-        scope: store.scope,
-        query: {
-          text,
-          yearFrom: store.filters.yearFrom,
-          yearTo: store.filters.yearTo,
-          openAccess: store.filters.openAccess || undefined,
-          sort: store.filters.sort,
-        },
-        include: store.include,
-        exclude: store.exclude,
-        cursors,
-      },
+      { scope: store.scope, query, include: store.include, exclude: store.exclude, cursors },
       (event) => {
         if (seq !== sequence) return;
         const current = useResearchStore.getState();
@@ -105,6 +100,24 @@ function openSaved(contentId: string, title: string, policy: string) {
   });
 }
 
+/** "Research / Goats" for the folder a saved node landed in; "the top of your tree" at the root. */
+async function folderPathOf(contentId: string): Promise<string> {
+  try {
+    const response = await fetch(`/api/content/content/${contentId}/path`, { credentials: "include" });
+    const body = (await response.json()) as { success?: boolean; data?: unknown };
+    const data = body.data as { ancestors?: Array<{ title: string }> } | Array<{ title: string }> | undefined;
+    const ancestors = Array.isArray(data) ? data : data?.ancestors ?? [];
+    const titles = ancestors.map((ancestor) => ancestor.title).filter(Boolean);
+    return titles.length ? titles.join(" / ") : "the top of your tree";
+  } catch {
+    return "your library";
+  }
+}
+
+function truncate(text: string, max = 60): string {
+  return text.length > max ? `${text.slice(0, max - 1)}…` : text;
+}
+
 /** Add a Work (or the Law stub's link) to the folder the tab was opened for. */
 export async function addWorkToFolder(work: Work | { key: string; title: string }, options: { open?: boolean } = {}) {
   const store = useResearchStore.getState();
@@ -122,21 +135,20 @@ export async function addWorkToFolder(work: Work | { key: string; title: string 
       fallback: isWork ? work : undefined,
     });
     useResearchStore.getState().markSaved(work.key, result.contentId, result.copyPolicy);
-    const where =
+    const path = await folderPathOf(result.contentId);
+    const how =
       result.copyPolicy === "stored"
-        ? "with its open-access PDF"
+        ? `Added to ${path} with its PDF`
         : result.copyPolicy === "on-demand"
-          ? "— its open copy opens on demand"
-          : "as a link";
-    toast.success(result.duplicate ? `“${truncate(work.title)}” is already in your library` : `Added “${truncate(work.title)}” ${where}`);
+          ? `Added to ${path} as a link — its free copy opens on demand`
+          : `Added to ${path} as a link`;
+    toast.success(result.duplicate ? `“${truncate(work.title)}” is already in ${path}` : how, {
+      description: result.duplicate ? undefined : truncate(work.title, 80),
+    });
     if (options.open) openSaved(result.contentId, result.title, result.copyPolicy);
   } catch (error) {
     toast.error(error instanceof Error ? error.message : "Could not add it");
   }
-}
-
-function truncate(text: string, max = 60): string {
-  return text.length > max ? `${text.slice(0, max - 1)}…` : text;
 }
 
 export const PAID_SOURCES = RESEARCH_SOURCES.filter((source) => !source.defaultOn);

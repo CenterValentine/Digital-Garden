@@ -22,8 +22,8 @@ A facet a source ignores is greyed for that source in the UI, never silently dro
 
 | Source | Facets | Types returned |
 |---|---|---|
-| OpenAlex | yearFrom, yearTo, openAccess, type, field, author | article, preprint, book, chapter, dataset, thesis, report, review, other |
-| Semantic Scholar | yearFrom, yearTo, openAccess, field, venue | article, preprint, review, book, chapter, dataset, other |
+| OpenAlex | yearFrom, yearTo, openAccess, type, field, author, venue, minCitations | article, preprint, book, chapter, dataset, thesis, report, review, other |
+| Semantic Scholar | yearFrom, yearTo, openAccess, field, venue, minCitations | article, preprint, review, book, chapter, dataset, other |
 | Crossref | yearFrom, yearTo, type, author, venue | article, book, chapter, dataset, report, thesis, preprint, other |
 | Unpaywall | — | article, preprint, book, chapter, dataset, other |
 
@@ -33,9 +33,20 @@ A facet a source ignores is greyed for that source in the UI, never silently dro
 |---|---|---|---|---|---|
 | Everything scholarly (`scholarly`) | core | available | openalex, semantic-scholar, crossref | — | — |
 | Preprints (`preprints`) | core | available | openalex, semantic-scholar | preprint | — |
-| Biomedicine (`biomedicine`) | biomedicine | available | openalex, semantic-scholar | — | biomedicine |
-| CS & ML (`cs-ml`) | cs-ml | available | openalex, semantic-scholar | — | computer-science |
-| Law (US) (`law-us`) | law-us | coming | — | case, statute, regulation | — |
+| Biomedicine & health (`biomedicine`) | biomedicine | available | openalex, semantic-scholar, crossref | — | biomedicine |
+| Biology & agriculture (`biology`) | core | available | openalex, semantic-scholar, crossref | — | biology |
+| Neuroscience & psychology (`neuroscience`) | core | available | openalex, semantic-scholar, crossref | — | neuroscience |
+| Computer science & ML (`computer-science`) | cs-ml | available | openalex, semantic-scholar, crossref | — | computer-science |
+| Mathematics (`mathematics`) | core | available | openalex, semantic-scholar, crossref | — | mathematics |
+| Physics & astronomy (`physics`) | core | available | openalex, semantic-scholar, crossref | — | physics |
+| Chemistry & materials (`chemistry`) | core | available | openalex, semantic-scholar, crossref | — | chemistry |
+| Engineering & energy (`engineering`) | core | available | openalex, semantic-scholar, crossref | — | engineering |
+| Earth & environment (`earth`) | core | available | openalex, semantic-scholar, crossref | — | earth |
+| Social sciences (`social`) | core | available | openalex, semantic-scholar, crossref | — | social |
+| Economics & business (`economics`) | core | available | openalex, semantic-scholar, crossref | — | economics |
+| Arts & humanities (`humanities`) | core | available | openalex, semantic-scholar, crossref | — | humanities |
+| Education (`education`) | core | available | openalex, semantic-scholar, crossref | — | education |
+| Law (US) (`law-us`) | law-us | coming | — | case, statute, regulation | law |
 | My library (`library`) | core | available | your library | — | — |
 | This folder (`folder`) | core | available | your library | — | — |
 

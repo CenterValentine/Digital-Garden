@@ -26,6 +26,7 @@ const body = z.object({
     field: z.string().max(40).optional(),
     venue: z.string().max(300).optional(),
     author: z.string().max(300).optional(),
+    minCitations: z.number().int().min(0).max(1_000_000).optional(),
     sort: z.enum(["relevance", "recent", "cited"]).optional(),
   }),
   include: z.array(z.string().max(40)).max(40).optional(),

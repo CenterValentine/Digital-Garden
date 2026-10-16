@@ -1,23 +1,22 @@
 /**
  * Research tab state (RESEARCH-READER-PLAN.md §2.3). One search at a time:
  * the query, the merged Works as they stream in, each source's report, and
- * the Work selected for the right sidebar. The scope and filters persist so
- * the tab reopens where the user left it; results don't (they go stale).
+ * the Work selected for the right sidebar.
+ *
+ * The box text is the single source of truth for filters: tokens such as
+ * `after:2015 oa:yes` live in it (`lib/domain/research/query-syntax.ts`),
+ * and the quick-pane edits the text by rewriting tokens. The scope, text
+ * and source toggles persist so the tab reopens where the user left it;
+ * results don't (they go stale).
  */
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { SourceReport } from "@/lib/domain/research/federate";
+import { applyFields, parseFieldedQuery, type QueryFields } from "@/lib/domain/research/query-syntax";
 import type { Work } from "@/lib/domain/research/types";
 
 export type ResearchStatus = "idle" | "searching" | "done" | "error";
-
-export interface ResearchFilters {
-  yearFrom?: number;
-  yearTo?: number;
-  openAccess?: boolean;
-  sort: "relevance" | "recent" | "cited";
-}
 
 /** A pasted legal citation (Law stub): saved as a link, shown as one result. */
 export interface ResearchLinkResult {
@@ -29,13 +28,17 @@ export interface ResearchLinkResult {
 
 interface ResearchState {
   scope: string;
-  filters: ResearchFilters;
   /** Paid / off-by-default sources the user turned on for their searches. */
   include: string[];
   /** Sources the user turned off. */
   exclude: string[];
-
+  /** The box: free words plus filter tokens. */
   text: string;
+  /** Parsed from `text` on every change — never set directly. */
+  fields: QueryFields;
+  /** The quick-pane (filters + sources) is open. */
+  paneOpen: boolean;
+
   status: ResearchStatus;
   error: string | null;
   works: Work[];
@@ -51,9 +54,11 @@ interface ResearchState {
   targetParentId: string | null;
 
   setScope: (scope: string) => void;
-  setFilters: (patch: Partial<ResearchFilters>) => void;
   toggleSource: (source: string, on: boolean, defaultOn: boolean) => void;
   setText: (text: string) => void;
+  /** Edit filters from the pane: rewrites the box's tokens. */
+  setFields: (patch: Partial<QueryFields>) => void;
+  setPaneOpen: (open: boolean) => void;
   startSearch: (append: boolean) => void;
   receiveWorks: (works: Work[], append: boolean, previous: Work[]) => void;
   receiveReport: (report: SourceReport) => void;
@@ -68,10 +73,11 @@ export const useResearchStore = create<ResearchState>()(
   persist(
     (set) => ({
       scope: "scholarly",
-      filters: { sort: "relevance" },
       include: [],
       exclude: [],
       text: "",
+      fields: {},
+      paneOpen: false,
       status: "idle",
       error: null,
       works: [],
@@ -83,13 +89,18 @@ export const useResearchStore = create<ResearchState>()(
       targetParentId: null,
 
       setScope: (scope) => set({ scope }),
-      setFilters: (patch) => set((state) => ({ filters: { ...state.filters, ...patch } })),
       toggleSource: (source, on, defaultOn) =>
         set((state) => ({
           include: on && !defaultOn ? [...new Set([...state.include, source])] : state.include.filter((id) => id !== source),
           exclude: !on && defaultOn ? [...new Set([...state.exclude, source])] : state.exclude.filter((id) => id !== source),
         })),
-      setText: (text) => set({ text }),
+      setText: (text) => set({ text, fields: parseFieldedQuery(text).fields }),
+      setFields: (patch) =>
+        set((state) => {
+          const text = applyFields(state.text, patch);
+          return { text, fields: parseFieldedQuery(text).fields };
+        }),
+      setPaneOpen: (paneOpen) => set({ paneOpen }),
       startSearch: (append) =>
         set({
           status: "searching",
@@ -129,13 +140,21 @@ export const useResearchStore = create<ResearchState>()(
     }),
     {
       name: "reader:research",
-      version: 1,
+      version: 2,
       partialize: (state) => ({
         scope: state.scope,
-        filters: state.filters,
         include: state.include,
         exclude: state.exclude,
+        text: state.text,
       }),
+      // The persisted text carries the tokens; derive the fields on rehydrate.
+      onRehydrateStorage: () => (state) => {
+        if (state) state.fields = parseFieldedQuery(state.text).fields;
+      },
+      migrate: (persisted) => {
+        const old = (persisted ?? {}) as Record<string, unknown>;
+        return { scope: old.scope ?? "scholarly", include: old.include ?? [], exclude: old.exclude ?? [], text: "" } as never;
+      },
     }
   )
 );
