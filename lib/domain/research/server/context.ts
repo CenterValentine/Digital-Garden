@@ -75,6 +75,16 @@ export async function researchContext(ownerId: string): Promise<ResearchContext>
         return await readerFetchJson<T>(url, { headers: options?.headers, timeoutMs: options?.timeoutMs ?? 12_000 });
       } catch (error) {
         if (error instanceof ReaderFetchError && error.upstreamStatus === 404) return null;
+        if (error instanceof ReaderFetchError && error.upstreamStatus === 429) {
+          // Anonymous pools (Semantic Scholar especially) are shared by every
+          // caller on the internet; say what to do, not just the status.
+          const host = new URL(url).hostname;
+          throw new ReaderFetchError(
+            `${host} is rate-limiting right now — try again shortly, or connect your own key in Settings → Reader`,
+            429,
+            429
+          );
+        }
         throw error;
       }
     },

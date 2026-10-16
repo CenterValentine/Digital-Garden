@@ -224,7 +224,7 @@ const SORT: Record<string, { sort: string; order: string } | null> = {
 };
 
 interface CrossrefList {
-  message?: { "total-results"?: number; "next-cursor"?: string | null; items?: CrossrefWork[] };
+  message?: { "total-results"?: number; items?: CrossrefWork[] };
 }
 
 export const crossrefAdapter: ResearchAdapter = {
@@ -232,6 +232,9 @@ export const crossrefAdapter: ResearchAdapter = {
 
   async search(input, ctx, cursor) {
     const rows = 25;
+    // Offset paging, not `cursor=*`: Crossref's deep-paging mode drops relevance
+    // ordering (results come back in index order). Offsets are capped at 10,000.
+    const offset = Math.min(Number(cursor ?? 0) || 0, 10_000);
     const result = await ctx.fetchJson<CrossrefList>(
       `${BASE}/works${query({
         "query.bibliographic": input.text,
@@ -239,18 +242,18 @@ export const crossrefAdapter: ResearchAdapter = {
         "query.container-title": input.venue,
         filter: crossrefFilter(input),
         rows,
-        cursor: cursor ?? "*",
+        offset,
         ...SORT[input.sort ?? "relevance"],
         ...polite(ctx),
       })}`
     );
-    const message = result.message ?? {};
+    const message = result?.message ?? {};
     const items = message.items ?? [];
+    const nextOffset = offset + rows;
     return {
-      candidates: items.map((item, index) => candidateFromCrossref(item, index)),
+      candidates: items.map((item, index) => candidateFromCrossref(item, offset + index)),
       total: message["total-results"] ?? null,
-      // Crossref repeats the cursor on the last page; stop when a page comes back short.
-      next: items.length === rows ? message["next-cursor"] ?? null : null,
+      next: items.length === rows && nextOffset < 10_000 ? String(nextOffset) : null,
     };
   },
 

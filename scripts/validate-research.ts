@@ -453,7 +453,7 @@ async function main() {
   await check("resolve: arXiv → S2 learns the DOI → Crossref and Unpaywall answer in round two", async () => {
     const arxivPaper: S2Paper = { ...s2Paper, externalIds: { ...s2Paper.externalIds, ArXiv: "1501.00001" } };
     const ctx = fixtureContext([
-      [/graph\/v1\/paper\/ARXIV%3A1501\.00001/, arxivPaper],
+      [/graph\/v1\/paper\/ARXIV:1501\.00001/, arxivPaper],
       [/api\.crossref\.org\/works\/10\.1371\/journal\.pone\.0123456/, { message: crossrefWork }],
       [/api\.unpaywall\.org\/v2\/10\.1371\/journal\.pone\.0123456/, unpaywallRecord],
       [/api\.openalex\.org\/works\/doi:10\.1371\/journal\.pone\.0123456/, openAlexWork],

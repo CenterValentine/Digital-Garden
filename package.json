@@ -28,6 +28,7 @@
     "research:check": "tsx scripts/validate-research.ts",
     "research:matrix": "tsx scripts/generate-research-source-matrix.ts",
     "research:matrix:check": "tsx scripts/generate-research-source-matrix.ts --check",
+    "research:live:smoke": "tsx scripts/research-live-smoke.ts",
     "docx:renderer:smoke": "tsx scripts/docx-renderer-smoke.ts",
     "docx:templates:check": "tsx scripts/validate-docx-templates.ts",
     "google:multipart:check": "tsx scripts/validate-google-multipart.ts",

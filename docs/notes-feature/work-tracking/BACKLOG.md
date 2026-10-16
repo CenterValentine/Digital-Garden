@@ -214,7 +214,7 @@ The order audit fixed the causes that moved rows between refreshes (anchored dro
 - [x] **R2 Library** (built 2026-09-29; + Wikisource, OAPEN, Google Books, Standard Ebooks preset) — OPDS / Gutendex / Open Library adapters, library dialog, acquire into folder, `BookMeta` + covers.
 - [ ] **R3 Scriptures in the reader** — scriptures plan P0/P1 feed a corpus source sharing the annotation store.
 - [ ] **R4 Bring in the rest** — ~~Kindle clippings + Readwise, Hardcover, Libby link~~ (built 2026-09-29); highlights → database, flashcards, AI tools, speed-reader EPUB, PDF in reader.
-- [ ] **Research (reader stub)** — third reader source after Scriptures. Plan proposed 2026-09-30: `work-tracking/RESEARCH-READER-PLAN.md` (one Work model + scopes UI, adapter roles, V1.0 core + Biomedicine/CS&ML packs, V1.1 Ask mode + Law, V1.2 Patents/Data/Archives, full service registry).
+- [ ] **Research (reader)** — V1.0 slice 1 (Work model, 4 sources, federation, save, Find tab) built 2026-10-01, live-verified 2026-10-15, PR pending; remaining V1.0: paper readers + re-anchoring, enrichment views, Zotero/BibTeX import, Biomedicine + CS&ML sources, Papers/Claims tables, Law + paid probes, AI tools. Plan: `work-tracking/RESEARCH-READER-PLAN.md` (one Work model + scopes UI, adapter roles, V1.0 core + Biomedicine/CS&ML packs, V1.1 Ask mode + Law, V1.2 Patents/Data/Archives, full service registry).
 - [ ] **CSP for /content** — foliate-js wants a script-blocking CSP; the reader sanitizer is the interim defence.
 
 ## Research reader — V1.3 and beyond (2026-10-01, plan `RESEARCH-READER-PLAN.md`)

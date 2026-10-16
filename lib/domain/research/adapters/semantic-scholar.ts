@@ -152,6 +152,11 @@ function s2PaperId(identifier: WorkIdentifier): string | null {
   }
 }
 
+/** S2 paper ids keep their ":" and "/" (DOI:10.1/x) — only the rest is escaped. */
+function idPath(id: string): string {
+  return encodeURIComponent(id).replace(/%3A/g, ":").replace(/%2F/g, "/");
+}
+
 /** The best S2 handle for a merged Work. */
 function paperIdOf(work: Work): string | null {
   for (const scheme of ["s2", "doi", "arxiv", "pmid", "pmcid"] as const) {
@@ -203,16 +208,16 @@ async function edges(
   if (!id) return EMPTY_PAGE;
   const offset = Number(cursor ?? 0) || 0;
   const result = await ctx.fetchJson<S2EdgeResult>(
-    `${GRAPH}/paper/${encodeURIComponent(id)}/${kind}${query({ fields: NESTED_FIELDS, offset, limit: PAGE_SIZE })}`,
+    `${GRAPH}/paper/${idPath(id)}/${kind}${query({ fields: NESTED_FIELDS, offset, limit: PAGE_SIZE })}`,
     { headers: headers(ctx) }
   );
-  const papers = (result.data ?? [])
+  const papers = (result?.data ?? [])
     .map((edge) => (kind === "references" ? edge.citedPaper : edge.citingPaper))
     .filter((paper): paper is S2Paper => Boolean(paper?.paperId && paper.title));
   return {
     candidates: papers.map((paper, index) => candidateFromS2(paper, index)),
     total: null,
-    next: result.next !== undefined && result.next !== null ? String(result.next) : null,
+    next: result?.next !== undefined && result?.next !== null ? String(result.next) : null,
   };
 }
 
@@ -228,9 +233,9 @@ export const semanticScholarAdapter: ResearchAdapter = {
     }`;
     const result = await ctx.fetchJson<S2SearchResult>(url, { headers: headers(ctx) });
     return {
-      candidates: (result.data ?? []).map((paper, index) => candidateFromS2(paper, index)),
-      total: result.total ?? null,
-      next: result.next !== undefined && result.next !== null ? String(result.next) : null,
+      candidates: (result?.data ?? []).map((paper, index) => candidateFromS2(paper, offset + index)),
+      total: result?.total ?? null,
+      next: result?.next !== undefined && result?.next !== null ? String(result.next) : null,
     };
   },
 
@@ -238,7 +243,7 @@ export const semanticScholarAdapter: ResearchAdapter = {
     const id = s2PaperId(identifier);
     if (!id) return null;
     const paper = await ctx.fetchJson<S2Paper | null>(
-      `${GRAPH}/paper/${encodeURIComponent(id)}${query({ fields: FIELDS })}`,
+      `${GRAPH}/paper/${idPath(id)}${query({ fields: FIELDS })}`,
       { headers: headers(ctx) }
     );
     return paper?.paperId ? candidateFromS2(paper) : null;
@@ -260,7 +265,7 @@ export const semanticScholarAdapter: ResearchAdapter = {
       { headers: headers(ctx) }
     );
     return {
-      candidates: (result.recommendedPapers ?? []).map((paper, index) => candidateFromS2(paper, index)),
+      candidates: (result?.recommendedPapers ?? []).map((paper, index) => candidateFromS2(paper, index)),
       total: null,
       next: null,
     };

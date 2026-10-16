@@ -1,5 +1,5 @@
 ---
-status: approved 2026-10-01 — V1.0 building (foundation, schema, first four sources)
+status: approved 2026-10-01 — V1.0 slice 1 (find, resolve, save, Find tab) built; merged with main and live-verified 2026-10-15; PR pending
 created: 2026-09-30
 parent: EREADER-PLAN.md (R-Research — the third reader source after Books and Scriptures)
 scope: research discovery, open-access full text, library import, paper reading, AI research, domain packs

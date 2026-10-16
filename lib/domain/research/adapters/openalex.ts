@@ -124,7 +124,9 @@ export function candidateFromOpenAlex(work: OpenAlexWork, rank?: number): WorkCa
   addIdentifier(identifiers, "openalex", work.id);
   addIdentifier(identifiers, "doi", work.doi ?? work.ids?.doi);
   addIdentifier(identifiers, "pmid", work.ids?.pmid?.replace(/^.*\//, ""));
-  addIdentifier(identifiers, "pmcid", work.ids?.pmcid?.match(/PMC\d+/i)?.[0] ?? work.ids?.pmcid?.replace(/^.*\//, ""));
+  // OpenAlex serves the PMC url with or without the "PMC" prefix on the number.
+  const pmcRaw = work.ids?.pmcid?.replace(/^.*\//, "").replace(/\/$/, "");
+  addIdentifier(identifiers, "pmcid", pmcRaw ? (/^\d+$/.test(pmcRaw) ? `PMC${pmcRaw}` : pmcRaw) : null);
 
   const type = TYPE_MAP[work.type ?? ""] ?? "other";
   const primary = work.primary_location ?? null;
@@ -220,9 +222,9 @@ async function list(ctx: AdapterContext, params: Record<string, string | number 
     `${BASE}/works${query({ ...params, select: SELECT, "per-page": perPage, cursor: cursor ?? "*", ...credentials(ctx) })}`
   );
   return {
-    candidates: (result.results ?? []).map((work, index) => candidateFromOpenAlex(work, index)),
-    total: result.meta?.count ?? null,
-    next: result.meta?.next_cursor ?? null,
+    candidates: (result?.results ?? []).map((work, index) => candidateFromOpenAlex(work, index)),
+    total: result?.meta?.count ?? null,
+    next: result?.meta?.next_cursor ?? null,
   };
 }
 
