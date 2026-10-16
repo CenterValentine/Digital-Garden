@@ -12,6 +12,8 @@ import { prisma } from "@/lib/database/client";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import { logger, withRouteTrace, withSpan } from "@/lib/core/logger";
 
+import { isUuid } from "@/lib/domain/content/uuid";
+
 const ROUTE_PATH = "/api/content/tags/content/[contentId]";
 
 export async function GET(
@@ -27,6 +29,9 @@ export async function GET(
       );
 
       const { contentId } = await params;
+      // A non-UUID id (an extension's virtual tab) can never be a tagged
+      // node; answer "no tags" rather than let Prisma throw on the filter.
+      if (!isUuid(contentId)) return NextResponse.json([]);
 
       const contentTags = await withSpan(
         { layer: "content", name: "tags_for_content" },

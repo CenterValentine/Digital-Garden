@@ -3,6 +3,7 @@
  * the access ladder a Work has), author lines and type labels.
  */
 
+import type { CSSProperties } from "react";
 import type { Work, WorkCopy } from "@/lib/domain/research/types";
 
 export interface AccessBadge {
@@ -59,6 +60,41 @@ const TYPE_LABELS: Record<string, string> = {
 
 export function typeLabel(type: string): string {
   return TYPE_LABELS[type] ?? type;
+}
+
+/**
+ * A card's accent, by Work type, from the design system's intent palette
+ * (`--intent-*` in globals.css; one value per theme pair). Retraction
+ * overrides to danger at the call site.
+ */
+export type WorkTone = "primary" | "secondary" | "accent" | "danger" | "neutral";
+
+const TYPE_TONES: Record<string, WorkTone> = {
+  article: "primary",
+  preprint: "neutral",
+  review: "accent",
+  book: "secondary",
+  chapter: "secondary",
+  thesis: "secondary",
+  report: "accent",
+  dataset: "accent",
+  trial: "primary",
+  case: "accent",
+  statute: "accent",
+  regulation: "accent",
+  patent: "accent",
+  archival: "secondary",
+  webpage: "neutral",
+  other: "neutral",
+};
+
+export function typeTone(type: string): WorkTone {
+  return TYPE_TONES[type] ?? "neutral";
+}
+
+/** Inline style for the tone: `--work-tone` drives the rail, chip and ring. */
+export function toneStyle(tone: WorkTone): CSSProperties {
+  return { "--work-tone": `var(--intent-${tone})` } as CSSProperties;
 }
 
 export const RETRACTION_LABELS: Record<string, string> = {
