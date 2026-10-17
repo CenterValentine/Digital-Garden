@@ -51,6 +51,9 @@ const TAB_SVG_PATHS: Record<string, string> = {
   // Table (lucide Table) — the database context rail's schema identity.
   database:
     "M3 5a2 2 0 012-2h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5z M3 10h18 M10 3v18",
+  // Eye (lucide Eye) — what the model sees: the context ledger for a chat.
+  modelContext:
+    "M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z",
   // Form fields (lucide ListTodo-ish) — a document filled from a template.
   templateFields:
     "M4 5h16M4 5v4h16V5M4 13h16M4 13v4h16v-4M8 7h.01M8 15h.01",
@@ -68,6 +71,7 @@ const TAB_TITLES: Record<string, string> = {
   studio: "Studio",
   context: "Context",
   database: "Database",
+  modelContext: "What the model sees",
   templateFields: "Template Fields",
 };
 
