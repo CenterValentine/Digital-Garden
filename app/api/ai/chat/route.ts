@@ -82,7 +82,9 @@ import {
   PROVIDER_CATALOG,
   getModelMeta,
 } from "@/lib/domain/ai/providers/catalog";
+import { measureToolDefinitionChars } from "@/lib/domain/ai/tool-definition-size";
 import {
+  applyUserContextMarks,
   dedupeRepeatedToolParts,
   stripOpenAIItemIdsFromModelMessages,
   stripOpenAIItemReferences,
@@ -2042,7 +2044,14 @@ export async function POST(request: Request) {
               // AI-BULK-ROW-READING §4.6; pinned reads survive, `turn`
               // reads collapse once a newer user message exists.
               supersedeBulkReads(
-                supersedeWriteInputs(supersedePerceptionHistory(repairedMessages)),
+                supersedeWriteInputs(
+                  supersedePerceptionHistory(
+                    // User context marks go FIRST (CONTEXT-WINDOW-EDITOR-PLAN
+                    // §5): they stub, never remove, so every index-keyed
+                    // fold map below still describes the shape the UI sees.
+                    applyUserContextMarks(repairedMessages, executedVendorId),
+                  ),
+                ),
                 { pinnedAllowanceTokens: bulkReadPinnedAllowance },
               ),
               executedVendorId,
@@ -3960,6 +3969,21 @@ export async function POST(request: Request) {
               reasoningConfig: reasoningConfigSummary,
               toolCount: activeToolCount,
               finalStepReserved: stepsTracker.finalStepReserved,
+              // Measured fixed cost for the context ledger (CONTEXT-WINDOW-
+              // EDITOR-PLAN §6): the prompt as built for this request, its
+              // dynamic sections, and the advertised tool definitions.
+              promptChars: systemPromptForDiag.length,
+              promptBreakdown: {
+                charter: charterContext.length,
+                mentions: mentionedContext.length,
+                rooted: rootedContentSection.length,
+                page: pageContextSection.length,
+                userContext: userContextSection.length,
+              },
+              toolDefinitionChars: measureToolDefinitionChars(
+                tools as Record<string, unknown>,
+                advertised,
+              ),
             };
             const finishMeta = {
               ...routeMeta,

@@ -25,6 +25,7 @@ export {
   ConversationNotFoundError,
   appendMessage,
   updateMessageParts,
+  updateMessageContextMarks,
   createConversation,
   ensureConversationContentNode,
   findConversationIdByArchivedContent,

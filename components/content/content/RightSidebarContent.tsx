@@ -12,6 +12,7 @@
 import { createElement } from "react";
 import { OutlinePanel } from "../OutlinePanel";
 import { ChatOutlinePanel } from "../ChatOutlinePanel";
+import { ModelContextTab } from "@/components/content/ModelContextTab";
 import { MultiConversationSidebar } from "../ai/MultiConversationSidebar";
 import { PropertiesPanel } from "../blocks/PropertiesPanel";
 import { useOutlineStore } from "@/state/outline-store";
@@ -113,6 +114,9 @@ export function RightSidebarContent({ activeTab }: RightSidebarContentProps) {
           rail so its loaded schema and expansion state re-seed fresh. */}
       {activeTab === "templateFields" && selectedContentId && (
         <TemplateFieldsPanel contentId={selectedContentId} />
+      )}
+      {activeTab === "modelContext" && (
+        <ModelContextTab contentId={selectedContentId} />
       )}
       {activeTab === "database" && (
         <DataSchemaRail

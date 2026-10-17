@@ -260,6 +260,18 @@ const TOOL_REGISTRY: ToolDefinition[] = [
     order: 20,
     tabKey: "context",
   },
+  // "What the model sees" — the context ledger for a chat open in the main
+  // pane (CONTEXT-WINDOW-EDITOR-PLAN §7). Chat only: the sidebar chat
+  // hosts the same ledger inside its control panel.
+  {
+    id: "model-context-tab",
+    label: "Model",
+    iconName: "Eye",
+    surfaces: ["sidebar-tab"],
+    contentTypes: ["chat"],
+    order: 12,
+    tabKey: "modelContext",
+  },
   // Studio tab — filtered out in the sidebar when the extension is disabled
   // (see RightSidebar/RightSidebarHeader), the registry-filter rule for
   // extension-owned surfaces.

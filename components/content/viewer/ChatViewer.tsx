@@ -55,6 +55,11 @@ import { useResolvedTheme } from "@/lib/features/theme/useResolvedTheme";
 import type { AIProviderId } from "@/lib/domain/ai/types";
 import { extractChatOutline } from "@/lib/domain/ai/chat-outline";
 import { useOutlineStore } from "@/state/outline-store";
+import { useModelContextStore } from "@/state/model-context-store";
+import { useContextMarks, type PersistMarks } from "@/lib/domain/ai/use-context-marks";
+import { lastUserMessageIndex, readContextMarks } from "@/lib/domain/ai/context-marks";
+import { vendorOf } from "@/lib/domain/ai/context-ledger";
+import { ContextLineDivider } from "@/components/content/ai/ContextLineDivider";
 import type { UIMessage } from "ai";
 import type { StoredChatMessage } from "@/lib/domain/ai/types";
 import { clientLogger } from "@/lib/core/logger/client";
@@ -222,6 +227,8 @@ function ChatViewerInner({
   const truncateRef = useRef<(clientId: string, inclusive: boolean) => Promise<void>>(
     async () => {},
   );
+  // User context marks persistence — populated by the binding in bound mode.
+  const marksRef = useRef<PersistMarks | null>(null);
   // Exact parts of the just-sent user turn (engine → binding) so
   // attachments persist reliably.
   const pendingUserPartsRef = useRef<UIMessage["parts"] | null>(null);
@@ -325,9 +332,32 @@ function ChatViewerInner({
       modelId,
       persistRef,
       truncateRef,
+      marksRef,
       pendingUserPartsRef,
       onHistoryReady: setHistoryReady,
     });
+
+  // "What the model sees" (CONTEXT-WINDOW-EDITOR-PLAN §7): marks + the
+  // publication the right-sidebar Model tab reads.
+  const { markStates, actions: markActions } = useContextMarks({
+    messages,
+    setMessages: setMessages as unknown as (updater: (prev: UIMessage[]) => UIMessage[]) => void,
+    marksRef,
+  });
+  const liveFrom = useMemo(() => lastUserMessageIndex(messages), [messages]);
+  const activeVendor = vendorOf(providerId, modelId);
+  const publishModelContext = useModelContextStore((s) => s.publish);
+  const clearModelContext = useModelContextStore((s) => s.clear);
+  useEffect(() => {
+    publishModelContext({
+      contentId,
+      conversationId: conversationId ?? null,
+      messages,
+      vendor: activeVendor,
+      actions: markActions,
+    });
+  }, [contentId, conversationId, messages, activeVendor, markActions, publishModelContext]);
+  useEffect(() => () => clearModelContext(contentId), [contentId, clearModelContext]);
 
   // Seed local context selection from the bound conversation on (re)load.
   useEffect(() => {
@@ -903,12 +933,22 @@ function ChatViewerInner({
                   ) : deco?.kind === "notices" ? (
                     <ModelRouteNotices notices={deco.notices} />
                   ) : null}
+                  {message.role === "user" && readContextMarks(message).lineAbove && (
+                    <ContextLineDivider onClear={() => markActions.setLine(null)} />
+                  )}
                   <ChatMessage
                     message={message}
                     messageIndex={i}
                     perceptionFolds={perceptionFolds}
                     duplicateFolds={duplicateFolds}
                     bulkReadFolds={bulkReadFolds}
+                    userMarks={markStates}
+                    markable={!isActive && liveFrom >= 0 && i < liveFrom}
+                    vendorId={vendorOf(stamp.providerId, stamp.modelId)}
+                    onTogglePartMark={markActions.togglePart}
+                    onDropExchange={markActions.dropExchange}
+                    onSetLine={markActions.setLine}
+                    lineAbove={message.role === "user" && readContextMarks(message).lineAbove === true}
                     sessionUsage={sessionUsage}
                     charterAttached={charterAttached}
                     providerId={stamp.providerId}

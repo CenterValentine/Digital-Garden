@@ -131,6 +131,26 @@ export interface TurnSegment {
    * exists to make visible.
    */
   finalStepReserved: boolean;
+  /**
+   * What the fixed part of the request cost, measured at assembly
+   * (CONTEXT-WINDOW-EDITOR-PLAN §6): the system prompt's characters, its
+   * named dynamic sections, and the serialized tool definitions. The
+   * context ledger shows these instead of guessing. Null on rows persisted
+   * before this field, and null for the tools when a schema could not be
+   * serialized.
+   */
+  promptChars?: number | null;
+  promptBreakdown?: PromptBreakdown | null;
+  toolDefinitionChars?: number | null;
+}
+
+/** Characters of the system prompt's dynamic sections (0 when absent). */
+export interface PromptBreakdown {
+  charter: number;
+  mentions: number;
+  rooted: number;
+  page: number;
+  userContext: number;
 }
 
 export interface TurnDiagnostics {
@@ -373,6 +393,21 @@ export function readTurnSegment(raw: unknown): TurnSegment | null {
       : "provider-default",
     reasoningConfig: strOrNull(s.reasoningConfig),
     toolCount: num(s.toolCount),
+    promptChars: numOrNull(s.promptChars),
+    promptBreakdown: readPromptBreakdown(s.promptBreakdown),
+    toolDefinitionChars: numOrNull(s.toolDefinitionChars),
+  };
+}
+
+function readPromptBreakdown(raw: unknown): PromptBreakdown | null {
+  if (!raw || typeof raw !== "object") return null;
+  const b = raw as Record<string, unknown>;
+  return {
+    charter: num(b.charter),
+    mentions: num(b.mentions),
+    rooted: num(b.rooted),
+    page: num(b.page),
+    userContext: num(b.userContext),
   };
 }
 

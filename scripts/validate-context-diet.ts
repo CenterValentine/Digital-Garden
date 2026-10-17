@@ -45,7 +45,10 @@ import {
   writeInputFoldStates,
   stripReasoningForResend,
   stripOpenAIItemIdsFromModelMessages,
+  applyUserContextMarks,
+  userMarkStates,
 } from "../lib/domain/ai/context-diet";
+import { partMarkKey, withContextMarks } from "../lib/domain/ai/context-marks";
 import { openaiModelReasons } from "../lib/domain/ai/model-constraints";
 import type { ModelMessage } from "ai";
 import { coBrowsePageIdentity } from "../lib/domain/ai/co-browse-page-identity";
@@ -491,6 +494,12 @@ const isStub = (v: unknown, word: string): boolean =>
   assert(block.includes("dedupeRepeatedToolParts("), "G5: the chat route must apply dedupeRepeatedToolParts in the model-message assembly");
   assert(block.includes("supersedeWriteInputs("), "G5: the chat route must apply supersedeWriteInputs in the model-message assembly");
   assert(block.includes("teachDeniedApprovals("), "G5: the chat route must apply teachDeniedApprovals in the model-message assembly");
+  // User marks go first: they stub (never remove), so the index-keyed fold
+  // maps computed after them still describe the shape the UI sees.
+  assert(
+    /supersedePerceptionHistory\(\s*(\/\/[^\n]*\n\s*)*applyUserContextMarks\(/.test(block),
+    "G5: the chat route must apply applyUserContextMarks FIRST — directly inside supersedePerceptionHistory( — so every later fold map keys the same shape",
+  );
   // The tail is reserved for item runs AND charter turns (ITERATION-RUN-
   // HARNESS-FIXES §9): one `tailDeliverables` feeds the size, the tool list
   // and the notice; a continuation opens with a floor, not the remainder.
@@ -630,6 +639,105 @@ const isStub = (v: unknown, word: string): boolean =>
     perceptionFoldStates(shortRead).get("1:0") === undefined,
     "G9: the size exemption must not extend to text tools (a short read is not worth a cache perturbation)",
   );
+}
+
+// ── Gate 10: user context marks (CONTEXT-WINDOW-EDITOR-PLAN §5) ────────────
+
+{
+  const textPart = (text: string): Part => ({ type: "text", text });
+  const reasoningPart = (text: string): Part => ({ type: "reasoning", text });
+  const filePart = (): Part => ({ type: "file", mediaType: "text/plain", filename: "a.txt", url: "data:text/plain;base64,aGk=" });
+  const partKeyOf = (m: UIMessage, i: number) => partMarkKey(m.parts[i], i);
+
+  // (a) a removed tool result is stubbed, its input kept, the part present.
+  {
+    const a1 = assistant([tool("search_web", { input: { query: "vesta" }, output: big("results") })]);
+    const msgs = [user(), withContextMarks(a1, { removed: [partKeyOf(a1, 0)] }), user("next")];
+    const states = userMarkStates(msgs);
+    assert(states.get("1:0") === "removed", "G10a: a part keyed in `removed` must be `removed`");
+    const out = applyUserContextMarks(msgs, "deepseek");
+    assert(out[1].parts.length === 1, "G10a: the tool part must stay present (call/result pairing)");
+    assert(isStub(outputOf(out[1], 0), "removed from context"), "G10a: the tool output must be the user-removed stub");
+    assert(
+      JSON.stringify((out[1].parts[0] as { input?: unknown }).input) === JSON.stringify({ query: "vesta" }),
+      "G10a: the tool input must be kept verbatim",
+    );
+    assert(msgs[1].parts[0] !== out[1].parts[0] && outputOf(msgs[1], 0) !== outputOf(out[1], 0), "G10a: the input array must not be mutated");
+  }
+
+  // (b) the live tail is untouched even when marked.
+  {
+    const live = assistant([tool("read_page", { output: big("live") })]);
+    const u = withContextMarks(user("ask"), { lineAbove: true });
+    const msgs = [user(), assistant([tool("read_page", { output: big("old") })]), u, withContextMarks(live, { removed: [partKeyOf(live, 0)] })];
+    const states = userMarkStates(msgs);
+    assert(states.get("3:0") === undefined, "G10b: a mark on the live assistant message must be ignored");
+    assert(states.get("1:0") === "behind-line", "G10b: a line on the live user message puts everything before it behind the line");
+    const out = applyUserContextMarks(msgs, "deepseek");
+    assert(outputOf(out[3], 0) === outputOf(msgs[3], 0), "G10b: the live tail must be byte-identical");
+    assert(isStub(outputOf(out[1], 0), "behind the user's context line"), "G10b: behind-line tool outputs must be stubbed");
+  }
+
+  // (c) the line stubs every markable part of every earlier message; text
+  //     becomes one stub per message, never an empty message.
+  {
+    const a = assistant([textPart("first"), textPart("second"), tool("search_web", { output: big("r") })]);
+    const msgs = [user("q1"), a, withContextMarks(user("q2"), { lineAbove: true }), assistant([textPart("reply")]), user("q3")];
+    const out = applyUserContextMarks(msgs, "deepseek");
+    const texts = out[1].parts.filter((p) => (p as { type?: string }).type === "text").map((p) => (p as { text?: string }).text);
+    assert(texts.length === 2 && texts[0] === "[behind the user's context line]" && texts[1] === "", "G10c: text parts behind the line collapse to one stub + empties");
+    assert((out[0].parts[0] as { text?: string }).text === "[behind the user's context line]", "G10c: the earlier user message is stubbed, not emptied");
+    assert((out[3].parts[0] as { text?: string }).text === "reply", "G10c: the message after the line is untouched");
+    assert(userMarkStates(msgs).get("2:0") === undefined, "G10c: the line message itself is not behind the line");
+  }
+
+  // (d) Anthropic signed thinking on a tool turn survives a mark; on
+  //     DeepSeek the same mark drops the reasoning part.
+  {
+    const a = assistant([reasoningPart(big("think")), tool("search_web", { output: "ok" })]);
+    const marked = withContextMarks(a, { removed: [partKeyOf(a, 0)] });
+    const msgs = [user(), marked, user("next")];
+    const claude = applyUserContextMarks(msgs, "anthropic");
+    assert(claude[1].parts.length === 2 && (claude[1].parts[0] as { type?: string }).type === "reasoning", "G10d: locked Anthropic reasoning must survive a mark");
+    const deepseek = applyUserContextMarks(msgs, "deepseek");
+    assert(deepseek[1].parts.length === 1 && (deepseek[1].parts[0] as { type?: string }).type?.startsWith("tool-"), "G10d: marked reasoning on a non-Anthropic vendor is dropped");
+  }
+
+  // (e) a marked file part on a user message is dropped whole; `data-*`
+  //     parts are never markable.
+  {
+    const u = { id: "u-file", role: "user", parts: [{ type: "data-charter", data: { id: "c" } }, filePart(), textPart("read this")] } as unknown as UIMessage;
+    const msgs = [withContextMarks(u, { removed: [partKeyOf(u, 1), partKeyOf(u, 0)] }), assistant([textPart("ok")]), user("next")];
+    const states = userMarkStates(msgs);
+    assert(states.get("0:0") === undefined, "G10e: a data-* part must never carry a mark state");
+    assert(states.get("0:1") === "removed", "G10e: the file part must be removed");
+    const out = applyUserContextMarks(msgs, "deepseek");
+    assert(out[0].parts.length === 2 && !out[0].parts.some((p) => (p as { type?: string }).type === "file"), "G10e: the file part must be dropped from the model-facing copy");
+    assert((out[0].parts[0] as { type?: string }).type === "data-charter", "G10e: the data part must stay");
+  }
+
+  // (f) precedence with a rule fold on the same part: the mark goes first,
+  //     the perception fold still sees a stubbed (short) output and leaves
+  //     it alone — no double stub, same part count.
+  {
+    const a = assistant([tool("read_page", { output: big("page") })]);
+    const msgs = [user(), withContextMarks(a, { removed: [partKeyOf(a, 0)] }), user("next")];
+    const chained = supersedePerceptionHistory(applyUserContextMarks(msgs, "deepseek"));
+    assert(isStub(outputOf(chained[1], 0), "removed from context"), "G10f: the user mark wins over the turn fold on the same part");
+    assert(chained[1].parts.length === 1, "G10f: no part is added or removed by the chain");
+    const twice = applyUserContextMarks(applyUserContextMarks(msgs, "deepseek"), "deepseek");
+    assert(JSON.stringify(twice) === JSON.stringify(applyUserContextMarks(msgs, "deepseek")), "G10f: applyUserContextMarks must be idempotent");
+  }
+
+  // (g) tool parts key by toolCallId, so a mark survives re-indexing.
+  {
+    const a = assistant([textPart("x"), tool("search_web", { id: "call-stable", output: big("r") })]);
+    const key = partKeyOf(a, 1);
+    assert(key === "call:call-stable", "G10g: tool parts key by `call:<toolCallId>`");
+    const reindexed = assistant([tool("search_web", { id: "call-stable", output: big("r") })]);
+    const msgs = [user(), withContextMarks(reindexed, { removed: [key] }), user("next")];
+    assert(userMarkStates(msgs).get("1:0") === "removed", "G10g: the mark must follow the toolCallId, not the index");
+  }
 }
 
 // ── Report ──────────────────────────────────────────────────────────────────

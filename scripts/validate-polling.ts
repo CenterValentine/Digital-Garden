@@ -126,6 +126,15 @@ const REGISTRY: Declared[] = [
       "entry; audited 2026-09-15.",
   },
   { file: "components/content/ai/reasoning/reasoning-disclosure.ts", policy: "ui-only", note: "Local disclosure animation." },
+  {
+    file: "lib/features/dev-banner/DevPrChecklist.tsx",
+    policy: "ui-only",
+    networkUnrelated: true,
+    note:
+      "5s tick that re-renders the pill's \"fetched … ago\" label (setNow). The file's two fetches are the " +
+      "focus-driven snapshot refresh and the checkbox toggle — event-driven, not the timer. Dev-only surface " +
+      "(mounted by the dev banner). Landed in #308 without a registry entry; audited 2026-10-16.",
+  },
   { file: "components/content/folder-views/MediaLightbox.tsx", policy: "ui-only", note: "Slideshow advance." },
   { file: "lib/domain/editor/extensions/blocks/stopwatch.ts", policy: "ui-only", note: "33ms stopwatch tick, local block state." },
   {
