@@ -11,10 +11,27 @@
  * cached clip serves every speed.
  */
 
-/** Max cached clips. Bounds memory (a whole-note clip can be a few hundred KB). */
-const MAX_ENTRIES = 8;
+/**
+ * Max cached clips. Bounds memory (a whole-note clip can be a few hundred KB).
+ *
+ * Raised from 8 when whole-note reads began chunking: a long note is now ~6–10
+ * clips rather than one, so the old ceiling couldn't hold a single document and
+ * every replay re-paid for the whole thing.
+ */
+const MAX_ENTRIES = 48;
 
-const cache = new Map<string, Blob>();
+/**
+ * A cached clip plus the route that produced it. The provider/model travel with
+ * the blob so a cache HIT can still report which model would have billed — the
+ * cost tooltip needs that to show "$0.00 (cached)" rather than "unknown model".
+ */
+export interface CachedSpeech {
+  blob: Blob;
+  providerId: string | null;
+  modelId: string | null;
+}
+
+const cache = new Map<string, CachedSpeech>();
 
 /**
  * Cache key for a read. The client only controls `voice` and `text`; the
@@ -25,19 +42,24 @@ export function speechCacheKey(text: string, voice?: string): string {
   return `${voice ?? "default"}:${hashText(text)}`;
 }
 
-export function getCachedSpeech(key: string): Blob | undefined {
-  const blob = cache.get(key);
-  if (blob) {
+export function getCachedSpeech(key: string): CachedSpeech | undefined {
+  const entry = cache.get(key);
+  if (entry) {
     // Touch → move to most-recently-used.
     cache.delete(key);
-    cache.set(key, blob);
+    cache.set(key, entry);
   }
-  return blob;
+  return entry;
 }
 
-export function putCachedSpeech(key: string, blob: Blob): void {
+/** True without materializing the entry — used to price a read before playing. */
+export function hasCachedSpeech(key: string): boolean {
+  return cache.has(key);
+}
+
+export function putCachedSpeech(key: string, entry: CachedSpeech): void {
   if (cache.has(key)) cache.delete(key);
-  cache.set(key, blob);
+  cache.set(key, entry);
   while (cache.size > MAX_ENTRIES) {
     const oldest = cache.keys().next().value;
     if (oldest === undefined) break;
