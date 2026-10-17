@@ -76,7 +76,7 @@ export const TOOL_MENU: Readonly<Record<string, ToolMenuEntry>> = {
   propose_output_database: { family: "databases", selectWhen: "Propose ONE new table for the user to approve" },
   propose_linked_databases: { family: "databases", selectWhen: "Propose SEVERAL tables that reference each other, in one card" },
   propose_database_columns: { family: "databases", selectWhen: "Propose new columns on a table the user already has" },
-  propose_column_changes: { family: "databases", selectWhen: "Propose RENAMING or REMOVING existing columns (never retyping)" },
+  propose_column_changes: { family: "databases", selectWhen: "Rename or remove columns THE USER ASKED to change — never on your own initiative, never retyping" },
   propose_column_options: { family: "databases", selectWhen: "Propose the option set for a select/status/multi-select column" },
 
   // ── web ────────────────────────────────────────────────────────────────

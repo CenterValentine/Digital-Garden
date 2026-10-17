@@ -69,7 +69,7 @@ export const DATA_TOOL_METADATA: Record<
   propose_column_changes: {
     name: "Propose Column Changes",
     description:
-      "Suggest RENAMING or REMOVING existing columns as a review card — removals arrive unchecked and are restorable, system columns of a charter ledger are refused, and nothing changes until you click Apply",
+      "Rename or remove columns you asked to change, as a review card — only ever on your request, removals arrive unchecked and are restorable, system columns of a charter ledger are refused, and nothing changes until you click Apply",
   },
   propose_output_database: {
     name: "Propose Output Database",

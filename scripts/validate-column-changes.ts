@@ -13,6 +13,7 @@
  */
 
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 
 import { planColumnChanges, type DataColumn } from "@/lib/domain/data";
 
@@ -158,6 +159,61 @@ const LIVE: DataColumn[] = [
   assert.equal(plan.refused.length, 1);
 }
 
+// ── The tool stays USER-INITIATED (owner directive, 2026-10-16) ─────────
+//
+// The card is the consent to APPLY; it is not consent to reach for the tool
+// at all. Nothing in code can stop a model from calling a tool it was
+// offered, so the only brake is what the description and the menu say — and
+// the first draft of both stated capability and no trigger, which reads as
+// an invitation to tidy a schema nobody asked about. Pinned as source text
+// because that IS the mechanism; a future edit that drops the constraint
+// fails here instead of shipping a quietly keener tool.
+{
+  const tools = readFileSync("lib/domain/ai/tools/data-tools.ts", "utf8");
+  const description = tools.slice(
+    tools.indexOf("propose_column_changes: tool({"),
+    tools.indexOf("inputSchema", tools.indexOf("propose_column_changes: tool({"))
+  );
+  assert.match(
+    description,
+    /ONLY when the user has asked/,
+    "propose_column_changes must state that the user has to ask"
+  );
+  assert.match(
+    description,
+    /not a tool you reach for on your own initiative/,
+    "propose_column_changes must forbid self-initiated use"
+  );
+  assert.match(
+    description,
+    /is NOT a reason to call it/,
+    "noticing a messy schema must be named as insufficient grounds"
+  );
+  assert.match(
+    description,
+    /Never re-propose a change they rejected/,
+    "a rejected change must not come back"
+  );
+
+  // The menu is the DISCOVERY surface — a model browsing for something to do
+  // reads this line, not the description.
+  const menu = readFileSync("lib/domain/ai/tools/menu.ts", "utf8");
+  const entry = menu
+    .split("\n")
+    .find((l) => l.includes("propose_column_changes:"));
+  assert.ok(entry, "propose_column_changes needs a TOOL_MENU entry");
+  assert.match(
+    entry,
+    /THE USER ASKED/,
+    "the menu line must name the user as the trigger"
+  );
+  assert.match(
+    entry,
+    /never on your own initiative/,
+    "the menu line must forbid self-initiated use"
+  );
+}
+
 console.log(
-  "✓ column:changes:check — system columns, the primary column, unknown names, no-op and colliding renames, duplicates; partial sets and freed names survive"
+  "✓ column:changes:check — system columns, the primary column, unknown names, no-op and colliding renames, duplicates; partial sets and freed names survive; the tool stays user-initiated"
 );
