@@ -2057,6 +2057,16 @@ body.flashcard-select-cursor * {
 .dark .ProseMirror .comment-mark--active {
   background: color-mix(in srgb, var(--gold-primary) 34%, transparent);
 }
+/* The thread card's tippy box is a bare carrier: the card draws its own chrome. */
+.tippy-box[data-theme~="comment-thread"] {
+  background: transparent;
+  padding: 0;
+  box-shadow: none;
+  border-radius: 0;
+}
+.tippy-box[data-theme~="comment-thread"] .tippy-content {
+  padding: 0;
+}
 /* Never on a public page — the JSON strip is the real guard; this is the net. */
 .public-prose [data-comment] {
   background: none;

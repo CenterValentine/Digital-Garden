@@ -24,9 +24,21 @@
  * collab-schema gate discovers marks by regex and a constant hides it.
  */
 
-import { Mark, mergeAttributes } from "@tiptap/core";
+import { Mark, mergeAttributes, type Editor } from "@tiptap/core";
 import type { Node as PMNode } from "@tiptap/pm/model";
+import type { Plugin } from "@tiptap/pm/state";
 import { COMMENT_MARK, isCommentThreadId } from "@/lib/domain/content/comments";
+
+export interface CommentMarkOptions {
+  /**
+   * Client-only plugins (the decorations drawn over the marks, the hover
+   * card). Injected by extensions-client so this file stays React-free —
+   * the wiki-link `hover` option pattern.
+   */
+  plugins?: ((editor: Editor) => Array<Plugin | null>) | null;
+  /** ⌘⌥M — start the comment composer on the current selection. */
+  onStartComposer?: ((editor: Editor) => void) | null;
+}
 
 declare module "@tiptap/core" {
   interface Commands<ReturnType> {
@@ -105,10 +117,14 @@ export function collectCommentRanges(doc: PMNode): Map<string, CommentRange[]> {
   return byThread;
 }
 
-export const CommentMark = Mark.create({
+export const CommentMark = Mark.create<CommentMarkOptions>({
   name: "comment",
   inclusive: false,
   excludes: "",
+
+  addOptions() {
+    return { plugins: null, onStartComposer: null };
+  },
 
   addAttributes() {
     return commentAttrSpec();
@@ -120,6 +136,22 @@ export const CommentMark = Mark.create({
 
   renderHTML({ HTMLAttributes }) {
     return [...commentRender(HTMLAttributes)];
+  },
+
+  addKeyboardShortcuts() {
+    return {
+      // Google Docs' chord. Nothing else in the app binds it, and Chrome's
+      // ⌘⇧M (profile switcher) stays out of the way.
+      "Mod-Alt-m": () => {
+        if (!this.options.onStartComposer || this.editor.state.selection.empty) return false;
+        this.options.onStartComposer(this.editor);
+        return true;
+      },
+    };
+  },
+
+  addProseMirrorPlugins() {
+    return (this.options.plugins?.(this.editor) ?? []).filter((p): p is Plugin => Boolean(p));
   },
 
   addCommands() {

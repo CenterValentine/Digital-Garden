@@ -28,12 +28,43 @@ import { Extension } from "@tiptap/core";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
 import { Fragment, Slice } from "@tiptap/pm/model";
 import type { Node as PMNode } from "@tiptap/pm/model";
+import type { EditorView } from "@tiptap/pm/view";
 import type { JSONContent } from "@tiptap/core";
+import { COMMENT_MARK } from "@/lib/domain/content/comments";
+import { knownThreadIds, useCommentsStore } from "@/state/comments-store";
+import { useEditorInstanceStore } from "@/state/editor-instance-store";
 import { primeShareLinks, shareableImageSrc } from "../share-links";
 
 const IMAGE_NODE = "image";
 /** How long after the last document change we re-scan for new image nodes. */
 const PRIME_SCAN_DELAY_MS = 300;
+
+/** The note the editor behind this view is registered under, if any. */
+function contentIdOfView(view: EditorView): string | null {
+  const entry = Object.entries(useEditorInstanceStore.getState().editorsByContentId).find(([, e]) => e?.view === view);
+  return entry?.[0] ?? null;
+}
+
+/** Remove `comment` marks whose thread id is not in `known`; the text stays. */
+function dropForeignCommentMarks(fragment: Fragment, known: Set<string>): Fragment {
+  let changed = false;
+  const nodes: PMNode[] = [];
+  fragment.forEach((node) => {
+    let next = node;
+    if (node.isText) {
+      const marks = node.marks.filter(
+        (m) => m.type.name !== COMMENT_MARK || known.has(String(m.attrs.threadId ?? "").toLowerCase()),
+      );
+      if (marks.length !== node.marks.length) next = node.mark(marks);
+    } else if (node.content.size > 0) {
+      const content = dropForeignCommentMarks(node.content, known);
+      if (content !== node.content) next = node.copy(content);
+    }
+    if (next !== node) changed = true;
+    nodes.push(next);
+  });
+  return changed ? Fragment.fromArray(nodes) : fragment;
+}
 
 function extractPlaintext(node: JSONContent): string {
   if (!node) return "";
@@ -172,6 +203,21 @@ export const Clipboard = Extension.create({
         props: {
           transformCopied: (slice) => {
             const content = rewriteImageSources(slice.content);
+            return content === slice.content
+              ? slice
+              : new Slice(content, slice.openStart, slice.openEnd);
+          },
+
+          // Comment anchors travel with text only INSIDE their own note:
+          // cut-and-paste within a note keeps a thread's anchor, paste into
+          // another note drops marks whose thread this note does not have
+          // (a foreign thread id would be an invisible orphan here). Until
+          // the destination's threads are known, nothing is dropped.
+          transformPasted: (slice, view) => {
+            const contentId = contentIdOfView(view);
+            const known = knownThreadIds(useCommentsStore.getState(), contentId);
+            if (!known) return slice;
+            const content = dropForeignCommentMarks(slice.content, known);
             return content === slice.content
               ? slice
               : new Slice(content, slice.openStart, slice.openEnd);

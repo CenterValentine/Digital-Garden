@@ -29,6 +29,7 @@ import {
   LayoutTemplate,
   Link2Off,
   Link as LinkIcon,
+  MessageSquarePlus,
   Paintbrush,
   Strikethrough,
   Code,
@@ -40,11 +41,17 @@ import {
   Heading3,
 } from "lucide-react";
 import type { JSONContent } from "@tiptap/core";
+import { toast } from "sonner";
 import { queryTools } from "@/lib/domain/tools";
 import type { ToolDefinition } from "@/lib/domain/tools";
 import { useContextMenuStore } from "@/state/context-menu-store";
+import { useCommentsStore } from "@/state/comments-store";
 import { ttsController } from "@/lib/features/tts";
 import { extractReadableText } from "@/lib/domain/editor/tts/extract-readable-text";
+import { pendingCommentRange, setPendingCommentRange } from "@/lib/domain/editor/extensions/comment-plugin";
+import { COMMENT_ANCHOR_CONTEXT_MAX, COMMENT_ANCHOR_QUOTE_MAX } from "@/lib/domain/comments/types";
+import { CommentComposer } from "@/components/content/comments/CommentComposer";
+import { revealCommentThread } from "@/components/content/comments/reveal";
 
 // Create unique plugin key for this bubble menu
 const textFormattingBubbleMenuKey = new PluginKey("textFormattingBubbleMenu");
@@ -92,6 +99,13 @@ type LinkSegment = {
   to: number;
 };
 
+/** A comment thread's anchor overlapping the selection (the link-segment shape). */
+type CommentSegment = {
+  threadId: string;
+  from: number;
+  to: number;
+};
+
 type SelectionFormattingState = {
   bold: boolean;
   italic: boolean;
@@ -103,6 +117,7 @@ type SelectionFormattingState = {
   heading2: boolean;
   heading3: boolean;
   links: LinkSegment[];
+  comments: CommentSegment[];
 };
 
 type LinkEditorTarget = {
@@ -122,6 +137,7 @@ const EMPTY_FORMATTING: SelectionFormattingState = {
   heading2: false,
   heading3: false,
   links: [],
+  comments: [],
 };
 
 function getSelectionFormattingState(editor: Editor): SelectionFormattingState {
@@ -132,6 +148,7 @@ function getSelectionFormattingState(editor: Editor): SelectionFormattingState {
   const summary: SelectionFormattingState = {
     ...EMPTY_FORMATTING,
     links: [],
+    comments: [],
   };
 
   let lastLink: LinkSegment | null = null;
@@ -157,6 +174,12 @@ function getSelectionFormattingState(editor: Editor): SelectionFormattingState {
       if (mark.type.name === "strike") summary.strikethrough = true;
       if (mark.type.name === "code") summary.code = true;
       if (mark.type.name === "privateText") summary.private = true;
+      if (mark.type.name === "comment") {
+        const threadId = String(mark.attrs.threadId || "");
+        const open = summary.comments.find((segment) => segment.threadId === threadId && segment.to === start);
+        if (open) open.to = end;
+        else if (threadId) summary.comments.push({ threadId, from: start, to: end });
+      }
       if (mark.type.name === "link") {
         const href = String(mark.attrs.href || "");
         if (lastLink && lastLink.href === href && lastLink.to === start) {
@@ -198,6 +221,7 @@ const TOOLBELT_ICONS: Record<string, ComponentType<{ className?: string }>> = {
   "code-inline": Code,
   private: EyeOff,
   link: LinkIcon,
+  comment: MessageSquarePlus,
   "heading-1": Heading1,
   "heading-2": Heading2,
   "heading-3": Heading3,
@@ -216,7 +240,8 @@ const TOOLBELT_ICONS: Record<string, ComponentType<{ className?: string }>> = {
 function getEditorCommand(
   toolId: string,
   editor: Editor,
-  onLinkClick?: () => void
+  onLinkClick?: () => void,
+  onCommentClick?: () => void
 ): (() => void) | undefined {
   const commands: Record<string, () => void> = {
     bold: () => editor.chain().toggleBold().run(),
@@ -227,6 +252,7 @@ function getEditorCommand(
     // block wrapper across blocks, reversal when already private.
     private: () => editor.chain().togglePrivate().run(),
     link: () => onLinkClick?.(),
+    comment: () => onCommentClick?.(),
     "heading-1": () => editor.chain().toggleHeading({ level: 1 }).run(),
     "heading-2": () => editor.chain().toggleHeading({ level: 2 }).run(),
     "heading-3": () => editor.chain().toggleHeading({ level: 3 }).run(),
@@ -243,6 +269,7 @@ function isToolActive(toolId: string, formatting: SelectionFormattingState): boo
     "code-inline": formatting.code,
     private: formatting.private,
     link: formatting.links.length > 0,
+    comment: formatting.comments.length > 0,
     "heading-1": formatting.heading1,
     "heading-2": formatting.heading2,
     "heading-3": formatting.heading3,
@@ -251,9 +278,12 @@ function isToolActive(toolId: string, formatting: SelectionFormattingState): boo
 }
 
 /** Get tooltip text for a tool */
-function getToolTitle(toolId: string, editor: Editor, shortcut?: string): string {
+function getToolTitle(toolId: string, editor: Editor, shortcut?: string, active = false): string {
   if (toolId === "link") {
     return editor.isActive("link") ? "Remove Link" : `Add Link${shortcut ? ` (${shortcut})` : ""}`;
+  }
+  if (toolId === "comment") {
+    return active ? "View comment" : `Comment${shortcut ? ` (${shortcut})` : ""}`;
   }
   const label =
     toolId === "code-inline" ? "Inline Code" :
@@ -275,6 +305,8 @@ function setEditorDomCursor(el: HTMLElement, cursor: string): void {
 
 export interface BubbleMenuProps {
   editor: Editor | null;
+  /** The note this editor shows — a comment thread is filed under it. */
+  contentId?: string | null;
   onLinkClick?: () => void;
 }
 
@@ -314,7 +346,7 @@ function applyFormat(editor: Editor, fmt: CapturedFormat) {
   chain.run();
 }
 
-export function BubbleMenu({ editor, onLinkClick }: BubbleMenuProps) {
+export function BubbleMenu({ editor, contentId = null, onLinkClick }: BubbleMenuProps) {
   const [, forceRender] = useState(0);
   const [linkEditorTarget, setLinkEditorTarget] = useState<LinkEditorTarget | null>(null);
   const [linkInputValue, setLinkInputValue] = useState("");
@@ -322,6 +354,86 @@ export function BubbleMenu({ editor, onLinkClick }: BubbleMenuProps) {
   const [paintMode, setPaintMode] = useState(false);
   const fmtRef = useRef<CapturedFormat | null>(null);
   const originRef = useRef<{ from: number; to: number } | null>(null);
+
+  // The comment composer: opened for THIS editor by the Comment button, the
+  // ⌘⌥M chord or the context menu (all through the store), hosted here as a
+  // second row like the link editor. While it is open the selection wears a
+  // provisional (dashed) decoration that maps across collaborators' edits;
+  // nothing is written to the document until the comment is posted.
+  const composerEditor = useCommentsStore((s) => s.composerEditor);
+  const composerNonce = useCommentsStore((s) => s.composerNonce);
+  const commentComposerOpen = Boolean(editor) && composerEditor === editor;
+
+  useEffect(() => {
+    if (!editor || !commentComposerOpen) return;
+    const { from, to, empty } = editor.state.selection;
+    if (empty) {
+      useCommentsStore.getState().closeComposer();
+      return;
+    }
+    setPendingCommentRange(editor, { from, to });
+    return () => {
+      setPendingCommentRange(editor, null);
+    };
+  }, [editor, commentComposerOpen, composerNonce]);
+
+  const closeCommentComposer = useCallback(() => {
+    useCommentsStore.getState().closeComposer();
+  }, []);
+
+  const handleCommentClick = useCallback(() => {
+    if (!editor) return;
+    const segments = getSelectionFormattingState(editor).comments;
+    if (segments.length === 1) {
+      // The passage already carries a thread: view it in place.
+      useCommentsStore.getState().requestOpen(segments[0].threadId);
+      return;
+    }
+    if (segments.length > 1 && contentId) {
+      revealCommentThread(contentId, segments[0].threadId);
+      return;
+    }
+    useCommentsStore.getState().openComposer(editor);
+  }, [contentId, editor]);
+
+  const submitComment = useCallback(
+    async (body: string) => {
+      if (!editor) return;
+      if (!contentId) {
+        toast.error("This editor isn't attached to a note");
+        return;
+      }
+      const selection = editor.state.selection;
+      const range = pendingCommentRange(editor) ?? (selection.empty ? null : { from: selection.from, to: selection.to });
+      if (!range || range.from >= range.to) {
+        toast.error("Select the text to comment on");
+        return;
+      }
+      const { doc } = editor.state;
+      const threadId = crypto.randomUUID();
+      const anchor = {
+        quote: doc.textBetween(range.from, range.to, " ").slice(0, COMMENT_ANCHOR_QUOTE_MAX),
+        before: doc.textBetween(Math.max(0, range.from - COMMENT_ANCHOR_CONTEXT_MAX), range.from, " ").slice(-COMMENT_ANCHOR_CONTEXT_MAX),
+        after: doc.textBetween(range.to, Math.min(doc.content.size, range.to + COMMENT_ANCHOR_CONTEXT_MAX), " ").slice(0, COMMENT_ANCHOR_CONTEXT_MAX),
+      };
+      // Optimistic: the mark lands now, the row follows; a failed save
+      // removes the mark again (the flashcard-selection precedent).
+      const applied = editor.chain().setTextSelection(range).setComment(threadId).setTextSelection(range.to).run();
+      if (!applied) {
+        toast.error("Couldn't anchor a comment here");
+        return;
+      }
+      closeCommentComposer();
+      try {
+        await useCommentsStore.getState().create(contentId, { id: threadId, body, anchor });
+        useCommentsStore.getState().setActiveThread(threadId);
+      } catch (error) {
+        editor.commands.unsetComment(threadId);
+        toast.error(error instanceof Error ? error.message : "Couldn't save the comment");
+      }
+    },
+    [closeCommentComposer, contentId, editor],
+  );
 
   useEffect(() => {
     if (!editor) return;
@@ -468,7 +580,7 @@ export function BubbleMenu({ editor, onLinkClick }: BubbleMenuProps) {
       from: number;
       to: number;
     }): boolean => {
-      if (linkEditorTarget) return true;
+      if (linkEditorTarget || commentComposerOpen) return true;
       const { selection } = state;
       const { empty } = selection;
       if (empty) return false;
@@ -477,7 +589,7 @@ export function BubbleMenu({ editor, onLinkClick }: BubbleMenuProps) {
       if (ed.isActive("image")) return false;
       return true;
     },
-    [linkEditorTarget]
+    [commentComposerOpen, linkEditorTarget]
   );
 
   useEffect(() => {
@@ -510,7 +622,7 @@ export function BubbleMenu({ editor, onLinkClick }: BubbleMenuProps) {
             {group.tools.map((tool) => {
               const IconComponent = TOOLBELT_ICONS[tool.id];
               const active = isToolActive(tool.id, formatting);
-              const command = getEditorCommand(tool.id, editor, onLinkClick);
+              const command = getEditorCommand(tool.id, editor, onLinkClick, handleCommentClick);
 
               if (tool.id === "link") {
                 const linkTargets = visibleLinks.length > 0 ? visibleLinks : [null];
@@ -544,9 +656,9 @@ export function BubbleMenu({ editor, onLinkClick }: BubbleMenuProps) {
                   onMouseDown={preventFocusLoss}
                   onClick={() => command?.()}
                   className={`rounded p-1.5 transition-colors hover:bg-white/10 ${
-                    active ? "bg-white/20 text-white" : "text-gray-400"
+                    active || (tool.id === "comment" && commentComposerOpen) ? "bg-white/20 text-white" : "text-gray-400"
                   }`}
-                  title={getToolTitle(tool.id, editor, tool.shortcut)}
+                  title={getToolTitle(tool.id, editor, tool.shortcut, active)}
                   type="button"
                 >
                   {IconComponent && <IconComponent className="h-4 w-4" />}
@@ -731,6 +843,30 @@ export function BubbleMenu({ editor, onLinkClick }: BubbleMenuProps) {
             >
               <X className="h-4 w-4" />
             </button>
+          </div>
+        </>
+      )}
+      {commentComposerOpen && (
+        <>
+          <div className="h-px w-full bg-white/10" />
+          <div
+            className="w-72"
+            // Clicks on the row's chrome must not collapse the editor
+            // selection (the link row's rule); the textarea itself needs the
+            // default so the caret can be placed in it (the MarkPopover rule).
+            onMouseDown={(e) => {
+              if (!(e.target instanceof HTMLTextAreaElement)) e.preventDefault();
+              e.stopPropagation();
+            }}
+          >
+            <CommentComposer
+              autoFocus
+              tone="dark"
+              placeholder="Comment…"
+              submitLabel="Comment"
+              onSubmit={submitComment}
+              onCancel={closeCommentComposer}
+            />
           </div>
         </>
       )}

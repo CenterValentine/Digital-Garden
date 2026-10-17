@@ -167,6 +167,7 @@ model ContentNode {
   personMentions               PersonMention[]
   trashBinEntry                TrashBin?
   viewGrants                   ViewGrant[]
+  commentThreads               CommentThread[]
   calendarEvents               CalendarEvent[]
   workspaceTabs                ContentWorkspaceTab[]
   viewWorkspaces               ContentWorkspace[]        @relation("WorkspaceViewRoot")
@@ -597,6 +598,8 @@ model User {
   readerCatalogs      ReaderCatalog[]
   readerConnections   ReaderConnection[]
   scriptureCorpora    UserScriptureCorpus[]
+  commentThreads      CommentThread[]          @relation("CommentThreadsCreated")
+  comments            Comment[]
 
   @@index([email])
 }
@@ -2792,6 +2795,49 @@ model ReadingProgress {
   owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 
   @@unique([ownerId, targetKey])
+}
+
+/// A comment thread on a note. Anchored to a passage by the `comment` mark
+/// whose threadId is this row's id (the anchor lives in the Y.Doc so it moves
+/// with every collaborator's edits), or to the note as a whole when `anchor`
+/// is null. Visible to everyone who can view the note. Resolution is a row
+/// flag drawn as an editor decoration, never a mark attribute.
+/// Plan: docs/notes-feature/work-tracking/COMMENTS-ANNOTATIONS-PLAN.md
+model CommentThread {
+  id           String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  contentId    String      @db.Uuid
+  createdById  String      @db.Uuid
+  // { quote, before?, after? } captured at creation: shown when the mark is
+  // gone ("Original text removed") and the re-anchoring hint.
+  anchor       Json?
+  resolvedAt   DateTime?   @db.Timestamptz(6)
+  resolvedById String?     @db.Uuid
+  createdAt    DateTime    @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime    @updatedAt @db.Timestamptz(6)
+  content      ContentNode @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  createdBy    User        @relation("CommentThreadsCreated", fields: [createdById], references: [id], onDelete: Cascade)
+  comments     Comment[]
+
+  @@index([contentId, resolvedAt])
+  @@index([contentId, updatedAt])
+}
+
+/// One message in a thread. Plain text; @mentions as resolved user ids. A
+/// deleted comment with replies after it stays as a placeholder row
+/// (deletedAt set, body emptied) so the thread still reads in order.
+model Comment {
+  id        String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  threadId  String        @db.Uuid
+  authorId  String        @db.Uuid
+  body      String
+  mentions  Json          @default("[]")
+  editedAt  DateTime?     @db.Timestamptz(6)
+  deletedAt DateTime?     @db.Timestamptz(6)
+  createdAt DateTime      @default(now()) @db.Timestamptz(6)
+  thread    CommentThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  author    User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([threadId, createdAt])
 }
 
 /// Highlights, notes and bookmarks anchored to text the user does not own
