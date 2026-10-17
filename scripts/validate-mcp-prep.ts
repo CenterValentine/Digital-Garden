@@ -158,7 +158,10 @@ function json(v: unknown): string {
 
 {
   const read = src("lib/domain/mcp/read.ts");
-  check(/tiptapToMarkdown\(stripPrivateContent\(/.test(read), "mcp: the read seam strips private content before serialising");
+  // Other strips may sit between the serializer and the private strip
+  // (comment anchors: `tiptapToMarkdown(stripCommentMarks(stripPrivateContent(…)))`);
+  // what matters is that private content goes BEFORE anything serialises.
+  check(/tiptapToMarkdown\((?:strip\w+\()*stripPrivateContent\(/.test(read), "mcp: the read seam strips private content before serialising");
   check(/lib\/domain\/mcp\/read\.ts/.test(src("scripts/validate-private-content.ts")), "mcp: the read seam is registered in validate-private-content.ts");
 }
 

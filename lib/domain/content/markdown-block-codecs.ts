@@ -24,6 +24,7 @@ import {
   wikiLinkAttrsToHtml,
   type NoteWindowMarkdownAttrs,
 } from "./wiki-link-markdown";
+import { reTagCommentMarkdown } from "./comment-markdown";
 
 export interface BlockMarkdownCodec {
   /** Node type this codec handles (e.g. "callout"). */
@@ -321,11 +322,33 @@ const wikiLinkCodec: BlockMarkdownCodec = {
   },
 };
 
+/**
+ * Comment mark ⇄ CriticMarkup `{==passage==}{>>#threadId<<}`.
+ *
+ * Serialize side is the `dgComment` turndown rule (an inline mark has no
+ * block-level codec slot — the private-text precedent); this entry is the
+ * parse-side half. The passage may hold inline tags (bold, links, a nested
+ * thread), so the reTag matches ACROSS tags but never across a block boundary
+ * or into a tag's attributes (comment-markdown.ts); it runs outside code,
+ * where the characters are content. Literal `{==x==}{>>#…<<}` in prose
+ * re-parses as a comment, fails self-verify, and fences.
+ */
+const commentCodec: BlockMarkdownCodec = {
+  type: "comment",
+  toMarkdown() {
+    return null; // inline — the turndown tier writes it
+  },
+  reTag(html) {
+    return outsideCode(html, reTagCommentMarkdown);
+  },
+};
+
 export const BLOCK_CODECS: BlockMarkdownCodec[] = [
   calloutCodec,
   headingCodec,
   privateBlockCodec,
   privateTextCodec,
+  commentCodec,
   accordionCodec,
   // The window reTag consumes `![[…]]` paragraphs before the inline link
   // reTag sees them (its regex also refuses a leading `!`, belt and braces).

@@ -173,6 +173,20 @@ const TOOL_REGISTRY: ToolDefinition[] = [
     isToggle: true,
   },
   {
+    // Comment on the selection: opens the composer in the toolbelt's second
+    // row; active when the selection already carries a thread (click views
+    // it). Google Docs' chord. Plan: COMMENTS-ANNOTATIONS-PLAN.md §5.1.
+    id: "comment",
+    label: "Comment",
+    iconName: "MessageSquarePlus",
+    surfaces: ["toolbelt"],
+    contentTypes: ["note"],
+    order: 55,
+    group: "link",
+    shortcut: "Cmd+Alt+M",
+    isToggle: true,
+  },
+  {
     id: "heading-1",
     label: "Heading 1",
     iconName: "Heading1",
@@ -259,6 +273,18 @@ const TOOL_REGISTRY: ToolDefinition[] = [
     contentTypes: "all",
     order: 20,
     tabKey: "context",
+  },
+  // Comment threads on a note, in document order, with the unresolved count
+  // as the rail badge (components/content/comments/CommentsTab.tsx). Sits
+  // right after Context (links · tags · AI) — owner placement, 2026-10-15.
+  {
+    id: "comments-tab",
+    label: "Comments",
+    iconName: "MessageSquare",
+    surfaces: ["sidebar-tab"],
+    contentTypes: ["note"],
+    order: 25,
+    tabKey: "comments",
   },
   // Studio tab — filtered out in the sidebar when the extension is disabled
   // (see RightSidebar/RightSidebarHeader), the registry-filter rule for

@@ -25,7 +25,38 @@ const SCAN_ROOTS = [
 ];
 
 const SOURCE_FILE_RE = /\.(ts|tsx)$/;
-const CREATE_RE = /\b(Node|Mark)\.create(?:<[^>]+>)?\s*\(\s*\{[\s\S]*?\bname:\s*["']([^"']+)["']/g;
+// `name:` may be a string literal or an ALL_CAPS constant bound to one
+// (privateText uses `name: PRIVATE_TEXT_MARK`). A constant is resolved through
+// every `const X = "…"` under lib/domain plus the file's own; one that cannot
+// be resolved fails the gate rather than hiding a mark from it. Lower-case
+// identifiers (`name: string` in a type position) are skipped as before.
+const CREATE_RE = /\b(Node|Mark)\.create(?:<[^>]+>)?\s*\(\s*\{[\s\S]*?\bname:\s*(?:["']([^"']+)["']|([A-Z][A-Z0-9_]+)\b)/g;
+const STRING_CONST_RE = /\bconst\s+([A-Za-z_$][\w$]*)\s*=\s*["']([^"'\n]+)["']/g;
+
+let stringConstants: Map<string, string> | null = null;
+function exportedStringConstants(): Map<string, string> {
+  if (stringConstants) return stringConstants;
+  const map = new Map<string, string>();
+  for (const filePath of walkFiles(join(REPO_ROOT, "lib/domain"))) {
+    const source = readFileSync(filePath, "utf8");
+    for (const match of source.matchAll(STRING_CONST_RE)) {
+      if (!map.has(match[1])) map.set(match[1], match[2]);
+    }
+  }
+  stringConstants = map;
+  return map;
+}
+
+function resolveSchemaName(literal: string | undefined, identifier: string | undefined, source: string, filePath: string): string {
+  if (literal) return literal;
+  const local = Array.from(source.matchAll(STRING_CONST_RE)).find((m) => m[1] === identifier);
+  if (local) return local[2];
+  const exported = identifier ? exportedStringConstants().get(identifier) : undefined;
+  if (exported) return exported;
+  throw new Error(
+    `Cannot resolve the schema name \`${identifier}\` in ${relative(REPO_ROOT, filePath)} — use a string literal or an exported string const.`
+  );
+}
 
 function walkFiles(dir: string): string[] {
   const entries = readdirSync(dir);
@@ -49,7 +80,7 @@ function discoverSchemaExtensions(): DiscoveredSchemaExtension[] {
       const source = readFileSync(filePath, "utf8");
       for (const match of source.matchAll(CREATE_RE)) {
         const kind = match[1] === "Mark" ? "mark" : "node";
-        const name = match[2];
+        const name = resolveSchemaName(match[2], match[3], source, filePath);
         const key = `${kind}:${name}`;
 
         if (!discovered.has(key)) {
@@ -188,11 +219,16 @@ function main() {
               text: " highlighted",
               marks: [{ type: "aiHighlight", attrs: { source: "ai" } }],
             },
+            {
+              type: "text",
+              text: " and commented",
+              marks: [{ type: "comment", attrs: { threadId: "0a0a0a0a-0a0a-4a0a-8a0a-0a0a0a0a0a0a" } }],
+            },
           ],
         },
       ],
     },
-    ["wikiLink", "tag", "personMention", "aiHighlight"]
+    ["wikiLink", "tag", "personMention", "aiHighlight", "comment"]
   );
 
   assertFixtureRoundTrip(

@@ -1960,6 +1960,7 @@ export function MarkdownEditor({
       {/* Bubble Menu - floating toolbar on text selection */}
       <BubbleMenu
         editor={editor}
+        contentId={contentId ?? null}
         onLinkClick={() => setIsLinkDialogOpen(true)}
       />
 

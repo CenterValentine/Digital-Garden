@@ -15,6 +15,7 @@ import {
   Bell,
   Check,
   MessageCircle,
+  MessageSquare,
   Sparkles,
   UserPlus,
   Users,
@@ -217,6 +218,44 @@ export const FALLBACK_RENDERER: NotificationKindRenderer = {
   Body: FallbackBody,
 };
 
+// Comment threads (COMMENTS-ANNOTATIONS-PLAN.md §9): one body for four kinds,
+// one deep link — the note, opened at the thread.
+const COMMENT_VERBS: Record<string, string> = {
+  "comment.new": "commented on",
+  "comment.reply": "replied in",
+  "comment.mention": "mentioned you in",
+  "comment.resolved": "resolved a thread in",
+};
+
+function CommentBody({ notification }: { notification: NotificationDTO }) {
+  const actor = payloadString(notification, "actorUsername") ?? "Someone";
+  const title = payloadString(notification, "contentTitle") ?? "a note";
+  const preview = payloadString(notification, "preview");
+  const verb = COMMENT_VERBS[notification.kind] ?? "commented on";
+  return (
+    <div className="min-w-0">
+      <p className="text-sm">
+        <span className="font-medium">{actor}</span> {verb}{" "}
+        <span className="font-medium">{title}</span>
+      </p>
+      {preview ? (
+        <p className="mt-0.5 truncate text-xs text-muted-foreground">“{preview}”</p>
+      ) : null}
+    </div>
+  );
+}
+
+const COMMENT_RENDERER: NotificationKindRenderer = {
+  icon: MessageSquare,
+  Body: CommentBody,
+  getHref: (notification) => {
+    const contentId = payloadString(notification, "contentId");
+    const threadId = payloadString(notification, "threadId");
+    if (!contentId) return null;
+    return `/content?content=${contentId}${threadId ? `&anchor=comment:${threadId}` : ""}`;
+  },
+};
+
 export const CORE_NOTIFICATION_RENDERERS: Record<
   string,
   NotificationKindRenderer
@@ -253,6 +292,10 @@ export const CORE_NOTIFICATION_RENDERERS: Record<
     Body: SystemAnnouncementBody,
     getHref: (notification) => payloadString(notification, "href"),
   },
+  "comment.new": COMMENT_RENDERER,
+  "comment.reply": COMMENT_RENDERER,
+  "comment.mention": COMMENT_RENDERER,
+  "comment.resolved": COMMENT_RENDERER,
 };
 
 export function useNotificationKindRenderers(): Record<

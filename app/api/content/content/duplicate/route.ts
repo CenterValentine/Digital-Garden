@@ -15,6 +15,7 @@ import { getSession } from "@/lib/infrastructure/auth/session";
 import { prisma } from "@/lib/database/client";
 import { logger, spanPayload, withRouteTrace, withSpan } from "@/lib/core/logger";
 import { regenerateAllBlockIds } from "@/lib/domain/blocks/block-id-walk";
+import { stripCommentMarks } from "@/lib/domain/content/comments";
 import { forkConversation } from "@/lib/features/conversations";
 
 /**
@@ -223,8 +224,10 @@ async function duplicateNode(
             // The duplicate has no Y.Doc, so there is no sub-map data on
             // the copy to orphan — unconditional re-id is safe here
             // (unlike paste, which is collision-scoped).
-            tiptapJson: regenerateAllBlockIds(
-              original.notePayload.tiptapJson as unknown as JSONContent,
+            // Comment threads are not copied, so their anchors go too (the
+            // text stays) — a foreign thread id would be an invisible orphan.
+            tiptapJson: stripCommentMarks(
+              regenerateAllBlockIds(original.notePayload.tiptapJson as unknown as JSONContent),
             ) as unknown as Prisma.InputJsonValue,
             markdownText: original.notePayload.markdownText,
             searchText: original.notePayload.searchText,

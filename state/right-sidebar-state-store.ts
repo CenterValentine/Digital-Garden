@@ -17,6 +17,8 @@ export type RightSidebarTab =
   | "publish"
   | "studio"
   | "context"
+  // Comment threads on a note (components/content/comments/CommentsTab.tsx).
+  | "comments"
   | "database"
   // A file produced from a document template: edit its values, re-render.
   | "templateFields"

@@ -4,10 +4,34 @@ epoch: 12 (Main Panel Tabs + Split Workspace)
 duration: multi-session
 branch: epoch-12/sprint-55-wire-blocks
 status: complete
-last_updated: 2026-10-13
+last_updated: 2026-10-16
 ---
 
 # Current Sprint Addendum
+
+## October 16, 2026 — Comments & annotations (Phases 0–2)
+
+**Tree**: worktree `.claude/worktrees/comments`, branch `feat/comments-annotations` (off `origin/main` at `a73a0bdf`, rebased onto `6b79bcbc`)
+**Plan**: `work-tracking/COMMENTS-ANNOTATIONS-PLAN.md` (all §11 defaults adopted by the owner 2026-10-15)
+**Status**: typecheck / lint 150 (0 errors, none new) / `comments:check` (new; 7 mutants killed across two runs) / `markdown:blocks:check` / `collab:schema:check` / `private:content:check` / `right-sidebar:default:check` / `extensions:check` green; migration applied to the per-worktree DB `dg_comments`; headless two-user smoke green (API 29 checks, Playwright UI 24 checks); **owner browser smoke pending; Hocuspocus redeploy owed after merge.**
+
+### Shipped
+
+- **Phase 0 — the mark and its seams.** `comment` mark `{threadId}` (`excludes: ""`, `inclusive: false`, faithful server twin, schema 1.22.0); CriticMarkup `{==passage==}{>>#id<<}` via turndown rule + codec reTag (nesting, marked's entity escaping, decline cases); `stripCommentMarks` after `stripPrivateContent` at the 8 markdown/HTML seams, never inside `tiptapToMarkdown`; gold-accent CSS with decoration state classes and the public-page net; `pnpm comments:check` in `build` + `quality.yml`; collab fixture; the collab-schema gate now resolves ALL_CAPS constant names (`privateText` was invisible to it).
+- **Phase 1 — threads in the text and in the rail.** `CommentThread` + `Comment` (+ migration), service on the collaboration access ladder, four routes, 60/h budget; toolbelt Comment button + ⌘⌥M + context menu, composer row with a provisional mapped decoration, optimistic mark with rollback; decoration plugin (active / hover / resolved / orphan / pending) reading the comments store; `hover-card.ts` extracted from the wiki-link hover (both consume it); `ThreadCard` ×3 modes, `CommentComposer`, `CommentsTab` (document order via live marks, filters, note-level composer, orphans + Re-anchor); rail tab + badge; `revealRightSidebarTab`; paste hygiene.
+- **Smoke-found fixes.** Pin survives the decoration swap under the pointer; no anchoring before the collaborative editor binds; duplicate-id 409 (error code, not class); tippy arrow hidden; accessible Resolve labels.
+- **Phase 2 — people and links.** Four notification kinds published from the service (actor never notified; mentions filtered to collaborators; collapsed per thread), one inbox renderer with deep links; `@` collaborator picker; `comment:` link anchor lister (`[[Note#`), anchor consumed by the plugin, `?content=…&anchor=…`; duplicate strips anchors.
+
+### Smoke (owner, on the real stack — two browsers, two users)
+
+- Select text → Comment → type → Enter: the passage turns gold in BOTH browsers; the thread appears in the other browser's Comments tab without a refresh.
+- Hover the passage → compact card; click → pinned card; reply → appears in the other browser within the 30 s poll; Esc closes.
+- Resolve from the tab → the passage goes quiet in both; "Resolved" filter shows it; Reopen restores.
+- Delete the thread → the mark is gone in both browsers.
+- ⌘Z right after commenting → the tab lists it under "Original text removed"; select text → Re-anchor → gold again.
+- `@` in a composer lists the other collaborator; pick → post → their bell shows `comment.mention`; clicking it opens the note with the card pinned on the passage.
+- Source view shows `{==…==}{>>#…<<}` and round-trips; the public page shows plain text; an AI read of the note shows no span; paste the passage into another note → no mark there; duplicate the note → no marks in the copy.
+- Phone: toolbelt composer below the selection; tap a passage → the Comments drawer opens on the thread.
 
 ## October 12, 2026 — The AI fills your own Word template (`fill_docx_template` + the docx-renderer service)
 

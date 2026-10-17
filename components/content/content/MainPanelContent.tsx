@@ -141,6 +141,7 @@ import { usePanelStore } from "@/state/panel-store";
 import { useIsMobile } from "@/components/common/useIsMobile";
 
 import { setLinkAnchorLister, setLinkAnchorSuggester } from "@/lib/domain/content/link-anchor";
+import { listCommentAnchors } from "@/lib/domain/content/comment-link-anchors";
 import {
   noteAdoptServerVersion,
   noteBodyHash,
@@ -1733,6 +1734,7 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
     setLinkAnchorLister(
       async (target, query) =>
         (await listDatabaseColumnAnchors(target, query)) ??
+        (await listCommentAnchors(target, query)) ??
         listExtensionLinkAnchors(target, query)
     );
     setLinkAnchorSuggester(suggestExtensionLinkAnchors);

@@ -14,6 +14,7 @@ import { useTemplateStore } from "@/state/template-store";
 import { useSnippetStore } from "@/state/snippet-store";
 import { useEditorInstanceStore } from "@/state/editor-instance-store";
 import { useSettingsStore } from "@/state/settings-store";
+import { useCommentsStore } from "@/state/comments-store";
 import { instantiateTemplateContent } from "@/lib/domain/editor/template-instantiation";
 import { resolveWikiLinkTarget } from "@/lib/domain/editor/wiki-link-resolve";
 import {
@@ -1045,6 +1046,17 @@ export const editorActionProvider: ContextMenuActionProvider = (ctx) => {
     const offline = typeof navigator !== "undefined" && navigator.onLine === false;
     sections.push({
       actions: [
+        {
+          // The keyboard- and touch-reachable copy of the toolbelt's Comment
+          // button (the "Display as" precedent): the composer opens in the
+          // selection toolbar's second row.
+          id: "comment-on-selection",
+          label: "Comment on selection",
+          tooltip: "Start a comment thread on the selected text (⌘⌥M)",
+          onClick: () => {
+            useCommentsStore.getState().openComposer(contextEditor);
+          },
+        },
         {
           id: "move-to-note",
           label: "Move highlight to note",

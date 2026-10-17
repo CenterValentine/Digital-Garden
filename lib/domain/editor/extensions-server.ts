@@ -54,6 +54,7 @@ import { ServerAudioEmbed } from "./extensions/blocks/audio-embed";
 import { ServerFlashcardSelect } from "./extensions/flashcard-select";
 import { ServerClozeDeletion } from "./extensions/cloze-deletion";
 import { ServerPrivateBlock, ServerPrivateText } from "./extensions/private-content";
+import { ServerCommentMark } from "./extensions/comment-mark";
 import {
   ServerUnsupportedBlock,
   ServerUnsupportedInline,
@@ -185,6 +186,7 @@ export function getServerExtensions(): Extensions {
     ServerClozeDeletion,
     ServerPrivateText,
     ServerPrivateBlock,
+    ServerCommentMark,
     ServerUnsupportedBlock,
     ServerUnsupportedInline,
     ...getExtensionServerEditorExtensions(),
