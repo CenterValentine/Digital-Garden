@@ -6,6 +6,8 @@
  *   pnpm wt          worktrees active in the last 7 days
  *   pnpm wt 30       ... in the last 30 days
  *   pnpm wt all      every worktree
+ *
+ * To pick one by clicking, use `pnpm dev -wt` (no name).
  */
 
 import { DEFAULT_RECENT_DAYS, printWorktrees } from "./lib/worktrees";

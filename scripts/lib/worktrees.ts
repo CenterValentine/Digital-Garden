@@ -261,15 +261,25 @@ function ago(ms: number): string {
   return `${Math.round(s / (7 * 86_400))}w ago`;
 }
 
+export interface WorktreeTable {
+  /** Worktree names in display order — row i of `rows` is `names[i]`. */
+  names: string[];
+  /** Aligned text lines: `header`, then one per worktree. */
+  header: string;
+  rows: string[];
+  /** Footer lines (hidden count, how to widen). */
+  notes: string[];
+}
+
 /**
- * The plain-terms table shared by `pnpm wt` and a bare `pnpm dev -wt`, newest
- * first. `days` limits it to worktrees active in that window (null = all);
- * main and anything currently serving always show.
+ * The plain-terms table behind `pnpm wt` (printed or interactive) and a bare
+ * `pnpm dev -wt`, newest first. `days` limits it to worktrees active in that
+ * window (null = all); main and anything currently serving always show.
  */
-export async function printWorktrees(
+export async function buildWorktreeTable(
   trees: Worktree[] = listWorktrees(),
   days: number | null = DEFAULT_RECENT_DAYS,
-): Promise<void> {
+): Promise<WorktreeTable> {
   const serving = new Map<string, Listener[]>();
   for (const l of findDevListeners()) {
     const tree = worktreeForCwd(trees, l.cwd);
@@ -299,19 +309,33 @@ export async function printWorktrees(
     .sort((a, b) => Number(b.t.isMain) - Number(a.t.isMain) || b.at - a.at);
   const hidden = all.length - shown.length;
 
-  const rows = shown.map((r) => [r.t.name, r.t.branch ?? "", ago(r.at), r.status]);
-  const width = (col: number, min: number) => Math.max(min, ...rows.map((r) => r[col].length));
+  const cells = shown.map((r) => [r.t.name, r.t.branch ?? "", ago(r.at), r.status]);
+  const width = (col: number, min: number) => Math.max(min, ...cells.map((r) => r[col].length));
   const [w0, w1, w2] = [width(0, 4), width(1, 6), width(2, 7)];
   const line = (r: string[]) => `  ${r[0].padEnd(w0)}  ${r[1].padEnd(w1)}  ${r[2].padEnd(w2)}  ${r[3]}`;
 
+  return {
+    names: shown.map((r) => r.t.name),
+    header: line(["NAME", "BRANCH", "UPDATED", "STATUS"]),
+    rows: cells.map(line),
+    notes:
+      hidden > 0
+        ? [`  ${hidden} not touched in ${days} days hidden — pnpm wt <days> to widen, pnpm wt all for everything.`]
+        : [],
+  };
+}
+
+export async function printWorktrees(
+  trees: Worktree[] = listWorktrees(),
+  days: number | null = DEFAULT_RECENT_DAYS,
+): Promise<void> {
+  const table = await buildWorktreeTable(trees, days);
   console.log("");
-  console.log(line(["NAME", "BRANCH", "UPDATED", "STATUS"]));
-  for (const r of rows) console.log(line(r));
+  console.log(table.header);
+  for (const r of table.rows) console.log(r);
   console.log("");
-  if (hidden > 0) {
-    console.log(`  ${hidden} not touched in ${days} days hidden — pnpm wt <days> to widen, pnpm wt all for everything.`);
-  }
-  console.log("  Serve one:  pnpm dev -wt <name>");
+  for (const n of table.notes) console.log(n);
+  console.log("  Serve one:  pnpm dev -wt <name>   ·   pick by clicking:  pnpm dev -wt");
   console.log("");
 }
 

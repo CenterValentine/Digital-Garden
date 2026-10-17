@@ -5,7 +5,8 @@
  *   pnpm dev -wt <name>         serve .claude/worktrees/<name> (or `main`) without cd-ing;
  *                               first free port in 3015–3025, stops itself after 15 min
  *   pnpm dev -wt <name> -t 45   same, lasting 45 min (`90m`, `2h`; `-t 0` = no expiry)
- *   pnpm dev -wt                list worktrees (same as `pnpm wt`)
+ *   pnpm dev -wt  (or dev wt)   pick a worktree from the table (click a row, or ↑↓ Enter);
+ *                               prints the table instead when not run in a terminal
  *
  * Readiness: before serving, a worktree is checked and made ready — a missing
  * or partial install runs `pnpm install`, so does an install older than the
@@ -34,10 +35,12 @@ import {
   ensureReady,
   firstFreePort,
   listWorktrees,
+  buildWorktreeTable,
   printWorktrees,
   resolveWorktree,
   type DevLease,
 } from "./lib/worktrees";
+import { pickWorktree } from "./lib/worktree-picker";
 
 const DEFAULT_TTL_MINUTES = 15;
 
@@ -74,7 +77,8 @@ function parseArgs(argv: string[]): Args {
       i++;
       return next;
     };
-    if (flag === "-wt" || flag === "--wt" || flag === "--worktree") {
+    // `pnpm dev wt` (no dash) works too, as the first arg only — next dev would read it as a directory.
+    if (flag === "-wt" || flag === "--wt" || flag === "--worktree" || (i === 0 && flag === "wt")) {
       args.worktree = takeValue() ?? null;
     } else if (flag === "-t" || flag === "--ttl") {
       args.ttl = parseDuration(takeValue());
@@ -120,14 +124,20 @@ async function main(): Promise<void> {
   }
 
   const trees = listWorktrees();
-  if (worktree === null) {
-    await printWorktrees(trees);
-    return;
+  let name = worktree;
+  if (name === null) {
+    // Bare `-wt`: in a terminal, pick from the table (click or ↑↓ Enter); piped, just print it.
+    if (!process.stdin.isTTY || !process.stdout.isTTY) {
+      await printWorktrees(trees);
+      return;
+    }
+    name = await pickWorktree(await buildWorktreeTable(trees));
+    if (name === null) return;
   }
 
-  const target = resolveWorktree(trees, worktree);
+  const target = resolveWorktree(trees, name);
   if (!target) {
-    console.error(`\n  No worktree named "${worktree}".`);
+    console.error(`\n  No worktree named "${name}".`);
     await printWorktrees(trees, null); // a typo'd name may be an old worktree — show them all
     process.exit(1);
   }
