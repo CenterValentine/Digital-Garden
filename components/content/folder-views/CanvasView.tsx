@@ -121,7 +121,7 @@ export function CanvasView({
                       paneId,
                     });
                   }}
-                  className="flex-shrink-0 p-1 rounded hover:bg-white/50 transition-colors"
+                  className="flex-shrink-0 p-1 rounded hover:bg-muted/50 transition-colors"
                   title="Open in main panel"
                 >
                   <ExternalLink className="h-3.5 w-3.5 text-gray-600 dark:text-gray-400" />
@@ -225,7 +225,7 @@ export function CanvasView({
   if (items.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-center px-4">
-        <FileText className="h-16 w-16 text-gray-400 mb-4" />
+        <FileText className="h-16 w-16 text-muted-foreground mb-4" />
         <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">No items to display</p>
         <p className="text-xs text-gray-500 dark:text-gray-400">
           Create content to see it visualized on the canvas
