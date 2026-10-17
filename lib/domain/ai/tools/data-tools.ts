@@ -96,6 +96,7 @@ import {
   type DataView,
   type FilterCondition,
   type FilterOperator,
+  planColumnChanges,
 } from "@/lib/domain/data";
 import type { ToolExecuteContext } from "./types";
 import { summarizeRejections } from "@/lib/domain/data/cells";
@@ -1989,7 +1990,7 @@ export function createDataTools(ctx: ToolExecuteContext) {
     // column. Same contract as every other propose_* tool.
     propose_database_columns: tool({
       description:
-        "Propose NEW columns for an EXISTING database — the way to answer \"make sure this database has these fields\". Renders a review card; NOTHING is written until the user clicks Apply, so never claim the columns exist. Add-only by design: it cannot rename, retype, or delete a column (those stay the user's own action in the grid — say so if asked). Call describe_database first; columns the table already has are reported as present and dropped from the proposal, so propose the FULL wanted set and let the diff sort it out. Every column needs a real description (what goes in it, where values come from), and select/multiSelect/status need their initial options or they reject every value. This is also how a table gains a LINK to another one: propose a relation column with `target` set to that database's exact title — its mirrored column appears there automatically. When the table to link to does not exist yet, use propose_linked_databases instead.",
+        "Propose NEW columns for an EXISTING database — the way to answer \"make sure this database has these fields\". Renders a review card; NOTHING is written until the user clicks Apply, so never claim the columns exist. Add-only by design: to rename or remove a column use propose_column_changes; retyping is impossible either way (add a new column, move the values, then propose removing the old one). Call describe_database first; columns the table already has are reported as present and dropped from the proposal, so propose the FULL wanted set and let the diff sort it out. Every column needs a real description (what goes in it, where values come from), and select/multiSelect/status need their initial options or they reject every value. This is also how a table gains a LINK to another one: propose a relation column with `target` set to that database's exact title — its mirrored column appears there automatically. When the table to link to does not exist yet, use propose_linked_databases instead.",
       inputSchema: z.object({
         databaseId: z
           .string()
@@ -2100,7 +2101,7 @@ export function createDataTools(ctx: ToolExecuteContext) {
                 ? `: ${alreadyPresent.join(", ")}. `
                 : ". ") +
               "Nothing to add — tell the user the schema is already complete. " +
-              "Renaming, retyping, or removing a column is not something you can do; that is theirs to do in the grid."
+              "To RENAME or REMOVE a column, use propose_column_changes. Retyping is not possible at all: add a new column, have the user move the values across, then propose removing the old one."
             );
           }
 
@@ -2121,6 +2122,109 @@ export function createDataTools(ctx: ToolExecuteContext) {
             error,
           });
           return "Proposing the columns failed with an internal error — nothing was changed; tell the user.";
+        }
+      },
+    }),
+    // ─── propose_column_changes ─────────────────────────────
+    // The reshape counterpart to propose_database_columns, which is
+    // add-only by design. Rename and remove only: changing a column's TYPE
+    // is forbidden (plan O4 — coercing every existing cell is lossy in ways
+    // no preview conveys), so the tool refuses it and says the real answer.
+    // System columns of a charter ledger are refused at PROPOSE time, which
+    // is the whole point of proposing: the refusal reaches the model while
+    // it can still revise, instead of a dead card the Apply would 403.
+    propose_column_changes: tool({
+      description:
+        "Rename or remove columns THE USER ASKED YOU TO CHANGE. Use this ONLY when the user has asked for a rename or a removal — this is not a tool you reach for on your own initiative. Noticing that a column looks redundant, misnamed, empty or superseded is NOT a reason to call it: SAY what you noticed in prose and let the user decide, and call this only once they ask. A schema the user did not ask you to change is theirs, and a tidier one is not worth a change they did not want. Never re-propose a change they rejected. When they do ask: call describe_database first and use each column's exact current name. Renders a review card; NOTHING changes until the user clicks Apply, so never claim a column was renamed or removed. A removal is SOFT — the cells keep their data and the column can be restored — but it is still destructive, so removals arrive unchecked on the card and the user opts into each one. You CANNOT change a column's type: propose a new column with propose_database_columns, tell the user to move the values across, then propose removing the old one. System columns of a charter ledger (master or quest) are refused — their names are what the machinery reads.",
+      inputSchema: z.object({
+        databaseId: z
+          .string()
+          .optional()
+          .describe(
+            "The database's id or exact name; omit in a chat open on the database"
+          ),
+        changes: z
+          .array(
+            z.object({
+              column: z
+                .string()
+                .min(1)
+                .max(120)
+                .describe("The column's exact current name, or its id."),
+              op: z
+                .enum(["rename", "remove"])
+                .describe(
+                  "rename = change its name only; remove = soft-delete it (cells keep their data, restorable)."
+                ),
+              to: z
+                .string()
+                .max(120)
+                .optional()
+                .describe("rename ONLY: the new name."),
+              reason: z
+                .string()
+                .max(200)
+                .optional()
+                .describe("One line the user sees on the card: why this change."),
+            })
+          )
+          .min(1)
+          .max(20)
+          .describe("The changes, in the order they should be reviewed."),
+        rationale: z
+          .string()
+          .max(300)
+          .optional()
+          .describe("One sentence on why this reshape — shown on the card."),
+      }),
+      execute: async (input) => {
+        try {
+          const dbRef = await resolveDatabaseRef(ctx, input.databaseId);
+          if ("refusal" in dbRef) return dbRef.refusal;
+          const gate = await resolveJurisdiction(ctx, dbRef.id);
+          if ("refusal" in gate) return gate.refusal;
+          const { table, level } = gate;
+          if (table.mode === "query") {
+            return "Query databases synthesize their columns from the query — there is nothing here to rename or remove.";
+          }
+          if (!canAlterSchema(level)) {
+            return "Only this database's owner can rename or remove columns — tell the user, and suggest they ask the owner.";
+          }
+
+          const live = table.columns.filter((c) => !c.deletedAt);
+          // Every judgement lives in planColumnChanges (pure, pinned by
+          // `pnpm column:changes:check`) — this tool resolves the database
+          // and the permission level, nothing more.
+          const { changes, refused } = planColumnChanges(live, input.changes);
+
+          // Nothing survived the diff: an ANSWER, not a card. Returning text
+          // keeps the model from claiming it changed anything.
+          if (changes.length === 0) {
+            return (
+              `Nothing to change on "${table.title}".` +
+              (refused.length > 0
+                ? ` ${refused.map((r) => `${r.column}: ${r.reason}`).join("; ")}.`
+                : "") +
+              " Tell the user exactly this — do not re-propose the same changes."
+            );
+          }
+
+          return JSON.stringify({
+            __columnChangesProposal: true,
+            databaseId: dbRef.id,
+            databaseTitle: table.title,
+            rationale: input.rationale?.trim() || null,
+            changes,
+            refused,
+          });
+        } catch (error) {
+          logger.warn({
+            layer: "ai",
+            event: "data_tools:propose_column_changes_caught",
+            summary: "propose_column_changes failed",
+            error,
+          });
+          return "Proposing the column changes failed with an internal error — nothing was changed; tell the user.";
         }
       },
     }),

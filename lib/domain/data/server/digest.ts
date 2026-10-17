@@ -20,7 +20,11 @@
  */
 
 import { prisma } from "@/lib/database/client";
-import { loadRowPage, loadTable } from "@/lib/domain/data/server/queries";
+import {
+  loadRowPage,
+  loadTable,
+  parseLedgerMarker,
+} from "@/lib/domain/data/server/queries";
 import {
   columnProfile,
   formatRows,
@@ -194,6 +198,8 @@ export async function buildDataSchemaDigest(
       description: true,
       rowCount: true,
       rowDigests: true,
+      // Carries the charter/quest ledger marker (see LedgerMarker).
+      source: true,
       content: { select: { title: true } },
       columns: {
         where: { deletedAt: null },
@@ -224,6 +230,18 @@ export async function buildDataSchemaDigest(
     `# ${payload.content.title} (database, ${payload.mode}) [id: ${nodeId}]`,
   ];
   if (payload.description) lines.push(payload.description);
+  // A charter/quest ledger says so in every AI read of it. Without this the
+  // machinery knew the table was special and the model never did — it saw an
+  // ordinary table and treated the rows as ordinary rows (owner follow-up,
+  // 2026-09-12). The sentence is what `insert_rows` and friends act on.
+  const ledger = parseLedgerMarker(payload.source);
+  if (ledger) {
+    lines.push(
+      ledger.kind === "master"
+        ? "SYSTEM TABLE — this charter's MASTER LEDGER: one row per QUEST (an ongoing matter), maintained by the quest machinery. Naming a row here creates that quest and mints its quest ledger. Its system columns are locked (no rename, retype, option edit or delete); cells and rows are not."
+        : "SYSTEM TABLE — a QUEST LEDGER: one row per item of one quest, written by the run harness each sitting. Its system columns are locked (no rename, retype, option edit or delete); cells and rows are not."
+    );
+  }
   lines.push(`Size: ${bucketRowCount(payload.rowCount)}`);
 
   const graph = await resolveGraphNames(payload.columns);

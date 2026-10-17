@@ -704,6 +704,10 @@ interface CharterCommandSource {
    * labelling every charter empty.
    */
   hasBody?: boolean;
+  /** Nothing but the unedited starter scaffold (same optional-read rule). */
+  templateOnly?: boolean;
+  /** How many phase headings are still "[name the … phase]". */
+  templatePhases?: number;
 }
 
 /** The playbook currently attached to the composer (AI v3.2 T3). */
@@ -1777,10 +1781,16 @@ export function useConversationEngine({
       // `description || "N phases"`, so a charter with a description and no
       // body looked exactly like a working one — at the one moment the user
       // is deciding to attach it.
+      // A charter that is still the STARTER TEMPLATE must say so too: the
+      // scaffold is a body, so `hasBody` reads true and it looked finished
+      // at exactly the moment the user decides to attach it (owner
+      // follow-up, 2026-09-12).
       description: p.hasBody === false
         ? `${p.description ? `${p.description} · ` : ""}Empty — nothing written in it yet`
-        : p.description ||
-          `Charter · ${p.phaseCount} phase${p.phaseCount === 1 ? "" : "s"}`,
+        : p.templateOnly
+          ? `${p.description ? `${p.description} · ` : ""}Still the starter template — nothing filled in yet`
+          : p.description ||
+            `Charter · ${p.phaseCount} phase${p.phaseCount === 1 ? "" : "s"}`,
       contentType: "charter",
     }));
     const toolItems: SuggestionItem[] = BASE_TOOL_IDS.map((id) => ({
