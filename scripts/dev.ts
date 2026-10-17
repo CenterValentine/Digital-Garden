@@ -8,8 +8,9 @@
  *   pnpm dev -wt                list worktrees (same as `pnpm wt`)
  *
  * Readiness: before serving, a worktree is checked and made ready — a missing
- * or partial install runs `pnpm install`, a missing `.env.local` is copied
- * from main. An install this command performed is marked, and when the server
+ * or partial install runs `pnpm install`, so does an install older than the
+ * checkout's lockfile (deps added by a pull/merge), and a missing `.env.local`
+ * is copied from main. An install this command performed is marked, and when the server
  * stops its `node_modules` and `.next` are removed again, so idle worktrees
  * don't hold gigabytes. A worktree you installed yourself (or with
  * `pnpm wt:install <name>`) is never cleaned.

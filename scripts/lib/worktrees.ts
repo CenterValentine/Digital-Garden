@@ -32,6 +32,8 @@ export interface Worktree {
   isMain: boolean;
   /** Dependencies fully installed (see isInstalled). */
   installed: boolean;
+  /** Installed, but from an older lockfile than the checkout now has (see isUpToDate). */
+  stale: boolean;
   /** Installed by `pnpm dev -wt`, so removed again when its server stops. */
   installedByDev: boolean;
   hasEnvLocal: boolean;
@@ -68,6 +70,7 @@ export function listWorktrees(): Worktree[] {
       branch: ref ?? (/^detached$/m.test(block) ? "(detached)" : null),
       isMain,
       installed: isInstalled(path),
+      stale: isInstalled(path) && !isUpToDate(path),
       installedByDev: existsSync(join(path, INSTALL_MARKER)),
       hasEnvLocal: existsSync(join(path, ".env.local")),
     });
@@ -84,6 +87,23 @@ export function isInstalled(worktreePath: string): boolean {
     existsSync(join(worktreePath, "node_modules/.modules.yaml")) &&
     existsSync(join(worktreePath, "node_modules/.bin/next"))
   );
+}
+
+/**
+ * pnpm keeps a copy of the lockfile it installed from at
+ * `node_modules/.pnpm/lock.yaml`. If it differs from `pnpm-lock.yaml`, the
+ * checkout gained or changed dependencies since its last install (a pull or
+ * merge) and imports of the new ones fail at compile time.
+ */
+export function isUpToDate(worktreePath: string): boolean {
+  try {
+    return (
+      readFileSync(join(worktreePath, "pnpm-lock.yaml"), "utf8") ===
+      readFileSync(join(worktreePath, "node_modules/.pnpm/lock.yaml"), "utf8")
+    );
+  } catch {
+    return false;
+  }
 }
 
 /** Folder name first, then exact branch name. */
@@ -266,6 +286,7 @@ export async function printWorktrees(
     }
     // `pnpm dev -wt` fixes both of these itself; shown so the first serve's wait isn't a surprise.
     if (!t.installed) return "not installed (installs on serve)";
+    if (t.stale) return "deps out of date (updates on serve)";
     if (!t.hasEnvLocal && !t.isMain) return "ready (copies .env.local on serve)";
     return t.installedByDev ? "ready (temporary install)" : "ready";
   };
@@ -315,14 +336,19 @@ export function ensureReady(target: Worktree, main: Worktree, opts: { temporary:
   }
   const marker = join(target.path, INSTALL_MARKER);
   if (!opts.temporary) rmSync(marker, { force: true });
-  if (isInstalled(target.path)) return;
+  const installed = isInstalled(target.path);
+  if (installed && isUpToDate(target.path)) return;
 
+  // An out-of-date install is updated in place and keeps its ownership: a
+  // temporary install stays temporary, one you made yourself stays yours.
   console.log(
-    opts.temporary
-      ? `  • "${target.name}" isn't installed — running pnpm install (removed again when the server stops)…\n`
-      : `  • Installing "${target.name}"…\n`,
+    installed
+      ? `  • "${target.name}" dependencies are out of date with its lockfile — running pnpm install…\n`
+      : opts.temporary
+        ? `  • "${target.name}" isn't installed — running pnpm install (removed again when the server stops)…\n`
+        : `  • Installing "${target.name}"…\n`,
   );
-  if (opts.temporary && !target.isMain) {
+  if (!installed && opts.temporary && !target.isMain) {
     // Mark before installing so an interrupted install is still ours to clean up.
     mkdirSync(dirname(marker), { recursive: true });
     writeFileSync(marker, new Date().toISOString());
@@ -332,7 +358,7 @@ export function ensureReady(target: Worktree, main: Worktree, opts: { temporary:
     stdio: "inherit",
     env: { ...process.env, CI: "true" }, // never prompt (e.g. to purge a modules dir)
   });
-  if (r.status !== 0 || !isInstalled(target.path)) {
+  if (r.status !== 0 || !isInstalled(target.path) || !isUpToDate(target.path)) {
     console.error(`\n  pnpm install failed in "${target.name}". Fix it there, then retry.\n`);
     process.exit(r.status || 1);
   }
