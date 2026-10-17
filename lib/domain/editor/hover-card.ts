@@ -216,7 +216,13 @@ export function createHoverCardPlugin(editor: Editor, options: HoverCardOptions)
 
       const onClick = (event: MouseEvent) => {
         if (!options.onClick) return;
-        const el = elementFor(event.target);
+        // The element under the pointer, not only the event target: when a
+        // decoration under the pointer changed between mousedown and mouseup
+        // (the hover class clearing), ProseMirror swapped the span and the
+        // browser fired `click` on the common ancestor instead.
+        const el =
+          elementFor(event.target) ??
+          elementFor(document.elementFromPoint(event.clientX, event.clientY));
         if (!el) return;
         if (options.onClick(el, controller) === "pin") controller.pin(el);
       };
@@ -224,10 +230,13 @@ export function createHoverCardPlugin(editor: Editor, options: HoverCardOptions)
       // A click outside the card, a keystroke in the editor, or a scroll of
       // the page ends a hover — a resting affordance, not a mode. A pinned
       // card survives keystrokes and scrolls (it follows its anchor) but not
-      // an outside click or Esc. Events INSIDE the card are its own business.
+      // an outside click or Esc. Events INSIDE the card are its own business,
+      // and a mousedown on the card's own anchor is the click that follows —
+      // hiding here would churn the decorations under the pointer first.
       const onDocMouseDown = (event: MouseEvent) => {
         if (!popup?.state.isVisible) return;
         if (insidePopup(event.target)) return;
+        if (!pinned && anchor && elementFor(event.target) === anchor) return;
         hide();
       };
       const onEditorKeyDown = () => {

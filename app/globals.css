@@ -2067,6 +2067,9 @@ body.flashcard-select-cursor * {
 .tippy-box[data-theme~="comment-thread"] .tippy-content {
   padding: 0;
 }
+.tippy-box[data-theme~="comment-thread"] .tippy-arrow {
+  display: none;
+}
 /* Never on a public page — the JSON strip is the real guard; this is the net. */
 .public-prose [data-comment] {
   background: none;

@@ -137,7 +137,7 @@ export function CommentsTab({ contentId }: { contentId: string | null }) {
   const shown = groups.noteLevel.length + groups.anchored.length + groups.orphaned.length;
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col" data-comments-tab>
       <div className="shrink-0 border-b border-black/10 px-3 py-3 dark:border-white/10">
         <div className="flex items-center gap-1">
           {FILTERS.map(({ id, label }) => (

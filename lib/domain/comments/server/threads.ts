@@ -126,7 +126,9 @@ async function loadThread(threadId: string): Promise<ThreadRow> {
 }
 
 function isUniqueViolation(error: unknown): boolean {
-  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
+  // The error code, not the class: through the pg adapter the thrown object
+  // is not always an `instanceof` the generated client's error class.
+  return typeof error === "object" && error !== null && (error as { code?: unknown }).code === "P2002";
 }
 
 // ── Operations ───────────────────────────────────────────────────────────────

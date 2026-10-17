@@ -384,6 +384,14 @@ export function BubbleMenu({ editor, contentId = null, onLinkClick }: BubbleMenu
   const handleCommentClick = useCallback(() => {
     if (!editor) return;
     const segments = getSelectionFormattingState(editor).comments;
+    // A collaborative note's editor is rebuilt when its provider binds, and
+    // a mark applied before that is lost with the first editor. Until the
+    // document is editable, viewing an existing thread is fine; anchoring a
+    // new one is not.
+    if (segments.length === 0 && !editor.isEditable) {
+      toast.message("The note is still loading — try again in a moment");
+      return;
+    }
     if (segments.length === 1) {
       // The passage already carries a thread: view it in place.
       useCommentsStore.getState().requestOpen(segments[0].threadId);
@@ -401,6 +409,10 @@ export function BubbleMenu({ editor, contentId = null, onLinkClick }: BubbleMenu
       if (!editor) return;
       if (!contentId) {
         toast.error("This editor isn't attached to a note");
+        return;
+      }
+      if (!editor.isEditable) {
+        toast.message("The note is still loading — try again in a moment");
         return;
       }
       const selection = editor.state.selection;

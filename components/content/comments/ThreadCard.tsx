@@ -275,7 +275,7 @@ export function ThreadCard(props: ThreadCardProps) {
       <div className="mt-2 flex items-center justify-between border-t border-black/5 pt-2 dark:border-white/5">
         <div className="flex items-center gap-1">
           {!resolved && (
-            <button type="button" onClick={toggleResolved} disabled={busy} className="inline-flex items-center gap-1 rounded px-1.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-black/5 hover:text-foreground dark:hover:bg-white/10">
+            <button type="button" onClick={toggleResolved} disabled={busy} aria-label="Resolve thread" className="inline-flex items-center gap-1 rounded px-1.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-black/5 hover:text-foreground dark:hover:bg-white/10">
               <Check className="h-3.5 w-3.5" /> Resolve
             </button>
           )}
