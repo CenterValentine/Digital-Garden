@@ -9,8 +9,8 @@
  *   0 — Neon mode, OR local container already healthy, OR just started it
  *   1 — LOCAL_POSTGRES=1 but Docker daemon unreachable, or container failed to come up
  *
- * Wired in via package.json:
- *   "dev": "tsx scripts/predev.ts && next dev --port 3015"
+ * Run by scripts/dev.ts (the `pnpm dev` entry) inside the checkout being
+ * served, before `next dev`.
  */
 
 import { execSync, spawnSync } from "node:child_process";
