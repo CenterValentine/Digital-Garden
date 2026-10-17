@@ -126,6 +126,15 @@ const REGISTRY: Declared[] = [
       "entry; audited 2026-09-15.",
   },
   { file: "components/content/ai/reasoning/reasoning-disclosure.ts", policy: "ui-only", note: "Local disclosure animation." },
+  {
+    file: "lib/features/dev-banner/DevPrChecklist.tsx",
+    policy: "ui-only",
+    networkUnrelated: true,
+    note:
+      "5s `setNow` tick that re-renders relative timestamps in the dev-only PR checklist pill. The file's fetches are " +
+      "the one-shot load and the checkbox toggle handler, not the timer. Landed in #308 without a registry entry " +
+      "(polling:check runs only in `build`, not CI); audited 2026-10-17.",
+  },
   { file: "components/content/folder-views/MediaLightbox.tsx", policy: "ui-only", note: "Slideshow advance." },
   { file: "lib/domain/editor/extensions/blocks/stopwatch.ts", policy: "ui-only", note: "33ms stopwatch tick, local block state." },
   {
@@ -210,6 +219,15 @@ const REGISTRY: Declared[] = [
       "The SECOND EventSource on the same endpoint — refcounted and shared across surfaces. Closed whenever engagement " +
       "leaves `active`; refetchAllCached reconciles on return. This file was missed by the first version of this gate " +
       "because `state/` was not in SCAN_ROOTS.",
+  },
+  {
+    file: "components/content/comments/CommentsTab.tsx",
+    policy: "pause-when-hidden",
+    note:
+      "30s refetch of the open note's comment threads (replies and resolves do not touch the document, so nothing " +
+      "else announces them), only while the Comments tab is mounted; every tick returns early when " +
+      "document.visibilityState is hidden and a visibilitychange refetches on return. New THREADS need no poll — their " +
+      "mark arrives through Y.js and the decoration plugin reloads quietly (COMMENTS-ANNOTATIONS-PLAN §7).",
   },
 
   // ── Browser extension ──────────────────────────────────────────────────────
