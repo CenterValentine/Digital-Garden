@@ -23,9 +23,28 @@ import { cn } from "@/lib/core/utils";
 import type { CommentDto, CommentThreadDto } from "@/lib/domain/comments/types";
 import { useCommentsStore } from "@/state/comments-store";
 import { useCurrentUser } from "@/components/common/use-current-user";
-import { CommentComposer } from "./CommentComposer";
+import { CommentComposer, MENTION_TOKEN_RE } from "./CommentComposer";
 
 export type ThreadCardMode = "collapsed" | "expanded" | "list";
+
+/** A body with its `@username`s set in the accent color. */
+function renderBody(body: string): React.ReactNode[] {
+  const out: React.ReactNode[] = [];
+  let last = 0;
+  let key = 0;
+  for (const match of body.matchAll(MENTION_TOKEN_RE)) {
+    const index = (match.index ?? 0) + match[1].length;
+    if (index > last) out.push(body.slice(last, index));
+    out.push(
+      <span key={key++} className="font-medium text-gold-primary">
+        @{match[2]}
+      </span>,
+    );
+    last = index + match[2].length + 1;
+  }
+  if (last < body.length) out.push(body.slice(last));
+  return out;
+}
 
 export interface ThreadCardProps {
   threadId: string;
@@ -140,9 +159,9 @@ export function ThreadCard(props: ThreadCardProps) {
       onClose?.();
     }, "Couldn't delete the thread");
 
-  const reply = async (body: string) => {
+  const reply = async (body: string, mentions: string[]) => {
     try {
-      await store.reply(contentId, threadId, body);
+      await store.reply(contentId, threadId, body, mentions);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Couldn't post the reply");
       throw error;
@@ -199,7 +218,7 @@ export function ThreadCard(props: ThreadCardProps) {
       {header(first?.author.username ?? "?", thread.createdAt, resolveButton)}
       {latest && (
         <p className={cn("mt-1 line-clamp-2 whitespace-pre-wrap break-words pl-8 text-foreground/90", latest.deletedAt && "italic text-muted-foreground")}>
-          {latest.deletedAt ? "Comment deleted" : latest.body}
+          {latest.deletedAt ? "Comment deleted" : renderBody(latest.body)}
         </p>
       )}
       <div className="mt-1 flex items-center gap-3 pl-8 text-xs text-muted-foreground">
@@ -239,13 +258,14 @@ export function ThreadCard(props: ThreadCardProps) {
             initialValue={comment.body}
             submitLabel="Save"
             autoFocus
+            contentId={contentId}
             onSubmit={(body) => editComment(comment.id, body)}
             onCancel={() => setEditingId(null)}
             onFocusChange={onHoldChange}
           />
         ) : (
           <p className={cn("mt-1 whitespace-pre-wrap break-words pl-8 text-foreground/90", deleted && "italic text-muted-foreground")}>
-            {deleted ? "Comment deleted" : comment.body}
+            {deleted ? "Comment deleted" : renderBody(comment.body)}
             {comment.editedAt && !deleted && <span className="ml-1 text-xs text-muted-foreground">(edited)</span>}
           </p>
         )}
@@ -269,6 +289,7 @@ export function ThreadCard(props: ThreadCardProps) {
         placeholder="Reply…"
         submitLabel="Reply"
         autoFocus={mode === "expanded"}
+        contentId={contentId}
         onSubmit={reply}
         onFocusChange={onHoldChange}
       />

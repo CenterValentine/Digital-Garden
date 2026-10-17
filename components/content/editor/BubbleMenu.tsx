@@ -405,7 +405,7 @@ export function BubbleMenu({ editor, contentId = null, onLinkClick }: BubbleMenu
   }, [contentId, editor]);
 
   const submitComment = useCallback(
-    async (body: string) => {
+    async (body: string, mentions: string[]) => {
       if (!editor) return;
       if (!contentId) {
         toast.error("This editor isn't attached to a note");
@@ -437,7 +437,7 @@ export function BubbleMenu({ editor, contentId = null, onLinkClick }: BubbleMenu
       }
       closeCommentComposer();
       try {
-        await useCommentsStore.getState().create(contentId, { id: threadId, body, anchor });
+        await useCommentsStore.getState().create(contentId, { id: threadId, body, anchor, mentions });
         useCommentsStore.getState().setActiveThread(threadId);
       } catch (error) {
         editor.commands.unsetComment(threadId);
@@ -876,6 +876,7 @@ export function BubbleMenu({ editor, contentId = null, onLinkClick }: BubbleMenu
               tone="dark"
               placeholder="Comment…"
               submitLabel="Comment"
+              contentId={contentId}
               onSubmit={submitComment}
               onCancel={closeCommentComposer}
             />

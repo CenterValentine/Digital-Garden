@@ -31,7 +31,7 @@ interface CommentsState {
 
   load: (contentId: string, options?: { quiet?: boolean }) => Promise<void>;
   create: (contentId: string, input: CreateThreadInput) => Promise<CommentThreadDto>;
-  reply: (contentId: string, threadId: string, body: string) => Promise<void>;
+  reply: (contentId: string, threadId: string, body: string, mentions?: string[]) => Promise<void>;
   setResolved: (contentId: string, threadId: string, resolved: boolean) => Promise<void>;
   removeThread: (contentId: string, threadId: string) => Promise<void>;
   editComment: (contentId: string, commentId: string, body: string) => Promise<void>;
@@ -100,8 +100,8 @@ export const useCommentsStore = create<CommentsState>()((set) => ({
     return thread;
   },
 
-  reply: async (contentId, threadId, body) => {
-    const thread = await commentsApi.reply(threadId, body);
+  reply: async (contentId, threadId, body, mentions = []) => {
+    const thread = await commentsApi.reply(threadId, body, mentions);
     set((state) => ({
       threadsByContentId: {
         ...state.threadsByContentId,

@@ -3,7 +3,7 @@
  * server's message so callers can toast it as is.
  */
 
-import type { CommentThreadDto, CreateThreadInput } from "./types";
+import type { CommentAuthorDto, CommentThreadDto, CreateThreadInput } from "./types";
 
 interface Envelope<T> {
   success: boolean;
@@ -63,4 +63,10 @@ export const commentsApi = {
     call<{ thread: CommentThreadDto | null; threadDeleted: boolean }>(`${base}/items/${encodeURIComponent(commentId)}`, {
       method: "DELETE",
     }),
+
+  /** Who can be @mentioned on this note: the owner plus every live grantee. */
+  collaborators: (contentId: string) =>
+    call<{ collaborators: CommentAuthorDto[] }>(`${base}/${encodeURIComponent(contentId)}/collaborators`).then(
+      (d) => d.collaborators,
+    ),
 };

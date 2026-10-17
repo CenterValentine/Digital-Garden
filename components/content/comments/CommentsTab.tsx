@@ -117,10 +117,10 @@ export function CommentsTab({ contentId }: { contentId: string | null }) {
     [editor],
   );
 
-  const createNoteLevel = async (body: string) => {
+  const createNoteLevel = async (body: string, mentions: string[]) => {
     if (!contentId) return;
     try {
-      const thread = await useCommentsStore.getState().create(contentId, { id: crypto.randomUUID(), body, anchor: null });
+      const thread = await useCommentsStore.getState().create(contentId, { id: crypto.randomUUID(), body, anchor: null, mentions });
       useCommentsStore.getState().setActiveThread(thread.id);
       setComposing(false);
     } catch (e) {
@@ -178,7 +178,7 @@ export function CommentsTab({ contentId }: { contentId: string | null }) {
         {composing && (
           <div className="rounded-md border border-gold-primary/40 p-2">
             <div className="mb-1 text-xs uppercase tracking-[0.14em] text-muted-foreground">On this note</div>
-            <CommentComposer autoFocus placeholder="Comment on the whole note…" onSubmit={createNoteLevel} onCancel={() => setComposing(false)} />
+            <CommentComposer autoFocus placeholder="Comment on the whole note…" contentId={contentId} onSubmit={createNoteLevel} onCancel={() => setComposing(false)} />
           </div>
         )}
 

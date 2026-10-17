@@ -29,7 +29,9 @@ import type { Node as PMNode } from "@tiptap/pm/model";
 import { Plugin, PluginKey, type EditorState, type Transaction } from "@tiptap/pm/state";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import { useCommentsStore, knownThreadIds } from "@/state/comments-store";
+import { useContentAnchorStore } from "@/state/content-anchor-store";
 import { useEditorInstanceStore } from "@/state/editor-instance-store";
+import { COMMENT_ANCHOR_KIND } from "@/lib/domain/content/comment-link-anchors";
 import { collectCommentRanges, type CommentRange } from "./comment-mark";
 
 export interface CommentPluginState {
@@ -129,6 +131,24 @@ export function createCommentDecorationPlugin(editor: Editor): Plugin<CommentPlu
       },
     },
     view(view) {
+      // A pending `comment:<threadId>` link anchor for this note (a wiki-link
+      // click, a notification, a deep link): once the document holds that
+      // mark, take the anchor and ask the hover plugin to open the thread
+      // in place. Checked after each update because the mark may arrive
+      // with the document, after the editor was created.
+      const tryAnchor = () => {
+        const contentId = contentIdFor();
+        if (!contentId) return;
+        const pending = useContentAnchorStore.getState().pending[contentId];
+        if (!pending || pending.kind !== COMMENT_ANCHOR_KIND) return;
+        const threadId = pending.id.toLowerCase();
+        if (!view.dom.querySelector(`[data-comment="${threadId}"]`)) return;
+        useContentAnchorStore.getState().take(contentId);
+        useCommentsStore.getState().requestOpen(threadId);
+      };
+      tryAnchor();
+      const unsubscribeAnchor = useContentAnchorStore.subscribe(() => tryAnchor());
+
       // Store changes (a reply arrived, a thread was resolved, the hover
       // moved) redraw without a document change.
       let prevSlice: unknown[] = [];
@@ -147,7 +167,15 @@ export function createCommentDecorationPlugin(editor: Editor): Plugin<CommentPlu
         const meta: CommentPluginMeta = { refresh: true };
         view.dispatch(view.state.tr.setMeta(commentPluginKey, meta));
       });
-      return { destroy: unsubscribe };
+      return {
+        update: (_view, prevState) => {
+          if (view.state.doc !== prevState.doc) tryAnchor();
+        },
+        destroy: () => {
+          unsubscribe();
+          unsubscribeAnchor();
+        },
+      };
     },
   });
 }

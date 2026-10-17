@@ -28,6 +28,9 @@ import {
   type CommentDto,
   type CommentThreadDto,
 } from "../types";
+import { listCollaborators, notifyReply, notifyResolved, notifyThreadCreated, type Collaborator } from "./notify";
+
+export { listCollaborators };
 
 export class CommentsError extends Error {
   constructor(
@@ -125,6 +128,18 @@ async function loadThread(threadId: string): Promise<ThreadRow> {
   return row;
 }
 
+async function actorOf(userId: string): Promise<Collaborator> {
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, username: true } });
+  return user ?? { id: userId, username: "someone" };
+}
+
+/** Keep only mentioned ids that are collaborators on the note (never notify a stranger). */
+async function allowedMentions(contentId: string, mentions: string[]): Promise<string[]> {
+  if (mentions.length === 0) return [];
+  const allowed = new Set((await listCollaborators(contentId)).map((c) => c.id));
+  return Array.from(new Set(mentions.filter((id) => allowed.has(id))));
+}
+
 function isUniqueViolation(error: unknown): boolean {
   // The error code, not the class: through the pg adapter the thrown object
   // is not always an `instanceof` the generated client's error class.
@@ -151,6 +166,8 @@ export async function createThread(
 ): Promise<CommentThreadDto> {
   await viewAccess(userId, contentId);
   await spendCommentBudget(userId);
+  const mentions = await allowedMentions(contentId, input.mentions);
+  let thread: CommentThreadDto;
   try {
     const row = await prisma.commentThread.create({
       data: {
@@ -162,17 +179,19 @@ export async function createThread(
           create: {
             authorId: userId,
             body: input.body,
-            mentions: input.mentions as unknown as Prisma.InputJsonValue,
+            mentions: mentions as unknown as Prisma.InputJsonValue,
           },
         },
       },
       include: threadInclude,
     });
-    return toThreadDto(row);
+    thread = toThreadDto(row);
   } catch (error) {
     if (isUniqueViolation(error)) throw new CommentsError(409, "That thread already exists");
     throw error;
   }
+  await notifyThreadCreated({ actor: await actorOf(userId), thread, body: input.body, mentions });
+  return thread;
 }
 
 export async function replyToThread(
@@ -183,13 +202,16 @@ export async function replyToThread(
   const thread = await loadThread(threadId);
   await viewAccess(userId, thread.contentId);
   await spendCommentBudget(userId);
+  const mentions = await allowedMentions(thread.contentId, input.mentions);
   await prisma.$transaction([
     prisma.comment.create({
-      data: { threadId, authorId: userId, body: input.body, mentions: input.mentions as unknown as Prisma.InputJsonValue },
+      data: { threadId, authorId: userId, body: input.body, mentions: mentions as unknown as Prisma.InputJsonValue },
     }),
     prisma.commentThread.update({ where: { id: threadId }, data: { updatedAt: new Date() } }),
   ]);
-  return toThreadDto(await loadThread(threadId));
+  const updated = toThreadDto(await loadThread(threadId));
+  await notifyReply({ actor: await actorOf(userId), thread: updated, body: input.body, mentions });
+  return updated;
 }
 
 export async function setThreadResolved(userId: string, threadId: string, resolved: boolean): Promise<CommentThreadDto> {
@@ -200,7 +222,12 @@ export async function setThreadResolved(userId: string, threadId: string, resolv
     data: resolved ? { resolvedAt: new Date(), resolvedById: userId } : { resolvedAt: null, resolvedById: null },
     include: threadInclude,
   });
-  return toThreadDto(row);
+  const updated = toThreadDto(row);
+  if (resolved && !thread.resolvedAt) {
+    const first = updated.comments.find((c) => !c.deletedAt);
+    await notifyResolved({ actor: await actorOf(userId), thread: updated, body: first?.body ?? "" });
+  }
+  return updated;
 }
 
 export async function deleteThread(userId: string, threadId: string): Promise<void> {

@@ -29,6 +29,7 @@ import { MainPanelContent } from "./content/MainPanelContent";
 import { useSpringTabs } from "./use-spring-tabs";
 import { useExtensionShellControllers } from "@/lib/extensions/client-registry";
 import type { ContentDetailResponse } from "@/lib/domain/content/api-types";
+import { useContentAnchorStore } from "@/state/content-anchor-store";
 
 // Initial content from server-side cache hit (page-level SSR). When the URL
 // names a content id that the server already had in its cache, the page
@@ -317,6 +318,13 @@ export function MainPanelWorkspace({
     const rawContentId = urlParams.get("content");
     const contentIdFromUrl =
       rawContentId && isRealId(rawContentId) ? rawContentId : null;
+    // `?content=<id>&anchor=<kind>:<id>` — open the content AT a spot (a
+    // comment thread from a notification). Same hand-off a wiki-link click
+    // uses; the viewer that shows the content takes it once it can.
+    const anchorFromUrl = urlParams.get("anchor");
+    if (contentIdFromUrl && anchorFromUrl) {
+      useContentAnchorStore.getState().request(contentIdFromUrl, anchorFromUrl);
+    }
     const layoutModeFromUrl = urlParams.get("layout");
     const activePaneIdFromUrl = urlParams.get("pane");
     const paneTabContentIds = {

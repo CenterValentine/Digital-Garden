@@ -119,6 +119,8 @@ async function main() {
     ["lib/domain/mcp/read.ts", /stripCommentMarks\(/],
     ["components/public/TipTapContent.tsx", /stripCommentMarks\(/],
     ["lib/domain/export/converters/html.ts", /stripCommentMarks\(/],
+    // A duplicated note gets no threads, so its copy carries no anchors.
+    ["app/api/content/content/duplicate/route.ts", /stripCommentMarks\(/],
   ];
   for (const [file, pattern] of SEAMS) {
     const source = readFileSync(resolve(process.cwd(), file), "utf8");
@@ -134,6 +136,25 @@ async function main() {
     check("the public net neutralises any slipped anchor", /\.public-prose \[data-comment\]/.test(css));
     const registry = readFileSync(resolve(process.cwd(), "lib/domain/collaboration/extensions.ts"), "utf8");
     check("the collaboration server knows the mark", /ServerCommentMark/.test(registry));
+
+    // Phase 2 wiring: every comment notification kind the service publishes
+    // is registered server-side AND has a client renderer, the `[[Note#`
+    // step lists threads, and the deep link's anchor is consumed.
+    const KINDS = ["comment.new", "comment.reply", "comment.mention", "comment.resolved"];
+    const kinds = readFileSync(resolve(process.cwd(), "lib/domain/notifications/kinds.ts"), "utf8");
+    const renderers = readFileSync(resolve(process.cwd(), "lib/features/notifications/kind-registry.tsx"), "utf8");
+    const notify = readFileSync(resolve(process.cwd(), "lib/domain/comments/server/notify.ts"), "utf8");
+    for (const kind of KINDS) {
+      check(`notification kind ${kind} is registered`, kinds.includes(`"${kind}"`));
+      check(`notification kind ${kind} has a renderer`, renderers.includes(`"${kind}"`));
+      check(`notification kind ${kind} is published`, notify.includes(`"${kind}"`));
+    }
+    const shell = readFileSync(resolve(process.cwd(), "components/content/content/MainPanelContent.tsx"), "utf8");
+    check("the link menu lists comment threads (`[[Note#`)", /listCommentAnchors\(target, query\)/.test(shell));
+    const plugin = readFileSync(resolve(process.cwd(), "lib/domain/editor/extensions/comment-plugin.ts"), "utf8");
+    check("a pending comment anchor is taken by the editor plugin", /useContentAnchorStore\.getState\(\)\.take\(/.test(plugin));
+    const workspace = readFileSync(resolve(process.cwd(), "components/content/MainPanelWorkspace.tsx"), "utf8");
+    check("?anchor= rides with ?content= on open", /urlParams\.get\("anchor"\)/.test(workspace));
   }
 
   // --- 4. The editor -------------------------------------------------------
@@ -185,7 +206,7 @@ async function main() {
     console.error(`\ncomments:check — ${failures} check(s) failed.\n`);
     process.exit(1);
   }
-  console.log("comments:check — OK (predicate, CriticMarkup grammar, 7 seams, source view untouched, editor commands)");
+  console.log(`comments:check — OK (predicate, CriticMarkup grammar, ${SEAMS.length} seams, source view untouched, notifications + anchors wired, editor commands)`);
 }
 
 main().catch((e) => {
