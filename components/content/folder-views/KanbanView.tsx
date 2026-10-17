@@ -102,7 +102,7 @@ function SortableCard({
       style={style}
       {...attributes}
       {...listeners}
-      className="p-3 mb-2 rounded-lg border border-white/10 cursor-move hover:border-primary/30 transition-colors"
+      className="p-3 mb-2 rounded-lg border border-border cursor-move hover:border-primary/30 transition-colors"
     >
       <div
         style={{
@@ -419,7 +419,7 @@ export function KanbanView({
           {columns.map((column) => (
             <DroppableColumn key={column.id} column={column}>
               {/* Column header */}
-              <div className="p-4 border-b border-white/10">
+              <div className="p-4 border-b border-border">
                 <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 flex items-center justify-between">
                   {column.title}
                   <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
@@ -441,17 +441,17 @@ export function KanbanView({
 
                 {column.items.length === 0 && (
                   <div className="flex flex-col items-center justify-center py-8 text-center">
-                    <FileText className="h-12 w-12 text-gray-400 mb-2" />
+                    <FileText className="h-12 w-12 text-muted-foreground mb-2" />
                     <p className="text-xs text-gray-500 dark:text-gray-400">No cards yet</p>
                   </div>
                 )}
               </div>
 
               {/* Add card button */}
-              <div className="p-4 border-t border-white/10">
+              <div className="p-4 border-t border-border">
                 <button
                   onClick={() => handleAddCard(column.id)}
-                  className="w-full flex items-center justify-center gap-2 py-2 text-sm text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 transition-colors"
+                  className="w-full flex items-center justify-center gap-2 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
                 >
                   <Plus className="h-4 w-4" />
                   Add Card
@@ -480,7 +480,7 @@ export function KanbanView({
                   <h4 className="text-sm font-medium text-gray-900 mb-2">
                     {activeItem.title}
                   </h4>
-                  <p className="text-xs text-gray-600 line-clamp-3">{previewLines}</p>
+                  <p className="text-xs text-muted-foreground line-clamp-3">{previewLines}</p>
                 </div>
               );
             })()

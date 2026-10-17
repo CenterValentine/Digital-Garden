@@ -17,7 +17,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Development Commands
 
 ```bash
-pnpm dev              # Start dev server (http://localhost:3015); predev auto-starts the Docker Postgres when LOCAL_POSTGRES=1
+pnpm dev              # Start dev server (http://localhost:3015); auto-starts the Docker Postgres when LOCAL_POSTGRES=1 (scripts/dev.ts)
+pnpm dev -wt <name>   # Serve a worktree without cd: first free port 3015–3025, stops after 15 min (-t 45 / 2h / 0 = none); auto-installs if needed and removes that install on stop
+pnpm wt [days|all]    # List worktrees active in the last 7 days (newest first): name (what -wt takes), branch, last activity, serving/ready/not installed (alias: pnpm worktrees)
+pnpm dev -wt          # No name (or `pnpm dev wt`): CLICK a worktree in the table (or ↑↓ Enter) to serve it; -t still applies
+pnpm wt:install <name>  # Install a worktree's deps to KEEP (not removed when a -wt server stops)
+pnpm pr-checklist:check # Gate for the dev-only PR checklist pill (lib/features/dev-banner/): ticking a box there ticks it on GitHub via `gh auth token`
 pnpm dev:collab       # Local Hocuspocus (ws://localhost:1234) — REQUIRED in dev, run from the same checkout as pnpm dev
 pnpm build            # tsc + 26 validation gates + lint + 2 workspace smokes, then next build — see "Build pipeline" below
 pnpm typecheck        # tsc --noEmit only (fast type check)

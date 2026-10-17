@@ -185,7 +185,7 @@ export function DashboardView({
 
     return (
       <div className="h-full flex items-center justify-center">
-        <div className="text-gray-400">{getIcon(item.contentType)}</div>
+        <div className="text-muted-foreground">{getIcon(item.contentType)}</div>
       </div>
     );
   };
@@ -201,7 +201,7 @@ export function DashboardView({
   if (items.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-center px-4">
-        <ImageIcon className="h-16 w-16 text-gray-400 mb-4" />
+        <ImageIcon className="h-16 w-16 text-muted-foreground mb-4" />
         <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">No items in this folder</p>
         <p className="text-xs text-gray-500 dark:text-gray-400">
           Create content to see it displayed as dashboard tiles
@@ -238,14 +238,14 @@ export function DashboardView({
           return (
           <div
             key={item.id}
-            className="rounded-lg border border-white/10 overflow-hidden cursor-pointer hover:border-primary/30 transition-colors"
+            className="rounded-lg border border-border overflow-hidden cursor-pointer hover:border-primary/30 transition-colors"
             style={{
               background: glass0.background,
               backdropFilter: glass0.backdropFilter,
             }}
             onClick={() => handleItemClick(item)}
           >
-            <div className="drag-handle cursor-move border-b border-white/10 px-3 py-2 bg-white/5">
+            <div className="drag-handle cursor-move border-b border-border px-3 py-2 bg-muted/50">
               <div className="flex items-center gap-2">
                 <div className="text-gray-600 dark:text-gray-400">{getIcon(item.contentType)}</div>
                 <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate flex-1">
