@@ -142,7 +142,7 @@ export function ListView({
   if (children.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-center px-4">
-        <Folder className="h-16 w-16 text-gray-400 mb-4" />
+        <Folder className="h-16 w-16 text-muted-foreground mb-4" />
         <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">This folder is empty</p>
         <p className="text-xs text-gray-500 dark:text-gray-400">
           Add content using the plus button or context menu
@@ -165,7 +165,7 @@ export function ListView({
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg border transition-colors text-left ${
                 isSelected
                   ? "border-primary bg-primary/10 ring-2 ring-primary/20"
-                  : "border-white/10 hover:bg-white/5"
+                  : "border-border hover:bg-muted/50"
               }`}
               style={
                 isSelected

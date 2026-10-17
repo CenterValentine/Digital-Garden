@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
 
+import { DevPrChecklist } from "./DevPrChecklist";
 import { composeWorktreeLabel, getWorktreeIdentity } from "./identity";
 
 /**
@@ -37,7 +38,8 @@ const BANNER_STYLE: CSSProperties = {
 };
 
 /**
- * Dev-only marker naming the worktree/branch this localhost is serving.
+ * Dev-only marker naming the worktree/branch this localhost is serving, plus
+ * the floating PR checklist for that branch (`DevPrChecklist`).
  *
  * Returns null before touching the filesystem in any non-development build, so
  * production pages neither render it nor bail out of static generation.
@@ -49,8 +51,11 @@ export async function DevWorktreeBanner() {
   if (!identity) return null;
 
   return (
-    <div aria-hidden style={BANNER_STYLE}>
-      {composeWorktreeLabel(identity)}
-    </div>
+    <>
+      <div aria-hidden style={BANNER_STYLE}>
+        {composeWorktreeLabel(identity)}
+      </div>
+      <DevPrChecklist />
+    </>
   );
 }
