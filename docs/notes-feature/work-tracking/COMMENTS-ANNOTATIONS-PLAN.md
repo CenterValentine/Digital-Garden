@@ -1,6 +1,6 @@
 ---
 title: Comments & Annotations Plan
-status: approved 2026-10-15 (all §11 defaults adopted) — Phase 0 in progress
+status: Phases 0–2 built 2026-10-16 on `feat/comments-annotations` (headless two-user smoke green; owner smoke + Hocuspocus redeploy pending); Phases 3–4 in BACKLOG.md
 last_updated: 2026-10-15
 owner: centervalentine
 related:

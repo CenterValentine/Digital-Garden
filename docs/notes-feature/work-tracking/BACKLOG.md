@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-10-15
+last_updated: 2026-10-16
 ---
 
 # Sprint Backlog
@@ -9,6 +9,19 @@ last_updated: 2026-10-15
 **Sprint Execution Protocol**: Before commencing any sprint, always ask the user for input before planning and executing — there may be additions or modifications.
 
 ---
+
+## Comments & annotations — follow-ups (2026-10-16, from `COMMENTS-ANNOTATIONS-PLAN.md`)
+
+Phases 0–2 built on `feat/comments-annotations`. Remaining, in the plan's order:
+
+- ⚪ **Post-merge:** redeploy Hocuspocus from a tree matching `origin/main` (schema 1.22.0 — an old server DROPS unknown marks on its next sanitize); `prisma migrate deploy` for `20261016120000_add_comment_threads` (owner-run on Neon); owner browser smoke (lines in CURRENT-SPRINT.md).
+- ⚪ **Phase 3 — highlights without a thread.** `highlight` mark `{ color }` with the reader's five-color vocabulary moved to `lib/domain/content/mark-palette.ts` (reader imports from there); the swatch row from `MarkPopover` in the toolbelt composer as "Highlight only"; markdown `==text=={.yellow}` (Obsidian's standard + the pandoc brace); listed in the Comments tab under a filter.
+- ⚪ **Phase 4 — view-only anchoring.** A view-level collaborator's Hocuspocus connection is read-only; anchor their comments server-side through `/internal/apply` with a new `mark` op that finds the range by text match (`position-anchor.ts`). Until then they reply and leave note-level comments.
+- ⚪ **Phase 4 — realtime for replies.** The tab polls every 30 s; a Hocuspocus stateless "comments changed" message would make replies instant.
+- ⚪ **Phase 4 — AI + MCP.** `read_comments` / `resolve_comment` tools and an "address the comments" charter line; `garden://note/{id}/comments`.
+- ⚪ File-tree unresolved-comment badge; rich comment bodies (links, code).
+- ⚪ Mobile: the composer row can sit under the software keyboard on short phones — move it into the Comments drawer when the viewport is shorter than ~500 px.
+- ⚪ A note-level thread's row shows the author truncated ("smo…") in the 320 px rail — give the name more room than the timestamp.
 
 ## 11 of the 24 `build` gates run in no CI workflow (2026-10-15, found verifying PR #292)
 

@@ -146,7 +146,9 @@ async function main() {
     const notify = readFileSync(resolve(process.cwd(), "lib/domain/comments/server/notify.ts"), "utf8");
     for (const kind of KINDS) {
       check(`notification kind ${kind} is registered`, kinds.includes(`"${kind}"`));
-      check(`notification kind ${kind} has a renderer`, renderers.includes(`"${kind}"`));
+      // The renderer BINDING, not any mention of the kind string (the verb
+      // map names every kind too — a mutant that dropped a binding survived).
+      check(`notification kind ${kind} has a renderer`, new RegExp(`"${kind.replace(".", "\\.")}":\\s*COMMENT_RENDERER`).test(renderers));
       check(`notification kind ${kind} is published`, notify.includes(`"${kind}"`));
     }
     const shell = readFileSync(resolve(process.cwd(), "components/content/content/MainPanelContent.tsx"), "utf8");

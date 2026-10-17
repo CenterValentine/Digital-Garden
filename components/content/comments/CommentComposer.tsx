@@ -219,7 +219,6 @@ export function CommentComposer({
         disabled={busy}
         aria-label={placeholder}
         aria-autocomplete={contentId ? "list" : undefined}
-        aria-expanded={mentionQuery ? suggestions.length > 0 : undefined}
         className={cn(
           "min-h-[30px] flex-1 resize-none rounded px-2 py-1 text-sm leading-5 outline-none",
           dark
