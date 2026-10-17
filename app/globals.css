@@ -2016,6 +2016,54 @@ body.flashcard-select-cursor * {
   display: none;
 }
 
+/* ── Comment threads ──────────────────────────────────────────────────────
+ * A commented passage is marked LIGHTLY — a translucent accent fill and a thin
+ * underline — so it reads as "the app is pointing here", never as a
+ * highlighter competing with the text. Gold is the app's accent (the
+ * collaboration caret, the active rail tab); the reader's five colors stay
+ * free for real highlights. State classes are editor DECORATIONS keyed by
+ * thread id (comments plugin), never mark attributes. Overlapping threads
+ * stack their fills, which reads naturally as "more than one".
+ * ──────────────────────────────────────────────────────────────────────── */
+.ProseMirror .comment-mark {
+  background: color-mix(in srgb, var(--gold-primary) 12%, transparent);
+  border-bottom: 2px solid color-mix(in srgb, var(--gold-primary) 55%, transparent);
+  border-radius: 2px;
+  cursor: pointer;
+  transition: background-color 150ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+.ProseMirror .comment-mark--hover {
+  background: color-mix(in srgb, var(--gold-primary) 22%, transparent);
+}
+.ProseMirror .comment-mark--active {
+  background: color-mix(in srgb, var(--gold-primary) 30%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--gold-primary) 60%, transparent);
+}
+.ProseMirror .comment-mark--resolved {
+  background: none;
+  border-bottom: none;
+  cursor: text;
+}
+/* The composer is open on this selection; nothing is written yet. */
+.ProseMirror .comment-mark--pending {
+  border-bottom: 2px dashed color-mix(in srgb, var(--gold-primary) 55%, transparent);
+}
+.dark .ProseMirror .comment-mark {
+  background: color-mix(in srgb, var(--gold-primary) 16%, transparent);
+}
+.dark .ProseMirror .comment-mark--hover {
+  background: color-mix(in srgb, var(--gold-primary) 26%, transparent);
+}
+.dark .ProseMirror .comment-mark--active {
+  background: color-mix(in srgb, var(--gold-primary) 34%, transparent);
+}
+/* Never on a public page — the JSON strip is the real guard; this is the net. */
+.public-prose [data-comment] {
+  background: none;
+  border: 0;
+  box-shadow: none;
+}
+
 /* Sprint 41: Chat outline scroll-to flash animation */
 @keyframes chat-outline-flash {
   0% { background-color: rgba(255, 215, 0, 0.15); }

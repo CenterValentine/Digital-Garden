@@ -64,6 +64,8 @@ const tm = (text: string, marks: string[]): JSONContent => ({ type: "text", text
 const h = (level: number, text: string, attrs?: Record<string, unknown>): JSONContent => ({ type: "heading", attrs: { level, ...(attrs ?? {}) }, content: [t(text)] });
 const list = (items: string[], type: string): JSONContent => ({ type, content: items.map((i) => ({ type: "listItem", content: [p([t(i)])] })) });
 const tc = (text: string): JSONContent => ({ type: "tableCell", content: [p([t(text)])] });
+const COMMENT_A = "0a0a0a0a-0a0a-4a0a-8a0a-0a0a0a0a0a0a";
+const COMMENT_B = "0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b";
 
 // ── 1. Construct battery ─────────────────────────────────────────────────────
 console.log("  ── construct battery ──");
@@ -127,6 +129,16 @@ const constructs: Array<{ name: string; doc: JSONContent }> = [
   { name: "private block", doc: doc({ type: "privateBlock", content: [p([t("hidden")]), p([t("more")])] }) },
   { name: "private block in blockquote", doc: doc({ type: "blockquote", content: [{ type: "privateBlock", content: [p([t("q-hidden")])] }] }) },
   { name: "literal %%x%% text", doc: doc(p([t("a %%b%% c")])) },
+  // Comment-thread anchors (CriticMarkup): alone, under bold, spanning a link,
+  // two threads overlapping, inside a list item and a table cell, and the
+  // pathological literal form in prose (must stay lossless — it fences).
+  { name: "comment mark", doc: doc(p([t("keep "), { type: "text", text: "noted", marks: [{ type: "comment", attrs: { threadId: COMMENT_A } }] }, t(" end")])) },
+  { name: "comment + bold", doc: doc(p([{ type: "text", text: "both", marks: [{ type: "bold" }, { type: "comment", attrs: { threadId: COMMENT_A } }] }])) },
+  { name: "comment spanning a link", doc: doc(p([{ type: "text", text: "dg", marks: [{ type: "link", attrs: { href: "https://x.com" } }, { type: "comment", attrs: { threadId: COMMENT_A } }] }, { type: "text", text: " tail", marks: [{ type: "comment", attrs: { threadId: COMMENT_A } }] }])) },
+  { name: "overlapping comments", doc: doc(p([{ type: "text", text: "one ", marks: [{ type: "comment", attrs: { threadId: COMMENT_A } }] }, { type: "text", text: "both", marks: [{ type: "comment", attrs: { threadId: COMMENT_A } }, { type: "comment", attrs: { threadId: COMMENT_B } }] }, { type: "text", text: " two", marks: [{ type: "comment", attrs: { threadId: COMMENT_B } }] }])) },
+  { name: "comment in list item", doc: doc({ type: "bulletList", content: [{ type: "listItem", content: [p([t("a "), { type: "text", text: "noted", marks: [{ type: "comment", attrs: { threadId: COMMENT_A } }] }])] }] }) },
+  { name: "comment in table cell", doc: doc({ type: "table", content: [{ type: "tableRow", content: [{ type: "tableCell", content: [p([{ type: "text", text: "cell", marks: [{ type: "comment", attrs: { threadId: COMMENT_A } }] }])] }, tc("B")] }] }) },
+  { name: "literal {==x==}{>>#id<<} text", doc: doc(p([t(`a {==b==}{>>#${COMMENT_A}<<} c`)])) },
   { name: "literal %% in code block", doc: doc({ type: "codeBlock", content: [t("%%{init: {}}%%")] }) },
 ];
 for (const c of constructs) {
@@ -298,6 +310,30 @@ console.log("\n  ── custom-block codecs (pretty markdown, not base64) ──
   if (!inline.ok) fail("privateText mark — LOSSY");
   else if (inline.fenced || !inline.md.includes("%%secret%%")) fail(`privateText mark — expected %%secret%%, got ${JSON.stringify(inline.md.slice(0, 40))}`);
   else pass("privateText → %%secret%% markdown");
+}
+
+// Comment anchors: CriticMarkup on the way out, never a fence, nested forms
+// for overlapping threads; the literal form in prose fences (lossless).
+{
+  const one = lossless(doc(p([t("keep "), { type: "text", text: "noted", marks: [{ type: "comment", attrs: { threadId: COMMENT_A } }] }, t(" end")])));
+  if (!one.ok) fail("comment mark — LOSSY");
+  else if (one.fenced || !one.md.includes(`{==noted==}{>>#${COMMENT_A}<<}`)) fail(`comment mark — expected {==noted==}{>>#id<<}, got ${JSON.stringify(one.md.slice(0, 80))}`);
+  else pass("comment → {==noted==}{>>#id<<} markdown");
+
+  const bold = lossless(doc(p([{ type: "text", text: "both", marks: [{ type: "bold" }, { type: "comment", attrs: { threadId: COMMENT_A } }] }])));
+  if (!bold.ok) fail("comment + bold — LOSSY");
+  else if (bold.fenced || !/\{==\*\*both\*\*==\}|\*\*\{==both==\}/.test(bold.md)) fail(`comment + bold — expected a pretty form, got ${JSON.stringify(bold.md.slice(0, 80))}`);
+  else pass("comment + bold → pretty CriticMarkup, not HTML");
+
+  const overlap = lossless(doc(p([{ type: "text", text: "one ", marks: [{ type: "comment", attrs: { threadId: COMMENT_A } }] }, { type: "text", text: "both", marks: [{ type: "comment", attrs: { threadId: COMMENT_A } }, { type: "comment", attrs: { threadId: COMMENT_B } }] }])));
+  if (!overlap.ok) fail("overlapping comments — LOSSY");
+  else if (overlap.fenced || !overlap.md.includes(`{>>#${COMMENT_B}<<}`) || !overlap.md.includes(`{>>#${COMMENT_A}<<}`)) fail(`overlapping comments — expected nested forms, got ${JSON.stringify(overlap.md.slice(0, 120))}`);
+  else pass("overlapping comments → nested CriticMarkup");
+
+  const literal = lossless(doc(p([t(`a {==b==}{>>#${COMMENT_A}<<} c`)])));
+  if (!literal.ok) fail("literal CriticMarkup text — LOSSY");
+  else if (!literal.fenced) fail("literal CriticMarkup text — should fence (would re-parse as a comment)");
+  else pass("literal {==x==}{>>#id<<} prose fences (lossless)");
 }
 
 // ── 2d. Tables (regression: every TipTap table used to leak as raw HTML) ─────

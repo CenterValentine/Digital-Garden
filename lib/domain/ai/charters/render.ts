@@ -30,6 +30,7 @@ import {
   type HtmlBridge,
 } from "@/lib/domain/content/markdown-serialize";
 import { stripPrivateContent } from "@/lib/domain/content/private-content";
+import { stripCommentMarks } from "@/lib/domain/content/comments";
 import { columnLinkSyntax } from "@/lib/domain/data/column-anchor";
 
 /**
@@ -38,7 +39,9 @@ import { columnLinkSyntax } from "@/lib/domain/data/column-anchor";
  * the plain fallback can never leak what the rich path hid.
  */
 function withoutPrivate(nodes: JSONContent[]): JSONContent[] {
-  return stripPrivateContent({ type: "doc", content: nodes }).content ?? [];
+  // Comment anchors go too (text kept): a thread is discussion ABOUT the
+  // charter, not the charter.
+  return stripCommentMarks(stripPrivateContent({ type: "doc", content: nodes })).content ?? [];
 }
 
 // ── Wiki-link preservation ───────────────────────────────────────────────────

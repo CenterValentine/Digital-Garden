@@ -14,9 +14,10 @@
 
 import type { JSONContent } from "@tiptap/core";
 import { stripPrivateContent } from "@/lib/domain/content/private-content";
+import { stripCommentMarks } from "@/lib/domain/content/comments";
 import { tiptapToMarkdown } from "@/lib/domain/content/markdown";
 
-/** A note body as an external agent may see it: markdown, private prose removed. */
+/** A note body as an external agent may see it: markdown, private prose removed, comment anchors removed (text kept). */
 export function renderNoteForMcp(tiptapJson: JSONContent): string {
-  return tiptapToMarkdown(stripPrivateContent(tiptapJson));
+  return tiptapToMarkdown(stripCommentMarks(stripPrivateContent(tiptapJson)));
 }
