@@ -20,6 +20,18 @@ export interface ReaderLocator {
     position?: number;
     start?: number;
     end?: number;
+    /** 0-based page for fixed-layout sources (PDF). */
+    page?: number;
+  };
+  /**
+   * An area rather than a text range: scanned pages, figures, archival images
+   * (RESEARCH-READER-PLAN.md §9.8). Rects are fractions of the page/image
+   * (0..1, origin top-left) so they survive any render size. Zotero image
+   * annotations import into this shape; drawing them is V1.2 (Archives).
+   */
+  region?: {
+    page?: number;
+    rects: Array<{ x: number; y: number; w: number; h: number }>;
   };
   text?: {
     before?: string;

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { BookOpen } from "lucide-react";
-import { READER_LIBRARY_CONTENT_ID } from "../manifest";
+import { READER_LIBRARY_CONTENT_ID, READER_RESEARCH_CONTENT_ID } from "../manifest";
 import {
   openBookTab,
   placeShortcut,
@@ -12,6 +12,7 @@ import {
 } from "../lib/use-acquire";
 import { useReaderSession } from "../state/reader-store";
 import { ReaderBookSidebar } from "./ReaderBookSidebar";
+import { ResearchWorkPanel } from "./research/ResearchWorkPanel";
 import {
   BookDetailsPanel,
   queryFromEntry,
@@ -35,6 +36,9 @@ export function ReaderSidebarPanel({ contentId }: { contentId: string }) {
   const [placing, setPlacing] = useState(false);
   const inLibrary = contentId === READER_LIBRARY_CONTENT_ID;
   const openBook = useReaderSession((state) => state.openBooks[contentId] ?? null);
+
+  // The Research tab's selected Work.
+  if (contentId === READER_RESEARCH_CONTENT_ID) return <ResearchWorkPanel />;
 
   // An open book: notes, contents, display settings and details share this tab.
   if (!inLibrary && openBook) {

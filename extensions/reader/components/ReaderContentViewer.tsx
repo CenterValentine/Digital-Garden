@@ -7,11 +7,13 @@ import { useContentSidebarClaims } from "@/lib/extensions/content-sidebar";
 import {
   READER_EXTENSION_ID,
   READER_LIBRARY_CONTENT_ID,
+  READER_RESEARCH_CONTENT_ID,
   READER_SCRIPTURES_CONTENT_ID,
   READER_VIRTUAL_PREFIX,
 } from "../manifest";
 import { corpusIdFromTabId, SCRIPTURE_RESOURCE_TYPE } from "@/lib/domain/scripture/types";
 import { LibraryView } from "./LibraryView";
+import { ResearchView } from "./research/ResearchView";
 import { ScriptureCatalog } from "./ScriptureCatalog";
 import { ScriptureReader } from "./ScriptureReader";
 import { ScriptureSessionViewer } from "./ScriptureSessionViewer";
@@ -51,6 +53,8 @@ export function ReaderContentViewer({
     <ReaderErrorBoundary resetKey={selectedContentId}>
       {selectedContentId === READER_LIBRARY_CONTENT_ID ? (
         <LibraryView />
+      ) : selectedContentId === READER_RESEARCH_CONTENT_ID ? (
+        <ResearchView />
       ) : selectedContentId === READER_SCRIPTURES_CONTENT_ID ? (
         <div className="h-full overflow-auto p-6">
           <div className="mx-auto max-w-3xl">
