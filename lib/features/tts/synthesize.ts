@@ -14,6 +14,7 @@
 
 import {
   getCachedSpeech,
+  hasCachedSpeech,
   putCachedSpeech,
   speechCacheKey,
 } from "./cache";
@@ -23,6 +24,23 @@ export interface SynthesizeOptions {
   voice?: string;
   signal?: AbortSignal;
 }
+
+/**
+ * A synthesized clip plus the route that produced it.
+ *
+ * `cached` is what makes the cost tooltip honest: a replay of an already-read
+ * note bills nothing, and the UI must say so rather than re-quoting the
+ * original price.
+ */
+export interface SpeechResult {
+  blob: Blob;
+  providerId: string | null;
+  modelId: string | null;
+  cached: boolean;
+}
+
+/** True when this exact text+voice is already in the session cache (free). */
+export { hasCachedSpeech, speechCacheKey };
 
 /** Error carrying the HTTP status so callers can distinguish setup vs network. */
 export class SpeechSynthesisError extends Error {
@@ -41,10 +59,17 @@ export class SpeechSynthesisError extends Error {
 export async function getSpeechBlob(
   text: string,
   options: SynthesizeOptions = {},
-): Promise<Blob> {
+): Promise<SpeechResult> {
   const key = speechCacheKey(text, options.voice);
   const cached = getCachedSpeech(key);
-  if (cached) return cached;
+  if (cached) {
+    return {
+      blob: cached.blob,
+      providerId: cached.providerId,
+      modelId: cached.modelId,
+      cached: true,
+    };
+  }
 
   const res = await fetch("/api/ai/speech", {
     method: "POST",
@@ -64,7 +89,12 @@ export async function getSpeechBlob(
     throw new SpeechSynthesisError(message, res.status);
   }
 
+  // The route stamps the resolved route on the response so the client can price
+  // the read without duplicating the server's provider-resolution ladder.
+  const providerId = res.headers.get("X-Speech-Provider");
+  const modelId = res.headers.get("X-Speech-Model");
+
   const blob = await res.blob();
-  putCachedSpeech(key, blob);
-  return blob;
+  putCachedSpeech(key, { blob, providerId, modelId });
+  return { blob, providerId, modelId, cached: false };
 }

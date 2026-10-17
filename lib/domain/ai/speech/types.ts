@@ -59,6 +59,30 @@ export function describeSpeechError(error: unknown): string {
   return message.includes(SPEECH_NO_KEY_MARKER) ? SPEECH_SETUP_HINT : message;
 }
 
+/**
+ * Maximum input characters a single synthesis request accepts, per provider.
+ *
+ * These are the PROVIDERS' limits, not ours — exceeding one is rejected
+ * upstream, not by us. Modelling them here lets `/api/ai/speech` fail with an
+ * accurate, actionable message instead of forwarding a request it knows will
+ * bounce (which previously surfaced as an opaque 502 and a silent downgrade to
+ * the browser's Web Speech voice — GitHub #65).
+ *
+ *   OpenAI      4096 — documented hard cap on the /audio/speech endpoint
+ *   ElevenLabs  5000 — per-request character cap on the TTS endpoint
+ *   Google      5000 — bytes, not characters; 5000 chars is the safe ASCII
+ *                      bound and under-counts only for multi-byte scripts
+ *
+ * Clients should chunk BELOW the smallest of these (see
+ * `lib/features/tts/chunk-text.ts`) so one cached chunk stays valid if the
+ * user's resolved provider changes.
+ */
+export const SPEECH_MAX_INPUT_CHARS: Record<SpeechProviderId, number> = {
+  openai: 4096,
+  elevenlabs: 5000,
+  google: 5000,
+};
+
 /** MIME type for a given output format. */
 export const SPEECH_FORMAT_MIME: Record<SpeechFormat, string> = {
   mp3: "audio/mpeg",

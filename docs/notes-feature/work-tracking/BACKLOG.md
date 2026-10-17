@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-10-12
+last_updated: 2026-10-15
 ---
 
 # Sprint Backlog
@@ -9,6 +9,22 @@ last_updated: 2026-10-12
 **Sprint Execution Protocol**: Before commencing any sprint, always ask the user for input before planning and executing — there may be additions or modifications.
 
 ---
+
+## 11 of the 24 `build` gates run in no CI workflow (2026-10-15, found verifying PR #292)
+
+`pnpm build` chains 24 `*:check` / `*:smoke` gates, but **CI runs a hand-picked subset and no workflow runs `pnpm build` itself** — `quality.yml` enumerates its gates by name, and `vercel-build` skips the chain entirely (`prisma generate && build:tokens && next build`). So these 11 fire **only when a human or an agent runs a full local build**:
+
+`ai:diagnostics:check` · `ai:pricing:check` · `blockid:hygiene:check` · `contrast:check` · `data:read:check` · `extensions:check` · `feedback:check` · `handles:check` · `inspector:check` · `polling:check` · `private:content:check`
+
+Several of those guard exactly the silent-failure classes they were written for *because* nothing else catches them: `private:content:check` pins the `stripPrivateContent` egress-seam list (a missed seam leaks commented-out prose to the AI or the public site); `blockid:hygiene:check` protects per-block Y.Doc sub-map identity; `extensions:check` is the reason a new extension's settings page doesn't 404; `handles:check` is the only thing asserting that a stale AI edit anchor refuses instead of rewriting the wrong block.
+
+**Measured 2026-10-15 on `809f74a7`: all 11 pass.** So wiring them up is additive and cheap right now — there is no latent breakage to triage first. It only gets more expensive the longer they drift unenforced, and the count is growing (10 on 2026-10-09, 11 now with `feedback:check`).
+
+Root cause is structural, not neglect: a new gate needs **two** registrations — the `build` chain and a workflow step — and nothing fails if you skip the second. That is the same double-registration shape as the extension registry (`installed.ts` + `manifests.ts`), except that one has `extensions:check` enforcing the pair and this one has nothing.
+
+- [ ] Add a `gates` job to `quality.yml` running the 11 unenforced scripts (all green today, so expect a green first run — then mutation-test one to prove the job actually fails the build).
+- [ ] Prefer making the job derive its list from `package.json`'s `build` script over hand-listing, so a future gate is enforced by existing, not by remembering. If it must be hand-listed, add a check that asserts every `:check` in `build` appears in some workflow — the gate-for-the-gates.
+- [ ] Note in CLAUDE.md's "CI gates" section which gates are CI-enforced vs build-chain-only, so "verified in CI" in a PR body stops being guesswork. (Two merged PRs, #244 and #292, claimed CI coverage for `handles:check` that did not exist.)
 
 ## DOCX template renderer — follow-ups (2026-10-12, from `DOCX-TEMPLATE-RENDERER-PLAN.md`)
 
