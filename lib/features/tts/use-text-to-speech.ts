@@ -18,6 +18,8 @@ export interface UseTextToSpeech extends TtsState {
   resume: () => void;
   stop: () => void;
   seek: (seconds: number) => void;
+  /** Scrub to a fraction (0–1) of the read — works on BOTH engines. */
+  seekFraction: (fraction: number) => void;
   setRate: (rate: number) => void;
   /** Replay the last read (idle mini-player). */
   replay: () => void;
@@ -38,6 +40,7 @@ export function useTextToSpeech(): UseTextToSpeech {
     resume: () => ttsController.resume(),
     stop: () => ttsController.stop(),
     seek: (seconds) => ttsController.seek(seconds),
+    seekFraction: (fraction) => ttsController.seekFraction(fraction),
     setRate: (rate) => ttsController.setRate(rate),
     replay: () => ttsController.replayLast(),
   };

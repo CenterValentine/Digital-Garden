@@ -21,14 +21,19 @@ import { generateSpeech } from "@/lib/domain/ai/speech/generate";
 import { resolveSpeechGenRoute } from "@/lib/domain/ai/speech/generate-and-store";
 import {
   describeSpeechError,
+  SPEECH_MAX_INPUT_CHARS,
   SPEECH_NO_KEY_MARKER,
   type SpeechFormat,
   type SpeechModelId,
   type SpeechProviderId,
 } from "@/lib/domain/ai/speech/types";
 
-/** Upper bound on a single read — guards cost/latency on a whole-doc read. */
-const MAX_TTS_CHARS = 8000;
+/**
+ * Cheap outer sanity bound, applied before we do any work. The REAL limit is
+ * the resolved provider's (`SPEECH_MAX_INPUT_CHARS`), checked after routing —
+ * this only rejects input so large it isn't worth resolving a connection for.
+ */
+const ABSURD_INPUT_CHARS = 100_000;
 
 interface SpeechRequestBody {
   text?: string;
@@ -62,11 +67,11 @@ export async function POST(request: NextRequest) {
       { status: 400 },
     );
   }
-  if (text.length > MAX_TTS_CHARS) {
+  if (text.length > ABSURD_INPUT_CHARS) {
     return NextResponse.json(
       {
         success: false,
-        error: `Text too long to read in one request (${text.length} > ${MAX_TTS_CHARS} characters).`,
+        error: `Text too long to read (${text.length} characters).`,
       },
       { status: 413 },
     );
@@ -77,6 +82,22 @@ export async function POST(request: NextRequest) {
     providerId: body?.providerId ?? "openai",
     modelId: body?.modelId ?? "tts-1",
   });
+
+  // Enforce the RESOLVED provider's real cap. Forwarding an over-length request
+  // would fail upstream as an opaque 502, which callers can't distinguish from
+  // a credential or network fault — so they'd degrade for the wrong reason.
+  const providerLimit = SPEECH_MAX_INPUT_CHARS[resolved.providerId];
+  if (providerLimit && text.length > providerLimit) {
+    return NextResponse.json(
+      {
+        success: false,
+        error:
+          `Text too long for ${resolved.providerId} in one request ` +
+          `(${text.length} > ${providerLimit} characters). Split it into smaller chunks.`,
+      },
+      { status: 413 },
+    );
+  }
 
   try {
     const result = await generateSpeech(
