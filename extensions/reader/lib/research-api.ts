@@ -75,6 +75,8 @@ export const researchApi = {
     key: string;
     identifiers?: WorkIdentifier[];
     parentId?: string | null;
+    /** "top" (default) or right after a sibling the picker chose. */
+    place?: "top" | { afterId: string };
     fallback?: Work;
     sourceAdapter?: string;
   }) =>

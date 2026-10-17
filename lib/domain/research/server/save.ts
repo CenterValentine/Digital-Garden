@@ -24,6 +24,8 @@ import { normalizeUrl, validateExternalUrl } from "@/lib/domain/content/external
 import { generateUniqueSlug } from "@/lib/domain/content/slug";
 import { MAX_BOOK_BYTES, readerFetch } from "@/lib/domain/reader/server/http";
 import { resolveFolderTarget, storeBookFile } from "@/lib/domain/reader/server/library";
+import { placeExistingRow } from "@/lib/domain/content/sibling-slot";
+import type { ArrivalPlacement } from "@/lib/domain/content/sibling-order";
 import { READER_MIME_TYPES } from "@/lib/domain/reader/types";
 import { isStorableLicense } from "../adapter";
 import { identifierKeys, parseIdentifierKey } from "../identifiers";
@@ -125,6 +127,11 @@ export interface SaveWorkInput {
   /** Further identifiers the client knows (from a merged search result). */
   identifiers?: WorkIdentifier[];
   parentId?: string | null;
+  /**
+   * Where in the folder it lands: the top (what you put somewhere lands
+   * where you look), or right after a sibling the picker chose.
+   */
+  placement?: ArrivalPlacement;
   /** The client's Work — used only if every source is unreachable, and then as a link. */
   fallback?: Work;
   sourceAdapter?: string;
@@ -202,6 +209,7 @@ export async function saveWork(input: SaveWorkInput): Promise<SaveWorkResult> {
     create: { contentId, ownerId, ...meta },
     update: meta,
   });
+  await placeExistingRow({ ownerId, rowId: contentId, parentId, placement: input.placement ?? "top" });
 
   return { contentId, title: work.title, parentId, duplicate: false, copyPolicy };
 }
@@ -214,6 +222,7 @@ export async function saveLegalLink(input: {
   ownerId: string;
   identifier: WorkIdentifier;
   parentId?: string | null;
+  placement?: ArrivalPlacement;
 }): Promise<SaveWorkResult> {
   const { ownerId, identifier } = input;
   const link = isLegalScheme(identifier.scheme) ? legalLink(identifier.scheme, identifier.value) : null;
@@ -256,5 +265,6 @@ export async function saveLegalLink(input: {
       provenance: [],
     },
   });
+  await placeExistingRow({ ownerId, rowId: contentId, parentId, placement: input.placement ?? "top" });
   return { contentId, title: work.title, parentId, duplicate: false, copyPolicy: "link" };
 }

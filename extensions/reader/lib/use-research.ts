@@ -14,9 +14,11 @@ import { parseIdentifierQuery, identifierKey } from "@/lib/domain/research/ident
 import { toResearchQuery } from "@/lib/domain/research/query-syntax";
 import { RESEARCH_SOURCES } from "@/lib/domain/research/sources";
 import type { Work, WorkIdentifier } from "@/lib/domain/research/types";
+import { withOptimisticTreeRow } from "@/lib/features/content/tree-optimistic";
 import { useContentStore } from "@/state/content-store";
+import { useTreeTargetStore } from "@/state/tree-target-store";
 import { useResearchStore } from "../state/research-store";
-import { researchApi, streamResearchSearch } from "./research-api";
+import { researchApi, streamResearchSearch, type SaveResult } from "./research-api";
 
 let sequence = 0;
 let inflight: AbortController | null = null;
@@ -118,22 +120,58 @@ function truncate(text: string, max = 60): string {
   return text.length > max ? `${text.slice(0, max - 1)}…` : text;
 }
 
-/** Add a Work (or the Law stub's link) to the folder the tab was opened for. */
-export async function addWorkToFolder(work: Work | { key: string; title: string }, options: { open?: boolean } = {}) {
+/**
+ * Where an Add lands when the user hasn't pointed somewhere: the file tree's
+ * live "+" target (a selected folder → inside; a selected item → beside it;
+ * nothing → the top), else the "+" the tab was opened from (the tree isn't
+ * mounted — a detached pane).
+ */
+export function currentAddTarget(): { parentId: string | null; label: string } {
+  const live = useTreeTargetStore.getState().addTarget;
+  if (live) return { parentId: live.serverParentId, label: live.label };
+  return { parentId: useResearchStore.getState().targetParentId, label: "the folder you opened Research from" };
+}
+
+export interface AddOptions {
+  open?: boolean;
+  /** A destination the user chose in the picker (hold on Add). */
+  parentId?: string | null;
+  place?: "top" | { afterId: string };
+}
+
+/**
+ * Add a Work (or the Law stub's link) to a folder: the chosen one, else the
+ * tree's live target. Resolves to what was saved (for the picker to name the
+ * placed row), or null when nothing was.
+ */
+export async function addWorkToFolder(
+  work: Work | { key: string; title: string },
+  options: AddOptions = {}
+): Promise<SaveResult | null> {
   const store = useResearchStore.getState();
   const existing = store.saved[work.key];
-  if (existing) {
+  if (existing && options.parentId === undefined) {
     if (options.open) openSaved(existing.contentId, work.title, existing.copyPolicy);
-    return;
+    return null;
   }
+  const parentId = options.parentId !== undefined ? options.parentId : currentAddTarget().parentId;
+  const place = options.place ?? "top";
   try {
     const isWork = "identifiers" in work;
-    const result = await researchApi.save({
-      key: work.key,
-      identifiers: isWork ? identifierList(work) : undefined,
-      parentId: store.targetParentId,
-      fallback: isWork ? work : undefined,
-    });
+    // Shown in the tree at once, where it lands (the reader's creates' path);
+    // a duplicate resolves to nothing new.
+    const result = await withOptimisticTreeRow(
+      { title: work.title, contentType: "external", parentId, place },
+      () =>
+        researchApi.save({
+          key: work.key,
+          identifiers: isWork ? identifierList(work) : undefined,
+          parentId,
+          place,
+          fallback: isWork ? work : undefined,
+        }),
+      (saved) => (saved.duplicate ? null : saved.contentId)
+    );
     useResearchStore.getState().markSaved(work.key, result.contentId, result.copyPolicy);
     const path = await folderPathOf(result.contentId);
     const how =
@@ -146,8 +184,10 @@ export async function addWorkToFolder(work: Work | { key: string; title: string 
       description: result.duplicate ? undefined : truncate(work.title, 80),
     });
     if (options.open) openSaved(result.contentId, result.title, result.copyPolicy);
+    return result;
   } catch (error) {
     toast.error(error instanceof Error ? error.message : "Could not add it");
+    return null;
   }
 }
 

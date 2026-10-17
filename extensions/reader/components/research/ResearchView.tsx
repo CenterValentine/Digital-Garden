@@ -13,7 +13,7 @@
  * from the intent palette (`work-labels.ts`).
  */
 
-import { useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   ArrowRight,
@@ -30,6 +30,7 @@ import {
   SlidersHorizontal,
   X,
 } from "lucide-react";
+import { ContentTreePicker, useWorkspaceViewOptions } from "@/components/content/pickers/ContentTreePicker";
 import { getSurfaceStyles } from "@/lib/design/system";
 import { FIELD_GROUPS, RESEARCH_FIELDS } from "@/lib/domain/research/fields";
 import { parseIdentifierQuery } from "@/lib/domain/research/identifiers";
@@ -40,6 +41,7 @@ import { KNOWN_WORK_TYPES, type Work } from "@/lib/domain/research/types";
 import type { SourceReport } from "@/lib/domain/research/federate";
 import { READER_RESEARCH_CONTENT_ID } from "../../manifest";
 import { revealReaderSidebar } from "../../lib/sidebar";
+import { useTreeTargetStore } from "@/state/tree-target-store";
 import { addWorkToFolder, hasMoreResults, runResearchSearch } from "../../lib/use-research";
 import { useResearchStore, type ResearchLinkResult } from "../../state/research-store";
 import { accessBadge, authorLine, RETRACTION_LABELS, toneStyle, typeLabel, typeTone } from "./work-labels";
@@ -72,6 +74,115 @@ const PICKER_SCOPES = RESEARCH_SCOPES.filter((scope) => !scope.local);
 
 const glass1 = getSurfaceStyles("glass-1");
 const glass2 = getSurfaceStyles("glass-2");
+
+/** Holding Add this long opens the picker (the reader's Contents hold uses the same). */
+const ADD_HOLD_MS = 450;
+
+/**
+ * The Add control: a click adds to the tree's live target; a hold (or a
+ * right-click) opens the shared tree picker so the user chooses the folder
+ * and the exact slot — the same "+ … here" affordances every picker has.
+ */
+function AddControl({
+  work,
+  savedId,
+  tone,
+}: {
+  work: Work | { key: string; title: string };
+  savedId: string | null;
+  tone: "card" | "link";
+}) {
+  const targetLabel = useTreeTargetStore((state) => state.addTarget?.label ?? "the folder you opened Research from");
+  const { views, defaultViewId } = useWorkspaceViewOptions();
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const heldRef = useRef(false);
+  // The picker's anchor is captured when it opens, never read from the ref during render.
+  const [pickerAnchor, setPickerAnchor] = useState<HTMLElement | null>(null);
+
+  const cancelHold = useCallback(() => {
+    if (holdTimer.current) clearTimeout(holdTimer.current);
+    holdTimer.current = null;
+  }, []);
+  const startHold = useCallback(() => {
+    heldRef.current = false;
+    cancelHold();
+    holdTimer.current = setTimeout(() => {
+      heldRef.current = true;
+      setPickerAnchor(buttonRef.current);
+    }, ADD_HOLD_MS);
+  }, [cancelHold]);
+  useEffect(() => cancelHold, [cancelHold]);
+
+  const label = savedId ? "Open" : tone === "link" ? "Add as link" : "Add";
+  return (
+    <>
+      <button
+        ref={buttonRef}
+        type="button"
+        title={savedId ? "In your library — open it" : `Add to ${targetLabel} · hold or right-click to choose where`}
+        data-no-select
+        onPointerDown={(event) => {
+          // The card selects on click; a press on Add — held or not — is Add's alone.
+          event.stopPropagation();
+          startHold();
+        }}
+        onPointerUp={(event) => {
+          event.stopPropagation();
+          cancelHold();
+        }}
+        onPointerLeave={cancelHold}
+        onPointerCancel={cancelHold}
+        onContextMenu={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          cancelHold();
+          setPickerAnchor(event.currentTarget);
+        }}
+        onClick={(event) => {
+          event.stopPropagation();
+          if (heldRef.current) {
+            heldRef.current = false;
+            return;
+          }
+          void addWorkToFolder(work, { open: Boolean(savedId) });
+        }}
+        className={`inline-flex h-6 shrink-0 select-none items-center gap-1 rounded-full border px-2 text-[11px] font-medium transition-colors ${
+          savedId
+            ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+            : "border-black/10 text-foreground hover:border-[var(--work-tone)] hover:bg-[color-mix(in_srgb,var(--work-tone)_12%,transparent)] dark:border-white/15"
+        }`}
+      >
+        {savedId ? <Check className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
+        {label}
+      </button>
+      {pickerAnchor && (
+        <ContentTreePicker
+          anchorEl={pickerAnchor}
+          onPick={() => undefined}
+          onClose={() => setPickerAnchor(null)}
+          views={views}
+          defaultViewId={defaultViewId}
+          searchPlaceholder="Where should this paper go? Search… or browse below"
+          quickCreate={{
+            defaultTitle: work.title,
+            noun: "paper",
+            verb: "Add",
+            pickCreatesInside: true,
+            leafPickPlacesAfter: true,
+            create: async ({ parentId, place }) => {
+              const saved = await addWorkToFolder(work, { parentId, place });
+              return saved
+                ? { id: saved.contentId, title: saved.title, contentType: saved.copyPolicy === "stored" ? "file" : "external" }
+                : null;
+            },
+            onCreated: () => setPickerAnchor(null),
+          }}
+        />
+      )}
+    </>
+  );
+}
 
 export function ResearchView() {
   const scopeId = useResearchStore((state) => state.scope);
@@ -529,9 +640,13 @@ function WorkCard({
       <div
         role="button"
         tabIndex={0}
-        onClick={onSelect}
+        onClick={(event) => {
+          // A click (or a held press) on Add is not a pick of the card.
+          if ((event.target as HTMLElement).closest("[data-no-select]")) return;
+          onSelect();
+        }}
         onKeyDown={(event) => {
-          if (event.key === "Enter") onSelect();
+          if (event.key === "Enter" && !(event.target as HTMLElement).closest("[data-no-select]")) onSelect();
         }}
         style={{
           ...toneStyle(tone),
@@ -589,29 +704,7 @@ function WorkCard({
             </span>
           )}
           <span className="min-w-0 flex-1 truncate text-muted-foreground/80">{sourceLabels(work.provenance)}</span>
-          <button
-            type="button"
-            title={savedId ? "In your library — open it" : "Add to the folder you opened Research from"}
-            onClick={(event) => {
-              event.stopPropagation();
-              void addWorkToFolder(work, { open: Boolean(savedId) });
-            }}
-            className={`inline-flex h-6 shrink-0 items-center gap-1 rounded-full border px-2 text-[11px] font-medium transition-colors ${
-              savedId
-                ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-                : "border-black/10 text-foreground hover:border-[var(--work-tone)] hover:bg-[color-mix(in_srgb,var(--work-tone)_12%,transparent)] dark:border-white/15"
-            }`}
-          >
-            {savedId ? (
-              <>
-                <Check className="h-3 w-3" /> Open
-              </>
-            ) : (
-              <>
-                <Plus className="h-3 w-3" /> Add
-              </>
-            )}
-          </button>
+          <AddControl work={work} savedId={savedId} tone="card" />
         </div>
       </div>
     </li>
@@ -637,21 +730,7 @@ function LinkResult({ link }: { link: ResearchLinkResult }) {
           . Saved as a link until the Law pack (V1.1) can read it here.
         </div>
       </div>
-      <button
-        type="button"
-        onClick={() => void addWorkToFolder({ key: link.key, title: link.title }, { open: Boolean(saved[link.key]) })}
-        className="inline-flex h-7 shrink-0 items-center gap-1 rounded-full border border-black/10 px-2.5 text-[11px] font-medium hover:border-[var(--work-tone)] dark:border-white/15"
-      >
-        {saved[link.key] ? (
-          <>
-            <Check className="h-3 w-3" /> Open
-          </>
-        ) : (
-          <>
-            <Plus className="h-3 w-3" /> Add as link
-          </>
-        )}
-      </button>
+      <AddControl work={{ key: link.key, title: link.title }} savedId={saved[link.key]?.contentId ?? null} tone="link" />
     </div>
   );
 }
