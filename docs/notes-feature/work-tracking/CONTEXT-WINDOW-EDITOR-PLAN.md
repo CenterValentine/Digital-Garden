@@ -1,6 +1,6 @@
 # Context Window Editor — "What the model sees"
 
-**Status:** PLANNED 2026-10-15 (owner idea; mock approved for build handoff). No code yet.
+**Status:** BUILT 2026-10-16 on `feat/context-window-editor` (§11 PR 1 + PR 2 in one slice; the §12 defaults were taken: an exchange drop removes tool results AND prose, the line follows truncation). Headless smoke passed on a copy of the evidence conversation; **owner smoke on prod pending** (lines in §11). Deviations from the plan: the ledger measures the prompt's dynamic sections by size (`promptBreakdown`) instead of naming every section (the builder joins unnamed strings; naming them is a prompt-cache-gated refactor); the per-part remove control lives in the tool bubble's expanded result header beside Copy, and text parts are removed per exchange or from the ledger, not per bubble.
 **Mock:** private artifact <https://claude.ai/artifact/R77YkXbh46Wmjd6eRXLRLn> (built on the real
 local conversation `801f9218` "Job Hunt", 12 messages, today's fold rules applied by calling the
 real functions). A copy lives in `.local/mocks/context-window-editor.html` (gitignored: it
