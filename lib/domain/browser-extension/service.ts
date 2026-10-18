@@ -13,6 +13,7 @@ import { sanitizeTipTapJsonWithExtensions } from "@/lib/domain/editor/unsupporte
 import { writeNoteContent } from "@/lib/domain/content/write-note-content";
 import { generateJSON, type JSONContent } from "@tiptap/core";
 import { stripPrivateContent } from "@/lib/domain/content/private-content";
+import { stripCommentMarks } from "@/lib/domain/content/comments";
 
 function asIsoString(value: Date | null | undefined) {
   return value ? value.toISOString() : null;
@@ -1161,7 +1162,7 @@ function formatExtensionNoteContent(
       // The markdown flavour is what the extension hands to a model as page
       // context; private (commented-out) content stays out of it. The JSON
       // stays whole — it is the author's own editing copy.
-      markdown: tiptapToMarkdown(stripPrivateContent(json)),
+      markdown: tiptapToMarkdown(stripCommentMarks(stripPrivateContent(json))),
       searchText: content.notePayload?.searchText ?? "",
       metadata: (content.notePayload?.metadata ?? {}) as Record<string, unknown>,
     },

@@ -12,6 +12,7 @@ import "server-only";
 import type { JSONContent } from "@tiptap/core";
 import { tiptapToMarkdown } from "@/lib/domain/content/markdown";
 import { stripPrivateContent } from "@/lib/domain/content/private-content";
+import { stripCommentMarks } from "@/lib/domain/content/comments";
 
 /** Default chunk size in characters (~2000 fits comfortably in tool output) */
 const DEFAULT_CHUNK_SIZE = 2000;
@@ -43,7 +44,7 @@ export function chunkDocument(
   tiptapJson: JSONContent,
   chunkSize: number = DEFAULT_CHUNK_SIZE
 ): string[] {
-  const markdown = tiptapToMarkdown(stripPrivateContent(tiptapJson));
+  const markdown = tiptapToMarkdown(stripCommentMarks(stripPrivateContent(tiptapJson)));
   if (!markdown.trim()) return ["(empty document)"];
   return splitIntoParagraphChunks(markdown, chunkSize);
 }

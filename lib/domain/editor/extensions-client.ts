@@ -76,6 +76,10 @@ import { AudioEmbed } from "./extensions/blocks/audio-embed-client";
 import { FlashcardSelect } from "./extensions/flashcard-select";
 import { ClozeDeletion } from "./extensions/cloze-deletion";
 import { PrivateBlock, PrivateText } from "./extensions/private-content";
+import { CommentMark } from "./extensions/comment-mark";
+import { createCommentDecorationPlugin } from "./extensions/comment-plugin";
+import { createCommentHoverPlugin } from "./extensions/comment-hover";
+import { useCommentsStore } from "@/state/comments-store";
 import {
   UnsupportedBlock,
   UnsupportedInline,
@@ -357,6 +361,14 @@ export function getEditorExtensions(options?: EditorExtensionsOptions): Extensio
     // at every AI / public / search seam by stripPrivateContent.
     PrivateText,
     PrivateBlock,
+    // Comment threads — the mark is the anchor; the discussion lives beside the
+    // note. Stripped (text kept) at every markdown/HTML seam by stripCommentMarks.
+    // The decorations and the hover card are client plugins injected here so
+    // the mark file (shared with the server twin) stays React-free.
+    CommentMark.configure({
+      plugins: (editor) => [createCommentDecorationPlugin(editor), createCommentHoverPlugin(editor)],
+      onStartComposer: (editor) => useCommentsStore.getState().openComposer(editor),
+    }),
     UnsupportedBlock,
     UnsupportedInline,
     ...getExtensionClientEditorExtensions(),

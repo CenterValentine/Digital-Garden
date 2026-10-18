@@ -80,6 +80,17 @@ export const studioRunPayloadSchema = z.object({
   error: z.string().max(500).optional(),
 });
 
+// Comment threads on notes (COMMENTS-ANNOTATIONS-PLAN.md §9). One payload
+// shape for the four kinds; `collapseKey` is the thread id so a burst of
+// replies is one unread row pointing at the newest.
+export const commentEventPayloadSchema = z.object({
+  threadId: z.string().uuid(),
+  contentId: z.string().uuid(),
+  contentTitle: z.string().max(255),
+  actorUsername: z.string().min(1).max(50),
+  preview: z.string().max(140),
+});
+
 export interface NotificationKindDefinition {
   payloadSchema: z.ZodTypeAny;
   collapsible: boolean;
@@ -121,6 +132,26 @@ export const NOTIFICATION_KINDS = {
   "studio.run": {
     payloadSchema: studioRunPayloadSchema,
     collapsible: false,
+  },
+  // A new thread on a note you collaborate on.
+  "comment.new": {
+    payloadSchema: commentEventPayloadSchema,
+    collapsible: true,
+  },
+  // A reply in a thread you took part in.
+  "comment.reply": {
+    payloadSchema: commentEventPayloadSchema,
+    collapsible: true,
+  },
+  // You were @mentioned in a comment.
+  "comment.mention": {
+    payloadSchema: commentEventPayloadSchema,
+    collapsible: false,
+  },
+  // A thread you started was resolved.
+  "comment.resolved": {
+    payloadSchema: commentEventPayloadSchema,
+    collapsible: true,
   },
 } as const satisfies Record<string, NotificationKindDefinition>;
 

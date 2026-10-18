@@ -26,11 +26,15 @@ it deletes the closing line and uncomments the block (nothing gets adopted
 into it), and Backspace at the start of its first paragraph does the same
 from the opening line.
 
-The aesthetic is a code editor's comment: muted color, dotted underline for
-the inline run, a dashed left rule and a small label for the block. Nothing is
-boxed, collapsed or hidden — the point of commented-out code is that you still
-see it. The `%%` delimiters are drawn by CSS (`::before`/`::after`), so the
-typed syntax stays visible while the document holds only the meaning.
+The aesthetic is "commented out", not redacted: the prose keeps its size and
+stays editable, muted to the ink a code editor gives a comment, on a faint
+tint of that ink — an inline run is a soft pill (cloned across line wraps),
+a block is a quiet card with a left rail and a small "Private" caption in its
+corner. One eye-off glyph (the toolbelt's Private icon) marks each run; no
+typed delimiters are drawn (the `%%` chrome was dropped 2026-10-18 as noise).
+Typing `%%…%%` still creates the mark and the markdown codec still emits the
+characters on the way out; the document holds only the meaning. All of it is
+CSS in `app/globals.css` (`--private-ink`, `--private-glyph`).
 
 **Semantics are private-to-the-author, not "AI-ignore".** A comment that the
 compiler skips but the linker reads is not a comment. So the same text is
