@@ -2037,16 +2037,27 @@ body.flashcard-select-cursor * {
 .ProseMirror .comment-mark:hover {
   background: color-mix(in srgb, var(--gold-primary) 22%, transparent);
 }
-.ProseMirror .comment-mark--active {
+/* ProseMirror renders an inline decoration as its OWN span nested INSIDE the
+ * mark's span: `<span class="comment-mark"><span class="comment-mark--resolved">`.
+ * So a state class never sits on the painted element — the outer mark is
+ * styled through `:has()` on the inner state span. (Found on the owner's
+ * smoke, 2026-10-17: resolved and orphaned passages kept their gold, and an
+ * active ring stacked a second fill on top of the first.) */
+.ProseMirror .comment-mark:has(.comment-mark--active) {
   background: color-mix(in srgb, var(--gold-primary) 30%, transparent);
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--gold-primary) 60%, transparent);
 }
-.ProseMirror .comment-mark--resolved {
+/* Resolved (quiet unless "Show resolved"), or a mark whose thread is gone. */
+.ProseMirror .comment-mark:has(.comment-mark--resolved) {
   background: none;
   border-bottom: none;
   cursor: text;
 }
-/* The composer is open on this selection; nothing is written yet. */
+.ProseMirror .comment-mark:has(.comment-mark--resolved):hover {
+  background: none;
+}
+/* The composer is open on this selection; nothing is written yet (plain text,
+ * so the decoration span is the painted element). */
 .ProseMirror .comment-mark--pending {
   border-bottom: 2px dashed color-mix(in srgb, var(--gold-primary) 55%, transparent);
 }
@@ -2056,8 +2067,12 @@ body.flashcard-select-cursor * {
 .dark .ProseMirror .comment-mark:hover {
   background: color-mix(in srgb, var(--gold-primary) 26%, transparent);
 }
-.dark .ProseMirror .comment-mark--active {
+.dark .ProseMirror .comment-mark:has(.comment-mark--active) {
   background: color-mix(in srgb, var(--gold-primary) 34%, transparent);
+}
+.dark .ProseMirror .comment-mark:has(.comment-mark--resolved),
+.dark .ProseMirror .comment-mark:has(.comment-mark--resolved):hover {
+  background: none;
 }
 /* The thread card's tippy box is a bare carrier: the card draws its own chrome. */
 .tippy-box[data-theme~="comment-thread"] {

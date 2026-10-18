@@ -67,6 +67,62 @@ export function contentIdOfEditor(editor: Editor): string | null {
 }
 
 /**
+ * Orphan cleanup. A mark whose thread the server does not have (deleted
+ * while this editor was closed, pasted from another note, a restored old
+ * version) renders quiet, but it still lives in the document and the source
+ * view. It is removed — conservatively — once ALL of these hold:
+ *   - it has been unknown for ORPHAN_GRACE_MS (a thread created by someone
+ *     else a moment ago is not an orphan; its reload lands long before);
+ *   - a FRESH fetch, made at removal time, still does not list it;
+ *   - this editor is editable (a view-only connection cannot write).
+ * A fetch failure removes nothing: unknown-after-failure is not unknown.
+ */
+const ORPHAN_GRACE_MS = 60_000;
+const orphanFirstSeen = new Map<string, number>();
+const orphanTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+function scheduleOrphanRemoval(editor: Editor, contentId: string, threadId: string): void {
+  const key = `${contentId}:${threadId}`;
+  const now = Date.now();
+  if (!orphanFirstSeen.has(key)) orphanFirstSeen.set(key, now);
+  if (orphanTimers.has(key)) return;
+  const wait = Math.max(0, orphanFirstSeen.get(key)! + ORPHAN_GRACE_MS - now);
+  orphanTimers.set(
+    key,
+    setTimeout(() => {
+      orphanTimers.delete(key);
+      if (editor.isDestroyed || !editor.isEditable) return;
+      const store = useCommentsStore.getState();
+      const before = store.loadedAt[contentId] ?? 0;
+      void store
+        .load(contentId, { quiet: true })
+        .then(() => {
+          const state = useCommentsStore.getState();
+          const loadedAfter = (state.loadedAt[contentId] ?? 0) > before || (state.loadedAt[contentId] ?? 0) >= Date.now() - 5_000;
+          if (!loadedAfter || editor.isDestroyed || !editor.isEditable) return;
+          const stillUnknown = !(state.threadsByContentId[contentId] ?? []).some((t) => t.id === threadId);
+          if (stillUnknown) editor.commands.unsetComment(threadId);
+          orphanFirstSeen.delete(key);
+        })
+        .catch(() => {
+          /* unknown-after-failure is not unknown */
+        });
+    }, wait),
+  );
+}
+
+/** The thread exists again (reload caught up): forget any orphan bookkeeping. */
+function clearOrphan(contentId: string, threadId: string): void {
+  const key = `${contentId}:${threadId}`;
+  orphanFirstSeen.delete(key);
+  const timer = orphanTimers.get(key);
+  if (timer) {
+    clearTimeout(timer);
+    orphanTimers.delete(key);
+  }
+}
+
+/**
  * A thread is gone: take its anchor out of every editable editor that holds
  * it. Called by the card that deleted the thread (pinned or in the tab) —
  * Y.js carries the removal to every other pane and collaborator. Editors a
@@ -90,7 +146,7 @@ export function pendingCommentRange(editor: Editor): CommentRange | null {
   return commentPluginKey.getState(editor.state)?.pending ?? null;
 }
 
-function buildDecorations(doc: PMNode, pending: CommentRange | null, contentId: string | null): DecorationSet {
+function buildDecorations(doc: PMNode, pending: CommentRange | null, contentId: string | null, editor: Editor | null): DecorationSet {
   const store = useCommentsStore.getState();
   const known = knownThreadIds(store, contentId);
   const threads = contentId ? store.threadsByContentId[contentId] ?? [] : [];
@@ -111,7 +167,11 @@ function buildDecorations(doc: PMNode, pending: CommentRange | null, contentId: 
     if (known && !thread) {
       sawUnknown = true;
       classes.push("comment-mark--resolved");
-    } else if (thread?.resolvedAt && !store.showResolved) {
+      if (contentId && editor) scheduleOrphanRemoval(editor, contentId, threadId);
+    } else if (known && thread && contentId) {
+      clearOrphan(contentId, threadId);
+    }
+    if (thread?.resolvedAt && !store.showResolved && !classes.length) {
       classes.push("comment-mark--resolved");
     }
     // Hover is CSS (`:hover`), never a decoration: redrawing the span under
@@ -142,7 +202,7 @@ export function createCommentDecorationPlugin(editor: Editor): Plugin<CommentPlu
     state: {
       init: (_config, state: EditorState) => ({
         pending: null,
-        decorations: buildDecorations(state.doc, null, contentIdFor()),
+        decorations: buildDecorations(state.doc, null, contentIdFor(), editor),
       }),
       apply: (tr: Transaction, prev: CommentPluginState) => {
         const meta = tr.getMeta(commentPluginKey) as CommentPluginMeta | undefined;
@@ -155,7 +215,7 @@ export function createCommentDecorationPlugin(editor: Editor): Plugin<CommentPlu
           pending = from < to ? { from, to } : null;
         }
         if (!tr.docChanged && !meta && pending === prev.pending) return prev;
-        return { pending, decorations: buildDecorations(tr.doc, pending, contentIdFor()) };
+        return { pending, decorations: buildDecorations(tr.doc, pending, contentIdFor(), editor) };
       },
     },
     props: {
