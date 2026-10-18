@@ -22,6 +22,12 @@ export interface CommentComposerProps {
   submitLabel?: string;
   initialValue?: string;
   autoFocus?: boolean;
+  /**
+   * A host's "focus me now" signal: every new non-zero value focuses the
+   * textarea (also on mount, when the row that holds it was just expanded
+   * for this purpose). `autoFocus` is the mount-only form.
+   */
+  focusNonce?: number;
   /** "dark" inside the bubble menu's black glass; "surface" on page surfaces. */
   tone?: "dark" | "surface";
   /** Enables the `@` collaborator picker for this note. */
@@ -65,6 +71,7 @@ export function CommentComposer({
   submitLabel = "Comment",
   initialValue = "",
   autoFocus = false,
+  focusNonce = 0,
   tone = "surface",
   contentId = null,
   onSubmit,
@@ -87,15 +94,17 @@ export function CommentComposer({
     el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
   }, [value]);
 
+  // Focus after the host has laid out (a row expanding in the same commit).
   useEffect(() => {
-    if (!autoFocus) return;
+    if (!autoFocus && !focusNonce) return;
     const timer = window.setTimeout(() => {
-      textareaRef.current?.focus();
       const el = textareaRef.current;
-      if (el) el.setSelectionRange(el.value.length, el.value.length);
+      if (!el) return;
+      el.focus();
+      el.setSelectionRange(el.value.length, el.value.length);
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [autoFocus]);
+  }, [autoFocus, focusNonce]);
 
   // Collaborators load on the first `@`, once per note.
   useEffect(() => {

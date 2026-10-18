@@ -75,7 +75,8 @@ export function createCommentHoverPlugin(editor: Editor): Plugin | null {
         onExpand: () => ctl.pin(el),
         onOpenSidebar: () => {
           ctl.hide();
-          revealCommentThread(found.contentId, threadId);
+          // Arriving from the passage lands in the thread's reply box.
+          revealCommentThread(found.contentId, threadId, { reply: true });
         },
         onHoldChange: (held) => ctl.hold(held),
       });

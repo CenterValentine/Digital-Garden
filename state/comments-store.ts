@@ -25,6 +25,13 @@ interface CommentsState {
   showResolved: boolean;
   /** A request to open a thread in place; the editor's hover plugin answers it. */
   openRequest: { threadId: string; nonce: number } | null;
+  /**
+   * "Focus this thread's reply box in the Comments tab": the row expands and
+   * its composer takes focus. Raised by a row's Reply affordance and by the
+   * editor card's "Open in sidebar" (owner, 2026-10-18: an explicit affordance
+   * over focusing whenever a row happens to open).
+   */
+  composerFocusRequest: { threadId: string; nonce: number } | null;
   /** The editor whose selection the composer is for (the toolbelt hosts it). */
   composerEditor: Editor | null;
   composerNonce: number;
@@ -40,6 +47,7 @@ interface CommentsState {
   setActiveThread: (threadId: string | null) => void;
   setShowResolved: (show: boolean) => void;
   requestOpen: (threadId: string) => void;
+  requestComposerFocus: (threadId: string) => void;
   openComposer: (editor: Editor) => void;
   closeComposer: () => void;
 }
@@ -60,6 +68,7 @@ export const useCommentsStore = create<CommentsState>()((set) => ({
   activeThreadId: null,
   showResolved: false,
   openRequest: null,
+  composerFocusRequest: null,
   composerEditor: null,
   composerNonce: 0,
 
@@ -179,6 +188,8 @@ export const useCommentsStore = create<CommentsState>()((set) => ({
   setActiveThread: (threadId) => set((state) => (state.activeThreadId === threadId ? state : { activeThreadId: threadId })),
   setShowResolved: (show) => set((state) => (state.showResolved === show ? state : { showResolved: show })),
   requestOpen: (threadId) => set((state) => ({ openRequest: { threadId, nonce: (state.openRequest?.nonce ?? 0) + 1 } })),
+  requestComposerFocus: (threadId) =>
+    set((state) => ({ composerFocusRequest: { threadId, nonce: (state.composerFocusRequest?.nonce ?? 0) + 1 } })),
   openComposer: (editor) => set((state) => ({ composerEditor: editor, composerNonce: state.composerNonce + 1 })),
   closeComposer: () => set((state) => (state.composerEditor ? { composerEditor: null } : state)),
 }));

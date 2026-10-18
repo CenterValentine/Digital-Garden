@@ -17,7 +17,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Check, MessageSquare, PanelRight, Pencil, RotateCcw, Trash2 } from "lucide-react";
+import { Check, MessageSquare, PanelRight, Pencil, Reply, RotateCcw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/core/utils";
 import type { CommentDto, CommentThreadDto } from "@/lib/domain/comments/types";
@@ -112,6 +112,10 @@ export function ThreadCard(props: ThreadCardProps) {
   const { threadId, contentId, mode, orphan, onClose, onExpand, onOpenSidebar, onJump, onReanchor, onHoldChange, onThreadRemoved, className } = props;
   const thread = useCommentsStore((s) => (s.threadsByContentId[contentId] ?? []).find((t) => t.id === threadId) ?? null);
   const isActive = useCommentsStore((s) => s.activeThreadId === threadId);
+  // The tab's "reply here" request (a row's Reply button, the card's "Open in
+  // sidebar"): the list row expands and hands the nonce to its composer.
+  const focusRequest = useCommentsStore((s) => s.composerFocusRequest);
+  const focusNonce = mode === "list" && focusRequest?.threadId === threadId ? focusRequest.nonce : 0;
   const me = useCurrentUser();
   const [listExpanded, setListExpanded] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -125,6 +129,10 @@ export function ThreadCard(props: ThreadCardProps) {
       setListExpanded(true);
     }
   }, [isActive, mode]);
+
+  useEffect(() => {
+    if (focusNonce) setListExpanded(true);
+  }, [focusNonce]);
 
   const run = useCallback(
     async (work: () => Promise<unknown>, failure: string) => {
@@ -221,9 +229,35 @@ export function ThreadCard(props: ThreadCardProps) {
     </button>
   );
 
+  // Sidebar rows carry an explicit "reply here": it opens the row AND puts the
+  // caret in the reply box, so replying never depends on finding the box.
+  const askReply = () => useCommentsStore.getState().requestComposerFocus(threadId);
+  const replyIconButton =
+    mode === "list" ? (
+      <button
+        type="button"
+        onClick={(event) => {
+          event.stopPropagation();
+          askReply();
+        }}
+        title="Reply"
+        aria-label="Reply to thread"
+        className={ICON_BUTTON}
+      >
+        <Reply className="h-4 w-4" />
+      </button>
+    ) : null;
+
   const summary = (
     <>
-      {header(first?.author.username ?? "?", thread.createdAt, resolveButton)}
+      {header(
+        first?.author.username ?? "?",
+        thread.createdAt,
+        <>
+          {replyIconButton}
+          {resolveButton}
+        </>,
+      )}
       {latest && (
         <p className={cn("mt-1 line-clamp-2 whitespace-pre-wrap break-words pl-8 text-foreground/90", latest.deletedAt && "italic text-muted-foreground")}>
           {latest.deletedAt ? "Comment deleted" : renderBody(latest.body)}
@@ -297,12 +331,18 @@ export function ThreadCard(props: ThreadCardProps) {
         placeholder="Reply…"
         submitLabel="Reply"
         autoFocus={mode === "expanded"}
+        focusNonce={focusNonce}
         contentId={contentId}
         onSubmit={reply}
         onFocusChange={onHoldChange}
       />
       <div className="mt-2 flex items-center justify-between border-t border-black/5 pt-2 dark:border-white/5">
         <div className="flex items-center gap-1">
+          {mode === "list" && (
+            <button type="button" onClick={askReply} aria-label="Reply to thread" className="inline-flex items-center gap-1 rounded px-1.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-black/5 hover:text-foreground dark:hover:bg-white/10">
+              <Reply className="h-3.5 w-3.5" /> Reply
+            </button>
+          )}
           {!resolved && (
             <button type="button" onClick={toggleResolved} disabled={busy} aria-label="Resolve thread" className="inline-flex items-center gap-1 rounded px-1.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-black/5 hover:text-foreground dark:hover:bg-white/10">
               <Check className="h-3.5 w-3.5" /> Resolve
