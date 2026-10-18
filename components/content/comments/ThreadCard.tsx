@@ -146,7 +146,9 @@ export function ThreadCard(props: ThreadCardProps) {
   const resolved = Boolean(thread.resolvedAt);
   const first = thread.comments[0] ?? null;
   const latest = latestLive(thread);
-  const replies = Math.max(0, thread.comments.filter((c) => !c.deletedAt).length - 1);
+  // The collapsed card shows the LATEST message; the hint counts the rest
+  // ("2 more replies"), not the thread's reply total (owner, 2026-10-18).
+  const moreReplies = Math.max(0, thread.comments.filter((c) => !c.deletedAt).length - 1);
   const mine = Boolean(me && thread.createdBy.id === me.id);
   const store = useCommentsStore.getState();
 
@@ -228,10 +230,10 @@ export function ThreadCard(props: ThreadCardProps) {
         </p>
       )}
       <div className="mt-1 flex items-center gap-3 pl-8 text-xs text-muted-foreground">
-        {replies > 0 && (
+        {moreReplies > 0 && (
           <span className="inline-flex items-center gap-1">
             <MessageSquare className="h-3 w-3" />
-            {replies} {replies === 1 ? "reply" : "replies"}
+            {moreReplies} more {moreReplies === 1 ? "reply" : "replies"}
           </span>
         )}
         {resolved && <span className="text-gold-primary">Resolved</span>}
