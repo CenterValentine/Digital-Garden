@@ -22,7 +22,7 @@ Phases 0–2 built on `feat/comments-annotations`. Remaining, in the plan's orde
 - ⚪ File-tree unresolved-comment badge; rich comment bodies (links, code).
 - ⚪ Mobile: the composer row can sit under the software keyboard on short phones — move it into the Comments drawer when the viewport is shorter than ~500 px.
 - ⚪ A note-level thread's row shows the author truncated ("smo…") in the 320 px rail — give the name more room than the timestamp.
-- ⚪ **Same note in two panes:** `state/editor-instance-store.ts` keys one editor per content id, so the second pane's editor resolves no content id (`contentIdOfEditor` → null). Its comment decorations still draw active/resolved state, but orphan detection, the unknown-thread reload and paste hygiene degrade to "unknown" there. Register editors per pane (or carry the content id on the editor DOM) and read it from there.
+- ⚪ **Same note in two panes:** `state/editor-instance-store.ts` keys one editor per content id, so the second pane's editor is not in the registry. The comment plugin now falls back to the wrapper's `data-content-id` (2026-10-17), so orphan styling and thread loading work there; still open: paste hygiene in `clipboard.ts` resolves the view through the registry only, and `removeCommentMarkEverywhere` reaches only registered editors (Y.js covers the rest). Register editors per pane to close both.
 
 ## 11 of the 24 `build` gates run in no CI workflow (2026-10-15, found verifying PR #292)
 

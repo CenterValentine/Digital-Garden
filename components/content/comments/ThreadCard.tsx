@@ -22,6 +22,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/core/utils";
 import type { CommentDto, CommentThreadDto } from "@/lib/domain/comments/types";
 import { useCommentsStore } from "@/state/comments-store";
+import { removeCommentMarkEverywhere } from "@/lib/domain/editor/extensions/comment-plugin";
 import { useCurrentUser } from "@/components/common/use-current-user";
 import { CommentComposer, MENTION_TOKEN_RE } from "./CommentComposer";
 
@@ -152,9 +153,13 @@ export function ThreadCard(props: ThreadCardProps) {
   const toggleResolved = () =>
     run(() => store.setResolved(contentId, threadId, !resolved), resolved ? "Couldn't reopen" : "Couldn't resolve");
 
+  // The anchor goes with the thread, from every open editor (the owner's
+  // first smoke deleted from the pinned card and the gold passage stayed —
+  // only the tab's delete had removed the mark).
   const deleteThread = () =>
     run(async () => {
       await store.removeThread(contentId, threadId);
+      removeCommentMarkEverywhere(threadId);
       onThreadRemoved?.(threadId);
       onClose?.();
     }, "Couldn't delete the thread");
@@ -182,6 +187,7 @@ export function ThreadCard(props: ThreadCardProps) {
     run(async () => {
       const result = await store.deleteComment(contentId, threadId, commentId);
       if (result.threadDeleted) {
+        removeCommentMarkEverywhere(threadId);
         onThreadRemoved?.(threadId);
         onClose?.();
       }

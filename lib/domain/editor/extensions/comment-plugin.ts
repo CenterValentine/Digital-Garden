@@ -53,10 +53,31 @@ export function requestThreadsQuietly(contentId: string): void {
   void useCommentsStore.getState().load(contentId, { quiet: true });
 }
 
-/** The note an editor instance is registered under, if any. */
+/**
+ * The note an editor instance renders: the instance registry first, else the
+ * `data-content-id` MarkdownEditor puts on the editor's wrapper (the registry
+ * keys one editor per content id, so the same note open in two panes has one
+ * unregistered editor).
+ */
 export function contentIdOfEditor(editor: Editor): string | null {
   const entry = Object.entries(useEditorInstanceStore.getState().editorsByContentId).find(([, e]) => e === editor);
-  return entry?.[0] ?? null;
+  if (entry) return entry[0];
+  if (editor.isDestroyed) return null;
+  return editor.view.dom.closest<HTMLElement>("[data-content-id]")?.getAttribute("data-content-id") ?? null;
+}
+
+/**
+ * A thread is gone: take its anchor out of every editable editor that holds
+ * it. Called by the card that deleted the thread (pinned or in the tab) —
+ * Y.js carries the removal to every other pane and collaborator. Editors a
+ * registry miss leaves out are covered by the registered one sharing the
+ * same Y.Doc.
+ */
+export function removeCommentMarkEverywhere(threadId: string): void {
+  for (const editor of Object.values(useEditorInstanceStore.getState().editorsByContentId)) {
+    if (!editor || editor.isDestroyed || !editor.isEditable) continue;
+    editor.commands.unsetComment(threadId);
+  }
 }
 
 export function setPendingCommentRange(editor: Editor, range: CommentRange | null): void {
