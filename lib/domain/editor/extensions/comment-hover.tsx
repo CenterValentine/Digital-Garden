@@ -22,7 +22,7 @@ import { ThreadCard } from "@/components/content/comments/ThreadCard";
 import { revealCommentThread } from "@/components/content/comments/reveal";
 import { findThread, useCommentsStore } from "@/state/comments-store";
 import { createHoverCardPlugin, type HoverCardController } from "../hover-card";
-import { contentIdOfEditor } from "./comment-plugin";
+import { contentIdOfEditor, requestThreadsQuietly } from "./comment-plugin";
 
 export const commentHoverPluginKey = new PluginKey("commentHover");
 
@@ -39,7 +39,10 @@ export function createCommentHoverPlugin(editor: Editor): Plugin | null {
   const plugin = createHoverCardPlugin(editor, {
     key: commentHoverPluginKey,
     selector: "[data-comment]",
-    showDelayMs: 350,
+    // A resting hover, not a glance: the pointer crossing a commented line on
+    // its way elsewhere must not pop a card (owner, 2026-10-17: "at least
+    // half a second; try one second").
+    showDelayMs: 1000,
     hideDelayMs: 220,
     editableOnly: false,
     placement: "top-start",
@@ -82,6 +85,13 @@ export function createCommentHoverPlugin(editor: Editor): Plugin | null {
     onShow(el, pinned) {
       const threadId = threadIdOf(el);
       if (threadId && pinned) useCommentsStore.getState().setActiveThread(threadId);
+      // Replies and resolves made elsewhere reach this window only by fetch
+      // (nothing in the document changes), and the tab's poll runs only while
+      // the tab is open. Showing a card is the moment the user wants the
+      // thread current: refetch quietly (throttled); the card re-renders
+      // from the store when it lands.
+      const contentId = contentIdOfEditor(editor);
+      if (contentId) requestThreadsQuietly(contentId);
     },
     onHide(wasPinned) {
       if (wasPinned) useCommentsStore.getState().setActiveThread(null);

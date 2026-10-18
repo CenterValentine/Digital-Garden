@@ -391,6 +391,38 @@ function getToolTitle(toolId: string, editor: Editor, shortcut?: string, active 
   return shortcut ? `${label} (${shortcut})` : label;
 }
 
+/**
+ * When the text toolbelt shows. MODULE-LEVEL AND NEVER REPLACED, on purpose:
+ * TipTap's React BubbleMenu re-sends its options to the plugin whenever this
+ * prop changes identity, through a transaction meta keyed "bubbleMenu" that is
+ * NOT scoped to one plugin — every bubble menu on the editor (image, table)
+ * adopts the new shouldShow and starts appearing on plain text selections.
+ * (Owner's smoke, 2026-10-17: posting a comment flipped a dependency of a
+ * useCallback'd shouldShow and the image + table menus came up with it.)
+ * Open rows (link editor, comment composer) therefore do not read state here;
+ * instead a collapsed selection closes them (see the selectionUpdate handler),
+ * which is also the behaviour a user expects.
+ */
+const textToolbeltShouldShow = ({
+  state,
+  editor: ed,
+}: {
+  editor: Editor;
+  element: HTMLElement;
+  view: import("@tiptap/pm/view").EditorView;
+  state: import("@tiptap/pm/state").EditorState;
+  oldState?: import("@tiptap/pm/state").EditorState;
+  from: number;
+  to: number;
+}): boolean => {
+  const { selection } = state;
+  if (selection.empty) return false;
+  if (selection instanceof NodeSelection) return false;
+  if (ed.isActive("table")) return false;
+  if (ed.isActive("image")) return false;
+  return true;
+};
+
 // Module-scope helper: writes through a fresh-bound function parameter so the
 // React Compiler does not treat the mutation as reaching through `editor`
 // (which it considers immutable as a hook argument). The compiler's mutation
@@ -590,8 +622,15 @@ export function BubbleMenu({ editor, contentId = null, onLinkClick }: BubbleMenu
     if (!editor) return;
     const rerender = () => {
       forceRender((value) => value + 1);
-      // A folded row is a moment, not a mode: it closes with the selection.
-      if (editor.state.selection.empty) setExpandedRow(null);
+      // An open row is a moment, not a mode: it closes with the selection.
+      // (shouldShow cannot keep the menu up for an open row — see
+      // textToolbeltShouldShow — so the rows follow the selection instead.)
+      if (editor.state.selection.empty) {
+        setExpandedRow(null);
+        setLinkEditorTarget((target) => (target ? null : target));
+        const comments = useCommentsStore.getState();
+        if (comments.composerEditor === editor) comments.closeComposer();
+      }
     };
     editor.on("selectionUpdate", rerender);
     editor.on("transaction", rerender);
@@ -722,30 +761,6 @@ export function BubbleMenu({ editor, contentId = null, onLinkClick }: BubbleMenu
     closeLinkEditor();
   }, [closeLinkEditor, editor, linkEditorTarget]);
 
-  const shouldShow = useCallback(
-    ({
-      state,
-      editor: ed,
-    }: {
-      editor: Editor;
-      element: HTMLElement;
-      view: import("@tiptap/pm/view").EditorView;
-      state: import("@tiptap/pm/state").EditorState;
-      oldState?: import("@tiptap/pm/state").EditorState;
-      from: number;
-      to: number;
-    }): boolean => {
-      if (linkEditorTarget || commentComposerOpen) return true;
-      const { selection } = state;
-      const { empty } = selection;
-      if (empty) return false;
-      if (selection instanceof NodeSelection) return false;
-      if (ed.isActive("table")) return false;
-      if (ed.isActive("image")) return false;
-      return true;
-    },
-    [commentComposerOpen, linkEditorTarget]
-  );
 
   useEffect(() => {
     if (!linkEditorTarget) return;
@@ -927,7 +942,7 @@ export function BubbleMenu({ editor, contentId = null, onLinkClick }: BubbleMenu
       editor={editor}
       pluginKey={textFormattingBubbleMenuKey}
       updateDelay={100}
-      shouldShow={shouldShow}
+      shouldShow={textToolbeltShouldShow}
       options={IS_COARSE_POINTER ? COARSE_POINTER_MENU_OPTIONS : undefined}
       className="flex flex-col gap-2 rounded-lg border border-white/10 bg-black/80 p-2 shadow-lg backdrop-blur-md"
     >
