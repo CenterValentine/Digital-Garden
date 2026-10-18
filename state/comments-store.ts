@@ -20,8 +20,8 @@ interface CommentsState {
   threadsByContentId: Record<string, CommentThreadDto[]>;
   /** Set once a note's threads were fetched (even if none); unset = unknown. */
   loadedAt: Record<string, number>;
+  /** The thread open in a pinned card or selected in the tab (the active ring). */
   activeThreadId: string | null;
-  hoverThreadId: string | null;
   showResolved: boolean;
   /** A request to open a thread in place; the editor's hover plugin answers it. */
   openRequest: { threadId: string; nonce: number } | null;
@@ -38,7 +38,6 @@ interface CommentsState {
   deleteComment: (contentId: string, threadId: string, commentId: string) => Promise<{ threadDeleted: boolean }>;
 
   setActiveThread: (threadId: string | null) => void;
-  setHoverThread: (threadId: string | null) => void;
   setShowResolved: (show: boolean) => void;
   requestOpen: (threadId: string) => void;
   openComposer: (editor: Editor) => void;
@@ -59,7 +58,6 @@ export const useCommentsStore = create<CommentsState>()((set) => ({
   threadsByContentId: {},
   loadedAt: {},
   activeThreadId: null,
-  hoverThreadId: null,
   showResolved: false,
   openRequest: null,
   composerEditor: null,
@@ -179,7 +177,6 @@ export const useCommentsStore = create<CommentsState>()((set) => ({
   },
 
   setActiveThread: (threadId) => set((state) => (state.activeThreadId === threadId ? state : { activeThreadId: threadId })),
-  setHoverThread: (threadId) => set((state) => (state.hoverThreadId === threadId ? state : { hoverThreadId: threadId })),
   setShowResolved: (show) => set((state) => (state.showResolved === show ? state : { showResolved: show })),
   requestOpen: (threadId) => set((state) => ({ openRequest: { threadId, nonce: (state.openRequest?.nonce ?? 0) + 1 } })),
   openComposer: (editor) => set((state) => ({ composerEditor: editor, composerNonce: state.composerNonce + 1 })),

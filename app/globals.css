@@ -2022,7 +2022,9 @@ body.flashcard-select-cursor * {
  * highlighter competing with the text. Gold is the app's accent (the
  * collaboration caret, the active rail tab); the reader's five colors stay
  * free for real highlights. State classes are editor DECORATIONS keyed by
- * thread id (comments plugin), never mark attributes. Overlapping threads
+ * thread id (comments plugin), never mark attributes — except hover, which
+ * is plain `:hover`: a decoration redraw under the pointer detaches the node
+ * the browser is tracking and the card hides itself. Overlapping threads
  * stack their fills, which reads naturally as "more than one".
  * ──────────────────────────────────────────────────────────────────────── */
 .ProseMirror .comment-mark {
@@ -2032,7 +2034,7 @@ body.flashcard-select-cursor * {
   cursor: pointer;
   transition: background-color 150ms cubic-bezier(0.4, 0, 0.2, 1);
 }
-.ProseMirror .comment-mark--hover {
+.ProseMirror .comment-mark:hover {
   background: color-mix(in srgb, var(--gold-primary) 22%, transparent);
 }
 .ProseMirror .comment-mark--active {
@@ -2051,7 +2053,7 @@ body.flashcard-select-cursor * {
 .dark .ProseMirror .comment-mark {
   background: color-mix(in srgb, var(--gold-primary) 16%, transparent);
 }
-.dark .ProseMirror .comment-mark--hover {
+.dark .ProseMirror .comment-mark:hover {
   background: color-mix(in srgb, var(--gold-primary) 26%, transparent);
 }
 .dark .ProseMirror .comment-mark--active {

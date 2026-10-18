@@ -8,8 +8,7 @@
  * ProseMirror decorations, so resolving, hovering or selecting a thread
  * never touches the shared document:
  *
- *   - `comment-mark--active`    the thread being viewed (ring)
- *   - `comment-mark--hover`     the pointer is on it
+ *   - `comment-mark--active`    the thread being viewed in a pinned card (ring)
  *   - `comment-mark--resolved`  resolved (quiet unless "Show resolved"), or
  *                               a mark whose thread the server does not know
  *                               (an orphan: deleted elsewhere, pasted in —
@@ -79,8 +78,10 @@ function buildDecorations(doc: PMNode, pending: CommentRange | null, contentId: 
     } else if (thread?.resolvedAt && !store.showResolved) {
       classes.push("comment-mark--resolved");
     }
+    // Hover is CSS (`:hover`), never a decoration: redrawing the span under
+    // the pointer detaches the node the browser is tracking, which fires a
+    // mouseout that hid the card and made the second hover look dead.
     if (store.activeThreadId === threadId) classes.push("comment-mark--active");
-    else if (store.hoverThreadId === threadId) classes.push("comment-mark--hover");
     if (classes.length === 0) continue;
     const className = classes.join(" ");
     for (const range of ranges) decorations.push(Decoration.inline(range.from, range.to, { class: className }));
@@ -156,7 +157,6 @@ export function createCommentDecorationPlugin(editor: Editor): Plugin<CommentPlu
         const contentId = contentIdFor();
         const slice = [
           state.activeThreadId,
-          state.hoverThreadId,
           state.showResolved,
           contentId ? state.threadsByContentId[contentId] : null,
           contentId ? state.loadedAt[contentId] : null,

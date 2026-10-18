@@ -62,16 +62,14 @@ export function createCommentHoverPlugin(editor: Editor): Plugin | null {
         onHoldChange: (held) => ctl.hold(held),
       });
     },
+    // Only a PINNED card touches the store (the active ring). A hover must
+    // not: writing hover state redraws the span under the pointer.
     onShow(el, pinned) {
       const threadId = threadIdOf(el);
-      if (!threadId) return;
-      if (pinned) useCommentsStore.getState().setActiveThread(threadId);
-      else useCommentsStore.getState().setHoverThread(threadId);
+      if (threadId && pinned) useCommentsStore.getState().setActiveThread(threadId);
     },
     onHide(wasPinned) {
-      const store = useCommentsStore.getState();
-      store.setHoverThread(null);
-      if (wasPinned) store.setActiveThread(null);
+      if (wasPinned) useCommentsStore.getState().setActiveThread(null);
     },
     onClick(el) {
       const selection = window.getSelection();

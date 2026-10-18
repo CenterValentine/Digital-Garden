@@ -205,6 +205,9 @@ export function createHoverCardPlugin(editor: Editor, options: HoverCardOptions)
         if (pinned) return;
         const el = (event.target as HTMLElement | null)?.closest?.(options.selector);
         if (!el) return;
+        // A node ProseMirror just replaced (a decoration changed under the
+        // pointer) fires mouseout on its way out; the pointer never left.
+        if (!el.isConnected) return;
         const to = event.relatedTarget as Node | null;
         if (to && el.contains(to)) return;
         if (showTimer !== null) {
