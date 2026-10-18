@@ -42,8 +42,16 @@ type CommentPluginMeta = { pending: CommentRange | null } | { refresh: true };
 
 export const commentPluginKey = new PluginKey<CommentPluginState>("commentThreads");
 
-const UNKNOWN_FETCH_THROTTLE_MS = 5_000;
-const lastUnknownFetch = new Map<string, number>();
+const FETCH_THROTTLE_MS = 5_000;
+const lastFetch = new Map<string, number>();
+
+/** Ask the store for this note's threads, at most once per throttle window. */
+export function requestThreadsQuietly(contentId: string): void {
+  const last = lastFetch.get(contentId) ?? 0;
+  if (Date.now() - last < FETCH_THROTTLE_MS) return;
+  lastFetch.set(contentId, Date.now());
+  void useCommentsStore.getState().load(contentId, { quiet: true });
+}
 
 /** The note an editor instance is registered under, if any. */
 export function contentIdOfEditor(editor: Editor): string | null {
@@ -68,8 +76,15 @@ function buildDecorations(doc: PMNode, pending: CommentRange | null, contentId: 
   const byId = new Map(threads.map((t) => [t.id, t]));
   const decorations: Decoration[] = [];
   let sawUnknown = false;
+  const anchored = collectCommentRanges(doc);
 
-  for (const [threadId, ranges] of collectCommentRanges(doc)) {
+  // A document that carries comment marks needs its threads: the hover card,
+  // the rail badge and orphan detection all read the store, and nothing else
+  // fetches until the Comments tab is opened. (Found on the owner's first
+  // smoke: a fresh page load, a hover, no card.)
+  if (anchored.size > 0 && !known && contentId) requestThreadsQuietly(contentId);
+
+  for (const [threadId, ranges] of anchored) {
     const thread = byId.get(threadId);
     const classes: string[] = [];
     if (known && !thread) {
@@ -91,13 +106,9 @@ function buildDecorations(doc: PMNode, pending: CommentRange | null, contentId: 
     decorations.push(Decoration.inline(pending.from, pending.to, { class: "comment-mark--pending" }));
   }
 
-  if (sawUnknown && contentId) {
-    const last = lastUnknownFetch.get(contentId) ?? 0;
-    if (Date.now() - last > UNKNOWN_FETCH_THROTTLE_MS) {
-      lastUnknownFetch.set(contentId, Date.now());
-      void store.load(contentId, { quiet: true });
-    }
-  }
+  // A mark whose thread the store does not know, on a note it HAS loaded, is
+  // a thread that arrived through Y.js from another collaborator.
+  if (sawUnknown && contentId) requestThreadsQuietly(contentId);
 
   return DecorationSet.create(doc, decorations);
 }

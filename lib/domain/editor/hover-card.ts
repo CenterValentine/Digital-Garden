@@ -127,7 +127,12 @@ export function createHoverCardPlugin(editor: Editor, options: HoverCardOptions)
         },
         isPinned: () => pinned,
         rerender() {
-          if (anchor && popup?.state.isVisible) render(anchor);
+          if (!anchor || !popup?.state.isVisible) return;
+          if (render(anchor)) {
+            // The content may have changed size (a loading card became the
+            // thread): re-place the box against its anchor.
+            void popup.popperInstance?.update();
+          }
         },
       };
 

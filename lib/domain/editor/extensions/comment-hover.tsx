@@ -47,8 +47,23 @@ export function createCommentHoverPlugin(editor: Editor): Plugin | null {
     theme: "comment-thread",
     render(el, ctl, pinned) {
       const threadId = threadIdOf(el);
-      const found = findThread(useCommentsStore.getState(), threadId);
-      if (!threadId || !found) return null;
+      if (!threadId) return null;
+      const state = useCommentsStore.getState();
+      const found = findThread(state, threadId);
+      if (!found) {
+        // The note's threads may not be in the store yet (a fresh page
+        // load, hovered before the plugin's quiet fetch landed): fetch, show
+        // a loading card, and re-render when the threads arrive. A thread the
+        // loaded note does not have is an orphan — nothing to show.
+        const contentId = contentIdOfEditor(editor);
+        if (!contentId || state.loadedAt[contentId]) return null;
+        void state.load(contentId, { quiet: true }).then(() => ctl.rerender());
+        return createElement(
+          "div",
+          { className: "w-56 rounded-lg border border-black/10 bg-white px-3 py-2 text-xs text-muted-foreground shadow-[0_8px_24px_rgba(0,0,0,0.12)] dark:border-white/10 dark:bg-[#1a1a1a]" },
+          "Loading comment…",
+        );
+      }
       return createElement(ThreadCard, {
         threadId,
         contentId: found.contentId,
