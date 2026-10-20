@@ -30,6 +30,7 @@ import ReaderSettingsDialog from "./settings/ReaderSettingsDialog";
 import { useReaderBookshelf } from "./state/bookshelf-store";
 import { useReaderSession } from "./state/reader-store";
 import { useResearchStore } from "./state/research-store";
+import { RESEARCH_RESOURCE_TYPE } from "@/lib/domain/research/types";
 
 /** Books listed directly in the "+" menu; the rest are one click away in the Library. */
 const SHELF_MENU_LIMIT = 12;
@@ -299,6 +300,8 @@ export const readerExtensionRuntime: ExtensionRuntime = {
       selectedContentId?.startsWith(READER_VIRTUAL_PREFIX) ||
         // Scripture sessions: link nodes the reader owns (see sessions.ts).
         (contentType === "external" && externalResourceType === SCRIPTURE_RESOURCE_TYPE) ||
+        // Research works: link nodes the reader owns (lib/domain/research/server/save.ts).
+        (contentType === "external" && externalResourceType === RESEARCH_RESOURCE_TYPE) ||
         (contentType === "file" &&
           mimeType &&
           READER_DEFAULT_VIEWER_MIME_TYPES.includes(mimeType))

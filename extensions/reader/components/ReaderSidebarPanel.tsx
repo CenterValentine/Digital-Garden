@@ -13,6 +13,7 @@ import {
 import { useReaderSession } from "../state/reader-store";
 import { ReaderBookSidebar } from "./ReaderBookSidebar";
 import { ResearchWorkPanel } from "./research/ResearchWorkPanel";
+import { useResearchStore } from "../state/research-store";
 import {
   BookDetailsPanel,
   queryFromEntry,
@@ -36,9 +37,11 @@ export function ReaderSidebarPanel({ contentId }: { contentId: string }) {
   const [placing, setPlacing] = useState(false);
   const inLibrary = contentId === READER_LIBRARY_CONTENT_ID;
   const openBook = useReaderSession((state) => state.openBooks[contentId] ?? null);
+  const openWork = useResearchStore((state) => state.openWorks[contentId] ?? null);
 
-  // The Research tab's selected Work.
+  // The Research tab's selected Work, or a research node open in the reader.
   if (contentId === READER_RESEARCH_CONTENT_ID) return <ResearchWorkPanel />;
+  if (openWork) return <ResearchWorkPanel node={openWork} />;
 
   // An open book: notes, contents, display settings and details share this tab.
   if (!inLibrary && openBook) {

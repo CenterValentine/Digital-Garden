@@ -14,7 +14,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { SourceReport } from "@/lib/domain/research/federate";
 import { applyFields, parseFieldedQuery, type QueryFields } from "@/lib/domain/research/query-syntax";
-import type { Work } from "@/lib/domain/research/types";
+import type { ResearchWorkNodeDto, Work } from "@/lib/domain/research/types";
 
 export type ResearchStatus = "idle" | "searching" | "done" | "error";
 
@@ -52,6 +52,8 @@ interface ResearchState {
   saved: Record<string, { contentId: string; copyPolicy: string }>;
   /** Where "Add" puts Works — the "+" target the tab was opened from. */
   targetParentId: string | null;
+  /** Research nodes open in the reader, by content id — the sidebar's Work view reads these. */
+  openWorks: Record<string, ResearchWorkNodeDto>;
 
   setScope: (scope: string) => void;
   toggleSource: (source: string, on: boolean, defaultOn: boolean) => void;
@@ -67,6 +69,7 @@ interface ResearchState {
   select: (key: string | null) => void;
   markSaved: (key: string, contentId: string, copyPolicy: string) => void;
   setTargetParentId: (parentId: string | null) => void;
+  setOpenWork: (contentId: string, node: ResearchWorkNodeDto | null) => void;
 }
 
 export const useResearchStore = create<ResearchState>()(
@@ -87,6 +90,7 @@ export const useResearchStore = create<ResearchState>()(
       selectedKey: null,
       saved: {},
       targetParentId: null,
+      openWorks: {},
 
       setScope: (scope) => set({ scope }),
       toggleSource: (source, on, defaultOn) =>
@@ -137,6 +141,13 @@ export const useResearchStore = create<ResearchState>()(
       markSaved: (key, contentId, copyPolicy) =>
         set((state) => ({ saved: { ...state.saved, [key]: { contentId, copyPolicy } } })),
       setTargetParentId: (targetParentId) => set({ targetParentId }),
+      setOpenWork: (contentId, node) =>
+        set((state) => {
+          const openWorks = { ...state.openWorks };
+          if (node) openWorks[contentId] = node;
+          else delete openWorks[contentId];
+          return { openWorks };
+        }),
     }),
     {
       name: "reader:research",

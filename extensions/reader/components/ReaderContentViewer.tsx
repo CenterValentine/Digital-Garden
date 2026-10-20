@@ -14,6 +14,8 @@ import {
 import { corpusIdFromTabId, SCRIPTURE_RESOURCE_TYPE } from "@/lib/domain/scripture/types";
 import { LibraryView } from "./LibraryView";
 import { ResearchView } from "./research/ResearchView";
+import { ResearchWorkViewer } from "./research/ResearchWorkViewer";
+import { RESEARCH_RESOURCE_TYPE } from "@/lib/domain/research/types";
 import { ScriptureCatalog } from "./ScriptureCatalog";
 import { ScriptureReader } from "./ScriptureReader";
 import { ScriptureSessionViewer } from "./ScriptureSessionViewer";
@@ -61,6 +63,8 @@ export function ReaderContentViewer({
             <ScriptureCatalog />
           </div>
         </div>
+      ) : contentType === "external" && externalResourceType === RESEARCH_RESOURCE_TYPE ? (
+        <ResearchWorkViewer key={selectedContentId} contentId={selectedContentId} />
       ) : contentType === "external" && externalResourceType === SCRIPTURE_RESOURCE_TYPE ? (
         <ScriptureSessionViewer key={selectedContentId} contentId={selectedContentId} paneId={paneId} />
       ) : corpusId ? (

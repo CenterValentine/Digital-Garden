@@ -5,7 +5,7 @@
 
 import type { FederationEvent } from "@/lib/domain/research/federate";
 import type { SourceReport } from "@/lib/domain/research/federate";
-import type { ResearchQuery, Work, WorkIdentifier } from "@/lib/domain/research/types";
+import type { ResearchQuery, ResearchWorkNodeDto, Work, WorkIdentifier } from "@/lib/domain/research/types";
 import { ReaderApiError, readerCall } from "./api";
 
 export type SearchStreamEvent = FederationEvent | { type: "done" } | { type: "error"; message: string };
@@ -70,6 +70,8 @@ export interface SaveResult {
 }
 
 export const researchApi = {
+  /** A saved research node (WorkMeta + its link), for the reader's viewer. */
+  work: (contentId: string) => readerCall<ResearchWorkNodeDto>(`/api/reader/research/work/${contentId}`),
   resolve: (q: string) => readerCall<ResolveResult>(`/api/reader/research/resolve?q=${encodeURIComponent(q)}`),
   save: (body: {
     key: string;

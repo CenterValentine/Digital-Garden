@@ -190,3 +190,22 @@ export interface CandidatePage {
   /** Opaque cursor for the next page, adapter-specific. */
   next: string | null;
 }
+
+// ── A saved Work, as its node in the tree ────────────────────────────────
+
+/** External link nodes for Works carry this `resourceType` (the viewer matcher claims them). */
+export const RESEARCH_RESOURCE_TYPE = "research";
+
+export type WorkCopyPolicy = "stored" | "on-demand" | "link";
+
+/** What the reader shows for a research node (a WorkMeta row + its link). */
+export interface ResearchWorkNodeDto {
+  contentId: string;
+  work: Work;
+  copyPolicy: WorkCopyPolicy;
+  /** The open copy read on demand (never persisted), when there is one. */
+  copyUrl: string | null;
+  /** The link node's own URL (landing page), for "Open at the source". */
+  url: string | null;
+  readingStatus: string | null;
+}

@@ -30,13 +30,12 @@ import { READER_MIME_TYPES } from "@/lib/domain/reader/types";
 import { isStorableLicense } from "../adapter";
 import { identifierKeys, parseIdentifierKey } from "../identifiers";
 import { isLegalScheme, legalLink } from "../legal";
-import type { Work, WorkCopy, WorkIdentifier } from "../types";
+import { RESEARCH_RESOURCE_TYPE, type Work, type WorkCopy, type WorkIdentifier } from "../types";
 import { ResearchError, resolveIdentifiers } from "./service";
 
 export type CopyPolicy = "stored" | "on-demand" | "link";
 
-/** External link nodes for Works carry this resourceType (viewer matcher). */
-export const RESEARCH_RESOURCE_TYPE = "research";
+export { RESEARCH_RESOURCE_TYPE } from "../types";
 
 export interface SaveWorkResult {
   contentId: string;

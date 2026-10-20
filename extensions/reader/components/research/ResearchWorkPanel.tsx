@@ -7,6 +7,7 @@
  */
 
 import { AlertTriangle, ExternalLink, FlaskConical, Plus } from "lucide-react";
+import type { ResearchWorkNodeDto } from "@/lib/domain/research/types";
 import { addWorkToFolder } from "../../lib/use-research";
 import { useResearchStore } from "../../state/research-store";
 import { accessBadge, RETRACTION_LABELS, typeLabel } from "./work-labels";
@@ -32,11 +33,12 @@ const IDENTIFIER_LABELS: Record<string, string> = {
   isbn: "ISBN",
 };
 
-export function ResearchWorkPanel() {
+export function ResearchWorkPanel({ node }: { node?: ResearchWorkNodeDto } = {}) {
   const works = useResearchStore((state) => state.works);
   const selectedKey = useResearchStore((state) => state.selectedKey);
   const saved = useResearchStore((state) => state.saved);
-  const work = works.find((candidate) => candidate.key === selectedKey) ?? null;
+  // A node open in the reader shows itself; the Find tab shows its selection.
+  const work = node?.work ?? works.find((candidate) => candidate.key === selectedKey) ?? null;
 
   if (!work) {
     return (
@@ -48,7 +50,7 @@ export function ResearchWorkPanel() {
   }
 
   const badge = accessBadge(work);
-  const isSaved = Boolean(saved[work.key]);
+  const isSaved = Boolean(node) || Boolean(saved[work.key]);
   const identifiers = Object.entries(work.identifiers).filter(([scheme]) => scheme !== "url");
 
   return (
@@ -77,19 +79,21 @@ export function ResearchWorkPanel() {
         </div>
       )}
 
-      <button
-        type="button"
-        onClick={() => void addWorkToFolder(work, { open: true })}
-        className="inline-flex h-8 items-center gap-1.5 rounded bg-primary px-3 text-xs font-medium text-primary-foreground"
-      >
-        {isSaved ? (
-          "Open"
-        ) : (
-          <>
-            <Plus className="h-3.5 w-3.5" /> Add and open
-          </>
-        )}
-      </button>
+      {!node && (
+        <button
+          type="button"
+          onClick={() => void addWorkToFolder(work, { open: true })}
+          className="inline-flex h-8 items-center gap-1.5 rounded bg-primary px-3 text-xs font-medium text-primary-foreground"
+        >
+          {isSaved ? (
+            "Open"
+          ) : (
+            <>
+              <Plus className="h-3.5 w-3.5" /> Add and open
+            </>
+          )}
+        </button>
+      )}
 
       {work.tldr && (
         <section className="space-y-1">
