@@ -245,8 +245,61 @@ The order audit fixed the causes that moved rows between refreshes (anchored dro
 - [x] **R2 Library** (built 2026-09-29; + Wikisource, OAPEN, Google Books, Standard Ebooks preset) — OPDS / Gutendex / Open Library adapters, library dialog, acquire into folder, `BookMeta` + covers.
 - [ ] **R3 Scriptures in the reader** — scriptures plan P0/P1 feed a corpus source sharing the annotation store.
 - [ ] **R4 Bring in the rest** — ~~Kindle clippings + Readwise, Hardcover, Libby link~~ (built 2026-09-29); highlights → database, flashcards, AI tools, speed-reader EPUB, PDF in reader.
-- [ ] **Research (reader stub)** — third reader source after Scriptures: open-access papers (arXiv, PubMed Central, OpenAlex/Unpaywall, Semantic Scholar) through the same shell + annotation store.
+- [ ] **Research (reader)** — V1.0 slice 1 (Work model, 4 sources, federation, save, Find tab) built 2026-10-01, live-verified 2026-10-15, PR pending; remaining V1.0: paper readers + re-anchoring, enrichment views, Zotero/BibTeX import, Biomedicine + CS&ML sources, Papers/Claims tables, Law + paid probes, AI tools. Plan: `work-tracking/RESEARCH-READER-PLAN.md` (one Work model + scopes UI, adapter roles, V1.0 core + Biomedicine/CS&ML packs, V1.1 Ask mode + Law, V1.2 Patents/Data/Archives, full service registry).
 - [ ] **CSP for /content** — foliate-js wants a script-blocking CSP; the reader sanitizer is the interim defence.
+
+## Research reader — V1.3 and beyond (2026-10-01, plan `RESEARCH-READER-PLAN.md`)
+
+The plan covers V1.0–V1.2. Everything below is parked on purpose, with the
+reason. Ratings and access notes are in the plan's §5 registry.
+
+**Domain packs**
+- [ ] **Physics / Astro / Math:** NASA ADS (token), INSPIRE-HEP, zbMATH Open, OEIS, arXiv physics/math scopes.
+- [ ] **Economics & social science:** RePEc harvest (no live API), OSF Preprints (PsyArXiv, SocArXiv…), IPUMS, ICPSR (limited); NBER / SSRN as links.
+- [ ] **Education:** ERIC API.
+- [ ] **Earth & environment:** NASA Earthdata CMR, NOAA, USGS ScienceBase.
+- [ ] **Law (EU / UK / CA):** EUR-Lex (web service + Cellar SPARQL), legislation.gov.uk, National Archives Find Case Law, CanLII (API on request); BAILII as a link.
+- [ ] **Biomedicine add-ons:** UMLS (licence agreement), WHO ICTRP.
+- [ ] **Patents add-on:** Google Patents Public Datasets (BigQuery, paid per query).
+- [ ] **Chemistry:** ChemRxiv.
+
+**Sources and indexes**
+- [ ] OpenAIRE Graph (EU funder links; overlaps OpenAlex).
+- [ ] BASE (needs server IP registration; mostly covered by CORE + OpenAlex).
+- [ ] HAL (French repository).
+- [ ] IEEE Xplore API (metadata mostly in OpenAlex; full text needs a subscription).
+- [ ] PhilPapers (limited API).
+- [ ] Mendeley API (restricted registrations; BibTeX import covers it).
+- [ ] scite Smart Citations (API is institutional — revisit if reachable).
+- [ ] Consensus API (paid — check fit).
+
+**Full text and parsing**
+- [ ] **GROBID**, only if the no-server approach leaves a real gap. It would need a new Java service. Today: reflowed text + S2 reference lists + PDF outline + on-demand AI.
+- [ ] **Zotero translation-server**, only if the long tail of sites without `citation_*` tags matters. It would need a new service.
+- [ ] Docling (tables), PaperMage.
+- [ ] Paid parsers (BYOK): Mathpix (math), Mistral OCR, LlamaParse, Reducto.
+
+**Web search for Ask mode**
+- [ ] Kagi, You.com and Linkup connections.
+- [ ] Self-host options: Crawl4AI, SearXNG.
+- [ ] Provider-managed deep research (OpenAI deep-research models, Gemini Deep Research) as a "delegate" option. Opaque and costly per run, and it cites URLs rather than Works — not the primary path.
+
+**AI ideas considered and not done in V1.0–V1.2 (reconsider here)**
+- [ ] **Embeddings + pgvector** for "similar in my library". Revisit if libraries pass ~5k papers. Costs: a migration, re-embedding when the model changes, another model table to keep in sync.
+- [ ] **Running our own models** (OpenScholar, SPECTER2, Nougat). Needs GPU hosting; S2 serves recommendations and embeddings.
+- [ ] **Python AI sidecars** (PaperQA2, GPT Researcher, STORM). We port their methods instead.
+- [ ] **Agent frameworks** (LangGraph, CrewAI). AI SDK v6 + the run harness cover it.
+- [ ] **Fine-tuning.**
+- [ ] **Consuming third-party MCP servers for research.** Quality varies, many run only locally, results are untyped, and each is a prompt-injection surface. Better as an app-wide "connect your MCP server" power feature.
+- [ ] **Digital Garden as an MCP server** (app-wide). Expose the library, highlights and claims to Claude Desktop / ChatGPT / Cursor; mostly reuses the research tools, the real work is OAuth.
+- [ ] Listen to a paper summary (TTS) and flashcards from a paper.
+
+**Unification (from the plan's §9 review)**
+- [ ] One metadata side row for books and Works (`BookMeta` → `WorkMeta` type `book`) once both are stable.
+- [ ] Move scriptures onto the generic hierarchical-corpus interface built for statutes.
+
+**Zotero**
+- [ ] Two-way edit sync and annotation write-back. Deliberately not planned: metadata / move / delete conflicts, and Zotero's page-rect anchors vs our text-quote anchors. V1 is one-way sync + create-only "Save to Zotero".
 
 ## Scriptures integration — parked (reader moved to `EREADER-PLAN.md`) (2026-09-28, plan `SCRIPTURES-INTEGRATION-PLAN.md`)
 

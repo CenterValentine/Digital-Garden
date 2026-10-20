@@ -40,6 +40,9 @@ pnpm ai:drift:check   # CI gate: AI parallel-table drift (provider catalog ↔ c
 pnpm context:diet:check  # CI gate: the model-facing transcript folds (distillation/turn), dedupe, write-input supersession, header retention — fixture transcripts, mutation-tested
 pnpm proposal:shape:check  # CI gate: the propose_item_iteration payloads that died in prod parse and resolve by meaning (lib/domain/ai/tools/iteration-proposal.ts — "schemas describe shape; execute judges")
 pnpm reader:check     # Reader gate: OPDS 1/2 parsing, EPUB DRM detection + metadata, Kindle clippings — fixture-based, no network (scripts/validate-reader.ts)
+pnpm research:check   # Research gate: identifier parsing, adapter response→Work mapping, cross-source merge, federation, faces — fixture-based, no network (scripts/validate-research.ts)
+pnpm research:matrix:check  # CI gate: docs/notes-feature/core/RESEARCH-SOURCE-MATRIX.md matches the source catalog + adapter registry (regenerate: pnpm research:matrix)
+pnpm research:live:smoke    # Manual: the research adapters against the real OpenAlex / Semantic Scholar / Crossref / Unpaywall APIs (network; S2 needs SEMANTIC_SCHOLAR_API_KEY in practice)
 pnpm private:content:check  # CI gate: private (commented-out) content — stripPrivateContent predicate + every AI/public/search seam calls it; the source-view serializer does not
 pnpm ai:matrix        # Regenerate docs/notes-feature/core/AI-CAPABILITY-MATRIX.md from the real provider/model tables
 pnpm ai:matrix:check  # CI gate: the committed capability matrix matches the code (run ai:matrix after model/provider changes)

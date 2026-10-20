@@ -4,10 +4,28 @@ epoch: 12 (Main Panel Tabs + Split Workspace)
 duration: multi-session
 branch: epoch-12/sprint-55-wire-blocks
 status: complete
-last_updated: 2026-10-16
+last_updated: 2026-10-20
 ---
 
 # Current Sprint Addendum
+
+## October 15, 2026 — Research in the reader, slice 1: find, resolve, save (`+ → Reader → Research`)
+
+**Tree**: worktree `.claude/worktrees/reader`, branch `claude/inspiring-franklin-2g7h8l` (merged with `origin/main` at `809f74a7`)
+**Plan**: `work-tracking/RESEARCH-READER-PLAN.md` (V1.0–V1.2; V1.3+ in BACKLOG)
+**Status**: typecheck / lint 149 (0 errors) / `research:check` 20 / `research:matrix:check` / `reader:check` 20 / `extensions:check` green; `pnpm research:live:smoke` 9/9 live; migration `20261015120000_research_works` applied locally, **prod deploy owner-run after merge**; PR pending
+
+### Shipped
+- `lib/domain/research/` — Work model, identifiers, faces, adapter contract, 4 adapters (OpenAlex, Semantic Scholar, Crossref, Unpaywall), merge, federation; `server/` context (keys, quotas, guarded fetch), cache, service, save.
+- Routes `/api/reader/research/{search,resolve,save}`; Find tab + right-sidebar Work view in `extensions/reader/components/research/`; `research-store`.
+- Gates `research:check`, `research:matrix:check` (both in `build`); manual `research:live:smoke`.
+
+### Smoke (pending — signed-in dev stack after the migration)
+- `+ → Reader → Research` on a folder → search "statin muscle symptoms" → results stream; source strip shows OpenAlex / Crossref answered; select a card → Work view in the right sidebar.
+- Paste `10.1371/journal.pmed.0020124` → one result, **Read here** → Add → a PDF file node lands in that folder with `WorkMeta` (`copyPolicy = stored`).
+- Paste `arXiv:1706.03762` → resolves (needs `SEMANTIC_SCHOLAR_API_KEY` set, or a lucky anonymous slot).
+- Paste `410 U.S. 113` → "Add as link" → an external node with `resourceType: research`, type `case`.
+- Set `RESEARCH_CONTACT_EMAIL` and re-run `pnpm research:live:smoke` → Unpaywall check runs.
 
 ## October 16, 2026 — Comments & annotations (Phases 0–2)
 

@@ -11,6 +11,7 @@ import {
   MessagesSquare,
   Table,
   Target,
+  BookOpen,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -47,6 +48,9 @@ export function getTabIcon(contentType: string | null): LucideIcon {
       return GitBranch;
     case "shortcut":
       return ArrowUpRight;
+    // The reader's virtual tabs (Library, Research, a scripture collection).
+    case "reader":
+      return BookOpen;
     default:
       return File;
   }

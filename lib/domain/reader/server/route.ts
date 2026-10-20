@@ -12,6 +12,7 @@ import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import { NoteEditRefused } from "@/lib/domain/content/write-note-content";
 import { isReaderNotMigrated, ReaderNotMigratedError } from "../db";
 import { ScriptureError } from "@/lib/domain/scripture/server/corpus";
+import { ResearchError } from "@/lib/domain/research/server/service";
 import { ReaderFetchError } from "./http";
 import { ReaderDrmError } from "./library";
 
@@ -50,6 +51,9 @@ export function readerRoute<T>(
               ? error.message
               : "The reader's database tables haven't been created yet. Apply docs/notes-feature/work-tracking/reader-schema-additions.prisma and run the reader migration."
           );
+        }
+        if (error instanceof ResearchError) {
+          return errorResponse(error.status, "RESEARCH_ERROR", error.message);
         }
         if (error instanceof ScriptureError) {
           return errorResponse(error.status, "SCRIPTURE_ERROR", error.message);
