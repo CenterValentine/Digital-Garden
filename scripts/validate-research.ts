@@ -18,6 +18,7 @@
 import assert from "node:assert/strict";
 import type { AdapterContext, ResearchAdapter } from "../lib/domain/research/adapter";
 import { isStorableLicense, licenseFromUrl, normalizeLicense } from "../lib/domain/research/adapter";
+import { backoffDelay, parseRetryAfter } from "../lib/domain/research/backoff";
 import { RESEARCH_ADAPTERS } from "../lib/domain/research/adapters";
 import { candidateFromCrossref, crossrefAdapter, crossrefFilter, retractionOf, type CrossrefWork } from "../lib/domain/research/adapters/crossref";
 import {
@@ -534,6 +535,22 @@ async function main() {
     for (const scope of RESEARCH_SCOPES) {
       if (scope.field) assert.ok(RESEARCH_FIELDS.some((entry) => entry.id === scope.field), `${scope.id}: unknown field ${scope.field}`);
     }
+  });
+
+  // ── backoff (the sources ask for it; Semantic Scholar's terms say so) ──
+  await check("backoff: Retry-After wins, else exponential with jitter, never past the budget", () => {
+    assert.equal(parseRetryAfter("3"), 3000);
+    assert.equal(parseRetryAfter("Wed, 21 Oct 2026 07:28:00 GMT", Date.parse("Wed, 21 Oct 2026 07:27:30 GMT")), 30_000);
+    assert.equal(parseRetryAfter("soon"), null);
+    assert.equal(parseRetryAfter(null), null);
+    const fixed = () => 1; // top of the jitter range
+    assert.equal(backoffDelay(1, { elapsedMs: 0, budgetMs: 12_000, random: fixed }), 600);
+    assert.equal(backoffDelay(2, { elapsedMs: 0, budgetMs: 12_000, random: fixed }), 1200);
+    assert.equal(backoffDelay(3, { elapsedMs: 0, budgetMs: 12_000, random: fixed }), null, "two retries at most");
+    assert.equal(backoffDelay(1, { elapsedMs: 0, budgetMs: 12_000, random: () => 0 }), 300, "full jitter halves at the low end");
+    assert.equal(backoffDelay(1, { retryAfterMs: 2500, elapsedMs: 0, budgetMs: 12_000 }), 2500);
+    assert.equal(backoffDelay(1, { retryAfterMs: 60_000, elapsedMs: 0, budgetMs: 12_000 }), null, "a long Retry-After overruns the budget");
+    assert.equal(backoffDelay(1, { elapsedMs: 11_000, budgetMs: 12_000, random: fixed }), null, "no room left for the retry itself");
   });
 
   // ── catalog consistency ──

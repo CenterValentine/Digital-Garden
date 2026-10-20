@@ -39,7 +39,11 @@ export interface ResearchSourceInfo {
   appKeyEnv?: string;
   /** Shown in the source strip for paid sources ("~$0.01 / search"). */
   costNote?: string;
-  /** The source's own published limit, which the federation layer respects. */
+  /**
+   * The source's own published limit. Enforced across every user of the
+   * deployment (server/context.ts: a DB-backed window per source), and a
+   * 429 backs off with Retry-After or exponential jitter (backoff.ts).
+   */
   rateLimit: { requests: number; perSeconds: number };
   /** Facets honoured by `search`. */
   facets: ResearchFacet[];
