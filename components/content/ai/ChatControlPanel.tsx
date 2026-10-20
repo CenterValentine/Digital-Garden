@@ -44,7 +44,7 @@ import {
 } from "@/lib/features/settings/validation";
 
 const PANEL_WIDTH = 340;
-const PANEL_MAX_HEIGHT = 420;
+const PANEL_MAX_HEIGHT = 560;
 
 interface ChatControlPanelProps {
   targetFolder: { id: string; title: string | null } | null;
@@ -61,6 +61,8 @@ interface ChatControlPanelProps {
   onModelPinnedChange: (next: boolean) => void;
   activeContextId: string | null;
   onContextChange: (next: string | null) => void;
+  /** "What the model sees" — the compact context ledger (CONTEXT-WINDOW-EDITOR-PLAN §7). */
+  contextLedger?: React.ReactNode;
   busy?: boolean;
   /** The chat's provider/model — the web-search row shows only when it has its own search. */
   providerId?: string | null;
@@ -107,6 +109,7 @@ export function ChatControlPanel({
   onModelPinnedChange,
   activeContextId,
   onContextChange,
+  contextLedger,
   busy = false,
   providerId = null,
   modelId = null,
@@ -266,6 +269,14 @@ export function ChatControlPanel({
               </button>
             </div>
             <div className="min-h-0 divide-y divide-black/[0.05] overflow-y-auto dark:divide-white/[0.06]">
+              {contextLedger && (
+                <div className="flex max-h-64 flex-col">
+                  <div className="px-3 pt-2 text-[11px] font-medium text-gray-700 dark:text-gray-200" title="What the next request carries — remove parts the model no longer needs">
+                    What the model sees
+                  </div>
+                  <div className="min-h-0 flex-1 overflow-y-auto">{contextLedger}</div>
+                </div>
+              )}
               <PanelRow
                 label="Target folder"
                 hint="The folder this chat serves — run notes and ledgers file here."

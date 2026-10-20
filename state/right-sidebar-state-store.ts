@@ -20,6 +20,8 @@ export type RightSidebarTab =
   // Comment threads on a note (components/content/comments/CommentsTab.tsx).
   | "comments"
   | "database"
+  // What the model sees — the context ledger for an open chat.
+  | "modelContext"
   // A file produced from a document template: edit its values, re-render.
   | "templateFields"
   | "extension";

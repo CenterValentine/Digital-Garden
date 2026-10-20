@@ -49,6 +49,9 @@ import { AlertTriangle,
   Wrench,
   X,
   FolderSearch,
+  EyeOff,
+  Eye,
+  ArrowDownToLine,
 } from "lucide-react";
 import { MediaInjectFlyout, type InjectMedia } from "./MediaInjectFlyout";
 import { AnomalySurfaces, deriveMessageAnomalies } from "./AnomalyChips";
@@ -114,7 +117,12 @@ import {
   type BulkReadFoldState,
   type DuplicatePartState,
   type PerceptionFoldState,
+  userMarkState,
+  isLockedReasoning,
+  type UserMarkState,
 } from "@/lib/domain/ai/context-diet";
+import { partMarkKey } from "@/lib/domain/ai/context-marks";
+import { exchangePartKeys } from "@/lib/domain/ai/use-context-marks";
 import {
   readTurnSegment,
   type TurnStepSummary,
@@ -361,6 +369,22 @@ interface ChatMessageProps {
   /** Bulk database reads: fold/pin state per part (bulkReadFoldStates). */
   bulkReadFolds?: Map<string, BulkReadFoldState> | null;
   /**
+   * User context marks (CONTEXT-WINDOW-EDITOR-PLAN §7): removed / behind
+   * the line per part (userMarkStates) — the same map the chat route stubs
+   * from. Marked parts render collapsed with a restore control.
+   */
+  userMarks?: Map<string, UserMarkState> | null;
+  /** False on the live tail: no mark controls are offered there. */
+  markable?: boolean;
+  /** Executed vendor of this message's stamp — Anthropic locks signed thinking. */
+  vendorId?: string;
+  onTogglePartMark?: (messageId: string, key: string, removed: boolean) => void;
+  onDropExchange?: (assistantMessageId: string, removed: boolean) => void;
+  /** Put "the model reads from here" above this user message (null clears). */
+  onSetLine?: (userMessageId: string | null) => void;
+  /** True when the line sits above this user message. */
+  lineAbove?: boolean;
+  /**
    * Cumulative session usage (all assistant turns so far, aggregated by the
    * surface) — the avatar popover shows it beside the turn's own numbers so
    * a large turn total reads in context (P3 owner ask, 2026-09-02).
@@ -506,9 +530,19 @@ function FoldedBulkReadPart({ part }: { part: unknown }) {
 
 /** Chip copy per fold verdict — says WHY the model no longer carries it. */
 const FOLD_CHIP_COPY: Record<
-  Exclude<PerceptionFoldState, "kept"> | DuplicatePartState,
+  Exclude<PerceptionFoldState, "kept"> | DuplicatePartState | Exclude<UserMarkState, "kept">,
   { label: string; title: string }
 > = {
+  removed: {
+    label: "removed from context by you",
+    title:
+      "You removed this from what the model carries; the transcript keeps it. Restore any time",
+  },
+  "behind-line": {
+    label: "behind the line — the model reads from below it",
+    title:
+      "Above “the model reads from here”; stubbed for the model, visible to you. Clear the line to restore",
+  },
   "folded-distilled": {
     label: "folded at checkpoint — digested into the run records",
     title:
@@ -534,9 +568,12 @@ const FOLD_CHIP_COPY: Record<
 function FoldedPerceptionPart({
   part,
   reason = "folded-distilled",
+  onRestore,
 }: {
   part: unknown;
   reason?: keyof typeof FOLD_CHIP_COPY;
+  /** User marks only: put the part back into context. */
+  onRestore?: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const p = part as { type?: string; output?: unknown };
@@ -565,10 +602,49 @@ function FoldedPerceptionPart({
           {toolName} · {copy.label}
         </span>
       </button>
+      {onRestore && (
+        <button
+          type="button"
+          onClick={onRestore}
+          className="ml-1.5 inline-flex items-center gap-1 rounded-md border border-amber-500/30 px-1.5 py-0.5 text-[10px] text-amber-700 hover:bg-amber-500/10 dark:text-amber-300"
+          title="Put this back into what the model carries"
+        >
+          <Eye className="h-3 w-3" /> restore
+        </button>
+      )}
       {expanded && (
         <pre className="mt-1 max-h-64 overflow-auto rounded-md border border-black/5 bg-black/[0.02] p-2 text-[10px] leading-snug text-gray-600 dark:border-white/5 dark:bg-white/[0.03] dark:text-gray-300">
           {raw}
         </pre>
+      )}
+    </div>
+  );
+}
+
+/** A text / reasoning / file part the user removed: struck, greyed, restorable. */
+function RemovedTextPart({
+  text,
+  reason,
+  onRestore,
+}: {
+  text: string;
+  reason: Exclude<UserMarkState, "kept">;
+  onRestore?: () => void;
+}) {
+  const copy = FOLD_CHIP_COPY[reason];
+  return (
+    <div className="my-1 flex items-start gap-2 rounded-md border border-amber-500/15 bg-amber-500/[0.04] px-2 py-1 text-[12px] text-gray-500 dark:text-gray-400" title={copy.title}>
+      <EyeOff className="mt-0.5 h-3 w-3 shrink-0 text-amber-600/70 dark:text-amber-300/70" />
+      <span className="min-w-0 flex-1 line-through decoration-amber-500/60 line-clamp-3">{text}</span>
+      {onRestore && (
+        <button
+          type="button"
+          onClick={onRestore}
+          className="shrink-0 rounded-md border border-amber-500/30 px-1.5 py-0.5 text-[10px] text-amber-700 hover:bg-amber-500/10 dark:text-amber-300"
+          title="Put this back into what the model carries"
+        >
+          restore
+        </button>
       )}
     </div>
   );
@@ -583,6 +659,13 @@ export const ChatMessage = memo(function ChatMessage({
   perceptionFolds = null,
   duplicateFolds = null,
   bulkReadFolds = null,
+  userMarks = null,
+  markable = false,
+  vendorId,
+  onTogglePartMark,
+  onDropExchange,
+  onSetLine,
+  lineAbove = false,
   sessionUsage = null,
   charterAttached,
   resumedStream = false,
@@ -1240,6 +1323,44 @@ export const ChatMessage = memo(function ChatMessage({
           // (perceptionFoldStates / duplicatePartStates), one implementation.
           // Duplicates first: a dropped duplicate call is gone from the
           // model's view entirely, whatever its fold state.
+          // User marks first (CONTEXT-WINDOW-EDITOR-PLAN §7): the route
+          // applies them before every rule fold, and the chip precedence
+          // mirrors that. Locked Anthropic thinking ignores a mark.
+          const rawMark =
+            userMarks && typeof messageIndex === "number"
+              ? userMarkState(userMarks, messageIndex, i)
+              : null;
+          const markState =
+            rawMark === "removed" || rawMark === "behind-line" ? rawMark : null;
+          if (markState && !isLockedReasoning(message, part, vendorId)) {
+            const restore =
+              markState === "removed" && onTogglePartMark
+                ? () => onTogglePartMark(message.id, partMarkKey(part, i), false)
+                : undefined;
+            if (part.type === "text") {
+              return (
+                <RemovedTextPart
+                  key={i}
+                  text={(part as { text?: string }).text ?? ""}
+                  reason={markState}
+                  onRestore={restore}
+                />
+              );
+            }
+            if (part.type === "reasoning" || part.type === "file") {
+              return (
+                <RemovedTextPart
+                  key={i}
+                  text={part.type === "file" ? ((part as { filename?: string }).filename ?? "attachment") : "Thinking"}
+                  reason={markState}
+                  onRestore={restore}
+                />
+              );
+            }
+            return (
+              <FoldedPerceptionPart key={i} part={part} reason={markState} onRestore={restore} />
+            );
+          }
           const dupState =
             duplicateFolds && typeof messageIndex === "number"
               ? duplicatePartState(duplicateFolds, messageIndex, i)
@@ -1560,6 +1681,11 @@ export const ChatMessage = memo(function ChatMessage({
                 args={toolPart.input}
                 result={toolPart.output}
                 pinState={bulkState}
+                onRemoveFromContext={
+                  markable && onTogglePartMark && toolPart.state === "output-available"
+                    ? () => onTogglePartMark(message.id, partMarkKey(part, i), true)
+                    : undefined
+                }
                 errorText={
                   !isStreaming &&
                   (toolPart.state === "input-streaming" ||
@@ -1806,6 +1932,34 @@ export const ChatMessage = memo(function ChatMessage({
                 label="Regenerate response"
               >
                 <RotateCcw className="h-3.5 w-3.5" />
+              </MessageActionButton>
+            )}
+            {isAssistant && markable && onDropExchange && (() => {
+              const keys = exchangePartKeys(message);
+              const dropped =
+                keys.length > 0 &&
+                typeof messageIndex === "number" &&
+                message.parts.every((p, idx) => {
+                  const k = partMarkKey(p, idx);
+                  return !keys.includes(k) || userMarkState(userMarks ?? new Map(), messageIndex, idx) != null;
+                });
+              return (
+                <MessageActionButton
+                  onClick={() => onDropExchange(message.id, !dropped)}
+                  disabled={actionsDisabled || keys.length === 0}
+                  label={dropped ? "Put this exchange back into context" : "Drop this exchange from context (the transcript keeps it)"}
+                >
+                  {dropped ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+                </MessageActionButton>
+              );
+            })()}
+            {isUser && onSetLine && (markable || lineAbove) && typeof messageIndex === "number" && messageIndex > 0 && (
+              <MessageActionButton
+                onClick={() => onSetLine(lineAbove ? null : message.id)}
+                disabled={actionsDisabled}
+                label={lineAbove ? "Clear the line — the model reads everything again" : "The model reads from here — stop carrying everything above"}
+              >
+                <ArrowDownToLine className={cn("h-3.5 w-3.5", lineAbove && "text-amber-500")} />
               </MessageActionButton>
             )}
             {isAssistant && onBranch && (
@@ -4028,6 +4182,7 @@ function ToolCallBubble({
   isRevertable = false,
   onRevertEdit,
   pinState = null,
+  onRemoveFromContext,
 }: {
   toolName: string;
   toolCallId?: string;
@@ -4037,6 +4192,8 @@ function ToolCallBubble({
   errorText?: string;
   /** Bulk database reads: pinned-run / pinned-chat / kept (plan §4.8). */
   pinState?: BulkReadFoldState | null;
+  /** User context marks: stop carrying this result on the next request. */
+  onRemoveFromContext?: () => void;
   isRevertable?: boolean;
   onRevertEdit?: (toolCallId: string) => void;
 }) {
@@ -4420,6 +4577,17 @@ function ToolCallBubble({
         <div className="border-t border-black/[0.06] dark:border-white/[0.06] bg-black/[0.02] dark:bg-black/20">
           <div className="flex items-center justify-between px-3 py-1 text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-500">
             <span>{hasError ? (wasStopped ? "Stopped" : "Error") : "Result"}</span>
+            <span className="inline-flex items-center gap-1">
+            {onRemoveFromContext && hasResult && (
+              <button
+                type="button"
+                onClick={onRemoveFromContext}
+                className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 normal-case tracking-normal hover:bg-amber-500/10 hover:text-amber-700 dark:hover:text-amber-300 transition-colors"
+                title="Stop carrying this result on the next request (the transcript keeps it)"
+              >
+                <EyeOff className="h-3 w-3" /> remove from context
+              </button>
+            )}
             <button
               type="button"
               onClick={handleCopy}
@@ -4432,6 +4600,7 @@ function ToolCallBubble({
                 <Copy className="h-3 w-3" />
               )}
             </button>
+            </span>
           </div>
           <pre className="max-h-60 overflow-auto px-3 pb-2 text-[11px] font-mono leading-relaxed text-gray-600 dark:text-gray-300 whitespace-pre-wrap break-words">
             {resultString}

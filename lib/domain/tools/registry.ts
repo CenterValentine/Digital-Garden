@@ -274,6 +274,18 @@ const TOOL_REGISTRY: ToolDefinition[] = [
     order: 20,
     tabKey: "context",
   },
+  // "What the model sees" — the context ledger for a chat open in the main
+  // pane (CONTEXT-WINDOW-EDITOR-PLAN §7). Chat only: the sidebar chat
+  // hosts the same ledger inside its control panel.
+  {
+    id: "model-context-tab",
+    label: "Model",
+    iconName: "Eye",
+    surfaces: ["sidebar-tab"],
+    contentTypes: ["chat"],
+    order: 12,
+    tabKey: "modelContext",
+  },
   // Comment threads on a note, in document order, with the unresolved count
   // as the rail badge (components/content/comments/CommentsTab.tsx). Sits
   // right after Context (links · tags · AI) — owner placement, 2026-10-15.

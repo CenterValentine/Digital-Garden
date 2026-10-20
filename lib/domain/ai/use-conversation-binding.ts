@@ -31,6 +31,7 @@ import { useAIChatStore } from "@/state/ai-chat-store";
 import { useSettingsStore } from "@/state/settings-store";
 import { normalizePersistedToolParts } from "@/lib/domain/ai/tool-state-persistence";
 import { stripRevertSnapshotFromParts } from "@/lib/domain/ai/compact-tool-outputs";
+import type { PersistMarks } from "@/lib/domain/ai/use-context-marks";
 import {
   getEngagement,
   subscribeEngagement,
@@ -145,6 +146,14 @@ interface UseConversationBindingParams {
     (clientId: string, inclusive: boolean) => Promise<void>
   >;
   /**
+   * Stable ref the context-marks hook calls to persist a user mark
+   * (CONTEXT-WINDOW-EDITOR-PLAN §4). Populated with a function that
+   * resolves the client id to its DB row and PATCHes the merged marks.
+   * Left null in transient/unbound mode (marks then ride in the message
+   * metadata the first save carries).
+   */
+  marksRef?: RefObject<PersistMarks | null>;
+  /**
    * Announces whether this hook's persisted transcript is in the chat yet.
    * `false` while a load is pending, `true` once messages are seeded (or the
    * load resolved to nothing). The engine's resumable-stream reattach waits on
@@ -207,6 +216,7 @@ export function useConversationBinding({
   modelId,
   persistRef,
   truncateRef,
+  marksRef,
   pendingUserPartsRef,
   onTitleChanged,
   skipNextLoadRef,
@@ -724,6 +734,32 @@ export function useConversationBinding({
       }
     };
   }, [conversationId, truncateRef]);
+
+  // Context marks (CONTEXT-WINDOW-EDITOR-PLAN §4): the server merges one
+  // metadata key, so a continuation PATCH and a mark never race.
+  useEffect(() => {
+    if (!marksRef) return;
+    if (!conversationId) {
+      marksRef.current = null;
+      return;
+    }
+    marksRef.current = async (clientId, patch) => {
+      const dbId = dbIdByClientIdRef.current.get(clientId) ?? clientId;
+      try {
+        await fetch(
+          `/api/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(dbId)}/context-marks`,
+          {
+            method: "PATCH",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(patch),
+          },
+        );
+      } catch {
+        /* best-effort — the mark already rides in message metadata; the next save carries it */
+      }
+    };
+  }, [conversationId, marksRef]);
 
   // Live title sync: subscribe to /api/conversations/events for
   // `conversation.updated` matching THIS conversationId. Without this,

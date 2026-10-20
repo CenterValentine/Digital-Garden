@@ -55,25 +55,31 @@ explains half of the subtle machinery.
    ceiling (§4), plus `rateLimitRetryMiddleware` (5 retries, 1s→30s backoff). This is
    the ONLY place temperature/maxOutputTokens are set — `streamText()` itself passes
    neither.
-4. **Tools are assembled** (§5) and filtered by user `toolConfig`; the system prompt
+4. **History is dieted** before conversion: `applyUserContextMarks` (the user's own
+   marks — `lib/domain/ai/context-marks.ts`, stubs only) runs FIRST, then the rule
+   folds in `context-diet.ts` (perception/turn folds, write inputs, bulk reads,
+   reasoning strip, dedupe, OpenAI item ids). Model path only; `originalMessages`
+   and persistence keep every byte. The context ledger (`context-ledger.ts`) shows
+   the same verdicts in the UI.
+5. **Tools are assembled** (§5) and filtered by user `toolConfig`; the system prompt
    is built from capability flags derived from the final tool set (`"search_web" in
    tools`, etc.), so prompt sections and tools can't disagree.
-5. **`streamText` runs the step loop** with `stopWhen: stepCountIs(…)` (§6) and
+6. **`streamText` runs the step loop** with `stopWhen: stepCountIs(…)` (§6) and
    `toolChoice: "auto"`. Server tools execute inline; reaching a **client-executed
    tool ends the HTTP stream** at that tool call.
-6. **Client executes** the browser/co-browse tool via the extension bridge, then
+7. **Client executes** the browser/co-browse tool via the extension bridge, then
    `sendAutomaticallyWhen` decides whether to auto-continue the turn with a new
    request. The predicate (`lastMessageHasResolvedBrowserRead`, engine) is
    **deliberately narrow** — it fires only when the last step's parts are all settled
    browser-tool parts. Using the SDK's generic "complete with tool calls" predicate
    would defeat the step cap by resuming turns the server intentionally ended.
-7. **Persistence**: the binding saves the message with `parts[]` verbatim.
+8. **Persistence**: the binding saves the message with `parts[]` verbatim.
    `mergeTurnUsageMetadata` (`use-conversation-binding.ts`) **accumulates usage
    across all requests of the turn and keeps the TERMINAL request's finishReason**.
    Why: the 2026-08-08 DeepSeek failure was mis-diagnosed from metadata frozen at
    request #1 ("tool-calls", 659 tokens) while the terminal request died at the
    output cap ("length", 4096).
-8. **Anomaly chips** (`AnomalyChips.tsx`) render failure states from the persisted
+9. **Anomaly chips** (`AnomalyChips.tsx`) render failure states from the persisted
    record — terminal `finishReason: "length"`, tool errors, captcha detection.
    Chips are a *view* over persisted parts/metadata; new anomaly kinds are derivation
    changes, not new storage.
@@ -326,7 +332,7 @@ production payloads still reach execute.
 gate 4 re-validates tool-name references; remember section order is part of the
 caching design.
 
-**Change tool loop behavior** → the resume predicate (§2 step 6), the step-cap
+**Change tool loop behavior** → the resume predicate (§2 step 7), the step-cap
 formulas (§6), and the budget derivations are each deliberately narrow; read their
 doc comments before "fixing" them — every one encodes a lesson from a production
 failure.
