@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-10-15
+last_updated: 2026-10-16
 ---
 
 # Sprint Backlog
@@ -9,6 +9,21 @@ last_updated: 2026-10-15
 **Sprint Execution Protocol**: Before commencing any sprint, always ask the user for input before planning and executing — there may be additions or modifications.
 
 ---
+
+## Comments & annotations — follow-ups (2026-10-16, from `COMMENTS-ANNOTATIONS-PLAN.md`)
+
+Phases 0–2 built on `feat/comments-annotations`. Remaining, in the plan's order:
+
+- ⚪ **Post-merge:** redeploy Hocuspocus from a tree matching `origin/main` (schema 1.22.0 — an old server DROPS unknown marks on its next sanitize); `prisma migrate deploy` for `20261016120000_add_comment_threads` (owner-run on Neon); owner browser smoke (lines in CURRENT-SPRINT.md).
+- ⚪ **Phase 3 — highlights without a thread.** `highlight` mark `{ color }` with the reader's five-color vocabulary moved to `lib/domain/content/mark-palette.ts` (reader imports from there); the swatch row from `MarkPopover` in the toolbelt composer as "Highlight only"; markdown `==text=={.yellow}` (Obsidian's standard + the pandoc brace); listed in the Comments tab under a filter.
+- ⚪ **Phase 4 — view-only anchoring.** A view-level collaborator's Hocuspocus connection is read-only; anchor their comments server-side through `/internal/apply` with a new `mark` op that finds the range by text match (`position-anchor.ts`). Until then they reply and leave note-level comments.
+- ⚪ **Phase 4 — realtime for replies.** The tab polls every 30 s; a Hocuspocus stateless "comments changed" message would make replies instant.
+- ⚪ **Phase 4 — AI + MCP (comment THREADS, not private content; sized 2026-10-18).** Today every AI read seam strips comment marks and no tool lists threads. In order of value per day: (1) `read_comments` tool + `garden://note/{id}/comments` + an opt-in "include comments" on `read_content` (the CriticMarkup text form already exists) — ~½ day; "address the comments" charter line rides on it. (2) `reply_to_comment` / `resolve_comment` — ~½ day, needs an AI authorship marker on `Comment` (owner-run migration). (3) AI-CREATED anchored threads — the anchor is a mark in the Y.Doc and `update_note` only replaces blocks: either rewrite the block with `{==…==}{>>#id<<}` behind a judge (~1½ days, weak models can mangle the block) or the Phase-4 `mark` op in `/internal/apply` that finds a range by text match (~2–3 days + Hocuspocus deploy; the same op anchors view-only collaborators' comments — build this one). (4) Surface: "Assistant" author in cards, resolve-all for AI notes, "Review this note" → charter line — ~1 day. Rule: reads keep stripping by default; threads are included only when asked ("the thread is not the note").
+- ⚪ **Mention a People profile that belongs to an account (owner, 2026-10-18 — deferred until collaboration matures).** Today `@` in a comment lists the note's collaborators only (owner + view-grant holders): a mention is a notification, and only an account that can open the note can act on one, so People-extension contacts never appear (the owner typed `@bob` for a People record and got nothing — by design). When accounts and People profiles are linked, the picker should offer the profile (name, avatar) and resolve to the account; a profile with no account stays a plain `@Name` reference with no `mentions` entry and no notification. Depends on the account ↔ People link and on collaboration maturing (grants, presence) — don't build it on today's owner-plus-grantees list.
+- ⚪ File-tree unresolved-comment badge; rich comment bodies (links, code).
+- ⚪ Mobile: the composer row can sit under the software keyboard on short phones — move it into the Comments drawer when the viewport is shorter than ~500 px.
+- ⚪ A note-level thread's row shows the author truncated ("smo…") in the 320 px rail — give the name more room than the timestamp.
+- ⚪ **Same note in two panes:** `state/editor-instance-store.ts` keys one editor per content id, so the second pane's editor is not in the registry. The comment plugin now falls back to the wrapper's `data-content-id` (2026-10-17), so orphan styling and thread loading work there; still open: paste hygiene in `clipboard.ts` resolves the view through the registry only, and `removeCommentMarkEverywhere` reaches only registered editors (Y.js covers the rest). Register editors per pane to close both.
 
 ## 11 of the 24 `build` gates run in no CI workflow (2026-10-15, found verifying PR #292)
 

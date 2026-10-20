@@ -81,7 +81,7 @@
  * See: docs/notes-feature/TIPTAP-SCHEMA-EVOLUTION-GUIDE.md
  */
 
-export const TIPTAP_SCHEMA_VERSION = "1.21.0";
+export const TIPTAP_SCHEMA_VERSION = "1.22.0";
 
 export interface SchemaVersion {
   version: string;
@@ -109,6 +109,22 @@ export interface SchemaChange {
  * 4. Run tests: pnpm test lib/domain/export
  */
 export const SCHEMA_HISTORY: SchemaVersion[] = [
+  {
+    version: "1.22.0",
+    date: "2026-10-15",
+    changes: [
+      {
+        type: "add",
+        target: "mark",
+        name: "comment",
+        description:
+          "Comment-thread anchor (`span[data-comment=<threadId>]`, class comment-mark). The mark carries ONLY the thread id; the discussion lives in Postgres (CommentThread / Comment) and resolved/active state is drawn as decorations. `excludes: \"\"` so threads may overlap; `inclusive: false`. Faithful server twin; stripped (text kept) at every markdown/HTML seam by stripCommentMarks; round-trips as CriticMarkup `{==passage==}{>>#id<<}`. Plan: COMMENTS-ANNOTATIONS-PLAN.md. ⚠ Hocuspocus redeploy required after merge — unsupported-content DROPS unknown marks, so an old server would strip every anchor on its next sanitize.",
+        breaking: false,
+        migrationsAvailable: [],
+      },
+    ],
+    migrationsRequired: false,
+  },
   {
     version: "1.21.0",
     date: "2026-10-08",
@@ -760,6 +776,7 @@ export function getCurrentSchemaSnapshot() {
       "flashcardSelect",
       "clozeDeletion",
       "privateText",
+      "comment",
     ],
     extensions: [
       "StarterKit",

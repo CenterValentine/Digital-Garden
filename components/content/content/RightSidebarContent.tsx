@@ -26,6 +26,7 @@ import { StudioTab } from "@/extensions/studio/components/StudioTab";
 import { ContextTab } from "@/components/content/ai-context/ContextTab";
 import { DataSchemaRail } from "@/components/content/data/DataSchemaRail";
 import { TemplateFieldsPanel } from "@/components/content/docx-templates/TemplateFieldsPanel";
+import { CommentsTab } from "@/components/content/comments/CommentsTab";
 import type { OutlineHeading } from "@/lib/domain/content/outline-extractor";
 import type { ChatOutlineEntry } from "@/lib/domain/ai/chat-outline";
 import type { RightSidebarTab } from "@/state/right-sidebar-state-store";
@@ -109,6 +110,7 @@ export function RightSidebarContent({ activeTab }: RightSidebarContentProps) {
       )}
       {activeTab === "studio" && <StudioTab />}
       {activeTab === "context" && <ContextTab />}
+      {activeTab === "comments" && <CommentsTab contentId={selectedContentId} />}
       {/* Keyed by content id: navigating between databases remounts the
           rail so its loaded schema and expansion state re-seed fresh. */}
       {activeTab === "templateFields" && selectedContentId && (
