@@ -136,6 +136,7 @@ Legend: ✅ shipped · 🟡 in T3 · ⏳ deferred → **AI 3.7 "resource governa
 | JIT retrieval (`[[refs]]` + `read_note`) | Context | ✅ | editor wikiLink + `read_note` tool |
 | Sub-task output tools (`create_folder`/`createNote`/`create_docx`) | Decomposition | ✅ | `tools/registry.ts` |
 | Token meter (observability) | Effort/Context | ✅ | chat route + UI |
+| User context marks + context ledger ("What the model sees") | Context | ✅ | `context-marks.ts`, `context-diet.ts` (`applyUserContextMarks`), `ContextLedger.tsx` |
 | Progressive disclosure (per-phase injection) | Context | 🟡 | `route.ts` playbook injection |
 | Definition-of-done per phase (`**Done when:**`) | Termination | 🟡 | SKILL.md format + system prompt |
 | Sub-playbook awareness in reference manifest | Decomposition | 🟡 | P4 manifest (`isPlaybookMetadata`) |

@@ -10,6 +10,8 @@
 import { useEffect, useState } from "react";
 import { ArrowLeft, ExternalLink, Link2 } from "lucide-react";
 import { toast } from "sonner";
+import { isUuid } from "@/lib/domain/content/uuid";
+import { resolveExtensionVirtualContentType } from "@/lib/extensions/client-registry";
 import { useContentStore } from "@/state/content-store";
 import { useFadeScrollbar } from "@/components/common/useFadeScrollbar";
 import { clientLogger } from "@/lib/core/logger/client";
@@ -86,7 +88,9 @@ export function BacklinksPanel({ contentId }: BacklinksPanelProps) {
       return;
     }
 
-    if (contentId.startsWith("temp-")) {
+    // Temporary ids and an extension's virtual tabs (`reader:research`) have
+    // no ContentNode, so there are no links to list.
+    if (contentId.startsWith("temp-") || resolveExtensionVirtualContentType(contentId) || !isUuid(contentId)) {
       setData(null);
       setIsLoading(false);
       return;

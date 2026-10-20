@@ -10,7 +10,7 @@ import { ReaderBookshelfController } from "./components/ReaderBookshelfControlle
 import { ReaderContentViewer } from "./components/ReaderContentViewer";
 import { ReaderSidebarPanel } from "./components/ReaderSidebarPanel";
 import { withOptimisticTreeRow } from "@/lib/features/content/tree-optimistic";
-import { SCRIPTURE_RESOURCE_TYPE, VERSE_ANCHOR_KIND, type ScriptureCorpusInfo } from "@/lib/domain/scripture/types";
+import { corpusIdFromTabId, SCRIPTURE_RESOURCE_TYPE, VERSE_ANCHOR_KIND, type ScriptureCorpusInfo } from "@/lib/domain/scripture/types";
 import { staticScriptureTable } from "@/lib/domain/scripture/tables";
 import { useContentAnchorStore } from "@/state/content-anchor-store";
 import { scriptureApi } from "./lib/api";
@@ -21,6 +21,7 @@ import { placeShortcut } from "./lib/use-acquire";
 import {
   READER_EXTENSION_ID,
   READER_LIBRARY_CONTENT_ID,
+  READER_RESEARCH_CONTENT_ID,
   READER_SCRIPTURES_CONTENT_ID,
   READER_VIRTUAL_CONTENT_TYPE,
   READER_VIRTUAL_PREFIX,
@@ -28,6 +29,8 @@ import {
 import ReaderSettingsDialog from "./settings/ReaderSettingsDialog";
 import { useReaderBookshelf } from "./state/bookshelf-store";
 import { useReaderSession } from "./state/reader-store";
+import { useResearchStore } from "./state/research-store";
+import { RESEARCH_RESOURCE_TYPE } from "@/lib/domain/research/types";
 
 /** Books listed directly in the "+" menu; the rest are one click away in the Library. */
 const SHELF_MENU_LIMIT = 12;
@@ -37,6 +40,16 @@ function openLibrary(parentId: string | null) {
   useReaderSession.getState().setLibraryTargetParentId(resolveServerCreateParent(parentId));
   useContentStore.getState().setSelectedContentId(READER_LIBRARY_CONTENT_ID, {
     title: "Library",
+    contentType: READER_VIRTUAL_CONTENT_TYPE,
+    pin: true,
+  });
+}
+
+/** Research: Works added from the tab land where this "+" pointed. */
+function openResearch(parentId: string | null) {
+  useResearchStore.getState().setTargetParentId(resolveServerCreateParent(parentId));
+  useContentStore.getState().setSelectedContentId(READER_RESEARCH_CONTENT_ID, {
+    title: "Research",
     contentType: READER_VIRTUAL_CONTENT_TYPE,
     pin: true,
   });
@@ -269,10 +282,10 @@ function readerMenu(): ExtensionCreateMenuItem[] {
         },
         {
           id: "new-reader-research",
-          label: "Research (coming soon)",
+          label: "Research",
           iconName: "FlaskConical",
-          title: "Papers and open-access research, planned",
-          disabled: true,
+          title: "Find papers, preprints and trials; paste a DOI, arXiv id or citation",
+          onSelect: ({ parentId }) => openResearch(parentId),
         },
       ],
     },
@@ -287,6 +300,8 @@ export const readerExtensionRuntime: ExtensionRuntime = {
       selectedContentId?.startsWith(READER_VIRTUAL_PREFIX) ||
         // Scripture sessions: link nodes the reader owns (see sessions.ts).
         (contentType === "external" && externalResourceType === SCRIPTURE_RESOURCE_TYPE) ||
+        // Research works: link nodes the reader owns (lib/domain/research/server/save.ts).
+        (contentType === "external" && externalResourceType === RESEARCH_RESOURCE_TYPE) ||
         (contentType === "file" &&
           mimeType &&
           READER_DEFAULT_VIEWER_MIME_TYPES.includes(mimeType))
@@ -294,6 +309,15 @@ export const readerExtensionRuntime: ExtensionRuntime = {
   virtualContent: [
     { prefix: READER_VIRTUAL_PREFIX, contentType: READER_VIRTUAL_CONTENT_TYPE },
   ],
+  // The reader's virtual tabs aren't content nodes: the Library, Research and
+  // the scripture catalog can't be linked, moved or duplicated as content. A
+  // scripture collection's tab is wiki-linkable (`[[Gospel Library#…`), so
+  // "Copy link" stays for it.
+  tabMenuCapabilities: (contentId) => {
+    if (!contentId.startsWith(READER_VIRTUAL_PREFIX)) return null;
+    const linkable = corpusIdFromTabId(contentId) !== null;
+    return { copyLink: linkable, move: false, duplicate: false };
+  },
   contentSidebarPanel: {
     label: "Book",
     svgPath: READER_SIDEBAR_SVG_PATH,

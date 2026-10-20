@@ -17,7 +17,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Development Commands
 
 ```bash
-pnpm dev              # Start dev server (http://localhost:3015); predev auto-starts the Docker Postgres when LOCAL_POSTGRES=1
+pnpm dev              # Start dev server (http://localhost:3015); auto-starts the Docker Postgres when LOCAL_POSTGRES=1 (scripts/dev.ts)
+pnpm dev -wt <name>   # Serve a worktree without cd: first free port 3015–3025, stops after 15 min (-t 45 / 2h / 0 = none); auto-installs if needed and removes that install on stop
+pnpm wt [days|all]    # List worktrees active in the last 7 days (newest first): name (what -wt takes), branch, last activity, serving/ready/not installed (alias: pnpm worktrees)
+pnpm dev -wt          # No name (or `pnpm dev wt`): CLICK a worktree in the table (or ↑↓ Enter) to serve it; -t still applies
+pnpm wt:install <name>  # Install a worktree's deps to KEEP (not removed when a -wt server stops)
+pnpm pr-checklist:check # Gate for the dev-only PR checklist pill (lib/features/dev-banner/): ticking a box there ticks it on GitHub via `gh auth token`
 pnpm dev:collab       # Local Hocuspocus (ws://localhost:1234) — REQUIRED in dev, run from the same checkout as pnpm dev
 pnpm build            # tsc + 26 validation gates + lint + 2 workspace smokes, then next build — see "Build pipeline" below
 pnpm typecheck        # tsc --noEmit only (fast type check)
@@ -35,6 +40,9 @@ pnpm ai:drift:check   # CI gate: AI parallel-table drift (provider catalog ↔ c
 pnpm context:diet:check  # CI gate: the model-facing transcript folds (distillation/turn), dedupe, write-input supersession, header retention — fixture transcripts, mutation-tested
 pnpm proposal:shape:check  # CI gate: the propose_item_iteration payloads that died in prod parse and resolve by meaning (lib/domain/ai/tools/iteration-proposal.ts — "schemas describe shape; execute judges")
 pnpm reader:check     # Reader gate: OPDS 1/2 parsing, EPUB DRM detection + metadata, Kindle clippings — fixture-based, no network (scripts/validate-reader.ts)
+pnpm research:check   # Research gate: identifier parsing, adapter response→Work mapping, cross-source merge, federation, faces — fixture-based, no network (scripts/validate-research.ts)
+pnpm research:matrix:check  # CI gate: docs/notes-feature/core/RESEARCH-SOURCE-MATRIX.md matches the source catalog + adapter registry (regenerate: pnpm research:matrix)
+pnpm research:live:smoke    # Manual: the research adapters against the real OpenAlex / Semantic Scholar / Crossref / Unpaywall APIs (network; S2 needs SEMANTIC_SCHOLAR_API_KEY in practice)
 pnpm private:content:check  # CI gate: private (commented-out) content — stripPrivateContent predicate + every AI/public/search seam calls it; the source-view serializer does not
 pnpm ai:matrix        # Regenerate docs/notes-feature/core/AI-CAPABILITY-MATRIX.md from the real provider/model tables
 pnpm ai:matrix:check  # CI gate: the committed capability matrix matches the code (run ai:matrix after model/provider changes)

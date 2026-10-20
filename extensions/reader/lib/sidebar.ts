@@ -1,5 +1,4 @@
-import { useRightPanelCollapseStore } from "@/state/right-panel-collapse-store";
-import { useRightSidebarStateStore } from "@/state/right-sidebar-state-store";
+import { revealRightSidebarTab } from "@/lib/features/content/reveal-right-sidebar";
 import { useReaderSession, type ReaderSidebarView } from "../state/reader-store";
 
 /** Book icon (lucide BookOpen) for the right-sidebar tab. */
@@ -12,6 +11,5 @@ export const READER_SIDEBAR_SVG_PATH =
  */
 export function revealReaderSidebar(contentId: string, view?: ReaderSidebarView): void {
   if (view) useReaderSession.getState().setSidebarView(contentId, view);
-  useRightSidebarStateStore.getState().setActiveTab(contentId, "extension");
-  useRightPanelCollapseStore.getState().setCollapsed(false);
+  revealRightSidebarTab(contentId, "extension");
 }

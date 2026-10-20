@@ -44,6 +44,11 @@ import {
   ModelRouteNotices,
 } from "./ModelSwitchDivider";
 import { ChatControlPanel } from "./ChatControlPanel";
+import { ContextLedger } from "./ContextLedger";
+import { ContextLineDivider } from "./ContextLineDivider";
+import { useContextMarks, type PersistMarks } from "@/lib/domain/ai/use-context-marks";
+import { lastUserMessageIndex, readContextMarks } from "@/lib/domain/ai/context-marks";
+import { vendorOf } from "@/lib/domain/ai/context-ledger";
 import { computeModelRouteDecorations } from "@/lib/domain/ai/model-directive";
 import {
   bulkReadFoldStates,
@@ -186,6 +191,8 @@ export function ChatPanel({
   const truncateRef = useRef<(clientId: string, inclusive: boolean) => Promise<void>>(
     async () => {},
   );
+  // User context marks persistence — populated by the binding in bound mode.
+  const marksRef = useRef<PersistMarks | null>(null);
   // Exact parts of the just-sent user turn (engine → binding) so
   // attachments persist reliably.
   const pendingUserPartsRef = useRef<UIMessage["parts"] | null>(null);
@@ -304,11 +311,22 @@ export function ChatPanel({
     modelId,
     persistRef,
     truncateRef,
+    marksRef,
     pendingUserPartsRef,
     onTitleChanged,
     skipNextLoadRef,
     onHistoryReady: setHistoryReady,
   });
+
+  // "What the model sees" (CONTEXT-WINDOW-EDITOR-PLAN §7): marks for the
+  // transcript chips plus the compact ledger inside the control panel.
+  const { markStates, actions: markActions } = useContextMarks({
+    messages,
+    setMessages: setMessages as unknown as (updater: (prev: UIMessage[]) => UIMessage[]) => void,
+    marksRef,
+  });
+  const liveFrom = useMemo(() => lastUserMessageIndex(messages), [messages]);
+  const activeVendor = vendorOf(providerId, modelId);
 
   // Seed the local context selection from the bound conversation whenever
   // it (re)loads. Transient mode resolves to null. User changes after load
@@ -1250,11 +1268,21 @@ export function ChatPanel({
                   ) : deco?.kind === "notices" ? (
                     <ModelRouteNotices notices={deco.notices} />
                   ) : null}
+                {message.role === "user" && readContextMarks(message).lineAbove && (
+                  <ContextLineDivider onClear={() => markActions.setLine(null)} />
+                )}
                 <ChatMessage
                   message={message}
                   messageIndex={i}
                   perceptionFolds={perceptionFolds}
                   duplicateFolds={duplicateFolds}
+                  userMarks={markStates}
+                  markable={!isActive && liveFrom >= 0 && i < liveFrom}
+                  vendorId={vendorOf(stamp.providerId, stamp.modelId)}
+                  onTogglePartMark={markActions.togglePart}
+                  onDropExchange={markActions.dropExchange}
+                  onSetLine={markActions.setLine}
+                  lineAbove={message.role === "user" && readContextMarks(message).lineAbove === true}
                   latestProposalIndex={latestProposalIndex}
                   existingDatabases={existingDatabases}
                   bulkReadFolds={bulkReadFolds}
@@ -1374,6 +1402,11 @@ export function ChatPanel({
               activeContextId={activeContextId}
               onContextChange={handleContextChange}
               busy={isActive}
+              contextLedger={
+                messages.length > 0 ? (
+                  <ContextLedger messages={messages} vendor={activeVendor} actions={markActions} compact />
+                ) : undefined
+              }
             />
           </div>
         }

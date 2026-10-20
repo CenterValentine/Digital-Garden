@@ -14,6 +14,7 @@ import type { JSONContent } from "@tiptap/core";
 import { prisma } from "@/lib/database/client";
 import { tiptapToMarkdown } from "@/lib/domain/content/markdown";
 import { stripPrivateContent } from "@/lib/domain/content/private-content";
+import { stripCommentMarks } from "@/lib/domain/content/comments";
 import type {
   ResolvedSourceContent,
   ResolverNodeRef,
@@ -139,7 +140,7 @@ async function resolveNote(
   let text = "";
   try {
     text = tiptapToMarkdown(
-      stripPrivateContent(payload.tiptapJson as unknown as JSONContent),
+      stripCommentMarks(stripPrivateContent(payload.tiptapJson as unknown as JSONContent)),
     );
   } catch {
     text = "";

@@ -13,6 +13,13 @@
 
 import type { ModelMessage, UIMessage } from "ai";
 import { parseReadHeader } from "@/lib/domain/data/read-format";
+import {
+  contextLineIndex,
+  isMarkablePart,
+  lastUserMessageIndex,
+  partMarkKey,
+  readContextMarks,
+} from "./context-marks";
 
 /**
  * Drop reasoning parts from RESENT assistant history for providers that
@@ -951,5 +958,148 @@ export function supersedeBulkReads(
       } as typeof part;
     });
     return changed ? { ...m, parts } : m;
+  });
+}
+
+// ── User context marks (CONTEXT-WINDOW-EDITOR-PLAN §5) ─────────────────────
+
+export type UserMarkState = "removed" | "behind-line" | "kept";
+
+const USER_REMOVED_TOOL_STUB = (toolName: string) =>
+  `[removed from context by the user — this ${toolName} result is still in the transcript; ask the user to restore it if a later step truly needs it]`;
+const USER_REMOVED_TEXT_STUB = "[removed from context by the user]";
+const BEHIND_LINE_TOOL_STUB = (toolName: string) =>
+  `[behind the user's context line — this ${toolName} result is no longer carried; ask the user if a later step truly needs it]`;
+const BEHIND_LINE_TEXT_STUB = "[behind the user's context line]";
+
+/**
+ * Anthropic extended thinking with tool use must resend the prior turn's
+ * signed thinking blocks (the reason stripReasoningForResend exempts
+ * anthropic). A mark never removes such a part; the UI shows it locked.
+ */
+export function isLockedReasoning(
+  message: UIMessage,
+  part: unknown,
+  executedVendorId: string | undefined,
+): boolean {
+  if ((part as { type?: string })?.type !== "reasoning") return false;
+  if (executedVendorId !== "anthropic") return false;
+  return message.parts.some((p) => {
+    const t = (p as { type?: string }).type;
+    return typeof t === "string" && (t.startsWith("tool-") || t === "dynamic-tool");
+  });
+}
+
+/**
+ * Verdict for every markable part, keyed `"messageIdx:partIdx"` — ONE
+ * implementation for the model-facing pass, the chat chips and the context
+ * ledger (owner rule: no divergence between front and back).
+ *
+ * Rules:
+ *  - the live tail (the latest user message and everything after it) is
+ *    never marked, whatever the metadata says — edit or regenerate it instead;
+ *  - every markable part of a message before the line is `behind-line`;
+ *  - a part whose key is in its message's `removed` list is `removed`;
+ *  - `data-*`, `step-start` and source parts are never in the map.
+ */
+export function userMarkStates(messages: UIMessage[]): Map<string, UserMarkState> {
+  const out = new Map<string, UserMarkState>();
+  const liveFrom = lastUserMessageIndex(messages);
+  const line = contextLineIndex(messages);
+  messages.forEach((m, messageIdx) => {
+    if (liveFrom >= 0 && messageIdx >= liveFrom) return;
+    const marks = readContextMarks(m);
+    const removed = new Set(marks.removed ?? []);
+    const behindLine = line != null && messageIdx < line;
+    m.parts.forEach((part, partIdx) => {
+      if (!isMarkablePart(part)) return;
+      if (behindLine) {
+        out.set(`${messageIdx}:${partIdx}`, "behind-line");
+        return;
+      }
+      if (removed.size > 0 && removed.has(partMarkKey(part, partIdx))) {
+        out.set(`${messageIdx}:${partIdx}`, "removed");
+      }
+    });
+  });
+  return out;
+}
+
+export function userMarkState(
+  states: Map<string, UserMarkState>,
+  messageIdx: number,
+  partIdx: number,
+): UserMarkState | null {
+  return states.get(`${messageIdx}:${partIdx}`) ?? null;
+}
+
+/**
+ * Model-path transform for user marks — applied FIRST in the chat route's
+ * chain, before every rule fold. It never removes a tool part (the call and
+ * its result stay paired by presence) and never empties a message:
+ *  - a marked tool result keeps its `input` and gets a stub `output`;
+ *  - marked text parts become one stub per message (the rest empty);
+ *  - marked reasoning is dropped unless it is locked signed thinking;
+ *  - a marked file part on a user message is dropped whole (the attachment
+ *    resolver then sees nothing);
+ *  - `data-*` parts are untouched.
+ * Same contract as every transform here: never applied to the persisted
+ * transcript or `originalMessages`.
+ */
+export function applyUserContextMarks(
+  messages: UIMessage[],
+  executedVendorId?: string,
+): UIMessage[] {
+  const states = userMarkStates(messages);
+  if (states.size === 0) return messages;
+
+  return messages.map((m, messageIdx) => {
+    let changed = false;
+    let textStubbed = false;
+    const parts: unknown[] = [];
+    m.parts.forEach((part, partIdx) => {
+      const state = states.get(`${messageIdx}:${partIdx}`);
+      if (!state) {
+        parts.push(part);
+        return;
+      }
+      const p = part as Record<string, unknown> & { type?: string };
+      const type = p.type ?? "";
+      if (type.startsWith("tool-") || type === "dynamic-tool") {
+        if (p.state !== "output-available") {
+          parts.push(part);
+          return;
+        }
+        changed = true;
+        const toolName = type === "dynamic-tool" ? String(p.toolName ?? "tool") : type.slice(5);
+        parts.push({
+          ...p,
+          output:
+            state === "removed" ? USER_REMOVED_TOOL_STUB(toolName) : BEHIND_LINE_TOOL_STUB(toolName),
+        });
+        return;
+      }
+      if (type === "text") {
+        changed = true;
+        const stub = state === "removed" ? USER_REMOVED_TEXT_STUB : BEHIND_LINE_TEXT_STUB;
+        parts.push({ ...p, text: textStubbed ? "" : stub });
+        textStubbed = true;
+        return;
+      }
+      if (type === "reasoning") {
+        if (isLockedReasoning(m, part, executedVendorId)) {
+          parts.push(part);
+          return;
+        }
+        changed = true;
+        return; // dropped
+      }
+      if (type === "file") {
+        changed = true;
+        return; // dropped
+      }
+      parts.push(part);
+    });
+    return changed ? ({ ...m, parts } as UIMessage) : m;
   });
 }

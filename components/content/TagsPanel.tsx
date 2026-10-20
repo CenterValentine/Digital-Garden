@@ -13,6 +13,8 @@ import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useContentStore } from "@/state/content-store";
 import { useEditorStatsStore } from "@/state/editor-stats-store";
+import { isUuid } from "@/lib/domain/content/uuid";
+import { resolveExtensionVirtualContentType } from "@/lib/extensions/client-registry";
 import { clientLogger } from "@/lib/core/logger/client";
 
 interface Tag {
@@ -49,8 +51,11 @@ export function TagsPanel({ contentId }: TagsPanelProps) {
       return;
     }
 
-    // Skip fetching for temporary IDs (files being created)
-    if (contentId.startsWith("temp-") || contentId.startsWith("person:") || contentId.startsWith("peopleGroup:")) {
+    // Skip fetching for temporary ids (files being created) and for an
+    // extension's virtual tabs (`reader:research`, `person:…`): they have no
+    // ContentNode, so there is nothing to tag — and a non-UUID id in the
+    // route's Prisma filter is a 500, not an empty list.
+    if (contentId.startsWith("temp-") || resolveExtensionVirtualContentType(contentId) || !isUuid(contentId)) {
       setTags([]);
       setIsLoading(false);
       return;

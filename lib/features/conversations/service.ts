@@ -16,6 +16,13 @@
 
 import "server-only";
 import { prisma } from "@/lib/database/client";
+import type { UIMessage } from "ai";
+import {
+  CONTEXT_MARKS_KEY,
+  mergeContextMarks,
+  readContextMarks,
+  type ContextMarks,
+} from "@/lib/domain/ai/context-marks";
 import { Prisma } from "@/lib/database/generated/prisma";
 import { logger } from "@/lib/core/logger";
 import { generateUniqueSlug } from "@/lib/domain/content/slug";
@@ -819,6 +826,44 @@ export async function updateMessageParts(
     },
   });
   return count > 0;
+}
+
+/**
+ * Merge a user context-mark patch into a message's metadata
+ * (CONTEXT-WINDOW-EDITOR-PLAN §4). Read → merge → write of ONE key, so a
+ * continuation's metadata PATCH and a mark never race each other's keys
+ * (the metadata-merge discipline from PR #222). Ownership-gated through the
+ * conversation join; returns the merged marks, or null when nothing matched.
+ */
+export async function updateMessageContextMarks(
+  userId: string,
+  conversationId: string,
+  messageId: string,
+  patch: { add?: string[]; remove?: string[]; lineAbove?: boolean },
+): Promise<ContextMarks | null> {
+  const row = await prisma.conversationMessage.findFirst({
+    where: {
+      id: messageId,
+      conversation: { id: conversationId, ownerId: userId, deletedAt: null },
+    },
+    select: { id: true, metadata: true },
+  });
+  if (!row) return null;
+  const metadata =
+    row.metadata && typeof row.metadata === "object" && !Array.isArray(row.metadata)
+      ? (row.metadata as Record<string, unknown>)
+      : {};
+  const current = readContextMarks({ metadata } as unknown as UIMessage);
+  const merged = mergeContextMarks(current, patch);
+  const next: Record<string, unknown> = { ...metadata };
+  if (Object.keys(merged).length === 0) delete next[CONTEXT_MARKS_KEY];
+  else next[CONTEXT_MARKS_KEY] = merged;
+  await prisma.conversationMessage.update({
+    where: { id: row.id },
+    data: { metadata: next as unknown as Prisma.InputJsonValue },
+    select: { id: true },
+  });
+  return merged;
 }
 
 export async function appendMessage(
