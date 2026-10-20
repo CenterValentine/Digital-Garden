@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { ChevronRight, Copy } from "lucide-react";
 import { toast } from "sonner";
 import type { ExtensionShellTabMenuSectionProps } from "@/lib/extensions/types";
+import { resolveTabMenuCapabilities } from "@/lib/extensions/client-registry";
 import { useWorkspaceStore } from "@/extensions/workplaces/state/workspace-store";
 import {
   copyTreeItems,
@@ -36,6 +37,11 @@ export function WorkplacesTabMenuSection({
     (state) => state.sendContentToWorkspace
   );
   const ensureWorkbench = useWorkspaceStore((state) => state.ensureWorkbench);
+  // What this tab's content allows — an extension's virtual tab (the reader's
+  // Library, Research, a scripture collection) is not a ContentNode, so a
+  // copied link, a move or a duplicate would be a no-op; its owner says what
+  // still applies (lib/extensions/types.ts: TabMenuCapabilities).
+  const can = resolveTabMenuCapabilities(tab.contentId);
 
   // Alt at Copy-click = strictly the URL — the tracker must be live while
   // the menu is open, before any click lands.
@@ -124,6 +130,7 @@ export function WorkplacesTabMenuSection({
         <span className="min-w-0 flex-1 truncate text-xs text-gray-500">
           {tab.title || "Untitled"}
         </span>
+        {can.copyLink && (
         <button
           type="button"
           title="Copy link"
@@ -148,10 +155,19 @@ export function WorkplacesTabMenuSection({
         >
           <Copy className="h-3.5 w-3.5" aria-hidden="true" />
         </button>
+        )}
       </div>
-      <div className="my-1 h-px bg-black/10 dark:bg-white/10" />
-      {flyoutRow("move", "Move tab to")}
-      {flyoutRow("duplicate", "Duplicate tab to")}
+      {can.move || can.duplicate ? (
+        <>
+          <div className="my-1 h-px bg-black/10 dark:bg-white/10" />
+          {can.move && flyoutRow("move", "Move tab to")}
+          {can.duplicate && flyoutRow("duplicate", "Duplicate tab to")}
+        </>
+      ) : (
+        <p className="px-2 pb-1.5 pt-1 text-[11px] leading-snug text-gray-500">
+          This tab isn&apos;t a file: it can&apos;t be linked, moved or duplicated as content.
+        </p>
+      )}
       {flyout ? (
         <WorkplaceTargetFlyout
           key={flyout.kind}

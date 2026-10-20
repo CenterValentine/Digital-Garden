@@ -86,6 +86,22 @@ export interface ExtensionShellTabMenuSectionProps {
   closeMenu: () => void;
 }
 
+/**
+ * What a tab's context menu may offer for one piece of content. Ordinary
+ * content nodes get everything. An extension's virtual tab (`reader:library`)
+ * has no ContentNode, so copying a link to it, or moving / duplicating it
+ * across workplaces as content, is a no-op — the owning extension says what
+ * still makes sense (`ExtensionRuntime.tabMenuCapabilities`).
+ */
+export interface TabMenuCapabilities {
+  /** "Copy link" — a deep link / wiki-link / @-mention to this content. */
+  copyLink: boolean;
+  /** "Move tab to" another workplace. */
+  move: boolean;
+  /** "Duplicate tab to" another workplace (sends it as content). */
+  duplicate: boolean;
+}
+
 export interface ExtensionContentViewerMatch {
   selectedContentId: string | null;
   contentType: string | null;
@@ -167,6 +183,12 @@ export interface ExtensionRuntime {
   shellNavigationTrailingControls?: ComponentType<ExtensionShellNavigationProps>[];
   shellControllers?: ComponentType[];
   shellTabMenuSections?: ComponentType<ExtensionShellTabMenuSectionProps>[];
+  /**
+   * What the tab menu may do for content this extension owns (its virtual
+   * tabs, or link nodes it claims). Return null for content that isn't
+   * yours. Unanswered virtual tabs get nothing; real content gets everything.
+   */
+  tabMenuCapabilities?: (contentId: string) => TabMenuCapabilities | null;
   headerNavActions?: Record<
     string,
     ComponentType<ExtensionHeaderNavActionProps>

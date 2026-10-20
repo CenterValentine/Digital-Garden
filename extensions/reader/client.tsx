@@ -10,7 +10,7 @@ import { ReaderBookshelfController } from "./components/ReaderBookshelfControlle
 import { ReaderContentViewer } from "./components/ReaderContentViewer";
 import { ReaderSidebarPanel } from "./components/ReaderSidebarPanel";
 import { withOptimisticTreeRow } from "@/lib/features/content/tree-optimistic";
-import { SCRIPTURE_RESOURCE_TYPE, VERSE_ANCHOR_KIND, type ScriptureCorpusInfo } from "@/lib/domain/scripture/types";
+import { corpusIdFromTabId, SCRIPTURE_RESOURCE_TYPE, VERSE_ANCHOR_KIND, type ScriptureCorpusInfo } from "@/lib/domain/scripture/types";
 import { staticScriptureTable } from "@/lib/domain/scripture/tables";
 import { useContentAnchorStore } from "@/state/content-anchor-store";
 import { scriptureApi } from "./lib/api";
@@ -309,6 +309,15 @@ export const readerExtensionRuntime: ExtensionRuntime = {
   virtualContent: [
     { prefix: READER_VIRTUAL_PREFIX, contentType: READER_VIRTUAL_CONTENT_TYPE },
   ],
+  // The reader's virtual tabs aren't content nodes: the Library, Research and
+  // the scripture catalog can't be linked, moved or duplicated as content. A
+  // scripture collection's tab is wiki-linkable (`[[Gospel Library#…`), so
+  // "Copy link" stays for it.
+  tabMenuCapabilities: (contentId) => {
+    if (!contentId.startsWith(READER_VIRTUAL_PREFIX)) return null;
+    const linkable = corpusIdFromTabId(contentId) !== null;
+    return { copyLink: linkable, move: false, duplicate: false };
+  },
   contentSidebarPanel: {
     label: "Book",
     svgPath: READER_SIDEBAR_SVG_PATH,
