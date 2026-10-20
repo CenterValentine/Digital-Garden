@@ -157,6 +157,10 @@ export function ContextLedger({
   const ledger = useMemo(() => buildContextLedger(messages, vendor), [messages, vendor]);
   const { fixed } = ledger;
   const total = ledger.estimatedNextTokens;
+  const hasReplies = ledger.turns.some((t) => t.assistantIdx != null);
+  // The fixed-cost stamp exists only on replies generated after it shipped:
+  // a chat with replies and no stamp predates it, and the next reply fills it.
+  const pendingCaption = hasReplies ? "measured on the next reply" : "measured after the first reply";
   const pct = (n: number) => (total > 0 ? `${(100 * n) / total}%` : "0%");
   const earlyMark = ledger.turns.some(
     (t) => t.parts.some((p) => p.state === "removed") && t.userIdx < Math.max(0, ledger.liveFrom - 4),
@@ -184,7 +188,7 @@ export function ContextLedger({
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <span className="font-mono text-[20px] font-semibold tabular-nums leading-none">{fmt(total)}</span>
           <span className="text-[11px] text-gray-500 dark:text-gray-400">
-            tokens in the next request{fixed.measured ? "" : " (history only — fixed cost appears after the first reply)"}
+            tokens in the next request{fixed.measured ? "" : ` (history only — the prompt and tool sizes are ${pendingCaption})`}
           </span>
         </div>
         <div className="mt-1 flex flex-wrap gap-x-3 text-[11px] text-gray-500 dark:text-gray-400">
@@ -215,7 +219,7 @@ export function ContextLedger({
       <div className="min-h-0 flex-1 overflow-y-auto">
         <Section
           title="System prompt"
-          detail={fixed.measured ? "measured on the last request" : "measured after the first reply"}
+          detail={fixed.measured ? "measured on the last request" : pendingCaption}
           tokens={fixed.promptTokens}
         >
           <div className="flex min-w-0 flex-col gap-1 text-[11.5px] text-gray-600 dark:text-gray-300">
@@ -241,7 +245,11 @@ export function ContextLedger({
         </Section>
         <Section
           title="Tool definitions"
-          detail={fixed.toolCount != null ? `${fixed.toolCount} tools offered` : undefined}
+          detail={
+            fixed.toolCount != null
+              ? `${fixed.toolCount} tools offered${fixed.measured ? "" : ` · size ${pendingCaption}`}`
+              : pendingCaption
+          }
           tokens={fixed.toolTokens}
         >
           <p className="text-[11px] text-gray-500 dark:text-gray-400">
