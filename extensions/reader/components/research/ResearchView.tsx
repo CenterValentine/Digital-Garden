@@ -37,12 +37,12 @@ import { parseIdentifierQuery } from "@/lib/domain/research/identifiers";
 import { activeFieldCount } from "@/lib/domain/research/query-syntax";
 import { RESEARCH_SCOPES, researchScope, SCOPE_GROUPS } from "@/lib/domain/research/scopes";
 import { RESEARCH_SOURCES, researchSource } from "@/lib/domain/research/sources";
-import { KNOWN_WORK_TYPES, type Work } from "@/lib/domain/research/types";
+import { KNOWN_WORK_TYPES, type SavedWorkRef, type Work } from "@/lib/domain/research/types";
 import type { SourceReport } from "@/lib/domain/research/federate";
 import { READER_RESEARCH_CONTENT_ID } from "../../manifest";
 import { revealReaderSidebar } from "../../lib/sidebar";
 import { useTreeTargetStore } from "@/state/tree-target-store";
-import { addWorkToFolder, hasMoreResults, runResearchSearch } from "../../lib/use-research";
+import { addWorkToFolder, hasMoreResults, openSavedRef, runResearchSearch, savedWhere } from "../../lib/use-research";
 import { useResearchStore, type ResearchLinkResult } from "../../state/research-store";
 import { accessBadge, authorLine, RETRACTION_LABELS, toneStyle, typeLabel, typeTone } from "./work-labels";
 
@@ -85,13 +85,15 @@ const ADD_HOLD_MS = 450;
  */
 function AddControl({
   work,
-  savedId,
+  savedRefs,
   tone,
 }: {
   work: Work | { key: string; title: string };
-  savedId: string | null;
+  /** Nodes that already hold this Work; empty = not in the library. */
+  savedRefs: SavedWorkRef[];
   tone: "card" | "link";
 }) {
+  const savedId = savedRefs[0]?.contentId ?? null;
   const targetLabel = useTreeTargetStore((state) => state.addTarget?.label ?? "the folder you opened Research from");
   const { views, defaultViewId } = useWorkspaceViewOptions();
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -114,13 +116,33 @@ function AddControl({
   }, [cancelHold]);
   useEffect(() => cancelHold, [cancelHold]);
 
-  const label = savedId ? "Open" : tone === "link" ? "Add as link" : "Add";
+  const addLabel = tone === "link" ? "Add as link" : "Add";
+  const where = savedWhere(savedRefs);
   return (
     <>
+      {savedId && (
+        <button
+          type="button"
+          data-no-select
+          title={`Already in ${where} — open it`}
+          onClick={(event) => {
+            event.stopPropagation();
+            openSavedRef(savedRefs[0], work.title);
+          }}
+          className="inline-flex h-6 shrink-0 items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 text-[11px] font-medium text-emerald-700 transition-colors hover:bg-emerald-500/20 dark:text-emerald-300"
+        >
+          <Check className="h-3 w-3" />
+          Open{savedRefs.length > 1 ? ` (${savedRefs.length})` : ""}
+        </button>
+      )}
       <button
         ref={buttonRef}
         type="button"
-        title={savedId ? "In your library — open it" : `Add to ${targetLabel} · hold or right-click to choose where`}
+        title={
+          savedId
+            ? `Already in ${where} — add another to ${targetLabel} (a stored PDF gets a shortcut) · hold or right-click to choose where`
+            : `Add to ${targetLabel} · hold or right-click to choose where`
+        }
         data-no-select
         onPointerDown={(event) => {
           // The card selects on click; a press on Add — held or not — is Add's alone.
@@ -145,16 +167,12 @@ function AddControl({
             heldRef.current = false;
             return;
           }
-          void addWorkToFolder(work, { open: Boolean(savedId) });
+          void addWorkToFolder(work, { again: Boolean(savedId) });
         }}
-        className={`inline-flex h-6 shrink-0 select-none items-center gap-1 rounded-full border px-2 text-[11px] font-medium transition-colors ${
-          savedId
-            ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-            : "border-black/10 text-foreground hover:border-[var(--work-tone)] hover:bg-[color-mix(in_srgb,var(--work-tone)_12%,transparent)] dark:border-white/15"
-        }`}
+        className="inline-flex h-6 shrink-0 select-none items-center gap-1 rounded-full border border-black/10 px-2 text-[11px] font-medium text-foreground transition-colors hover:border-[var(--work-tone)] hover:bg-[color-mix(in_srgb,var(--work-tone)_12%,transparent)] dark:border-white/15"
       >
-        {savedId ? <Check className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
-        {label}
+        <Plus className="h-3 w-3" />
+        {addLabel}
       </button>
       {pickerAnchor && (
         <ContentTreePicker
@@ -171,7 +189,7 @@ function AddControl({
             pickCreatesInside: true,
             leafPickPlacesAfter: true,
             create: async ({ parentId, place }) => {
-              const saved = await addWorkToFolder(work, { parentId, place });
+              const saved = await addWorkToFolder(work, { parentId, place, again: Boolean(savedId) });
               return saved
                 ? { id: saved.contentId, title: saved.title, contentType: saved.copyPolicy === "stored" ? "file" : "external" }
                 : null;
@@ -593,7 +611,7 @@ function ResultList({ works }: { works: Work[] }) {
             key={work.key}
             work={work}
             selected={selectedKey === work.key}
-            savedId={saved[work.key]?.contentId ?? null}
+            savedRefs={saved[work.key] ?? []}
             onSelect={() => {
               select(work.key);
               revealReaderSidebar(READER_RESEARCH_CONTENT_ID);
@@ -623,12 +641,12 @@ function ResultList({ works }: { works: Work[] }) {
 function WorkCard({
   work,
   selected,
-  savedId,
+  savedRefs,
   onSelect,
 }: {
   work: Work;
   selected: boolean;
-  savedId: string | null;
+  savedRefs: SavedWorkRef[];
   onSelect: () => void;
 }) {
   const badge = accessBadge(work);
@@ -704,7 +722,7 @@ function WorkCard({
             </span>
           )}
           <span className="min-w-0 flex-1 truncate text-muted-foreground/80">{sourceLabels(work.provenance)}</span>
-          <AddControl work={work} savedId={savedId} tone="card" />
+          <AddControl work={work} savedRefs={savedRefs} tone="card" />
         </div>
       </div>
     </li>
@@ -730,7 +748,7 @@ function LinkResult({ link }: { link: ResearchLinkResult }) {
           . Saved as a link until the Law pack (V1.1) can read it here.
         </div>
       </div>
-      <AddControl work={{ key: link.key, title: link.title }} savedId={saved[link.key]?.contentId ?? null} tone="link" />
+      <AddControl work={{ key: link.key, title: link.title }} savedRefs={saved[link.key] ?? []} tone="link" />
     </div>
   );
 }

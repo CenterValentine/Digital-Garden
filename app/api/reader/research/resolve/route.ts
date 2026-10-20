@@ -13,6 +13,7 @@ import { readerRoute } from "@/lib/domain/reader/server/route";
 import { parseIdentifierQuery } from "@/lib/domain/research/identifiers";
 import { isLegalScheme, legalLink } from "@/lib/domain/research/legal";
 import { ResearchError, resolveIdentifiers } from "@/lib/domain/research/server/service";
+import { findSavedWorks } from "@/lib/domain/research/server/save";
 
 const params = z.object({
   q: z.string().trim().min(1).max(2000),
@@ -30,5 +31,6 @@ export const GET = readerRoute("/api/reader/research/resolve", async ({ ownerId,
   }
 
   const result = await resolveIdentifiers(ownerId, identifiers, { fresh: input.fresh === "1" });
-  return { kind: result.work ? ("work" as const) : ("none" as const), identifier: identifiers[0], ...result };
+  const saved = result.work ? await findSavedWorks(ownerId, result.work) : [];
+  return { kind: result.work ? ("work" as const) : ("none" as const), identifier: identifiers[0], ...result, saved };
 });

@@ -5,10 +5,15 @@
 
 import type { FederationEvent } from "@/lib/domain/research/federate";
 import type { SourceReport } from "@/lib/domain/research/federate";
-import type { ResearchQuery, ResearchWorkNodeDto, Work, WorkIdentifier } from "@/lib/domain/research/types";
+import type { ResearchQuery, ResearchWorkNodeDto, SavedWorkRef, Work, WorkIdentifier } from "@/lib/domain/research/types";
 import { ReaderApiError, readerCall } from "./api";
 
-export type SearchStreamEvent = FederationEvent | { type: "done" } | { type: "error"; message: string };
+export type SearchStreamEvent =
+  | FederationEvent
+  /** Which of the merged Works the user already has, by Work key (sent after each "works" event). */
+  | { type: "saved"; refs: Record<string, SavedWorkRef[]> }
+  | { type: "done" }
+  | { type: "error"; message: string };
 
 export interface SearchBody {
   scope: string;
@@ -57,16 +62,21 @@ export async function streamResearchSearch(
 }
 
 export type ResolveResult =
-  | { kind: "work"; identifier: WorkIdentifier; work: Work; reports: SourceReport[]; cached: boolean }
+  | { kind: "work"; identifier: WorkIdentifier; work: Work; reports: SourceReport[]; cached: boolean; saved: SavedWorkRef[] }
   | { kind: "none"; identifier: WorkIdentifier; work: null; reports: SourceReport[]; cached: boolean }
   | { kind: "link"; identifier: WorkIdentifier; link: { title: string; url: string; type: string } | null; work: null; reports: [] };
 
 export interface SaveResult {
   contentId: string;
+  /** What to open: the node, or — for a shortcut — its target. */
+  openId: string;
   title: string;
   parentId: string | null;
   duplicate: boolean;
   copyPolicy: "stored" | "on-demand" | "link";
+  /** "shortcut" when "add again" placed a shortcut to the existing stored file. */
+  kind: "node" | "shortcut";
+  folderTitle: string | null;
 }
 
 export const researchApi = {
@@ -79,6 +89,8 @@ export const researchApi = {
     parentId?: string | null;
     /** "top" (default) or right after a sibling the picker chose. */
     place?: "top" | { afterId: string };
+    /** Add another copy even though the Work is already in the library (a shortcut, for a stored PDF). */
+    again?: boolean;
     fallback?: Work;
     sourceAdapter?: string;
   }) =>

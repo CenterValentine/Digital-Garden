@@ -14,7 +14,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { SourceReport } from "@/lib/domain/research/federate";
 import { applyFields, parseFieldedQuery, type QueryFields } from "@/lib/domain/research/query-syntax";
-import type { ResearchWorkNodeDto, Work } from "@/lib/domain/research/types";
+import type { ResearchWorkNodeDto, SavedWorkRef, Work } from "@/lib/domain/research/types";
 
 export type ResearchStatus = "idle" | "searching" | "done" | "error";
 
@@ -48,8 +48,11 @@ interface ResearchState {
   /** Cursor per source for "More results"; null = that source has no more. */
   cursors: Record<string, string | null>;
   selectedKey: string | null;
-  /** Work key → the saved node (this session's adds, and duplicates found). */
-  saved: Record<string, { contentId: string; copyPolicy: string }>;
+  /**
+   * Work key → the nodes that already hold it: what the server reports with
+   * each search, plus this session's adds. Empty array = checked, not saved.
+   */
+  saved: Record<string, SavedWorkRef[]>;
   /** Where "Add" puts Works — the "+" target the tab was opened from. */
   targetParentId: string | null;
   /** Research nodes open in the reader, by content id — the sidebar's Work view reads these. */
@@ -67,7 +70,8 @@ interface ResearchState {
   finish: (error?: string | null) => void;
   showSingle: (work: Work | null, link: ResearchLinkResult | null) => void;
   select: (key: string | null) => void;
-  markSaved: (key: string, contentId: string, copyPolicy: string) => void;
+  receiveSaved: (refs: Record<string, SavedWorkRef[]>) => void;
+  markSaved: (key: string, ref: SavedWorkRef) => void;
   setTargetParentId: (parentId: string | null) => void;
   setOpenWork: (contentId: string, node: ResearchWorkNodeDto | null) => void;
 }
@@ -138,8 +142,11 @@ export const useResearchStore = create<ResearchState>()(
           selectedKey: work?.key ?? null,
         }),
       select: (key) => set({ selectedKey: key }),
-      markSaved: (key, contentId, copyPolicy) =>
-        set((state) => ({ saved: { ...state.saved, [key]: { contentId, copyPolicy } } })),
+      receiveSaved: (refs) => set((state) => ({ saved: { ...state.saved, ...refs } })),
+      markSaved: (key, ref) =>
+        set((state) => ({
+          saved: { ...state.saved, [key]: [...(state.saved[key] ?? []).filter((r) => r.contentId !== ref.contentId), ref] },
+        })),
       setTargetParentId: (targetParentId) => set({ targetParentId }),
       setOpenWork: (contentId, node) =>
         set((state) => {

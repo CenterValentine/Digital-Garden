@@ -13,7 +13,9 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { readerRoute } from "@/lib/domain/reader/server/route";
 import { searchWorks } from "@/lib/domain/research/server/service";
+import { savedRefsFor } from "@/lib/domain/research/server/save";
 import type { FederationEvent } from "@/lib/domain/research/federate";
+import type { SavedWorkRef } from "@/lib/domain/research/types";
 
 const body = z.object({
   scope: z.string().min(1).max(40),
@@ -39,8 +41,12 @@ export const POST = readerRoute("/api/reader/research/search", async ({ ownerId,
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
-      const send = (event: FederationEvent | { type: "done" } | { type: "error"; message: string }) =>
-        controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
+      const send = (
+        event: FederationEvent | { type: "saved"; refs: Record<string, SavedWorkRef[]> } | { type: "done" } | { type: "error"; message: string }
+      ) => controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
+      // "Already in your library" rides behind each merged page, one query
+      // per source answer; a lookup failure never breaks the search.
+      const pendingSaved: Promise<void>[] = [];
       try {
         await searchWorks({
           ownerId,
@@ -49,8 +55,18 @@ export const POST = readerRoute("/api/reader/research/search", async ({ ownerId,
           include: input.include,
           exclude: input.exclude,
           cursors: input.cursors,
-          onEvent: send,
+          onEvent: (event) => {
+            send(event);
+            if (event.type === "works") {
+              pendingSaved.push(
+                savedRefsFor(ownerId, event.works)
+                  .then((refs) => send({ type: "saved", refs }))
+                  .catch(() => undefined)
+              );
+            }
+          },
         });
+        await Promise.all(pendingSaved);
         send({ type: "done" });
       } catch (error) {
         send({ type: "error", message: error instanceof Error ? error.message : "Search failed" });

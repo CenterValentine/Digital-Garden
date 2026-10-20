@@ -8,7 +8,7 @@
 
 import { AlertTriangle, ExternalLink, FlaskConical, Plus } from "lucide-react";
 import type { ResearchWorkNodeDto } from "@/lib/domain/research/types";
-import { addWorkToFolder } from "../../lib/use-research";
+import { addWorkToFolder, openSavedRef, savedWhere } from "../../lib/use-research";
 import { useResearchStore } from "../../state/research-store";
 import { accessBadge, RETRACTION_LABELS, typeLabel } from "./work-labels";
 
@@ -50,7 +50,8 @@ export function ResearchWorkPanel({ node }: { node?: ResearchWorkNodeDto } = {})
   }
 
   const badge = accessBadge(work);
-  const isSaved = Boolean(node) || Boolean(saved[work.key]);
+  const savedRefs = saved[work.key] ?? [];
+  const isSaved = Boolean(node) || savedRefs.length > 0;
   const identifiers = Object.entries(work.identifiers).filter(([scheme]) => scheme !== "url");
 
   return (
@@ -80,19 +81,27 @@ export function ResearchWorkPanel({ node }: { node?: ResearchWorkNodeDto } = {})
       )}
 
       {!node && (
-        <button
-          type="button"
-          onClick={() => void addWorkToFolder(work, { open: true })}
-          className="inline-flex h-8 items-center gap-1.5 rounded bg-primary px-3 text-xs font-medium text-primary-foreground"
-        >
-          {isSaved ? (
-            "Open"
-          ) : (
-            <>
-              <Plus className="h-3.5 w-3.5" /> Add and open
-            </>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void addWorkToFolder(work, { open: true, again: isSaved })}
+            className={`inline-flex h-8 items-center gap-1.5 rounded px-3 text-xs font-medium ${
+              isSaved ? "border border-black/10 dark:border-white/15" : "bg-primary text-primary-foreground"
+            }`}
+          >
+            <Plus className="h-3.5 w-3.5" /> {isSaved ? "Add another" : "Add and open"}
+          </button>
+          {isSaved && (
+            <button
+              type="button"
+              onClick={() => openSavedRef(savedRefs[0], work.title)}
+              className="inline-flex h-8 items-center gap-1.5 rounded bg-primary px-3 text-xs font-medium text-primary-foreground"
+              title={`Already in ${savedWhere(savedRefs)}`}
+            >
+              Open
+            </button>
           )}
-        </button>
+        </div>
       )}
 
       {work.tldr && (

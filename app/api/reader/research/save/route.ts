@@ -22,6 +22,8 @@ const body = z.object({
   parentId: z.string().uuid().nullable().optional(),
   /** "top" (default) or right after a sibling the picker chose. */
   place: z.union([z.literal("top"), z.object({ afterId: z.string().uuid() })]).optional(),
+  /** Add another copy although the Work is already in the library. */
+  again: z.boolean().optional(),
   /** The client's view of the Work — used only as a link when no source answers. */
   fallback: z
     .object({
@@ -44,7 +46,7 @@ export const POST = readerRoute("/api/reader/research/save", async ({ ownerId, r
   const index = input.key.indexOf(":");
   const scheme = input.key.slice(0, index);
   if (isLegalScheme(scheme)) {
-    return saveLegalLink({ ownerId, identifier: { scheme, value: input.key.slice(index + 1) }, parentId: input.parentId, placement: input.place });
+    return saveLegalLink({ ownerId, identifier: { scheme, value: input.key.slice(index + 1) }, parentId: input.parentId, placement: input.place, again: input.again });
   }
   const given = input.fallback;
   const fallback: Work | undefined = given
@@ -74,6 +76,7 @@ export const POST = readerRoute("/api/reader/research/save", async ({ ownerId, r
     identifiers: input.identifiers,
     parentId: input.parentId,
     placement: input.place,
+    again: input.again,
     fallback,
     sourceAdapter: input.sourceAdapter,
   });

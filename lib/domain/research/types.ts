@@ -209,3 +209,14 @@ export interface ResearchWorkNodeDto {
   url: string | null;
   readingStatus: string | null;
 }
+
+/** A node in the user's tree that already holds a Work (any copy policy, or a shortcut to one). */
+export interface SavedWorkRef {
+  contentId: string;
+  /** What opens: the node itself, or a shortcut's target. */
+  openId: string;
+  contentType: string;
+  copyPolicy: WorkCopyPolicy;
+  /** The folder it sits in, for "in “Spices”"; null = the top level. */
+  folderTitle: string | null;
+}

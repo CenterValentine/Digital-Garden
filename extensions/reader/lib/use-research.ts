@@ -13,7 +13,7 @@ import { toast } from "sonner";
 import { parseIdentifierQuery, identifierKey } from "@/lib/domain/research/identifiers";
 import { toResearchQuery } from "@/lib/domain/research/query-syntax";
 import { RESEARCH_SOURCES } from "@/lib/domain/research/sources";
-import type { Work, WorkIdentifier } from "@/lib/domain/research/types";
+import type { SavedWorkRef, Work, WorkIdentifier } from "@/lib/domain/research/types";
 import { withOptimisticTreeRow } from "@/lib/features/content/tree-optimistic";
 import { useContentStore } from "@/state/content-store";
 import { useTreeTargetStore } from "@/state/tree-target-store";
@@ -51,6 +51,7 @@ export async function runResearchSearch(options: { append?: boolean } = {}): Pro
           store.showSingle(null, { key: identifierKey(result.identifier), ...result.link });
         } else if (result.kind === "work") {
           store.showSingle(result.work, null);
+          store.receiveSaved({ [result.work.key]: result.saved });
         } else {
           store.showSingle(null, null);
           store.finish("No source knows that identifier yet");
@@ -79,6 +80,7 @@ export async function runResearchSearch(options: { append?: boolean } = {}): Pro
         const current = useResearchStore.getState();
         if (event.type === "source") current.receiveReport(event.report);
         else if (event.type === "works") current.receiveWorks(event.works, append, previous);
+        else if (event.type === "saved") current.receiveSaved(event.refs);
         else if (event.type === "error") current.finish(event.message);
         else if (event.type === "done") current.finish();
       },
@@ -137,6 +139,19 @@ export interface AddOptions {
   /** A destination the user chose in the picker (hold on Add). */
   parentId?: string | null;
   place?: "top" | { afterId: string };
+  /** Add another copy although it's already in the library (a shortcut, for a stored PDF). */
+  again?: boolean;
+}
+
+/** Open a saved copy (a shortcut opens its target). */
+export function openSavedRef(ref: SavedWorkRef, title: string): void {
+  openSaved(ref.openId, title, ref.copyPolicy);
+}
+
+/** The folders a Work already sits in, for tooltips: "“Spices”, the top level". */
+export function savedWhere(refs: SavedWorkRef[]): string {
+  const names = [...new Set(refs.map((ref) => (ref.folderTitle ? `“${ref.folderTitle}”` : "the top level")))];
+  return names.join(", ");
 }
 
 /**
@@ -149,11 +164,13 @@ export async function addWorkToFolder(
   options: AddOptions = {}
 ): Promise<SaveResult | null> {
   const store = useResearchStore.getState();
-  const existing = store.saved[work.key];
-  if (existing && options.parentId === undefined) {
-    if (options.open) openSaved(existing.contentId, work.title, existing.copyPolicy);
+  const existing = store.saved[work.key] ?? [];
+  // Already here and not asked for another copy: open it instead.
+  if (existing.length && !options.again && options.parentId === undefined) {
+    if (options.open) openSavedRef(existing[0], work.title);
     return null;
   }
+  const again = options.again || existing.length > 0;
   const parentId = options.parentId !== undefined ? options.parentId : currentAddTarget().parentId;
   const place = options.place ?? "top";
   try {
@@ -168,22 +185,31 @@ export async function addWorkToFolder(
           identifiers: isWork ? identifierList(work) : undefined,
           parentId,
           place,
+          again,
           fallback: isWork ? work : undefined,
         }),
       (saved) => (saved.duplicate ? null : saved.contentId)
     );
-    useResearchStore.getState().markSaved(work.key, result.contentId, result.copyPolicy);
+    useResearchStore.getState().markSaved(work.key, {
+      contentId: result.contentId,
+      openId: result.openId,
+      contentType: result.kind === "shortcut" ? "shortcut" : result.copyPolicy === "stored" ? "file" : "external",
+      copyPolicy: result.copyPolicy,
+      folderTitle: result.folderTitle,
+    });
     const path = await folderPathOf(result.contentId);
     const how =
-      result.copyPolicy === "stored"
-        ? `Added to ${path} with its PDF`
-        : result.copyPolicy === "on-demand"
-          ? `Added to ${path} as a link — its free copy opens on demand`
-          : `Added to ${path} as a link`;
+      result.kind === "shortcut"
+        ? `Added a shortcut to its PDF in ${path}`
+        : result.copyPolicy === "stored"
+          ? `Added to ${path} with its PDF`
+          : result.copyPolicy === "on-demand"
+            ? `Added to ${path} as a link — its free copy opens on demand`
+            : `Added to ${path} as a link`;
     toast.success(result.duplicate ? `“${truncate(work.title)}” is already in ${path}` : how, {
       description: result.duplicate ? undefined : truncate(work.title, 80),
     });
-    if (options.open) openSaved(result.contentId, result.title, result.copyPolicy);
+    if (options.open) openSaved(result.openId, result.title, result.copyPolicy);
     return result;
   } catch (error) {
     toast.error(error instanceof Error ? error.message : "Could not add it");
