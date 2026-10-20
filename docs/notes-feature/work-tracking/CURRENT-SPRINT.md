@@ -4,10 +4,66 @@ epoch: 12 (Main Panel Tabs + Split Workspace)
 duration: multi-session
 branch: epoch-12/sprint-55-wire-blocks
 status: complete
-last_updated: 2026-10-13
+last_updated: 2026-10-20
 ---
 
 # Current Sprint Addendum
+
+## October 15, 2026 — Research in the reader, slice 1: find, resolve, save (`+ → Reader → Research`)
+
+**Tree**: worktree `.claude/worktrees/reader`, branch `claude/inspiring-franklin-2g7h8l` (merged with `origin/main` at `809f74a7`)
+**Plan**: `work-tracking/RESEARCH-READER-PLAN.md` (V1.0–V1.2; V1.3+ in BACKLOG)
+**Status**: typecheck / lint 149 (0 errors) / `research:check` 20 / `research:matrix:check` / `reader:check` 20 / `extensions:check` green; `pnpm research:live:smoke` 9/9 live; migration `20261015120000_research_works` applied locally, **prod deploy owner-run after merge**; PR pending
+
+### Shipped
+- `lib/domain/research/` — Work model, identifiers, faces, adapter contract, 4 adapters (OpenAlex, Semantic Scholar, Crossref, Unpaywall), merge, federation; `server/` context (keys, quotas, guarded fetch), cache, service, save.
+- Routes `/api/reader/research/{search,resolve,save}`; Find tab + right-sidebar Work view in `extensions/reader/components/research/`; `research-store`.
+- Gates `research:check`, `research:matrix:check` (both in `build`); manual `research:live:smoke`.
+
+### Smoke (pending — signed-in dev stack after the migration)
+- `+ → Reader → Research` on a folder → search "statin muscle symptoms" → results stream; source strip shows OpenAlex / Crossref answered; select a card → Work view in the right sidebar.
+- Paste `10.1371/journal.pmed.0020124` → one result, **Read here** → Add → a PDF file node lands in that folder with `WorkMeta` (`copyPolicy = stored`).
+- Paste `arXiv:1706.03762` → resolves (needs `SEMANTIC_SCHOLAR_API_KEY` set, or a lucky anonymous slot).
+- Paste `410 U.S. 113` → "Add as link" → an external node with `resourceType: research`, type `case`.
+- Set `RESEARCH_CONTACT_EMAIL` and re-run `pnpm research:live:smoke` → Unpaywall check runs.
+
+## October 16, 2026 — Comments & annotations (Phases 0–2)
+
+**Tree**: worktree `.claude/worktrees/comments`, branch `feat/comments-annotations` (off `origin/main` at `a73a0bdf`, rebased onto `6b79bcbc`)
+**Plan**: `work-tracking/COMMENTS-ANNOTATIONS-PLAN.md` (all §11 defaults adopted by the owner 2026-10-15)
+**Status**: typecheck / lint 150 (0 errors, none new) / `comments:check` (new; 7 mutants killed across two runs) / `markdown:blocks:check` / `collab:schema:check` / `private:content:check` / `right-sidebar:default:check` / `extensions:check` green; migration applied to the per-worktree DB `dg_comments`; headless two-user smoke green (API 29 checks, Playwright UI 24 checks); **owner browser smoke pending; Hocuspocus redeploy owed after merge.**
+
+### Shipped
+
+- **Phase 0 — the mark and its seams.** `comment` mark `{threadId}` (`excludes: ""`, `inclusive: false`, faithful server twin, schema 1.22.0); CriticMarkup `{==passage==}{>>#id<<}` via turndown rule + codec reTag (nesting, marked's entity escaping, decline cases); `stripCommentMarks` after `stripPrivateContent` at the 8 markdown/HTML seams, never inside `tiptapToMarkdown`; gold-accent CSS with decoration state classes and the public-page net; `pnpm comments:check` in `build` + `quality.yml`; collab fixture; the collab-schema gate now resolves ALL_CAPS constant names (`privateText` was invisible to it).
+- **Phase 1 — threads in the text and in the rail.** `CommentThread` + `Comment` (+ migration), service on the collaboration access ladder, four routes, 60/h budget; toolbelt Comment button + ⌘⌥M + context menu, composer row with a provisional mapped decoration, optimistic mark with rollback; decoration plugin (active / hover / resolved / orphan / pending) reading the comments store; `hover-card.ts` extracted from the wiki-link hover (both consume it); `ThreadCard` ×3 modes, `CommentComposer`, `CommentsTab` (document order via live marks, filters, note-level composer, orphans + Re-anchor); rail tab + badge; `revealRightSidebarTab`; paste hygiene.
+- **Smoke-found fixes.** Pin survives the decoration swap under the pointer; no anchoring before the collaborative editor binds; duplicate-id 409 (error code, not class); tippy arrow hidden; accessible Resolve labels.
+- **Phase 2 — people and links.** Four notification kinds published from the service (actor never notified; mentions filtered to collaborators; collapsed per thread), one inbox renderer with deep links; `@` collaborator picker; `comment:` link anchor lister (`[[Note#`), anchor consumed by the plugin, `?content=…&anchor=…`; duplicate strips anchors.
+- **Only the text toolbelt shows on a text selection (owner, 2026-10-17: after posting a comment the image + table bubble menus appeared, then kept appearing on selections).** TipTap's React BubbleMenu re-sends its options through `tr.setMeta("bubbleMenu", {type:"updateOptions"})`, which every BubbleMenuView on the editor receives — so when the text menu's `shouldShow` changed identity (a `useCallback` dep on the composer state), the image and table menus adopted it. `textToolbeltShouldShow` is now module-level and never replaced; an open row (link editor, composer) closes when the selection collapses rather than forcing the menu to stay. Reproduced and re-verified headlessly (after posting: no menus; on a selection: only the text menu); the smoke asserts both.
+- **Hover is a rest, not a glance (owner): the card appears after a one-second hold (was 350 ms).**
+- **Showing a card refetches its thread (owner, 2026-10-17: a reply made in one window was missing from the other's card).** Replies and resolves reach another window only by fetch; the hover and pinned cards now call the quiet, throttled refetch on show and re-render from the store when it lands.
+- **State styles reach the painted element (owner, 2026-10-17: resolved/orphaned passages stayed gold; "the underlining is persisting"; the active ring stacked a second fill).** ProseMirror renders an inline decoration as its own span NESTED INSIDE the mark's span (`<span class="comment-mark"><span class="comment-mark--resolved">`), so the state class never sat on the element that paints. The outer mark is now styled through `:has()` on the inner state span. Found by driving the owner's real Chrome against the worktree stack; the smoke asserts a resolved passage's computed fill and underline are gone.
+- **Orphan marks are cleaned up.** A mark whose thread the server does not have renders quiet at once and is removed after a 60 s grace — only after a fresh fetch at removal time still omits it, only in an editable editor. Verified on the owner's own orphan (the thread they deleted before the delete-removes-mark fix): quiet on reload, gone a minute later, text intact. The owner's "card only on the first hover" was this orphan: no thread → no card, and the nesting bug kept it gold. In a real Chrome run on a fresh comment, hover → leave → hover shows the card every time.
+- **Deleting a thread removes its mark everywhere (owner, 2026-10-17: deleted from the pinned card, the gold passage stayed).** Only the tab's delete removed the mark. `removeCommentMarkEverywhere` now runs on any thread deletion (card or tab, or the last comment going) across every registered editable editor; Y.js carries it on. The editor wrapper carries `data-content-id`, so the second pane of the same note — invisible to the one-editor-per-note registry — still resolves its note for orphan styling and thread loading (the two-panes backlog item is half closed by this). Smoke deletes from the card and asserts the mark is gone.
+- **Threads load as soon as a note shows comment marks (owner, 2026-10-17: a fresh page load, a hover, no card).** Nothing fetched a note's threads until the Comments tab opened, so the hover card had nothing to read (the smoke had created the thread in the same session, which hid it). The decoration plugin now requests the threads quietly whenever the document carries a `comment` mark; a hover before that lands shows a loading card and re-renders when the threads arrive. Smoke opens a fresh page and asserts the card.
+- **Hover is CSS, never a decoration (owner, 2026-10-17: "the card appears once, then hovering stops working" + "inconsistent highlight strength").** The hover state was written to the store and drawn as a decoration; ProseMirror redrew the span under the pointer, the browser fired `mouseout` from the detached node, and the card hid itself. Now `:hover` styles the mark, only a PINNED card touches the store, the hover card ignores mouse-out from detached nodes, and posting a comment no longer leaves the thread "active" (the strong ring the owner read as a stuck hover). Smoke asserts hover → leave → hover again.
+- **Responsive toolbelt (owner, 2026-10-17: the row overflowed a split pane).** The selection menu now fits the EDITOR's width (ResizeObserver on the ProseMirror box, capped by the viewport), folding by priority instead of wrapping: the three heading buttons → one **H** button that opens H1/H2/H3 as a second row; then Save as Template / Snippet → a **⋯** row (icon + label); then Format Painter; then Copy / Paste / Read aloud; on the narrowest phones the H button itself. Bold…Private, Link and Comment never fold. Width is modelled from a slot count (every button is the same size), so a future button is accounted for automatically. Verified at 1440 / 900 / 700 (full row), 560 (H + ⋯) and 430 (primary + ⋯) px.
+- **A Reply affordance in the sidebar (owner, 2026-10-18: "add an affordance in the right sidebar that can autofocus to a particular comment").** Every row in the Comments tab carries Reply — an icon beside Resolve on a collapsed row, a button beside Resolve on an open one — that opens the row and puts the caret in its reply box. The editor card's "Open in sidebar" does the same, so arriving from the passage lands in the reply box. One store request (`composerFocusRequest`, a nonce like `openRequest`) carries it; the composer gained `focusNonce` next to `autoFocus`. The owner's report that the tab's controls were unusable did not reproduce headlessly (real mouse click, remount counter, `elementFromPoint`); the affordance makes replying independent of hitting the box. Smoke: 14 checks (card route, icon on a collapsed row, button on an open row, a second request on the same thread, Collapse still collapses).
+
+- **Private content looks commented out, not marked up (owner, 2026-10-18: "do away with the `%%`… reconsider the whole design… keeping the backend untouched").** CSS only (`app/globals.css`): an inline run is a soft pill of the comment ink, cloned across wraps, with ONE eye-off glyph (the toolbelt's Private icon); segments split by bold or a link join into one pill; a block is a quiet card with a left rail and a small "Private" corner caption. `--private-ink` (an RGB triple) and `--private-tint` retint everything for dark. Mark, node, `stripPrivateContent` and codecs untouched; typing `%%…%%` still works. Guide updated.
+
+### Smoke (owner, on the real stack — two browsers, two users)
+
+- Select text → Comment → type → Enter: the passage turns gold in BOTH browsers; the thread appears in the other browser's Comments tab without a refresh.
+- Hover the passage → compact card; click → pinned card; reply → appears in the other browser within the 30 s poll; Esc closes.
+- Pinned card → Open in sidebar → the caret is in that thread's reply box; in the tab, the Reply icon on another (collapsed) row opens it with the caret in its box; Collapse closes it and it stays closed.
+- Resolve from the tab → the passage goes quiet in both; "Resolved" filter shows it; Reopen restores.
+- Delete the thread → the mark is gone in both browsers.
+- ⌘Z right after commenting → the tab lists it under "Original text removed"; select text → Re-anchor → gold again.
+- `@` in a composer lists the other collaborator; pick → post → their bell shows `comment.mention`; clicking it opens the note with the card pinned on the passage.
+- Source view shows `{==…==}{>>#…<<}` and round-trips; the public page shows plain text; an AI read of the note shows no span; paste the passage into another note → no mark there; duplicate the note → no marks in the copy.
+- Phone: toolbelt composer below the selection; tap a passage → the Comments drawer opens on the thread.
+- Private content look: select text → Private → a muted pill with one eye-off glyph and no `%%`; type `%%aside%%` → the same pill; `/private` → a card with a rail and a "Private" corner caption; light and dark both read.
 
 ## October 12, 2026 — The AI fills your own Word template (`fill_docx_template` + the docx-renderer service)
 

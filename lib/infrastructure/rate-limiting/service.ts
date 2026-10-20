@@ -36,6 +36,8 @@ export const RATE_LIMITS = {
   // In-app feedback files PUBLIC GitHub issues under the owner's token.
   FEEDBACK_ISSUES_PER_HOUR: { limit: 5, windowSeconds: 3_600 },
   FEEDBACK_ISSUES_PER_DAY: { limit: 15, windowSeconds: 86_400 },
+  // Comment threads + replies on notes (every collaborator can comment).
+  COMMENTS_PER_HOUR: { limit: 60, windowSeconds: 3_600 },
 } as const;
 
 export async function consumeRateLimit(

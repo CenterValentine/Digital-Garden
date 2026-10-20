@@ -14,6 +14,7 @@ import { generateHTML } from "@tiptap/core";
 // to extensions-server keeps the server bundle clean.
 import { getServerExtensions } from "@/lib/domain/editor/extensions-server";
 import { sanitizeTipTapJsonWithExtensions } from "@/lib/domain/editor/unsupported-content";
+import { stripCommentMarks } from "@/lib/domain/content/comments";
 import type {
   DocumentConverter,
   ConversionOptions,
@@ -32,7 +33,9 @@ export class HTMLConverter implements DocumentConverter {
 
     // Generate HTML from TipTap JSON using server extensions
     const extensions = getServerExtensions();
-    const sanitized = sanitizeTipTapJsonWithExtensions(tiptapJson, extensions).json;
+    // Comment anchors are an in-app affordance; an exported page carries the
+    // passage, not the thread's handle.
+    const sanitized = stripCommentMarks(sanitizeTipTapJsonWithExtensions(tiptapJson, extensions).json);
     const htmlContent = generateHTML(sanitized, extensions);
 
     let finalHTML = htmlContent;

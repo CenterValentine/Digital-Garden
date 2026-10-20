@@ -36,6 +36,7 @@ import { gfm } from "turndown-plugin-gfm";
 import { serializeUnknownBlock, restoreDgBlocks, DG_BLOCK_PREFIX } from "./markdown-fences";
 import { getBlockCodec, applyBlockReTags } from "./markdown-block-codecs";
 import { noteWindowToMarkdown, wikiLinkToMarkdown } from "./wiki-link-markdown";
+import { commentToMarkdown } from "./comment-markdown";
 
 /**
  * The TipTap HTML (de)serialization pair. Injectable so the CI gate can supply a
@@ -166,6 +167,16 @@ export function createTurndown(
     filter: (node) =>
       node.nodeName === "DIV" && node.getAttribute("data-private") === "block",
     replacement: (content) => `\n\n%%\n\n${content.trim()}\n\n%%\n\n`,
+  });
+  // Comment-thread anchors → CriticMarkup `{==passage==}{>>#threadId<<}`.
+  // Grammar shared with the parse side in comment-markdown.ts; a passage the
+  // grammar can't carry keeps turndown's default (its content), which fails
+  // self-verify and falls to the HTML tier. Parsed back by the comment codec.
+  td.addRule("dgComment", {
+    filter: (node) =>
+      node.nodeName === "SPAN" && node.hasAttribute("data-comment"),
+    replacement: (content, node) =>
+      commentToMarkdown(content, (node as HTMLElement).getAttribute("data-comment")) ?? content,
   });
   // Wiki-links → `[[Title|alias]]{#id .card …}`; a Note Window nested inside
   // another container (callout, column, blockquote) → `![[Title]]{#id …}`.

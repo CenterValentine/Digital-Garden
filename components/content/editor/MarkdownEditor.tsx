@@ -1937,7 +1937,10 @@ export function MarkdownEditor({
           }
         }}
       >
-        <EditorContent editor={editor} />
+        {/* data-content-id: lets editor plugins find the note they render when
+            the instance registry (one editor per content id) cannot — the same
+            note open in two panes (comment-plugin's contentIdOfEditor). */}
+        <EditorContent editor={editor} data-content-id={contentId ?? undefined} />
         {cursorLabels.length > 0 ? (
           <div className="pointer-events-none absolute inset-0 z-30">
             {cursorLabels.map((label) => (
@@ -1960,6 +1963,7 @@ export function MarkdownEditor({
       {/* Bubble Menu - floating toolbar on text selection */}
       <BubbleMenu
         editor={editor}
+        contentId={contentId ?? null}
         onLinkClick={() => setIsLinkDialogOpen(true)}
       />
 

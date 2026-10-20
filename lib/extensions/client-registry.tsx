@@ -24,6 +24,7 @@ import type {
   ExtensionHeaderNavActionProps,
   ExtensionShellNavigationProps,
   ExtensionShellTabMenuSectionProps,
+  TabMenuCapabilities,
 } from "./types";
 import type { NotificationKindRenderer } from "@/lib/features/notifications/kind-renderer-types";
 
@@ -227,6 +228,23 @@ export function resolveExtensionVirtualContentType(
     if (match) return match.contentType;
   }
   return null;
+}
+
+const ALL_TAB_MENU_CAPABILITIES: TabMenuCapabilities = { copyLink: true, move: true, duplicate: true };
+const NO_TAB_MENU_CAPABILITIES: TabMenuCapabilities = { copyLink: false, move: false, duplicate: false };
+
+/**
+ * What a tab's context menu may offer for `contentId`: the owning enabled
+ * extension's answer, else everything for real content and nothing for an
+ * unclaimed virtual tab (it has no ContentNode — a copied link, a move or a
+ * duplicate would be a no-op).
+ */
+export function resolveTabMenuCapabilities(contentId: string): TabMenuCapabilities {
+  for (const runtime of getClientEnabledExtensionRuntimes()) {
+    const answer = runtime.tabMenuCapabilities?.(contentId);
+    if (answer) return answer;
+  }
+  return resolveExtensionVirtualContentType(contentId) ? NO_TAB_MENU_CAPABILITIES : ALL_TAB_MENU_CAPABILITIES;
 }
 
 /**

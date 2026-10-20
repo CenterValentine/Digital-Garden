@@ -17,6 +17,8 @@ export type RightSidebarTab =
   | "publish"
   | "studio"
   | "context"
+  // Comment threads on a note (components/content/comments/CommentsTab.tsx).
+  | "comments"
   | "database"
   // What the model sees — the context ledger for an open chat.
   | "modelContext"

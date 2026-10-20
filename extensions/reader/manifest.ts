@@ -6,6 +6,8 @@ export const READER_VIRTUAL_PREFIX = "reader:";
 export const READER_LIBRARY_CONTENT_ID = "reader:library";
 /** The scripture catalog (traditions → collections to install / enable). */
 export const READER_SCRIPTURES_CONTENT_ID = "reader:scriptures";
+/** Research: find, resolve and save Works (RESEARCH-READER-PLAN.md). */
+export const READER_RESEARCH_CONTENT_ID = "reader:research";
 export const READER_VIRTUAL_CONTENT_TYPE = "reader";
 
 export const readerExtensionManifest: ExtensionManifest = {

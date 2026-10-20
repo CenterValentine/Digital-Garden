@@ -144,6 +144,7 @@ model ContentNode {
   // ShortcutPayload.target, which Prisma needs to resolve the named relation.
   shortcutsToThis      ShortcutPayload[]     @relation("ShortcutTarget")
   bookMeta             BookMeta?
+  workMeta             WorkMeta?
 
   history                      ContentHistory[]
   sourceLinks                  ContentLink[]             @relation("SourceContent")
@@ -167,6 +168,7 @@ model ContentNode {
   personMentions               PersonMention[]
   trashBinEntry                TrashBin?
   viewGrants                   ViewGrant[]
+  commentThreads               CommentThread[]
   calendarEvents               CalendarEvent[]
   workspaceTabs                ContentWorkspaceTab[]
   viewWorkspaces               ContentWorkspace[]        @relation("WorkspaceViewRoot")
@@ -597,6 +599,9 @@ model User {
   readerCatalogs      ReaderCatalog[]
   readerConnections   ReaderConnection[]
   scriptureCorpora    UserScriptureCorpus[]
+  workMetas           WorkMeta[]
+  commentThreads      CommentThread[]          @relation("CommentThreadsCreated")
+  comments            Comment[]
 
   @@index([email])
 }
@@ -2794,6 +2799,49 @@ model ReadingProgress {
   @@unique([ownerId, targetKey])
 }
 
+/// A comment thread on a note. Anchored to a passage by the `comment` mark
+/// whose threadId is this row's id (the anchor lives in the Y.Doc so it moves
+/// with every collaborator's edits), or to the note as a whole when `anchor`
+/// is null. Visible to everyone who can view the note. Resolution is a row
+/// flag drawn as an editor decoration, never a mark attribute.
+/// Plan: docs/notes-feature/work-tracking/COMMENTS-ANNOTATIONS-PLAN.md
+model CommentThread {
+  id           String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  contentId    String      @db.Uuid
+  createdById  String      @db.Uuid
+  // { quote, before?, after? } captured at creation: shown when the mark is
+  // gone ("Original text removed") and the re-anchoring hint.
+  anchor       Json?
+  resolvedAt   DateTime?   @db.Timestamptz(6)
+  resolvedById String?     @db.Uuid
+  createdAt    DateTime    @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime    @updatedAt @db.Timestamptz(6)
+  content      ContentNode @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  createdBy    User        @relation("CommentThreadsCreated", fields: [createdById], references: [id], onDelete: Cascade)
+  comments     Comment[]
+
+  @@index([contentId, resolvedAt])
+  @@index([contentId, updatedAt])
+}
+
+/// One message in a thread. Plain text; @mentions as resolved user ids. A
+/// deleted comment with replies after it stays as a placeholder row
+/// (deletedAt set, body emptied) so the thread still reads in order.
+model Comment {
+  id        String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  threadId  String        @db.Uuid
+  authorId  String        @db.Uuid
+  body      String
+  mentions  Json          @default("[]")
+  editedAt  DateTime?     @db.Timestamptz(6)
+  deletedAt DateTime?     @db.Timestamptz(6)
+  createdAt DateTime      @default(now()) @db.Timestamptz(6)
+  thread    CommentThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  author    User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([threadId, createdAt])
+}
+
 /// Highlights, notes and bookmarks anchored to text the user does not own
 /// (a book file, a corpus). Kept beside the text, never inside it. Imported
 /// highlights (Kindle clippings, Readwise) carry source + externalId so a
@@ -2929,4 +2977,67 @@ model ReaderConnection {
   owner          User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 
   @@unique([ownerId, provider])
+}
+
+/// A research Work's metadata beside its content node — the research
+/// counterpart of BookMeta (RESEARCH-READER-PLAN.md §3). The node is a stored
+/// copy (file), or an external link node for Works fetched on demand or not
+/// readable here (§7.2). Type-specific fields live in `face` (faces.ts).
+model WorkMeta {
+  contentId      String   @id @db.Uuid
+  ownerId        String   @db.Uuid
+  /// Canonical key ("doi:10.…") — "already in your library?" lookups.
+  workKey        String   @db.VarChar(500)
+  /// Every "scheme:value" key the Work answers to (DOI, PMID, arXiv, …).
+  identifierKeys String[]
+  /// "article" | "preprint" | "trial" | "case" | … (open list, types.ts)
+  type           String   @db.VarChar(40)
+  title          String   @db.VarChar(1000)
+  authors        String[]
+  year           Int?
+  venue          String?  @db.VarChar(500)
+  abstract       String?
+  /// WorkIdentifiers JSON ({ doi: [...], pmid: [...] }).
+  identifiers    Json     @default("{}")
+  face           Json     @default("{}")
+  /// "cc-by" | "cc0" | "public-domain" | … | null — gates publishing (§9.7).
+  license        String?  @db.VarChar(60)
+  /// How the text is read: "stored" | "on-demand" | "link" (§7.2).
+  copyPolicy     String   @default("link") @db.VarChar(20)
+  /// The copy read on demand (when not stored).
+  copyUrl        String?
+  /// Retraction / correction notice, when one exists.
+  retraction     Json?
+  /// "want" | "reading" | "finished" | "reference" | null
+  readingStatus  String?  @db.VarChar(20)
+  /// How it arrived: "search" | "identifier" | "zotero" | "bibtex" | …
+  sourceAdapter  String   @default("search") @db.VarChar(80)
+  /// Sources that described it (provenance chips).
+  provenance     String[]
+  /// Zotero item key when synced from Zotero (§7.4).
+  zoteroKey      String?  @db.VarChar(40)
+  createdAt      DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @db.Timestamptz(6)
+
+  content ContentNode @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  owner   User        @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@unique([ownerId, zoteroKey])
+  @@index([ownerId])
+  @@index([ownerId, workKey])
+  @@index([identifierKeys], type: Gin)
+}
+
+/// Shared cache of resolved Works (public metadata only — never per-user
+/// data), one row per identifier key the Work answers to, so a later lookup
+/// by DOI, PMID or arXiv id all hit (§9.5: protects the shared API quotas).
+model WorkCache {
+  key       String   @id @db.VarChar(500)
+  workKey   String   @db.VarChar(500)
+  work      Json
+  sources   String[]
+  fetchedAt DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([workKey])
+  @@index([fetchedAt])
 }

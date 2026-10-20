@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-10-15
+last_updated: 2026-10-16
 ---
 
 # Sprint Backlog
@@ -9,6 +9,21 @@ last_updated: 2026-10-15
 **Sprint Execution Protocol**: Before commencing any sprint, always ask the user for input before planning and executing — there may be additions or modifications.
 
 ---
+
+## Comments & annotations — follow-ups (2026-10-16, from `COMMENTS-ANNOTATIONS-PLAN.md`)
+
+Phases 0–2 built on `feat/comments-annotations`. Remaining, in the plan's order:
+
+- ⚪ **Post-merge:** redeploy Hocuspocus from a tree matching `origin/main` (schema 1.22.0 — an old server DROPS unknown marks on its next sanitize); `prisma migrate deploy` for `20261016120000_add_comment_threads` (owner-run on Neon); owner browser smoke (lines in CURRENT-SPRINT.md).
+- ⚪ **Phase 3 — highlights without a thread.** `highlight` mark `{ color }` with the reader's five-color vocabulary moved to `lib/domain/content/mark-palette.ts` (reader imports from there); the swatch row from `MarkPopover` in the toolbelt composer as "Highlight only"; markdown `==text=={.yellow}` (Obsidian's standard + the pandoc brace); listed in the Comments tab under a filter.
+- ⚪ **Phase 4 — view-only anchoring.** A view-level collaborator's Hocuspocus connection is read-only; anchor their comments server-side through `/internal/apply` with a new `mark` op that finds the range by text match (`position-anchor.ts`). Until then they reply and leave note-level comments.
+- ⚪ **Phase 4 — realtime for replies.** The tab polls every 30 s; a Hocuspocus stateless "comments changed" message would make replies instant.
+- ⚪ **Phase 4 — AI + MCP (comment THREADS, not private content; sized 2026-10-18).** Today every AI read seam strips comment marks and no tool lists threads. In order of value per day: (1) `read_comments` tool + `garden://note/{id}/comments` + an opt-in "include comments" on `read_content` (the CriticMarkup text form already exists) — ~½ day; "address the comments" charter line rides on it. (2) `reply_to_comment` / `resolve_comment` — ~½ day, needs an AI authorship marker on `Comment` (owner-run migration). (3) AI-CREATED anchored threads — the anchor is a mark in the Y.Doc and `update_note` only replaces blocks: either rewrite the block with `{==…==}{>>#id<<}` behind a judge (~1½ days, weak models can mangle the block) or the Phase-4 `mark` op in `/internal/apply` that finds a range by text match (~2–3 days + Hocuspocus deploy; the same op anchors view-only collaborators' comments — build this one). (4) Surface: "Assistant" author in cards, resolve-all for AI notes, "Review this note" → charter line — ~1 day. Rule: reads keep stripping by default; threads are included only when asked ("the thread is not the note").
+- ⚪ **Mention a People profile that belongs to an account (owner, 2026-10-18 — deferred until collaboration matures).** Today `@` in a comment lists the note's collaborators only (owner + view-grant holders): a mention is a notification, and only an account that can open the note can act on one, so People-extension contacts never appear (the owner typed `@bob` for a People record and got nothing — by design). When accounts and People profiles are linked, the picker should offer the profile (name, avatar) and resolve to the account; a profile with no account stays a plain `@Name` reference with no `mentions` entry and no notification. Depends on the account ↔ People link and on collaboration maturing (grants, presence) — don't build it on today's owner-plus-grantees list.
+- ⚪ File-tree unresolved-comment badge; rich comment bodies (links, code).
+- ⚪ Mobile: the composer row can sit under the software keyboard on short phones — move it into the Comments drawer when the viewport is shorter than ~500 px.
+- ⚪ A note-level thread's row shows the author truncated ("smo…") in the 320 px rail — give the name more room than the timestamp.
+- ⚪ **Same note in two panes:** `state/editor-instance-store.ts` keys one editor per content id, so the second pane's editor is not in the registry. The comment plugin now falls back to the wrapper's `data-content-id` (2026-10-17), so orphan styling and thread loading work there; still open: paste hygiene in `clipboard.ts` resolves the view through the registry only, and `removeCommentMarkEverywhere` reaches only registered editors (Y.js covers the rest). Register editors per pane to close both.
 
 ## 11 of the 24 `build` gates run in no CI workflow (2026-10-15, found verifying PR #292)
 
@@ -230,8 +245,61 @@ The order audit fixed the causes that moved rows between refreshes (anchored dro
 - [x] **R2 Library** (built 2026-09-29; + Wikisource, OAPEN, Google Books, Standard Ebooks preset) — OPDS / Gutendex / Open Library adapters, library dialog, acquire into folder, `BookMeta` + covers.
 - [ ] **R3 Scriptures in the reader** — scriptures plan P0/P1 feed a corpus source sharing the annotation store.
 - [ ] **R4 Bring in the rest** — ~~Kindle clippings + Readwise, Hardcover, Libby link~~ (built 2026-09-29); highlights → database, flashcards, AI tools, speed-reader EPUB, PDF in reader.
-- [ ] **Research (reader stub)** — third reader source after Scriptures: open-access papers (arXiv, PubMed Central, OpenAlex/Unpaywall, Semantic Scholar) through the same shell + annotation store.
+- [ ] **Research (reader)** — V1.0 slice 1 (Work model, 4 sources, federation, save, Find tab) built 2026-10-01, live-verified 2026-10-15, PR pending; remaining V1.0: paper readers + re-anchoring, enrichment views, Zotero/BibTeX import, Biomedicine + CS&ML sources, Papers/Claims tables, Law + paid probes, AI tools. Plan: `work-tracking/RESEARCH-READER-PLAN.md` (one Work model + scopes UI, adapter roles, V1.0 core + Biomedicine/CS&ML packs, V1.1 Ask mode + Law, V1.2 Patents/Data/Archives, full service registry).
 - [ ] **CSP for /content** — foliate-js wants a script-blocking CSP; the reader sanitizer is the interim defence.
+
+## Research reader — V1.3 and beyond (2026-10-01, plan `RESEARCH-READER-PLAN.md`)
+
+The plan covers V1.0–V1.2. Everything below is parked on purpose, with the
+reason. Ratings and access notes are in the plan's §5 registry.
+
+**Domain packs**
+- [ ] **Physics / Astro / Math:** NASA ADS (token), INSPIRE-HEP, zbMATH Open, OEIS, arXiv physics/math scopes.
+- [ ] **Economics & social science:** RePEc harvest (no live API), OSF Preprints (PsyArXiv, SocArXiv…), IPUMS, ICPSR (limited); NBER / SSRN as links.
+- [ ] **Education:** ERIC API.
+- [ ] **Earth & environment:** NASA Earthdata CMR, NOAA, USGS ScienceBase.
+- [ ] **Law (EU / UK / CA):** EUR-Lex (web service + Cellar SPARQL), legislation.gov.uk, National Archives Find Case Law, CanLII (API on request); BAILII as a link.
+- [ ] **Biomedicine add-ons:** UMLS (licence agreement), WHO ICTRP.
+- [ ] **Patents add-on:** Google Patents Public Datasets (BigQuery, paid per query).
+- [ ] **Chemistry:** ChemRxiv.
+
+**Sources and indexes**
+- [ ] OpenAIRE Graph (EU funder links; overlaps OpenAlex).
+- [ ] BASE (needs server IP registration; mostly covered by CORE + OpenAlex).
+- [ ] HAL (French repository).
+- [ ] IEEE Xplore API (metadata mostly in OpenAlex; full text needs a subscription).
+- [ ] PhilPapers (limited API).
+- [ ] Mendeley API (restricted registrations; BibTeX import covers it).
+- [ ] scite Smart Citations (API is institutional — revisit if reachable).
+- [ ] Consensus API (paid — check fit).
+
+**Full text and parsing**
+- [ ] **GROBID**, only if the no-server approach leaves a real gap. It would need a new Java service. Today: reflowed text + S2 reference lists + PDF outline + on-demand AI.
+- [ ] **Zotero translation-server**, only if the long tail of sites without `citation_*` tags matters. It would need a new service.
+- [ ] Docling (tables), PaperMage.
+- [ ] Paid parsers (BYOK): Mathpix (math), Mistral OCR, LlamaParse, Reducto.
+
+**Web search for Ask mode**
+- [ ] Kagi, You.com and Linkup connections.
+- [ ] Self-host options: Crawl4AI, SearXNG.
+- [ ] Provider-managed deep research (OpenAI deep-research models, Gemini Deep Research) as a "delegate" option. Opaque and costly per run, and it cites URLs rather than Works — not the primary path.
+
+**AI ideas considered and not done in V1.0–V1.2 (reconsider here)**
+- [ ] **Embeddings + pgvector** for "similar in my library". Revisit if libraries pass ~5k papers. Costs: a migration, re-embedding when the model changes, another model table to keep in sync.
+- [ ] **Running our own models** (OpenScholar, SPECTER2, Nougat). Needs GPU hosting; S2 serves recommendations and embeddings.
+- [ ] **Python AI sidecars** (PaperQA2, GPT Researcher, STORM). We port their methods instead.
+- [ ] **Agent frameworks** (LangGraph, CrewAI). AI SDK v6 + the run harness cover it.
+- [ ] **Fine-tuning.**
+- [ ] **Consuming third-party MCP servers for research.** Quality varies, many run only locally, results are untyped, and each is a prompt-injection surface. Better as an app-wide "connect your MCP server" power feature.
+- [ ] **Digital Garden as an MCP server** (app-wide). Expose the library, highlights and claims to Claude Desktop / ChatGPT / Cursor; mostly reuses the research tools, the real work is OAuth.
+- [ ] Listen to a paper summary (TTS) and flashcards from a paper.
+
+**Unification (from the plan's §9 review)**
+- [ ] One metadata side row for books and Works (`BookMeta` → `WorkMeta` type `book`) once both are stable.
+- [ ] Move scriptures onto the generic hierarchical-corpus interface built for statutes.
+
+**Zotero**
+- [ ] Two-way edit sync and annotation write-back. Deliberately not planned: metadata / move / delete conflicts, and Zotero's page-rect anchors vs our text-quote anchors. V1 is one-way sync + create-only "Save to Zotero".
 
 ## Scriptures integration — parked (reader moved to `EREADER-PLAN.md`) (2026-09-28, plan `SCRIPTURES-INTEGRATION-PLAN.md`)
 

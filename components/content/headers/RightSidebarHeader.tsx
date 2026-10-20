@@ -29,6 +29,7 @@ import {
 } from "@/extensions/studio/manifest";
 import type { RightSidebarTab } from "@/state/right-sidebar-state-store";
 import { useDocxFillStore } from "@/state/docx-fill-store";
+import { useOpenCommentCount } from "@/state/comments-store";
 
 /** Inline SVG paths keyed by tabKey (project pattern: inline SVG in headers) */
 const TAB_SVG_PATHS: Record<string, string> = {
@@ -48,6 +49,8 @@ const TAB_SVG_PATHS: Record<string, string> = {
     "M14 5l-3 3l2 7l8-8l-7-2Z M14 5l-3 3l-3-3l3-3l3 3Z M9.5 6.5L4 12l3 6 M3 22v-2c0-1.1.9-2 2-2h10a2 2 0 0 1 2 2v2H3Z",
   context:
     "M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z",
+  // Speech bubble (lucide MessageSquare) — comment threads on a note.
+  comments: "M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z",
   // Table (lucide Table) — the database context rail's schema identity.
   database:
     "M3 5a2 2 0 012-2h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5z M3 10h18 M10 3v18",
@@ -70,6 +73,7 @@ const TAB_TITLES: Record<string, string> = {
   publish: "Publish",
   studio: "Studio",
   context: "Context",
+  comments: "Comments",
   database: "Database",
   modelContext: "What the model sees",
   templateFields: "Template Fields",
@@ -117,6 +121,8 @@ export function RightSidebarHeader({
     Boolean(selectedContentId && s.filled[selectedContentId]),
   );
   const selectedBlockId = useBlockStore((s) => s.selectedBlockId);
+  // The Comments tab wears the note's unresolved count.
+  const openComments = useOpenCommentCount(selectedContentId);
   const activeView = useLeftPanelViewStore((state) => state.activeView);
   const extensionManifest = getExtensionManifestForView(activeView);
 
@@ -192,13 +198,14 @@ export function RightSidebarHeader({
           if (!svgPath) return null;
 
           const tabDisabled = disabled || (disabledTabs?.includes(tabKey) ?? false);
+          const badge = tabKey === "comments" && openComments > 0 ? openComments : null;
 
           return (
             <button
               key={tool.id}
               onClick={() => onTabChange(tabKey)}
               disabled={tabDisabled}
-              className={`flex flex-1 items-center justify-center px-4 py-3 transition-colors ${
+              className={`relative flex flex-1 items-center justify-center px-4 py-3 transition-colors ${
                 tabDisabled ? "cursor-not-allowed opacity-40" : ""
               } ${
                 activeTab === tabKey
@@ -221,6 +228,14 @@ export function RightSidebarHeader({
                   d={svgPath}
                 />
               </svg>
+              {badge !== null && (
+                <span
+                  aria-label={`${badge} open comment${badge === 1 ? "" : "s"}`}
+                  className="absolute right-2 top-1.5 min-w-[16px] rounded-full bg-gold-primary px-1 text-center text-[10px] font-semibold leading-4 text-black"
+                >
+                  {badge > 99 ? "99+" : badge}
+                </span>
+              )}
             </button>
           );
         })}

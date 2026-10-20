@@ -1,0 +1,148 @@
+"use client";
+
+/**
+ * Comment hover + click — the in-place thread card over a commented passage.
+ *
+ * Hover (mouse, 350 ms): the collapsed ThreadCard — who, when, the latest
+ * comment, a Resolve button. Click: the same card pinned and expanded, with
+ * the whole thread and a reply composer; Esc or a click elsewhere closes it.
+ * On a coarse pointer there is no hover and a tap opens the Comments tab
+ * instead (a popover under a software keyboard is unusable).
+ *
+ * A consumer of the shared hover card (lib/domain/editor/hover-card.ts). The
+ * toolbelt's "View comment" and a sidebar jump ask for a pinned card through
+ * the store's `openRequest`; this plugin answers for the editor that holds
+ * the mark. Plan: COMMENTS-ANNOTATIONS-PLAN.md §5.3.
+ */
+
+import type { Editor } from "@tiptap/core";
+import { PluginKey, type Plugin } from "@tiptap/pm/state";
+import { createElement } from "react";
+import { ThreadCard } from "@/components/content/comments/ThreadCard";
+import { revealCommentThread } from "@/components/content/comments/reveal";
+import { findThread, useCommentsStore } from "@/state/comments-store";
+import { createHoverCardPlugin, type HoverCardController } from "../hover-card";
+import { contentIdOfEditor, requestThreadsQuietly } from "./comment-plugin";
+
+export const commentHoverPluginKey = new PluginKey("commentHover");
+
+const IS_COARSE_POINTER =
+  typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches === true;
+
+export function createCommentHoverPlugin(editor: Editor): Plugin | null {
+  let controller: HoverCardController | null = null;
+  let unsubscribe: (() => void) | null = null;
+  let lastRequestNonce = 0;
+
+  const threadIdOf = (el: HTMLElement) => el.getAttribute("data-comment")?.toLowerCase() ?? null;
+
+  const plugin = createHoverCardPlugin(editor, {
+    key: commentHoverPluginKey,
+    selector: "[data-comment]",
+    // A resting hover, not a glance: the pointer crossing a commented line on
+    // its way elsewhere must not pop a card (owner, 2026-10-17: "at least
+    // half a second; try one second").
+    showDelayMs: 1000,
+    hideDelayMs: 220,
+    editableOnly: false,
+    placement: "top-start",
+    offset: [0, 6],
+    theme: "comment-thread",
+    render(el, ctl, pinned) {
+      const threadId = threadIdOf(el);
+      if (!threadId) return null;
+      const state = useCommentsStore.getState();
+      const found = findThread(state, threadId);
+      if (!found) {
+        // The note's threads may not be in the store yet (a fresh page
+        // load, hovered before the plugin's quiet fetch landed): fetch, show
+        // a loading card, and re-render when the threads arrive. A thread the
+        // loaded note does not have is an orphan — nothing to show.
+        const contentId = contentIdOfEditor(editor);
+        if (!contentId || state.loadedAt[contentId]) return null;
+        void state.load(contentId, { quiet: true }).then(() => ctl.rerender());
+        return createElement(
+          "div",
+          { className: "w-56 rounded-lg border border-black/10 bg-white px-3 py-2 text-xs text-muted-foreground shadow-[0_8px_24px_rgba(0,0,0,0.12)] dark:border-white/10 dark:bg-[#1a1a1a]" },
+          "Loading comment…",
+        );
+      }
+      return createElement(ThreadCard, {
+        threadId,
+        contentId: found.contentId,
+        mode: pinned ? "expanded" : "collapsed",
+        onClose: () => ctl.hide(),
+        onExpand: () => ctl.pin(el),
+        onOpenSidebar: () => {
+          ctl.hide();
+          // Arriving from the passage lands in the thread's reply box.
+          revealCommentThread(found.contentId, threadId, { reply: true });
+        },
+        onHoldChange: (held) => ctl.hold(held),
+      });
+    },
+    // Only a PINNED card touches the store (the active ring). A hover must
+    // not: writing hover state redraws the span under the pointer.
+    onShow(el, pinned) {
+      const threadId = threadIdOf(el);
+      if (threadId && pinned) useCommentsStore.getState().setActiveThread(threadId);
+      // Replies and resolves made elsewhere reach this window only by fetch
+      // (nothing in the document changes), and the tab's poll runs only while
+      // the tab is open. Showing a card is the moment the user wants the
+      // thread current: refetch quietly (throttled); the card re-renders
+      // from the store when it lands.
+      const contentId = contentIdOfEditor(editor);
+      if (contentId) requestThreadsQuietly(contentId);
+    },
+    onHide(wasPinned) {
+      if (wasPinned) useCommentsStore.getState().setActiveThread(null);
+    },
+    onClick(el) {
+      const selection = window.getSelection();
+      if (selection && !selection.isCollapsed) return "ignore";
+      const threadId = threadIdOf(el);
+      if (!threadId) return "ignore";
+      if (IS_COARSE_POINTER) {
+        const contentId = contentIdOfEditor(editor);
+        if (contentId) revealCommentThread(contentId, threadId);
+        return "ignore";
+      }
+      return "pin";
+    },
+    onReady(ctl) {
+      controller = ctl;
+      lastRequestNonce = useCommentsStore.getState().openRequest?.nonce ?? 0;
+      unsubscribe = useCommentsStore.subscribe((state) => {
+        const request = state.openRequest;
+        if (!request || request.nonce === lastRequestNonce) return;
+        const el = editor.view.dom.querySelector<HTMLElement>(`[data-comment="${request.threadId}"]`);
+        if (!el) return; // another editor holds this thread
+        lastRequestNonce = request.nonce;
+        if (IS_COARSE_POINTER) {
+          const contentId = contentIdOfEditor(editor);
+          if (contentId) revealCommentThread(contentId, request.threadId);
+          return;
+        }
+        el.scrollIntoView({ block: "center", behavior: "smooth" });
+        controller?.pin(el);
+      });
+    },
+  });
+
+  if (!plugin) return null;
+
+  // Wrap the plugin's view so the store subscription is released with it.
+  const originalView = plugin.spec.view;
+  plugin.spec.view = (view) => {
+    const pluginView = originalView?.(view);
+    return {
+      ...pluginView,
+      destroy() {
+        unsubscribe?.();
+        unsubscribe = null;
+        pluginView?.destroy?.();
+      },
+    };
+  };
+  return plugin;
+}

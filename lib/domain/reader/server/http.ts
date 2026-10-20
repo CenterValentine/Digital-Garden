@@ -18,7 +18,9 @@ export class ReaderFetchError extends Error {
     message: string,
     readonly status = 502,
     /** HTTP status the upstream source answered with, when there was one. */
-    readonly upstreamStatus?: number
+    readonly upstreamStatus?: number,
+    /** The upstream's `Retry-After`, verbatim, when it sent one (429 / 503). */
+    readonly retryAfter?: string | null
   ) {
     super(message);
   }
@@ -166,7 +168,8 @@ export async function readerFetch(
         throw new ReaderFetchError(
           `${url.hostname} answered ${response.status}${detail ? `: ${detail}` : ""}`,
           response.status === 401 || response.status === 403 ? 401 : 502,
-          response.status
+          response.status,
+          response.headers.get("retry-after")
         );
       }
       const body = await readCapped(response, options.maxBytes ?? MAX_FEED_BYTES);

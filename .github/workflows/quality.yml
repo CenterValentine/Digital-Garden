@@ -144,6 +144,12 @@ jobs:
       - name: Markdown round-trip smoke
         run: pnpm markdown:smoke
 
+      # Comment threads (COMMENTS-ANNOTATIONS-PLAN §4): the strip-the-mark
+      # predicate, the CriticMarkup grammar, every markdown/HTML seam calling
+      # the predicate, and the mark's editor commands under jsdom.
+      - name: Comments gate
+        run: pnpm comments:check
+
       # OCR text → paste-ready blocks (lib/features/ocr/reflow.ts): which line
       # ends are word-wraps and which are real breaks, and the hand-off to the
       # markdown paste parser. Mutation-tested (13 mutants killed, 2026-10-06).
