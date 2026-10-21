@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-09-12
+last_updated: 2026-10-20
 audience: contributors and AI assistants
 ---
 
@@ -141,3 +141,83 @@ Related: `docs/notes-feature/work-tracking/EXTRACTION-TO-DATABASE-PLAN.md`
 note → cards instance, with a fixed schema) — both are special cases of this
 principle, and tooling that serves the general case should eventually serve
 them too.
+
+---
+
+## 3. AI context is the user's money — make it legible
+
+**When the user brings their own key, every token the AI reads is billed to
+them. They should be able to see what the model is carrying, what it cost,
+and why, and they should be able to change it.** We call this practice *AI
+context analytics*: attribute every token, measure it, show it where the
+decision is made, and hand the user the controls.
+
+The failure this guards against: spend that happens out of sight. On the Job
+Hunt chat a one-word "Hello" after a finished run read 47,134 input tokens,
+and nothing on screen said why. Measured across the context-economics work,
+input is 90–98% of what a chat costs, and on one 21.9M-token run the model's
+own words were 2% of it. A user cannot manage a cost they cannot see. On a
+subscription product that waste is the vendor's margin; with BYOK it is a
+line on the user's own invoice, and an unexplained one reads as being
+overcharged. Users also choose the provider and model themselves, and they
+need real numbers to make that choice well.
+
+**Worked example — the context window editor** (PR #309). A chat's **Model**
+tab shows the next request by bucket (system prompt, tool definitions,
+attachments, history), each turn's billed read beside what it still carries,
+every automatic fold as a chip that says why, and controls to remove a part,
+drop an exchange, or draw "the model reads from here". Building it made a
+cost visible that a history-only view would have hidden: on a full chat the
+fixed overhead (a ~7.7k-token prompt plus ~11k tokens of tool schemas) was
+larger than the conversation it carried (~13k). The prompt and tool sizes are
+measured on the server per request, not estimated.
+
+**What already exists.** New work extends this stack rather than starting a
+parallel one:
+
+| Level | What the user sees | Where |
+|---|---|---|
+| Before spending | "Ask before reads over N tokens" approval for bulk database reads | `ChatControlPanel` |
+| Per part | Fold chips with a reason; remove / restore marks | `context-diet.ts`, `ChatMessage` (#250, #309) |
+| Per request | The context ledger: buckets, measured prompt + tool sizes | `ContextLedger`, `TurnSegment` (#309) |
+| Per step | The avatar meter's step chain: tokens each step read | `turn-diagnostics.ts` (#253) |
+| Per turn | Tokens in/out, duration, estimated cost; an unpriced model says so, never $0 | `COST-METERING-PLAN.md` |
+| Per session | Cumulative tokens and cost beside each turn's numbers | `sessionUsage` |
+| Per connection | Requests, cost, by-model table, with a pill naming the data source | `ConnectionUsageCard` |
+
+**Design tests.** When a feature changes what the AI reads, or how much,
+ask:
+
+- **Attributed?** Can the user tell which bucket a cost belongs to, and
+  which turn or step paid it?
+- **Measured, or labelled as a guess?** Measure on the server where we can.
+  An estimate says it is one. An unknown price never displays as $0, and a
+  usage figure names its source.
+- **Does every automatic reduction have a face?** If the harness folds,
+  strips or dedupes something, a chip says so, drawn from the same verdict
+  map the model-facing transform uses. Silent savings are as opaque as
+  silent spend.
+- **Visibility for control, never enforcement.** Show the cost and offer the
+  lever: remove, detach, switch the tool off, choose a cheaper model.
+  Suggestions may offer, but nothing marks, caps or prunes on the user's
+  behalf. Caps and automatic elision were both tried and rejected because
+  they fail without warning. The user decides.
+- **Does it ship with its analytics?** A new tool, prompt section or
+  attachment type says where its cost will show up: a ledger bucket, a
+  meter, a chip. This sits beside the rule that a tool with a large
+  output/input ratio needs a compaction story before it ships.
+- **Shown where the decision is made?** Numbers belong at the point of
+  action (the bubble, the approval card, the composer), not only on a
+  settings page.
+
+The direction this sets, and the next concrete gaps, are tracked under "AI
+context analytics" in `docs/notes-feature/work-tracking/BACKLOG.md`.
+
+Related: `docs/notes-feature/guides/ai/AGENTIC-RESOURCE-DISCIPLINE.md`
+principle 8 ("observability is a control, not a report") is the agent-facing
+form of the same idea, and §1b covers the transforms whose effects this
+principle makes visible. The two decisions that keep this consent-first:
+token-cap enforcement was rejected on 2026-09-04
+(`EXTRACTION-TO-DATABASE-PLAN.md` §9.2: a mid-run cap wastes everything in
+flight), and automatic read elision on 2026-08-08 (`CONTEXT-WINDOW-EDITOR-PLAN.md`
+§2: fuzzy folding silently flipped verdicts).

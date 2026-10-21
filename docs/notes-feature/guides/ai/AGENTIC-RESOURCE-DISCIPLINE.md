@@ -68,6 +68,27 @@ model's own words were 2% of them**. Tool parts *are* the input context.
     scaffolding. (Generated text replayed as input is the pattern that costs
     most on vendors with expensive output tokens.)
 
+### 1c. Context analytics — the user's side (added 2026-10-20)
+
+Principle 8 says observability lets *the agent and the user* steer. Under BYOK
+the user pays for every token, so the user's half is now a product principle
+in its own right: [PRODUCT-PRINCIPLES.md §3](../../core/PRODUCT-PRINCIPLES.md)
+("AI context is the user's money — make it legible"). Two rules from it bind
+the mechanisms in this guide:
+
+14. **Every reduction has a face.** A fold, strip or dedupe from §1b shows in
+    the transcript as a chip with its reason, computed by the same verdict map
+    the model-facing transform uses. Savings the user cannot see are as opaque
+    as spend they cannot see.
+15. **A new context source ships with a visibility story.** Alongside
+    principle 10's compaction story, a new tool, prompt section or attachment
+    type declares where its cost is shown: a context-ledger bucket, the step
+    meter, or a chip. If it adds to the system prompt, its size should be
+    measurable in the request segment (`promptBreakdown`).
+
+Both are enforced by the user, never by a cap: visibility serves the user's own
+decisions (see the T4 row in §4 and its rejection record).
+
 ---
 
 ## 2. The four mechanism families
