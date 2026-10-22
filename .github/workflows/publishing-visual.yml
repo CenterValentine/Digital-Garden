@@ -57,7 +57,12 @@ jobs:
 
   visual:
     name: Per-block Playwright snapshots
-    runs-on: ubuntu-latest
+    # Pinned, not `ubuntu-latest`: on 2026-10-21 the latest image became
+    # Ubuntu 26.04 and `playwright install` refused it ("Playwright does not
+    # support chromium on ubuntu26.04-x64"), failing every PR that touches
+    # package.json. Move back to latest once the pinned Playwright release
+    # ships a Chromium build for 26.04.
+    runs-on: ubuntu-24.04
     # Visual regression needs the dev server, which needs a DATABASE_URL
     # to instantiate Prisma — but the synthetic fixture route itself does
     # not query the DB. Gated on the secret existing so forks without DB
