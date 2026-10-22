@@ -30,6 +30,7 @@ import { markContextDirty } from "@/lib/domain/ai-context/context-dirty";
 import { canAlterSchema } from "@/lib/domain/data/server/access";
 import { Prisma } from "@/lib/database/generated/prisma";
 import { mergeAiPolicy, parseAiPolicyPatch } from "@/lib/domain/data/ai-policy";
+import { DEFAULT_ROW_PAGE_SIZE, MAX_ROW_PAGE_SIZE } from "@/lib/domain/data/types";
 
 const ROUTE_PATH = "/api/content/data/[id]";
 
@@ -103,15 +104,24 @@ export async function GET(
         });
       }
 
+      // `limit` lets the grid RELOAD everything it had already paged in
+      // (a view switch or an undo must not shrink 300 loaded rows back to
+      // the first page). Same cap as the rows route.
+      const requestedLimit = Number(request.nextUrl.searchParams.get("limit"));
+      const limit = Math.min(
+        Math.max(requestedLimit || DEFAULT_ROW_PAGE_SIZE, 1),
+        MAX_ROW_PAGE_SIZE
+      );
       const page = await withSpan(
         { layer: "content", name: "data_rows_first_page" },
-        { attrs: { view_id: view?.id ?? "none" } },
+        { attrs: { view_id: view?.id ?? "none", limit } },
         async (span) => {
           const result = await loadRowPage({
             tableId: id,
             view,
             columns: table.columns,
             viewerId: session.user.id,
+            limit,
           });
           span.attr("rows", result.rows.length).attr("total", result.total);
           return result;

@@ -13,6 +13,7 @@ import "server-only";
  */
 
 import {
+  CLIENT_CAPABILITIES_META_KEY,
   McpServer,
   ResourceTemplate,
   type CallToolResult,
@@ -65,7 +66,7 @@ export const SERVER_INFO = { name: "digital-garden", version: "1.0.0" } as const
 
 export const SERVER_INSTRUCTIONS = `This is a user's Digital Garden: notes, folders, databases (tables with typed columns and rows), files and chats.
 Find before you guess: garden_search (empty query + types lists what exists), garden_list_tree, then garden_read for one item. Databases: garden_read gives the schema and a preview; garden_query_rows pages rows — start from the index tier, narrow with columns/filters/view, follow nextCursor until it is null before claiming completeness. Rows are addressed by [8-hex handles].
-Writes need the token's capability and are named for their consent model: garden_insert_rows (partial on bad cells), garden_update_rows (all-or-nothing, expect is required), garden_delete_rows (the table's own policy decides; you may be asked to confirm), garden_write_note (append by default; replace requires expectUpdatedAt and never approves a destructive rewrite), garden_write_code, garden_upload_file, garden_create_folder, garden_insert_block / garden_update_block (typed blocks by catalog), garden_update_ai_context (when a read says the context is stale).
+Writes need the token's capability and are named for their consent model: garden_insert_rows (partial on bad cells), garden_update_rows (all-or-nothing, expect is required), garden_delete_rows (the table's own policy decides; rows you inserted go without asking, the user's rows may need their confirmation — the result names any held rows), garden_write_note (append by default; replace requires expectUpdatedAt and never approves a destructive rewrite), garden_write_code, garden_upload_file, garden_create_folder, garden_insert_block / garden_update_block (typed blocks by catalog), garden_update_ai_context (when a read says the context is stale).
 Two writable text slots on every item: its NOTES (a note's body, or the notes panel of a database, folder, file or chat — garden_write_note with the item's id) and its AI CONTEXT (garden_update_ai_context). Notes are what the user reads; context is what agents read. A summary or write-up the user asks for goes in the notes unless they say "context" or "AI context"; then say in your reply that the context can be updated too. If the request names both, or you cannot tell which reader is meant, ask before writing.
 Leave any \`\`\`dg-block fences exactly as read. Never create at the garden root. Chats are a separate tool pair (garden_chats_search, garden_chat_read) and read-only.
 If a tool fails twice with the same internal error, or a result contradicts what you just read, file it with garden_report_issue (never paste note content), then continue on a safer path.`;
@@ -83,6 +84,25 @@ function sessionFrom(ctx: ServerContext): Session | null {
 }
 
 const UNAUTHENTICATED: McpToolResult = refuse("No valid MCP token on this request.");
+
+/**
+ * Can this client be asked for input (elicitation)? Read from what the
+ * client DECLARED, never discovered by trying and catching:
+ *   - a 2026-07-28-era request carries the client's capabilities in its
+ *     `_meta` envelope;
+ *   - a 2025-era client declared them at `initialize` — which this route,
+ *     serving the 2025 era statelessly (`legacy: "stateless"`), never sees,
+ *     so the answer there is no. See `DeleteAsk` in tools/data.ts.
+ * Protocol revisions are ISO dates, so the era test is a string compare.
+ */
+function clientCanElicit(server: McpServer, ctx: ServerContext): boolean {
+  const version = server.server.getNegotiatedProtocolVersion();
+  const modern = typeof version === "string" && version >= "2026-07-28";
+  const declared = modern
+    ? (ctx.mcpReq.envelope as Record<string, unknown> | undefined)?.[CLIENT_CAPABILITIES_META_KEY]
+    : server.server.getClientCapabilities();
+  return !!(declared as { elicitation?: unknown } | undefined)?.elicitation;
+}
 
 type ToolReturn = CallToolResult | InputRequiredResult;
 
@@ -158,7 +178,7 @@ export function createGardenMcpServer(server: McpServer): void {
       inputSchema: insertRowsInput,
       annotations: WRITE,
     },
-    withSession(async (s, args) => requireCapability(s, "garden:write-rows", "insert rows") ?? insertRows(s.scope, args))
+    withSession(async (s, args) => requireCapability(s, "garden:write-rows", "insert rows") ?? insertRows(s.scope, s.principal, args))
   );
 
   server.registerTool(
@@ -177,11 +197,14 @@ export function createGardenMcpServer(server: McpServer): void {
     {
       title: "Delete database rows",
       description:
-        "Soft-delete up to 25 rows (the user can restore them from the grid's Undo). The database's owner sets its AI deletion policy: Ask me (default) — you will be asked to get the user's confirmation; Allowed — deleted at once and the user is notified; Never — refused. Give the reason in the user's words. Only delete rows the user named or clearly described.",
+        "Soft-delete up to 25 rows (the user can restore them from the grid's Undo). The database's owner sets its AI deletion policy: Ask me (default) — rows an assistant inserted (garden_insert_rows, or the in-app assistant) are deleted at once and the user is notified; the user's own rows need the user's confirmation, which is requested when this client can show one and otherwise held — the result names the held rows so you can tell the user; Allowed — deleted at once and the user is notified; Never — refused. Give the reason in the user's words. Only delete rows the user named or clearly described.",
       inputSchema: deleteRowsInput,
       annotations: DESTRUCTIVE,
     },
-    withSession(async (s, args, ctx) => requireCapability(s, "garden:delete-rows", "delete rows") ?? deleteRows(s.scope, s.principal, args, ctx))
+    withSession(async (s, args, ctx) =>
+      requireCapability(s, "garden:delete-rows", "delete rows")
+        ?? deleteRows(s.scope, s.principal, args, ctx, { canElicit: clientCanElicit(server, ctx) })
+    )
   );
 
   // ── files ─────────────────────────────────────────────────────────────

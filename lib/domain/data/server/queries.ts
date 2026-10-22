@@ -865,9 +865,9 @@ interface RawSortedRow {
  * orderBy a JSONB path. Filters still run through the ONE Prisma compiler
  * (filterToWhere) as an id-preselect, so the filter semantics cannot fork
  * into a third implementation; the raw query only orders and pages the
- * matching ids. Sorted views serve the first `limit` rows with an accurate
- * total — deep pagination lands with the pagination UI, which no path has
- * yet.
+ * matching ids. Sorted views page by OFFSET into the sorted matching set
+ * (`cursor.offset`), the one place offset paging is accepted — there is no
+ * keyset to continue from when the order is a JSONB expression.
  */
 export async function loadRowPage({
   tableId,
@@ -908,13 +908,16 @@ export async function loadRowPage({
       return { rows: [], nextCursor: null, total: 0 };
     }
     const ids = matching.map((m) => m.id);
+    const offset = Math.max(0, Math.floor(cursor?.offset ?? 0));
     const raw = await prisma.$queryRaw<RawSortedRow[]>(Prisma.sql`
       SELECT "id", "tableId", "sortKey", "data", "contentId", "createdAt", "updatedAt"
       FROM "DataRow"
       WHERE "id" = ANY(${ids}::uuid[])
       ORDER BY ${Prisma.join(orderFragments, ", ")}, "id" ASC
-      LIMIT ${limit}
+      LIMIT ${limit} OFFSET ${offset}
     `);
+    const sortedNext: RowPageCursor | null =
+      offset + raw.length < ids.length && raw.length > 0 ? { offset: offset + raw.length } : null;
     const sortedLinks = await hydrateRelationLinks(raw, columns, viewerId);
     const sortedDerived = await computeDerivedValues(raw, columns, sortedLinks);
     const sortedContentRefs = await hydrateContentRefs(raw, columns, viewerId);
@@ -933,17 +936,18 @@ export async function loadRowPage({
         updatedAt: r.updatedAt.toISOString(),
       }));
     await attachRowDigests(sortedRows, columns);
-    return { rows: sortedRows, nextCursor: null, total: ids.length };
+    return { rows: sortedRows, nextCursor: sortedNext, total: ids.length };
   }
 
-  const cursorWhere: Prisma.DataRowWhereInput | null = cursor
-    ? {
-        OR: [
-          { sortKey: { gt: cursor.sortKey } },
-          { sortKey: cursor.sortKey, id: { gt: cursor.id } },
-        ],
-      }
-    : null;
+  const cursorWhere: Prisma.DataRowWhereInput | null =
+    cursor && typeof cursor.sortKey === "string" && typeof cursor.id === "string"
+      ? {
+          OR: [
+            { sortKey: { gt: cursor.sortKey } },
+            { sortKey: cursor.sortKey, id: { gt: cursor.id } },
+          ],
+        }
+      : null;
 
   const where: Prisma.DataRowWhereInput = cursorWhere
     ? { AND: [baseWhere, cursorWhere] }

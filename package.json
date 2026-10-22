@@ -43,6 +43,7 @@
     "mcp:surface:check": "tsx scripts/validate-mcp-surface.ts",
     "remote-write:wake:check": "tsx scripts/validate-remote-write-wake.ts",
     "mcp:smoke": "tsx scripts/smoke-mcp.ts",
+    "mcp:rows:smoke": "tsx scripts/smoke-mcp-row-authorship.ts",
     "tree:smooth:check": "tsx scripts/validate-tree-smooth.ts",
     "create-target:check": "tsx scripts/validate-create-target.ts",
     "charters:check": "tsx scripts/validate-charter-parser.ts",

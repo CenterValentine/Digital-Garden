@@ -53,7 +53,7 @@ export const DATA_TOOL_METADATA: Record<
   delete_rows: {
     name: "Delete Database Rows",
     description:
-      "Soft-delete rows the user named, under each database's own AI deletion policy (schema rail → \"AI deletes rows\"): Ask me pauses on an approval card you answer, Allowed deletes and posts an inbox notice, Never refuses. Deleted rows restore from the grid's Undo (≤25 per call)",
+      "Soft-delete rows the user named, under each database's own AI deletion policy (schema rail → \"AI deletes rows\"): Ask me pauses on an approval card you answer (rows the assistant inserted itself skip the card and post an inbox notice), Allowed deletes and posts an inbox notice, Never refuses. Deleted rows restore from the grid's Undo (≤25 per call)",
   },
   propose_column_options: {
     name: "Propose Column Options",

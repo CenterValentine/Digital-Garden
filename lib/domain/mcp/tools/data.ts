@@ -10,7 +10,9 @@ import "server-only";
  * through the same two functions chat uses (`applyRowInserts`,
  * `applyRowUpdates`), so every cell meets the same encoder. Deletion is
  * consent-gated by the table's own policy: `confirm` asks the user through
- * elicitation when the client can, and refuses when it cannot.
+ * elicitation when the client can; when it cannot, the assistant may still
+ * remove the rows it inserted itself (`lib/domain/data/authorship.ts`) and
+ * the user's rows are held with the reason.
  */
 
 import { z } from "zod";
@@ -21,6 +23,7 @@ import { applyRowInserts, applyRowUpdates } from "@/lib/domain/ai/tools/data-too
 import { findColumn, normalizeCellInput, resolveRowRefs, translateOptionValue } from "@/lib/domain/data/server/resolve";
 import { loadRowPage, loadRowsByIds } from "@/lib/domain/data/server/queries";
 import { softDeleteRows } from "@/lib/domain/data/server/mutations";
+import { splitRowsByAuthorship } from "@/lib/domain/data/server/authorship";
 import { loadRowDigests } from "@/lib/domain/data/server/digest-read";
 import { readAiPolicy } from "@/lib/domain/data/ai-policy";
 import {
@@ -41,6 +44,7 @@ import {
   type FilterOperator,
   type RelationMode,
   type RenderOptions,
+  type RowPageCursor,
 } from "@/lib/domain/data";
 import { publishEvent } from "@/lib/domain/notifications/service";
 import { estimateTokens } from "@/lib/domain/ai-context/tokens";
@@ -59,14 +63,21 @@ type InsertInput = z.infer<typeof insertRowsInput>;
 type UpdateInput = z.infer<typeof updateRowsInput>;
 type DeleteInput = z.infer<typeof deleteRowsInput>;
 
-function encodeCursor(row: DataRow): string {
-  return Buffer.from(JSON.stringify({ s: row.sortKey, i: row.id })).toString("base64url");
+/**
+ * Opaque continuation: keyset (`s`, `i`) in the natural order, or an offset
+ * (`o`) under view sorts — both shapes of RowPageCursor, which is what the
+ * server hands back. The model never sees the inside.
+ */
+function encodeCursor(cursor: RowPageCursor): string {
+  const v = typeof cursor.offset === "number" ? { o: cursor.offset } : { s: cursor.sortKey, i: cursor.id };
+  return Buffer.from(JSON.stringify(v)).toString("base64url");
 }
-function decodeCursor(raw: string | undefined): { sortKey: string; id: string } | null {
+function decodeCursor(raw: string | undefined): RowPageCursor | null {
   if (!raw) return null;
   try {
-    const v = JSON.parse(Buffer.from(raw, "base64url").toString("utf8")) as { s?: unknown; i?: unknown };
+    const v = JSON.parse(Buffer.from(raw, "base64url").toString("utf8")) as { s?: unknown; i?: unknown; o?: unknown };
     if (typeof v.s === "string" && typeof v.i === "string") return { sortKey: v.s, id: v.i };
+    if (typeof v.o === "number" && v.o > 0) return { offset: v.o };
   } catch {
     // fall through
   }
@@ -181,9 +192,10 @@ export async function queryRows(scope: McpScope, principal: McpPrincipal, input:
       });
     }
 
+    const inboundCursor = decodeCursor(input.cursor);
     const page = rowIds
       ? { rows: await loadRowsByIds(databaseId, rowIds, live, scope.userId), nextCursor: null, total: rowIds.length }
-      : await loadRowPage({ tableId: databaseId, view, columns: live, cursor: decodeCursor(input.cursor), limit, viewerId: scope.userId, search: input.search });
+      : await loadRowPage({ tableId: databaseId, view, columns: live, cursor: inboundCursor, limit, viewerId: scope.userId, search: input.search });
 
     let rows = rowIds ? rowIds.map((id) => page.rows.find((r) => r.id === id)).filter((r): r is DataRow => !!r) : page.rows;
 
@@ -205,10 +217,17 @@ export async function queryRows(scope: McpScope, principal: McpPrincipal, input:
       body = formatRows({ rows, columns: shown, live, render, suffixByRow });
       truncatedByBudget = true;
     }
+    // A budget cut continues from the last row KEPT: keyset from its key in
+    // the natural order; under sorts, the offset of the row after it.
+    const offsetBase = typeof inboundCursor?.offset === "number" ? inboundCursor.offset : 0;
     const nextCursor = truncatedByBudget && rows.length > 0 && !rowIds
-      ? encodeCursor(rows[rows.length - 1])
+      ? encodeCursor(
+          sorts.length > 0
+            ? { offset: offsetBase + rows.length }
+            : { sortKey: rows[rows.length - 1].sortKey, id: rows[rows.length - 1].id }
+        )
       : page.nextCursor
-        ? encodeCursor({ ...rows[rows.length - 1], sortKey: (page.nextCursor as { sortKey: string }).sortKey, id: (page.nextCursor as { id: string }).id } as DataRow)
+        ? encodeCursor(page.nextCursor)
         : null;
 
     const header = `${table.title}: ${rows.length} of ${page.total} row${page.total === 1 ? "" : "s"} · ${shown.length} column${shown.length === 1 ? "" : "s"} · ~${estimateTokens(body.text)} tokens${nextCursor ? " · more: pass nextCursor" : " · complete"}`;
@@ -237,11 +256,16 @@ export async function queryRows(scope: McpScope, principal: McpPrincipal, input:
   }
 }
 
-export async function insertRows(scope: McpScope, input: InsertInput): Promise<McpToolResult> {
+export async function insertRows(scope: McpScope, principal: McpPrincipal, input: InsertInput): Promise<McpToolResult> {
   try {
     const opened = await openTable(scope, input.database, "write");
     if ("refusal" in opened) return refuse(opened.refusal);
-    const receipt = await applyRowInserts({ userId: scope.userId }, opened.databaseId, opened.table, input.rows, input.dedupeBy);
+    // Stamped as the MCP's own rows (any of the user's tokens may later
+    // delete them without a confirmation — authorship.ts).
+    const receipt = await applyRowInserts({ userId: scope.userId }, opened.databaseId, opened.table, input.rows, input.dedupeBy, {
+      kind: "mcp",
+      ref: principal.token.id,
+    });
     const inserted = Number(/^Inserted (\d+)/.exec(receipt)?.[1] ?? 0);
     const failed = /^Nothing (inserted|to insert)/.test(receipt);
     return failed ? refuse(receipt, { inserted: 0 }) : ok(receipt, { database: opened.databaseId, inserted });
@@ -271,11 +295,32 @@ export async function updateRows(scope: McpScope, input: UpdateInput): Promise<M
 
 const confirmSchema = z.object({ confirm: z.boolean() });
 
+/**
+ * Whether THIS client can be asked to confirm, decided by the caller
+ * (server.ts) from what the client declared, not discovered by trying:
+ *
+ *   - 2026-07-28 era: the request envelope carries the client's
+ *     capabilities; `inputRequired(...)` reaches a client that declared
+ *     `elicitation`, and is a protocol error toward one that did not.
+ *   - 2025 era: capabilities are declared at `initialize`. The garden's
+ *     route serves 2025-era clients STATELESSLY (mcp-handler `legacy:
+ *     "stateless"`), so the per-request server never saw an initialize and
+ *     the SDK's legacy shim refuses every input request on this route
+ *     ("no client capabilities are available on this connection"). That is
+ *     the wall the ChatGPT connector hit (2026-10-21), and every other
+ *     2025-era client hits the same one. There is no `era` field on the
+ *     request context — the old legacy branch here tested one and was dead.
+ */
+export interface DeleteAsk {
+  canElicit: boolean;
+}
+
 export async function deleteRows(
   scope: McpScope,
   principal: McpPrincipal,
   input: DeleteInput,
-  ctx: ServerContext
+  ctx: ServerContext,
+  ask: DeleteAsk
 ): Promise<McpToolResult | InputRequiredResult> {
   try {
     const opened = await openTable(scope, input.database, "write");
@@ -289,52 +334,62 @@ export async function deleteRows(
     const refusals = resolved.filter((r): r is { refusal: string } => "refusal" in r);
     if (refusals.length > 0) return refuse(`Nothing deleted — ${refusals.length} reference(s) did not resolve:\n${refusals.map((r) => r.refusal).join("\n")}`);
     const ids = resolved.map((r) => (r as { id: string }).id);
-    const handles = ids.map((id) => `[${rowHandle(id)}]`).join(" ");
+    const handleList = (list: string[]) => list.map((id) => `[${rowHandle(id)}]`).join(" ");
+    const handles = handleList(ids);
+
+    // Which rows this call may remove, and which it must hold. Under
+    // "confirm": the assistant's own rows (authorship.ts) go without asking;
+    // the user's rows go only on the user's word.
+    let toDelete = ids;
+    let held: string[] = [];
+    let ownRowsOnly = false;
+    let userConfirmed = false;
 
     if (policy === "confirm") {
-      const message = `Delete ${ids.length} row${ids.length === 1 ? "" : "s"} from "${table.title}"? ${handles}\nReason given: ${input.reason}\n(They go to the trash and can be restored from the grid's Undo.)`;
-      const era = (ctx.mcpReq as { era?: string }).era;
-      if (era === "legacy") {
-        // 2025-era client: ask through the live elicitation request; a client
-        // without the capability throws, and that is a refusal here.
-        try {
-          const answer = await ctx.mcpReq.elicitInput({
-            mode: "form",
-            message,
-            requestedSchema: {
-              type: "object",
-              properties: { confirm: { type: "boolean", title: "Delete these rows" } },
-              required: ["confirm"],
-            },
-          });
-          const confirmed = answer.action === "accept" && (answer.content as { confirm?: unknown } | undefined)?.confirm === true;
-          if (!confirmed) return refuse("The user did not confirm the deletion. Nothing changed.", { confirmed: false });
-        } catch {
-          return refuse(`This client cannot ask the user to confirm, and "${table.title}" requires confirmation for assistant deletes. Ask the user to delete in the app, or to set the database's policy to Allowed on its schema rail.`);
-        }
+      const split = await splitRowsByAuthorship(databaseId, ids);
+      if (split.userWritten.length === 0) {
+        ownRowsOnly = true;
       } else {
         const accepted = acceptedContent(ctx.mcpReq.inputResponses, "confirm", confirmSchema);
-        if (accepted?.confirm !== true) {
-          if (ctx.mcpReq.inputResponses && "confirm" in ctx.mcpReq.inputResponses) {
-            return refuse("The user did not confirm the deletion. Nothing changed.", { confirmed: false });
-          }
+        if (accepted?.confirm === true) {
+          userConfirmed = true;
+        } else if (ctx.mcpReq.inputResponses && "confirm" in ctx.mcpReq.inputResponses) {
+          return refuse("The user did not confirm the deletion. Nothing changed.", { confirmed: false });
+        } else if (ask.canElicit) {
+          const message = `Delete ${ids.length} row${ids.length === 1 ? "" : "s"} from "${table.title}"? ${handles}\nReason given: ${input.reason}\n(They go to the trash and can be restored from the grid's Undo.)`;
           return inputRequired({
             inputRequests: { confirm: inputRequired.elicit({ message, requestedSchema: confirmSchema }) },
           });
+        } else {
+          // No way to ask on this connection: do what needs no asking, hold
+          // the rest, and say exactly which is which.
+          toDelete = split.aiDrafted;
+          held = split.userWritten;
+          if (toDelete.length === 0) {
+            return refuse(
+              `Nothing deleted. "${table.title}" asks the user before an assistant deletes rows, this client cannot show that confirmation, and none of these rows were inserted by an assistant: ${handles}. Ask the user to delete them in the app, or to set "AI deletes rows" to Allowed on the database's schema rail.`,
+              { deleted: 0, held: held.map((id) => rowHandle(id)), policy }
+            );
+          }
         }
       }
     }
 
-    const deleted = await softDeleteRows(databaseId, ids, scope.userId);
-    if (policy === "allow") {
+    const deleted = await softDeleteRows(databaseId, toDelete, scope.userId);
+    const deletedHandles = handleList(toDelete);
+
+    // A notice whenever the user did not just say yes on a confirmation.
+    if (!userConfirmed) {
       try {
         await publishEvent(prisma, {
           kind: "ai.notify",
           actorType: "ai",
           actorLabel: `MCP token "${principal.token.name}"`,
           payload: {
-            title: `MCP deleted ${deleted} row${deleted === 1 ? "" : "s"} from ${table.title}`,
-            body: `${input.reason}\nRows: ${handles}\nIf this was wrong, open the table and use Undo to restore them.`,
+            title: ownRowsOnly || held.length > 0
+              ? `MCP deleted ${deleted} row${deleted === 1 ? "" : "s"} it had added to ${table.title}`
+              : `MCP deleted ${deleted} row${deleted === 1 ? "" : "s"} from ${table.title}`,
+            body: `${input.reason}\nRows: ${deletedHandles}\nIf this was wrong, open the table and use Undo to restore them.${held.length > 0 ? `\nHeld (yours, not deleted — this client could not ask you): ${handleList(held)}` : ""}`,
           },
           subjectType: "content",
           subjectId: databaseId,
@@ -344,11 +399,22 @@ export async function deleteRows(
         logger.warn({ layer: "ai", event: "mcp:delete_notice_failed", summary: "inbox notice not posted", error });
       }
     }
-    return ok(`Deleted ${deleted} of ${ids.length} row${ids.length === 1 ? "" : "s"} from "${table.title}": ${handles}. Policy: ${policy}. The user can restore them from the grid's Undo.`, {
+
+    const consent =
+      policy === "allow"
+        ? "Policy: allow (the user was notified)."
+        : userConfirmed
+          ? "Policy: confirm (the user confirmed)."
+          : "Policy: confirm — these were rows an assistant had inserted, so no confirmation was needed (the user was notified).";
+    const heldLine = held.length > 0
+      ? ` Held ${held.length} user-written row${held.length === 1 ? "" : "s"}: ${handleList(held)} — this client cannot ask the user to confirm, so tell the user: they can delete those in the app, or set "AI deletes rows" to Allowed on the database's schema rail.`
+      : "";
+    return ok(`Deleted ${deleted} of ${toDelete.length} row${toDelete.length === 1 ? "" : "s"} from "${table.title}": ${deletedHandles}. ${consent} The user can restore them from the grid's Undo.${heldLine}`, {
       database: databaseId,
       deleted,
       policy,
-      rows: ids.map((id) => rowHandle(id)),
+      rows: toDelete.map((id) => rowHandle(id)),
+      held: held.map((id) => rowHandle(id)),
     });
   } catch (error) {
     logger.warn({ layer: "ai", event: "mcp:delete_rows_caught", summary: "garden_delete_rows failed", error });
