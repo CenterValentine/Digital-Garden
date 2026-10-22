@@ -36,7 +36,7 @@ import {
   type CellWrite,
 } from "@/lib/domain/data/server/mutations";
 import { ensureLedgersForMasterRows } from "@/lib/domain/ai/quests";
-import { DEFAULT_ROW_PAGE_SIZE } from "@/lib/domain/data";
+import { DEFAULT_ROW_PAGE_SIZE, MAX_ROW_PAGE_SIZE } from "@/lib/domain/data";
 
 const ROUTE_PATH = "/api/content/data/[id]/rows";
 
@@ -108,11 +108,14 @@ export async function GET(request: NextRequest, { params }: { params: Params }) 
         });
       }
 
+      // Two cursor shapes, mirroring RowPageCursor: keyset for the natural
+      // order, `cursorOffset` for a view sorted by cell values.
       const cursorSortKey = sp.get("cursorSortKey");
       const cursorId = sp.get("cursorId");
+      const cursorOffset = Number(sp.get("cursorOffset"));
       const limit = Math.min(
         Number(sp.get("limit")) || DEFAULT_ROW_PAGE_SIZE,
-        500
+        MAX_ROW_PAGE_SIZE
       );
 
       const page = await loadRowPage({
@@ -122,7 +125,9 @@ export async function GET(request: NextRequest, { params }: { params: Params }) 
         cursor:
           cursorSortKey && cursorId
             ? { sortKey: cursorSortKey, id: cursorId }
-            : null,
+            : Number.isFinite(cursorOffset) && cursorOffset > 0
+              ? { offset: cursorOffset }
+              : null,
         limit,
         viewerId: session.user.id,
       });

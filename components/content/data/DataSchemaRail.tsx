@@ -427,7 +427,7 @@ export function DataSchemaRail({ contentId }: DataSchemaRailProps) {
             <label
               htmlFor={`ai-delete-policy-${contentId}`}
               className="text-[11px] text-muted-foreground"
-              title="Whether the assistant may delete rows in this database, and whether it must ask you first. Deleted rows restore from Undo."
+              title="Whether the assistant may delete rows in this database, and whether it must ask you first. Rows the assistant inserted itself never need the ask. Deleted rows restore from Undo."
             >
               AI deletes rows
             </label>

@@ -1607,6 +1607,16 @@ model DataRow {
   searchText String  @default("")
 
   createdBy String?   @db.Uuid
+  /// Who DRAFTED this row when an AI did: "ai-chat" | "mcp". Null = the
+  /// user, or any row from before this column existed. Stamped once by the
+  /// AI insert paths (chat `insert_rows`, MCP `garden_insert_rows`); a cell
+  /// edit never changes it. Under the table's "Ask me" delete policy an
+  /// assistant may delete AI-drafted rows without asking (an inbox notice
+  /// is posted); user-written rows still need the user's confirmation.
+  draftedBy    String?   @db.VarChar(16)
+  /// The Conversation id (ai-chat) or McpToken id (mcp) that drafted it.
+  draftedByRef String?   @db.VarChar(64)
+  draftedAt    DateTime? @db.Timestamptz(6)
   createdAt DateTime  @default(now()) @db.Timestamptz(6)
   updatedAt DateTime  @updatedAt @db.Timestamptz(6)
   deletedAt DateTime? @db.Timestamptz(6)

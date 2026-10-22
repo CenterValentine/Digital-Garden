@@ -17,3 +17,4 @@ export * from "./defaults";
 export * from "./undo";
 export * from "./column-anchor";
 export * from "./ai-policy";
+export * from "./authorship";

@@ -9,6 +9,29 @@ last_updated: 2026-10-20
 
 # Current Sprint Addendum
 
+## October 21, 2026 — Every row shows up, and the assistant can take back what it wrote
+
+**Tree**: worktree `.claude/worktrees/db-rows`, branch `feat/database-rows-paging-and-ai-delete` (off `origin/main` at `00cf6377`)
+**Plan**: `MCP-DATABASE-REACH-PLAN.md` §2.8 revision note (2026-10-21)
+**Status**: typecheck / lint 149 (0 errors, none new) / `data:delete-policy:check` (section C new) / `mcp:surface:check` (6 new checks) green; migration `20261021180000_data_row_drafted_by` applied to the local dev DB, **prod deploy owner-run after merge**; `pnpm mcp:rows:smoke` 24/24 against a dev server; headless grid smoke green
+
+### Shipped
+- **Row paging in the grid.** The table route pages at 100 and always said so (`total`, `nextCursor`), but no client ever asked for page two: a 333-row production table read as "100 rows". The grid now shows `100 of 333 rows`, fetches the next page as you near the bottom, and offers **Load more** under the board, list and gallery layouts; a reload (undo, view switch) keeps however many rows you had; **New row** loads up to the row it just made. Sorted views, which had no continuation at all, page by offset (`RowPageCursor.offset`, the one accepted offset path). `garden_query_rows` follows the same cursor in both orders.
+- **Row authorship.** `DataRow.draftedBy / draftedByRef / draftedAt`, stamped by chat `insert_rows` (conversation) and MCP `garden_insert_rows` (token); `lib/domain/data/authorship.ts` is the rule, `server/authorship.ts` the one query.
+- **"Ask me" asks only about the user's rows.** Chat: `needsApproval` is false when every row is AI-drafted (inbox notice instead). MCP: the assistant's own rows go at once; a mixed set asks when the client declared elicitation and otherwise holds the user's rows, naming them; a user-only set on a client that cannot ask is refused with the remedy.
+- **The MCP reads what the client declared** (`clientCanElicit`): the request envelope on the 2026 era, `initialize` on the 2025 era — which this stateless route never sees, so the ChatGPT wall was every 2025-era client's wall. The dead `era === "legacy"` branch is gone; the two gates now forbid it.
+
+### Migration (owner-run, before deploy)
+- `20261021180000_data_row_drafted_by` — additive: three nullable columns on `DataRow`. Deploys ahead of code safely.
+
+### Smoke (owner, production, after the migration)
+- [ ] **Smoke paging:** open the Job Opportunities Library → header reads `100 of 333 rows` → scroll to the bottom → rows keep loading until the header reads `333 rows` and no Load more footer remains.
+- [ ] **Smoke paging-sorted:** sort a view by a column → scroll to the bottom → the rest loads in that order.
+- [ ] **Smoke paging-new-row:** on the full table click New row → the new last row is visible and editable.
+- [ ] **Smoke ai-delete-own:** from ChatGPT (or any MCP client), insert two rows with `garden_insert_rows`, then delete them → deleted without a prompt; an inbox notice names them.
+- [ ] **Smoke ai-delete-held:** ask the same client to delete one of those plus a hand-written row → the AI row goes, the result names the held row and the remedy.
+- [ ] **Smoke ai-delete-chat:** in the in-app chat, `insert_rows` two rows then ask to delete them → no approval card, inbox notice posted; ask to delete a hand-written row → the card appears.
+
 ## October 15, 2026 — Research in the reader, slice 1: find, resolve, save (`+ → Reader → Research`)
 
 **Tree**: worktree `.claude/worktrees/reader`, branch `claude/inspiring-franklin-2g7h8l` (merged with `origin/main` at `809f74a7`)

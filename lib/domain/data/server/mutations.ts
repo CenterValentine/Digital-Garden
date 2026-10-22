@@ -14,6 +14,7 @@
 
 import { prisma } from "@/lib/database/client";
 import { canonicalJson } from "@/lib/domain/data/digest-hash";
+import { draftedRowFields, type RowDrafter } from "@/lib/domain/data/authorship";
 import type { Prisma } from "@/lib/database/generated/prisma";
 import {
   applyCell,
@@ -462,9 +463,17 @@ export async function createRows(
   columns: DataColumn[],
   count: number,
   createdBy: string,
-  afterSortKey: string | null = null
+  afterSortKey: string | null = null,
+  /**
+   * Set by the AI insert paths only (chat `insert_rows`, MCP
+   * `garden_insert_rows`): records that an assistant drafted these rows, so
+   * it may later delete them without asking (lib/domain/data/authorship.ts).
+   * The grid, forms, duplicates and quest ledgers leave it unset.
+   */
+  drafter: RowDrafter | null = null
 ): Promise<string[]> {
   if (count <= 0) return [];
+  const drafted = draftedRowFields(drafter);
 
   // Column defaults stamped at creation — HERE, so every creation path
   // (grid add-row, board "+ New", forms, AI insert_rows) agrees. A caller
@@ -503,6 +512,7 @@ export async function createRows(
           data: defaults as unknown as Prisma.InputJsonValue,
           searchText: deriveRowSearchText(columns, defaults),
           createdBy,
+          ...drafted,
         },
         select: { id: true },
       });

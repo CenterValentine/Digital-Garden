@@ -123,7 +123,12 @@ check(/applyRowInserts\(/.test(data) && /applyRowUpdates\(/.test(data), "writes:
 check(!/prisma\.dataRow\.(create|update|updateMany|delete|deleteMany)\(/.test(data), "writes: the MCP data module never writes rows through Prisma directly");
 const del = data.slice(data.indexOf("export async function deleteRows"));
 check(/readAiPolicy\(table\.aiPolicy\)/.test(del), "delete: the table policy decides");
-check(/"deny"/.test(del) && /inputRequired\(/.test(del) && /elicitInput\(/.test(del), "delete: deny refuses; confirm elicits on both protocol eras");
+check(/"deny"/.test(del) && /inputRequired\(/.test(del), "delete: deny refuses; confirm elicits through inputRequired (the SDK's shim carries it to 2025-era clients)");
+check(!/elicitInput\(/.test(del) && !/mcpReq as \{ era/.test(del), "delete: no hand-rolled legacy branch — the request context has no era field, so that branch was dead");
+check(/ask\.canElicit/.test(del) && /splitRowsByAuthorship\(/.test(del), "delete: asks only a client that declared elicitation; otherwise deletes the assistant's own rows and holds the user's");
+check(/held/.test(del) && /ownRowsOnly/.test(del), "delete: the result names held rows and says when no confirmation was needed");
+check(/function clientCanElicit/.test(server) && /CLIENT_CAPABILITIES_META_KEY/.test(server) && /getClientCapabilities\(\)/.test(server), "registration: elicitation capability is read from the envelope (2026 era) or initialize (2025 era), never discovered by throwing");
+check(/insertRows\(s\.scope, s\.principal, args\)/.test(server) && /kind: "mcp"/.test(data), "insert: rows are stamped as MCP-drafted with the token as the ref");
 check(/softDeleteRows\(/.test(del), "delete: soft delete only");
 
 const files = src("lib/domain/mcp/tools/files.ts");
