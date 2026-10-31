@@ -76,6 +76,11 @@
       var ticks=P.map(function(pl,i){ var t=document.createElement('span'); t.className='tick';
         t.addEventListener('click',function(){ goTo(i); }); rail.appendChild(t); return t; });
 
+      // copyright watermark, bottom-right of the viewport (bottom-left is the scroll hint); the year writes itself
+      var mark=document.createElement('div'); mark.className='copymark';
+      mark.textContent='© '+new Date().getFullYear()+' David Valentine';
+      scroller.parentElement.appendChild(mark);
+
       // scroll signal: a wide double chevron in the first viewport's lower half. It lives INSIDE
       // the scroller so wheel/touch over it still scroll (an overlay above would be a dead zone),
       // rides away with the page, and fades over the first quarter-screen. Tap → first chapter.
