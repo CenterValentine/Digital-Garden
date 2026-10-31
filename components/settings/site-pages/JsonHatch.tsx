@@ -11,13 +11,18 @@
 
 import { useMemo, useState } from "react";
 import { sitePageConfig, type SitePageConfig } from "@/lib/domain/page-layout/schema";
+import { validateResumeConfig } from "@/lib/domain/page-layout/resume";
+import type { PageKind } from "./defaults";
 
 export function JsonHatch({
   config,
+  pageKind,
   onApply,
   onClose,
 }: {
   config: SitePageConfig;
+  /** A résumé also has to hold its fixed shape (validateResumeConfig). */
+  pageKind?: PageKind;
   onApply: (next: SitePageConfig) => void;
   onClose: () => void;
 }) {
@@ -38,8 +43,18 @@ export function JsonHatch({
         message: `${first.path.join(".") || "(root)"}: ${first.message}`,
       };
     }
+    if (pageKind === "resume") {
+      const issues = validateResumeConfig(parsed.data);
+      if (issues.length > 0) {
+        const more = issues.length > 1 ? ` (+${issues.length - 1} more)` : "";
+        return {
+          ok: false as const,
+          message: `${issues[0].path.join(".")}: ${issues[0].message}${more}`,
+        };
+      }
+    }
     return { ok: true as const, config: parsed.data, sections: parsed.data.sections.length };
-  }, [text]);
+  }, [text, pageKind]);
 
   return (
     <div

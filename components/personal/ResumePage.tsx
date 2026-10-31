@@ -1,74 +1,55 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { Fragment, useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import { parseEmphasis } from "@/components/common/Emphasis";
+import { DEFAULT_RESUME_DATA } from "@/lib/domain/page-layout/resume";
+import type { ResumeCta, ResumeData } from "@/lib/domain/page-layout/resolved";
 import "./personal-pages.css";
 
-// ── CV data ────────────────────────────────────────────────────────────
-interface CvEntry {
-  yr: string;
-  title: string;
-  titleEm: string;
-  meta: string;
-  blurbPre?: string;
-  blurbBold?: string;
-  blurbPost?: string;
-  tags: string[];
+// Content (eras, entries, page copy) is data — a "resume" SitePage, falling
+// back to DEFAULT_RESUME_DATA (lib/domain/page-layout/resume.ts). Era index 0
+// is the innermost zone (the most recent chapter): the ring inverts the
+// real-tree metaphor — current work at the centre, the earliest era outermost.
+// The FOUR bands below are fixed geometry; only what they say is data.
+
+/**
+ * The résumé's emphasis markup: *accent* → <em>, **bold** → <b>, plain text as
+ * bare text nodes. Not the shared <Emphasis> — that emits <strong>/<span>, and
+ * this page's CSS styles `.rv-cve-blurb b`.
+ */
+function Rich({ text }: { text: string }) {
+  return (
+    <>
+      {parseEmphasis(text).map((part, i) =>
+        part.tier === "accent" ? (
+          <em key={i}>{part.text}</em>
+        ) : part.tier === "bold" ? (
+          <b key={i}>{part.text}</b>
+        ) : (
+          <Fragment key={i}>{part.text}</Fragment>
+        ),
+      )}
+    </>
+  );
 }
 
-const DATA: CvEntry[] = [
-  {
-    yr: "2021–now",
-    title: "Execution Engineer — ",
-    titleEm: "Independent",
-    meta: "Technology · Operations · AI Systems",
-    blurbPre:
-      "Building a personal technology & operations practice across AI workflows, digital-garden architecture, resume systems, and career systems. ",
-    blurbBold: "Durable knowledge, automation, and human judgment",
-    blurbPost: " — compounding over time.",
-    tags: ["AI Workflows", "Digital Garden", "System Design", "Career Ops"],
-  },
-  {
-    yr: "2023–25",
-    title: "Revenue Operations — ",
-    titleEm: "Doxy.me",
-    meta: "RevOps · Stripe · HubSpot · Segment · Snowflake",
-    blurbPre:
-      "Owned revenue-operations systems across billing, lifecycle messaging, usage-based revenue, analytics, and customer-data integrity. Helped mature RevOps governance across Stripe, HubSpot, Intercom, Segment, Tray.io, Snowflake, and Sigma — documenting sources, locking down access, and stabilizing trusted reporting. ",
-    blurbBold:
-      "Lifted dunning recovery ~65% → 73%, supporting $1.37M recovered; dropped operational cost $300k/yr.",
-    blurbPost: "",
-    tags: ["RevOps", "HubSpot", "Stripe", "Segment", "Data Integrity", "Dunning"],
-  },
-  {
-    yr: "2020–23",
-    title: "CS Operations — ",
-    titleEm: "Doxy.me",
-    meta: "Customer Operations · Intercom · CRM Hygiene",
-    blurbPre:
-      "Scaled customer operations through hypergrowth to 1M+ providers — Intercom, automation, routing, help-center systems, CRM hygiene, and lifecycle communications. ",
-    blurbBold:
-      "Supported 3M+ automated conversations and 6M+ outbound messages; CSAT 74% → 85%.",
-    blurbPost: " Operationalized >$100k/month usage billing.",
-    tags: ["CS Ops", "Intercom", "CRM Hygiene", "Workflow Automation"],
-  },
-  {
-    yr: "pre-2020",
-    title: "Ecommerce & Operations — ",
-    titleEm: "independent",
-    meta: "Early Operations · CX · Process",
-    blurbPre:
-      "Built early operational judgment through ecommerce, customer communication, and automation. ",
-    blurbBold: "Practical instincts for CX, tooling, and systemized execution.",
-    blurbPost: " The heartwood: narrow but load-bearing.",
-    tags: ["Ecommerce", "Customer Ops", "Process", "Zendesk"],
-  },
-];
-
-// Era labels: index 0 = innermost zone (most recent, 2021–now).
-// The ring inverts the real-tree metaphor: current work at center,
-// earliest era at the outermost ring (roots grow outward over time).
-const ERA_LABELS = ["2021–NOW", "2023–25", "2020–23", "PRE-2020"];
+/** In-app paths route client-side; "#", web and mail links stay plain anchors. */
+function Cta({ cta }: { cta: ResumeCta }) {
+  const className = `cta ${cta.primary ? "pri" : "sec"}`;
+  if (cta.href.startsWith("/") && !cta.href.startsWith("//")) {
+    return (
+      <Link className={className} href={cta.href} aria-label={cta.ariaLabel}>
+        {cta.label}
+      </Link>
+    );
+  }
+  return (
+    <a className={className} href={cta.href} aria-label={cta.ariaLabel}>
+      {cta.label}
+    </a>
+  );
+}
 
 // ── Ring geometry (module-level constants, evaluated once at import) ───
 // Ported from resume-b-standalone.html. Pure math — React Compiler safe.
@@ -165,19 +146,18 @@ const LINE_DATA: LineData[] = (() => {
 const PITH_PATH = loopPath(5.5);
 const [PITH_CX, PITH_CY] = ringCenter(6);
 
-interface LabelData {
+interface LabelPosition {
   x: string;
   y: string;
-  label: string;
 }
 
-const LABEL_DATA: LabelData[] = Array.from({ length: 4 }, (_, e) => {
+// Where each era's ring label sits; the label text comes from data.
+const LABEL_POSITIONS: LabelPosition[] = Array.from({ length: 4 }, (_, e) => {
   const rmid = (BOUNDS[e] + BOUNDS[e + 1]) / 2;
   const [lx, ly] = ringCenter(rmid);
   return {
     x: lx.toFixed(1),
     y: (ly - rmid + 5).toFixed(1),
-    label: ERA_LABELS[e],
   };
 });
 
@@ -201,7 +181,8 @@ const GRAIN_D = (() => {
 })();
 
 // ── Component ──────────────────────────────────────────────────────────
-export function ResumePage() {
+export function ResumePage({ data }: { data?: ResumeData }) {
+  const { eras, copy } = data ?? DEFAULT_RESUME_DATA;
   const [active, setActive] = useState(-1);
   const ringContainerRef = useRef<HTMLDivElement>(null);
   const sizerRef = useRef<HTMLDivElement>(null);
@@ -242,13 +223,11 @@ export function ResumePage() {
             <span className="rv-l-tag">davidvalentine.org / résumé</span>
           </div>
           <div className="rv-cv-head">
-            <span className="rv-cvh-label">
-              ROOT · RÉSUMÉ · four growth rings
-            </span>
+            <span className="rv-cvh-label">{copy.kicker}</span>
             <h2 className="rv-cvh-title">
-              The Growth <em>Rings.</em>
+              <Rich text={copy.heading} />
             </h2>
-            <p className="rv-cvh-sub">Over a decade of growing and building.</p>
+            <p className="rv-cvh-sub">{copy.subtitle}</p>
           </div>
         </header>
 
@@ -332,13 +311,13 @@ export function ResumePage() {
                   />
 
                   {/* Era labels — paint-order knockout halo applied via CSS .rv-elabel */}
-                  {LABEL_DATA.map((lbl, e) => (
+                  {LABEL_POSITIONS.map((pos, e) => (
                     <text
                       key={`lbl${e}`}
                       className={`rv-elabel${active === e ? " rv-is-active" : ""}`}
                       data-idx={e}
-                      x={lbl.x}
-                      y={lbl.y}
+                      x={pos.x}
+                      y={pos.y}
                       textAnchor="middle"
                       fontFamily="monospace"
                       fontSize="7.5"
@@ -346,7 +325,7 @@ export function ResumePage() {
                       opacity="0.85"
                       pointerEvents="none"
                     >
-                      {lbl.label}
+                      {eras[e]?.label}
                     </text>
                   ))}
 
@@ -366,58 +345,49 @@ export function ResumePage() {
               </div>
             </div>
             <div className="rv-left-foot">
-              <span className="rv-hint">hover a ring to illuminate</span>
+              <span className="rv-hint">{copy.hint}</span>
             </div>
           </aside>
 
           {/* Right: scrollable CV entries */}
           <main className="rv-right">
             <div className="rv-cv-body">
-              {DATA.map((entry, i) => (
-                <div
-                  key={i}
-                  className={`rv-cv-entry${active === i ? " rv-is-active" : ""}`}
-                  onMouseEnter={() => setActive(i)}
-                  onMouseLeave={() => setActive(-1)}
-                >
-                  <span className="rv-cve-yr">{entry.yr}</span>
-                  <div className="rv-cve-right">
-                    <h3>
-                      {entry.title}
-                      <em>{entry.titleEm}</em>
-                    </h3>
-                    <span className="rv-cve-meta">{entry.meta}</span>
-                    <p className="rv-cve-blurb">
-                      {entry.blurbPre}
-                      {entry.blurbBold && <b>{entry.blurbBold}</b>}
-                      {entry.blurbPost}
-                    </p>
-                    <div className="rv-cve-tags">
-                      {entry.tags.map((t) => (
-                        <span key={t} className="rv-cve-tag">
-                          {t}
-                        </span>
-                      ))}
+              {/* Entries in era order; an entry lights its era's ring, and a
+                  ring lights every entry in its era. */}
+              {eras.map((era, e) =>
+                era.entries.map((entry, j) => (
+                  <div
+                    key={`${e}-${j}`}
+                    className={`rv-cv-entry${active === e ? " rv-is-active" : ""}`}
+                    onMouseEnter={() => setActive(e)}
+                    onMouseLeave={() => setActive(-1)}
+                  >
+                    <span className="rv-cve-yr">{entry.year}</span>
+                    <div className="rv-cve-right">
+                      <h3>
+                        <Rich text={entry.title} />
+                      </h3>
+                      <span className="rv-cve-meta">{entry.meta}</span>
+                      <p className="rv-cve-blurb">
+                        <Rich text={entry.blurb} />
+                      </p>
+                      <div className="rv-cve-tags">
+                        {entry.tags.map((t) => (
+                          <span key={t} className="rv-cve-tag">
+                            {t}
+                          </span>
+                        ))}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                )),
+              )}
 
-              <div className="rv-cv-foot">each ring is a chapter</div>
+              <div className="rv-cv-foot">{copy.footnote}</div>
               <div className="rv-ctas">
-                <a
-                  className="cta pri"
-                  href="#"
-                  aria-label="Download résumé PDF"
-                >
-                  Download résumé →
-                </a>
-                <Link className="cta sec" href="/results">
-                  See the work
-                </Link>
-                <Link className="cta sec" href="/">
-                  See the garden
-                </Link>
+                {copy.ctas.map((cta, k) => (
+                  <Cta key={k} cta={cta} />
+                ))}
               </div>
             </div>
           </main>

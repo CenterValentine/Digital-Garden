@@ -97,3 +97,42 @@ export interface ProseSection {
 export interface ProseData {
   sections: ProseSection[];
 }
+
+// ── Résumé (growth rings) ────────────────────────────────────────────────────
+// Exactly RESUME_ERA_COUNT eras — the ring's bands are fixed geometry; what each
+// era SAYS is data. eras[0] is the innermost ring (the most recent chapter).
+
+export interface ResumeEntry {
+  year: string; // the entry's year column, e.g. "2021–now"
+  title: string; // emphasis string — "Role — *Org*"
+  meta: string; // the mono line under the title
+  blurb: string; // emphasis string — **bold** renders as <b>
+  tags: string[];
+}
+
+export interface ResumeEra {
+  label: string; // the ring label, e.g. "2021–NOW"
+  entries: ResumeEntry[];
+}
+
+export interface ResumeCta {
+  label: string;
+  href: string; // "/path" → in-app link; "#", http(s), mailto → plain <a>
+  primary?: boolean;
+  ariaLabel?: string;
+}
+
+/** The résumé's page-level copy (the site identity in the left head stays code). */
+export interface ResumeCopy {
+  kicker: string;
+  heading: string; // emphasis string — "The Growth *Rings.*"
+  subtitle: string;
+  hint: string;
+  footnote: string;
+  ctas: ResumeCta[];
+}
+
+export interface ResumeData {
+  eras: ResumeEra[];
+  copy: ResumeCopy;
+}

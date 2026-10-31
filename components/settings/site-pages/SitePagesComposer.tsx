@@ -31,8 +31,10 @@ import {
   starterConfig,
   slugToSegment,
   emptySection,
+  emptyResumeEntry,
   routeInfo,
 } from "./defaults";
+import { validateResumeConfig } from "@/lib/domain/page-layout/resume";
 import { SectionCard } from "./SectionCard";
 import { JsonHatch } from "./JsonHatch";
 import { ContentPicker } from "./ContentPicker";
@@ -59,10 +61,53 @@ interface WorkingPage {
   hasDraft: boolean;
 }
 
-type SaveState = "idle" | "saving" | "saved" | "error";
+/** "held": a résumé draft with shape problems — not sent until they're fixed. */
+type SaveState = "idle" | "saving" | "saved" | "error" | "held";
 
 const inputCls =
   "rounded-md border border-white/10 bg-white/5 px-3 py-1.5 text-sm min-w-0";
+
+/**
+ * A failed save's message: the first validation issue (a résumé's shape rules
+ * read as sentences) plus a count, rather than a bare "Validation failed".
+ */
+async function saveErrorMessage(res: Response): Promise<string> {
+  const err = (await res.json().catch(() => null)) as
+    | { error?: string; issues?: { message?: string }[] }
+    | null;
+  const issues = err?.issues ?? [];
+  const first = issues[0]?.message;
+  if (first) return issues.length > 1 ? `${first} (+${issues.length - 1} more)` : first;
+  return err?.error ?? `HTTP ${res.status}`;
+}
+
+/**
+ * The résumé's shape problems, live while editing — the same validator the API
+ * enforces, so the author sees why a save will be refused before it is.
+ */
+function ResumeIssues({ config }: { config: SitePageConfig }) {
+  const issues = validateResumeConfig(config);
+  if (issues.length === 0) {
+    return (
+      <p className="font-mono text-[11px] text-emerald-400/80">
+        ✓ Résumé shape is valid — four eras, every entry complete.
+      </p>
+    );
+  }
+  return (
+    <div role="alert" className="rounded-md border border-rose-500/30 bg-rose-500/[0.06] px-3 py-2">
+      <p className="mb-1 font-mono text-[10px] uppercase tracking-wider text-rose-300/80">
+        {issues.length} {issues.length === 1 ? "problem" : "problems"} — saves are refused until fixed
+      </p>
+      <ul className="list-disc space-y-0.5 pl-4 text-xs text-rose-200/80">
+        {issues.slice(0, 8).map((issue, k) => (
+          <li key={k}>{issue.message}</li>
+        ))}
+        {issues.length > 8 && <li>…and {issues.length - 8} more</li>}
+      </ul>
+    </div>
+  );
+}
 
 function toKind(value: string): PageKind {
   return (KINDS as string[]).includes(value) ? (value as PageKind) : "record";
@@ -226,6 +271,12 @@ export function SitePagesComposer() {
     const w = workingRef.current;
     const t = tenantRef.current;
     if (!w || !t) return;
+    // Mid-edit a résumé is briefly incomplete; the API would refuse every
+    // autosave. Hold the draft (the problems panel says why) instead.
+    if (w.kind === "resume" && validateResumeConfig(w.config).length > 0) {
+      setSaveState("held");
+      return;
+    }
     setSaveState("saving");
     try {
       const seg = slugToSegment(w.slug);
@@ -240,10 +291,7 @@ export function SitePagesComposer() {
           config: w.config,
         }),
       });
-      if (!res.ok) {
-        const err = (await res.json().catch(() => null)) as { error?: string } | null;
-        throw new Error(err?.error ?? `HTTP ${res.status}`);
-      }
+      if (!res.ok) throw new Error(await saveErrorMessage(res));
       setSaveState("saved");
       setWorking((prev) =>
         prev && prev.slug === w.slug ? { ...prev, persisted: true, hasDraft: true } : prev,
@@ -325,10 +373,7 @@ export function SitePagesComposer() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ tenantId: t }),
       });
-      if (!res.ok) {
-        const err = (await res.json().catch(() => null)) as { error?: string } | null;
-        throw new Error(err?.error ?? `HTTP ${res.status}`);
-      }
+      if (!res.ok) throw new Error(await saveErrorMessage(res));
       setWorking((prev) => (prev ? { ...prev, hasDraft: false } : prev));
       setPreviewKey((k) => k + 1);
     } catch (err) {
@@ -413,7 +458,7 @@ export function SitePagesComposer() {
     mutate((prev) => {
       const sections = prev.config.sections.slice();
       sections[index] = next;
-      return { ...prev, config: { sections } };
+      return { ...prev, config: { ...prev.config, sections } };
     });
 
   /**
@@ -431,7 +476,7 @@ export function SitePagesComposer() {
       if (replaceItemIndex != null) list.splice(replaceItemIndex, 1, ...items);
       else list.push(...items);
       sections[sectionIndex] = { ...section, items: list };
-      return { ...prev, config: { sections } };
+      return { ...prev, config: { ...prev.config, sections } };
     });
   };
 
@@ -443,9 +488,12 @@ export function SitePagesComposer() {
       if (!section) return prev;
       sections[sectionIndex] = {
         ...section,
-        items: [...section.items, { title: "New row", status: "done" }],
+        items: [
+          ...section.items,
+          prev.kind === "resume" ? emptyResumeEntry() : { title: "New row", status: "done" },
+        ],
       };
-      return { ...prev, config: { sections } };
+      return { ...prev, config: { ...prev.config, sections } };
     });
 
   return (
@@ -669,12 +717,24 @@ export function SitePagesComposer() {
                   >
                     Unpublish
                   </button>
-                  <span className={`text-xs ${saveState === "error" ? "text-rose-400" : "text-white/40"}`}>
-                    {saveState === "saving" ? "Saving…" : saveState === "error" ? "Save failed" : ""}
+                  <span
+                    className={`text-xs ${
+                      saveState === "error" ? "text-rose-400" : saveState === "held" ? "text-amber-400/80" : "text-white/40"
+                    }`}
+                  >
+                    {saveState === "saving"
+                      ? "Saving…"
+                      : saveState === "error"
+                        ? "Save failed"
+                        : saveState === "held"
+                          ? "Not saved — fix the problems above"
+                          : ""}
                   </span>
                 </>
               )}
             </div>
+
+            {working.kind === "resume" && <ResumeIssues config={working.config} />}
 
             {working.config.sections.map((section, i) => (
               <SectionCard
@@ -687,7 +747,7 @@ export function SitePagesComposer() {
                 onRemove={() =>
                   mutate((prev) => ({
                     ...prev,
-                    config: { sections: prev.config.sections.filter((_, j) => j !== i) },
+                    config: { ...prev.config, sections: prev.config.sections.filter((_, j) => j !== i) },
                   }))
                 }
                 onMove={(dir) =>
@@ -696,7 +756,7 @@ export function SitePagesComposer() {
                     const j = i + dir;
                     if (j < 0 || j >= sections.length) return prev;
                     [sections[i], sections[j]] = [sections[j], sections[i]];
-                    return { ...prev, config: { sections } };
+                    return { ...prev, config: { ...prev.config, sections } };
                   })
                 }
                 onConnect={() => setPicker({ sectionIndex: i })}
@@ -709,18 +769,21 @@ export function SitePagesComposer() {
               />
             ))}
 
-            <button
-              type="button"
-              className="rounded-md border border-dashed border-white/20 px-4 py-2.5 text-sm text-white/50 hover:border-amber-500/50 hover:text-amber-400"
-              onClick={() =>
-                mutate((p) => ({
-                  ...p,
-                  config: { sections: [...p.config.sections, emptySection()] },
-                }))
-              }
-            >
-              + Add {working.kind === "garden" ? "category" : "section"}
-            </button>
+            {/* A résumé's four eras are fixed — they map onto the ring's bands. */}
+            {working.kind !== "resume" && (
+              <button
+                type="button"
+                className="rounded-md border border-dashed border-white/20 px-4 py-2.5 text-sm text-white/50 hover:border-amber-500/50 hover:text-amber-400"
+                onClick={() =>
+                  mutate((p) => ({
+                    ...p,
+                    config: { ...p.config, sections: [...p.config.sections, emptySection()] },
+                  }))
+                }
+              >
+                + Add {working.kind === "garden" ? "category" : "section"}
+              </button>
+            )}
           </>
         )}
       </main>
@@ -739,6 +802,7 @@ export function SitePagesComposer() {
       {showJson && working && (
         <JsonHatch
           config={working.config}
+          pageKind={working.kind}
           onApply={(next) => mutate((p) => ({ ...p, config: next }))}
           onClose={() => setShowJson(false)}
         />

@@ -13,6 +13,7 @@
  * them.
  */
 
+import { useState } from "react";
 import type { ListItem } from "@/lib/domain/page-layout/schema";
 import type { PageKind } from "./defaults";
 import { EmphasisInput } from "./EmphasisInput";
@@ -235,6 +236,38 @@ function BlurbField({
   );
 }
 
+/** Comma-separated while typing; committed on blur as a trimmed, non-empty list. */
+function TagsField({ tags, onChange }: { tags: string[]; onChange: (next: string[]) => void }) {
+  const joined = tags.join(", ");
+  const [draft, setDraft] = useState(joined);
+  const [last, setLast] = useState(joined);
+  if (joined !== last) {
+    // the item changed elsewhere (JSON hatch, reorder) — adopt it
+    setLast(joined);
+    setDraft(joined);
+  }
+  return (
+    <div className="flex flex-col gap-1 sm:col-span-2">
+      <span className="font-mono text-[10px] uppercase tracking-wider text-white/40">Tags — comma-separated</span>
+      <input
+        aria-label="Tags"
+        className={inputCls}
+        value={draft}
+        placeholder="RevOps, HubSpot, Stripe"
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={() =>
+          onChange(
+            draft
+              .split(",")
+              .map((t) => t.trim())
+              .filter((t) => t.length > 0),
+          )
+        }
+      />
+    </div>
+  );
+}
+
 function HiddenToggle({
   item,
   set,
@@ -348,6 +381,29 @@ export function ItemEditor({
             <HiddenToggle item={item} set={set} />
           </div>
           <BlurbField item={item} inherited={inherited} set={set} />
+        </>
+      )}
+
+      {pageKind === "resume" && (
+        <>
+          <OverridableText label="Year (shown)" value={item.year} placeholder="2021–now" onChange={(v) => set("year", v)} />
+          <OverridableText label="Meta line" value={item.meta} placeholder="RevOps · Stripe · HubSpot" onChange={(v) => set("meta", v)} />
+          <div className="flex flex-col gap-1 sm:col-span-2">
+            <span className="font-mono text-[10px] uppercase tracking-wider text-white/40">
+              Blurb — wrap the headline result in **stars** to bold it
+            </span>
+            <textarea
+              aria-label="Blurb"
+              className={`${inputCls} min-h-[80px] font-serif`}
+              value={item.blurb ?? ""}
+              placeholder="What you owned, then the **measurable result**."
+              onChange={(e) => set("blurb", e.target.value === "" ? undefined : e.target.value)}
+            />
+          </div>
+          <TagsField tags={item.tags ?? []} onChange={(next) => set("tags", next)} />
+          <div className="flex items-end">
+            <HiddenToggle item={item} set={set} />
+          </div>
         </>
       )}
 
