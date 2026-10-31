@@ -142,3 +142,40 @@ Sprints (each committed):
 - [ ] Preview auth: draft mode denied for non-owner/anon
 - [ ] Docs: SITE-PAGES-GUIDE.md updated for composer · STATUS.md · BACKLOG.md (nav-consumption follow-up)
 - [ ] Post-merge: none (no Hocuspocus impact — no TipTap schema change)
+
+## Addendum (2026-10-31) — the résumé joins site pages (`kind: "resume"`)
+
+`/resume` was a static route with its content hard-coded in `ResumePage.tsx`;
+it predated the composer (built 2026-07-01, composer wired Results/About on
+07-18/21) and was never migrated. Its stated reason — tenant lookup blanking
+client-side navigation — no longer held (2026-10-31: client navigation to
+`/about` and `/results` on production renders identically to a full load).
+
+- **Route:** the catch-all's `joined === "resume"` branch → `fetchResumeData`
+  (draft for the owner via `?preview=draft`); `app/(public)/resume/page.tsx`
+  deleted. Served only to the personal tenant, like About/Results.
+- **Shape** (`lib/domain/page-layout/resume.ts`): `sections[0..3]` = the four
+  eras, innermost ring (most recent) first; `label` = ring label; `items` =
+  the era's entries `{ year, title, meta, blurb, tags }` (title/blurb are
+  emphasis strings: `*accent*`, `**bold**` → `<b>`). An era may hold several
+  entries. Optional `page` block = `kicker`, `heading`, `subtitle`, `hint`,
+  `footnote`, `ctas[] {label, href, primary?, ariaLabel?}`; absent fields keep
+  the design default. The left-head site identity (name, role, back link) stays
+  code. The ring geometry is code; the era COUNT is fixed at four.
+- **Validation** — `validateResumeConfig`, one function run by the API write
+  (`sitePageInput.superRefine`), the composer (live problems panel; autosave is
+  held while invalid), the JSON hatch, the resolver (an invalid stored config
+  renders the design default + `site_page:resume:invalid_config` warn), and
+  `pnpm resume:page:check` (in `build` ⇒ CI). Rules: exactly 4 eras; ring label
+  required, ≤10 chars; every era ≥1 visible entry; every entry has year, title,
+  meta, blurb and 1–8 unique tags (≤32 chars); no leading/trailing spaces;
+  balanced `*`; generic list fields a résumé ignores (`ref`, `date`, `facts`,
+  section `heading`, …) are refused, not dropped; ≤3 buttons, ≤1 primary,
+  href = `/path`, `#`, http(s) or `mailto:`.
+- **Seed:** `scripts/seed-resume-page.ts` mirrors `DEFAULT_RESUME_DATA` (the
+  live page, verbatim — facts are corrected in the JSON afterwards, not here).
+  `--verify` is the gate; `--tenant=<slug>`; `--publish` makes a NEW page Live;
+  an existing page only has its draft replaced.
+- **Fidelity proof:** the new component's static HTML is byte-identical to the
+  old one's (187,916 chars incl. every SVG path), both from the default and from
+  data round-tripped through the seeded JSON.

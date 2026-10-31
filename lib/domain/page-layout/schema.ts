@@ -15,6 +15,7 @@
  */
 
 import { z } from "zod/v4";
+import { validateResumeConfig } from "./resume";
 
 /**
  * Rich emphasis string. Drives BOTH the text and the dual/tri font effect:
@@ -68,6 +69,7 @@ const listItem = z.object({
   facts: z.array(z.tuple([z.string(), z.string()])).optional(),
   sub: z.array(z.object({ title: z.string(), note: z.string() })).optional(), // garden DNA
   timelineNote: z.string().optional(),
+  tags: z.array(z.string()).optional(), // résumé: the entry's skill chips
   hidden: z.boolean().optional(),
 });
 
@@ -90,23 +92,52 @@ const listSection = z.object({
   items: z.array(listItem).default([]),
 });
 
+/**
+ * Page-level copy a kind may expose beside its sections (today: the résumé's
+ * head, hint, footnote and buttons). Absent fields keep the design's default
+ * text. A kind that has no such copy ignores the block.
+ */
+const pageCta = z.object({
+  label: z.string(),
+  href: z.string(),
+  primary: z.boolean().optional(),
+  ariaLabel: z.string().optional(),
+});
+const pageCopy = z.object({
+  kicker: z.string().optional(),
+  heading: emphasisString.optional(),
+  subtitle: z.string().optional(),
+  hint: z.string().optional(),
+  footnote: z.string().optional(),
+  ctas: z.array(pageCta).optional(),
+});
+
 export const sitePageConfig = z.object({
   sections: z.array(listSection).default([]),
+  page: pageCopy.optional(),
 });
 
 /**
  * Column metadata for a SitePage, validated on write. Shared by the API route
  * and the admin form. `visibility` is the page's Draft/Live state; `navLabel`
- * (null = not in menu) + `navOrder` drive site navigation.
+ * (null = not in menu) + `navOrder` drive site navigation. A `resume` page must
+ * also hold the résumé's fixed shape (see validateResumeConfig).
  */
-export const sitePageInput = z.object({
-  title: z.string().min(1).max(255),
-  kind: z.enum(["record", "index", "prose", "garden"]),
-  navLabel: z.string().max(120).nullish(),
-  navOrder: z.number().int().default(0),
-  visibility: z.enum(["draft", "published"]).default("draft"),
-  config: sitePageConfig,
-});
+export const sitePageInput = z
+  .object({
+    title: z.string().min(1).max(255),
+    kind: z.enum(["record", "index", "prose", "garden", "resume"]),
+    navLabel: z.string().max(120).nullish(),
+    navOrder: z.number().int().default(0),
+    visibility: z.enum(["draft", "published"]).default("draft"),
+    config: sitePageConfig,
+  })
+  .superRefine((input, ctx) => {
+    if (input.kind !== "resume") return;
+    for (const issue of validateResumeConfig(input.config)) {
+      ctx.addIssue({ code: "custom", path: ["config", ...issue.path], message: issue.message });
+    }
+  });
 
 // ── Legacy migration ────────────────────────────────────────────────────────
 // Maps the pre-v1.1 discriminated-union config (recordList / directoryIndex /
@@ -200,6 +231,9 @@ export function migrateLegacyConfig(raw: unknown): { sections: unknown[] } {
 
 export type SitePageInput = z.infer<typeof sitePageInput>;
 export type SitePageConfig = z.infer<typeof sitePageConfig>;
+/** The authored (pre-default) shape — what a seed or the JSON hatch writes. */
+export type SitePageConfigInput = z.input<typeof sitePageConfig>;
+export type PageCopy = z.infer<typeof pageCopy>;
 export type ListSection = z.infer<typeof listSection>;
 export type ListItem = z.infer<typeof listItem>;
 export type ContentRef = z.infer<typeof contentRef>;

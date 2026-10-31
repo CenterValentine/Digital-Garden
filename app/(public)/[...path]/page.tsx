@@ -82,10 +82,12 @@ async function renderPublic(
       return <WorkResultsPage data={data ?? undefined} />;
     }
     if (joined === "resume") {
-      const { ResumePage } = await import(
-        "../../../components/personal/ResumePage"
-      );
-      return <ResumePage />;
+      const [{ ResumePage }, { fetchResumeData }] = await Promise.all([
+        import("../../../components/personal/ResumePage"),
+        import("@/lib/domain/page-layout/resolve"),
+      ]);
+      const data = await fetchResumeData(tenant.tenantId, { draft });
+      return <ResumePage data={data ?? undefined} />;
     }
     if (joined === "garden") {
       const { GardenConstructionPage } = await import(

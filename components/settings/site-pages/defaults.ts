@@ -5,17 +5,24 @@
  * section shape — so there's one section factory, not three.
  */
 
-import type { SitePageConfig, ListSection } from "@/lib/domain/page-layout/schema";
+import {
+  sitePageConfig,
+  type SitePageConfig,
+  type ListItem,
+  type ListSection,
+} from "@/lib/domain/page-layout/schema";
+import { DEFAULT_RESUME_DATA, resumeToConfig } from "@/lib/domain/page-layout/resume";
 
-export type PageKind = "record" | "index" | "prose" | "garden";
+export type PageKind = "record" | "index" | "prose" | "garden" | "resume";
 
-export const KINDS: PageKind[] = ["record", "index", "prose", "garden"];
+export const KINDS: PageKind[] = ["record", "index", "prose", "garden", "resume"];
 
 export const KIND_LABELS: Record<PageKind, string> = {
   record: "Record ledger",
   index: "Simple list",
   prose: "Prose",
   garden: "Garden",
+  resume: "Résumé",
 };
 
 /** Short helper text shown under the kind selector. */
@@ -24,7 +31,13 @@ export const KIND_HELP: Record<PageKind, string> = {
   index: "A plain list of pages and directories.",
   prose: "Freeform — sections render as simple blocks.",
   garden: "The Field Notes garden — sections become leaves, items become veins.",
+  resume: "The Growth Rings — exactly four eras (innermost first); each era holds its entries.",
 };
+
+/** A blank résumé entry; validation flags each empty field until it's filled. */
+export function emptyResumeEntry(): ListItem {
+  return { year: "", title: "", meta: "", blurb: "", tags: [], status: "done" };
+}
 
 export function emptySection(): ListSection {
   return { label: "— New section", sort: "date-desc", items: [] };
@@ -65,6 +78,9 @@ export function starterConfig(kind: PageKind): SitePageConfig {
       };
     case "prose":
       return { sections: [] };
+    case "resume":
+      // The live page's own content — a new résumé starts as an exact copy.
+      return sitePageConfig.parse(resumeToConfig(DEFAULT_RESUME_DATA));
   }
 }
 
@@ -82,6 +98,7 @@ const PERSONAL_ROUTES: Record<string, { kind: PageKind; label: string }> = {
   results: { kind: "record", label: "Results / Work" },
   blog: { kind: "garden", label: "Field Notes" },
   about: { kind: "prose", label: "About" },
+  resume: { kind: "resume", label: "Résumé" },
 };
 
 export type RouteStatus = "wired" | "wrong-kind" | "home" | "unwired";

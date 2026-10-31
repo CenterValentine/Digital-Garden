@@ -15,7 +15,9 @@
  */
 
 import { prisma } from "@/lib/database/client";
+import { logger } from "@/lib/core/logger/emit";
 import { resolvePublicPath } from "@/lib/domain/tenancy";
+import { resumeFromConfig, validateResumeConfig } from "./resume";
 import {
   sitePageConfig,
   migrateLegacyConfig,
@@ -29,6 +31,7 @@ import type {
   GardenData,
   GardenItem,
   ProseData,
+  ResumeData,
   ResolvedRecordEntry,
   ResolvedRecordSection,
   ResolvedTimelineEntry,
@@ -334,4 +337,29 @@ export async function fetchProseData(
       aside: section.aside,
     })),
   };
+}
+
+/**
+ * Resolve the résumé ("resume" SitePage). Null — the component keeps its
+ * built-in design default — when there is no Live page, or when the stored
+ * config doesn't hold the résumé's shape (writes are validated, so that means
+ * an out-of-band edit; it is logged rather than rendered half-broken).
+ */
+export async function fetchResumeData(
+  tenantId: string,
+  opts?: ResolveOptions,
+): Promise<ResumeData | null> {
+  const loaded = await loadPage(tenantId, "resume", opts);
+  if (!loaded) return null;
+  const issues = validateResumeConfig(loaded.config);
+  if (issues.length > 0) {
+    logger.warn({
+      layer: "route",
+      event: "site_page:resume:invalid_config",
+      summary: "resume SitePage config fails validation — rendering the design default",
+      attrs: { tenant_id: tenantId, issue_count: issues.length, first_issue: issues[0].message },
+    });
+    return null;
+  }
+  return resumeFromConfig(loaded.config);
 }

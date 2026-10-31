@@ -161,7 +161,8 @@ export function SectionCard({
     setOpenRow(null);
   };
 
-  const sectionNoun = pageKind === "garden" ? "category" : "section";
+  const isResume = pageKind === "resume";
+  const sectionNoun = pageKind === "garden" ? "category" : isResume ? "era" : "section";
 
   return (
     <section className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
@@ -176,25 +177,38 @@ export function SectionCard({
               ? "Category name"
               : pageKind === "prose"
                 ? "Section kicker (e.g. The work)"
-                : "— Section heading"
+                : isResume
+                  ? `Ring label for era ${index + 1} (e.g. 2021–NOW)`
+                  : "— Section heading"
           }
           onChange={(e) => onChange({ ...section, label: e.target.value })}
         />
-        <label className="ml-1 font-mono text-[10px] uppercase tracking-wider text-white/40">Order</label>
-        <select
-          aria-label="Sort"
-          className={inputCls}
-          value={section.sort}
-          onChange={(e) => onChange({ ...section, sort: e.target.value as ListSection["sort"] })}
-        >
-          <option value="date-desc">newest first</option>
-          <option value="date-asc">oldest first</option>
-          <option value="manual">as listed</option>
-        </select>
+        {isResume ? (
+          <span className="ml-1 font-mono text-[10px] uppercase tracking-wider text-white/40">
+            {index === 0 ? "innermost ring" : index === total - 1 ? "outermost ring" : `ring ${index + 1}`}
+          </span>
+        ) : (
+          <>
+            <label className="ml-1 font-mono text-[10px] uppercase tracking-wider text-white/40">Order</label>
+            <select
+              aria-label="Sort"
+              className={inputCls}
+              value={section.sort}
+              onChange={(e) => onChange({ ...section, sort: e.target.value as ListSection["sort"] })}
+            >
+              <option value="date-desc">newest first</option>
+              <option value="date-asc">oldest first</option>
+              <option value="manual">as listed</option>
+            </select>
+          </>
+        )}
         <span className="flex-1" />
         <button type="button" aria-label="Move up" disabled={index === 0} className="px-1 text-white/40 hover:text-white/80 disabled:opacity-20" onClick={() => onMove(-1)}>↑</button>
         <button type="button" aria-label="Move down" disabled={index === total - 1} className="px-1 text-white/40 hover:text-white/80 disabled:opacity-20" onClick={() => onMove(1)}>↓</button>
-        <button type="button" aria-label={`Remove ${sectionNoun}`} className="px-1 text-white/30 hover:text-rose-400" onClick={onRemove}>✕</button>
+        {/* A résumé's eras are fixed: one per growth ring. */}
+        {!isResume && (
+          <button type="button" aria-label={`Remove ${sectionNoun}`} className="px-1 text-white/30 hover:text-rose-400" onClick={onRemove}>✕</button>
+        )}
       </div>
 
       {pageKind === "garden" && (
@@ -247,7 +261,9 @@ export function SectionCard({
             ? "Items in this category"
             : pageKind === "prose"
               ? "Paragraphs in this section"
-              : "Rows in this section"}
+              : isResume
+                ? "Entries in this era"
+                : "Rows in this section"}
         </span>
         <ul className="divide-y divide-white/5 rounded-md border border-white/10 bg-black/15">
         {section.items.map((item, i) => {
@@ -328,19 +344,22 @@ export function SectionCard({
         </ul>
 
         <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            className="rounded-md border border-dashed border-amber-600/60 px-3 py-1.5 text-xs text-amber-400 hover:bg-amber-500/10"
-            onClick={onConnect}
-          >
-            ⚡ Add published content…
-          </button>
+          {/* Résumé entries are authored, never connected to published pages. */}
+          {!isResume && (
+            <button
+              type="button"
+              className="rounded-md border border-dashed border-amber-600/60 px-3 py-1.5 text-xs text-amber-400 hover:bg-amber-500/10"
+              onClick={onConnect}
+            >
+              ⚡ Add published content…
+            </button>
+          )}
           <button
             type="button"
             className="rounded-md border border-dashed border-white/20 px-3 py-1.5 text-xs text-white/50 hover:border-amber-500/50 hover:text-amber-400"
             onClick={onAddManual}
           >
-            + Add manual row
+            {isResume ? "+ Add entry" : "+ Add manual row"}
           </button>
         </div>
       </div>
