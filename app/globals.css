@@ -8416,9 +8416,14 @@ mark {
 }
 
 /* Scoped reset for the garden's internal layout math (border-box sizing +
-   zeroed default margins) — the prototype's own `*{...}` reset, rescoped. */
-.personal-home:not(.personal-page),
-.personal-home:not(.personal-page) * {
+   zeroed default margins) — the prototype's own `*{...}` reset, rescoped.
+   `:where()` is load-bearing: the prototype's bare `*` had ZERO specificity,
+   so every m44 rule (`.nav-item{padding:6px 10px}`) beat it. Written as
+   `.personal-home:not(.personal-page) *` the reset is (0,2,0) and zeroes
+   every single-class margin/padding in m44-home.css — the nav pills, hero
+   spacing and CTA buttons all collapsed that way. */
+:where(.personal-home:not(.personal-page)),
+:where(.personal-home:not(.personal-page)) * {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
@@ -8489,7 +8494,11 @@ html[data-theme="dark"] .personal-home {
   background-image:
     radial-gradient(120% 90% at 50% 6%, rgba(255,255,255,.5), transparent 60%),
     radial-gradient(120% 120% at 50% 122%, rgba(120,96,52,.11), transparent 55%);
-  transition: background-color .5s ease, color .5s ease;
+  /* background only — NOT `color`. The garden holds ~16k nodes; transitioning an
+     inherited property on its root restyles every one of them per frame (~100ms
+     frames), which starved the monarch/rain rAF loops after every theme flip.
+     Text that reads var(--text) snaps regardless (custom props don't interpolate). */
+  transition: background-color .5s ease;
 }
 /* The m44 garden is a fixed full-viewport experience with its own internal
    .scroller — the outer page must not also scroll. About/Résumé/etc are

@@ -38,7 +38,7 @@ interface GardenWindow {
 const GARDEN_SCRIPTS = [
   "/garden/garden-plants.js?v=3",
   "/garden/garden-carousel.js",
-  "/garden/m44-home.js?v=4",
+  "/garden/m44-home.js?v=15",
 ];
 
 export function PersonalHomeShell({
