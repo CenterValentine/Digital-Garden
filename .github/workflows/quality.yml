@@ -39,6 +39,44 @@ jobs:
       - name: Lint
         run: pnpm lint
 
+  # Every validation gate the `build` chain runs, DERIVED from package.json
+  # rather than listed here. Adding a gate used to need two registrations — the
+  # build chain and a workflow step — and nothing failed if you skipped the
+  # second: 11 of 24 had drifted that way by 2026-10-15, including
+  # `handles:check`, `private:content:check`, `blockid:hygiene:check` and
+  # `extensions:check`, each guarding a silent-failure class nothing else
+  # catches. A hand-maintained list here would drift again, so
+  # scripts/run-build-gates.ts reads the `build` script itself.
+  # ~26s for the whole chain, so it runs unfiltered on every PR.
+  gates:
+    name: Validation gates
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.25.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Types only — no gate connects to a database.
+      - name: Generate Prisma client
+        run: pnpm exec prisma generate
+
+      - name: Build-chain validation gates
+        run: pnpm ci:gates
+
   typecheck:
     name: TypeScript
     runs-on: ubuntu-latest
