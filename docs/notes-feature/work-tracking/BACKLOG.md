@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-10-16
+last_updated: 2026-10-31
 ---
 
 # Sprint Backlog
@@ -9,6 +9,13 @@ last_updated: 2026-10-16
 **Sprint Execution Protocol**: Before commencing any sprint, always ask the user for input before planning and executing — there may be additions or modifications.
 
 ---
+
+## Garden home — follow-ups (2026-10-31, from `feat/garden-home-polish`)
+
+- ⚪ **Page Down / Page Up / Home / End don't scroll the garden.** The page scrolls inside `#scroller`, and the keydown handler in `public/garden/m44-home.js` only handles the arrow keys and Space. Already the case on production; add the four keys to that handler (Home/End → `goTo(-1)` / `goTo(N-1)`).
+- ⚪ **The garden header overlaps at phone widths.** "David Valentine" runs into the nav, which runs off-screen (390 px). `m44-home.css` has no small-screen rules for `.topbar` / `.nav`.
+- ⚪ **The generated-file headers are stale.** `m44-home.css`, `m44-markup.ts` and `public/garden/m44-home.js` say "do not hand-edit — re-run `scripts/extract-m44.mjs`", but all three have been hand-edited across several PRs; a re-extract would erase that work. Either retire the extractor (repo copies = source of truth) or port the edits back into the design source.
+- ⚪ **`components/personal/field-notes.css` still has a bare `*{margin:0;padding:0}`** that can leak beyond `/blog` (noted in #139). Rescope with `:where(.field-notes) *`, the same zero-specificity pattern as `.personal-home`.
 
 ## Database rows — paging and AI delete follow-ups (2026-10-21, from `feat/database-rows-paging-and-ai-delete`)
 

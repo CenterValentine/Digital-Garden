@@ -76,6 +76,76 @@
       var ticks=P.map(function(pl,i){ var t=document.createElement('span'); t.className='tick';
         t.addEventListener('click',function(){ goTo(i); }); rail.appendChild(t); return t; });
 
+      // scroll signal: a wide double chevron in the first viewport's lower half. It lives INSIDE
+      // the scroller so wheel/touch over it still scroll (an overlay above would be a dead zone),
+      // rides away with the page, and fades over the first quarter-screen. Tap → first chapter.
+      var V='<svg class="sc-v" viewBox="0 0 240 24" preserveAspectRatio="none" aria-hidden="true"><path d="M2 2 L120 22 L238 2"></path></svg>';
+      var CUE_LINES=2;   // 2 = a faint wide echo over the smaller chevron; 1 = the smaller chevron alone (.single)
+      var scue=document.createElement('div'); scue.className='scrollcue'+(CUE_LINES===1?' single':'');
+      scue.innerHTML='<button type="button" class="sc-btn" aria-label="Scroll down">'+(CUE_LINES===1?V:V.replace('class="sc-v"','class="sc-v echo"')+V)+'</button>';
+      scroller.appendChild(scue);
+      scue.querySelector('.sc-btn').addEventListener('click',function(){ glideTo(chapterH(), 1500); });
+      /* A slow eased glide (native smooth scroll is ~400ms — too abrupt for the intro→first-hero
+         transition, which also seats the panel and turns the carousel). Timed by the clock, not
+         frames; any wheel/touch/key hands control straight back to the visitor. */
+      function glideTo(top, ms){
+        var from=scroller.scrollTop, d=top-from, t0=performance.now(), live=true;
+        function stop(){ live=false; removeEventListener('wheel',stop); removeEventListener('touchstart',stop); removeEventListener('keydown',stop); }
+        addEventListener('wheel',stop,{passive:true}); addEventListener('touchstart',stop,{passive:true}); addEventListener('keydown',stop);
+        (function tick(now){
+          if(!live) return;
+          var p=Math.min(1,(now-t0)/ms), e=p<.5?4*p*p*p:1-Math.pow(-2*p+2,3)/2;   // easeInOutCubic
+          scroller.scrollTop=from+d*e;
+          if(p<1) requestAnimationFrame(tick); else stop();
+        })(t0);
+      }
+      /* Fade it out BEFORE it rises into the orchard: the chevron scrolls 1:1 while the lowest
+         root barely moves, so the gap at scrollTop 0 tells us exactly how far it can travel.
+         Measured lazily (plants must have rendered), re-measured on resize. */
+      var CUE_MARGIN=28, cueRun=null;
+      function measureCue(){
+        var v=scue.querySelector('.sc-v'), bot=0;
+        if(!v) return null;
+        var roots=document.querySelectorAll('#garden path.b-root');
+        for(var i=0;i<roots.length;i++){ var q=roots[i].getBoundingClientRect(); if((q.width||q.height) && q.bottom>bot) bot=q.bottom; }
+        if(!bot) return null;
+        return v.getBoundingClientRect().top+scroller.scrollTop-bot-CUE_MARGIN;   // travel before it reaches the margin
+      }
+      function fadeCue(){
+        if(cueRun===null) cueRun=measureCue();
+        if(cueRun===null) return;
+        scue.style.opacity=cueRun<=0?'0':Math.max(0,1-scroller.scrollTop/cueRun).toFixed(2);
+      }
+      scroller.addEventListener('scroll',fadeCue,{passive:true});
+      addEventListener('resize',function(){ cueRun=null; fadeCue(); });
+      setTimeout(fadeCue,1200);   // a too-short viewport where it would already sit on the roots: hide at rest
+
+      /* The wide upper chevron is an echo that only comes in to nudge an idle visitor: 4s of no
+         scrolling at the top the first time, 8s every time after. Any scroll drops it at once and
+         restarts the idle clock. The first clock starts when the intro ends (or at once if it was skipped). */
+      var ECHO_FIRST=4000, ECHO_AGAIN=8000;
+      if(scue.querySelector('.sc-v.echo')){
+        var echoTimer=0, echoed=false, stg=document.querySelector('.stage');
+        var armEcho=function(){
+          clearTimeout(echoTimer);
+          echoTimer=setTimeout(function(){
+            if(stg&&stg.classList.contains('iv-active')) return;   // the intro's end re-arms it
+            if(scroller.scrollTop<=4){ scue.classList.add('echo-on'); echoed=true; }
+          }, echoed?ECHO_AGAIN:ECHO_FIRST);
+        };
+        scroller.addEventListener('scroll',function(){ scue.classList.remove('echo-on'); armEcho(); },{passive:true});
+        if(stg){   // the intro adds iv-active ~480ms AFTER this runs, so watch for it starting AND ending
+          var introOn=stg.classList.contains('iv-active');
+          var introWatch=new MutationObserver(function(){
+            var on=stg.classList.contains('iv-active');
+            if(introOn && !on){ introWatch.disconnect(); armEcho(); }
+            introOn=on;
+          });
+          introWatch.observe(stg,{attributes:true,attributeFilter:['class']});
+        }
+        armEcho();
+      }
+
       var gfcap=document.getElementById('gfcap'), gffoot=document.getElementById('gffoot'), soil=document.getElementById('soilline');
       var soilSvg=soil.querySelector('svg'), SOIL_LEN=1180, SOIL_WIN=300, SOIL_TRAVEL=560;   // terrain pans so each specimen sits on a different stretch (SOIL_TRAVEL = total slide across all specimens)
       function panSoil(){ if(!soilSvg) return; var t=(N>1?Math.max(0,Math.min(1,pos/(N-1))):0); var minX=(1-t)*SOIL_TRAVEL; soilSvg.setAttribute('viewBox', minX.toFixed(1)+' 0 '+SOIL_WIN+' 14'); }
@@ -185,12 +255,19 @@
     function nstack(){
       return '<div class="nstack"><span class="dav">David</span><span class="ess">&rsquo;s</span></div>';
     }
-    function run(){
-      wrap.classList.add('dim');
-      if(stage) stage.classList.add('iv-active');
-      var el=document.createElement('div');
-      el.className='iv-overlay v2s';
-      el.innerHTML=
+    /* The monarch is born on the seed: it waits unseen (critter 'hold') until the intro hands it
+       the seed's screen point, appears over the dot, the dot sinks out beneath it, then it lifts.
+       Set synchronously — the critter block below reads it at init. */
+    window.__critterHold=true;
+    function seedPoint(root){   // the seed sits at (360,37) of the ground's 720×44 stretched viewBox
+      var g=root&&root.querySelector('.ground'); if(!g) return null;
+      var r=g.getBoundingClientRect(); if(!r.width) return null;
+      return { x:r.left+r.width*360/720, y:r.top+r.height*37/44 };
+    }
+    function critterAppear(pt){ if(window.__critter&&pt) window.__critter.appear(pt.x,pt.y); }
+    function critterRelease(){ if(window.__critter) window.__critter.release(); }
+    function overlayHTML(){
+      return (
         '<div class="scrim"></div>'+
         '<div class="sprout">'+
           '<div class="name-soft">'+nstack()+'</div>'+
@@ -208,15 +285,27 @@
             '<span class="intro-rw rw3" style="--bd:3.4s">Excellence</span>'+
           '</div>'+
           '<div class="gm"><span class="gi sp3" style="--gd:.35s;--gx:0s">Digital Garden</span></div>'+
-          '<img class="treelogo" src="logo-neuron-tree.png" alt="">'+
-        '</div>';
+          '<img class="treelogo" src="/images/logo-neuron-tree.png" alt="">'+
+        '</div>');
+    }
+    function run(){
+      wrap.classList.add('dim');
+      if(stage) stage.classList.add('iv-active');
+      var el=document.createElement('div');
+      el.className='iv-overlay v2s';
+      el.innerHTML=overlayHTML();
       host.appendChild(el);
+      var seed=el.querySelector('.iv-seed');
       var exitAt=reduced?1800:6600;
+      /* The painted surface is .personal-home (+ its ::before night gradient), not body —
+         globals.css owns those since the CSS was scoped off html/body. Only background-color
+         is eased: an inherited `color` transition restyles all ~16k garden nodes per frame. */
+      var surface=document.querySelector('.personal-home')||document.body;
       /* ── gradual sunrise: ease the lighting from night → day over ~4.5s, then the moon gives way to a rising sun ── */
       function endSunrise(){
         if(window.__setTheme) window.__setTheme('light');
         document.documentElement.classList.remove('sunrise-hold');
-        document.body.style.transition='';
+        surface.style.transition='';
         var s=document.getElementById('sunrise-fade'); if(s) s.remove();
       }
       if(reduced){
@@ -227,14 +316,14 @@
           if(!window.__setTheme) return;
           var st=document.createElement('style'); st.id='sunrise-fade';
           st.textContent=
-            'body::before{transition:opacity '+SUN_DUR+'s ease !important}'+
+            '.personal-home::before{transition:opacity '+SUN_DUR+'s ease !important}'+
             '.stars{transition:opacity '+SUN_DUR+'s ease !important}'+
             '.daytint{transition:opacity '+SUN_DUR+'s ease !important}'+
             '.sunrise-hold .celest .sun{display:none !important}'+
             '.sunrise-hold .celest .moonwrap{display:flex !important}';
           document.head.appendChild(st);
           document.documentElement.classList.add('sunrise-hold');   /* keep the moon up while the light comes in */
-          document.body.style.transition='background-color '+SUN_DUR+'s ease, color '+SUN_DUR+'s ease';
+          surface.style.transition='background-color '+SUN_DUR+'s ease';
           window.__setTheme('light');     /* begin the slow dark → light fade */
         }, SUN_START);
         later(function(){               /* ~65% in: majority of the light is up → the moon gives way to the rising sun */
@@ -242,27 +331,30 @@
           var cel=document.getElementById('celest');
           if(cel){ cel.classList.remove('arrive'); void cel.offsetWidth; cel.classList.add('arrive'); setTimeout(function(){ cel.classList.remove('arrive'); },1600); }
         }, SUN_START+2900);
-        later(function(){ document.body.style.transition=''; var s=document.getElementById('sunrise-fade'); if(s) s.remove(); }, SUN_START+5200);
+        later(function(){ surface.style.transition=''; var s=document.getElementById('sunrise-fade'); if(s) s.remove(); }, SUN_START+5200);
       }
       later(function(){ el.classList.add('out'); wrap.classList.remove('dim'); },exitAt);
-      later(function(){
+      /* hand-off: the arcs undraw into the seed → the monarch fades in over it → the seed
+         sinks beneath the wings → the overlay goes and the monarch lifts off */
+      later(function(){ critterAppear(seedPoint(el)); },exitAt+1000);
+      later(function(){ if(seed) seed.classList.add('gone'); },exitAt+1600);
+      function finish(){
         if(el.parentNode) el.parentNode.removeChild(el);
         if(stage) stage.classList.remove('iv-active');
         var c=document.getElementById('critter');
-        if(c){ c.classList.remove('down','perched'); c.style.setProperty('--bf-dur','1.1s'); }
-      },exitAt+1700);
-      /* scroll during intro: skip to exit immediately */
+        if(c){ c.classList.remove('down','perched'); }
+        critterRelease();
+      }
+      later(finish,exitAt+2100);
+      /* scroll during intro: skip to exit immediately — same hand-off, compressed */
       function onIntroScroll(){
         scr.removeEventListener('scroll',onIntroScroll,{passive:true});
         timers.forEach(clearTimeout); timers.length=0;
         endSunrise();
         el.classList.add('out'); wrap.classList.remove('dim');
-        setTimeout(function(){
-          if(el.parentNode) el.parentNode.removeChild(el);
-          if(stage) stage.classList.remove('iv-active');
-          var c=document.getElementById('critter');
-          if(c){ c.classList.remove('down','perched'); c.style.setProperty('--bf-dur','1.1s'); }
-        },900);
+        critterAppear(seedPoint(el));
+        setTimeout(function(){ if(seed) seed.classList.add('gone'); },350);
+        setTimeout(finish,900);
       }
       scr.addEventListener('scroll',onIntroScroll,{passive:true,once:true});
     }
@@ -284,6 +376,19 @@
       /* Skip straight to the resting day state the intro would have left behind. */
       if(window.__setTheme) window.__setTheme('light');
       else document.documentElement.setAttribute('data-theme','light');
+      /* …and the monarch still rises from where the seed would have landed: lay out an
+         invisible copy of the overlay to find that point. Deferred a frame — the critter
+         block initialises after this one. */
+      requestAnimationFrame(function(){
+        var probe=document.createElement('div');
+        probe.className='iv-overlay v2s iv-probe';
+        probe.innerHTML=overlayHTML();
+        host.appendChild(probe);
+        var pt=seedPoint(probe);
+        host.removeChild(probe);
+        critterAppear(pt);
+        setTimeout(critterRelease,700);
+      });
     }
   })();
   
@@ -303,12 +408,15 @@
       var DAY=[[252,240,214],[230,168,94],[196,96,48]];     // soft warm → amber → deep dusk orange
       var NIGHT=[[120,140,200],[58,80,150],[22,32,78]];      // soft moonlight → → deep night
       function stop(s,t){ return t<=0.5 ? mix(s[0],s[1],t/0.5) : mix(s[1],s[2],(t-0.5)/0.5); }
-      var prevT=null, leftTop=false, leftBottom=true, scroller=null;
+      var prevT=null, atEdge=null, lastEdge=null, scroller=null;   // lastEdge: the edge the current pass started from
       var sky=celest.parentElement;
       /* the sky sits beneath the scroller, so overlay a hit-target that tracks the sun/moon and toggles theme */
       var hit=document.createElement('button');
       hit.id='celestHit'; hit.type='button'; hit.setAttribute('aria-label','Toggle day or night');
       hit.style.cssText='position:fixed;width:108px;height:108px;margin:0;padding:0;border:0;border-radius:50%;background:transparent;cursor:pointer;z-index:40;display:none';
+      // a mouse click must not leave focus on this fixed button — it sits outside the scroller, so
+      // PageDown/Home/End would then scroll nothing (keyboard users can still Tab to it)
+      hit.addEventListener('mousedown',function(e){ e.preventDefault(); });
       hit.addEventListener('click',function(){
         var d=document.documentElement.getAttribute('data-theme')==='dark';
         if(window.__setTheme) window.__setTheme(d?'light':'dark');
@@ -332,16 +440,25 @@
         var dark=document.documentElement.getAttribute('data-theme')==='dark';
         if(!scroller) scroller=document.querySelector('.scroller');
         var atTop, atBottom;
-        if(scroller){ atTop=scroller.scrollTop<=4; atBottom=(scroller.scrollTop+scroller.clientHeight)>=(scroller.scrollHeight-4); }
-        else { atTop=t<=0.02; atBottom=t>=0.98; }
-        if(!atTop) leftTop=true;        // user moved down, away from the top
-        if(!atBottom) leftBottom=true;  // user moved up, away from the bottom
-        // reach the bottom → night; return to the top → day. Fires once the edge has been left,
-        // so even a small scroll down then back up flips reliably at the top.
-        if(window.__setTheme){
-          if(!dark && leftBottom && atBottom){ handoff(); window.__setTheme('dark'); dark=true; leftBottom=false; }
-          else if(dark && leftTop && atTop){ handoff(); window.__setTheme('light'); dark=false; leftTop=false; }
+        if(scroller){
+          // "bottom" = the last chapter SEATED (N viewports down: where ArrowDown/Space/nav land and the
+          // sky arc ends) or the true end, whichever comes first. The last chapter can overhang the
+          // viewport (61px at 1145×600), so a true-end-only test missed every keyboard/nav arrival.
+          var maxTop=scroller.scrollHeight-scroller.clientHeight, lastSeat=N*scroller.clientHeight;
+          atTop=scroller.scrollTop<=4; atBottom=scroller.scrollTop>=Math.min(maxTop,lastSeat)-4;
         }
+        else { atTop=t<=0.02; atBottom=t>=0.98; }
+        // A completed pass across the sky hands off to the other body: arriving at the edge OPPOSITE
+        // the one last left flips the theme, whichever it is — so the plain cycle is top day → bottom
+        // night → top day, and after a sun/moon click it carries on from the clicked state. Returning
+        // to the SAME edge (a small scroll and back) changes nothing. Edge-triggered on arrival only:
+        // a level check stayed armed while resting at an edge and instantly undid a click.
+        var edge=atTop?'top':atBottom?'bottom':null;
+        if(edge && edge!==atEdge){
+          if(lastEdge && lastEdge!==edge && window.__setTheme){ handoff(); window.__setTheme(dark?'light':'dark'); dark=!dark; }
+          lastEdge=edge;
+        }
+        atEdge=edge;
         prevT=t;
         var px=t;                                           // moon stays where the sun ended; rides the same arc back up
         var pp=dark?1-t:t;                                  // phase/hue progress through the night pass (full at dusk → new by the top)
@@ -486,11 +603,19 @@
 
       var x=innerWidth*0.62, y=topY()+120, vx=0, vy=0, t=Math.random()*100;
       var tx=x, ty=y, retarget=0, facing=1;
-      var state='fly', groundT=0;
-      lx=x; ly=y;
+      /* 'hold': unseen and still until the intro hands over the seed point (appear → release) */
+      var state=window.__critterHold?'hold':'fly', groundT=0;
+      if(state==='hold') el.classList.add('waiting');
+      var lx=x, ly=y;   /* declared HERE: a later `var lx=0` re-zeroed them, so it crawled out of the top-left corner */
       var noPerchUntil=Date.now()+6000, nextPerch=Date.now()+8000+Math.random()*6000;
       var perchEl=null, perchFx=0.5, perchUntil=0, approach=false, perchBB=null, hops=0;
-      var bodyEl=el.querySelector('.layer.body'), bodyTilt=52, burstUntil=0, fallT=0, lx=0, ly=0;
+      var bodyEl=el.querySelector('.layer.body'), bodyTilt=52, burstUntil=0, fallT=0;
+
+      /* Motion is integrated per REAL elapsed time, not per frame: every per-frame constant
+         below is expressed per REF_MS of wall clock. Frame-counted, it flew twice as fast at
+         120Hz as at 60Hz and crawled whenever the main thread was busy (the sunrise). */
+      var REF_MS=1000/120, lastNow=0;
+      var FLAP={ climb:'0.55s', cruise:'1.1s', perch:'2.6s', down:'5.5s' }, flapNow='';
 
       function pickTarget(){
         var sy=soilY();
@@ -571,9 +696,11 @@
       function caughtByRain(){ state='fall'; vy=0.25; fallT=0; approach=false; perchEl=null;
         el.classList.add('down'); el.classList.remove('perched'); el.classList.remove('front'); }
 
-      function step(){
+      function step(now){
+        /* k = reference frames elapsed; capped so a backgrounded tab doesn't teleport it */
+        var k=lastNow?Math.min(4,(now-lastNow)/REF_MS):1; lastNow=now;
         var sy=soilY(), floor=sy-6;
-        t+=0.016;
+        t+=0.016*k;
         if(state==='fly'){
           if(approach){
             var p=perchPoint();
@@ -592,15 +719,15 @@
             pickTarget();
           }
           /* slow, fluttering travel — monarchs amble, they don't dart */
-          if(Date.now()<burstUntil){ vx*=0.9; vy=0; }
-          else{ vx+=(tx-x)*0.0003; vy+=(ty-y)*0.0003; }
-          vx*=0.975; vy*=0.975;
+          if(Date.now()<burstUntil){ vx*=Math.pow(0.9,k); vy=0; }
+          else{ vx+=(tx-x)*0.0003*k; vy+=(ty-y)*0.0003*k; }
+          var drag=Math.pow(0.975,k); vx*=drag; vy*=drag;
           var dT=Math.hypot(tx-x,ty-y);
           var sp=Math.hypot(vx,vy), cap=approach?0.42:0.34, lo=(dT>40)?0.26:0;
           if(sp>cap){ vx*=cap/sp; vy*=cap/sp; }
           else if(lo && sp>0.001 && sp<lo){ vx*=lo/sp; vy*=lo/sp; }   /* keep a steady amble — no crawling */
-          x+=vx+Math.sin(t*1.7)*0.09;
-          y+=vy+Math.sin(t*2.6)*0.22;
+          x+=(vx+Math.sin(t*1.7)*0.09)*k;
+          y+=(vy+Math.sin(t*2.6)*0.22)*k;
           if(y>floor){ y=floor; vy=0; }
           if(y<topY()){ y=topY(); vy=0; }
           if(inRain()) caughtByRain();
@@ -611,32 +738,35 @@
           else{ x=pp.x; y=pp.y; if(inRain()) caughtByRain(); }
         } else if(state==='fall'){
           /* spiralling down, like a leaf */
-          fallT+=0.016; vx*=0.9;
-          vy=Math.min(vy+0.045,0.9);
-          x+=vx+Math.cos(fallT*4.6)*1.5*Math.min(1,fallT*2.5);
-          y+=vy+Math.sin(fallT*4.6)*0.45;
+          fallT+=0.016*k; vx*=Math.pow(0.9,k);
+          vy=Math.min(vy+0.045*k,0.9);
+          x+=(vx+Math.cos(fallT*4.6)*1.5*Math.min(1,fallT*2.5))*k;
+          y+=(vy+Math.sin(fallT*4.6)*0.45)*k;
           if(y>=floor){ y=floor; vy=0; state='ground'; groundT=Date.now(); el.classList.add('flat'); }
         } else if(state==='ground'){
-          y=floor; x+=Math.sin(t*1.2)*0.05;
+          y=floor; x+=Math.sin(t*1.2)*0.05*k;
           if(!rainActive() && Date.now()-groundT>800){ state='rise'; vy=-0.05; burstUntil=Date.now()+500; el.classList.remove('down'); el.classList.remove('flat'); }
         } else if(state==='rise'){
           if(Date.now()<burstUntil){ vy=-0.02; }   /* wings first, lift second */
-          else vy=Math.max(vy-0.0028,-0.45);        /* a slow, gathering take-off */
-          y+=vy+Math.sin(t*3.5)*0.3; x+=Math.sin(t*0.9)*0.5;
+          else vy=Math.max(vy-0.0028*k,-0.45);      /* a slow, gathering take-off */
+          y+=(vy+Math.sin(t*3.5)*0.3)*k; x+=Math.sin(t*0.9)*0.5*k;
           if(y<sy-110){ state='fly'; noPerchUntil=Date.now()+4000; pickTarget(); }
           if(inRain()){ state='fall'; vy=0.3; el.classList.add('down'); }
         }
-        if(state!=='perch'){
+        if(state!=='perch' && state!=='hold'){
           /* hard ceiling on travel speed — excitement allowed, darting not */
-          var ddx=x-lx, ddy=y-ly, dd=Math.hypot(ddx,ddy), MAXD=(state==='fall')?1.1:0.38;
+          var ddx=x-lx, ddy=y-ly, dd=Math.hypot(ddx,ddy), MAXD=((state==='fall')?1.1:0.38)*k;
           if(dd>MAXD){ x=lx+ddx*MAXD/dd; y=ly+ddy*MAXD/dd; }
         }
         lx=x; ly=y;
         var f=(vx>0.05)?1:(vx<-0.05)?-1:facing; facing=f;
         var fast=(Date.now()<burstUntil)||(state!=='perch' && vy<-0.06);
-        el.style.setProperty('--bf-dur', fast?'0.55s':(state==='perch'?'2.6s':'1.1s'));
+        /* inline --bf-dur outranks the .perched/.down class values, so every tempo is chosen here;
+           written only on change — re-setting animation-duration mid-beat jumps the wing phase */
+        var flap=fast?FLAP.climb:(state==='perch'||state==='hold')?FLAP.perch:state==='fall'?FLAP.down:FLAP.cruise;
+        if(flap!==flapNow){ flapNow=flap; el.style.setProperty('--bf-dur', flap); }
         var bT=(state!=='perch' && vy<-0.06)?0:52;   /* climbing: original torso angle */
-        bodyTilt+=(bT-bodyTilt)*0.08;
+        bodyTilt+=(bT-bodyTilt)*(1-Math.pow(0.92,k));
         bodyEl.style.transform='rotate('+bodyTilt.toFixed(1)+'deg)';
         el.style.transform='translate3d('+(x-17)+'px,'+(y-22)+'px,0)';
         dir.style.transform='scaleX('+f+')';
@@ -668,7 +798,25 @@
         requestAnimationFrame(step);
       }
       addEventListener('resize',function(){ x=Math.min(x,innerWidth-30); });
-      window.__critter={ get state(){return state;}, get pos(){return {x:x,y:y};}, get perchEl(){return perchEl;} };
+
+      /* intro hand-off (see the intro block): appear() seats it on the seed, above the overlay,
+         wings fanning lazily; release() beats the wings and lets it fly. */
+      function appear(px,py){
+        x=lx=tx=px; y=ly=ty=py; vx=vy=0; state='hold'; approach=false; perchEl=null;
+        el.classList.remove('waiting','behind','perched','front','down','flat');
+        el.classList.add('arrive');
+        el.style.transform='translate3d('+(x-17)+'px,'+(y-22)+'px,0)';
+      }
+      function release(){
+        el.classList.remove('waiting','arrive');
+        if(state!=='hold') return;
+        state='fly'; burstUntil=Date.now()+420;
+        noPerchUntil=Date.now()+4000; nextPerch=Date.now()+8000+Math.random()*6000;
+        pickTarget();
+      }
+      if(state==='hold') setTimeout(release,15000);   // never strand it unseen if the hand-off fails
+      window.__critter={ get state(){return state;}, get pos(){return {x:x,y:y};}, get perchEl(){return perchEl;},
+        appear:appear, release:release };
     })();
   
 

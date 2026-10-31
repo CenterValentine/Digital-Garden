@@ -380,6 +380,37 @@ html[data-theme="dark"] .cur{display:inline-block;box-shadow:0 0 6px var(--accen
   .cue .wheel::after{content:"";position:absolute;left:50%;top:6px;width:3px;height:6px;border-radius:2px;background:var(--text-soft);transform:translateX(-50%);animation:wp 1.6s ease-in-out infinite}
   @keyframes wp{0%,100%{opacity:.3;transform:translate(-50%,0)}50%{opacity:1;transform:translate(-50%,7px)}}
   @media (prefers-reduced-motion:reduce){.cue .wheel::after{animation:none}}
+  /* scroll signal — first viewport only, built in m44-home.js inside #scroller. Only
+     transform/opacity animate (on HTML wrappers, not SVG children) so it stays on the compositor. */
+  .scrollcue{position:absolute;left:0;right:0;top:0;height:100%;z-index:2;pointer-events:none;
+    display:flex;justify-content:center;align-items:flex-end;padding-bottom:10vh;transition:opacity .5s ease}
+  /* a soft, blurred shadow of an arrow rather than a drawn one: the blur sits on the HTML
+     wrapper (rasterised once, then only translated) and a horizontal mask feathers the tips */
+  .scrollcue .sc-btn{pointer-events:auto;appearance:none;border:0;background:transparent;cursor:pointer;
+    width:clamp(200px,46vw,620px);padding:16px 0;display:flex;flex-direction:column;align-items:center;gap:4px;
+    color:color-mix(in srgb,var(--accent-warm) 62%,var(--text-soft));animation:sc-in 1.6s ease 1.4s both}
+  .scrollcue .sc-btn:focus-visible{outline:1px dashed var(--accent-warm);outline-offset:6px}
+  /* the V's depth IS the svg height (path is stretched); top ≈7–8°, lower a touch shallower in height but narrower, so similar angle */
+  .scrollcue .sc-v{display:block;width:100%;height:clamp(18px,3.6vw,46px);overflow:visible;opacity:.2;
+    filter:blur(1.3px);
+    -webkit-mask-image:linear-gradient(90deg,transparent,#000 26%,#000 74%,transparent);
+            mask-image:linear-gradient(90deg,transparent,#000 26%,#000 74%,transparent)}
+  /* the smaller lower chevron leads; the wide one above is only a faint echo of it, shown by
+     m44-home.js after the visitor idles (.echo-on) — it slips in slowly and leaves quickly */
+  .scrollcue .sc-v + .sc-v{width:66%;height:clamp(14px,2.6vw,32px);opacity:.5}
+  .scrollcue .sc-v.echo{opacity:0;transition:opacity .25s ease}
+  .scrollcue.echo-on .sc-v.echo{opacity:.2;transition:opacity 1.8s ease}
+  /* single-line variant (CUE_LINES=1): the lower chevron's geometry, at the pair's lead opacity */
+  .scrollcue.single .sc-v{width:66%;height:clamp(14px,2.6vw,32px);opacity:.5}
+  .scrollcue .sc-v path{fill:none;stroke:currentColor;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke}
+  @media (prefers-reduced-motion:no-preference){
+    .scrollcue .sc-v{animation:sc-bob 3.2s ease-in-out infinite}
+    .scrollcue .sc-v + .sc-v{animation-delay:.25s}
+  }
+  @keyframes sc-bob{0%,100%{transform:translateY(0)}50%{transform:translateY(5px)}}
+  @keyframes sc-in{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:none}}
+  .stage.iv-active .scrollcue,.stage.seq-zoom .scrollcue{opacity:0 !important}
+  .stage.iv-active .scrollcue .sc-btn,.stage.seq-zoom .scrollcue .sc-btn{pointer-events:none}
 
   .gframe .gf-cap{display:none}
 
@@ -444,7 +475,18 @@ html[data-theme="dark"] .cur{display:inline-block;box-shadow:0 0 6px var(--accen
   .critter.flat .fore.b{animation:none;transform:rotateZ(-10deg) rotateX(-84deg)}
   .critter.perched{--bf-dur:2.6s}   /* perched: slow, lazy wing fanning */
   .critter.down{--bf-dur:5.5s}      /* rained-on: barely moving */
-  .critter .ff{display:none;width:5px;height:5px;border-radius:50%;background:#ffe9a8;
+  /* intro hand-off (m44-home.js appear/release): unseen until it is given the seed point, then
+     seated ABOVE the intro overlay (z 30) so the seed sinks out beneath its wings */
+  .critter.waiting{opacity:0}
+  .critter.arrive{z-index:31;transition:opacity .6s ease}
+  .stage.iv-active .critter.arrive{opacity:1 !important}
+  .iv-overlay .iv-seed.gone{transform-box:fill-box;transform-origin:center;animation:iv-seedout .45s ease-in forwards}
+  @keyframes iv-seedout{from{transform:scale(1);opacity:1}to{transform:scale(.15);opacity:0}}
+  /* pinned on the critter's anchor (17,22): the point step() positions and the .dir flip
+     mirrors about. In flow it sat at (0,0) once .bf is display:none, so every scaleX(-1)
+     turn threw the glow ~29px sideways. */
+  .critter .ff{display:none;position:absolute;left:17px;top:22px;margin:-2.5px 0 0 -2.5px;
+    width:5px;height:5px;border-radius:50%;background:#ffe9a8;
     box-shadow:0 0 9px 3px rgba(255,221,130,.6)}
   @media (prefers-reduced-motion:no-preference){.critter .ff{animation:ffpulse 2.1s ease-in-out infinite}}
   @keyframes ffpulse{0%,100%{box-shadow:0 0 9px 3px rgba(255,221,130,.6)}50%{box-shadow:0 0 14px 5px rgba(255,221,130,.85)}}
