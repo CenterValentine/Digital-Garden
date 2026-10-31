@@ -11,8 +11,44 @@
 
 import { useMemo, useState } from "react";
 import { sitePageConfig, type SitePageConfig } from "@/lib/domain/page-layout/schema";
-import { validateResumeConfig } from "@/lib/domain/page-layout/resume";
+import {
+  RESUME_SHAPE_GUIDE,
+  resumeConfigJsonSchema,
+  validateResumeConfig,
+} from "@/lib/domain/page-layout/resume";
 import type { PageKind } from "./defaults";
+
+/**
+ * The résumé's editing contract, on the page an editor works in: the prose
+ * guide for people, and the config's JSON Schema in a machine-readable
+ * <script> for an AI agent reading the DOM. One source (lib/domain/page-layout/resume.ts).
+ */
+export function ResumeShapeHelp({ embedSchema = false }: { embedSchema?: boolean }) {
+  // `<` escaped so the schema can never close its own <script> tag.
+  const schemaJson = embedSchema ? JSON.stringify(resumeConfigJsonSchema()).replace(/</g, "\\u003c") : "";
+  return (
+    <details className="mb-3 rounded-md border border-white/10 bg-white/[0.03] px-3 py-2" data-resume-shape>
+      <summary className="cursor-pointer font-mono text-[11px] uppercase tracking-wider text-white/55">
+        JSON shape — for people and AI editors
+      </summary>
+      <pre className="mt-2 max-h-[220px] overflow-auto whitespace-pre-wrap font-mono text-[11px] leading-relaxed text-white/70">
+        {RESUME_SHAPE_GUIDE}
+      </pre>
+      <p className="mt-1 text-[11px] text-white/40">
+        Machine-readable JSON Schema for this config: <code>script#resume-config-schema</code> on the composer page,
+        and <code>shape.configJsonSchema</code> in <code>GET /api/site-pages/resume</code>.
+      </p>
+      {/* One copy per page (the composer's), so the id stays unique while the JSON editor is open. */}
+      {embedSchema && (
+        <script
+          type="application/schema+json"
+          id="resume-config-schema"
+          dangerouslySetInnerHTML={{ __html: schemaJson }}
+        />
+      )}
+    </details>
+  );
+}
 
 export function JsonHatch({
   config,
@@ -78,7 +114,9 @@ export function JsonHatch({
             ✕
           </button>
         </div>
+        {pageKind === "resume" && <ResumeShapeHelp />}
         <textarea
+          aria-label="Page config JSON"
           className="h-[420px] w-full rounded-md border border-white/10 bg-black/20 p-3 font-mono text-xs leading-relaxed"
           spellCheck={false}
           value={text}
