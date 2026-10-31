@@ -10,6 +10,14 @@ last_updated: 2026-10-16
 
 ---
 
+## Database rows — paging and AI delete follow-ups (2026-10-21, from `feat/database-rows-paging-and-ai-delete`)
+
+- ⚪ **Backfill of pre-existing AI rows is owner-only.** Rows inserted before `draftedBy` existed read as the user's, so a table an MCP client filled last week (the "Research Queue" case) still needs the ask. There is no honest automatic backfill; if the owner knows a table was entirely AI-written, a one-line `UPDATE "DataRow" SET "draftedBy" = 'mcp' WHERE "tableId" = …` is the remedy, or set that table's policy to Allowed.
+- ⚪ **Asking a 2025-era client would need a stateful session.** `clientCanElicit` is honest about the stateless route; the day the MCP route keeps sessions (M3 OAuth may want one anyway), 2025-era clients that declared `elicitation` at `initialize` get the ask for free.
+- ⚪ **Chat `delete_rows` on a mixed set still parks the whole request on the card.** Correct, but the card could pre-tick the assistant's own rows and say "2 of 5 are rows I added" — rides the dedicated reason-first card below.
+- ⚪ **Grid: a "jump to row" beyond the loaded pages.** `?row=` and the peek open nothing for a row past the loaded edge (v1 note in the viewer still stands); `ensureRowLoaded` exists now, so wiring the URL path to it is small.
+- ⚪ **Sorted views page by offset** (the one accepted offset path) — a concurrent insert can shift a row across the page seam. Acceptable at design scale; revisit if a sorted table ever grows past a few thousand rows.
+
 ## Comments & annotations — follow-ups (2026-10-16, from `COMMENTS-ANNOTATIONS-PLAN.md`)
 
 Phases 0–2 built on `feat/comments-annotations`. Remaining, in the plan's order:
@@ -84,7 +92,7 @@ Keyboard shortcuts (found 2026-10-12 while moving search off Cmd+/):
 Deletion follow-ups (from `feat/ai-row-deletion-policy`):
 
 - ⚪ Control-panel section under AI context listing every database's AI policy (today only the schema rail sets it).
-- ✅ MCP `garden_delete_rows`: `confirm` via elicitation where the client declares it, refusal otherwise (plan §2.8) — shipped in `feat/mcp-server`.
+- ✅ MCP `garden_delete_rows`: `confirm` via elicitation where the client declares it, refusal otherwise (plan §2.8) — shipped in `feat/mcp-server`. **Revised 2026-10-21** (`feat/database-rows-paging-and-ai-delete`): on this stateless route no 2025-era client can be asked at all; rows the assistant inserted (`DataRow.draftedBy`) delete without the ask, the user's are held and named. See the §2.8 revision note.
 - ⚪ "Reason" on the approval card: the generic card shows the tool input; a dedicated card for `delete_rows` that leads with the reason and the row titles would read better.
 
 ## Note saves take 2.5–5.5 s on production (2026-10-09, found diagnosing 409s)

@@ -64,9 +64,12 @@ import {
   type ContentRef,
   type DataView,
   type RowData,
+  type RowPageCursor,
   type UndoExecutor,
   type UndoOp,
   type UndoStackState,
+  DEFAULT_ROW_PAGE_SIZE,
+  MAX_ROW_PAGE_SIZE,
 } from "@/lib/domain/data";
 import {
   DataGridRow,
@@ -111,6 +114,15 @@ interface LoadState {
   table: DataTable | null;
   view: DataView | null;
   rows: DataRow[];
+  /**
+   * Paging (2026-10-21): `rows` is what has been loaded so far, `total`
+   * is what the view matches, `nextCursor` continues the server's page.
+   * The grid used to show the first page and stop, with nothing telling
+   * the user — a 333-row table read as 100 rows.
+   */
+  total: number;
+  nextCursor: RowPageCursor | null;
+  loadingMore: boolean;
   serverTime: string | null;
   canWrite: boolean;
   /** Owner-only affordances (option creation) key off this, matching the
@@ -120,11 +132,41 @@ interface LoadState {
   error: string | null;
 }
 
+/** Rows loaded so far, ordered the way the server serves them. */
+function mergeLoadedRows(
+  current: DataRow[],
+  incoming: DataRow[],
+  sorted: boolean
+): DataRow[] {
+  const seen = new Set(current.map((r) => r.id));
+  const merged = [...current];
+  for (const row of incoming) {
+    if (seen.has(row.id)) continue;
+    seen.add(row.id);
+    merged.push(row);
+  }
+  // Under view sorts the server's order is the truth (a cell-value order no
+  // client can recompute); otherwise the key order is total and cheap.
+  if (!sorted) {
+    merged.sort((a, b) =>
+      a.sortKey === b.sortKey
+        ? a.id.localeCompare(b.id)
+        : a.sortKey < b.sortKey
+          ? -1
+          : 1
+    );
+  }
+  return merged;
+}
+
 export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
   const [state, setState] = useState<LoadState>({
     table: null,
     view: null,
     rows: [],
+    total: 0,
+    nextCursor: null,
+    loadingMore: false,
     serverTime: null,
     canWrite: false,
     canAlterSchema: false,
@@ -515,9 +557,30 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
 
   // ── Load ───────────────────────────────────────────────────────────────
 
+  // Paging state the callbacks below read without re-creating themselves:
+  // how many rows are loaded (a reload asks for at least that many, so an
+  // undo or a view switch never shrinks a scrolled table back to page one),
+  // the continuation, and an in-flight guard.
+  const loadedCountRef = useRef(0);
+  const loadedIdsRef = useRef<Set<string>>(new Set());
+  const nextCursorRef = useRef<RowPageCursor | null>(null);
+  const loadingMoreRef = useRef(false);
+  useEffect(() => {
+    loadedCountRef.current = state.rows.length;
+    loadedIdsRef.current = new Set(state.rows.map((r) => r.id));
+    nextCursorRef.current = state.nextCursor;
+  }, [state.rows, state.nextCursor]);
+
   const load = useCallback(async (viewId: string | null = null) => {
     try {
-      const q = viewId ? `?view=${encodeURIComponent(viewId)}` : "";
+      const limit = Math.min(
+        Math.max(DEFAULT_ROW_PAGE_SIZE, loadedCountRef.current),
+        MAX_ROW_PAGE_SIZE
+      );
+      const params = new URLSearchParams();
+      if (viewId) params.set("view", viewId);
+      if (limit !== DEFAULT_ROW_PAGE_SIZE) params.set("limit", String(limit));
+      const q = params.size > 0 ? `?${params.toString()}` : "";
       const res = await fetch(`/api/content/data/${contentId}${q}`, {
         credentials: "include",
       });
@@ -529,6 +592,9 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
         table: json.data.table,
         view: json.data.view,
         rows: json.data.rows,
+        total: typeof json.data.total === "number" ? json.data.total : json.data.rows.length,
+        nextCursor: json.data.nextCursor ?? null,
+        loadingMore: false,
         serverTime: json.data.serverTime,
         canWrite:
           json.data.accessLevel === "write" || json.data.accessLevel === "owner",
@@ -556,6 +622,78 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
     const fromUrl = new URLSearchParams(window.location.search).get("view");
     void load(fromUrl);
   }, [load]);
+
+  /**
+   * Fetch the next page and append it. Returns the ids now loaded and
+   * whether more remain, so a caller can keep going until a row it needs
+   * is present (addRow). Serialised through the ref: a scroll that fires
+   * while a page is in flight is a no-op, not a duplicate request.
+   */
+  const loadMore = useCallback(async (): Promise<{
+    loaded: Set<string>;
+    more: boolean;
+  }> => {
+    const cursor = nextCursorRef.current;
+    const snapshot = () => ({
+      loaded: loadedIdsRef.current,
+      more: nextCursorRef.current !== null,
+    });
+    if (!cursor || loadingMoreRef.current) return snapshot();
+    loadingMoreRef.current = true;
+    setState((s) => ({ ...s, loadingMore: true }));
+    try {
+      const params = new URLSearchParams();
+      const viewId = viewRef.current?.id;
+      if (viewId) params.set("view", viewId);
+      if (typeof cursor.offset === "number") {
+        params.set("cursorOffset", String(cursor.offset));
+      } else if (cursor.sortKey && cursor.id) {
+        params.set("cursorSortKey", cursor.sortKey);
+        params.set("cursorId", cursor.id);
+      }
+      params.set("limit", String(DEFAULT_ROW_PAGE_SIZE));
+      const res = await fetch(
+        `/api/content/data/${contentId}/rows?${params.toString()}`,
+        { credentials: "include" }
+      );
+      const json = await res.json();
+      if (!res.ok || !json?.success) {
+        throw new Error(json?.error?.message ?? "Could not load more rows");
+      }
+      const sorted = (viewRef.current?.sorts?.length ?? 0) > 0;
+      const next: RowPageCursor | null = json.data.nextCursor ?? null;
+      const incoming: DataRow[] = json.data.rows ?? [];
+      // The refs move with the request, not with the render: a caller
+      // looping on `ensureRowLoaded` reads them before React commits.
+      nextCursorRef.current = next;
+      for (const row of incoming) loadedIdsRef.current.add(row.id);
+      setState((s) => ({
+        ...s,
+        rows: mergeLoadedRows(s.rows, incoming, sorted),
+        total: typeof json.data.total === "number" ? json.data.total : s.total,
+        nextCursor: next,
+        loadingMore: false,
+      }));
+    } catch (err) {
+      setState((s) => ({ ...s, loadingMore: false }));
+      setNotice(err instanceof Error ? err.message : "Could not load more rows");
+    } finally {
+      loadingMoreRef.current = false;
+    }
+    return snapshot();
+  }, [contentId]);
+
+  /** Load pages until `rowId` is present or the table is exhausted. */
+  const ensureRowLoaded = useCallback(
+    async (rowId: string) => {
+      // Bounded by the design scale (plan D1: ≤10k rows per table).
+      for (let i = 0; i < 100; i += 1) {
+        const { loaded, more } = await loadMore();
+        if (loaded.has(rowId) || !more) return;
+      }
+    },
+    [loadMore]
+  );
 
   // The rail's open-a-view seam: a fresh mount reads ?view= above; an
   // already-mounted viewer switches live on this event (same CustomEvent
@@ -662,8 +800,21 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
           const merged = s.rows
             .filter((r) => !gone.has(r.id))
             .map((r) => byId.get(r.id) ?? r);
+          const removed = s.rows.length - merged.length;
+          // A changed row the grid has not loaded belongs to a later page
+          // when more pages remain and its key falls past the loaded edge;
+          // splicing it in would show it out of place. It still counts.
+          const edge = merged.length > 0 ? merged[merged.length - 1] : null;
+          let beyondEdge = 0;
           for (const row of changed) {
-            if (!merged.some((r) => r.id === row.id)) merged.push(row);
+            if (merged.some((r) => r.id === row.id)) continue;
+            const pastEdge =
+              s.nextCursor !== null &&
+              edge !== null &&
+              (row.sortKey > edge.sortKey ||
+                (row.sortKey === edge.sortKey && row.id > edge.id));
+            if (pastEdge) beyondEdge += 1;
+            else merged.push(row);
           }
           merged.sort((a, b) =>
             a.sortKey === b.sortKey
@@ -672,7 +823,13 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
                 ? -1
                 : 1
           );
-          return { ...s, rows: merged, serverTime: json.data.serverTime };
+          const added = merged.length - (s.rows.length - removed) + beyondEdge;
+          return {
+            ...s,
+            rows: merged,
+            total: Math.max(merged.length, s.total - removed + added),
+            serverTime: json.data.serverTime,
+          };
         });
       } catch {
         // A failed poll is not worth surfacing — the next one will catch up,
@@ -961,7 +1118,11 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
       pushOp(s, { ...op, label: describeOp(op) }, clientId, Date.now())
     );
     await load(state.view?.id ?? null);
-  }, [contentId, load, clientId, state.view]);
+    // The new row sorts last; when pages remain it is past the loaded edge,
+    // and a row you cannot see is a row you cannot type into.
+    const newId: string | undefined = json.data.rowIds?.[0];
+    if (newId) await ensureRowLoaded(newId);
+  }, [contentId, load, ensureRowLoaded, clientId, state.view]);
 
   const deleteSelected = useCallback(async () => {
     if (selectedRows.size === 0) return;
@@ -2206,6 +2367,27 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
 
   const totalHeight = state.rows.length * ROW_HEIGHT;
 
+  // One footer for every layout: the loaded count against the view's
+  // total, and the way to the rest. The grid also fetches on scroll; the
+  // board, list and gallery rely on this. Nothing renders once everything
+  // is loaded — a complete table should look exactly as it did before.
+  const loadMoreFooter =
+    state.nextCursor || state.loadingMore ? (
+      <button
+        type="button"
+        onClick={() => void loadMore()}
+        disabled={state.loadingMore}
+        className={cn(
+          "flex w-full items-center justify-center gap-2 border-t border-border px-4 py-2",
+          "text-xs text-muted-foreground hover:bg-muted/50 disabled:opacity-60"
+        )}
+      >
+        {state.loadingMore
+          ? "Loading more rows…"
+          : `Load more · ${state.rows.length} of ${state.total} rows`}
+      </button>
+    ) : null;
+
   const peekRow = peekRowId
     ? state.rows.find((r) => r.id === peekRowId) ?? null
     : null;
@@ -2254,8 +2436,17 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
                 {effectiveTitle}
               </h2>
             )}
-            <span className="shrink-0 font-mono text-xs text-muted-foreground">
-              {state.rows.length} {state.rows.length === 1 ? "row" : "rows"}
+            <span
+              className="shrink-0 font-mono text-xs text-muted-foreground"
+              title={
+                state.total > state.rows.length
+                  ? `${state.rows.length} of ${state.total} rows loaded — scroll down or use "Load more" for the rest`
+                  : undefined
+              }
+            >
+              {state.total > state.rows.length
+                ? `${state.rows.length} of ${state.total} rows`
+                : `${state.rows.length} ${state.rows.length === 1 ? "row" : "rows"}`}
             </span>
           </div>
           {/* Same folder-path breadcrumb the note editor renders under its
@@ -2400,16 +2591,19 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
       )}
 
       {state.view?.mode === "board" ? (
-        <div className="min-h-0 flex-1">
-          <DataBoardView
-            view={state.view}
-            columns={allColumns}
-            rows={state.rows}
-            editable={canEditData}
-            onCommitCell={commitCell}
-            onAddRowInGroup={addRowInGroup}
-            onOpenRow={openRow}
-          />
+        <div className="flex min-h-0 flex-1 flex-col">
+          <div className="min-h-0 flex-1">
+            <DataBoardView
+              view={state.view}
+              columns={allColumns}
+              rows={state.rows}
+              editable={canEditData}
+              onCommitCell={commitCell}
+              onAddRowInGroup={addRowInGroup}
+              onOpenRow={openRow}
+            />
+          </div>
+          {loadMoreFooter}
         </div>
       ) : state.view?.mode === "list" ? (
         <div className="min-h-0 flex-1 overflow-y-auto">
@@ -2418,6 +2612,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
             columns={allColumns}
             onOpenRow={openRow}
           />
+          {loadMoreFooter}
         </div>
       ) : state.view?.mode === "form" ? (
         <div className="min-h-0 flex-1 overflow-y-auto">
@@ -2436,6 +2631,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
             view={state.view}
             onOpenRow={openRow}
           />
+          {loadMoreFooter}
         </div>
       ) : state.view?.mode === "split" ? (
         <div className="flex min-h-0 flex-1">
@@ -2445,6 +2641,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
               columns={allColumns}
               onOpenRow={openRow}
             />
+            {loadMoreFooter}
           </div>
           <div className="min-w-0 flex-1 overflow-y-auto">
             {peekRow ? (
@@ -2476,7 +2673,19 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
       ) : (
       <div
         ref={scrollRef}
-        onScroll={(e) => setScrollTop(e.currentTarget.scrollTop)}
+        onScroll={(e) => {
+          const el = e.currentTarget;
+          setScrollTop(el.scrollTop);
+          // Within two overscans of the bottom: fetch the next page before
+          // the user reaches the end, so the list reads as continuous.
+          if (
+            nextCursorRef.current &&
+            el.scrollTop + el.clientHeight >=
+              el.scrollHeight - ROW_HEIGHT * OVERSCAN * 2
+          ) {
+            void loadMore();
+          }
+        }}
         // No native text selection while a drag-select is in flight.
         className={cn("flex-1 overflow-auto", isDragSelecting && "select-none")}
       >
@@ -2634,6 +2843,8 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
               ))}
             </div>
           </div>
+
+          {loadMoreFooter}
 
           {canEditData && (
             <button

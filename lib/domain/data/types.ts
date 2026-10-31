@@ -646,13 +646,21 @@ export interface DataTable {
 // ── Pagination ───────────────────────────────────────────────────────────
 
 /**
- * Cursor-based on `(sortKey, id)`, never offset: offset pagination skips and
- * duplicates rows under concurrent insertion, which is exactly what a shared
- * table has (plan B8d).
+ * Cursor-based on `(sortKey, id)` wherever the order IS the sort key: offset
+ * pagination skips and duplicates rows under concurrent insertion, which is
+ * exactly what a shared table has (plan B8d).
+ *
+ * A view sorted by cell values has no keyset to continue from (the order is
+ * a JSONB expression), so its continuation is an `offset` into the sorted
+ * matching set — the known trade-off, accepted so a sorted view can page at
+ * all (before 2026-10-21 it served its first page and stopped). One flat
+ * shape rather than a union: this repo's tsconfig does not narrow unions.
  */
 export interface RowPageCursor {
-  sortKey: string;
-  id: string;
+  sortKey?: string;
+  id?: string;
+  /** Sorted views only: rows already served. */
+  offset?: number;
 }
 
 export interface RowPage {
@@ -663,3 +671,5 @@ export interface RowPage {
 }
 
 export const DEFAULT_ROW_PAGE_SIZE = 100;
+/** The most rows one request serves — the grid and the rows route share it. */
+export const MAX_ROW_PAGE_SIZE = 500;

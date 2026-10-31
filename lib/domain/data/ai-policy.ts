@@ -11,8 +11,11 @@
  * than a `confirmedByUser` flag the model sets itself.
  *
  *   confirm  (default) the call pauses on an approval card the USER answers
- *            in chat; over MCP the server asks through elicitation and
- *            refuses on clients that cannot elicit
+ *            in chat; over MCP the server asks through elicitation when the
+ *            client declared it. Rows an assistant inserted ITSELF
+ *            (`authorship.ts`, owner 2026-10-21) need no ask: they delete
+ *            at once with an inbox notice. On an MCP client that cannot
+ *            ask, the user's rows are held and named in the result.
  *   allow    delete at once; the user gets an inbox notice with an undo hint
  *   deny     refuse, naming the setting
  *
@@ -117,7 +120,7 @@ export const AI_DELETE_POLICY_LABELS: Record<
 > = {
   confirm: {
     label: "Ask me",
-    hint: "The assistant may delete rows only after you approve each request on a card.",
+    hint: "The assistant deletes your rows only after you approve each request on a card. Rows it inserted itself it may delete without asking; you get an inbox notice.",
   },
   allow: {
     label: "Allowed",

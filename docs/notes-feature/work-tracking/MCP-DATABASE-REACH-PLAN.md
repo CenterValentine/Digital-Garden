@@ -396,7 +396,7 @@ if the hash test proves too eager, tune it in `context-refresh.ts` and both surf
 |---|---|
 | Tool | `garden_delete_rows { database, rows (≤ 25), reason }` behind a separate `garden:delete-rows` capability |
 | Policy | per database, `aiPolicy.delete: "confirm" \| "allow" \| "deny"`, default `confirm`, stored as a Json bag on `DataPayload` next to `rowDigests` (config over enum members, Database II D11) |
-| `confirm` | the server asks the **user** through MCP **elicitation** when the client declared that capability at `initialize` (Claude Code, Claude Desktop, Inspector). A client without it gets a refusal naming the policy: "this client cannot confirm; delete in the app or allow deletes for this database". A model-set `confirmedByUser` flag is not consent and is not offered. |
+| `confirm` | the server asks the **user** through MCP **elicitation** when the client declared that capability (2026-era: on the request envelope; 2025-era: at `initialize`). **Rows the assistant inserted itself need no ask** (revision 2026-10-21 below). A client that cannot be asked gets the assistant's own rows deleted and the user's rows *held* and named: "this client cannot confirm; delete in the app or allow deletes for this database". A model-set `confirmedByUser` flag is not consent and is not offered. |
 | `allow` | soft-delete, audit row, and an in-app notification through the existing notifications route ("token X deleted 12 rows from Y, Restore"), so the user sees it and can undo |
 | `deny` | refuse |
 | Settings | the per-database switch lives in the schema rail beside the digests switch, and a control-panel section under AI context lists every database's policy. Both persist through the same PATCH; a settings section needs its four registrations. |
@@ -404,6 +404,29 @@ if the hash test proves too eager, tune it in `context-refresh.ts` and both surf
 Why elicitation and not a staged deletion: staging needs a new pending state on rows and UI to
 resolve it, while elicitation is the protocol's own answer to "ask the human", and the clients
 that lack it are the API connectors, where the user is not present anyway.
+
+> **Revision (2026-10-21) — row authorship, and what "a client that cannot ask" really covers.**
+> The ChatGPT connector reported it could not remove rows it had written itself: "the connector
+> requires a deletion confirmation, but this connection can't display that confirmation prompt".
+> Two findings. (1) **No 2025-era client can be asked on this route.** `mcp-handler` serves the
+> 2025 era statelessly, so the per-request server never sees the client's `initialize`
+> capabilities, and the SDK's legacy shim refuses every input request with exactly that message —
+> ChatGPT, Claude.ai, Claude Code and every other 2025-era client hit the same wall, not only
+> OpenAI. The `era === "legacy"` branch in `deleteRows` tested a field the request context does not
+> have and was dead. The server now reads what the client *declared* (`clientCanElicit` in
+> `server.ts`: envelope on the 2026 era, `initialize` on the 2025 era) instead of trying and
+> catching. (2) **An assistant could not tell its own rows from the user's.** `DataRow.createdBy` is
+> the user on every path, so the policy asked about everything. `DataRow.draftedBy / draftedByRef /
+> draftedAt` (migration `20261021180000_data_row_drafted_by`, same vocabulary as content
+> authorship: `"ai-chat"` with the conversation, `"mcp"` with the token) is stamped once by
+> `insert_rows` and `garden_insert_rows`; `lib/domain/data/authorship.ts` is the rule. Under
+> `confirm`, a set of only AI-drafted rows deletes at once with an inbox notice on both surfaces
+> (chat's `needsApproval` returns false; the MCP skips the ask); a mixed set asks when it can,
+> and otherwise deletes the assistant's own rows and **holds** the user's, naming them in the
+> result and the notice; a user-only set on a client that cannot ask is refused with the remedy.
+> `allow` and `deny` are unchanged. Rows from before the column read as the user's — nothing
+> recorded who inserted them, so there is no honest backfill. Gates: `data:delete-policy:check`
+> (section C) and `mcp:surface:check`; smoke `pnpm mcp:rows:smoke`.
 
 **Issue reporting.** PR #211 (merged 2026-10-12) ships `POST /api/feedback`: templates and an area allowlist in
 `lib/domain/feedback/issue-templates.ts` (`composeIssue`), filing to GitHub through

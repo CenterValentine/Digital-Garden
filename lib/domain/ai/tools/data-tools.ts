@@ -81,6 +81,8 @@ import {
   type CellWrite,
 } from "@/lib/domain/data/server/mutations";
 import { readAiPolicy, type AiDeletePolicy } from "@/lib/domain/data/ai-policy";
+import type { RowDrafter } from "@/lib/domain/data/authorship";
+import { splitRowsByAuthorship } from "@/lib/domain/data/server/authorship";
 import { publishEvent } from "@/lib/domain/notifications/service";
 import { ensureLedgersForMasterRows } from "@/lib/domain/ai/quests";
 import {
@@ -542,6 +544,33 @@ async function deletePolicyFor(
     return "confirm";
   }
 }
+
+/**
+ * True when EVERY named row is one an assistant drafted (chat or MCP —
+ * lib/domain/data/authorship.ts), so the "confirm" policy has nothing to
+ * ask about: the card exists to protect the user's rows, not the
+ * assistant's own scratch. Anything unresolvable reads as false — the card
+ * then shows, and execute reports the real problem.
+ */
+async function allRowsAiDrafted(
+  ctx: ToolExecuteContext,
+  databaseId: string | undefined,
+  refs: string[] | undefined
+): Promise<boolean> {
+  try {
+    const cleaned = (refs ?? []).map((r) => r.trim()).filter(Boolean);
+    if (cleaned.length === 0) return false;
+    const dbRef = await resolveDatabaseRef(ctx, databaseId);
+    if ("refusal" in dbRef) return false;
+    const resolved = await resolveRowRefs(dbRef.id, cleaned);
+    if (resolved.some((r) => "refusal" in r)) return false;
+    const ids = resolved.map((r) => (r as { id: string }).id);
+    const split = await splitRowsByAuthorship(dbRef.id, ids);
+    return split.userWritten.length === 0 && split.aiDrafted.length === ids.length;
+  } catch {
+    return false;
+  }
+}
 /** Cells one row may change in a single update. */
 const UPDATE_CELL_CAP = 10;
 
@@ -755,7 +784,13 @@ export async function applyRowInserts(
   databaseId: string,
   table: DataTable,
   rows: Array<Record<string, unknown>>,
-  dedupeBy: string | undefined
+  dedupeBy: string | undefined,
+  /**
+   * Who is drafting: chat passes its conversation, the MCP its token. The
+   * stamp is what later lets the same assistant delete these rows without
+   * asking (lib/domain/data/authorship.ts). Null = unstamped, user-written.
+   */
+  drafter: RowDrafter | null = null
 ): Promise<string> {
   const live = table.columns.filter((c) => !c.deletedAt);
 
@@ -854,7 +889,9 @@ export async function applyRowInserts(
     databaseId,
     live,
     prepared.length,
-    ctx.userId
+    ctx.userId,
+    null,
+    drafter
   );
   const writes: CellWrite[] = [];
   rowIds.forEach((rowId, i) => {
@@ -1533,7 +1570,10 @@ export function createDataTools(ctx: ToolExecuteContext) {
             return `Batches over ${CONFIRM_THRESHOLD} rows need explicit user approval first. Show the user what you're about to add, get their yes, then retry with confirmedByUser: true.`;
           }
 
-          return await applyRowInserts(ctx, databaseId, table, input.rows, input.dedupeBy);
+          return await applyRowInserts(ctx, databaseId, table, input.rows, input.dedupeBy, {
+            kind: "ai-chat",
+            ref: ctx.conversationId ?? null,
+          });
         } catch (error) {
           logger.warn({
             layer: "ai",
@@ -1703,9 +1743,15 @@ export function createDataTools(ctx: ToolExecuteContext) {
     // notice with the undo hint; "deny" refuses and names the setting.
     // Deletes are soft (restoreRows is the inverse; the grid's Undo knows
     // it), so a wrong approval costs a restore, not a loss.
+    //
+    // Authorship (owner 2026-10-21): under "confirm", rows an assistant
+    // drafted itself (lib/domain/data/authorship.ts) skip the card — the
+    // card protects the user's rows, and an assistant that cannot remove
+    // its own scratch is stuck. One user-written row in the set brings the
+    // whole request to the card.
     delete_rows: tool({
       description:
-        "Soft-delete rows from a reachable database. rowIds are the [handles] (or ids) from a query_database result; max 25 per call. The database's owner sets its AI deletion policy in the schema rail: 'confirm' (the default) pauses this call on an approval card the user answers; 'allow' deletes at once and posts a notice to the user's inbox; 'deny' refuses. Give `reason` in the user's own words — it appears on the card and in the notice. Deleted rows can be restored from the grid's Undo. Never delete rows the user did not name or clearly describe, and never retry a request the user rejected.",
+        "Soft-delete rows from a reachable database. rowIds are the [handles] (or ids) from a query_database result; max 25 per call. The database's owner sets its AI deletion policy in the schema rail: 'confirm' (the default) pauses this call on an approval card the user answers — except when every row was inserted by an assistant (insert_rows or an MCP client), which deletes at once with an inbox notice; 'allow' deletes at once and posts a notice to the user's inbox; 'deny' refuses. Give `reason` in the user's own words — it appears on the card and in the notice. Deleted rows can be restored from the grid's Undo. Never delete rows the user did not name or clearly describe, and never retry a request the user rejected.",
       inputSchema: z.object({
         databaseId: z
           .string()
@@ -1727,7 +1773,8 @@ export function createDataTools(ctx: ToolExecuteContext) {
       // then refuses with the real reason.
       needsApproval: async (input) => {
         const policy = await deletePolicyFor(ctx, input.databaseId);
-        return policy === "confirm";
+        if (policy !== "confirm") return false;
+        return !(await allRowsAiDrafted(ctx, input.databaseId, input.rowIds));
       },
       execute: async (input) => {
         try {
@@ -1761,17 +1808,25 @@ export function createDataTools(ctx: ToolExecuteContext) {
             return `Nothing deleted — ${refusals.length} reference(s) did not resolve:\n${refusals.slice(0, 8).join("\n")}\nRe-read the rows with query_database and try again with handles from that result.`;
           }
 
+          // Under "confirm" the card was skipped exactly when every row is
+          // the assistant's own (needsApproval); say so in the receipt and
+          // notify, since no card means the user has not seen it yet.
+          const split = policy === "confirm" ? await splitRowsByAuthorship(databaseId, ids) : null;
+          const ownRowsOnly = split !== null && split.userWritten.length === 0;
+
           const deleted = await softDeleteRows(databaseId, ids, ctx.userId);
           const handles = ids.map((id) => `[${id.slice(0, 8)}]`).join(" ");
 
-          if (policy === "allow") {
+          if (policy === "allow" || ownRowsOnly) {
             try {
               await publishEvent(prisma, {
                 kind: "ai.notify",
                 actorType: "ai",
                 actorLabel: "Assistant",
                 payload: {
-                  title: `Assistant deleted ${deleted} row${deleted === 1 ? "" : "s"} from ${table.title}`,
+                  title: ownRowsOnly
+                    ? `Assistant deleted ${deleted} row${deleted === 1 ? "" : "s"} it had added to ${table.title}`
+                    : `Assistant deleted ${deleted} row${deleted === 1 ? "" : "s"} from ${table.title}`,
                   body: `${reason}\nRows: ${handles}\nIf this was wrong, open the table and use Undo to restore them. Change what the assistant may delete in the schema rail ("AI deletes rows").`,
                   ...(ctx.conversationId ? { conversationId: ctx.conversationId } : {}),
                 },
@@ -1789,7 +1844,13 @@ export function createDataTools(ctx: ToolExecuteContext) {
             }
           }
 
-          return `Deleted ${deleted} of ${ids.length} row${ids.length === 1 ? "" : "s"} from "${table.title}": ${handles}. Policy: ${policy}${policy === "allow" ? " (an inbox notice was posted)" : " (the user approved this on the card)"}. The user can restore them from the grid's Undo.`;
+          const consent =
+            policy === "allow"
+              ? " (an inbox notice was posted)"
+              : ownRowsOnly
+                ? " (these were rows an assistant had inserted, so no card was needed; an inbox notice was posted)"
+                : " (the user approved this on the card)";
+          return `Deleted ${deleted} of ${ids.length} row${ids.length === 1 ? "" : "s"} from "${table.title}": ${handles}. Policy: ${policy}${consent}. The user can restore them from the grid's Undo.`;
         } catch (error) {
           logger.warn({
             layer: "ai",
