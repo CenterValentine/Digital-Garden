@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-10-31
+last_updated: 2026-11-02
 ---
 
 # Sprint Backlog
@@ -9,6 +9,15 @@ last_updated: 2026-10-31
 **Sprint Execution Protocol**: Before commencing any sprint, always ask the user for input before planning and executing — there may be additions or modifications.
 
 ---
+
+## Canvas archive — follow-ups (2026-11-02, from `feat/canvas-archive`; plan `CANVAS-ARCHIVE-PLAN.md` §15)
+
+- ⚪ **OAuth / developer keys** — only needed to offer Canvas import to other users; each school's admin issues a key (§11). `tokenEncrypted` already stores `{ kind, … }`, so it adds a way to get the token, not a sync change.
+- ⚪ **`ExtensionRuntime.nodeContextActions`** — a generic per-row right-click hook ("Re-import from Canvas…"). Build when a second extension needs per-node actions.
+- ⚪ **Compare view** for a re-import conflict (Canvas version beside yours before choosing).
+- ⚪ **One storage helper**: image/speech/workflow-DOCX storage hardcode `storageProvider: "r2"`; move them onto `storeFileBody` (`lib/domain/canvas/server/write.ts`), which records the provider it uploaded to.
+- ⚪ **Verify: cron routes export only `POST`** but Vercel Cron sends `GET` — purge-trash / scheduled-publish may be 405ing in production (found in the 2026-11-02 survey, unverified).
+- ⚪ **Verify: `lib/domain/browser-extension/service.ts:1073`** calls `@tiptap/core` `generateJSON` server-side (needs a DOM); the `@tiptap/html` root import is the server-safe one.
 
 ## Garden home — follow-ups (2026-10-31, from `feat/garden-home-polish`)
 

@@ -9,6 +9,32 @@ last_updated: 2026-10-20
 
 # Current Sprint Addendum
 
+## November 2, 2026 — Courses you've taken in Canvas, in your notes (`+ → Canvas Course…`)
+
+**Tree**: worktree `.claude/worktrees/canvas`, branch `feat/canvas-archive` (off `origin/main` at `ed2a30aa`)
+**Plan**: `CANVAS-ARCHIVE-PLAN.md` (P1 archive import, P2 re-import, P3 `.imscc`; §15 = as built)
+**Status**: typecheck / lint / **`canvas:check` (NEW, 90 checks, in `build` ⇒ CI; mutation-tested ×4)** / full `pnpm build`; migration `20261102120000_canvas_archive` replays clean + no drift (local shadow DB); end-to-end smoke 45/45 against `pnpm canvas:mock` + headless UI 10/10; **prod migration owner-run**
+
+### Shipped
+- **Import a course** (`extensions/canvas/`, off by default): connect once with a Canvas personal access token (encrypted, never sent back to the browser), pick past or current courses, import into the folder the "+" pointed at. A course is plain folders: modules → folders, SubHeaders → sub-folders, pages → notes, files → file nodes, links → link nodes. Assignments carry your submission, grade and feedback; discussions carry your replies only; quizzes your score; the syllabus and an **Import report** name the instructor and list anything not captured.
+- **The archive links to itself**: Canvas links between pages become wiki-links; Canvas images are stored and re-pointed; links, images and embeds that couldn't be captured stay visible as marked gaps.
+- **Titles stay as Canvas has them**: one lock (`lib/domain/canvas/server/lock.ts`) asked by every rename, move and publish seam — PATCH (title / parent / share), move, the AI's `rename_note`, publishing create + publish. Imported items move only within their course; course material can't be published. Tree rows show a lock; Rename is greyed out.
+- **Re-import, not sync**: the right sidebar's **Canvas** tab (any node in an imported course) shows provenance and **Check for changes** → per-module counts → tick modules → one conflict queue (Keep mine / Add Canvas version beside it, plus Skip all / Add all) → re-import. Your notes between imported items stay attached to the item above them.
+- **Course exports (`.imscc`)** import into the same tree (no submissions — said so in each assignment).
+- **Shared fix**: the content GET cache is now one map per process (`globalThis`); invalidations from other routes used to miss it.
+
+### Migration (owner-run, before deploy)
+- `20261102120000_canvas_archive` — additive: `CanvasConnection` + `CanvasSyncLink`. Deploys ahead of code safely.
+
+### Smoke (owner)
+- [ ] **Smoke canvas-access:** in your school's Canvas → Courses → All Courses → Past Enrollments → the courses you want are listed and open.
+- [ ] **Smoke canvas-connect:** Settings → Extensions → enable Canvas → + → Canvas Course… → paste your Canvas address and a new access token → "Connected to … as <your name>".
+- [ ] **Smoke canvas-import:** tick one past course → Import → the course folder appears with its modules in Canvas order; open a page → links to other pages are wiki-links; the Import report lists anything not captured.
+- [ ] **Smoke canvas-own-work:** open an assignment you submitted → "My submission", your grade and the instructor's feedback are there; a discussion shows only your replies.
+- [ ] **Smoke canvas-lock:** right-click an imported note → Rename reads "Rename (title from Canvas)" and is greyed out; drag it out of the course folder → refused with a message.
+- [ ] **Smoke canvas-recheck:** select any note in the course → Canvas tab → Check for changes → "Everything matches Canvas."
+- [ ] **Smoke canvas-mock-reimport (dev):** `pnpm canvas:mock` + `CANVAS_ALLOW_LOCAL=1 pnpm dev` → import BIO 201 → edit Osmosis → `curl -X POST localhost:4580/__mock/change` → Check for changes → choose "Add Canvas version beside it" → re-import → your edit is kept and "Osmosis (Canvas, …)" sits right after it.
+
 ## October 21, 2026 — Every row shows up, and the assistant can take back what it wrote
 
 **Tree**: worktree `.claude/worktrees/db-rows`, branch `feat/database-rows-paging-and-ai-delete` (off `origin/main` at `00cf6377`)

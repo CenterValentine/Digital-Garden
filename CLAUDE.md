@@ -40,6 +40,8 @@ pnpm ai:drift:check   # CI gate: AI parallel-table drift (provider catalog ↔ c
 pnpm context:diet:check  # CI gate: the model-facing transcript folds (distillation/turn), dedupe, write-input supersession, header retention — fixture transcripts, mutation-tested
 pnpm proposal:shape:check  # CI gate: the propose_item_iteration payloads that died in prod parse and resolve by meaning (lib/domain/ai/tools/iteration-proposal.ts — "schemas describe shape; execute judges")
 pnpm reader:check     # Reader gate: OPDS 1/2 parsing, EPUB DRM detection + metadata, Kindle clippings — fixture-based, no network (scripts/validate-reader.ts)
+pnpm canvas:check     # Canvas archive gate: import planner, re-import rules, ordering, HTML rewriting, .imscc parsing, and the title/move/publish lock seams — fixture-based (scripts/validate-canvas.ts)
+pnpm canvas:mock      # Mock Canvas on :4580 for trying the Canvas import without a school token; serve the app with CANVAS_ALLOW_LOCAL=1 (dev only)
 pnpm research:check   # Research gate: identifier parsing, adapter response→Work mapping, cross-source merge, federation, faces — fixture-based, no network (scripts/validate-research.ts)
 pnpm research:matrix:check  # CI gate: docs/notes-feature/core/RESEARCH-SOURCE-MATRIX.md matches the source catalog + adapter registry (regenerate: pnpm research:matrix)
 pnpm research:live:smoke    # Manual: the research adapters against the real OpenAlex / Semantic Scholar / Crossref / Unpaywall APIs (network; S2 needs SEMANTIC_SCHOLAR_API_KEY in practice)
@@ -172,7 +174,7 @@ First-party feature modules with clear ownership boundaries. Each extension live
 - `server/` — Services, types, route handlers
 - `state/` — Extension-local Zustand stores
 
-**Active extensions:** `daily-notes`, `flashcards`, `people`, `workplaces` (workspaces — named tab sets + pane layouts), `calendar`, `publishing`, `speed-reader`, `browser-bookmarks`, `workflows`, `studio` (Folder Studio), `reader` (e-reader + book library — `docs/notes-feature/work-tracking/EREADER-PLAN.md`)
+**Active extensions:** `daily-notes`, `flashcards`, `people`, `workplaces` (workspaces — named tab sets + pane layouts), `calendar`, `publishing`, `speed-reader`, `browser-bookmarks`, `workflows`, `studio` (Folder Studio), `reader` (e-reader + book library — `docs/notes-feature/work-tracking/EREADER-PLAN.md`), `canvas` (import courses you've taken in Canvas as folders; titles locked via `lib/domain/canvas/server/lock.ts`, which every rename/move/publish seam asks — `docs/notes-feature/work-tracking/CANVAS-ARCHIVE-PLAN.md`)
 
 **Key rules:**
 - Disabled extensions disappear through registry filters — never add direct conditionals in shared UI
