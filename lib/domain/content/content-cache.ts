@@ -41,7 +41,13 @@ type CacheEntry = {
   cachedAt: number;
 };
 
-const cache = new Map<string, CacheEntry>();
+// One map per PROCESS, not per module instance: Next compiles each route
+// with its own copy of this module, so a module-level Map made
+// `invalidateCachedContent` from any other route (a Canvas re-import, a
+// tag update) clear a cache the content GET never reads — it served the
+// pre-write body for the rest of the TTL (found 2026-11-02, Canvas archive).
+const globalCache = globalThis as typeof globalThis & { __dgContentCache?: Map<string, CacheEntry> };
+const cache = (globalCache.__dgContentCache ??= new Map<string, CacheEntry>());
 let stats = { hits: 0, misses: 0, evictions: 0 };
 
 /**
