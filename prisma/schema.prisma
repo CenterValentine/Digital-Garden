@@ -183,6 +183,7 @@ model ContentNode {
   agenticMetadata              AgenticMetadata?
   studioSourceSelections       StudioSourceSelection[]
   studioGenerationRuns         StudioGenerationRun[]     @relation("StudioRunFolder")
+  canvasSyncLink               CanvasSyncLink?
 
   @@unique([ownerId, slug])
   @@index([ownerId, deletedAt])
@@ -598,6 +599,7 @@ model User {
   readerAnnotations   ReaderAnnotation[]
   readerCatalogs      ReaderCatalog[]
   readerConnections   ReaderConnection[]
+  canvasConnections   CanvasConnection[]
   scriptureCorpora    UserScriptureCorpus[]
   workMetas           WorkMeta[]
   commentThreads      CommentThread[]          @relation("CommentThreadsCreated")
@@ -3050,4 +3052,54 @@ model WorkCache {
 
   @@index([workKey])
   @@index([fetchedAt])
+}
+
+/// Where Canvas course content comes from (CANVAS-ARCHIVE-PLAN.md §4): a
+/// Canvas instance reached over the REST API with the user's token, or the
+/// user's Common Cartridge (.imscc) uploads (kind "cartridge", no token).
+model CanvasConnection {
+  id             String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId        String           @db.Uuid
+  kind           String           @db.VarChar(20)
+  baseUrl        String           @db.VarChar(500)
+  tokenEncrypted String?
+  canvasUserId   String?          @db.VarChar(64)
+  displayName    String?          @db.VarChar(255)
+  lastUsedAt     DateTime?        @db.Timestamptz(6)
+  createdAt      DateTime         @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime         @updatedAt @db.Timestamptz(6)
+  owner          User             @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  links          CanvasSyncLink[]
+
+  @@unique([ownerId, baseUrl])
+}
+
+/// One imported node ↔ the Canvas item it came from. Provenance, the title
+/// lock, and module-scoped re-import all read this; ContentNode stays
+/// untouched, and deleting the connection leaves the notes in place.
+model CanvasSyncLink {
+  id            String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  connectionId  String           @db.Uuid
+  /// Null once the node is purged from the trash: the link stays as the
+  /// record that the user dismissed this item, so re-import skips it.
+  contentId     String?          @unique @db.Uuid
+  courseId      String           @db.VarChar(128)
+  canvasType    String           @db.VarChar(32)
+  canvasKey     String           @db.VarChar(255)
+  moduleId      String?          @db.VarChar(128)
+  /// The Canvas version the user last saw (updated_at for the API, a content
+  /// hash for cartridges). Advances when a conflict is resolved either way.
+  remoteVersion String?          @db.VarChar(128)
+  /// The node's bodyHash right after the import wrote it: unchanged means
+  /// the user hasn't edited it, so a re-import may replace it.
+  importedHash  String?          @db.VarChar(64)
+  /// linked | removed_upstream
+  status        String           @default("linked") @db.VarChar(20)
+  importedAt    DateTime         @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime         @updatedAt @db.Timestamptz(6)
+  connection    CanvasConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  content       ContentNode?     @relation(fields: [contentId], references: [id], onDelete: SetNull)
+
+  @@unique([connectionId, courseId, canvasKey])
+  @@index([connectionId, courseId, moduleId])
 }
