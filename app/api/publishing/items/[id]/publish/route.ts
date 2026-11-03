@@ -11,6 +11,7 @@ import { withRouteTrace } from "@/lib/core/logger/route-trace";
 import { withSpan } from "@/lib/core/logger/span";
 import { invalidateTenantCache } from "@/lib/domain/tenancy/cache";
 import { spanPayload } from "@/lib/core/logger/span-payload";
+import { canvasPublishRefusal } from "@/lib/domain/canvas/server/lock";
 import crypto from "crypto";
 
 function hashJson(value: unknown): string {
@@ -66,6 +67,11 @@ export async function POST(
               { error: "Validation errors must be resolved before publishing" },
               { status: 422 },
             );
+          }
+          // Canvas course material is the instructor's work: it stays private.
+          const publishRefused = await canvasPublishRefusal(item.contentNodeId);
+          if (publishRefused) {
+            return NextResponse.json({ error: publishRefused }, { status: 423 });
           }
           if (item.state === "archived") {
             logger.warn({

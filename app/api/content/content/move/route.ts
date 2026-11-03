@@ -29,6 +29,7 @@ import {
   writeKeptSort,
 } from "@/lib/domain/content/sibling-slot";
 import { logger, spanPayload, withRouteTrace, withSpan } from "@/lib/core/logger";
+import { canvasMoveRefusal } from "@/lib/domain/canvas/server/lock";
 
 const ROUTE_PATH = "/api/content/content/move";
 
@@ -364,6 +365,17 @@ export async function POST(request: NextRequest) {
         storageTargetParentId === undefined
           ? content.parentId
           : storageTargetParentId;
+
+      // Canvas-imported items stay inside their course folder (CANVAS-ARCHIVE-PLAN §7).
+      if (finalParentId !== content.parentId) {
+        const refused = await canvasMoveRefusal(contentId, finalParentId);
+        if (refused) {
+          return NextResponse.json(
+            { success: false, error: { code: "MOVE_LOCKED", message: refused } },
+            { status: 423 }
+          );
+        }
+      }
 
       const updated = await withSpan(
         { layer: "tree", name: "move" },

@@ -12,6 +12,7 @@ import { withSpan } from "@/lib/core/logger/span";
 import { spanPayload } from "@/lib/core/logger/span-payload";
 import { resolveWritableTenantId, TenantAuthError } from "@/lib/domain/tenancy/api";
 import { invalidateTenantCache } from "@/lib/domain/tenancy/cache";
+import { canvasPublishRefusal } from "@/lib/domain/canvas/server/lock";
 
 export async function GET(req: NextRequest) {
   return withRouteTrace(req, { route: "/api/publishing/items" }, async () => {
@@ -112,6 +113,12 @@ export async function POST(req: NextRequest) {
         { error: "contentNodeId, pathId, slug, payloadType required" },
         { status: 400 },
       );
+    }
+
+    // Canvas course material is the instructor's work: it stays private.
+    const publishRefused = await canvasPublishRefusal(contentNodeId);
+    if (publishRefused) {
+      return NextResponse.json({ error: publishRefused }, { status: 423 });
     }
 
     return withSpan(

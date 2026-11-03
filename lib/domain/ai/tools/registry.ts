@@ -12,6 +12,7 @@
 import { tool, generateObject } from "ai";
 import { z } from "zod/v4";
 import { prisma } from "@/lib/database/client";
+import { canvasTitleLockRefusal } from "@/lib/domain/canvas/server/lock";
 import { resolveRowRefs } from "@/lib/domain/data/server/resolve";
 import {
   readStandingContext,
@@ -3811,6 +3812,12 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         });
         if (!existing) {
           return `Content "${contentId}" not found or deleted. Use search_content to find the right id.`;
+        }
+        // Canvas-imported titles are locked (CANVAS-ARCHIVE-PLAN §7): report the
+        // real outcome rather than a rename that didn't happen.
+        const locked = await canvasTitleLockRefusal(contentId);
+        if (locked) {
+          return `Not renamed: "${existing.title}" was imported from Canvas. ${locked}`;
         }
         await prisma.contentNode.update({
           where: { id: contentId },

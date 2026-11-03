@@ -378,6 +378,8 @@ function findSelfReschedulingTimers(source: string): string[] {
  * the timer is, and why it is not an ungated poll.
  */
 const REVIEWED_RECURRING_TIMEOUTS: Record<string, string> = {
+  "lib/domain/canvas/server/http.ts":
+    "sleep — server-side rate-limit backoff inside one request's retry loop (MAX_ATTEMPTS = 5, exponential). Runs only while a user-started import is in flight; nothing re-arms on its own.",
   "lib/domain/collaboration/runtime.ts":
     "schedulePresenceHeartbeat — THE recurring one, tiered and audited in the registry above. shouldReconnectProvider is reconnect backoff, bounded by PROVIDER_RECONNECT_MAX_MS.",
   "components/content/ai/ChatMessage.tsx":

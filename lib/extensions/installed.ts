@@ -19,6 +19,7 @@ import { publishingBuiltInExtension } from "@/extensions/publishing/module";
 import { workflowsBuiltInExtension } from "@/extensions/workflows/module";
 import { studioBuiltInExtension } from "@/extensions/studio/module";
 import { readerBuiltInExtension } from "@/extensions/reader/module";
+import { canvasBuiltInExtension } from "@/extensions/canvas/module";
 import type { BuiltInExtension } from "./types";
 
 export const BUILT_IN_EXTENSIONS: BuiltInExtension[] = [
@@ -33,4 +34,5 @@ export const BUILT_IN_EXTENSIONS: BuiltInExtension[] = [
   workflowsBuiltInExtension,
   studioBuiltInExtension,
   readerBuiltInExtension,
+  canvasBuiltInExtension,
 ];

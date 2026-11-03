@@ -100,6 +100,8 @@ export interface ReaderFetchResult {
   status: number;
   contentType: string;
   body: Buffer;
+  /** Response headers of the final hop (Canvas paginates through `Link`). */
+  headers: Headers;
 }
 
 async function readCapped(response: Response, maxBytes: number): Promise<Buffer> {
@@ -178,6 +180,7 @@ export async function readerFetch(
         status: response.status,
         contentType: response.headers.get("content-type") ?? "",
         body,
+        headers: response.headers,
       };
     }
     throw new ReaderFetchError("Too many redirects");

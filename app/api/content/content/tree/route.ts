@@ -21,6 +21,7 @@ import { logger, spanPayload, withRouteTrace, withSpan } from "@/lib/core/logger
 import { WINDOW_REF_LINK_TYPE } from "@/lib/domain/content/window-refs";
 import { readTemplateRecord } from "@/lib/domain/ai/docx-templates/record";
 import { toWindowReferenceRow } from "@/lib/features/content/window-reference";
+import { lockedContentIds } from "@/lib/domain/canvas/server/lock";
 
 const ROUTE_PATH = "/api/content/content/tree";
 
@@ -97,6 +98,8 @@ type ContentTreeNode = {
   };
   /** The database this node is a promoted row of, if any (plan Phase 5). */
   promotedFromTableId?: string | null;
+  /** Imported from Canvas: the title stays as Canvas has it (CANVAS-ARCHIVE-PLAN §7). */
+  titleLocked?: boolean;
   children: ContentTreeNode[];
   /**
    * Referenced children, partitioned OUT of `children` so the tree renders
@@ -220,6 +223,9 @@ export async function GET(request: NextRequest) {
         });
         viewRootContentId = workspace?.viewRootContentId ?? null;
       }
+
+      // Canvas-imported nodes whose titles are locked: one query, a set lookup per node.
+      const titleLockedIds = await lockedContentIds(session.user.id).catch(() => new Set<string>());
 
       // Fetch all content for user (flat list)
       // IMPORTANT: Don't apply orderBy here - we'll sort after building the tree
@@ -494,6 +500,7 @@ export async function GET(request: NextRequest) {
               }
             : {}),
           promotedFromTableId: item.promotedFromRow?.tableId ?? null,
+          ...(titleLockedIds.has(item.id) ? { titleLocked: true } : {}),
           children: [],
           references: [],
           publishState: derivePublishState(item.isPublished, item.publicItems),

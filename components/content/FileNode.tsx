@@ -836,6 +836,7 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
           // deletion, and can withhold destructive actions from projections.
           isShortcut,
           isShortcutMirror: isMirrorRow,
+          titleLocked: data.titleLocked === true,
           isWindowReference: Boolean(data.windowRef),
           mirrorOf: data.mirrorOf ?? null,
           mirrorShortcutTitle,
@@ -1368,6 +1369,12 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
           className="h-2 w-2 flex-none rounded-full bg-amber-500"
           title="Unpublished — this was live"
         />
+      )}
+      {/* Imported from Canvas: the title stays as Canvas has it. */}
+      {data.titleLocked && (
+        <span className="flex-none" title="Title from Canvas (locked)" aria-label="Title from Canvas">
+          <LucideIcons.Lock className="h-3 w-3 text-gray-400 dark:text-gray-500" />
+        </span>
       )}
     </div>
   );

@@ -623,6 +623,8 @@ export function FileTree({
           // name belongs to the original's own row. The menu greys Rename out
           // here; the key does nothing.
           if (node.data.isShortcutMirror) return;
+          // Imported from Canvas: the title is Canvas's (the server refuses too).
+          if (node.data.titleLocked) return;
 
           // Check if this is an external link
           if (node.data.contentType === "external") {

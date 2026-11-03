@@ -88,6 +88,12 @@ export interface TreeNode {
    */
   promotedFromTableId?: string | null;
   /**
+   * Imported from Canvas: the title stays as Canvas has it. Rename is greyed
+   * out and the row shows a lock; the server refuses regardless
+   * (lib/domain/canvas/server/lock.ts).
+   */
+  titleLocked?: boolean;
+  /**
    * Status-dot state. "none" renders nothing — the overwhelming majority of
    * nodes, which have never been published and need no status.
    */

@@ -55,6 +55,11 @@ import {
   withRouteTrace,
   withSpan,
 } from "@/lib/core/logger";
+import {
+  canvasMoveRefusal,
+  canvasPublishRefusal,
+  canvasTitleLockRefusal,
+} from "@/lib/domain/canvas/server/lock";
 import crypto from "node:crypto";
 
 /**
@@ -773,6 +778,16 @@ export async function PATCH(
             { status: 400 }
           );
         }
+        // Titles imported from Canvas stay as Canvas has them (CANVAS-ARCHIVE-PLAN §7).
+        if (title !== existing.title) {
+          const locked = await canvasTitleLockRefusal(id);
+          if (locked) {
+            return NextResponse.json(
+              { success: false, error: { code: "TITLE_LOCKED", message: locked } },
+              { status: 423 }
+            );
+          }
+        }
         updateData.title = title;
 
         // Regenerate slug if title changed
@@ -782,6 +797,15 @@ export async function PATCH(
       }
 
       if (parentId !== undefined) {
+        if (parentId !== existing.parentId) {
+          const refused = await canvasMoveRefusal(id, parentId);
+          if (refused) {
+            return NextResponse.json(
+              { success: false, error: { code: "MOVE_LOCKED", message: refused } },
+              { status: 423 }
+            );
+          }
+        }
         updateData.parentId = parentId;
       }
       if (categoryId !== undefined) {
@@ -799,6 +823,15 @@ export async function PATCH(
             },
             { status: 403 }
           );
+        }
+        if (isPublished === true) {
+          const refused = await canvasPublishRefusal(id);
+          if (refused) {
+            return NextResponse.json(
+              { success: false, error: { code: "PUBLISH_LOCKED", message: refused } },
+              { status: 423 }
+            );
+          }
         }
         updateData.isPublished = isPublished;
       }

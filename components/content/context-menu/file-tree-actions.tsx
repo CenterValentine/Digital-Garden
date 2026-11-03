@@ -102,6 +102,8 @@ export interface FileTreeContext {
     isShortcut?: boolean;
     /** This row is a view-only projection inside an expanded folder-shortcut. */
     isShortcutMirror?: boolean;
+    /** Imported from Canvas: its title stays as Canvas has it. */
+    titleLocked?: boolean;
     /** A note's window row (also a mirror row): derived, nothing to delete. */
     isWindowReference?: boolean;
     /** For a mirror row, the real ContentNode id it stands for. */
@@ -781,11 +783,11 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
       },
       {
         id: "rename",
-        label: "Rename",
+        label: clickedNode?.titleLocked ? "Rename (title from Canvas)" : "Rename",
         icon: <Edit className="h-4 w-4" />,
         shortcut: "⌥R",
         onClick: () => onRename?.(clickedId),
-        disabled: !onRename || isMirrorRow,
+        disabled: !onRename || isMirrorRow || clickedNode?.titleLocked === true,
       },
     ];
 
