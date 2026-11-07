@@ -14,6 +14,7 @@
  * The era COUNT is fixed (the ring's bands are geometry in ResumePage); every
  * word the eras show is data.
  */
+import { z } from "zod/v4";
 import { parseEmphasis } from "@/components/common/Emphasis";
 import type { SitePageConfig, SitePageConfigInput } from "./schema";
 import type { ResumeCopy, ResumeData } from "./resolved";
@@ -167,6 +168,124 @@ const ENTRY_TEXT_FIELDS = ["year", "title", "meta", "blurb"] as const;
 const COPY_TEXT_FIELDS = ["kicker", "heading", "subtitle", "hint", "footnote"] as const;
 /** In-app path, same-page anchor, web URL, or mail link. */
 const CTA_HREF = /^(\/(?!\/)|#|https?:\/\/\S|mailto:\S)/;
+
+// ── Shape description for AI (and human) editors ────────────────────────────
+// The STRUCTURE as a strict Zod schema, published as JSON Schema (composer
+// JSON editor + GET /api/site-pages/resume) and exercised by
+// `pnpm resume:page:check`, so the schema an editor reads is one the gate runs.
+// validateResumeConfig stays the authority: it adds what JSON Schema can't say
+// (no stray spaces, balanced *, case-insensitive unique tags, a visible entry
+// per era, one primary button).
+
+const resumeEntryShape = z
+  .object({
+    year: z.string().min(1).describe('The year column, e.g. "2021–now" or "2023–25".'),
+    title: z
+      .string()
+      .min(1)
+      .describe('Emphasis string, conventionally "Role — *Organisation*"; *…* renders in the accent italic.'),
+    meta: z.string().min(1).describe('One mono line of domains or tools, e.g. "RevOps · Stripe · HubSpot".'),
+    blurb: z
+      .string()
+      .min(1)
+      .describe("Emphasis string: what was owned, then the headline result wrapped in **…** (renders bold)."),
+    tags: z
+      .array(z.string().min(1).max(RESUME_TAG_LENGTH_MAX))
+      .min(1)
+      .max(RESUME_TAGS_MAX)
+      .describe(`1–${RESUME_TAGS_MAX} skill chips, unique (ignoring case).`),
+    hidden: z.boolean().optional().describe("true keeps the entry in the JSON but off the page."),
+    status: z.enum(["active", "done"]).optional().describe("Written by the API on save; ignored by the résumé."),
+  })
+  .strict();
+
+const resumeEraShape = z
+  .object({
+    label: z
+      .string()
+      .min(1)
+      .max(RING_LABEL_MAX)
+      .describe(`The ring label, ≤${RING_LABEL_MAX} characters, e.g. "2021–NOW" or "PRE-2020".`),
+    sort: z.enum(["date-desc", "date-asc", "manual"]).optional().describe("Ignored: entries render in the order listed."),
+    items: z
+      .array(resumeEntryShape)
+      .min(1)
+      .describe("The era's entries, in display order; at least one must be visible (not hidden)."),
+  })
+  .strict();
+
+const resumeCtaShape = z
+  .object({
+    label: z.string().min(1),
+    href: z.string().regex(CTA_HREF).describe('"/path" (in-app), "#", an http(s) URL, or "mailto:".'),
+    primary: z.boolean().optional().describe("At most one button is primary (the filled one)."),
+    ariaLabel: z.string().optional(),
+  })
+  .strict();
+
+/** The résumé config's structure. Exported for the gate; editors read its JSON Schema. */
+export const resumeConfigShape = z
+  .object({
+    sections: z
+      .array(resumeEraShape)
+      .length(RESUME_ERA_COUNT)
+      .describe(
+        `Exactly ${RESUME_ERA_COUNT} eras, one per growth ring: index 0 is the INNERMOST ring (the most recent chapter), the last is the outermost (the earliest).`,
+      ),
+    page: z
+      .object({
+        kicker: z.string().min(1).optional().describe('The small caps line over the heading, e.g. "ROOT · RÉSUMÉ · four growth rings".'),
+        heading: z.string().min(1).optional().describe('Emphasis string, e.g. "The Growth *Rings.*".'),
+        subtitle: z.string().min(1).optional(),
+        hint: z.string().min(1).optional().describe("The small line under the rings."),
+        footnote: z.string().min(1).optional().describe("The line under the last entry."),
+        ctas: z.array(resumeCtaShape).max(RESUME_CTAS_MAX).optional().describe(`Up to ${RESUME_CTAS_MAX} buttons, in order.`),
+      })
+      .strict()
+      .optional()
+      .describe("Page copy. Any field left out keeps the design's default text."),
+  })
+  .strict()
+  .describe("The config of the davidvalentine.org résumé (SitePage slug \"resume\", kind \"resume\").");
+
+/** JSON Schema (draft 2020-12) for the résumé config — the machine-readable shape. */
+export function resumeConfigJsonSchema(): Record<string, unknown> {
+  return z.toJSONSchema(resumeConfigShape) as Record<string, unknown>;
+}
+
+/** The same shape in prose, with the rules JSON Schema can't express. */
+export const RESUME_SHAPE_GUIDE = [
+  "RÉSUMÉ CONFIG — how to edit it",
+  "",
+  `The page is four growth rings. The JSON's "sections" are the ${RESUME_ERA_COUNT} eras, always exactly ${RESUME_ERA_COUNT}: sections[0] is the INNERMOST ring (the most recent chapter), sections[${RESUME_ERA_COUNT - 1}] the outermost (the earliest). Reorder eras to move chapters between rings; never add or remove one.`,
+  "",
+  "Each era:",
+  `  label  the ring label, ${RING_LABEL_MAX} characters or fewer ("2021–NOW", "PRE-2020")`,
+  "  items  the era's entries, in display order; at least one must be visible",
+  "",
+  "Each entry (all required unless marked):",
+  '  year    "2021–now"',
+  '  title   "Role — *Organisation*"     *…* = accent italic',
+  '  meta    "RevOps · Stripe · HubSpot"',
+  '  blurb   "What was owned. **The headline result.** More."   **…** = bold',
+  `  tags    1–${RESUME_TAGS_MAX} unique skill chips, each ${RESUME_TAG_LENGTH_MAX} characters or fewer`,
+  "  hidden  (optional) true keeps the entry in the JSON but off the page",
+  "  Several entries may share an era (e.g. two roles at one employer).",
+  "",
+  'Optional "page" block — leave any field out to keep the design default:',
+  "  kicker, heading (*accent* allowed), subtitle, hint, footnote,",
+  `  ctas: up to ${RESUME_CTAS_MAX} buttons { label, href, primary?, ariaLabel? }, at most one primary;`,
+  '        href is "/path", "#", an http(s) URL or "mailto:".',
+  "",
+  "Refused on save (the API answers with a sentence naming the field):",
+  "  - a different number of eras, an empty or over-long ring label, an era with no visible entry",
+  "  - a missing or blank field, or leading/trailing spaces in any text",
+  "  - an unmatched * (use *accent* or **bold** in pairs)",
+  "  - duplicate tags (ignoring case)",
+  `  - fields a résumé doesn't use: entry ${UNUSED_ITEM_FIELDS.map((f) => `"${f}"`).join(", ")}; era ${UNUSED_SECTION_FIELDS.map((f) => `"${f}"`).join(", ")}`,
+  "",
+  "The name, role and back link at the top left are part of the site, not this JSON.",
+].join("\n");
 
 /** Leading/trailing whitespace or an empty value — both break the page's even rhythm. */
 function textProblem(value: string | undefined, what: string): string | null {

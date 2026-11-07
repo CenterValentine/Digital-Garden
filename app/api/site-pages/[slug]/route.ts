@@ -19,8 +19,14 @@ import type { Prisma } from "@/lib/database/generated/prisma";
 import { withRouteTrace } from "@/lib/core/logger";
 import { resolveWritableTenantId, TenantAuthError } from "@/lib/domain/tenancy";
 import { sitePageInput } from "@/lib/domain/page-layout/schema";
+import { RESUME_SHAPE_GUIDE, resumeConfigJsonSchema } from "@/lib/domain/page-layout/resume";
 
 const ROUTE_PATH = "/api/site-pages/[slug]";
+
+/** The résumé's editing contract: prose rules + the JSON Schema of `config`. */
+function resumeShape() {
+  return { guide: RESUME_SHAPE_GUIDE, configJsonSchema: resumeConfigJsonSchema() };
+}
 
 type Ctx = { params: Promise<{ slug: string }> };
 
@@ -49,6 +55,11 @@ export async function GET(req: NextRequest, { params }: Ctx) {
       const page = await prisma.sitePage.findUnique({
         where: { tenantId_slug: { tenantId, slug } },
       });
+      // A résumé carries its own editing contract, so an AI (or script)
+      // reading the page before writing it knows the shape it must keep.
+      if (slug === "resume" || page?.kind === "resume") {
+        return NextResponse.json({ tenantId, page, shape: resumeShape() });
+      }
       return NextResponse.json({ tenantId, page });
     } catch (err) {
       const resp = authError(err);
@@ -76,7 +87,12 @@ export async function PUT(req: NextRequest, { params }: Ctx) {
       const parsed = sitePageInput.safeParse(body);
       if (!parsed.success) {
         return NextResponse.json(
-          { error: "Validation failed", issues: parsed.error.issues },
+          {
+            error: "Validation failed",
+            issues: parsed.error.issues,
+            // a refused résumé write says how to fix it, not only what's wrong
+            ...(body.kind === "resume" ? { shape: resumeShape() } : {}),
+          },
           { status: 422 },
         );
       }

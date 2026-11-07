@@ -36,7 +36,7 @@ import {
 } from "./defaults";
 import { validateResumeConfig } from "@/lib/domain/page-layout/resume";
 import { SectionCard } from "./SectionCard";
-import { JsonHatch } from "./JsonHatch";
+import { JsonHatch, ResumeShapeHelp } from "./JsonHatch";
 import { ContentPicker } from "./ContentPicker";
 import { PreviewPane } from "./PreviewPane";
 import type { InheritedValues } from "./RowEditor";
@@ -734,7 +734,12 @@ export function SitePagesComposer() {
               )}
             </div>
 
-            {working.kind === "resume" && <ResumeIssues config={working.config} />}
+            {working.kind === "resume" && (
+              <>
+                <ResumeIssues config={working.config} />
+                <ResumeShapeHelp embedSchema />
+              </>
+            )}
 
             {working.config.sections.map((section, i) => (
               <SectionCard

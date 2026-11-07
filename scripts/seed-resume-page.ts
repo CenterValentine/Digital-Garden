@@ -17,6 +17,13 @@
 import { sitePageInput, type SitePageConfig } from "../lib/domain/page-layout/schema";
 import {
   DEFAULT_RESUME_DATA,
+  RESUME_CTAS_MAX,
+  RESUME_ERA_COUNT,
+  RESUME_SHAPE_GUIDE,
+  RESUME_TAGS_MAX,
+  RING_LABEL_MAX,
+  resumeConfigJsonSchema,
+  resumeConfigShape,
   resumeFromConfig,
   resumeToConfig,
   validateResumeConfig,
@@ -39,23 +46,28 @@ function seededConfig(): SitePageConfig {
  * Each case breaks the config in one way the validator must catch, at the
  * path it must name. A case the validator misses fails the gate.
  */
-const MUST_CATCH: { name: string; path: string; mutate: (c: SitePageConfig) => void }[] = [
-  { name: "three eras", path: "sections", mutate: (c) => void c.sections.pop() },
-  { name: "five eras", path: "sections", mutate: (c) => void c.sections.push(structuredClone(c.sections[0])) },
-  { name: "empty ring label", path: "sections.1.label", mutate: (c) => void (c.sections[1].label = "") },
-  { name: "ring label too long", path: "sections.0.label", mutate: (c) => void (c.sections[0].label = "2021–PRESENT DAY") },
+/**
+ * `schema: true` marks the structural breaks the published JSON Schema must
+ * ALSO reject (the rest — spaces, `*` balance, case-insensitive duplicates —
+ * are beyond JSON Schema and only the validator catches them).
+ */
+const MUST_CATCH: { name: string; path: string; schema?: true; mutate: (c: SitePageConfig) => void }[] = [
+  { name: "three eras", path: "sections", schema: true, mutate: (c) => void c.sections.pop() },
+  { name: "five eras", path: "sections", schema: true, mutate: (c) => void c.sections.push(structuredClone(c.sections[0])) },
+  { name: "empty ring label", path: "sections.1.label", schema: true, mutate: (c) => void (c.sections[1].label = "") },
+  { name: "ring label too long", path: "sections.0.label", schema: true, mutate: (c) => void (c.sections[0].label = "2021–PRESENT DAY") },
   { name: "padded ring label", path: "sections.2.label", mutate: (c) => void (c.sections[2].label = " 2020–23") },
-  { name: "section field a résumé ignores", path: "sections.0.heading", mutate: (c) => void (c.sections[0].heading = "x") },
+  { name: "section field a résumé ignores", path: "sections.0.heading", schema: true, mutate: (c) => void (c.sections[0].heading = "x") },
   {
     name: "era with every entry hidden",
     path: "sections.3.items",
     mutate: (c) => void c.sections[3].items.forEach((it) => (it.hidden = true)),
   },
-  { name: "entry with a ref", path: "sections.0.items.0.ref", mutate: (c) => void (c.sections[0].items[0].ref = "publicItem:x") },
-  { name: "entry with facts", path: "sections.1.items.0.facts", mutate: (c) => void (c.sections[1].items[0].facts = [["a", "b"]]) },
-  { name: "missing year", path: "sections.0.items.0.year", mutate: (c) => void delete c.sections[0].items[0].year },
+  { name: "entry with a ref", path: "sections.0.items.0.ref", schema: true, mutate: (c) => void (c.sections[0].items[0].ref = "publicItem:x") },
+  { name: "entry with facts", path: "sections.1.items.0.facts", schema: true, mutate: (c) => void (c.sections[1].items[0].facts = [["a", "b"]]) },
+  { name: "missing year", path: "sections.0.items.0.year", schema: true, mutate: (c) => void delete c.sections[0].items[0].year },
   { name: "blank meta", path: "sections.1.items.0.meta", mutate: (c) => void (c.sections[1].items[0].meta = "   ") },
-  { name: "missing blurb", path: "sections.2.items.0.blurb", mutate: (c) => void delete c.sections[2].items[0].blurb },
+  { name: "missing blurb", path: "sections.2.items.0.blurb", schema: true, mutate: (c) => void delete c.sections[2].items[0].blurb },
   { name: "padded title", path: "sections.3.items.0.title", mutate: (c) => void (c.sections[3].items[0].title += " ") },
   {
     name: "unmatched * in title",
@@ -67,7 +79,7 @@ const MUST_CATCH: { name: string; path: string; mutate: (c: SitePageConfig) => v
     path: "sections.1.items.0.blurb",
     mutate: (c) => void (c.sections[1].items[0].blurb += " **dangling"),
   },
-  { name: "no tags", path: "sections.0.items.0.tags", mutate: (c) => void (c.sections[0].items[0].tags = []) },
+  { name: "no tags", path: "sections.0.items.0.tags", schema: true, mutate: (c) => void (c.sections[0].items[0].tags = []) },
   {
     name: "duplicate tag (case-insensitive)",
     path: "sections.1.items.0.tags.1",
@@ -77,13 +89,13 @@ const MUST_CATCH: { name: string; path: string; mutate: (c: SitePageConfig) => v
   {
     name: "too many tags",
     path: "sections.2.items.0.tags",
-    mutate: (c) => void (c.sections[2].items[0].tags = ["a", "b", "c", "d", "e", "f", "g", "h", "i"]),
+    schema: true, mutate: (c) => void (c.sections[2].items[0].tags = ["a", "b", "c", "d", "e", "f", "g", "h", "i"]),
   },
   { name: "blank page heading", path: "page.heading", mutate: (c) => void (c.page!.heading = " ") },
   { name: "unmatched * in page heading", path: "page.heading", mutate: (c) => void (c.page!.heading = "The Growth *Rings.") },
-  { name: "button with a bad href", path: "page.ctas.1.href", mutate: (c) => void (c.page!.ctas![1].href = "results") },
+  { name: "button with a bad href", path: "page.ctas.1.href", schema: true, mutate: (c) => void (c.page!.ctas![1].href = "results") },
   { name: "two primary buttons", path: "page.ctas", mutate: (c) => void (c.page!.ctas![1].primary = true) },
-  { name: "button with no label", path: "page.ctas.2.label", mutate: (c) => void (c.page!.ctas![2].label = "") },
+  { name: "button with no label", path: "page.ctas.2.label", schema: true, mutate: (c) => void (c.page!.ctas![2].label = "") },
 ];
 
 /** Shapes that are valid and must NOT be refused (a résumé is allowed to grow). */
@@ -188,6 +200,40 @@ function verify(): void {
     else accepted++;
   }
   console.log(`✓ ${accepted}/${MUST_ACCEPT.length} valid variations accepted`);
+
+  // (5) The published shape (resumeConfigShape → JSON Schema for AI editors)
+  // is the one exercised here: it accepts every good config and rejects every
+  // structural break, so what an editor reads matches what the API enforces.
+  const schemaProblems: string[] = [];
+  const accepts = (label: string, cfg: unknown) => {
+    const r = resumeConfigShape.safeParse(cfg);
+    if (!r.success) schemaProblems.push(`published schema refuses ${label}: ${r.error.issues[0]?.path.join(".")} ${r.error.issues[0]?.message}`);
+  };
+  accepts("the live page", seededConfig());
+  if (alteredParsed.success) accepts("the every-value-changed résumé", alteredParsed.data.config);
+  for (const c of MUST_ACCEPT) {
+    const config = seededConfig();
+    c.mutate(config);
+    accepts(`"${c.name}"`, config);
+  }
+  const structural = MUST_CATCH.filter((c) => c.schema);
+  for (const c of structural) {
+    const config = seededConfig();
+    c.mutate(config);
+    if (resumeConfigShape.safeParse(config).success) schemaProblems.push(`published schema accepts "${c.name}"`);
+  }
+  const json = resumeConfigJsonSchema() as { properties?: { sections?: { minItems?: number; maxItems?: number } } };
+  if (json.properties?.sections?.minItems !== RESUME_ERA_COUNT || json.properties?.sections?.maxItems !== RESUME_ERA_COUNT) {
+    schemaProblems.push(`JSON Schema doesn't pin sections to ${RESUME_ERA_COUNT}`);
+  }
+  for (const n of [RESUME_ERA_COUNT, RING_LABEL_MAX, RESUME_TAGS_MAX, RESUME_CTAS_MAX]) {
+    if (!RESUME_SHAPE_GUIDE.includes(String(n))) schemaProblems.push(`shape guide doesn't state the limit ${n}`);
+  }
+  if (schemaProblems.length) problems.push(...schemaProblems);
+  else
+    console.log(
+      `✓ published shape: accepts the live page + ${MUST_ACCEPT.length + 1} valid variants, rejects ${structural.length}/${structural.length} structural breaks; JSON Schema pins ${RESUME_ERA_COUNT} eras; guide states every limit`,
+    );
 
   if (problems.length) {
     console.error("✗ résumé page check failed:\n  " + problems.join("\n  "));
