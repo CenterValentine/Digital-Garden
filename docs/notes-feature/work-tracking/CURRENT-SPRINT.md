@@ -4,10 +4,28 @@ epoch: 12 (Main Panel Tabs + Split Workspace)
 duration: multi-session
 branch: epoch-12/sprint-55-wire-blocks
 status: complete
-last_updated: 2026-10-20
+last_updated: 2026-11-17
 ---
 
 # Current Sprint Addendum
+
+## November 17, 2026 — CRM workspace, milestone 1
+
+**Tree**: worktree `.claude/worktrees/crm`, branch `feat/crm-workspace` (off `origin/main` at `4df92b04`)
+**Plan**: `CRM-WORKSPACE-PLAN.md`
+**Status**: typecheck / lint / `crm:check` / `extensions:check` / full `pnpm build` green; no migration; headless UI smoke 36/36 (`smoke_alice`) + cross-user 404s (`smoke_bob`)
+
+### Shipped
+- Opt-in `crm` extension: inbox (conversation desk), pipeline, record workspace as workspace tabs; right-sidebar context per tab.
+- Business setup = folder + five linked databases + id-bound config (`viewPrefs.crm`); Property / Vehicle / contact-as-subject presets.
+- Inbound event seam with advisory-lock idempotency; local simulator stands in for n8n; n8n adapter via the workflows client (unverified live).
+
+### Smoke (owner, local)
+- [ ] **Smoke CRM-1:** Settings → Extensions → enable CRM → the Handshake icon in the left rail → Barefoot Yard Co. → Inbox → Tess Walker shows "Concerns Home — goathead extraction $145", the home property, and "Follow-up paused" with her text as the reason.
+- [ ] **Smoke CRM-2:** in the right sidebar type a gate instruction on the home → reload → Properties → Walker home shows it; Walker rental still reads "Lockbox on the side gate…" with its follow-up Scheduled.
+- [ ] **Smoke CRM-3:** Pipeline → move the home quote to Scheduled → Inbox → Tess's thread shows Scheduled.
+- [ ] **Smoke CRM-4:** Simulate text → Replay "Saturday works…" → "Already applied"; the home's Activity still has one "Follow-up paused" entry.
+
 
 ## October 21, 2026 — Every row shows up, and the assistant can take back what it wrote
 

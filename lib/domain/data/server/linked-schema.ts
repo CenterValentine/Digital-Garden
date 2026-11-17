@@ -42,7 +42,9 @@ import {
   createRelationPairTx,
   refreshTableSearchText,
 } from "./mutations";
-import { generateUniqueSlug } from "@/lib/domain/content";
+// Direct module, not the content barrel: the barrel drags in the TipTap
+// editor stack, which cannot load under tsx (scripts/seed-crm-demo.ts).
+import { generateUniqueSlug } from "@/lib/domain/content/slug";
 
 // ── Spec ─────────────────────────────────────────────────────────────────
 

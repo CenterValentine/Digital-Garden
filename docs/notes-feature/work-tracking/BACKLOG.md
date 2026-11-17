@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-10-31
+last_updated: 2026-11-17
 ---
 
 # Sprint Backlog
@@ -9,6 +9,16 @@ last_updated: 2026-10-31
 **Sprint Execution Protocol**: Before commencing any sprint, always ask the user for input before planning and executing — there may be additions or modifications.
 
 ---
+
+## CRM workspace — follow-ups (2026-11-17, from `feat/crm-workspace`)
+
+Plan: `CRM-WORKSPACE-PLAN.md`.
+- ⚪ **Live texting** — SMS provider → n8n → `POST /api/crm/[id]/events` with the workflows service-token auth (`dgwf_…`); "Send" on drafts through the executor.
+- ⚪ **Follow-up execution in n8n** — `scheduleFollowUp` on the adapter; a due follow-up becomes an outbound Messages row; verify the n8n adapter against a live instance (unverified in M1).
+- ⚪ **Extension virtual tabs survive reload in their pane** — workplaces drop non-UUID tabs from `paneState` by design; a CRM record opened beside the inbox comes back only via the nav. Affects reader tabs too; a workplaces decision.
+- ⚪ **Bind an existing folder's databases** (binding UI over the same config) instead of only starter presets.
+- ⚪ **Contacts ↔ People** — a `person` column (`personSource: "person"`) on Contacts.
+- ⚪ **DataRowFields labels aren't tied to inputs** (`<label>` without `htmlFor`) — screen readers can't name the fields; found writing the CRM smoke.
 
 ## Garden home — follow-ups (2026-10-31, from `feat/garden-home-polish`)
 
