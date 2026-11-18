@@ -131,6 +131,9 @@ const eslintConfig = defineConfig([
     // package.json, tsconfig, and toolchain. Not part of the Next.js build
     // or its lint/typecheck gates. See mobile/README.md.
     "mobile/**",
+    // Electron desktop shell — same isolation as mobile/: own package.json,
+    // tsconfig, and toolchain. See desktop/README.md.
+    "desktop/**",
   ]),
 ]);
 

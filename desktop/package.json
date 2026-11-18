@@ -1,0 +1,21 @@
+{
+  "name": "digital-garden-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Electron shell around the Digital Garden web app. See README.md and docs/notes-feature/work-tracking/DESKTOP-APP-PLAN.md.",
+  "main": "out/main/index.js",
+  "scripts": {
+    "dev": "env -u ELECTRON_RUN_AS_NODE electron-vite dev",
+    "dev:prod": "env -u ELECTRON_RUN_AS_NODE DG_DESKTOP_URL=https://davidvalentine.org/content electron-vite dev",
+    "build": "electron-vite build",
+    "start": "env -u ELECTRON_RUN_AS_NODE electron-vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "electron": "^45.3.4",
+    "electron-vite": "^6.0.0",
+    "typescript": "^5.9.0",
+    "vite": "^8.3.8"
+  }
+}
