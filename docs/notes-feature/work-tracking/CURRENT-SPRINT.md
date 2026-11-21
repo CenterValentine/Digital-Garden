@@ -9,6 +9,22 @@ last_updated: 2026-10-20
 
 # Current Sprint Addendum
 
+## November 21, 2026 — Hosted apps can find the garden's sign-in (MCP OAuth)
+
+Branch `feat/mcp-oauth-discovery`. The 401 from `/api/mcp` pointed hosted clients at `/.well-known/oauth-protected-resource`, which 307'd to `/` through the public catch-all; behind it there was no issuer at all.
+
+### Shipped
+- RFC 9728 protected-resource metadata (bare + `/api/mcp` suffixed) and RFC 8414 issuer metadata, anonymous 200 JSON on the request's public origin; `proxy.ts` passes `/.well-known/oauth-*` through.
+- Dynamic client registration, consent at `/oauth/authorize` (the Settings → MCP grant form, extracted to `components/settings/mcp/McpGrantFields.tsx`), PKCE token endpoint minting an `McpToken` (`issuedVia: "oauth"`).
+- `pnpm mcp:oauth:check` (build ⇒ CI) + `--live <url>`; `pnpm mcp:oauth:smoke` (full flow + PAT still works).
+
+### Migration (owner-run, before deploy)
+- `20261121120000_mcp_oauth` — two new tables (`McpOAuthClient`, `McpOAuthCode`); additive.
+
+### Smoke (owner, production, after the migration)
+- `pnpm mcp:oauth:check -- --live https://davidvalentine.org` green.
+- claude.ai custom connector → consent → tools listed; Codex PAT still connects.
+
 ## October 21, 2026 — Every row shows up, and the assistant can take back what it wrote
 
 **Tree**: worktree `.claude/worktrees/db-rows`, branch `feat/database-rows-paging-and-ai-delete` (off `origin/main` at `00cf6377`)

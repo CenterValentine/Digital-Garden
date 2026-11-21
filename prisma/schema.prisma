@@ -570,6 +570,7 @@ model User {
   series                   Series[]
   serviceTokens            ServiceToken[]
   mcpTokens                McpToken[]
+  mcpOAuthCodes            McpOAuthCode[]
   browserExtensionTokens   BrowserExtensionToken[]
   browserExtensionInstalls BrowserExtensionInstall[]
   bookmarkSyncConnections  BookmarkSyncConnection[]
@@ -941,6 +942,42 @@ model McpToken {
 
   @@index([userId, revokedAt])
   @@index([tokenPrefix])
+}
+
+/// A hosted MCP client (claude.ai, ChatGPT, `codex mcp login`) that registered
+/// itself through dynamic client registration (RFC 7591) at
+/// /api/mcp/oauth/register. Public clients only: PKCE stands in for a secret.
+model McpOAuthClient {
+  id           String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  /// The `client_id` handed back at registration (`dgmcpc_` + 32 hex).
+  clientId     String         @unique @db.VarChar(64)
+  clientName   String         @db.VarChar(200)
+  /// Exact-match allow-list for `redirect_uri` on /oauth/authorize.
+  redirectUris String[]
+  lastUsedAt   DateTime?      @db.Timestamptz(6)
+  createdAt    DateTime       @default(now()) @db.Timestamptz(6)
+  codes        McpOAuthCode[]
+}
+
+/// A single-use authorization code between consent and the token exchange.
+/// `grant` carries what the owner ticked on the consent screen (roots, chats,
+/// expiry) so the exchange mints exactly that `McpToken`.
+model McpOAuthCode {
+  id                  String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  codeHash            String         @unique @db.Char(64)
+  clientId            String         @db.VarChar(64)
+  userId              String         @db.Uuid
+  redirectUri         String
+  codeChallenge       String         @db.VarChar(128)
+  codeChallengeMethod String         @db.VarChar(8)
+  scope               String[]
+  grant               Json
+  expiresAt           DateTime       @db.Timestamptz(6)
+  createdAt           DateTime       @default(now()) @db.Timestamptz(6)
+  client              McpOAuthClient @relation(fields: [clientId], references: [clientId], onDelete: Cascade)
+  user                User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
 }
 
 model BrowserExtensionToken {

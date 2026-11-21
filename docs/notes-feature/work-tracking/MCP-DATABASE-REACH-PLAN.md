@@ -645,6 +645,8 @@ Six consumers matter, and they split into two families by how they authenticate:
 
 ### 8.1 Auth: two token sources, one verifier
 
+> **As built (2026-11-21, `feat/mcp-oauth-discovery`):** the SDK's `OAuthServerProvider` / `mcpAuthRouter` did not survive into SDK 2.x (`@modelcontextprotocol/express` 2.x ships no auth router), so the issuer uses **`@node-oauth/oauth2-server` 5.x** — framework-agnostic, model-based, PKCE (S256-only by default), public clients, burns a code on a failed verifier. Chosen over `oidc-provider` (Koa-bound, OIDC-centric, heavier to host in Next route handlers) and over a hosted provider (a second identity to link; tokens that would not be `McpToken` rows). Paths live in `lib/domain/mcp/oauth/discovery.ts`; the token endpoint mints through `createMcpTokenRecord` (`issuedVia: "oauth"`), so §4's verifier is untouched. Deliberate gaps: no refresh tokens (consent re-runs on expiry), DCR only (CIMD needs SSRF hardening — BACKLOG). `pnpm mcp:oauth:check` pins the discovery chain against the `/[...path]` catch-all, which is what broke on prod: the 401 advertised a URL nothing served.
+
 The PAT from §4 covers the API-level consumers and both CLIs on day one. The two consumer apps,
 claude.ai and ChatGPT, only speak OAuth 2.1, which is MCP-PLAN's M3. The right shape is **one
 verifier, two ways to mint a token**:

@@ -70,7 +70,10 @@ Root cause is structural, not neglect: a new gate needs **two** registrations �
 ## MCP server — prep PR and follow-ups (2026-10-12, from `MCP-DATABASE-REACH-PLAN.md`)
 ## MCP server — follow-ups (2026-10-13, from `feat/mcp-server`)
 
-- ⚪ **M3 — OAuth for hosted clients** (claude.ai, ChatGPT, Gemini CLI with OAuth): the garden as its own authorization server. Note the 2026-07-28 spec the handler now serves deprecates dynamic client registration for **client-ID metadata documents** (CIMD); plan §8.1 needs that revision before building. `protectedResourceHandler` + `/.well-known/oauth-protected-resource` come with it.
+- 🟡 **M3 — OAuth for hosted clients** (claude.ai, ChatGPT, Gemini CLI with OAuth): BUILT on `feat/mcp-oauth-discovery` (2026-11-21) — discovery, DCR, consent, PKCE token endpoint; prod migration + production smoke pending. Follow-ups:
+  - ⚪ **CIMD** (client-ID metadata documents, the 2026-07-28 spec's preferred registration): needs a hardened fetch of a client-supplied HTTPS URL (no private IPs, size + time caps) before `client_id_metadata_document_supported` is advertised. DCR covers every current client meanwhile.
+  - ⚪ **OAuth clients list** on Settings → MCP (the plan §6 table row): registered clients with their tokens, revoke per client. Issued tokens already appear in the token list tagged `oauth`.
+  - ⚪ **Sweep stale `McpOAuthClient` rows** (registered, never used) in the notifications maintenance cron.
 - ⚪ **M4 — MCP client in chat** (external servers, namespacing, approval gates; MCP-PLAN §4).
 - ⚪ Image OCR over MCP: `readImageTextForModel` is client-only; wire the server-side engine so `garden_read` on an image returns recognised text for text-only models (vision models already get the pixels as an `image` block), and page PDFs through `createPDFProcessor`.
 - ⚪ Presigned links in MCP reads are 15-minute storage URLs; a long-lived public link would need the public-file-link machinery from #227 (opt-in per file), not a longer presign.

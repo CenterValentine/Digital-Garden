@@ -14,6 +14,7 @@ import crypto from "crypto";
 import { prisma } from "@/lib/database/client";
 import type { McpToken } from "@/lib/database/generated/prisma";
 import {
+  MCP_TOKEN_PATTERN,
   MCP_TOKEN_PREFIX,
   parseMcpCapabilities,
   type McpCapability,
@@ -119,6 +120,24 @@ export interface CreateMcpTokenInput {
   dailyCallCap?: number | null;
   expiresAt?: string | null;
   issuedVia?: "pat" | "oauth";
+  /**
+   * OAuth only: the value the token endpoint already generated (the library
+   * asks for it before saving). Must match the PAT shape; never user input.
+   */
+  tokenValue?: string;
+}
+
+/** Roots must be the owner's own live nodes; throws naming the rule otherwise. */
+export async function assertOwnedMcpRoots(userId: string, rootIds: string[]): Promise<void> {
+  if (rootIds.length === 0) return;
+  const owned = await prisma.contentNode.findMany({
+    where: { id: { in: rootIds }, ownerId: userId, deletedAt: null },
+    select: { id: true },
+  });
+  const ownedIds = new Set(owned.map((n) => n.id));
+  if (ownedIds.size !== rootIds.length) {
+    throw new Error("Every root must be one of your own folders or databases");
+  }
 }
 
 export async function createMcpTokenRecord(
@@ -128,18 +147,12 @@ export async function createMcpTokenRecord(
   const caps = parseMcpCapabilities(input.capabilities);
   if (!caps.ok) throw new Error(caps.reason ?? "invalid capabilities");
   const rootIds = (input.rootIds ?? []).filter((id) => typeof id === "string" && id.length > 0);
-  if (rootIds.length > 0) {
-    // Roots must be the owner's own nodes; a foreign id is dropped, not trusted.
-    const owned = await prisma.contentNode.findMany({
-      where: { id: { in: rootIds }, ownerId: userId, deletedAt: null },
-      select: { id: true },
-    });
-    const ownedIds = new Set(owned.map((n) => n.id));
-    if (ownedIds.size !== rootIds.length) {
-      throw new Error("Every root must be one of your own folders or databases");
-    }
+  // A foreign id is refused, not trusted.
+  await assertOwnedMcpRoots(userId, rootIds);
+  if (input.tokenValue !== undefined && !MCP_TOKEN_PATTERN.test(input.tokenValue)) {
+    throw new Error("tokenValue must be a dgmcp_ token");
   }
-  const tokenValue = createMcpTokenValue();
+  const tokenValue = input.tokenValue ?? createMcpTokenValue();
   const token = await prisma.mcpToken.create({
     data: {
       userId,
