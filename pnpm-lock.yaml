@@ -101,6 +101,9 @@ importers:
       '@mozilla/readability':
         specifier: ^0.6.0
         version: 0.6.0
+      '@node-oauth/oauth2-server':
+        specifier: 5.3.1
+        version: 5.3.1
       '@onlyoffice/document-editor-react':
         specifier: ^2.1.1
         version: 2.1.1(react-dom@19.2.1(react@19.2.1))(react@19.2.1)
@@ -3057,6 +3060,13 @@ packages:
 
   '@nodable/entities@3.0.0':
     resolution: {integrity: sha512-8L9xFeTYKhm49xfIypoe2W5wV1m/3Z58kT+7kR9A8OyFxcPduI4VmxaUMQyKYrRjUoLLSXv6EKKID5Tvj9cUVw==}
+
+  '@node-oauth/formats@1.0.0':
+    resolution: {integrity: sha512-DwSbLtdC8zC5B5gTJkFzJj5s9vr9SGzOgQvV9nH7tUVuMSScg0EswAczhjIapOmH3Y8AyP7C4Jv7b8+QJObWZA==}
+
+  '@node-oauth/oauth2-server@5.3.1':
+    resolution: {integrity: sha512-zT822tqX/Y7VWTcxN02uzeYn8RirKpRAuX56JARb0Bl5RIL+LBMjkW5GAPAl0yZps3ReqNT5J+Mn58Oyljy3Lw==}
+    engines: {node: '>=16.0.0'}
 
   '@nodelib/fs.scandir@2.1.5':
     resolution: {integrity: sha512-vq24Bq3ym5HEQm2NKCr3yXDwjc7vTsEThRDnkp2DK9p1uqLR+DHurm/NOTo0KG7HYHU7eppKZj3MyqYuMBf62g==}
@@ -6359,6 +6369,10 @@ packages:
   baseline-browser-mapping@2.9.19:
     resolution: {integrity: sha512-ipDqC8FrAl/76p2SSWKSI+H9tFwm7vYqXQrItCuiVPt26Km0jS+NzSsBWAaBusvSbQcfJG+JitdMm+wZAgTYqg==}
     hasBin: true
+
+  basic-auth@2.0.1:
+    resolution: {integrity: sha512-NF+epuEdnUYVlGuhaxbbq+dvJttwLnGY+YixlXlME5KpQ5W3CnXA5cVTneY3SPbPDRkcjMbifrwmFYcClgOZeg==}
+    engines: {node: '>= 0.8'}
 
   bcryptjs@3.0.3:
     resolution: {integrity: sha512-GlF5wPWnSa/X5LKM1o0wz0suXIINz1iHRLvTS+sLyi7XPbe5ycmYI3DlZqVGZZtDgl4DmasFg7gOB3JYbphV5g==}
@@ -15189,6 +15203,14 @@ snapshots:
 
   '@nodable/entities@3.0.0': {}
 
+  '@node-oauth/formats@1.0.0': {}
+
+  '@node-oauth/oauth2-server@5.3.1':
+    dependencies:
+      '@node-oauth/formats': 1.0.0
+      basic-auth: 2.0.1
+      type-is: 2.1.0
+
   '@nodelib/fs.scandir@2.1.5':
     dependencies:
       '@nodelib/fs.stat': 2.0.5
@@ -19195,6 +19217,10 @@ snapshots:
   baseline-browser-mapping@2.10.32: {}
 
   baseline-browser-mapping@2.9.19: {}
+
+  basic-auth@2.0.1:
+    dependencies:
+      safe-buffer: 5.1.2
 
   bcryptjs@3.0.3: {}
 

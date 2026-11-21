@@ -167,7 +167,8 @@ check(/dropped: result\.dropped/.test(toolBlock("garden_update_ai_context") ?? "
 // ── D. auth ───────────────────────────────────────────────────────────
 
 const route = src("app/api/mcp/route.ts");
-check(/withMcpAuth\(handler, verifyMcpBearer, \{ required: true \}\)/.test(route), "auth: the route requires a bearer token through verifyMcpBearer");
+// Other options (resourceMetadataPath — pinned by mcp:oauth:check) may ride along; required: true may not leave.
+check(/withMcpAuth\(\s*handler,\s*verifyMcpBearer,\s*\{[^}]*\brequired:\s*true\b[^}]*\}\s*\)/.test(route), "auth: the route requires a bearer token through verifyMcpBearer");
 const auth = src("lib/domain/mcp/auth.ts");
 check(/validateMcpToken\(bearerToken, "garden:read"\)/.test(auth), "auth: the verifier uses the one token validator");
 

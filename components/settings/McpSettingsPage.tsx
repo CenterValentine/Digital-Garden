@@ -12,7 +12,13 @@ import { toast } from "sonner";
 import { Button } from "@/components/client/ui/button";
 import { Input } from "@/components/client/ui/input";
 import { SettingSection, SettingsPage } from "@/components/settings/ui";
-import { MCP_CAPABILITIES, type McpCapability } from "@/lib/domain/mcp/capabilities";
+import type { McpCapability } from "@/lib/domain/mcp/capabilities";
+import {
+  MCP_CAP_LABELS as CAP_LABELS,
+  McpGrantFields,
+  useMcpGrantState,
+  useMcpRootOptions,
+} from "@/components/settings/mcp/McpGrantFields";
 
 interface TokenDto {
   id: string;
@@ -30,46 +36,18 @@ interface TokenDto {
   revokedAt: string | null;
 }
 
-interface TreeNode {
-  id: string;
-  title: string;
-  contentType: string;
-  children?: TreeNode[];
-}
-
-const CAP_LABELS: Record<McpCapability, { label: string; hint: string }> = {
-  "garden:read": { label: "Read", hint: "Search, the tree, notes, files, database schemas and rows. Always on." },
-  "garden:read-chats": { label: "Read chats", hint: "Find and read past assistant chats about reachable content." },
-  "garden:write-rows": { label: "Write rows", hint: "Insert and update database rows (compare-and-set on updates)." },
-  "garden:delete-rows": { label: "Delete rows", hint: "Soft-delete rows, under each database's own AI deletion policy." },
-  "garden:write-files": { label: "Write files", hint: "Create and append to notes, write code files, upload files, create folders, insert blocks, update AI context." },
-  "garden:report-issues": { label: "File issues", hint: "Report bugs and feature requests to the public repository." },
-};
-
 function formatDate(iso: string | null): string {
   if (!iso) return "—";
   return new Date(iso).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
-}
-
-function flatten(nodes: TreeNode[], depth = 0, out: Array<{ id: string; title: string; type: string; depth: number }> = []) {
-  for (const n of nodes) {
-    if (n.contentType === "folder" || n.contentType === "data") {
-      out.push({ id: n.id, title: n.title, type: n.contentType, depth });
-      if (n.children && depth < 3) flatten(n.children, depth + 1, out);
-    }
-  }
-  return out;
 }
 
 export default function McpSettingsPage() {
   const [tokens, setTokens] = useState<TokenDto[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [name, setName] = useState("");
-  const [caps, setCaps] = useState<Set<McpCapability>>(new Set(["garden:read"]));
-  const [roots, setRoots] = useState<Set<string>>(new Set());
-  const [allChats, setAllChats] = useState(false);
-  const [expiresDays, setExpiresDays] = useState<string>("");
-  const [picker, setPicker] = useState<Array<{ id: string; title: string; type: string; depth: number }>>([]);
+  const grantForm = useMcpGrantState();
+  const { caps, roots, allChats, expiresDays } = grantForm.state;
+  const picker = useMcpRootOptions();
   const [creating, setCreating] = useState(false);
   const [revokingId, setRevokingId] = useState<string | null>(null);
   const [purgingId, setPurgingId] = useState<string | null>(null);
@@ -94,39 +72,9 @@ export default function McpSettingsPage() {
     }
   }, []);
 
-  const loadPicker = useCallback(async () => {
-    try {
-      const res = await fetch("/api/content/content/tree", { credentials: "include" });
-      const json = await res.json();
-      if (res.ok && json.success) setPicker(flatten((json.data?.tree ?? []) as TreeNode[]));
-    } catch {
-      // the picker is a convenience; the form still works with no roots (whole garden)
-    }
-  }, []);
-
   useEffect(() => {
     void loadTokens();
-    void loadPicker();
-  }, [loadTokens, loadPicker]);
-
-  const toggleCap = (cap: McpCapability) => {
-    if (cap === "garden:read") return;
-    setCaps((prev) => {
-      const next = new Set(prev);
-      if (next.has(cap)) next.delete(cap);
-      else next.add(cap);
-      return next;
-    });
-  };
-
-  const toggleRoot = (id: string) => {
-    setRoots((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
+  }, [loadTokens]);
 
   const handleCreate = useCallback(async () => {
     setCreating(true);
@@ -202,6 +150,7 @@ export default function McpSettingsPage() {
       { key: "codex", label: "Codex CLI (~/.codex/config.toml)", text: `[mcp_servers.garden]\nurl = "${serverUrl}"\nbearer_token_env_var = "GARDEN_MCP_TOKEN"` },
       { key: "gemini", label: "Gemini CLI (~/.gemini/settings.json)", text: `{ "mcpServers": { "garden": { "httpUrl": "${serverUrl}", "headers": { "Authorization": "Bearer ${tokenPlaceholder}" } } } }` },
       { key: "stdio", label: "stdio-only clients (mcp-remote)", text: `npx -y mcp-remote ${serverUrl} --header "Authorization: Bearer ${tokenPlaceholder}"` },
+      { key: "oauth", label: "OAuth apps (claude.ai / ChatGPT custom connector, `codex mcp login`) — no token to paste; you approve on a consent page", text: serverUrl },
     ],
     [serverUrl, tokenPlaceholder]
   );
@@ -210,7 +159,7 @@ export default function McpSettingsPage() {
 
   return (
     <SettingsPage title="MCP" description="Let Claude Code, Codex, Gemini and other agents work in this garden through the Model Context Protocol.">
-      <SettingSection title="Server" description="Streamable HTTP, bearer-token authenticated. Hosted apps that only speak OAuth (claude.ai, ChatGPT) are a later milestone.">
+      <SettingSection title="Server" description="Streamable HTTP. Agents you run take a bearer token from below; hosted apps that only speak OAuth (claude.ai, ChatGPT) add this URL as a connector and you approve them here — the token they receive appears in the list below, tagged oauth.">
         <div className="flex items-center gap-2">
           <code className="min-w-0 flex-1 truncate rounded-md bg-black/5 px-3 py-2 font-mono text-xs dark:bg-white/10">{serverUrl}</code>
           <Button type="button" size="sm" variant="outline" onClick={() => copy("url", serverUrl)}>
@@ -262,52 +211,19 @@ export default function McpSettingsPage() {
             <Input id="mcp-token-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Claude Code on my laptop" maxLength={120} disabled={creating} />
           </div>
 
-          <div className="space-y-1.5">
-            <span className="text-sm font-medium">Capabilities</span>
-            <div className="grid gap-2 sm:grid-cols-2">
-              {MCP_CAPABILITIES.map((cap) => (
-                <label key={cap} className="flex items-start gap-2 rounded-md border border-black/10 px-3 py-2 text-sm dark:border-white/10">
-                  <input type="checkbox" className="mt-0.5" checked={caps.has(cap)} disabled={cap === "garden:read" || creating} onChange={() => toggleCap(cap)} />
-                  <span>
-                    <span className="font-medium">{CAP_LABELS[cap].label}</span>
-                    <span className="block text-xs text-muted-foreground">{CAP_LABELS[cap].hint}</span>
-                  </span>
-                </label>
-              ))}
-            </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <span className="text-sm font-medium">Reach</span>
-            <p className="text-xs text-muted-foreground">{roots.size === 0 ? "Whole garden. Tick folders or databases to narrow it." : `${roots.size} root${roots.size === 1 ? "" : "s"}: ${[...roots].map(titleOf).join(", ")}`}</p>
-            <div className="max-h-56 overflow-y-auto rounded-md border border-black/10 p-2 dark:border-white/10">
-              {picker.length === 0 ? (
-                <p className="px-1 text-xs text-muted-foreground">No folders or databases to list.</p>
-              ) : (
-                picker.map((p) => (
-                  <label key={p.id} className="flex items-center gap-2 px-1 py-0.5 text-xs" style={{ paddingLeft: `${4 + p.depth * 14}px` }}>
-                    <input type="checkbox" checked={roots.has(p.id)} disabled={creating} onChange={() => toggleRoot(p.id)} />
-                    <span>{p.type === "folder" ? "📁" : "▦"} {p.title}</span>
-                  </label>
-                ))
-              )}
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-end gap-4">
-            <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={allChats} disabled={creating} onChange={(e) => setAllChats(e.target.checked)} />
-              <span>Reach every chat, not only chats about reachable content</span>
-            </label>
-            <div className="space-y-1.5">
-              <label htmlFor="mcp-expires" className="text-sm font-medium">Expires in (days, blank = never)</label>
-              <Input id="mcp-expires" value={expiresDays} onChange={(e) => setExpiresDays(e.target.value)} placeholder="90" className="w-28" inputMode="numeric" disabled={creating} />
-            </div>
-            <Button type="button" onClick={handleCreate} disabled={creating}>
-              {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
-              <span className="ml-1.5">Generate token</span>
-            </Button>
-          </div>
+          <McpGrantFields
+            state={grantForm.state}
+            rootOptions={picker}
+            disabled={creating}
+            onToggleCap={grantForm.toggleCap}
+            onToggleRoot={grantForm.toggleRoot}
+            onAllChats={grantForm.setAllChats}
+            onExpiresDays={grantForm.setExpiresDays}
+          />
+          <Button type="button" onClick={handleCreate} disabled={creating}>
+            {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
+            <span className="ml-1.5">Generate token</span>
+          </Button>
         </div>
 
         <div className="mt-4 space-y-2">
